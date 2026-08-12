@@ -429,7 +429,7 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
-      if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+      if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
       else pem_real = 0
     }
   }

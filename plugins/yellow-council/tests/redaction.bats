@@ -66,13 +66,19 @@ available_awks() {
 # assert_redacted_under_all <input> <secret-substring>
 # The secret must not survive under ANY available awk.
 assert_redacted_under_all() {
-  local input="$1" secret="$2" impl out
+  local input="$1" secret="$2" impl out hits
   for impl in $(available_awks); do
     out="$(printf '%s\n' "$input" | run_redaction "$impl")"
     if [[ "$out" == *"$secret"* ]]; then
-      echo "LEAK under ${impl}: secret '${secret}' survived redaction" >&2
-      echo "--- output ---" >&2
-      echo "$out" >&2
+      # Report the SHAPE of the failure, never the secret or the raw output.
+      # These fixtures are synthetic, but a redaction suite that prints the
+      # unredacted value on failure writes it into CI logs — which is the
+      # exact disclosure the code under test exists to prevent, and the habit
+      # carries over the first time someone reproduces with a real capture.
+      hits="$(printf '%s\n' "$out" | grep -cF -- "$secret")"
+      echo "LEAK under ${impl}: the secret survived redaction on ${hits} line(s)." >&2
+      echo "Secret length ${#secret}, starts '${secret:0:4}…'. Output withheld." >&2
+      printf '%s\n' "$out" | sed "s/${secret//\//\\/}/<<UNREDACTED-SECRET>>/g" >&2
       return 1
     fi
   done
@@ -147,17 +153,45 @@ assert_survives_under_all() {
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 
-@test "a key whose BEGIN marker shares its line with prose is fully redacted" {
-  # Same bounded-path downgrade, reached a different way: the anchored test
-  # requires the marker to be essentially the whole line, so any prefix prose
-  # classifies a genuine key as a stray mention.
-  # Six body lines, not three: the stray counter releases redaction on the
-  # THIRD non-key-shaped line, so a fixture with exactly three narrow lines
-  # ends before any of them print. The leak only becomes visible past the
-  # cutoff.
+@test "a prose line ending with a key marker stays on the bounded path" {
+  # DELIBERATE SCOPE. Classification requires the marker to be the whole line
+  # AFTER decoration stripping. A round of this PR removed that anchor so a
+  # real key whose BEGIN shared a line with prose would be treated as real —
+  # but reviewers correctly pointed out the cost: ordinary prose that merely
+  # ENDS by quoting the header ("The header format is exactly: <marker>")
+  # then classifies as a real key and redacts the whole report to EOF.
+  #
+  # The anchor is restored. With strip_deco fixed, the reachable case — a key
+  # echoed from a diff — normalises to a marker-only line and still gets the
+  # unbounded path (see the deletion-lines test). A genuine key with prose
+  # ahead of its BEGIN on the same line is not a shape the reviewer CLIs
+  # emit, and it stays on the bounded path rather than trading a live
+  # over-redaction for it.
+  # BOUNDED, not zero-cost: the stray counter still redacts three lines
+  # before releasing (same trade-off the mention test below pins). What must
+  # NOT happen is the unbounded path, which runs to EOF and would take the
+  # verdict no matter how far away it sits.
   local input
-  input="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s' \
-    "note: leaked key follows ${BEGIN_PK}" \
+  input="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s' \
+    "The header format is exactly: ${BEGIN_PK}" \
+    "and reviewers should not paste keys into findings." \
+    "That is all this finding is about." \
+    "Nothing further to report here." \
+    "" "Verdict: APPROVE" "Summary: fine")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+}
+
+@test "a key echoed as diff ADDITION lines is fully redacted" {
+  # Same bounded-path downgrade, reached a different way: the anchored test
+  # The '+' side of the same diff shape as the deletion test: strip_deco must
+  # normalise it to a marker-only line so the key takes the unbounded path.
+  # Six body lines, not three: the stray counter releases on the THIRD
+  # non-key-shaped line, so a fixture with exactly three narrow lines ends
+  # before any of them would print and the leak stays invisible.
+  local input
+  input="$(printf '+%s\n+%s\n+%s\n+%s\n+%s\n+%s\n+%s\n+%s' \
+    "$BEGIN_PK" \
     "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" \
     "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
   assert_redacted_under_all "$input" "$NARROW_BODY"
