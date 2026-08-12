@@ -425,7 +425,19 @@ function is_base64_line(s, minlen) {
   # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
   # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
   # because there is no ^ anchor; only trailing content after the marker is
-  # rejected. A hostile producer can embed a decoy END mid-body with garbage
+  # rejected.
+  #
+  # SCOPE: everything above is about ENTERING and LEAVING pem mode, which is
+  # deliberately unanchored so no marker shape can dodge redaction. It is NOT
+  # about the real-vs-prose classifier further below, which anchors
+  # `pem_check` with `^...$` on purpose. The two are separate decisions and
+  # must not be "made consistent": unanchoring entry keeps keys from escaping,
+  # while anchoring the classifier keeps ordinary prose that merely ends by
+  # quoting a header from being read as a real key and redacting the report to
+  # EOF. Decoration is stripped before the classifier runs, so a diff- or
+  # blockquote-prefixed real marker still reaches it anchored.
+  #
+  # A hostile producer can embed a decoy END mid-body with garbage
   # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
   # redaction early — the tail anchor makes that decoy fail the
   # immediate-terminate path and fall through to the re-arm/stray logic

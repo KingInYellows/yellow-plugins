@@ -75,10 +75,17 @@ assert_redacted_under_all() {
       # unredacted value on failure writes it into CI logs — which is the
       # exact disclosure the code under test exists to prevent, and the habit
       # carries over the first time someone reproduces with a real capture.
+      # Report the SHAPE only. An earlier version masked the secret out of the
+      # output with sed, but sed takes a BRE: a secret containing '.', '*',
+      # '[', '^', '$' or '\' would not match its own mask pattern and the raw
+      # line printed unredacted — the guard leaking the exact value it exists
+      # to withhold. Grep with -F (literal) to COUNT, and never print a line
+      # known to contain the secret.
       hits="$(printf '%s\n' "$out" | grep -cF -- "$secret")"
       echo "LEAK under ${impl}: the secret survived redaction on ${hits} line(s)." >&2
-      echo "Secret length ${#secret}, starts '${secret:0:4}…'. Output withheld." >&2
-      printf '%s\n' "$out" | sed "s/${secret//\//\\/}/<<UNREDACTED-SECRET>>/g" >&2
+      echo "Secret length ${#secret}, starts '${secret:0:4}'. Value and output withheld." >&2
+      echo "Lines NOT containing it, for context:" >&2
+      printf '%s\n' "$out" | grep -vF -- "$secret" >&2 || true
       return 1
     fi
   done
