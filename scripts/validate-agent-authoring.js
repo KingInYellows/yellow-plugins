@@ -517,6 +517,19 @@ function listItemContentColumn(rest) {
   return match[1].length + match[2].length + effectiveGap;
 }
 
+// A fence opener starting at `column` of `rest`, or null. Returns the marker
+// character and run length the matching closer must reproduce. A backtick
+// opener whose info string itself contains a backtick is not a fence per
+// CommonMark, so it is rejected here rather than at each call site.
+function fenceOpenerAt(rest, column) {
+  const openerMatch = fenceOpenerRe.exec(rest.slice(column));
+  if (!openerMatch) return null;
+  const marker = openerMatch[1];
+  const infoString = rest.slice(column + openerMatch[0].length);
+  if (marker[0] === '`' && infoString.includes('`')) return null;
+  return { char: marker[0], len: marker.length };
+}
+
 // `stripFrontmatter` MUST be false when the caller has already sliced the
 // frontmatter off, or passes a mid-document section. The leading-`---` regex
 // below cannot tell a frontmatter block from a body that simply OPENS with a
@@ -575,34 +588,39 @@ function stripFencedContent(content, { stripFrontmatter = true } = {}) {
     }
     const containerColumn = listStack.length ? listStack[listStack.length - 1] : 0;
 
+    // The content column this line's own list marker establishes, if it
+    // opens one. Needed BEFORE the fence test: a fence may open on the very
+    // same line as the marker, at that column rather than the container's.
+    const openedColumn = isBlank ? -1 : listItemContentColumn(rest);
+
+    let opener = null;
+    let openerColumn = containerColumn;
     if (indent - containerColumn <= 3) {
-      const openerMatch = fenceOpenerRe.exec(rest.slice(containerColumn));
-      const marker = openerMatch ? openerMatch[1] : '';
-      const infoString = openerMatch
-        ? rest.slice(containerColumn + openerMatch[0].length)
-        : '';
-      const validOpener = openerMatch && (marker[0] !== '`' || !infoString.includes('`'));
-      if (validOpener) {
-        inFence = true;
-        fenceStart = kept.length;
-        fenceChar = marker[0];
-        fenceLen = marker.length;
-        fenceDepth = depth;
-        fenceListColumn = containerColumn;
-      }
-      // else: indent within tolerance but either not fence-shaped, or a
-      // backtick opener whose info string itself contains a backtick — not
-      // a fence per CommonMark. Ordinary text either way.
+      opener = fenceOpenerAt(rest, containerColumn);
     }
     // else: 4+ spaces past the container's content column — an indented
     // code block, not a fence opener. Left as ordinary content below, which
     // means it IS scanned normally (finding 1: scanning is the safe side).
+    if (!opener && openedColumn !== -1) {
+      // A fence opening ON the marker line (`- ```text`): CommonMark starts
+      // the item's content at the marker's content column, so the fence
+      // begins there. Testing only the container column leaves the opener
+      // unrecognized and scans the whole item body as live prose — a false
+      // positive on legitimate illustrative examples.
+      opener = fenceOpenerAt(rest, openedColumn);
+      if (opener) openerColumn = openedColumn;
+    }
+    if (opener) {
+      inFence = true;
+      fenceStart = kept.length;
+      fenceChar = opener.char;
+      fenceLen = opener.len;
+      fenceDepth = depth;
+      fenceListColumn = openerColumn;
+    }
     kept.push(line); // provisional when opening — kept only if unclosed
 
-    if (!isBlank) {
-      const newColumn = listItemContentColumn(rest);
-      if (newColumn !== -1) listStack.push(newColumn);
-    }
+    if (openedColumn !== -1) listStack.push(openedColumn);
   }
   // Unclosed fence reaching EOF: per CommonMark, an unterminated fenced code
   // block implicitly runs to the end of the document — everything from the

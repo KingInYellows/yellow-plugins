@@ -656,6 +656,55 @@ allowed-tools:
     expect(runValidator(dir).status).toBe(0);
   });
 
+  it('ignores an unresolved dispatch in a fence that opens on the list-marker line', () => {
+    // A fence may open on the SAME line as its list marker (`- ```text`).
+    // CommonMark starts the item's content at the marker's content column,
+    // so the fence begins there — not at column 0. An earlier version tested
+    // only the enclosing container's column, left the `- ` in place, failed
+    // to recognize the opener, and scanned the whole item body as live
+    // prose: a false positive on a legitimate illustrative example.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+- \`\`\`text
+  Invoke the Skill tool with skill: "flow:example-only"
+  \`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('ignores an unresolved dispatch in a fence opening on an ordered list marker', () => {
+    // Same as above for the `N.` marker form, whose content column differs.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+1. \`\`\`text
+   Invoke the Skill tool with skill: "flow:example-only"
+   \`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
   it('reports a live top-level dispatch that follows an unclosed fence inside a list item', () => {
     // Finding 2 from the 4th review round: the fence opens inside a list
     // item and is never explicitly closed, but the list item ends when the
