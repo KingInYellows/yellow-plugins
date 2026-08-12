@@ -475,7 +475,13 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // the straightforward single- and nested-bullet Markdown this repo's docs
 // actually use, not adversarial or exotic list constructs.
 const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
-const blockquotePrefixRe = /^(?:[ \t]*>[ \t]?)*/;
+// `{0,3}`, not `*`: a block-quote marker may carry at most three leading
+// spaces. At four the line is an indented code block and the `>` is literal
+// content, so `    > ```text` must NOT be read as a depth-1 quote wrapping a
+// fence opener — doing so hid every following quoted line as fence content
+// through EOF and let a broken dispatch evade RULE 18. Matches the same
+// three-space bound `fenceOpenerRe` above already applies.
+const blockquotePrefixRe = /^(?:[ \t]{0,3}>[ \t]?)*/;
 // A list-item marker at the very start of `rest` (already blockquote-
 // stripped): `-`/`*`/`+`, or `N.`/`N)`, followed by whitespace or EOL.
 const listMarkerRe = /^([ \t]*)([-*+]|\d+[.)])([ \t]+|$)/;

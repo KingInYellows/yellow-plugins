@@ -603,6 +603,59 @@ Invoke the Skill tool with skill: "flow:nonexistent"
     expect(stderr).toContain('flow:nonexistent');
   });
 
+  it('reports a live top-level dispatch that follows a 4-space-indented block-quoted fence', () => {
+    // Companion to the 4-space-indented case above, for the block-quote
+    // path. A block-quote marker may carry at most THREE leading spaces;
+    // at four it is an indented code block and the `>` is literal content.
+    // An earlier `blockquotePrefixRe` allowed unlimited leading whitespace,
+    // so `    > ```text` was read as a depth-1 quote wrapping a 0-indent
+    // fence opener — swallowing the live dispatch below as fence content.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+    > \`\`\`text
+> Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('still ignores a fence in a block quote indented three spaces or less', () => {
+    // Negative control for the rule above: at three leading spaces the
+    // block-quote marker is still valid, so the fence is a real fence and
+    // the dispatch inside it stays an inert example.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+   > \`\`\`text
+   > Invoke the Skill tool with skill: "flow:example-only"
+   > \`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
   it('reports a live top-level dispatch that follows an unclosed fence inside a list item', () => {
     // Finding 2 from the 4th review round: the fence opens inside a list
     // item and is never explicitly closed, but the list item ends when the
