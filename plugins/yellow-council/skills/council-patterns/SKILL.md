@@ -603,8 +603,36 @@ the algorithm has a single reference:
 # ${BASE_REF}, which is unset in this subprocess.
 BASE="<literal BASE_REF value printed by the caller>"
 
+# FAIL CLOSED on a placeholder that was never substituted. Left literal,
+# `git diff` exits 128 — but the redirect has already created the file, `wc -c`
+# reads 0, the size test below is simply false, and the block exits 0 with an
+# EMPTY diff. The reviewers then fan out over nothing and return APPROVE for a
+# change none of them saw. The caller's empty-diff guard does not cover this:
+# it ran before this block recomputed the diff.
+case "$BASE" in
+  ''|*'<'*|*'>'*)
+    printf '[council] Error: BASE was not substituted (got: %s)\n' "$BASE" >&2
+    exit 1
+    ;;
+esac
+git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null || {
+  printf '[council] Error: BASE does not resolve to a commit: %s\n' "$BASE" >&2
+  exit 1
+}
+
 DIFF_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt)
-git diff "${BASE}...HEAD" > "$DIFF_FILE"
+git diff "${BASE}...HEAD" > "$DIFF_FILE" || {
+  printf '[council] Error: git diff against %s failed\n' "$BASE" >&2
+  rm -f "$DIFF_FILE"
+  exit 1
+}
+# An empty diff is never a reviewable input. Refuse rather than hand the
+# reviewers a blank pack.
+[ -s "$DIFF_FILE" ] || {
+  printf '[council] Error: diff against %s is empty — refusing to fan out\n' "$BASE" >&2
+  rm -f "$DIFF_FILE"
+  exit 1
+}
 DIFF_BYTES=$(wc -c < "$DIFF_FILE")
 
 if [ "$DIFF_BYTES" -gt 200000 ]; then

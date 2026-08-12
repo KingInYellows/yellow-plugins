@@ -16,3 +16,11 @@ back, otherwise the advertised flag would be non-functional."
 
 `MODE`/`REST` are now re-derived at the top of that block, matching Step 6's
 existing convention.
+
+The skill's truncation snippet recomputes the diff in its own bash block, so
+the caller's empty-diff guard does not cover it. Left unsubstituted, the `BASE`
+placeholder made `git diff` exit 128 while the redirect still created the file,
+`wc -c` read 0, and the block exited successfully with an empty diff — fanning
+out reviewers over nothing, which returns an unfounded APPROVE. The snippet now
+rejects an unsubstituted placeholder, requires `BASE` to resolve to a commit,
+and aborts when `git diff` fails or produces an empty file.
