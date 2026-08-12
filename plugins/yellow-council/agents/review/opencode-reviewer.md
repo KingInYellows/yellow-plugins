@@ -344,7 +344,7 @@ printf '%s' "$ASSISTANT_TEXT" > "$TEXT_FILE"
 
 REDACTED_FILE=$(mktemp /tmp/council-opencode-redacted-XXXXXX.txt)
 awk '
-function strip_deco(s) {
+function strip_deco(s,   pfx) {
   sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
   sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
   sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
@@ -353,7 +353,16 @@ function strip_deco(s) {
   # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
   # test below, since this helper also classifies the BEGIN line itself
   # now, not just body lines.
-  if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
+  # Combined diffs (git diff --cc, merge output) carry ONE prefix character
+  # PER PARENT, so "++"/"--" is normal and a single strip leaves the marker
+  # unrecognisable. Strip repeatedly, but never off a line that is ALREADY a
+  # valid delimiter: that would corrupt "-----BEGIN" into "----BEGIN" and
+  # break every anchored test below. Bounded to 8 so a line of pure dashes
+  # cannot spin.
+  pfx = 0
+  while (pfx++ < 8 && s ~ /^[-+]/ && s !~ /^-----BEGIN/ && s !~ /^-----END/) {
+    sub(/^[-+]/, "", s)
+  }
   sub(/^[[:space:]]+/, "", s)
   sub(/[[:space:]]+$/, "", s)
   return s

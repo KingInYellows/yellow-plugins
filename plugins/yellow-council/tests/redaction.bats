@@ -197,6 +197,25 @@ assert_survives_under_all() {
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 
+@test "a key echoed from a COMBINED diff is fully redacted" {
+  # `git diff --cc` (merge output) carries one prefix character PER PARENT,
+  # so "--"/"++" is normal. A single strip leaves "------BEGIN…" with the
+  # wrong dash count, the anchored test fails, and the block drops to the
+  # bounded path where a narrow body leaks.
+  local input
+  input="$(printf -- '--%s\n--%s\n--%s\n--%s\n--%s\n--%s' \
+    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" \
+    "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "a line of pure dashes does not hang the prefix stripper" {
+  # The repeated strip is bounded; a horizontal rule must terminate.
+  local input
+  input="$(printf '%s\n%s' "--------------------------------" "Verdict: APPROVE")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
 @test "a short placeholder does not shadow a real token later on the same line" {
   # cred_hit() uses match(), which returns only the LEFTMOST occurrence. When
   # a short placeholder sharing the prefix appears first, RLENGTH reflects the
