@@ -556,6 +556,21 @@ parse_reviewer_return() {
     claude_fenced="<literal CLAUDE_FENCED_FILE value from Step 4>"
     if [ -n "$fenced_path" ] && [ "$fenced_path" = "$claude_fenced" ] \
        && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+      # Narrow the readability window FIRST. claude-reviewer creates this file
+      # with the Write tool under the ordinary process umask (0644 on a default
+      # umask 022), and /tmp is world-traversable, so on a multi-user host the
+      # raw review — the copy that still holds any credential text the pass
+      # below exists to remove — is readable by every local user until it is
+      # replaced. Take the mode down the instant this run takes ownership.
+      #
+      # This does NOT close the window between the agent's Write and this line,
+      # only bounds it to that span. Closing it entirely means minting the path
+      # inside a private `mktemp -d`, which every path guard in this file
+      # deliberately rejects (`/tmp/council-claude-fenced-*/*` — `*` matches `/`
+      # and `..`); reshaping those guards for a nested path risks a traversal
+      # bypass worse than the exposure it removes. Deliberate trade, recorded
+      # here so it is not silently re-litigated.
+      chmod 600 "$fenced_path" 2>/dev/null || true
       # Fail CLOSED at every branch: once claude has written its RAW output to
       # this path, any outcome other than "the redacted copy is installed"
       # must leave nothing readable behind. Skipping on error would hand Step

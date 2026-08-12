@@ -9,6 +9,13 @@ Propagate the redaction fixes to council.md and close the synthesis handoff gap
 the same four bypass fixes as the reviewer agents and the canonical skill —
 five sites in total, which the drift test now enumerates rather than assumes.
 
+Step 4b now also `chmod 600`s the fenced file as soon as it takes ownership.
+`claude-reviewer` creates it with the `Write` tool under the ordinary process
+umask, so on a multi-user host the raw review was world-readable until the
+redacted copy replaced it. The window between the agent's write and this line
+remains; closing it fully would require a nested `mktemp -d` path, which every
+path guard in `council.md` rejects on purpose.
+
 Also closes the sanitized-field handoff: Step 4 redacted claude's summary and
 findings into Bash associative arrays, but every Bash block runs in its own
 subprocess, so those values were gone by the time Step 5 synthesized. Step 5
