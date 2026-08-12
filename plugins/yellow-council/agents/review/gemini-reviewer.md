@@ -338,12 +338,12 @@ function strip_deco(s) {
   # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
   # test below, since this helper also classifies the BEGIN line itself
   # now, not just body lines.
-  if (s !~ /^-----/) sub(/^[-+]/, "", s)
+  if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
   sub(/^[[:space:]]+/, "", s)
   sub(/[[:space:]]+$/, "", s)
   return s
 }
-function cred_hit(re, minlen) {
+function cred_hit(re, minlen,   s) {
   # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
   # interval expressions ({n,}/{n}) — it matches them literally, so a
   # `{20,}`-gated credential regex silently stops matching real secrets on
@@ -353,8 +353,20 @@ function cred_hit(re, minlen) {
   # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
   # purposes (we only ever discard the matched text, never reuse it, so
   # {N} exact and {N,} at-least are interchangeable here).
-  match($0, re)
-  return (RLENGTH >= minlen)
+  # match() returns only the LEFTMOST occurrence. When a short placeholder
+  # sharing the same literal prefix appears before a real token on the same
+  # line ("example sk-ant-xxx ... sk-ant-<real>"), the leftmost RLENGTH falls
+  # under minlen and the line — real token included — is emitted unredacted.
+  # Walk every start position instead of testing only the first, advancing by
+  # ONE character rather than past the whole match: a longer occurrence can
+  # begin inside a shorter one ("sk-sk-ant-<real>"), and skipping RLENGTH
+  # would step over it.
+  s = $0
+  while (match(s, re)) {
+    if (RLENGTH >= minlen) return 1
+    s = substr(s, RSTART + 1)
+  }
+  return 0
 }
 function is_base64_line(s, minlen) {
   if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
@@ -417,7 +429,7 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
-      if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+      if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
       else pem_real = 0
     }
   }
@@ -448,9 +460,18 @@ function is_base64_line(s, minlen) {
   # below — because closing it completely would require watching
   # indefinitely, which reintroduces the "swallow the whole report"
   # failure the window exists to prevent.
-  if (pem_watch > 0) {
+  if (!in_pem && pem_watch > 0) {
     pem_check = strip_deco($0)
-    if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
+    # The re-arm additionally requires a digit or a base64-only punctuation
+    # character. Without it an ordinary camelCase identifier
+    # ("additionalRecommendationsForReviewers") satisfies the shape test and
+    # re-enters UNBOUNDED real mode on a single word, redacting the report
+    # through EOF so Verdict:/Confidence:/Summary: never survive and the
+    # reviewer is scored UNKNOWN. Real key material is base64 of random
+    # bytes and effectively always carries digits or +//=; English
+    # identifiers do not.
+    if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
+        pem_check ~ /[0-9+\/=]/) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
