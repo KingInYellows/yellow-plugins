@@ -656,6 +656,67 @@ allowed-tools:
     expect(runValidator(dir).status).toBe(0);
   });
 
+  it('errors on a SKILL.md with no name: instead of indexing it by directory', () => {
+    // `name:` is the runtime identifier. Synthesizing `<plugin>:<directory>`
+    // would register a target the runtime may never expose, so a dispatch to
+    // it would pass RULE 18 and fail in a live session. No RULE 15 sub-rule
+    // checks `name:`, and all of them are warning-tier, so this is the only
+    // gate that catches it.
+    writeAgent(
+      dir,
+      'demo-plugin/skills/nameless-skill/SKILL.md',
+      `---
+description: 'Fixture skill with no name. Use when testing RULE 18.'
+---
+
+## What It Does
+
+Nothing.
+
+## When to Use
+
+Never.
+
+## Usage
+
+None.
+`
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('no `name:`');
+  });
+
+  it('does not resolve a dispatch to a nameless skill via its directory name', () => {
+    // The companion to the rule above: the synthesized directory-qualified
+    // target must not satisfy a dispatch.
+    writeAgent(
+      dir,
+      'demo-plugin/skills/nameless-skill/SKILL.md',
+      `---
+description: 'Fixture skill with no name. Use when testing RULE 18.'
+---
+
+## What It Does
+
+Nothing.
+
+## When to Use
+
+Never.
+
+## Usage
+
+None.
+`
+    );
+    writeAgent(dir, 'demo-plugin/commands/caller.md', callerCommand('demo-plugin:nameless-skill'));
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('demo-plugin:nameless-skill');
+  });
+
   it('ignores an unresolved dispatch in a fence that opens on the list-marker line', () => {
     // A fence may open on the SAME line as its list marker (`- ```text`).
     // CommonMark starts the item's content at the marker's content column,

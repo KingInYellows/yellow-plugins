@@ -1423,15 +1423,21 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
     // runtime does not expose whenever the two disagree, so a dispatch to that
     // stale directory-qualified value would pass this rule and then fail to
     // resolve in a live session — precisely the class RULE 18 exists to catch.
-    // The directory remains the fallback for a SKILL.md with no parseable
-    // `name:`, which RULE 15's structural gate reports separately.
+    // A SKILL.md with no parseable `name:` is SKIPPED rather than indexed
+    // under its directory: synthesizing a target from the directory registers
+    // an id the runtime may never expose, so a dispatch to it would pass this
+    // rule and fail in a live session. `validateSkillDispatchResolution`
+    // reports the missing `name:` as a hard error instead — RULE 15's
+    // sub-rules are all warning-tier and none of them checks `name:`, so
+    // nothing else catches it.
     const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
     const pluginName = relSegments[0];
     const skillDir = relSegments[relSegments.length - 2];
     if (!pluginName || !skillDir) continue;
     const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
     const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
-    const skillName = (declaredName || '').trim() || skillDir;
+    const skillName = (declaredName || '').trim();
+    if (!skillName) continue;
     const qualified = `${pluginName}:${skillName}`;
     if (!index.has(qualified)) index.set(qualified, filePath);
   }
@@ -1440,6 +1446,24 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
 }
 
 function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors) {
+  // `name:` is the runtime identifier a `skill: "<plugin>:<name>"` dispatch
+  // resolves against. Without it there is no target to validate, and the
+  // directory is not a safe stand-in (see buildDispatchTargetIndex). Hard
+  // error rather than advisory: every RULE 15 sub-rule is warning-tier, so an
+  // advisory here would let a nameless skill reach a release unnoticed.
+  for (const filePath of skillFiles) {
+    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
+    if (!(declaredName || '').trim()) {
+      errors.push(
+        `[RULE 18] ${relative(filePath)}: SKILL.md has no \`name:\` in its ` +
+          `frontmatter. \`name:\` is the runtime identifier a ` +
+          `\`skill: "<plugin>:<name>"\` dispatch resolves against; a skill ` +
+          `without one cannot be dispatched to and is not indexed as a target.`
+      );
+    }
+  }
+
   const dispatchTargets = buildDispatchTargetIndex(commandFiles, skillFiles);
 
   for (const filePath of markdownFiles) {
