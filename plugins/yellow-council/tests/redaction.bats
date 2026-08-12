@@ -229,13 +229,36 @@ assert_survives_under_all() {
 }
 
 @test "a key behind more diff prefixes than any fixed ceiling is fully redacted" {
-  # An earlier fix bounded prefix stripping to eight, which is a ceiling an
-  # octopus merge — or simply hostile output — can step over, leaving one
-  # prefix and downgrading the block to the bounded path. Fixpoint stripping
-  # has no ceiling to exceed.
-  local input
-  input="$(printf -- '+++++++++++%s\n+++++++++++%s\n+++++++++++%s\n+++++++++++%s\n+++++++++++%s' \
-    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  # Bounding prefix stripping by a CONSTANT is the recurring bug, not the
+  # specific constant: the bound was 8, then 64, and each time output carrying
+  # more prefixes than the bound exited the loop with prefixes still attached,
+  # failed the anchored classifier, and leaked on the bounded path.
+  #
+  # This fixture must therefore not hardcode a count either — an 11-prefix
+  # fixture is what let the 64-ceiling ship green. Generate a run that exceeds
+  # any constant a future edit is likely to reintroduce.
+  # Decorate ONLY the BEGIN line. Prefixing every line hides the bug: the body
+  # lines then exceed the base64 floor on their own and get redacted anyway,
+  # so the fixture passes against the very ceiling it is meant to catch. It is
+  # the classification of the BEGIN line that the ceiling corrupts, and a
+  # narrow undecorated body is what then slips the bounded path's stray count.
+  local prefix input
+  prefix="$(printf '+%.0s' $(seq 1 100))"
+  input="$(printf -- '%s%s\n%s\n%s\n%s\n%s\n%s' \
+    "$prefix" "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" \
+    "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "prefix stripping scales with input length rather than a constant" {
+  # The companion to the test above: the bound is derived from length(s), so
+  # raising the prefix count by 5x must not change the outcome. A future edit
+  # that swaps the derived bound back for any constant turns these red.
+  local prefix input
+  prefix="$(printf '+%.0s' $(seq 1 500))"
+  input="$(printf -- '%s%s\n%s\n%s\n%s\n%s\n%s' \
+    "$prefix" "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" \
+    "$NARROW_BODY" "$END_PK")"
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 

@@ -344,7 +344,7 @@ printf '%s' "$ASSISTANT_TEXT" > "$TEXT_FILE"
 
 REDACTED_FILE=$(mktemp /tmp/council-opencode-redacted-XXXXXX.txt)
 awk '
-function strip_deco(s,   prev, guard) {
+function strip_deco(s,   prev, guard, limit) {
   # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in
   # arbitrary order and depth: a blockquote inside a list item
   # ("- > <header>"), a combined diff with one prefix character per parent
@@ -354,11 +354,22 @@ function strip_deco(s,   prev, guard) {
   # drops to the bounded path where a narrowly wrapped body leaks.
   #
   # Repeating until nothing changes removes every layer regardless of order
-  # or count, so there is no ceiling to exceed. It terminates because each
-  # iteration either shortens s or exits; `guard` is a belt-and-braces bound
-  # against a future substitution that could rewrite without shrinking, not a
-  # limit on legitimate nesting depth.
+  # or count. The bound is derived from the INPUT LENGTH, not a constant: an
+  # iteration only continues after removing at least one character, so
+  # length(s)+2 iterations always reach the fixpoint. A CONSTANT ceiling (the
+  # original 8, then 64) is a real limit on a nesting depth the attacker
+  # chooses -- 100 leading "+" exhausted the 64-ceiling with prefixes still
+  # attached, the anchored classifier below then failed, and the block leaked
+  # on the bounded path.
+  #
+  # Reaching `limit` is therefore impossible while every substitution above
+  # shrinks s; it can only mean a later edit added one that rewrites without
+  # shrinking. That is a bug, not deep nesting, so record it and let the
+  # caller fail CLOSED (treat the line as a real key) instead of falling
+  # through to the bounded path. No test exercises this arm today -- it exists
+  # so a future edit degrades safely rather than silently leaking.
   guard = 0
+  limit = length(s) + 2
   do {
     prev = s
     sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
@@ -369,7 +380,8 @@ function strip_deco(s,   prev, guard) {
     # anchored test downstream.
     if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
     sub(/^[[:space:]]+/, "", s)
-  } while (s != prev && ++guard < 64)
+  } while (s != prev && ++guard < limit)
+  deco_exhausted = (s != prev)
   sub(/[[:space:]]+$/, "", s)
   return s
 }
@@ -471,7 +483,10 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
-      if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+      # deco_exhausted: strip_deco could not reach its fixpoint, so pem_check
+      # may still carry decoration and cannot be trusted to fail the anchor
+      # honestly. Fail closed -- treat the block as a real key.
+      if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
       else pem_real = 0
     }
   }
