@@ -87,7 +87,9 @@ git commit -m "test: small change for council review"
 
 **Failure modes to verify:**
 - `/council review --base origin/nonexistent-branch` → git diff fails; surface error
-- Diff > 200K bytes → truncation algorithm engages: `git diff --stat` + first 200 lines + truncation marker
+- Diff > 60K bytes → truncation algorithm engages: `git diff --stat` (capped at
+  4K) + first 200 lines (capped at 60K bytes, cut at a line boundary) +
+  truncation marker
 
 ### 2.3 — `debug` mode
 
