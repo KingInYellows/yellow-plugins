@@ -31,3 +31,12 @@ symlink. Neither the redaction branch nor the unexpected-path branch fired, so
 the path and an apparently valid verdict survived into `$STATE_FILE` and Step 5
 counted a vote whose sanitized source could not be read. That case now fails the
 slot closed, the same way an unexpected path does.
+
+Two further fail-closed gaps in the same block: the truncation that backstops a
+failed redaction ignored its own exit status, so an unwritable file or an I/O
+error left the RAW review at a path the function still reported as good; and an
+empty `fenced_output_path=` matched none of the branches, so a malformed or
+injected return carrying APPROVE/REVISE kept its vote with no reviewable output
+behind it. Both now record the slot as ERROR and clear the path. The empty-path
+arm only overrides a participating vote, so a TIMEOUT or UNAVAILABLE slot keeps
+its more specific reason.

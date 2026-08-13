@@ -552,7 +552,7 @@ parse_reviewer_return() {
     # refused here and left for Step 7 to reject too. `! -L` per the skill's
     # validate_path symlink rule — the identity check constrains the path
     # text, not what it resolves to.
-    local claude_fenced redacted_tmp
+    local claude_fenced redacted_tmp claude_truncate_failed=0
     claude_fenced="<literal CLAUDE_FENCED_FILE value from Step 4>"
     if [ -n "$fenced_path" ] && [ "$fenced_path" = "$claude_fenced" ] \
        && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
@@ -576,21 +576,51 @@ parse_reviewer_return() {
       # must leave nothing readable behind. Skipping on error would hand Step
       # 5 the unredacted file, which is the failure this whole pass exists to
       # prevent.
-      redacted_tmp=$(mktemp "${fenced_path}.redacted.XXXXXX") || redacted_tmp=""
+      # Stage INSIDE the reclaimable namespace. Deriving the staging name from
+      # $fenced_path ("<path>.txt.redacted.XXXXXX") puts it outside every
+      # cleanup shape in this file: the Step 6/8/9 case-arms and the Step 4
+      # stale sweep all key on `council-claude-fenced-*.txt`, and a name ending
+      # in `.redacted.XXXXXX` matches none of them. A kill between this mktemp
+      # and the mv/rm below would then orphan a file holding the reviewer's RAW
+      # output until the OS reaps /tmp. Keeping the prefix AND the .txt suffix
+      # means the existing age-gated sweep reclaims it with no new code.
+      # Truncation is the LAST line of defence, so its own failure cannot be
+      # ignored. `: > "$fenced_path"` can fail — the file turned unwritable, the
+      # filesystem returned an I/O error — and the raw review then survives at a
+      # path this function still reports as good, which Step 5 reads before
+      # Step 7`s pass ever runs. Every truncation below therefore routes through
+      # a helper that fails the slot when it cannot empty the file.
+      redacted_tmp=$(mktemp /tmp/council-claude-fenced-redact-XXXXXX.txt) || redacted_tmp=""
       if [ -z "$redacted_tmp" ]; then
         printf '[council] Error: cannot stage redaction of %s — truncating\n' \
           "$fenced_path" >&2
-        : > "$fenced_path"
+        claude_truncate_failed=1
       elif ! awk "$redact_awk" "$fenced_path" > "$redacted_tmp"; then
         rm -f "$redacted_tmp"
         printf '[council] Error: redaction of %s failed — truncating\n' \
           "$fenced_path" >&2
-        : > "$fenced_path"
+        claude_truncate_failed=1
       elif ! mv "$redacted_tmp" "$fenced_path"; then
         rm -f "$redacted_tmp"
         printf '[council] Error: cannot install redacted %s — truncating\n' \
           "$fenced_path" >&2
-        : > "$fenced_path"
+        claude_truncate_failed=1
+      fi
+      if [ "${claude_truncate_failed:-0}" -eq 1 ]; then
+        if : > "$fenced_path"; then
+          printf '[council] Error: %s truncated after a redaction failure — failing the slot\n' \
+            "$fenced_path" >&2
+        else
+          printf '[council] Error: cannot truncate %s — RAW output may remain on disk\n' \
+            "$fenced_path" >&2
+        fi
+        # Either way the slot has no trustworthy sanitized source: clear the
+        # path so Step 5 cannot read it, and record ERROR rather than a vote.
+        rm -f -- "$fenced_path" 2>/dev/null || true
+        fenced_path=""
+        verdict="ERROR"
+        summary="claude-reviewer output could not be sanitized; slot recorded as ERROR."
+        findings=""
       fi
     elif [ -n "$fenced_path" ] && [ "$fenced_path" != "$claude_fenced" ]; then
       # Refusing to REDACT the path is not enough — it must also stop being a
@@ -622,6 +652,24 @@ parse_reviewer_return() {
       verdict="ERROR"
       summary="claude-reviewer produced no readable fenced output; slot recorded as ERROR."
       findings=""
+    else
+      # fenced_path is EMPTY. Every branch above requires a non-empty path, so
+      # without this arm a malformed or injected return carrying a valid
+      # APPROVE/REVISE but no `fenced_output_path=` value keeps its vote: the
+      # headline counts a reviewer that produced no reviewable output at all.
+      # Only override an actual participating VOTE. A slot already recorded as
+      # TIMEOUT, UNAVAILABLE, ERROR or UNKNOWN legitimately has no fenced file,
+      # and restamping it ERROR would erase the more specific reason the user
+      # needs to see in the appendix.
+      case "$verdict" in
+        APPROVE|REVISE|REJECT)
+          printf '[council] Warning: claude returned %s with no fenced output path — failing the slot\n' \
+            "$verdict" >&2
+          verdict="ERROR"
+          summary="claude-reviewer returned no fenced output path; slot recorded as ERROR."
+          findings=""
+          ;;
+      esac
     fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
