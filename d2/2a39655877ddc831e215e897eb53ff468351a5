@@ -1,0 +1,21 @@
+.changeset/council-md-redaction-parity.md
+  s_3bb494324db8bc::t_fb3cb2cd3ddc96 23-29
+plugins/yellow-council/commands/council/council.md
+  s_3bb494324db8bc::t_62ac4e33f93320 612-626
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d22a39655877ddc831e215e897eb53ff468351a5",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
