@@ -647,6 +647,14 @@ if [ "$DIFF_BYTES" -gt 200000 ]; then
   mv "$DIFF_FILE.truncated" "$DIFF_FILE"
 fi
 
+# EMIT the result. This block runs in its own subprocess, so neither $DIFF_FILE
+# nor its randomized path survives to the pack-assembly step that consumes it —
+# a result left only on disk is unreachable, and a large review would fan out
+# with no diff at all, which every reviewer answers with an unfounded APPROVE.
+# Captured stdout IS the handoff, exactly as the BASE_REF literal above is.
+cat "$DIFF_FILE"
+rm -f "$DIFF_FILE"
+
 # Per changed file: cap at 4K chars per file
 # Total pack budget: 100K chars before injection fencing
 # (drives under Codex's 128K token budget with ~22% headroom)

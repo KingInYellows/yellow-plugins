@@ -24,3 +24,11 @@ placeholder made `git diff` exit 128 while the redirect still created the file,
 out reviewers over nothing, which returns an unfounded APPROVE. The snippet now
 rejects an unsubstituted placeholder, requires `BASE` to resolve to a commit,
 and aborts when `git diff` fails or produces an empty file.
+
+The truncation block also never emitted its result. It wrote the truncated diff
+to a randomized `$DIFF_FILE` and ended, but it runs in its own Bash call, so
+neither the variable nor the path reaches the pack-assembly step that consumes
+it — a review large enough to trigger truncation fanned out with no diff at all,
+which every reviewer answers with an unfounded APPROVE. The block now prints the
+diff on stdout and removes the file, and `council.md` states that the captured
+stdout is the handoff.

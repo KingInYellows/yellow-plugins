@@ -182,7 +182,7 @@ For each mode:
 - If the diff is empty, stop and report `[council] Error: empty diff for the
   resolved base — nothing to review`. Do NOT fan out reviewers on an empty
   pack: every reviewer would return an unfounded APPROVE.
-- If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker).
+- If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker). That block runs in its own Bash call and prints the truncated diff on stdout; **capture that output** and use it as the diff for the rest of this step. Do not expect `$DIFF_FILE` or any other variable from it to be readable here.
 - Per changed file: `git diff --name-only "<literal BASE_REF value printed above>...HEAD"` then read each file capped at 4K chars.
 - Pack: `## Task: review` + `### Diff` + truncated diff + `### Changed Files` + per-file content.
 
