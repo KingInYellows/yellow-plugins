@@ -1,0 +1,34 @@
+plugins/yellow-council/tests/redaction.bats
+  s_44086bc4cefe03::t_a2da3b64bc911d 55-60
+  s_44086bc4cefe03::t_0874d91c324605 129-140,142-159,164,166-172
+  s_44086bc4cefe03::t_004985c7296f20 36-37
+  s_44086bc4cefe03::t_4397837b521655 184-187,190-191,193,198-204
+  s_44086bc4cefe03::t_e2d3b8c9514cd3 177-183,188-189,192,194-197,205-206
+.changeset/council-md-redaction-parity.md
+  s_44086bc4cefe03::t_752cf60163150b 1-19
+plugins/yellow-council/commands/council/council.md
+  s_44086bc4cefe03::t_5a6e47edaac314 625-636
+  s_44086bc4cefe03::t_2b7a8ec541265c 358,363,373,375-383,446,477,479-480,975,980,990,992-1000,1063,1094,1096-1097
+  s_44086bc4cefe03::t_10020c253ec148 536-561
+  s_44086bc4cefe03::t_0d470aafdf84e0 374,991
+plugins/yellow-council/tests/lib/extract-redaction-awk.bash
+  s_44086bc4cefe03::t_babb05fde36130 66-76
+  s_44086bc4cefe03::t_5af3e1322a2548 2-3,5-9,11-20,22-25,30,33-34,36-64
+  s_44086bc4cefe03::t_9a93b300bb0c85 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a45acd05c003b8e8cff9c246594691a107523de0",
+  "prompts": {},
+  "sessions": {
+    "s_44086bc4cefe03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c892ae64-321b-4803-8573-afdef91d0406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
