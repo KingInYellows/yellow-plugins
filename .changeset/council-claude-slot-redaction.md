@@ -54,3 +54,12 @@ Two supporting fixes: `validate-agent-authoring.js` now honours a
 Write-capable reviewer cannot be deleted with CI staying green; and `find`,
 which drives the stale-`/tmp` sweep, is declared a prerequisite instead of being
 depended on silently.
+
+The slot now returns `summary=` and its findings block EMPTY, and `council.md`
+reads both back out of the fenced file after redacting it. The CLI reviewers
+redact inside their own agent before returning, so their prose is already
+sanitized when the orchestrator sees it; the in-process slot has no `Bash` and
+cannot, so anything it returned entered orchestrator context raw — and once read,
+no later pass can retract it. Sanitizing the file afterwards was too late by
+construction. Verdict and confidence are still returned directly, being enum-
+constrained with no free text.

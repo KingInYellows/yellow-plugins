@@ -328,13 +328,27 @@ kills your council slot without failing anything. Emit exactly:
 ```text
 verdict=<APPROVE|REVISE|REJECT|UNKNOWN|ERROR>
 confidence=<HIGH|MEDIUM|LOW|N/A>
-summary=<2-3 sentence summary, single line>
+summary=
 fenced_output_path=<the literal path you wrote in Step 3>
 findings_block_begin
-- [P1] path/to/file.ts:42 — <80-char summary>
-  Evidence: "<exact quoted line from that file>"
 findings_block_end
 ```
+
+**`summary=` and the findings block are deliberately EMPTY for this slot, and
+that is not an oversight.** The three CLI reviewers run the credential
+redaction inside their own agent, over the CLI output, BEFORE they return — so
+their prose is already sanitized by the time it reaches the orchestrator. You
+have no `Bash`, so you cannot. Any prose you put in this return enters the
+orchestrator context raw, and no later pass can retract it: if injected pack
+content got you to repeat a credential or an instruction, sanitizing the file
+afterwards is already too late.
+
+Put your prose ONLY in the fenced file you wrote in Step 3, in the
+capitalized `Verdict:`/`Confidence:`/`Findings:`/`Summary:` shape. `council.md`
+redacts that file and then reads your summary and findings back out of the
+sanitized copy. The verdict and confidence values above are safe to return
+because they are constrained to a fixed enum on arrival and never carry free
+text.
 
 Contract rules:
 

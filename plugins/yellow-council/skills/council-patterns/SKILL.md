@@ -111,6 +111,16 @@ capitalized Layer-1 lines never reach council.md directly. (Codex differs
 only at Layer 1 — its CLI emits strict-mode JSON parsed with `jq` per
 yellow-codex's `codex-patterns` skill; its Layer-2 return is identical.)
 
+`claude-reviewer` also returns `summary=` and its findings block **empty** by
+contract. The three CLI reviewers run the redaction inside their own agent
+before returning, so their prose is sanitized by the time the orchestrator sees
+it; the in-process slot has no `Bash` and cannot, and anything it returned would
+enter orchestrator context raw, where no later pass can retract it. It writes
+its prose only into its fenced file, and `council.md` reads the summary and
+findings back out of that file **after** redacting it, using the Layer-1
+regexes above. Verdict and confidence are still returned directly — both are
+constrained to a fixed enum on arrival and carry no free text.
+
 `claude-reviewer` has **no Layer 1 at all** — there is no external CLI whose
 output it parses. It implements Layer 2 directly, and writes the capitalized
 `Verdict:`/`Confidence:`/`Findings:`/`Summary:` shape only into its fenced

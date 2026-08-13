@@ -681,6 +681,23 @@ parse_reviewer_return() {
           ;;
       esac
     fi
+    # Derive the reviewer prose from the SANITIZED FILE, not from the Task
+    # return. claude-reviewer returns summary= and its findings block empty on
+    # purpose: it has no Bash, so anything it put there would reach the
+    # orchestrator context raw, and no later pass can retract what has already
+    # been read — sanitizing afterwards is too late by construction. The file
+    # has just been through the redaction pass above, so it is the only
+    # trustworthy source of prose for this slot. Parsed with the Layer-1
+    # regexes council-patterns documents for CLI output, which is the shape
+    # claude-reviewer writes into the file.
+    #
+    # The redaction of the two locals above is kept as a backstop rather than
+    # removed: if a future revision of the agent returns prose anyway, it is
+    # still scrubbed before anything stores it.
+    if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+      summary=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$fenced_path")
+      findings=$(awk '/^Findings:/ { c = 1; next } /^Summary: / { c = 0 } c' "$fenced_path")
+    fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
   # entry, before anything stores or renders them. Both are taken verbatim
