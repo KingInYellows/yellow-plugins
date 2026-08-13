@@ -32,6 +32,7 @@
 setup() {
   load 'lib/extract-redaction-awk'
   REPO_ROOT="$(repo_root)"
+  require_awks "$(available_awks)"
   AWK_PROG="${BATS_TEST_TMPDIR}/redact.awk"
   extract_redaction_awk "${REPO_ROOT}/${REDACTION_SOURCES[0]}" >"$AWK_PROG"
 
@@ -61,14 +62,19 @@ run_redaction() {
 # ({n,}), which is why the program uses match()+RLENGTH; gawk is the common
 # developer default. A fix verified on only one of them is not verified.
 available_awks() {
-  local a found=0
+  local a
   for a in mawk gawk awk; do
-    if command -v "$a" >/dev/null 2>&1; then echo "$a"; found=1; fi
+    command -v "$a" >/dev/null 2>&1 && echo "$a"
   done
-  # A host with no awk would make every assertion below iterate zero times and
-  # report success — the whole suite passing precisely because it ran nothing.
-  # Refuse to be vacuously green.
-  [ "$found" -eq 1 ] || {
+}
+
+# require_awks — the emptiness check that available_awks CANNOT perform itself.
+# Every caller runs it as `for impl in $(available_awks)`, i.e. inside a command
+# substitution, so a `return 1` there is discarded and the loop simply iterates
+# zero times: the suite would pass because it ran nothing. Assert on the
+# captured value instead, in setup(), where a failure actually aborts the test.
+require_awks() {
+  [ -n "$1" ] || {
     echo "no awk implementation found (looked for mawk, gawk, awk)" >&2
     return 1
   }
