@@ -52,3 +52,10 @@ unbounded as well, so a wide change still blew the budget with the diff portion
 capped. The stat is now bounded, changed-file excerpts are added until a 30K
 combined budget is reached (then a count of omissions), and the assembled-pack
 ceiling of 100K is stated with the per-section arithmetic beside it.
+
+The ceiling is now a measured post-assembly check rather than arithmetic: the
+pack is written out, `wc -c` is taken, and changed-file excerpts are dropped
+from the end until it is under 100000 bytes. A content-only budget counted
+neither the per-file path/heading/fence framing — which a diff touching hundreds
+of tiny files pays for every one of them — nor the byte cost of non-ASCII
+content over its character count.
