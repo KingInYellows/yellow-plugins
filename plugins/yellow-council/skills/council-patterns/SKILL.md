@@ -621,7 +621,12 @@ git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null || {
 }
 
 DIFF_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt)
-git diff "${BASE}...HEAD" > "$DIFF_FILE" || {
+# `>|` for the same reason as the staging redirect below: mktemp created this
+# file, and a plain `>` onto an existing path is an error under `noclobber`.
+# This one fails closed (the `||` fires), but it fails on every invocation for
+# anyone who has the option set — the command is simply unusable rather than
+# subtly wrong.
+git diff "${BASE}...HEAD" >| "$DIFF_FILE" || {
   printf '[council] Error: git diff against %s failed\n' "$BASE" >&2
   rm -f "$DIFF_FILE"
   exit 1
@@ -677,7 +682,26 @@ if [ "$DIFF_BYTES" -gt 60000 ]; then
     head -200 "$DIFF_FILE" | LC_ALL=C awk -v cap=60000 '
       { n += length($0) + 1; if (n > cap) exit; print }'
     printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 60000 bytes ...]\n' "$DIFF_BYTES"
-  } > "$TRUNC_FILE"
+  # `>|`, not `>`. mktemp CREATES the file, and a plain redirect onto an
+  # existing path fails outright under `noclobber` — which zsh users commonly
+  # have set, and these fences are not guaranteed to run under bash's default
+  # options. Without the force-clobber the redirect fails, and with no `set -e`
+  # and no error branch the `mv` below would still run, moving the empty
+  # TRUNC_FILE onto DIFF_FILE: an empty diff, reported as success. That is the
+  # same silent no-op this algorithm's own empty-diff guard exists to prevent.
+  # See docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md.
+  } >| "$TRUNC_FILE" || {
+    printf '[council] Error: cannot write the truncated diff\n' >&2
+    rm -f "$TRUNC_FILE" "$DIFF_FILE"
+    exit 1
+  }
+  # Re-check after staging, not just before. The guard above catches a failed
+  # redirect; this catches a redirect that succeeded but produced nothing.
+  [ -s "$TRUNC_FILE" ] || {
+    printf '[council] Error: truncated diff staged empty — refusing to emit an empty pack\n' >&2
+    rm -f "$TRUNC_FILE" "$DIFF_FILE"
+    exit 1
+  }
   mv "$TRUNC_FILE" "$DIFF_FILE"
 fi
 

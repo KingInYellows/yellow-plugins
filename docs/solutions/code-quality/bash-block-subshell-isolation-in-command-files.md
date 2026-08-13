@@ -452,8 +452,11 @@ reintroduces this bug a fourth time.
 
 ## Update — 2026-08-11: fourth recurrence, and the fix for it had the same bug one stage further down (PR #708)
 
-Fourth documented instance, and the first in `yellow-council` rather than
-`yellow-codex` — the pattern is not plugin-specific.
+Fourth documented instance, and the second in `yellow-council` — after the
+2026-05-04 recurrence above, where `setup.md`'s Step 5 summary block read
+`$READY_COUNT`/`$GEMINI_STATUS`/`$OPENCODE_STATUS`/`$CODEX_STATUS` across the
+same kind of fence boundary. The pattern is not plugin-specific, and it has
+now bitten this plugin twice.
 
 `plugins/yellow-council/commands/council/council.md` Step 3 (`review` mode)
 parsed `--base <ref>` inside its own bash fence. Step 2 had set `REST`, but
