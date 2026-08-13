@@ -1283,18 +1283,30 @@ jobs:
         # by every credential-bearing plugin in the marketplace.
         run: bats plugins/yellow-core/tests/
 
+      - name: Run yellow-council redaction bats suite (required)
+        # Required, not advisory. This suite is the behavioural gate on the
+        # credential-redaction awk program: it pins both failure directions
+        # (a key leaking, and over-redaction swallowing a reviewer verdict),
+        # asserts every shipped copy of the program matches, and guards the
+        # shell-embedding and awk-availability assumptions the others rely on.
+        # Run under the advisory glob below it would let a change that
+        # reintroduces a tested credential leak merge with the suite red,
+        # which defeats the point of having written it.
+        run: bats plugins/yellow-council/tests/
+
       - name: Run other plugins' bats suites (advisory)
         continue-on-error: true
         run: |
           set -uo pipefail
           STATUS=0
-          # Both top-level and nested test dirs. yellow-core's suites are
-          # run as required steps above; skip them here to avoid double
-          # execution and to keep the advisory status accurate.
+          # Both top-level and nested test dirs. yellow-core's suites and
+          # yellow-council's redaction suite are run as required steps above;
+          # skip them here to avoid double execution and to keep the advisory
+          # status accurate.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             case "$d" in
-              plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests) continue ;;
+              plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests) continue ;;
             esac
             echo "::group::bats $d"
             bats "$d" || STATUS=$?

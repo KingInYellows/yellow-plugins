@@ -74,8 +74,9 @@ Each invocation produces:
 - **Inline synthesis** — Headline (verdict count) + Agreement (findings cited
   by ≥2 reviewers) + Disagreement (unique findings or verdict conflicts).
 - **Persisted report** at `docs/council/<date>-<mode>-<slug>.md` — synthesis
-  plus four labeled raw reviewer outputs (each wrapped in injection fences
-  and credential-redacted).
+  plus four labeled raw reviewer outputs (each wrapped in injection fences and
+  passed through credential redaction — **best-effort, not a guarantee**; see
+  the note below before sharing a report).
 
 The user is asked for confirmation before the report file is written.
 

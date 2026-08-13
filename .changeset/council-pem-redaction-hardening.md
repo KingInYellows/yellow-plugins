@@ -65,3 +65,8 @@ with a stale count — and the re-arm path restores the real/prose mode from the
 PREVIOUS block, so a later base64-shaped prose line could re-enter unbounded
 redaction on the strength of a key that had already closed, swallowing the
 report. Opening a block now closes any window that belongs to an earlier one.
+
+The suite is now a REQUIRED CI step rather than part of the advisory
+`continue-on-error` plugin glob. Left advisory, a change that reintroduced any
+tested credential leak could merge with the whole regression suite red, which
+defeats the reason for writing it.
