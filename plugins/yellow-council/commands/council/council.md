@@ -438,6 +438,12 @@ parse_reviewer_return() {
       if (!in_pem && $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
         if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) {
           line = "--- redacted PEM key block at line " NR " ---"
+          # Retire a re-arm window left by an earlier block here too. This arm changes no
+          # other state -- the pair is self-contained -- but leaving the window
+          # open lets a later base64-shaped line restore the mode of the PREVIOUS
+          # block, redacting the report to EOF. Same reason as the
+          # multiline arm below; the window belongs to the block that closed.
+          pem_watch = 0
         } else {
           pem_check = strip_deco($0)
           in_pem = 1
@@ -1167,6 +1173,12 @@ for reviewer in claude codex gemini opencode; do
         if (!in_pem && $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
           if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) {
             line = "--- redacted PEM key block at line " NR " ---"
+            # Retire a re-arm window left by an earlier block here too. This arm changes no
+            # other state -- the pair is self-contained -- but leaving the window
+            # open lets a later base64-shaped line restore the mode of the PREVIOUS
+            # block, redacting the report to EOF. Same reason as the
+            # multiline arm below; the window belongs to the block that closed.
+            pem_watch = 0
           } else {
             pem_check = strip_deco($0)
             in_pem = 1
