@@ -40,6 +40,15 @@ Body for synth-violator. The 'tools:' list above includes Bash, which is
 forbidden for review/ agents that are not on the allowlist.
 `;
 
+// The allowlist is only honoured while the agent still carries its rationale
+// section, so every fixture standing in for an ALLOWLISTED agent must include
+// one. Without it the validator now (correctly) rejects the allowlist entry.
+const EXCEPTION_SECTION = `
+## Tool Surface — Documented Exception
+
+Test fixture rationale for the documented tool-surface exception.
+`;
+
 const REVIEW_AGENT_CLEAN = `---
 name: clean-reviewer
 description: "Test fixture. Use when verifying clean review agents pass W1.5."
@@ -86,7 +95,7 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
       REVIEW_AGENT_BASH_VIOLATOR.replace(
         'synth-violator',
         'codex-reviewer'
-      )
+      ) + EXCEPTION_SECTION
     );
 
     const { status, stderr } = runValidator(tmpRoot);
@@ -102,13 +111,35 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
       REVIEW_AGENT_CLEAN.replace('clean-reviewer', 'claude-reviewer').replace(
         '  - Glob',
         '  - Glob\n  - Write'
-      )
+      ) + EXCEPTION_SECTION
     );
 
     const { status, stderr } = runValidator(tmpRoot);
 
     expect(status).toBe(0);
     expect(stderr).not.toMatch(/claude-reviewer\.md.*review\/ agent/);
+  });
+
+  it('rejects an allowlisted agent whose documented-exception section is gone', () => {
+    // The allowlist entry grants the tool; the "Tool Surface — Documented
+    // Exception" section is what justifies it. Honouring the entry without the
+    // section lets the human-auditable rationale be deleted or renamed while
+    // CI stays green, leaving a Write-capable reviewer with nothing explaining
+    // why it has that privilege. Note the fixture omits EXCEPTION_SECTION.
+    writeAgent(
+      tmpRoot,
+      'yellow-council/agents/review/claude-reviewer.md',
+      REVIEW_AGENT_CLEAN.replace('clean-reviewer', 'claude-reviewer').replace(
+        '  - Glob',
+        '  - Glob\n  - Write'
+      )
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/claude-reviewer\.md/);
+    expect(stderr).toMatch(/REVIEW_AGENT_ALLOWLIST but has no/);
   });
 
   it('still flags claude-reviewer.md gaining Bash — a per-file allowlist entry does not cover tools outside its granted set', () => {
