@@ -743,7 +743,17 @@ parse_reviewer_return() {
         fenced_path=""
       else
         [ -n "$file_confidence" ] && confidence="$file_confidence"
-      summary=$(awk '/^Summary: / { sub(/^Summary: /, ""); print }' "$fenced_path" | tail -n 1)
+      # Fence-scoped and unique, for the same reason as the verdict above: a
+      # `Summary:` line appended AFTER the end delimiter is outside the
+      # reviewer`s own fence, and a whole-file scan would let injected prose
+      # win. Zero or multiple in-fence summaries leave this empty rather than
+      # picking one arbitrarily.
+      summary=$(awk '
+        /^--- begin council-output:claude/ { inf = 1; next }
+        /^--- end council-output:claude/   { inf = 0 }
+        inf && /^Summary: / { sub(/^Summary: /, ""); s[++ns] = $0 }
+        END { if (ns == 1) print s[1] }
+      ' "$fenced_path")
       # Bound the findings capture by the FENCE END, not by the first
       # `Summary: ` line. A finding body that begins with that literal prefix
       # (plausible when a finding restates an issue title) would otherwise stop
@@ -751,8 +761,9 @@ parse_reviewer_return() {
       # the last field before the fence by contract, so buffer the block and
       # cut at the LAST top-level Summary line instead of the first.
       findings=$(awk '
-        /^Findings:/ { c = 1; next }
-        /^--- end council-output:/ { c = 0 }
+        /^--- begin council-output:claude/ { inf = 1; next }
+        inf && /^Findings:/ { c = 1; next }
+        /^--- end council-output:claude/ { c = 0; inf = 0 }
         c { buf[++n] = $0; if ($0 ~ /^Summary: /) last = n }
         END { for (i = 1; i <= (last ? last - 1 : n); i++) print buf[i] }
       ' "$fenced_path")

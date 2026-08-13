@@ -103,3 +103,7 @@ Zero or multiple matches both fail the slot. The fenced-file schema also gains
 `UNKNOWN`, which Step 2 already requires for the early-stop path — without it,
 following the template produced a verdict the consistency check turned into
 ERROR on every partial review.
+
+Summary and findings extraction is fence-scoped and unique too, matching the
+verdict: a `Summary:` line appended after the end delimiter is outside the
+reviewer's own fence, and a whole-file scan let that injected prose win.
