@@ -66,3 +66,11 @@ and dropping every excerpt still could not bring the pack under OpenCode's
 guard; and the measurement copy must be `mktemp`-staged (0600) and removed on
 every path, because it holds the pack unredacted and a Write-created file would
 persist at the ordinary umask.
+
+Three fixes to the truncation work itself: byte caps now cut at a line boundary
+via `LC_ALL=C awk` rather than `head -c`, which could split a multibyte
+character and emit invalid UTF-8 into the pack; the truncated diff is staged
+through `mktemp` (0600) instead of a `>` redirect that created it at the
+ordinary umask; and the plugin README and CLAUDE.md now document the thresholds
+and the omission policy, since a council review may legitimately not inspect the
+complete change.

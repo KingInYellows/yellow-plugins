@@ -639,13 +639,23 @@ DIFF_BYTES=$(wc -c < "$DIFF_FILE")
 # the budget and 200K used to skip truncation entirely, so the pack could not be
 # brought under the ceiling by dropping excerpts alone and OpenCode rejected it.
 if [ "$DIFF_BYTES" -gt 60000 ]; then
+  # Stage through mktemp (0600), NOT `> "$DIFF_FILE.truncated"`. A plain
+  # redirect creates the file at the ordinary umask, so the unredacted diff is
+  # briefly world-readable in /tmp and stays that way if the block dies before
+  # the mv. `mv` then carries the private mode onto $DIFF_FILE.
+  TRUNC_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt) || {
+    printf '[council] Error: cannot stage the truncated diff\n' >&2
+    rm -f "$DIFF_FILE"
+    exit 1
+  }
   # Truncate: stat header + first 200 lines + marker
   {
     printf '### git diff --stat\n\n'
     # Bounded too. A diff big enough to reach this branch can touch thousands
     # of files, and an unbounded stat is then its own budget overrun before a
     # single diff line is emitted.
-    git diff --stat "${BASE}...HEAD" | head -c 4000
+    git diff --stat "${BASE}...HEAD" | LC_ALL=C awk -v cap=4000 '
+      { n += length($0) + 1; if (n > cap) exit; print }'
     printf '\n### Raw diff (first 200 lines of %d total)\n\n' "$(wc -l < "$DIFF_FILE")"
     # Bound by BYTES as well as lines. A line count alone is not a size bound:
     # 200 lines of a minified bundle or a generated lockfile can exceed the
@@ -659,10 +669,16 @@ if [ "$DIFF_BYTES" -gt 60000 ]; then
     # threshold (see opencode-reviewer.md) — a diff portion capped at 150000
     # blows both on its own and deterministically marks that reviewer
     # UNAVAILABLE. 60000 leaves roughly 40K of headroom for the rest.
-    head -200 "$DIFF_FILE" | head -c 60000 | sed '$ { /./!d; }'
+    # Cap at a LINE boundary inside the byte budget, never mid-line. `head -c`
+    # can split a multibyte character, and trimming an empty final line does
+    # not repair that — the result is invalid UTF-8 in a pack that then gets
+    # serialized to every reviewer. LC_ALL=C makes awk`s length() count bytes
+    # rather than characters, so the budget is a real byte budget.
+    head -200 "$DIFF_FILE" | LC_ALL=C awk -v cap=60000 '
+      { n += length($0) + 1; if (n > cap) exit; print }'
     printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 60000 bytes ...]\n' "$DIFF_BYTES"
-  } > "$DIFF_FILE.truncated"
-  mv "$DIFF_FILE.truncated" "$DIFF_FILE"
+  } > "$TRUNC_FILE"
+  mv "$TRUNC_FILE" "$DIFF_FILE"
 fi
 
 # EMIT the result. This block runs in its own subprocess, so neither $DIFF_FILE

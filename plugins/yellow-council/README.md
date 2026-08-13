@@ -97,6 +97,17 @@ The user is asked for confirmation before the report file is written.
 > repository without reading them first. Rationale and the follow-up work are
 > in the plugin's `CLAUDE.md` Known Limitations.
 
+> **Large reviews are truncated, and the council may not see the whole change.**
+> `/council review` caps what it sends: a diff over 60K bytes is reduced to
+> `git diff --stat` plus its first 200 lines, and changed-file excerpts are
+> added only until a 30K combined budget is reached. If the assembled pack still
+> exceeds 100K bytes, excerpts are dropped from the end until it fits. Every
+> reduction is announced in the pack itself — a truncation marker on the diff,
+> and a line naming how many files were omitted — so the reviewers know their
+> view is partial, but their verdicts are still formed on less than the full
+> change. The ceiling is not arbitrary: OpenCode rejects any pack over 120000
+> bytes outright and would otherwise return `UNAVAILABLE` for the whole slot.
+
 ## Configuration
 
 | Var | Default | Purpose |
