@@ -2,7 +2,7 @@
 'yellow-council': patch
 ---
 
-Close four credential-redaction bypasses and add a regression suite
+Close credential-redaction bypasses and add a regression suite
 
 - `strip_deco` refused to strip git's `-` prefix from PEM delimiter lines, so
   a key echoed as diff deletions (`------BEGIN…`, six dashes) was classified
