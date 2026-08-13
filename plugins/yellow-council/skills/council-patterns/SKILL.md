@@ -639,7 +639,10 @@ if [ "$DIFF_BYTES" -gt 200000 ]; then
   # Truncate: stat header + first 200 lines + marker
   {
     printf '### git diff --stat\n\n'
-    git diff --stat "${BASE}...HEAD"
+    # Bounded too. A diff big enough to reach this branch can touch thousands
+    # of files, and an unbounded stat is then its own budget overrun before a
+    # single diff line is emitted.
+    git diff --stat "${BASE}...HEAD" | head -c 4000
     printf '\n### Raw diff (first 200 lines of %d total)\n\n' "$(wc -l < "$DIFF_FILE")"
     # Bound by BYTES as well as lines. A line count alone is not a size bound:
     # 200 lines of a minified bundle or a generated lockfile can exceed the

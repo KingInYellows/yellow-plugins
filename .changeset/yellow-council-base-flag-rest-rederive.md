@@ -44,3 +44,11 @@ changed-file excerpts and the fence framing, and must clear both the 100K pack
 budget and OpenCode's 120000-byte argv rejection. A 150000-byte diff portion
 exceeded both on its own and would have marked that reviewer UNAVAILABLE on
 every large-diff run.
+
+Correction to the above: the earlier derivation assumed at most three 4K
+changed-file excerpts, which is the `debug`/`question` limit — `review` mode has
+no file-count cap and appends every changed file, and the `git diff --stat` was
+unbounded as well, so a wide change still blew the budget with the diff portion
+capped. The stat is now bounded, changed-file excerpts are added until a 30K
+combined budget is reached (then a count of omissions), and the assembled-pack
+ceiling of 100K is stated with the per-section arithmetic beside it.

@@ -183,8 +183,9 @@ For each mode:
   resolved base — nothing to review`. Do NOT fan out reviewers on an empty
   pack: every reviewer would return an unfounded APPROVE.
 - If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker). That block runs in its own Bash call and prints the truncated diff on stdout; **capture that output** and use it as the diff for the rest of this step. Do not expect `$DIFF_FILE` or any other variable from it to be readable here.
-- Per changed file: `git diff --name-only "<literal BASE_REF value printed above>...HEAD"` then read each file capped at 4K chars.
+- Per changed file: `git diff --name-only "<literal BASE_REF value printed above>...HEAD"` then read each file capped at 4K chars. **The file COUNT is bounded too, by a total budget, not just per file.** Unlike `debug`/`question` there is no 3-file limit here, so a wide change would otherwise append excerpts without end. Add files in listed order until their combined content reaches 30K chars, then stop and append a single line naming how many files were omitted.
 - Pack: `## Task: review` + `### Diff` + truncated diff + `### Changed Files` + per-file content.
+- **Hard ceiling on the assembled pack: 100K chars.** It is the tightest budget the pack has to clear, and OpenCode rejects anything over 120000 bytes outright (`opencode-reviewer.md`), returning `UNAVAILABLE` without invoking its CLI. The bounds above are sized to land under it — truncated diff ≤ 60K, stat ≤ 4K, excerpts ≤ 30K, framing ~3K. If a future change adds a pack section, re-derive these rather than assuming headroom exists.
 
 **`debug` mode:** `$REST` starts with quoted symptom text, then optional `--paths file1,file2,...`.
 - Parse symptom (first quoted block).
