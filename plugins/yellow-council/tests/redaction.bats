@@ -143,6 +143,24 @@ assert_survives_under_all() {
   done
 }
 
+@test "no copy of the program contains a single quote" {
+  # Two of the sources embed the program inside a single-quoted shell string
+  # (`awk '"'"'...'"'"' "$FILE"`). One apostrophe in a COMMENT closes that string
+  # early and turns the rest of the command into a shell syntax error, while
+  # leaving the awk itself valid — so the syntax test above passes and the
+  # shipped command is broken. An apostrophe reached main once this way.
+  local f copy
+  for f in "${REDACTION_SOURCES[@]}"; do
+    copy="$(extract_redaction_awk "${REPO_ROOT}/${f}")"
+    [ -n "$copy" ] || { echo "extracted nothing from ${f}" >&2; return 1; }
+    if printf '%s' "$copy" | grep -q "'"; then
+      echo "single quote in ${f}:" >&2
+      printf '%s' "$copy" | grep -n "'" >&2
+      return 1
+    fi
+  done
+}
+
 @test "every extracted copy is a syntactically valid awk program" {
   local f impl
   for f in "${REDACTION_SOURCES[@]}"; do
