@@ -1254,7 +1254,8 @@ jobs:
           exit 0
 
   # ============================================================================
-  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, advisory for others
+  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core and yellow-council,
+  # advisory for others
   # ============================================================================
   plugin-shell-tests:
     name: Plugin Shell Tests

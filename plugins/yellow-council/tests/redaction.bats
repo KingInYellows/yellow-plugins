@@ -35,6 +35,16 @@ setup() {
   require_awks "$(available_awks)"
   AWK_PROG="${BATS_TEST_TMPDIR}/redact.awk"
   extract_redaction_awk "${REPO_ROOT}/${REDACTION_SOURCES[0]}" >"$AWK_PROG"
+  # Fail loudly if extraction produced nothing. An empty awk program is
+  # syntactically valid and prints nothing for any input, which makes every
+  # leak-direction assertion below pass vacuously ("the secret is absent"
+  # because NOTHING is emitted). Without this guard a future reformat of the
+  # source fence would silently disable the half of this suite that matters
+  # most.
+  [ -s "$AWK_PROG" ] || {
+    echo "extracted an empty program from ${REDACTION_SOURCES[0]}: the opener/closer signature in extract_redaction_awk no longer matches" >&2
+    return 1
+  }
 
   D5="-----"
   BEGIN_PK="${D5}BEGIN PRIVATE KEY${D5}"
@@ -132,8 +142,13 @@ assert_survives_under_all() {
   # copy). This is the test that catches it.
   local first="" f current
   for f in "${REDACTION_SOURCES[@]}"; do
-    current="$(extract_redaction_awk "${REPO_ROOT}/${f}" | md5sum | cut -d' ' -f1)"
-    [ -n "$current" ] || { echo "extracted nothing from ${f}" >&2; return 1; }
+    # Check the extracted CONTENT for emptiness, not its hash: md5sum of empty
+    # input still emits d41d8cd98f00b204e9800998ecf8427e, so testing the hash
+    # string can never fail and the guard below would be dead code.
+    local content
+    content="$(extract_redaction_awk "${REPO_ROOT}/${f}")"
+    [ -n "$content" ] || { echo "extracted nothing from ${f}" >&2; return 1; }
+    current="$(printf '%s' "$content" | md5sum | cut -d' ' -f1)"
     if [ -z "$first" ]; then
       first="$current"
     elif [ "$current" != "$first" ]; then
@@ -165,6 +180,9 @@ assert_survives_under_all() {
   local f impl
   for f in "${REDACTION_SOURCES[@]}"; do
     extract_redaction_awk "${REPO_ROOT}/${f}" >"${BATS_TEST_TMPDIR}/p.awk"
+    # An empty file is trivially valid awk, so without this the test would
+    # pass against a broken extraction.
+    [ -s "${BATS_TEST_TMPDIR}/p.awk" ] || { echo "extracted nothing from ${f}" >&2; return 1; }
     for impl in $(available_awks); do
       echo "" | "$impl" -f "${BATS_TEST_TMPDIR}/p.awk" >/dev/null
     done
