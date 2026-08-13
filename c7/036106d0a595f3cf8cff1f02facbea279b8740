@@ -1,6 +1,8 @@
 plugins/yellow-council/commands/council/council.md
   s_3bb494324db8bc::t_b3eabd15f88475 492,1173
   s_3bb494324db8bc::t_4e806b456b68e9 610-624
+.changeset/council-md-redaction-parity.md
+  s_3bb494324db8bc::t_5ce9e6226627b0 27-33
 ---
 {
   "schema_version": "authorship/3.0.0",
