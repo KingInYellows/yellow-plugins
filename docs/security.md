@@ -29,8 +29,10 @@ once while online.
 - **yellow-review** — Uses `gh` CLI (GitHub CLI) for GraphQL API calls, not MCP
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
-- **yellow-council** — Ships no MCP server; reviewers are shelled-out CLIs
-  (`agy`, `opencode`, and Codex reused from yellow-codex)
+- **yellow-council** — Ships no MCP server. Three of its four reviewers are
+  shelled-out CLIs (`agy`, `opencode`, and Codex reused from yellow-codex);
+  the fourth, `claude-reviewer`, runs in-process with no subprocess at all
+  and holds a narrowly-scoped `Write` grant (see "In-Process Reviewer" below)
 
 ## Setting Up Authentication
 
@@ -251,6 +253,46 @@ doesn't match either pattern above:
 - **Never use** `agy --dangerously-skip-permissions` — it auto-approves
   every tool permission request, including writes (same class as the
   retired Gemini `--yolo`)
+
+### In-Process Reviewer (yellow-council `claude-reviewer`)
+
+`/council`'s fourth slot does not shell out at all. It runs inside Claude
+Code with `tools: [Read, Grep, Glob, Write]` and no `Bash`, which makes its
+trust boundary different from the three CLI reviewers above in three ways
+that matter:
+
+- **`Write` on a `review/` agent.** The W1.5 rule in
+  `scripts/validate-agent-authoring.js` denies `Write` to `review/` agents by
+  default; `gemini-reviewer` and `opencode-reviewer` are also allowlisted
+  exceptions, but for a different reason — they shell out to an external CLI
+  binary via `Bash` and need `Write` alongside it. `claude-reviewer` is the
+  only allowlisted reviewer with `Write` and no `Bash` at all: the exception
+  exists solely so it can materialize its fenced-output file in-process,
+  with no CLI invocation to justify it. The bound is a prompt constraint
+  plus that review-time gate — **Claude Code has no runtime path-scoping for
+  `Write`**, so nothing at execution time confines it. This is weaker than a
+  sandbox and is stated as such in the agent body.
+- **A two-hop path trust chain.** `council.md` mints the output path with
+  `mktemp -u` in a Bash block, but the value reaches the agent because the
+  orchestrating model copied the printed literal into the spawn prompt — a
+  turn whose context already holds the untrusted pack. The `mktemp` suffix
+  carries real entropy, so no attacker-chosen target is reachable, and both
+  `council.md` and the agent shape-check the path against
+  `/tmp/council-claude-fenced-*.txt` (rejecting `..`, extra separators, and
+  symlinks) before reading, writing, or unlinking it. What is **not**
+  enforced: the substitution itself is an LLM turn, not deterministic
+  templating.
+- **Prose safeguards, not mechanical ones.** The CLI reviewers redact
+  credentials with an 11-pattern `awk` block and escape fence delimiters
+  with `sed`. Both need `Bash`. `claude-reviewer` states the same rules as
+  prompt-level self-discipline with nothing executing them — a genuine
+  reduction in guarantee, not a formality.
+- **No timeout bound.** `COUNCIL_TIMEOUT` wraps the CLI reviewers in
+  `timeout(1)`; there is no subprocess here to kill, so a run that never
+  returns blocks the fan-out. Mitigation is prompt-level only.
+
+Full writeup in `plugins/yellow-council/CLAUDE.md` "Known Limitations" and
+in the agent's own "Tool Surface — Documented Exception" section.
 
 ### Shell Commands
 

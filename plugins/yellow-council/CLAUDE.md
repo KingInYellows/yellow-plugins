@@ -1,8 +1,9 @@
 # yellow-council Plugin
 
-On-demand cross-lineage code review plugin. Fans out to Codex (via yellow-codex
-optional dependency), Gemini, and OpenCode CLIs in parallel via subprocess
-spawn-and-wait, synthesizes verdicts inline, and persists the full report to
+On-demand cross-lineage code review plugin. Fans out to four reviewers in
+parallel — an in-process Claude reviewer plus Codex (via yellow-codex optional
+dependency), Gemini, and OpenCode CLIs via subprocess spawn-and-wait —
+synthesizes verdicts inline, and persists the full report to
 `docs/council/<date>-<mode>-<slug>.md`.
 
 ## Core Principle
@@ -15,7 +16,9 @@ and never auto-commits. The user decides what to do with the verdicts.
 ## Required Environment
 
 - **Bash 4.3+** — for associative arrays and `${var^}` case-conversion used in `/council` orchestration
-- **GNU coreutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`, `grep`
+- **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
+  `grep`, and `find` (the last drives the stale-`/tmp` sweep; without it a
+  cancelled run leaves raw reviewer output behind until the OS reaps `/tmp`)
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
@@ -24,21 +27,35 @@ and never auto-commits. The user decides what to do with the verdicts.
   - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`)
 - **Optional cross-plugin dependency:** `yellow-codex` ≥ 0.2.0 — provides the
   `yellow-codex:review:codex-reviewer` agent. If absent, council runs with
-  2 of 3 reviewers (graceful soft-skip).
+  3 of 4 reviewers (graceful soft-skip).
 
 ## Conventions
 
-- **Synchronous parallel fan-out.** All three reviewers spawned in a single
+- **Synchronous parallel fan-out.** All four reviewers spawned in a single
   message via Task tool; Claude Code's harness runs them concurrently.
-  council.md collects return values after all three complete.
-- **Per-reviewer timeout: 600 seconds.** Configurable via `COUNCIL_TIMEOUT`.
+  council.md collects return values after all four complete.
+- **One in-process slot, three CLI slots.** `claude-reviewer` runs inside
+  Claude Code with no `Bash` and no subprocess. Consequences: `COUNCIL_TIMEOUT`
+  does not bound it, it has no not-installed degradation branch, and its
+  redaction and fence-escaping safeguards are prompt-level prose rather than
+  the `awk`/`sed` mechanics the CLI wrappers run. It also cannot mint its own
+  temp path, so `council.md` mints its fenced-output path with `mktemp -u` and
+  passes the literal path in the spawn prompt.
+- **Per-reviewer timeout: 600 seconds** (CLI reviewers only). Configurable via
+  `COUNCIL_TIMEOUT`.
   Partial results: timed-out reviewers are excluded from synthesis but the
   council still produces a report with the remaining verdicts.
 - **Output redaction is mandatory.** Each reviewer's output passes through an
   11-pattern awk redaction block (sk-proj-, sk-ant-, sk-, AIza, gh[pous]_,
   github_pat_, AKIA, Bearer, Authorization, ses_, PEM private key blocks)
   before being included in the report file or surfaced inline. Canonical
-  list and awk source in `council-patterns` SKILL.md.
+  list and awk source in `council-patterns` SKILL.md. **Where it runs differs
+  by slot:** the three CLI reviewers run it inside their own agent, over the
+  CLI output, before writing their fenced file. `claude-reviewer` has no Bash
+  and cannot, so `council.md` Step 7 runs the same block over its fenced file
+  before appending it to the report. The invariant is that no reviewer's
+  content reaches `docs/council/<report>.md` unredacted — the enforcement
+  point, not the guarantee, is what varies.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
   `--- end council-output:<reviewer> ---` fences.
@@ -60,7 +77,7 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 ## Plugin Components
 
-### Commands (1)
+### Commands (2)
 
 - `/council <mode> [args]` — main entry point with four modes:
   - `plan <path-or-text>` — council on a planning doc / design proposal
@@ -70,9 +87,19 @@ and never auto-commits. The user decides what to do with the verdicts.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
+- `/council:setup` — prerequisite check (bash 4.3+, `timeout`, `jq`) plus a
+  reviewer-availability summary. Does NOT verify CLI authentication.
 
-### Agents (2)
+### Agents (3)
 
+- `claude-reviewer` — the in-process slot. No CLI, no subprocess, no `Bash`:
+  it reads the pack from its spawn prompt, investigates with Read/Grep/Glob,
+  and returns the same 6-key contract as the CLI wrappers. Carries a
+  contrarian review stance (R6) to decorrelate it from the synthesizer it
+  shares a model family with. Holds `Write` for exactly one file — the
+  fenced-output path `council.md` mints with `mktemp -u` — and is allowlisted
+  for that in `scripts/validate-agent-authoring.js`. Spawned via
+  `Task(subagent_type="yellow-council:review:claude-reviewer")`.
 - `gemini-reviewer` — Antigravity CLI (`agy`) wrapper for the Google lineage
   slot. Invokes
   `cd "$PACK_DIR" && agy --sandbox --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
@@ -109,7 +136,7 @@ Codex agent.)
 
 | Need | Command | Notes |
 |---|---|---|
-| Cross-lineage opinion on a design doc | `/council plan <path>` | All three reviewers see the doc + repo CLAUDE.md |
+| Cross-lineage opinion on a design doc | `/council plan <path>` | All four reviewers see the doc + repo CLAUDE.md |
 | Cross-lineage code review of current diff | `/council review` | Defaults to upstream-tracking branch's merge-base |
 | Cross-lineage debug investigation | `/council debug "<symptom>" --paths <files>` | Up to 3 files, 8K chars each |
 | Open-ended consultation | `/council question "<text>" [--paths]` | Most flexible; lowest context structure |
@@ -131,6 +158,37 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
+- **The in-process slot has no timeout bound.** `COUNCIL_TIMEOUT` covers only
+  the three CLI reviewers; a `claude-reviewer` run that never returns blocks
+  the whole fan-out with no fallback (detail: `council.md`'s Failure Modes
+  table, "claude-reviewer never returns at all"). Mitigation is prompt-level
+  only — see `claude-reviewer.md` Step 2, "Keep this bounded." Worst case,
+  cancel and re-run. A real regression versus the 3-reviewer V1, accepted as
+  the cost of the in-process slot.
+- **"Orchestrator-minted path" is a two-hop trust chain, not one.**
+  `council.md` mints `claude-reviewer`'s fenced-output path in a Bash block,
+  but the value reaches the agent because the orchestrating model copied the
+  printed literal into the spawn prompt — and that turn's context already
+  holds the untrusted pack. The `mktemp -u` suffix carries real entropy (no
+  attacker-chosen target is reachable) and both `council.md` Step 7 and the
+  agent itself now shape-check the path against
+  `/tmp/council-claude-fenced-*.txt`, so a substituted lookalike is refused
+  rather than read. What is NOT enforced: the substitution itself is an LLM
+  turn, not deterministic templating. Same class of prompt-plus-containment
+  enforcement as the agy limitation below.
+- **A cancelled claude-reviewer leaves its raw output readable until the
+  sweep.** `claude-reviewer` creates its fenced-output file with the `Write`
+  tool under the ordinary process umask (0644 on a default umask 022), and
+  `council.md` takes the mode down to 0600 in Step 4 — but Step 4 only runs
+  when the slot returns and parses. If the in-process reviewer is cancelled or
+  hangs, the `chmod` never executes and the file, holding RAW un-redacted
+  review text, stays world-readable in `/tmp` until the age-gated sweep
+  reclaims it (`STALE_MINUTES=1440`, so up to 24 hours) or the OS reaps
+  `/tmp`. Closing this properly means minting the path inside a private
+  `mktemp -d`, which every path guard in `council.md` rejects on purpose —
+  see the `chmod` site for why that trade was taken. On a multi-user host,
+  cancel a hung `/council` and remove `/tmp/council-claude-fenced-*.txt`
+  by hand rather than waiting for the sweep.
 - **agy workspace trust in print mode is unverified.** The Antigravity CLI
   tracks `trustedWorkspaces` in its settings; the 2026-08-01 spike ran only
   in an already-trusted repo. If a first `/council` run in a new directory
@@ -161,7 +219,8 @@ Codex agent.)
   for `agy` only.
 - **Codex timeout cap is 300s when reused via yellow-codex.** The existing
   `codex-reviewer` agent uses a 300s timeout. yellow-council's `COUNCIL_TIMEOUT`
-  affects only Gemini and OpenCode; Codex honors its own agent timeout. If
+  affects only Gemini and OpenCode; Codex honors its own agent timeout, and
+  the in-process `claude-reviewer` has no subprocess to bound at all. If
   Codex routinely times out at 300s for council use, file a yellow-codex
   enhancement issue rather than modifying `codex-reviewer.md`.
 - **No fresh-machine install CI.** No automated CI job verifies that Claude

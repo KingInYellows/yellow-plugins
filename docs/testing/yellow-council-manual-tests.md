@@ -123,10 +123,14 @@ COUNCIL_TIMEOUT=10 /council review
 ```
 
 **Expected behavior:**
-- All three reviewers timeout at 10s (exit 124 or 137)
-- Synthesis Headline: `Council ran with 0 of 3 reviewers (Codex timed out at 10s, Gemini timed out at 10s, OpenCode timed out at 10s)`
+- The three CLI reviewers timeout at 10s (exit 124 or 137). `COUNCIL_TIMEOUT`
+  bounds subprocesses only, and `claude-reviewer` runs in-process with no
+  subprocess to bound — it is NOT expected to time out and should still return
+  a verdict. Treating it as a fourth timeout is a false failure.
+- Synthesis Headline: `Council ran with 1 of 4 reviewers (Codex timed out at 10s, Gemini timed out at 10s, OpenCode timed out at 10s)`
 - M3 gate still asks before file write
-- File written contains TIMEOUT verdict from each reviewer
+- File written contains a TIMEOUT verdict from each CLI reviewer and a real
+  verdict from Claude
 
 ### 3.2 — yellow-codex absent
 
@@ -135,23 +139,36 @@ COUNCIL_TIMEOUT=10 /council review
 /plugin uninstall yellow-codex
 
 /council review
-# Expected: "Council ran with 2 of 3 reviewers (Codex not available — yellow-codex plugin not installed)"
-# Gemini and OpenCode still produce verdicts
+# Expected: "Council ran with 3 of 4 reviewers (Codex not available — yellow-codex plugin not installed)"
+# Claude, Gemini and OpenCode still produce verdicts
 
 # Restore
 /plugin install yellow-codex@yellow-plugins
 ```
 
-### 3.3 — All reviewers fail
+### 3.3 — All CLI reviewers fail
 
-Trigger all three to fail simultaneously (e.g., disable network or revoke
-auth tokens):
+Trigger all three CLI reviewers to fail simultaneously (e.g., disable network
+or revoke auth tokens). `claude-reviewer` needs no network or CLI auth, so it
+is expected to survive this scenario:
 
 ```text
 /council review
-# Expected: "Council failed: 0 of 3 reviewers returned verdicts"
-# M3 still asks; user can save (file documents the failure) or cancel
+# Expected: "Council ran with 1 of 4 reviewers (Codex/Gemini/OpenCode unavailable)"
+# M3 still asks; user can save (file documents the failures) or cancel
 ```
+
+To exercise a genuinely empty council, the in-process slot has to fail too —
+cancel it, or feed it a malformed pack so it returns `verdict=ERROR`:
+
+```text
+# Expected: "Council ran with 0 of 4 reviewers (...)"
+```
+
+There is no separate all-failed headline — `council.md`'s Failure Modes table
+says so explicitly, and Step 5 renders the same `Council ran with N of 4
+reviewers` template at every N. A tester looking for a distinct "Council failed"
+string will not find one, because the code never emits it.
 
 ### 3.4 — M3 cancel path
 

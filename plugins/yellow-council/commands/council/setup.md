@@ -21,13 +21,13 @@ present and at compatible versions.
 ### Step 1: Verify required system tools
 
 ```bash
-for tool in bash timeout jq mktemp awk sed grep; do
+for tool in bash timeout jq mktemp awk sed grep find; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[yellow-council] Error: required system tool "%s" not found\n' "$tool" >&2
     exit 1
   fi
 done
-printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep)\n'
+printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find)\n'
 
 # Bash version check (need 4.3+ for ${BASH_VERSINFO[N]} array indexing, associative arrays, and ${var^} capitalization used in council.md)
 BASH_VER="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
@@ -142,7 +142,11 @@ Print a one-line summary:
 ```bash
 # Re-detect each CLI inline — each Bash block is a fresh subprocess so
 # variables from Steps 2-4 do not survive here.
-READY_COUNT=0
+#
+# The council has four slots. claude-reviewer is in-process — no binary, no
+# subprocess, nothing to detect — so it is always available and seeds the
+# count at 1. Only the three CLI slots can be missing.
+READY_COUNT=1
 
 if command -v agy >/dev/null 2>&1; then
   GEMINI_STATUS="installed"
@@ -167,14 +171,14 @@ fi
 
 printf '\n[yellow-council] Setup summary:\n'
 printf '  Required: bash 4.3+, timeout, jq — verified\n'
-printf '  Reviewers: %d of 3 available (Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
+printf '  Reviewers: %d of 4 available (Claude=in-process (always available), Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
   "$READY_COUNT" "$GEMINI_STATUS" "$OPENCODE_STATUS" "$CODEX_STATUS"
-if [ "$READY_COUNT" -eq 0 ]; then
-  printf '  Status: NOT READY — install at least one reviewer CLI before invoking /council\n'
-elif [ "$READY_COUNT" -lt 3 ]; then
+if [ "$READY_COUNT" -eq 1 ]; then
+  printf '  Status: MINIMAL — only the in-process Claude reviewer is available, so /council has no cross-lineage independence; install at least one reviewer CLI\n'
+elif [ "$READY_COUNT" -lt 4 ]; then
   printf '  Status: PARTIAL — /council will run with %d reviewer(s); install missing CLIs for full council\n' "$READY_COUNT"
 else
-  printf '  Status: READY — /council can run with all three reviewers\n'
+  printf '  Status: READY — /council can run with all four reviewers\n'
 fi
 ```
 

@@ -28,7 +28,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 21 agents, 16 commands, 18 skills              |
-| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 2 commands, 1 skill                  |
+| `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 10 agents, 6 commands, 1 skill                 |
@@ -270,7 +270,7 @@ yellow-plugins/
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (21 agents, 16 commands, 18 skills)
-│   ├── yellow-council/        # Cross-lineage code council (2 agents, 2 commands, 1 skill)
+│   ├── yellow-council/        # Cross-lineage code council (3 agents, 2 commands, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)

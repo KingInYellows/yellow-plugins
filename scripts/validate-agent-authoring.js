@@ -69,22 +69,44 @@ const CONTEXT7_WILDCARD_TOOL = 'mcp__context7__*';
 // drift-detected and must be repaired.
 const LIBRARY_CONTEXT_SENTINEL = 'context7 unavailable — falling back to';
 
-// Documented exceptions to the read-only rule. Each entry must be a
-// plugins-relative POSIX path. Any exception requires a "Tool Surface —
-// Documented … Exception" section in the agent body explaining why the
-// containment is dropped and bounding legitimate use.
-const REVIEW_AGENT_ALLOWLIST = new Set([
+// Documented exceptions to the read-only rule. Each entry maps a
+// plugins-relative POSIX path to the SPECIFIC denied tool(s) (drawn from
+// REVIEW_AGENT_DENIED_TOOLS) that agent is granted — not blanket membership.
+// Bare set-membership let ANY tool the agent later gained ride the exception
+// (e.g., claude-reviewer picking up Bash would still pass, silently widening
+// its privileges beyond the documented Write-only rationale below); keying
+// the exception to a per-file allowed-tool set closes that gap — a tool
+// outside the granted set still trips W1.5. Any exception requires a "Tool
+// Surface — Documented … Exception" section in the agent body explaining why
+// the containment is dropped and bounding legitimate use.
+const REVIEW_AGENT_ALLOWLIST = new Map([
   // codex-reviewer invokes the codex CLI binary as its core function; read-
   // only restriction would break the agent. See agent body for rationale.
   // Decision recorded in plans/everyinc-merge.md W1.2 (2026-04-29).
-  'yellow-codex/agents/review/codex-reviewer.md',
+  ['yellow-codex/agents/review/codex-reviewer.md', new Set(['Bash'])],
   // gemini-reviewer and opencode-reviewer wrap external CLIs (gemini, opencode)
   // for the on-demand cross-lineage council. Same containment rationale as
   // codex-reviewer: Bash is required for binary invocation; read-only contract
   // is enforced via prose discipline + explicit prompt design. See plan
-  // plans/yellow-council-godmodeskill-integration.md (2026-05-04).
-  'yellow-council/agents/review/gemini-reviewer.md',
-  'yellow-council/agents/review/opencode-reviewer.md',
+  // plans/yellow-council-godmodeskill-integration.md (2026-05-04). Both also
+  // carry Write to materialize their own fenced-output file (unlike
+  // codex-reviewer, which does not).
+  ['yellow-council/agents/review/gemini-reviewer.md', new Set(['Bash', 'Write'])],
+  ['yellow-council/agents/review/opencode-reviewer.md', new Set(['Bash', 'Write'])],
+  // claude-reviewer is the council's in-process slot and does NOT share the
+  // CLI-wrapper rationale above: it has no Bash at all and invokes no binary.
+  // Write is granted for exactly one file — the fenced-output path the
+  // orchestrator mints with `mktemp -u` and passes in the spawn prompt. With
+  // no Bash there is no mktemp, so the agent cannot mint a collision-safe
+  // path itself, and a hardcoded one breaks on the second /council run of a
+  // session (Write refuses to overwrite a file it has not Read). This entry
+  // is a review-time gate, NOT a runtime path restriction — Claude Code has
+  // no path-scoping for Write; the bound is the agent's "Tool Surface —
+  // Documented Exception" prompt constraint plus human review of any change
+  // to this list. See plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  // R5/R7 (2026-08-10). Granted Write only — Bash/Edit/MultiEdit are NOT in
+  // this agent's allowed set, so gaining any of them still trips W1.5.
+  ['yellow-council/agents/review/claude-reviewer.md', new Set(['Write'])],
 ]);
 
 // V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
@@ -805,53 +827,98 @@ function validateAgentFile(filePath, ctx) {
     // cannot bypass the security check. Reuses subdir/pluginsRelPath
     // computed once at the top of the loop body.
     if (subdir === 'review') {
-      if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
-        const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
-          t.toLowerCase()
+      // A REVIEW_AGENT_ALLOWLIST entry is a per-file allowed-tool SET, not
+      // bare membership: it only suppresses W1.5 for the specific denied
+      // tool(s) it was granted for. A tool outside that set (e.g.,
+      // claude-reviewer, granted Write only, later gaining Bash) still trips
+      // the check below — the exception cannot be silently widened by an
+      // unrelated frontmatter edit.
+      // An allowlist entry is only half the exception. The other half is the
+      // "Tool Surface — Documented Exception" section in the agent body, which
+      // is the human-auditable rationale that justifies the privilege. Honour
+      // the allowlist ONLY while that section is actually present: otherwise
+      // deleting or renaming the heading silently drops the justification
+      // while CI keeps passing, and the Write-capable reviewer keeps its
+      // grant with nothing left explaining why it has it.
+      // Test LIVE markdown only. Against the raw file the heading also matches
+      // inside an HTML comment or a fenced example, so an agent could keep its
+      // privileged grant with the real rationale deleted and only a commented-out
+      // or illustrative copy of the heading left behind — the exact audit the
+      // check exists to guarantee.
+      const liveBody = stripFencedContent(content).replace(
+        /<!--[\s\S]*?-->/g,
+        ''
+      );
+      const hasDocumentedException =
+        // AGENTS.md writes the heading with an ASCII hyphen; every shipped
+        // agent uses an em dash. Accept either (and an en dash), plus the
+        // optional qualifier some files carry ("Documented Bash Exception"),
+        // so the normative spelling and the actual one both satisfy this.
+        /^##+[ \t]+Tool Surface[ \t]+[-\u2013\u2014][ \t]+Documented(?:[ \t]+\S+)?[ \t]+Exception[ \t]*$/m.test(
+          liveBody
         );
-        const toolsLower = tools.map((t) => t.toLowerCase());
-        const violations = REVIEW_AGENT_DENIED_TOOLS.filter((_, i) =>
-          toolsLower.includes(deniedLower[i])
+      const allowedExceptionTools = hasDocumentedException
+        ? REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath)
+        : undefined;
+      if (!hasDocumentedException && REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
+        errors.push(
+          `${relative(filePath)}: listed in REVIEW_AGENT_ALLOWLIST but has no ` +
+            `"## Tool Surface — Documented Exception" section — the allowlist ` +
+            `entry grants the tool, that section is what justifies it. Restore ` +
+            `the section or remove the allowlist entry.`
         );
-        if (violations.length > 0) {
-          errors.push(
-            `${relative(filePath)}: review/ agent must not include ` +
-              `${violations.join(', ')} in "tools:" — reviewers are ` +
-              `read-only (W1.5 rule). To document a justified exception, ` +
-              `add the plugins-relative path to REVIEW_AGENT_ALLOWLIST in ` +
-              `scripts/validate-agent-authoring.js and add a "Tool ` +
-              `Surface — Documented Exception" section to the agent body.`
-          );
-        }
+      }
+      const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
+        t.toLowerCase()
+      );
+      const toolsLower = tools.map((t) => t.toLowerCase());
+      const violations = REVIEW_AGENT_DENIED_TOOLS.filter((deniedTool, i) => {
+        if (!toolsLower.includes(deniedLower[i])) return false;
+        return !(allowedExceptionTools && allowedExceptionTools.has(deniedTool));
+      });
+      if (violations.length > 0) {
+        errors.push(
+          `${relative(filePath)}: review/ agent must not include ` +
+            `${violations.join(', ')} in "tools:" — reviewers are ` +
+            `read-only (W1.5 rule). To document a justified exception, ` +
+            `add the plugins-relative path to REVIEW_AGENT_ALLOWLIST in ` +
+            `scripts/validate-agent-authoring.js and add a "Tool ` +
+            `Surface — Documented Exception" section to the agent body.`
+        );
+      }
 
-        // W1.5b — `memory:` auto-enables Read/Write/Edit regardless of the
-        // `tools:` list (per Claude Code docs), so the tools-only check
-        // above is bypassed whenever a review/ agent sets `memory:`. Such an
-        // agent MUST restore the read-only contract with a `disallowedTools`
-        // entry denying Write, Edit, and MultiEdit. Without this, a review
-        // agent processing untrusted PR diffs runs write-capable. Every
-        // shipped memory:-bearing review agent already carries
-        // `disallowedTools: [Write, Edit, MultiEdit]`; this rule prevents a
-        // future review/ agent from regressing silently.
-        const memoryScope = parseScalar(frontmatter, 'memory');
-        if (memoryScope && VALID_MEMORY_SCOPES.has(memoryScope)) {
-          const disallowedLower = parseList(
-            frontmatter,
-            'disallowedTools'
-          ).map((t) => t.toLowerCase());
-          const missingDenies = REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS.filter(
-            (t) => !disallowedLower.includes(t.toLowerCase())
+      // W1.5b — `memory:` auto-enables Read/Write/Edit regardless of the
+      // `tools:` list (per Claude Code docs) AND regardless of any
+      // REVIEW_AGENT_ALLOWLIST entry — an allowlist exception documents a
+      // specific tools: grant, not a blanket exemption from the memory:
+      // auto-grant. This check always runs for review/ agents, allowlisted
+      // or not, so a future `memory:` addition to an allowlisted agent (e.g.,
+      // claude-reviewer) cannot silently widen its privileges past its
+      // documented tools: exception. Such an agent MUST restore the
+      // read-only contract with a `disallowedTools` entry denying Write,
+      // Edit, and MultiEdit. Without this, a review agent processing
+      // untrusted PR diffs runs write-capable. Every shipped memory:-bearing
+      // review agent already carries `disallowedTools: [Write, Edit,
+      // MultiEdit]`; this rule prevents a future review/ agent from
+      // regressing silently.
+      const memoryScope = parseScalar(frontmatter, 'memory');
+      if (memoryScope && VALID_MEMORY_SCOPES.has(memoryScope)) {
+        const disallowedLower = parseList(
+          frontmatter,
+          'disallowedTools'
+        ).map((t) => t.toLowerCase());
+        const missingDenies = REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS.filter(
+          (t) => !disallowedLower.includes(t.toLowerCase())
+        );
+        if (missingDenies.length > 0) {
+          errors.push(
+            `${relative(filePath)}: review/ agent sets \`memory: ` +
+              `${memoryScope}\` (auto-enables Read/Write/Edit) but ` +
+              `\`disallowedTools\` is missing ${missingDenies.join(', ')} ` +
+              `— add \`disallowedTools: [Write, Edit, MultiEdit]\` to ` +
+              `restore the read-only contract (W1.5b rule). The \`tools:\` ` +
+              `list alone does not contain the memory-granted write access.`
           );
-          if (missingDenies.length > 0) {
-            errors.push(
-              `${relative(filePath)}: review/ agent sets \`memory: ` +
-                `${memoryScope}\` (auto-enables Read/Write/Edit) but ` +
-                `\`disallowedTools\` is missing ${missingDenies.join(', ')} ` +
-                `— add \`disallowedTools: [Write, Edit, MultiEdit]\` to ` +
-                `restore the read-only contract (W1.5b rule). The \`tools:\` ` +
-                `list alone does not contain the memory-granted write access.`
-            );
-          }
         }
       }
     }

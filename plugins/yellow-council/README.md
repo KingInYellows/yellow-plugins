@@ -1,7 +1,8 @@
 # yellow-council
 
-On-demand cross-lineage code review for Claude Code. Fans out to three external
-LLM CLIs (Codex, Gemini (via Antigravity CLI), OpenCode) in parallel and
+On-demand cross-lineage code review for Claude Code. Fans out to four reviewers
+in parallel — three external LLM CLIs (Codex, Gemini (via Antigravity CLI),
+OpenCode) plus an in-process Claude reviewer that needs no CLI at all — and
 synthesizes their verdicts inline.
 
 ## Install
@@ -24,7 +25,7 @@ synthesizes their verdicts inline.
   bash "$TMP_INSTALLER"
   ```
 - **Codex CLI (optional)** — install `yellow-codex` plugin for Codex coverage.
-  Without it, the council runs with 2 of 3 reviewers.
+  Without it, the council runs with 3 of 4 reviewers.
 
 ## Usage
 
@@ -73,7 +74,7 @@ Each invocation produces:
 - **Inline synthesis** — Headline (verdict count) + Agreement (findings cited
   by ≥2 reviewers) + Disagreement (unique findings or verdict conflicts).
 - **Persisted report** at `docs/council/<date>-<mode>-<slug>.md` — synthesis
-  plus three labeled raw reviewer outputs (each wrapped in injection fences
+  plus four labeled raw reviewer outputs (each wrapped in injection fences
   and credential-redacted).
 
 The user is asked for confirmation before the report file is written.
@@ -82,7 +83,7 @@ The user is asked for confirmation before the report file is written.
 
 | Var | Default | Purpose |
 |---|---|---|
-| `COUNCIL_TIMEOUT` | `600` | Per-reviewer timeout in seconds |
+| `COUNCIL_TIMEOUT` | `600` | Timeout in seconds for the three CLI reviewers. The in-process Claude reviewer spawns no subprocess and is not bounded by it |
 | `COUNCIL_OPENCODE_VARIANT` | `high` | OpenCode reasoning effort |
 | `COUNCIL_PATH_CHAR_CAP` | `8000` | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | `3` | Max `--paths` files per invocation |
