@@ -1,0 +1,25 @@
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_3bb494324db8bc::t_341d9f3eb7a1dd 379-387,394-395,409-415,417-418
+.changeset/yellow-council-base-flag-rest-rederive.md
+  s_3bb494324db8bc::t_fd69ed51869b95 69-76
+plugins/yellow-council/CLAUDE.md
+  s_3bb494324db8bc::t_4ee021a7b1b148 179-187
+plugins/yellow-council/README.md
+  s_3bb494324db8bc::t_b48cd9b7880e14 82-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a1929e52baf02e77c66590322cb5e229c900a676",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
