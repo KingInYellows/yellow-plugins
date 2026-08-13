@@ -121,13 +121,28 @@ assert_redacted_under_all() {
 # assert_survives_under_all <input> <substring>
 # The substring must survive under ANY available awk (over-redaction guard).
 assert_survives_under_all() {
-  local input="$1" keep="$2" impl out
+  local input="$1" keep="$2" impl out lines chars markers
   for impl in $(available_awks); do
     out="$(printf '%s\n' "$input" | run_redaction "$impl")"
     if [[ "$out" != *"$keep"* ]]; then
-      echo "OVER-REDACTION under ${impl}: '${keep}' was swallowed" >&2
-      echo "--- output ---" >&2
-      echo "$out" >&2
+      # Report the SHAPE of the failure, never the raw output. Several of
+      # these fixtures feed genuine key-shaped bytes (WIDE_BODY, BEGIN_PK) as
+      # input to pin the bounded-path release, so an over-redaction
+      # regression could leave that material sitting unredacted in $out —
+      # dumping it here would be the exact disclosure this suite exists to
+      # catch, not just describe. Mirror assert_redacted_under_all's
+      # discipline: report counts and redaction-marker positions, which
+      # never carry secret bytes, instead of the content itself.
+      lines="$(printf '%s\n' "$out" | wc -l)"
+      chars="${#out}"
+      markers="$(printf '%s\n' "$out" | grep -oE -- '--- redacted (credential|PEM key block) at line [0-9]+ ---' | tr '\n' ';')"
+      echo "OVER-REDACTION under ${impl}: expected substring did not survive: '${keep}'" >&2
+      echo "Output withheld: ${lines} line(s), ${chars} char(s)." >&2
+      if [ -n "$markers" ]; then
+        echo "Redaction markers present: ${markers}" >&2
+      else
+        echo "No redaction markers present in output — the substring is absent, not redacted." >&2
+      fi
       return 1
     fi
   done
@@ -322,21 +337,48 @@ assert_survives_under_all() {
   # care, and a hostile "-" flood remains a known open cost (see strip_deco).
   # Assert BOTH halves: the secret is redacted, AND it finishes quickly — the
   # redaction alone would pass even at quadratic cost, just slowly.
-  local prefix input start elapsed
-  # 100k is the size the quadratic cost was measured at (~10s under the host
-  # awk). A smaller run completes fast enough to pass either way, which would
-  # make this test decorative.
-  prefix="$(printf -- '+%.0s' $(seq 1 100000))"
+  #
+  # A raw `elapsed < N` wall-clock assertion is nondeterministic: it depends
+  # on host speed, load, and awk flavor (gawk measured ~20x slower than mawk
+  # on identical input), so a correct linear implementation can fail
+  # spuriously on a slow or busy runner while a quadratic one could squeak by
+  # on a fast one. Two changes replace the stopwatch with a bound that cannot
+  # flake:
+  #   - the run is 5x the length the quadratic cost was originally measured
+  #     at (100k, ~10s), so a reintroduced quadratic pass costs on the order
+  #     of 25x longer — an unambiguous, order-of-magnitude gap from the
+  #     linear cost, not a margin near the threshold.
+  #   - `timeout` bounds each awk invocation directly instead of measuring
+  #     elapsed time after the run finishes. A regression is caught by the
+  #     process being killed within BOUND seconds, not by waiting out
+  #     whatever a quadratic pass over 500k chars actually takes.
+  local prefix input impl out status
+  # Built with head+tr, not `seq 1 500000 | printf` (a 500k-argument command
+  # line risks ARG_MAX) and not `${prefix// /+}` on a 500k-char string, which
+  # is itself quadratic in bash: that construction measured 57s here versus
+  # 0.0s for head+tr with byte-identical output. The awk program handles this
+  # fixture in well under a second, so a slow test would be timing bash's
+  # string handling rather than the redaction pass it exists to bound.
+  prefix="$(head -c 500000 /dev/zero | tr '\0' '+')"
   input="$(printf -- '%s%s\n%s\n%s\n%s\n%s\n%s' \
     "$prefix" "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" \
     "$NARROW_BODY" "$END_PK")"
-  start=$SECONDS
-  assert_redacted_under_all "$input" "$NARROW_BODY"
-  elapsed=$((SECONDS - start))
-  [ "$elapsed" -lt 5 ] || {
-    echo "decoration stripping took ${elapsed}s — the plus-run is not being consumed in bulk" >&2
-    return 1
-  }
+  for impl in $(available_awks); do
+    out="$(printf '%s\n' "$input" | timeout 30 "$impl" -f "$AWK_PROG")"
+    status=$?
+    if [ "$status" -eq 124 ]; then
+      echo "decoration stripping exceeded 30s under ${impl} — the plus-run is not being consumed in bulk" >&2
+      return 1
+    fi
+    [ "$status" -eq 0 ] || {
+      echo "${impl} exited ${status} unexpectedly processing the plus-run fixture" >&2
+      return 1
+    }
+    if [[ "$out" == *"$NARROW_BODY"* ]]; then
+      echo "LEAK under ${impl}: the secret survived redaction on the plus-run fixture." >&2
+      return 1
+    fi
+  done
 }
 
 @test "a long prose line mentioning a marker still releases the report" {
