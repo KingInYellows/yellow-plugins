@@ -21,13 +21,13 @@ present and at compatible versions.
 ### Step 1: Verify required system tools
 
 ```bash
-for tool in bash timeout jq mktemp awk sed grep; do
+for tool in bash timeout jq mktemp awk sed grep find; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[yellow-council] Error: required system tool "%s" not found\n' "$tool" >&2
     exit 1
   fi
 done
-printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep)\n'
+printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find)\n'
 
 # Bash version check (need 4.3+ for ${BASH_VERSINFO[N]} array indexing, associative arrays, and ${var^} capitalization used in council.md)
 BASH_VER="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"

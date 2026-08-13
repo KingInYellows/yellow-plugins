@@ -58,3 +58,21 @@ enforces both invariants for this leg from the orchestrator side:
   only files older than that are swept, so a second concurrent `/council`
   invocation's own in-flight file is never at risk of being deleted out from
   under it.
+
+Three further fixes from review:
+
+- The appendix fence-escaping pass matched only `council-output:` lines, so a
+  native `--- end codex-output ---` or `--- code end ---` in injected reviewer
+  output survived into the persisted report and any consumer recognising those
+  would read the text after it as unfenced. It now escapes every structural form
+  `claude-reviewer.md` Safeguard 2 names, including the two `findings_block_*`
+  sentinels (prefixed, since they carry no leading `--- ` to consume).
+- `validate-agent-authoring.js` honoured a `REVIEW_AGENT_ALLOWLIST` entry
+  regardless of whether the agent still carried its
+  `Tool Surface — Documented … Exception` section, so the human-auditable
+  rationale for a Write-capable reviewer could be deleted with CI still green.
+  The allowlist is now only honoured while that section is present.
+- `find` drives the stale-`/tmp` sweep but was never declared a prerequisite.
+  On a host without it the sweep silently produced no candidates with its stderr
+  suppressed, so a cancelled run left raw reviewer output in `/tmp` despite the
+  documented next-run reclamation. Added to both prerequisite loops and the docs.

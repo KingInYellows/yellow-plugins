@@ -40,7 +40,11 @@ and atomic file write conventions.
 
 ```bash
 # Required system tools
-for tool in bash git timeout jq mktemp awk sed grep; do
+# `find` drives the Step 4 stale-/tmp sweep. Without it that sweep silently
+# yields no candidates (its stderr is suppressed), so a cancelled or hung
+# claude-reviewer leaves raw output in /tmp indefinitely while the docs promise
+# next-run reclamation. Declare it rather than depend on it undeclared.
+for tool in bash git timeout jq mktemp awk sed grep find; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[council] Error: required tool "%s" not found\n' "$tool" >&2
     exit 1
@@ -1289,11 +1293,26 @@ for reviewer in claude codex gemini opencode; do
       #
       # Escape form matches claude-reviewer.md's own rule: replace the
       # leading "--- " with "[ESCAPED] " (not merely prefix it) so the exact
-      # delimiter substring is gone from the result. Scoped to
-      # "council-output:" so it never touches this same pass's own
-      # "--- redacted ... ---" markers.
+      # delimiter substring is gone from the result.
+      #
+      # Cover EVERY structural form claude-reviewer.md Safeguard 2 names, not
+      # just this command's own fence. The reviewer is told four families are
+      # structural; escaping only "council-output:" leaves a native
+      # "--- end codex-output ---" or "--- code end ---" intact in the
+      # appendix, and any later consumer that recognises those treats
+      # everything after as unfenced attacker-controlled text. The two
+      # sentinels have no leading "--- " to consume, so they are prefixed
+      # instead, exactly as Safeguard 2 specifies.
+      #
+      # Each arm is anchored and specific, so this never touches the
+      # "--- redacted ... ---" markers the redaction pass above emits. Order
+      # is safe: once an arm rewrites the line it no longer starts with
+      # "--- ", so no later arm can double-escape it.
       section_body=$(printf '%s\n' "$section_body" | awk '
         /^--- (begin|end) council-output:/ { sub(/^--- /, "[ESCAPED] ") }
+        /^--- (begin|end) codex-output/    { sub(/^--- /, "[ESCAPED] ") }
+        /^--- code (begin|end)/            { sub(/^--- /, "[ESCAPED] ") }
+        /^findings_block_(begin|end)[[:space:]]*$/ { sub(/^/, "[ESCAPED] ") }
         { print }
       ')
       # The emitted pair is ASYMMETRIC — the begin line carries a

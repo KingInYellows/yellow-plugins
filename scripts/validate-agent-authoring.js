@@ -833,7 +833,28 @@ function validateAgentFile(filePath, ctx) {
       // claude-reviewer, granted Write only, later gaining Bash) still trips
       // the check below — the exception cannot be silently widened by an
       // unrelated frontmatter edit.
-      const allowedExceptionTools = REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath);
+      // An allowlist entry is only half the exception. The other half is the
+      // "Tool Surface — Documented Exception" section in the agent body, which
+      // is the human-auditable rationale that justifies the privilege. Honour
+      // the allowlist ONLY while that section is actually present: otherwise
+      // deleting or renaming the heading silently drops the justification
+      // while CI keeps passing, and the Write-capable reviewer keeps its
+      // grant with nothing left explaining why it has it.
+      const hasDocumentedException =
+        /^##+[ \t]+Tool Surface[ \t]+—[ \t]+Documented(?:[ \t]+\S+)?[ \t]+Exception[ \t]*$/m.test(
+          content
+        );
+      const allowedExceptionTools = hasDocumentedException
+        ? REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath)
+        : undefined;
+      if (!hasDocumentedException && REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
+        errors.push(
+          `${relative(filePath)}: listed in REVIEW_AGENT_ALLOWLIST but has no ` +
+            `"## Tool Surface — Documented Exception" section — the allowlist ` +
+            `entry grants the tool, that section is what justifies it. Restore ` +
+            `the section or remove the allowlist entry.`
+        );
+      }
       const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
         t.toLowerCase()
       );

@@ -16,7 +16,9 @@ and never auto-commits. The user decides what to do with the verdicts.
 ## Required Environment
 
 - **Bash 4.3+** — for associative arrays and `${var^}` case-conversion used in `/council` orchestration
-- **GNU coreutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`, `grep`
+- **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
+  `grep`, and `find` (the last drives the stale-`/tmp` sweep; without it a
+  cancelled run leaves raw reviewer output behind until the OS reaps `/tmp`)
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
