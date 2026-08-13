@@ -855,7 +855,7 @@ function validateAgentFile(filePath, ctx) {
         // optional qualifier some files carry ("Documented Bash Exception"),
         // so the normative spelling and the actual one both satisfy this.
         /^##+[ \t]+Tool Surface[ \t]+[-\u2013\u2014][ \t]+Documented(?:[ \t]+\S+)?[ \t]+Exception[ \t]*$/m.test(
-          content
+          liveBody
         );
       const allowedExceptionTools = hasDocumentedException
         ? REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath)
