@@ -489,16 +489,7 @@ parse_reviewer_return() {
       }
       if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
       if (in_pem) {
-        # Normalize before the tail anchor, exactly as the BEGIN classifier does.
-        # A key serialized as JSON or a table cell ends with a WRAPPED marker
-        # ("-----END ...", or | -----END ... |); tested raw, the trailing quote or
-        # pipe defeats the anchor, the block never terminates, and redaction eats
-        # the rest of the report including Verdict:/Confidence:. strip_deco removes
-        # only matched wrappers, so a decoy END with genuine garbage trailing it
-        # ("-----END PRIVATE KEY----- extra") still fails the anchor and still
-        # falls through to the re-arm path, which is the behaviour that keeps a
-        # hostile producer from disarming redaction early.
-        if (strip_deco($0) ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
           pem_prev_real = pem_real
           in_pem = 0
           pem_watch = 5
@@ -615,6 +606,21 @@ parse_reviewer_return() {
       fenced_path=""
       verdict="ERROR"
       summary="claude-reviewer returned a fenced path this run did not mint; output discarded."
+      findings=""
+    elif [ -n "$fenced_path" ]; then
+      # The path IS the minted one, but it is not a usable regular file: the
+      # agent's Write failed, it never created the file, or something replaced
+      # it with a symlink. Without this arm neither branch above fires, so the
+      # path and an apparently valid APPROVE/REVISE survive into $STATE_FILE —
+      # Step 5 then counts a vote whose mandated sanitized source cannot be
+      # read, and the headline claims a reviewer participated while the
+      # appendix reports its output missing. Same treatment as an unexpected
+      # path: fail the slot closed.
+      printf '[council] Warning: claude fenced path %s is missing or not a regular file — failing the slot\n' \
+        "$fenced_path" >&2
+      fenced_path=""
+      verdict="ERROR"
+      summary="claude-reviewer produced no readable fenced output; slot recorded as ERROR."
       findings=""
     fi
   fi
@@ -1164,16 +1170,7 @@ for reviewer in claude codex gemini opencode; do
         }
         if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
         if (in_pem) {
-          # Normalize before the tail anchor, exactly as the BEGIN classifier does.
-          # A key serialized as JSON or a table cell ends with a WRAPPED marker
-          # ("-----END ...", or | -----END ... |); tested raw, the trailing quote or
-          # pipe defeats the anchor, the block never terminates, and redaction eats
-          # the rest of the report including Verdict:/Confidence:. strip_deco removes
-          # only matched wrappers, so a decoy END with genuine garbage trailing it
-          # ("-----END PRIVATE KEY----- extra") still fails the anchor and still
-          # falls through to the re-arm path, which is the behaviour that keeps a
-          # hostile producer from disarming redaction early.
-          if (strip_deco($0) ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+          if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
             pem_prev_real = pem_real
             in_pem = 0
             pem_watch = 5

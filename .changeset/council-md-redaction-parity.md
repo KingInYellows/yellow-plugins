@@ -24,3 +24,10 @@ model context, bypassing the redaction entirely. Step 4 now redacts the
 persisted fenced file in place (failing closed by truncating if the pass
 errors), and Step 5 states that reviewer text must be read from that file
 rather than from the Task return.
+
+Step 4b also had no arm for "the path is the minted one but the file is not
+usable" — the agent's `Write` failed, never ran, or the file was replaced by a
+symlink. Neither the redaction branch nor the unexpected-path branch fired, so
+the path and an apparently valid verdict survived into `$STATE_FILE` and Step 5
+counted a vote whose sanitized source could not be read. That case now fails the
+slot closed, the same way an unexpected path does.
