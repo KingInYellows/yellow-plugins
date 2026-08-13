@@ -331,6 +331,19 @@ assert_survives_under_all() {
   done
 }
 
+@test "a new block retires the previous block's re-arm window" {
+  # pem_watch only decrements while !in_pem, so a countdown still running when
+  # a new BEGIN opens is frozen for that whole block and resumes afterwards
+  # with a stale count — and the re-arm path restores pem_real from
+  # pem_prev_real, which belongs to the OLDER block. A base64-ish prose line
+  # arriving later then re-entered UNBOUNDED real mode on the strength of a key
+  # that had already closed, swallowing the report.
+  local input
+  input="$(printf '%s\n%s\n%s\nnote: the header is %s\nshort prose\nmore prose\nthird prose\naGVsbG8gd29ybGQgMTIzNDU2Nzg5\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$WIDE_BODY" "$END_PK" "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
 @test "a line of pure dashes does not hang the prefix stripper" {
   # The repeated strip is bounded; a horizontal rule must terminate.
   local input

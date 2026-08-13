@@ -495,6 +495,14 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
+      # Retire any re-arm window left over from an EARLIER block. pem_watch is
+      # only decremented while !in_pem, so a countdown still running when this
+      # BEGIN opens is frozen for the whole of this block and resumes after it
+      # with a stale count -- and the re-arm path restores pem_real from
+      # pem_prev_real, which belongs to that older block. A prose mention could
+      # then re-enter UNBOUNDED real mode on the strength of a key that ended
+      # long before. The window belongs to the block that closed, so close it.
+      pem_watch = 0
       # deco_exhausted: strip_deco could not reach its fixpoint, so pem_check
       # may still carry decoration and cannot be trusted to fail the anchor
       # honestly. Fail closed -- treat the block as a real key.

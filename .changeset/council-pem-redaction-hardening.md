@@ -57,3 +57,11 @@ a JSON string is therefore still classified as a mention and takes the bounded
 window — the same accepted trade as an inline-prose mention, recorded in the
 plugin Known Limitations. Handling serialized shapes safely needs the bounded
 window's width floor reworked alongside it, which belongs in its own change.
+
+A re-arm window left over from an earlier block was never retired when a new
+BEGIN opened. `pem_watch` only decrements while outside a block, so a countdown
+still running was frozen for the whole of the next block and resumed afterwards
+with a stale count — and the re-arm path restores the real/prose mode from the
+PREVIOUS block, so a later base64-shaped prose line could re-enter unbounded
+redaction on the strength of a key that had already closed, swallowing the
+report. Opening a block now closes any window that belongs to an earlier one.
