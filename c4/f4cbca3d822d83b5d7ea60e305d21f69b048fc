@@ -23,6 +23,7 @@ catalog/plugins/yellow-council.json
 plugins/yellow-council/README.md
   s_6c2a352ad27053::t_46bb3634a9ff0f 28
   s_6c2a352ad27053::t_2c4a3109accee2 3-5
+  s_3bb494324db8bc::t_72cb56a57b534e 77
 ---
 {
   "schema_version": "authorship/3.0.0",
