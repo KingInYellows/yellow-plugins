@@ -695,8 +695,19 @@ parse_reviewer_return() {
     # removed: if a future revision of the agent returns prose anyway, it is
     # still scrubbed before anything stores it.
     if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
-      summary=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$fenced_path")
-      findings=$(awk '/^Findings:/ { c = 1; next } /^Summary: / { c = 0 } c' "$fenced_path")
+      summary=$(awk '/^Summary: / { sub(/^Summary: /, ""); print }' "$fenced_path" | tail -n 1)
+      # Bound the findings capture by the FENCE END, not by the first
+      # `Summary: ` line. A finding body that begins with that literal prefix
+      # (plausible when a finding restates an issue title) would otherwise stop
+      # the capture early and silently drop every finding after it. Summary is
+      # the last field before the fence by contract, so buffer the block and
+      # cut at the LAST top-level Summary line instead of the first.
+      findings=$(awk '
+        /^Findings:/ { c = 1; next }
+        /^--- end council-output:/ { c = 0 }
+        c { buf[++n] = $0; if ($0 ~ /^Summary: /) last = n }
+        END { for (i = 1; i <= (last ? last - 1 : n); i++) print buf[i] }
+      ' "$fenced_path")
     fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
@@ -763,8 +774,16 @@ before storing them (Step 4) — the three CLI legs' fields need no equivalent
 pass here because they derive from a `REDACTED_FILE` the agent already
 redacted.
 
-**Read every reviewer's summary and findings from the sanitized file at that
-reviewer's `$STATE_FILE` path — never from the Task return in context.** The
+**For the claude leg, read its summary and findings from the sanitized file at
+its `$STATE_FILE` path — never from the Task return in context.** The CLI legs
+differ and the distinction matters: they redact inside their own agent before
+returning, so their Task return is already sanitized and is a legitimate source.
+That is not optional generosity — `yellow-codex`'s reviewer writes only its
+escaped findings plus fence framing to its fenced file, so its overall summary
+exists ONLY in that (already redacted) return. Demanding the file for every leg
+would either drop Codex's explanation from synthesis or force a fallback to raw
+context. The claude leg is the one that cannot sanitize its own return, which is
+why it, and only it, must be read from disk. The
 Bash arrays Step 4 filled do not exist here: each Bash block runs in its own
 subprocess, so `REVIEWER_SUMMARIES`/`REVIEWER_FINDINGS` are gone by the time
 this step runs. The raw Task return IS still in context, and synthesizing

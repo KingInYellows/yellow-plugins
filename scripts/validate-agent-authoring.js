@@ -840,6 +840,15 @@ function validateAgentFile(filePath, ctx) {
       // deleting or renaming the heading silently drops the justification
       // while CI keeps passing, and the Write-capable reviewer keeps its
       // grant with nothing left explaining why it has it.
+      // Test LIVE markdown only. Against the raw file the heading also matches
+      // inside an HTML comment or a fenced example, so an agent could keep its
+      // privileged grant with the real rationale deleted and only a commented-out
+      // or illustrative copy of the heading left behind — the exact audit the
+      // check exists to guarantee.
+      const liveBody = stripFencedContent(content).replace(
+        /<!--[\s\S]*?-->/g,
+        ''
+      );
       const hasDocumentedException =
         // AGENTS.md writes the heading with an ASCII hyphen; every shipped
         // agent uses an em dash. Accept either (and an en dash), plus the

@@ -162,8 +162,13 @@ To exercise a genuinely empty council, the in-process slot has to fail too —
 cancel it, or feed it a malformed pack so it returns `verdict=ERROR`:
 
 ```text
-# Expected: "Council failed: 0 of 4 reviewers returned verdicts"
+# Expected: "Council ran with 0 of 4 reviewers (...)"
 ```
+
+There is no separate all-failed headline — `council.md`'s Failure Modes table
+says so explicitly, and Step 5 renders the same `Council ran with N of 4
+reviewers` template at every N. A tester looking for a distinct "Council failed"
+string will not find one, because the code never emits it.
 
 ### 3.4 — M3 cancel path
 

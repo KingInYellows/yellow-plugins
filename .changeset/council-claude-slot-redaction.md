@@ -63,3 +63,20 @@ cannot, so anything it returned entered orchestrator context raw — and once re
 no later pass can retract it. Sanitizing the file afterwards was too late by
 construction. Verdict and confidence are still returned directly, being enum-
 constrained with no free text.
+
+Four corrections to the above, from review of it:
+
+- The EMPTY-return rule is scoped to the SUCCESS path. Step 1's malformed-pack
+  and Step 3's refused-path branches produce no fenced file, so their fixed
+  diagnostic summaries must still be returned or the reason is lost; they are
+  constant strings, not pack-derived prose, and are redacted on arrival.
+- Only the claude leg is read from disk. The CLI legs redact inside their own
+  agent before returning, and `yellow-codex`'s reviewer writes only findings to
+  its fenced file — its summary exists solely in that already-redacted return,
+  so demanding the file for every leg would have dropped Codex's explanation.
+- The findings capture is bounded by the fence end and cut at the LAST
+  `Summary: ` line rather than the first, so a finding whose body starts with
+  that literal prefix no longer truncates every finding after it.
+- The documented-exception heading check runs on live markdown, with fenced
+  blocks and HTML comments stripped first — otherwise a commented-out or
+  illustrative copy of the heading kept the privileged grant alive.
