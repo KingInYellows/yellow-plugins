@@ -703,8 +703,25 @@ parse_reviewer_return() {
       # preferring either — a disagreement means one of them is not the
       # reviewer's actual judgement, and there is no way to tell which.
       local file_verdict file_confidence
-      file_verdict=$(awk '/^Verdict: / { sub(/^Verdict: /, ""); print; exit }' "$fenced_path")
-      file_confidence=$(awk '/^Confidence: / { sub(/^Confidence: /, ""); print; exit }' "$fenced_path")
+      # Require EXACTLY ONE verdict, inside the claude fence. A first-match
+      # parser over the whole file accepts a forged `Verdict: APPROVE` quoted
+      # ahead of the reviewer`s real one; if the Layer-2 return carries the same
+      # forged value the consistency check below passes and the headline counts
+      # a vote the appendix contradicts. Zero matches or more than one both
+      # yield an empty value here, which the check treats as a mismatch and
+      # fails the slot — the safe direction for an ambiguous vote.
+      file_verdict=$(awk '
+        /^--- begin council-output:claude/ { inf = 1; next }
+        /^--- end council-output:claude/   { inf = 0 }
+        inf && /^Verdict: /    { sub(/^Verdict: /, "");    v[++nv] = $0 }
+        END { if (nv == 1) print v[1] }
+      ' "$fenced_path")
+      file_confidence=$(awk '
+        /^--- begin council-output:claude/ { inf = 1; next }
+        /^--- end council-output:claude/   { inf = 0 }
+        inf && /^Confidence: / { sub(/^Confidence: /, ""); c[++nc] = $0 }
+        END { if (nc == 1) print c[1] }
+      ' "$fenced_path")
       # A MISSING file verdict is a mismatch too, not an exemption. Skipping the
       # check when the file has no `Verdict:` line would let the independently
       # generated Task-return vote stand while the persisted appendix shows no

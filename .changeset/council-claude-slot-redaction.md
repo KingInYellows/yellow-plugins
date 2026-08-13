@@ -95,3 +95,11 @@ Task-return vote cannot stand while the appendix shows no vote at all; and both
 interpolated values are redacted before reaching stderr, since neither has been
 through the enum coercion or the redaction pass at that point and a malformed
 return can carry credential-shaped text in `verdict=`.
+
+The fenced verdict must now be UNIQUE and inside the claude fence: a first-match
+parser over the whole file accepted a forged `Verdict:` quoted ahead of the real
+one, and a matching forged Layer-2 return would then pass the consistency check.
+Zero or multiple matches both fail the slot. The fenced-file schema also gains
+`UNKNOWN`, which Step 2 already requires for the early-stop path — without it,
+following the template produced a verdict the consistency check turned into
+ERROR on every partial review.
