@@ -1,0 +1,256 @@
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_6c2a352ad27053::t_c05f38e0809a09 1-39,214-250,273-274,289-294,296-330,332-333,334-336,360-367,374-392
+  s_6c2a352ad27053::t_8ab95ffecf7772 393-395
+  s_6c2a352ad27053::t_d79460ea66cad6 174-213
+  s_6c2a352ad27053::t_a93fb7601d815a 40-74,86-124,129-130,159-173
+  s_6c2a352ad27053::t_902090c68d1b2d 396-402
+  s_6c2a352ad27053::t_eeacc1e1dd1ca3 75-85
+  s_6c2a352ad27053::t_94cc6c2e2c4df6 131-143
+  s_6c2a352ad27053::t_debba83ea81b50 251-263
+  s_6c2a352ad27053::t_d7ee629f512411 275-288
+  s_6c2a352ad27053::t_593d049291ce6e 125-128
+  s_6c2a352ad27053::t_b8d64c9dd39d19 368-373
+  s_6c2a352ad27053::t_a17cc0ee9e2a48 265-272
+  s_6c2a352ad27053::t_4db69d14c208f6 145-158
+  s_6c2a352ad27053::t_5b0940990c3398 264
+scripts/validate-agent-authoring.js
+  s_6c2a352ad27053::t_863710f0733a94 96-106
+  s_69313f122f35b8::t_f609de9e3e9378 72-82,86,107-109
+  s_69313f122f35b8::t_c5e91dfe278e7f 91-95
+  s_69313f122f35b8::t_50bcef5212e46d 830-835,871-886,888-911,913,915-920
+  s_3bb494324db8bc::t_808c50f7ef9426 836-842,852,859-870
+plugins/yellow-council/commands/council/council.md
+  s_6c2a352ad27053::t_45e7e3173bffb5 217-224,264-269,278-290,299-310,313-314,316
+  s_6c2a352ad27053::t_100e1ee448beae 1147
+  s_6c2a352ad27053::t_2b1da776fe42f9 1683-1685
+  s_6c2a352ad27053::t_1ccf9359da3eaf 1699
+  s_6c2a352ad27053::t_1d80141ab7eb99 19-21
+  s_6c2a352ad27053::t_76a3aa1832c73a 922,924-925,929
+  s_6c2a352ad27053::t_01a66462fe1768 331
+  s_6c2a352ad27053::t_e2543fcbfbb57b 3
+  s_6c2a352ad27053::t_5c43a4ad3cb288 1128-1138,1158,1159,1172-1175,1177-1178
+  s_6c2a352ad27053::t_35a388342643be 270-277
+  s_6c2a352ad27053::t_1a18655181a819 1527-1534,1626-1633
+  s_6c2a352ad27053::t_ea41ca57cab989 1160-1168,1170-1171,1179-1181
+  s_6c2a352ad27053::t_3fd6faeec8d5c7 1535-1542,1548,1550,1634-1641,1647,1649
+  s_6c2a352ad27053::t_676e133da4be24 1032-1033,1039,1041-1048
+  s_6c2a352ad27053::t_819dd5aec1d898 1013-1017,1026,1030-1031,1049-1053,1068-1069,1082
+  s_6c2a352ad27053::t_e7554df157f4e5 1498-1503,1509,1511-1525,1597-1602,1608,1610-1624
+  s_6c2a352ad27053::t_fa1303af31a6d9 1054-1055,1066-1067
+  s_6c2a352ad27053::t_24ca78d3dec38b 1576-1579,1582
+  s_6c2a352ad27053::t_ad3896d5e280a0 1651-1653
+  s_6c2a352ad27053::t_ce9ffb3e7df65d 1056-1061,1065
+  s_6c2a352ad27053::t_96eb1148f652dc 1487-1492,1494,1587-1592,1594
+  s_6c2a352ad27053::t_3e1315461a0d4a 1021-1022
+  s_6c2a352ad27053::t_df58cabafbe916 1551,1650
+  s_6c2a352ad27053::t_f3c6fd1c13b1c2 1027-1029
+  s_6c2a352ad27053::t_310c166260f7c4 1018-1020
+  s_6c2a352ad27053::t_fbc34c1daa60b0 1023-1025,1676,1682
+  s_6c2a352ad27053::t_f5a88a59385ef9 1092-1097,1101-1111,1114,1119
+  s_6c2a352ad27053::t_c8b8a1d17b2886 1543-1547,1549,1642-1646,1648
+  s_6c2a352ad27053::t_c73721d4d4fddd 1070-1079
+  s_6c2a352ad27053::t_7ca5b97e70201f 1182-1190,1191-1193,1234-1235,1341,1381-1383,1433-1435,1440,1443-1455,1460
+  s_6c2a352ad27053::t_6daa47a003020e 783-788,801-802,803,811,813-816,818-819
+  s_6c2a352ad27053::t_13a763b0f8c3bf 1139-1146,1149-1157
+  s_6c2a352ad27053::t_7f35092cd4ddbd 1008-1012
+  s_6c2a352ad27053::t_39faf5cf4a921c 1062-1064
+  s_dbe8034b0f3e9c::t_04feace791e141 1424-1426
+  s_dbe8034b0f3e9c::t_9917f97b3e0d43 1169,1176
+  s_6c2a352ad27053::t_154c1e9db6c97e 789-800,817
+  s_dbe8034b0f3e9c::t_91870a4035afc8 1034-1038,1040
+  s_dbe8034b0f3e9c::t_490180d67aa2d6 1504-1508,1510,1603-1607,1609
+  s_dbe8034b0f3e9c::t_658b489d7ab1f1 1403,1412
+  s_dbe8034b0f3e9c::t_c8bfaae4fcf206 841-844,865-868
+  s_dbe8034b0f3e9c::t_8e98d0c2c7de68 359-369,555,565-566,782
+  s_dbe8034b0f3e9c::t_b1e7f62fb82ea2 1098-1100,1112-1113
+  s_dbe8034b0f3e9c::t_66212d55bb8fec 1687
+  s_69313f122f35b8::t_a940a8a238d681 225-230,245,249,252-261,263
+  s_69313f122f35b8::t_5625b8daecd3cf 291-295
+  s_69313f122f35b8::t_bed7146840bb57 440,520,522,525,531,553-554
+  s_69313f122f35b8::t_9e259bf4ff52fb 804-810,812
+  s_69313f122f35b8::t_8a93238c75fd93 1260,1340,1342,1345,1351,1373-1375
+  s_69313f122f35b8::t_5d6b2ed5ee7a68 370-373,414-415,521,561-563
+  s_69313f122f35b8::t_44122a4230f241 1384-1398,1400-1401,1417-1418,1422-1423,1427-1432
+  s_69313f122f35b8::t_1d890de8ba4eb9 564
+  s_69313f122f35b8::t_c82332f5d7b54f 374-382,384-387,389-397,409-413,416-439,441-465,472-476,478-507,509,512-519,523-524,526-530,532-552,556-560
+  s_69313f122f35b8::t_afcd61dbc89ff5 231-244,246-248,250-251,262
+  s_69313f122f35b8::t_4264478ff4f393 1194-1202,1204-1207,1209-1217,1229-1233,1236-1259,1261-1285,1292-1296,1298-1327,1329,1332-1339,1343-1344,1346-1350,1352-1372,1376-1380
+  s_69313f122f35b8::t_1c3eaed607adf9 1686
+  s_44086bc4cefe03::t_5a6e47edaac314 845-846,857-864
+  s_44086bc4cefe03::t_2b7a8ec541265c 383,388,398,400-408,477,508,510-511,1203,1208,1218,1220-1228,1297,1328,1330-1331
+  s_44086bc4cefe03::t_10020c253ec148 567-577,644,646,647,655,704
+  s_44086bc4cefe03::t_0d470aafdf84e0 399,1219
+  s_44086bc4cefe03::t_37d8724210e099 578-585,587-589,605-609,625-627,629-632,634-637,656,681
+  s_3bb494324db8bc::t_98f37aa312c3d7 610-617,624
+  s_3bb494324db8bc::t_62ac4e33f93320 590-604
+  s_3bb494324db8bc::t_4a763524a1ad24 657-665,667-670
+  s_3bb494324db8bc::t_b3eabd15f88475 523,1343
+  s_3bb494324db8bc::t_4e806b456b68e9 671-685
+  s_3bb494324db8bc::t_5c407f9ac03622 691-703
+  s_3bb494324db8bc::t_aae9501206b8e9 586,618-623,628,633,638-654,686-690
+  h_6000354274ce50 466-471,1286-1291
+  s_3bb494324db8bc::t_b745861bd51777 1402-1416,1419-1421
+  s_3bb494324db8bc::t_aadd6f51056d4f 43-47
+  s_dbe8034b0f3e9c::t_ffae6248433498 178
+  s_dbe8034b0f3e9c::t_e867a5024a3837 169-176,179-184,186
+  s_6c2a352ad27053::t_0c7e460b781cb8 126-132
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_6c2a352ad27053::t_b47bd7b40164f3 3
+  s_6c2a352ad27053::t_789be695d35fc3 350-353
+  s_6c2a352ad27053::t_cdd0971c3482d0 414-423,425,428
+  s_6c2a352ad27053::t_8d942076863fb6 106,124-132
+  s_6c2a352ad27053::t_df3e2d95e0b3eb 439
+  s_6c2a352ad27053::t_43b2b24b374fac 381-385
+  s_6c2a352ad27053::t_a60a05183d5939 24-27,36-37
+  s_6c2a352ad27053::t_73a817c9ca4ff8 208-212
+  s_6c2a352ad27053::t_bada3e5c8a66c1 47-50
+  s_6c2a352ad27053::t_ae374db5a8ebf7 133,224
+  s_6c2a352ad27053::t_ccb061ef00c704 518-526
+  s_6c2a352ad27053::t_fd604c205c5412 355-363
+  s_6c2a352ad27053::t_f2d5ca96043a75 217-223
+  s_6c2a352ad27053::t_25501a0930af39 28-32
+  s_6c2a352ad27053::t_460ec318eeb9b2 527-528,530,532-535
+  s_6c2a352ad27053::t_81eb287daaf987 424,426-427
+.claude-plugin/marketplace.json
+  s_6c2a352ad27053::t_a6e0905a9be042 166
+plugins/yellow-council/.claude-plugin/plugin.json
+  s_6c2a352ad27053::t_a6e0905a9be042 5
+plugins/yellow-council/commands/council/setup.md
+  s_6c2a352ad27053::t_52ac0a3d634504 145-149
+  s_6c2a352ad27053::t_bf17af67b34d12 174,176-178,181
+  s_3bb494324db8bc::t_2e9fced5238ba9 24,30
+plugins/yellow-council/CLAUDE.md
+  s_6c2a352ad27053::t_3667a057302274 30
+  s_6c2a352ad27053::t_6c5fc878f26d7d 139
+  s_6c2a352ad27053::t_2789fbb221aedb 222-223
+  s_6c2a352ad27053::t_66ff06707a12fa 90-102
+  s_6c2a352ad27053::t_4e0e7d0565f372 80
+  s_6c2a352ad27053::t_9cf32408f9ce1f 34,36-45
+  s_6c2a352ad27053::t_1e5b5192dcfaa5 3-6
+  s_6c2a352ad27053::t_026462278f3602 168-178
+  s_6c2a352ad27053::t_64e9fadc4648c0 161-167
+  s_6c2a352ad27053::t_2ef3a197e1fd3f 52-58
+  s_3bb494324db8bc::t_058babe0125197 179-191
+  s_3bb494324db8bc::t_2e9fced5238ba9 19-21
+README.md
+  s_6c2a352ad27053::t_955a3bdf0771e4 273
+  s_6c2a352ad27053::t_aec4e0ff3e2eba 31
+plugins/yellow-council/package.json
+  s_6c2a352ad27053::t_a080ebbab8729a 5
+catalog/plugins/yellow-council.json
+  s_6c2a352ad27053::t_a66bff779f43a0 3
+plugins/yellow-council/README.md
+  s_6c2a352ad27053::t_46bb3634a9ff0f 28
+  s_6c2a352ad27053::t_2c4a3109accee2 3-5
+  s_6c2a352ad27053::t_fce92efcd898b1 86
+.changeset/yellow-council-claude-reviewer-fanout.md
+  s_6c2a352ad27053::t_384c6e8d832bef 1-36
+  s_69313f122f35b8::t_1dfb82247b5ad4 49-50
+  s_69313f122f35b8::t_84c4c645b67f07 37-48,51-60
+  s_3bb494324db8bc::t_af02ba5bcc32b9 61-78
+plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  s_6c2a352ad27053::t_f478b64c979a9e 169
+  s_6c2a352ad27053::t_8b5cff29171280 179
+  s_6c2a352ad27053::t_b228aa1b80a617 150
+  s_6c2a352ad27053::t_46da9e6dbfccc2 121
+  s_272aff645fd807::t_fb3d3ea7f18c5b 1-120,122-133,135-141,143-149,151-156,158-160,167-168,170-178,180-184,186-195,197-236
+  s_6c2a352ad27053::t_45746209eee860 157
+  s_6c2a352ad27053::t_8a3e181d0ffd08 142
+  s_6c2a352ad27053::t_a236c2ff2a1f8c 185
+  s_6c2a352ad27053::t_228af5359549ec 134
+  s_6c2a352ad27053::t_70029a904a5a96 196
+  s_dbe8034b0f3e9c::t_25fe3a4cb28d17 164-166
+  s_dbe8034b0f3e9c::t_98c572b9f4929d 161-163
+docs/CONCEPTS.md
+  s_272aff645fd807::t_4dc927d42c0f59 49-51,55-57,62-66
+  s_6c2a352ad27053::t_a957bcaed353d9 52-54,58-61
+docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md
+  s_272aff645fd807::t_e932af15c00d71 1-57,64-144,152-159
+  s_dbe8034b0f3e9c::t_4e665e44e3c3e7 58-63
+  s_69313f122f35b8::t_bacc3665a33439 145-151
+docs/security.md
+  s_6c2a352ad27053::t_248763d01f05dc 257-263,275-296
+  s_6c2a352ad27053::t_706cbf31a265e0 32-35
+  s_dbe8034b0f3e9c::t_26f0781026dbd2 264-274
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_dbe8034b0f3e9c::t_e421fdb628b513 169,484
+tests/integration/validate-agent-authoring-w15b.test.ts
+  s_69313f122f35b8::t_d1f74d32f83cc6 149-151,154
+  s_69313f122f35b8::t_5696a2aeea018a 333,340-341
+tests/integration/validate-agent-authoring-review-rule.test.ts
+  s_69313f122f35b8::t_c65796c9371888 107-113,115-122,145-167
+  s_3bb494324db8bc::t_44288fc75d9963 43-51,98,114,123-144
+.changeset/yellow-council-base-flag-rest-rederive.md
+  s_6c2a352ad27053::t_dcd641880a3936 1-18
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_dbe8034b0f3e9c::t_dc53e79e0a9300 452-497
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "14df1acad947f8092110ecf4034a0f798764ee50",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  },
+  "sessions": {
+    "s_272aff645fd807": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "612ee0ae-3b97-4524-b10f-bd2899fbf1f1",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_44086bc4cefe03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c892ae64-321b-4803-8573-afdef91d0406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_9101bf3f47ec09": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cbd7d37-b29a-40bf-ab74-760730978964",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_dbe8034b0f3e9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7641ec5c-3b7e-4580-9864-e17959d2a2f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
