@@ -88,3 +88,10 @@ authoritative, so a return claiming `APPROVE` while its own fenced file said
 contradicted. The two are compared and the slot fails closed when they differ —
 a disagreement means one of them is not the reviewer's judgement and there is no
 way to tell which.
+
+Two corrections to that consistency check: a MISSING `Verdict:` line in the
+fenced file is treated as a mismatch rather than an exemption, so the
+Task-return vote cannot stand while the appendix shows no vote at all; and both
+interpolated values are redacted before reaching stderr, since neither has been
+through the enum coercion or the redaction pass at that point and a malformed
+return can carry credential-shaped text in `verdict=`.

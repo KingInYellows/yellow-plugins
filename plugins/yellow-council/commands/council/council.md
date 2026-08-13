@@ -705,11 +705,23 @@ parse_reviewer_return() {
       local file_verdict file_confidence
       file_verdict=$(awk '/^Verdict: / { sub(/^Verdict: /, ""); print; exit }' "$fenced_path")
       file_confidence=$(awk '/^Confidence: / { sub(/^Confidence: /, ""); print; exit }' "$fenced_path")
-      if [ -n "$file_verdict" ] && [ "$file_verdict" != "$verdict" ]; then
+      # A MISSING file verdict is a mismatch too, not an exemption. Skipping the
+      # check when the file has no `Verdict:` line would let the independently
+      # generated Task-return vote stand while the persisted appendix shows no
+      # vote at all.
+      if [ -z "$file_verdict" ] || [ "$file_verdict" != "$verdict" ]; then
+        # Both values are still REVIEWER-CONTROLLED and unvalidated at this
+        # point — the enum coercion and the redaction pass both run later — so
+        # a malformed or injected return can carry credential-shaped text in
+        # `verdict=`. Redact before they reach stderr; a diagnostic that prints
+        # raw reviewer bytes is the leak this function exists to prevent.
+        local shown_return shown_file
+        shown_return=$(printf '%s\n' "$verdict" | awk "$redact_awk")
+        shown_file=$(printf '%s\n' "${file_verdict:-<none>}" | awk "$redact_awk")
         printf '[council] Warning: claude returned verdict=%s but its fenced file says %s — failing the slot\n' \
-          "$verdict" "$file_verdict" >&2
+          "$shown_return" "$shown_file" >&2
         verdict="ERROR"
-        summary="claude-reviewer returned a verdict its own output contradicts; slot recorded as ERROR."
+        summary="claude-reviewer returned a verdict its own output does not corroborate; slot recorded as ERROR."
         findings=""
         fenced_path=""
       else
