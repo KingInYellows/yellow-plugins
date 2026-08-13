@@ -1,0 +1,37 @@
+tests/integration/validate-agent-authoring-w15b.test.ts
+  s_69313f122f35b8::t_d1f74d32f83cc6 149-151,154
+  s_69313f122f35b8::t_5696a2aeea018a 333,340-341
+plugins/yellow-council/commands/council/council.md
+  s_69313f122f35b8::t_a940a8a238d681 200-225
+  s_69313f122f35b8::t_5625b8daecd3cf 253-257
+  s_69313f122f35b8::t_bed7146840bb57 348-366,368-388
+  s_69313f122f35b8::t_9e259bf4ff52fb 418-424,426
+  s_69313f122f35b8::t_8a93238c75fd93 801-820,822-843
+  s_69313f122f35b8::t_5d6b2ed5ee7a68 332-347,367,390-392
+  s_69313f122f35b8::t_44122a4230f241 847-861,863-871,875-880
+  s_69313f122f35b8::t_1d890de8ba4eb9 393
+scripts/validate-agent-authoring.js
+  s_69313f122f35b8::t_f609de9e3e9378 72-82,86,107-109
+  s_69313f122f35b8::t_c5e91dfe278e7f 91-95
+  s_69313f122f35b8::t_50bcef5212e46d 830-852,854-877,879,881-886
+tests/integration/validate-agent-authoring-review-rule.test.ts
+  s_69313f122f35b8::t_c65796c9371888 98-136
+docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md
+  s_69313f122f35b8::t_bacc3665a33439 145-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "87c33ddbe4fa364cb161179c36b8cf7eb595deed",
+  "prompts": {},
+  "sessions": {
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

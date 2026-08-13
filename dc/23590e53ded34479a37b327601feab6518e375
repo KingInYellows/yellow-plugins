@@ -1,0 +1,59 @@
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_6c2a352ad27053::t_c05f38e0809a09 1-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "dc23590e53ded34479a37b327601feab6518e375",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_44086bc4cefe03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c892ae64-321b-4803-8573-afdef91d0406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_9101bf3f47ec09": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cbd7d37-b29a-40bf-ab74-760730978964",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_dbe8034b0f3e9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7641ec5c-3b7e-4580-9864-e17959d2a2f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
