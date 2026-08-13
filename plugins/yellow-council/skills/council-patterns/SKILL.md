@@ -171,13 +171,15 @@ function strip_deco(s,   prev, guard, limit) {
   # caller fail CLOSED (treat the line as a real key) instead of falling
   # through to the bounded path. No test exercises this arm today -- it exists
   # so a future edit degrades safely rather than silently leaking.
-  # A dash run must be consumed one character per pass (see the delimiter
-  # guard below), and each pass copies the remainder, so cost is quadratic in
-  # the run length: a 100k-character run measurably stalls the redaction pass
-  # and can outlast the timeout that is supposed to bound it. No legitimate
-  # marker line comes close to this length, so refuse to spend the time and
-  # fail CLOSED - the caller treats an unnormalised line as a real key.
-  if (length(s) > 4096) { deco_exhausted = 1; return s }
+  # A "+" run is consumed whole below, so the common flood case is linear. A
+  # long "-" run still costs one pass per character (the delimiter guard has to
+  # re-test after each removal), which is quadratic in the run length. An
+  # earlier revision bounded that with a flat length cap that failed CLOSED,
+  # but keying "this is a real key" off LENGTH ALONE meant any long line that
+  # merely MENTIONED a marker was promoted to a real key and swallowed the
+  # report through EOF. Cost is bounded here only for the "+" case; a hostile
+  # "-" flood is a known open issue, tracked rather than papered over with a
+  # guard that misclassifies.
   guard = 0
   limit = length(s) + 2
   do {
@@ -193,17 +195,6 @@ function strip_deco(s,   prev, guard, limit) {
     # anchored test downstream.
     if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
     sub(/^[[:space:]]+/, "", s)
-    # SERIALIZED wrappers, stripped as a matched PAIR. A reviewer that emits
-    # JSON (OpenCode runs with --format json) or a markdown table renders a key
-    # line as a quoted string or a table cell. Those wrap the marker rather
-    # than precede it, so nothing above removes them, the anchored classifier
-    # fails, and a genuine key drops to the bounded path where a narrow body
-    # leaks. Requiring a MATCHED pair keeps this consistent with the whole-line
-    # rule: the entire line must BE the quoted or celled value, so a sentence
-    # that merely quotes a header keeps its prefix and still reads as a
-    # mention.
-    sub(/[[:space:]]*\|[[:space:]]*$/, "", s)
-    if (s ~ /^".*"[,;]?$/) { sub(/^"/, "", s); sub(/"[,;]?$/, "", s) }
   } while (s != prev && ++guard < limit)
   deco_exhausted = (s != prev)
   sub(/[[:space:]]+$/, "", s)
@@ -364,16 +355,7 @@ function is_base64_line(s, minlen) {
   }
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
   if (in_pem) {
-    # Normalize before the tail anchor, exactly as the BEGIN classifier does.
-    # A key serialized as JSON or a table cell ends with a WRAPPED marker
-    # ("-----END ...", or | -----END ... |); tested raw, the trailing quote or
-    # pipe defeats the anchor, the block never terminates, and redaction eats
-    # the rest of the report including Verdict:/Confidence:. strip_deco removes
-    # only matched wrappers, so a decoy END with genuine garbage trailing it
-    # ("-----END PRIVATE KEY----- extra") still fails the anchor and still
-    # falls through to the re-arm path, which is the behaviour that keeps a
-    # hostile producer from disarming redaction early.
-    if (strip_deco($0) ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
       pem_prev_real = pem_real
       in_pem = 0
       pem_watch = 5

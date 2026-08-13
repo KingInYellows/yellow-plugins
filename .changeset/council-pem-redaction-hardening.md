@@ -41,11 +41,19 @@ Round two, from continued review of the above:
 - Decoration stripping consumed a `+` run one character per pass while copying
   the remainder, so an attacker-supplied run was quadratic in its length — a
   100k-character run took roughly ten seconds and could outlast the timeout
-  meant to bound the redaction step. `+` runs are now taken whole, and a line
-  longer than any real marker fails closed rather than being normalized at all.
-- A key serialized as JSON strings (OpenCode runs with `--format json`) or as
-  markdown table cells wraps the marker rather than preceding it, so leading
-  decoration stripping left the wrapper, the anchored classifier failed, and a
-  narrow body leaked on the bounded path. Matched wrappers are now normalized
-  on both the BEGIN and the END line — the END too, or the block never closes
-  and redaction swallows `Verdict:` through EOF.
+  meant to bound the redaction step. `+` runs are now taken whole. A long `-`
+  run still costs one pass per character, because the delimiter guard has to
+  re-test after each removal; that remains a known open cost rather than a
+  closed one.
+
+An interim revision of this PR also normalized serialized markers (JSON strings
+and markdown table cells) and capped line length with a fail-closed guard. Both
+were reverted: reviewers demonstrated that each traded the leak for the opposite
+failure. The length cap keyed "real key" off length alone, so any long line
+merely MENTIONING a marker swallowed the report through EOF; the wrapper strip
+ran after list/blockquote/numbered prefixes were already removed, so
+`- "<marker>"` normalized to a bare marker and did the same. A key serialized as
+a JSON string is therefore still classified as a mention and takes the bounded
+window — the same accepted trade as an inline-prose mention, recorded in the
+plugin Known Limitations. Handling serialized shapes safely needs the bounded
+window's width floor reworked alongside it, which belongs in its own change.
