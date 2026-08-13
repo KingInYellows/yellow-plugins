@@ -59,3 +59,10 @@ from the end until it is under 100000 bytes. A content-only budget counted
 neither the per-file path/heading/fence framing — which a diff touching hundreds
 of tiny files pays for every one of them — nor the byte cost of non-ASCII
 content over its character count.
+
+Two more from review of that check: the truncation trigger is lowered from 200K
+to the 60K diff budget, since a diff between the two skipped truncation entirely
+and dropping every excerpt still could not bring the pack under OpenCode's
+guard; and the measurement copy must be `mktemp`-staged (0600) and removed on
+every path, because it holds the pack unredacted and a Write-created file would
+persist at the ordinary umask.

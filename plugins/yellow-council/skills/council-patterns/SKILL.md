@@ -635,7 +635,10 @@ git diff "${BASE}...HEAD" > "$DIFF_FILE" || {
 }
 DIFF_BYTES=$(wc -c < "$DIFF_FILE")
 
-if [ "$DIFF_BYTES" -gt 200000 ]; then
+# Trigger on the DIFF BUDGET, not on some larger round number. A diff between
+# the budget and 200K used to skip truncation entirely, so the pack could not be
+# brought under the ceiling by dropping excerpts alone and OpenCode rejected it.
+if [ "$DIFF_BYTES" -gt 60000 ]; then
   # Truncate: stat header + first 200 lines + marker
   {
     printf '### git diff --stat\n\n'
