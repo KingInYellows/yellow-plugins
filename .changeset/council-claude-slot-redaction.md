@@ -80,3 +80,11 @@ Four corrections to the above, from review of it:
 - The documented-exception heading check runs on live markdown, with fenced
   blocks and HTML comments stripped first — otherwise a commented-out or
   illustrative copy of the heading kept the privileged grant alive.
+
+The vote is now derived from the same place as the prose. Reading only the
+summary and findings from the sanitized file left the Task-return `verdict=`
+authoritative, so a return claiming `APPROVE` while its own fenced file said
+`Verdict: REVISE` produced a headline the persisted appendix visibly
+contradicted. The two are compared and the slot fails closed when they differ —
+a disagreement means one of them is not the reviewer's judgement and there is no
+way to tell which.

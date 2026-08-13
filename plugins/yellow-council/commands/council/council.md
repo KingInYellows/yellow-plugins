@@ -695,6 +695,25 @@ parse_reviewer_return() {
     # removed: if a future revision of the agent returns prose anyway, it is
     # still scrubbed before anything stores it.
     if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+      # The VOTE has to come from the same place as the prose, or the two can
+      # disagree: a prompt-injected or malformed return can send verdict=APPROVE
+      # while the fenced file says Verdict: REVISE, and the headline would then
+      # count an approval the persisted appendix visibly contradicts. Compare
+      # the two and fail the slot when they differ rather than silently
+      # preferring either — a disagreement means one of them is not the
+      # reviewer's actual judgement, and there is no way to tell which.
+      local file_verdict file_confidence
+      file_verdict=$(awk '/^Verdict: / { sub(/^Verdict: /, ""); print; exit }' "$fenced_path")
+      file_confidence=$(awk '/^Confidence: / { sub(/^Confidence: /, ""); print; exit }' "$fenced_path")
+      if [ -n "$file_verdict" ] && [ "$file_verdict" != "$verdict" ]; then
+        printf '[council] Warning: claude returned verdict=%s but its fenced file says %s — failing the slot\n' \
+          "$verdict" "$file_verdict" >&2
+        verdict="ERROR"
+        summary="claude-reviewer returned a verdict its own output contradicts; slot recorded as ERROR."
+        findings=""
+        fenced_path=""
+      else
+        [ -n "$file_confidence" ] && confidence="$file_confidence"
       summary=$(awk '/^Summary: / { sub(/^Summary: /, ""); print }' "$fenced_path" | tail -n 1)
       # Bound the findings capture by the FENCE END, not by the first
       # `Summary: ` line. A finding body that begins with that literal prefix
@@ -708,6 +727,7 @@ parse_reviewer_return() {
         c { buf[++n] = $0; if ($0 ~ /^Summary: /) last = n }
         END { for (i = 1; i <= (last ? last - 1 : n); i++) print buf[i] }
       ' "$fenced_path")
+      fi
     fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
