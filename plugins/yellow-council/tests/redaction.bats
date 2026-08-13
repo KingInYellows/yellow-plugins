@@ -344,6 +344,16 @@ assert_survives_under_all() {
   assert_survives_under_all "$input" "Verdict: APPROVE"
 }
 
+@test "an inline key pair also retires the previous re-arm window" {
+  # The multiline branch clears pem_watch; the self-contained BEGIN...END arm
+  # changes no other state and was initially left out. A later base64-shaped
+  # line then restored the FIRST block's unbounded real mode through EOF.
+  local input
+  input="$(printf '%s\n%s\n%s\n%s %s\nshort prose\nmore prose\nthird prose\naGVsbG8gd29ybGQgMTIzNDU2Nzg5\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$WIDE_BODY" "$END_PK" "$BEGIN_PK" "$END_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
 @test "a line of pure dashes does not hang the prefix stripper" {
   # The repeated strip is bounded; a horizontal rule must terminate.
   local input

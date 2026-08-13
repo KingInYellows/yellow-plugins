@@ -293,6 +293,12 @@ function is_base64_line(s, minlen) {
   if (!in_pem && $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
     if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) {
       line = "--- redacted PEM key block at line " NR " ---"
+      # Retire an earlier block's re-arm window here too. This arm changes no
+      # other state -- the pair is self-contained -- but leaving the window
+      # open lets a later base64-shaped line restore the PREVIOUS block's
+      # unbounded real mode and redact the report to EOF. Same reason as the
+      # multiline arm below; the window belongs to the block that closed.
+      pem_watch = 0
     } else {
       pem_check = strip_deco($0)
       in_pem = 1
