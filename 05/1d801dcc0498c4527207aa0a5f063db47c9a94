@@ -1,0 +1,42 @@
+.claude-plugin/marketplace.json
+  s_6c2a352ad27053::t_a6e0905a9be042 166
+plugins/yellow-council/.claude-plugin/plugin.json
+  s_6c2a352ad27053::t_a6e0905a9be042 5
+plugins/yellow-council/commands/council/setup.md
+  s_6c2a352ad27053::t_52ac0a3d634504 145-149
+  s_6c2a352ad27053::t_bf17af67b34d12 174,176-178,181
+plugins/yellow-council/CLAUDE.md
+  s_6c2a352ad27053::t_3667a057302274 28
+  s_6c2a352ad27053::t_6c5fc878f26d7d 131
+  s_6c2a352ad27053::t_2789fbb221aedb 201-202
+  s_6c2a352ad27053::t_66ff06707a12fa 82-94
+  s_6c2a352ad27053::t_4e0e7d0565f372 72
+  s_6c2a352ad27053::t_9cf32408f9ce1f 32,34-43
+  s_6c2a352ad27053::t_1e5b5192dcfaa5 3-6
+README.md
+  s_6c2a352ad27053::t_955a3bdf0771e4 273
+  s_6c2a352ad27053::t_aec4e0ff3e2eba 31
+plugins/yellow-council/package.json
+  s_6c2a352ad27053::t_a080ebbab8729a 5
+catalog/plugins/yellow-council.json
+  s_6c2a352ad27053::t_a66bff779f43a0 3
+plugins/yellow-council/README.md
+  s_6c2a352ad27053::t_46bb3634a9ff0f 28
+  s_6c2a352ad27053::t_2c4a3109accee2 3-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "051d801dcc0498c4527207aa0a5f063db47c9a94",
+  "prompts": {},
+  "sessions": {
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
