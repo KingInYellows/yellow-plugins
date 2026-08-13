@@ -646,8 +646,15 @@ if [ "$DIFF_BYTES" -gt 200000 ]; then
     # 200K the truncation exists to stay under, so the "truncated" result comes
     # back as large as the input and the pack budget is blown anyway. `head -c`
     # can split a UTF-8 character, so trim to a line boundary afterwards.
-    head -200 "$DIFF_FILE" | head -c 150000 | sed '$ { /./!d; }'
-    printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 150000 bytes ...]\n' "$DIFF_BYTES"
+    # Bound below the TIGHTEST downstream consumer, not just below the raw
+    # diff size. The assembled pack also carries the stat header, up to three
+    # 4K changed-file excerpts and the fence framing, and it has to clear both
+    # the 100K total pack budget below and OpenCode`s 120000-byte rejection
+    # threshold (see opencode-reviewer.md) — a diff portion capped at 150000
+    # blows both on its own and deterministically marks that reviewer
+    # UNAVAILABLE. 60000 leaves roughly 40K of headroom for the rest.
+    head -200 "$DIFF_FILE" | head -c 60000 | sed '$ { /./!d; }'
+    printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 60000 bytes ...]\n' "$DIFF_BYTES"
   } > "$DIFF_FILE.truncated"
   mv "$DIFF_FILE.truncated" "$DIFF_FILE"
 fi

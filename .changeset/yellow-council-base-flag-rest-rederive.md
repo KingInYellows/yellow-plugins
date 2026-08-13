@@ -37,3 +37,10 @@ The truncation is now bounded by bytes as well as lines. `head -200` alone is
 not a size bound — 200 lines of a minified bundle or a generated lockfile can
 exceed the 200K the truncation exists to stay under, so the truncated result
 came back as large as the input and blew the pack budget anyway.
+
+The byte cap is set from the tightest downstream consumer rather than from the
+raw diff alone: the assembled pack also carries the stat header, up to three 4K
+changed-file excerpts and the fence framing, and must clear both the 100K pack
+budget and OpenCode's 120000-byte argv rejection. A 150000-byte diff portion
+exceeded both on its own and would have marked that reviewer UNAVAILABLE on
+every large-diff run.
