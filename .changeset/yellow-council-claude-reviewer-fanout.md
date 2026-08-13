@@ -76,3 +76,11 @@ Three further fixes from review:
   On a host without it the sweep silently produced no candidates with its stderr
   suppressed, so a cancelled run left raw reviewer output in `/tmp` despite the
   documented next-run reclamation. Added to both prerequisite loops and the docs.
+
+Two follow-ups from review: the documented-exception heading check accepts the
+ASCII-hyphen spelling `AGENTS.md` uses as well as the em dash every shipped agent
+uses; and `docs/testing/yellow-council-manual-tests.md` scenarios 3.1-3.3 are
+updated for four slots. They previously expected all reviewers to time out or
+fail together, which the in-process slot cannot do — it has no subprocess for
+`COUNCIL_TIMEOUT` to bound and needs no CLI auth — so a maintainer following the
+checklist would have reported false failures and never exercised the new slot.

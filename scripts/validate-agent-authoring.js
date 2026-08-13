@@ -841,7 +841,11 @@ function validateAgentFile(filePath, ctx) {
       // while CI keeps passing, and the Write-capable reviewer keeps its
       // grant with nothing left explaining why it has it.
       const hasDocumentedException =
-        /^##+[ \t]+Tool Surface[ \t]+—[ \t]+Documented(?:[ \t]+\S+)?[ \t]+Exception[ \t]*$/m.test(
+        // AGENTS.md writes the heading with an ASCII hyphen; every shipped
+        // agent uses an em dash. Accept either (and an en dash), plus the
+        // optional qualifier some files carry ("Documented Bash Exception"),
+        // so the normative spelling and the actual one both satisfy this.
+        /^##+[ \t]+Tool Surface[ \t]+[-\u2013\u2014][ \t]+Documented(?:[ \t]+\S+)?[ \t]+Exception[ \t]*$/m.test(
           content
         );
       const allowedExceptionTools = hasDocumentedException
