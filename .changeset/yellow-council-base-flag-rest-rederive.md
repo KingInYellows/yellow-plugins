@@ -32,3 +32,8 @@ it — a review large enough to trigger truncation fanned out with no diff at al
 which every reviewer answers with an unfounded APPROVE. The block now prints the
 diff on stdout and removes the file, and `council.md` states that the captured
 stdout is the handoff.
+
+The truncation is now bounded by bytes as well as lines. `head -200` alone is
+not a size bound — 200 lines of a minified bundle or a generated lockfile can
+exceed the 200K the truncation exists to stay under, so the truncated result
+came back as large as the input and blew the pack budget anyway.

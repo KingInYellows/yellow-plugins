@@ -641,8 +641,13 @@ if [ "$DIFF_BYTES" -gt 200000 ]; then
     printf '### git diff --stat\n\n'
     git diff --stat "${BASE}...HEAD"
     printf '\n### Raw diff (first 200 lines of %d total)\n\n' "$(wc -l < "$DIFF_FILE")"
-    head -200 "$DIFF_FILE"
-    printf '\n[... truncated — full diff is %d bytes; showing first 200 lines ...]\n' "$DIFF_BYTES"
+    # Bound by BYTES as well as lines. A line count alone is not a size bound:
+    # 200 lines of a minified bundle or a generated lockfile can exceed the
+    # 200K the truncation exists to stay under, so the "truncated" result comes
+    # back as large as the input and the pack budget is blown anyway. `head -c`
+    # can split a UTF-8 character, so trim to a line boundary afterwards.
+    head -200 "$DIFF_FILE" | head -c 150000 | sed '$ { /./!d; }'
+    printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 150000 bytes ...]\n' "$DIFF_BYTES"
   } > "$DIFF_FILE.truncated"
   mv "$DIFF_FILE.truncated" "$DIFF_FILE"
 fi
