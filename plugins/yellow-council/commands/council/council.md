@@ -75,7 +75,7 @@ The user invokes `/council <mode> [args]`. Parse `$ARGUMENTS`:
 
 ```bash
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
-REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 
 case "$MODE" in
   plan|review|debug|question)
@@ -128,7 +128,7 @@ For each mode:
   # $# to 0, the parse loop never runs, EXPLICIT_BASE stays empty, and
   # `--base <ref>` silently falls through to the origin/main default —
   # contradicting the loud-failure contract stated directly above.
-  REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+  REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 
   EXPLICIT_BASE=""
   # shellcheck disable=SC2086
@@ -994,7 +994,7 @@ and paste them at the top of the block (before the first call site).
 ```bash
 # Re-derive state — each bash block runs in a fresh subprocess
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
-REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
 cd "$GIT_ROOT"
 
