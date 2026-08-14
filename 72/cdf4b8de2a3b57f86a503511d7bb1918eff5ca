@@ -1,0 +1,22 @@
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_29dc3c32680214::t_b2a84785c8b409 455-459
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_29dc3c32680214::t_77dcea4b976ea7 685-704
+  s_29dc3c32680214::t_d1892b3167084b 624-629
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "72cdf4b8de2a3b57f86a503511d7bb1918eff5ca",
+  "prompts": {},
+  "sessions": {
+    "s_29dc3c32680214": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a38e39ef-daaf-47e1-a9c4-0e69aba10de5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
