@@ -530,6 +530,27 @@ assert_survives_under_all() {
   assert_survives_under_all "$input" "Findings: none blocking"
 }
 
+@test "a base64-shaped prose line after a clean END cannot swallow the report" {
+  # The re-arm shape test accepts any alphanumeric run carrying a digit and a
+  # non-hex letter, which ordinary prose satisfies. Inheriting the previous
+  # block's UNBOUNDED mode on that evidence let one benign sentence after a
+  # genuine END redact everything through EOF, so Verdict:/Confidence:/Summary:
+  # never survived and the reviewer scored UNKNOWN off a false positive.
+  #
+  # The re-arm itself is deliberately still sensitive — it must fire so a
+  # genuinely resumed body stays redacted (see the decoy-END tests) — so what
+  # is pinned here is the BOUND, not the absence of re-arm: without armor
+  # evidence the block re-enters the bounded path and the report tail lives.
+  local input
+  input="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s' \
+    "$BEGIN_RSA" "$WIDE_BODY" "$END_RSA" \
+    "HereIsSomeBase64LookingData12345AndMore7" \
+    "stray one" "stray two" "Summary: the report tail must survive")"
+  assert_survives_under_all "$input" "Summary: the report tail must survive"
+  # The key itself must still be redacted — this must not become a leak test.
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+}
+
 @test "the line that ends the stray window is emitted, not redacted" {
   # The window is THREE non-key lines wide, and the third one is the line that
   # proves the window is over. An earlier revision overwrote `line` with the

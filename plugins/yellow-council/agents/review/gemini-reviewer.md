@@ -543,7 +543,20 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
-      pem_real = pem_prev_real
+      # Inherit UNBOUNDED mode only with real base64-armor evidence. The
+      # shape test above accepts any alphanumeric run with a digit and a
+      # non-hex letter, which ordinary prose satisfies
+      # ("HereIsSomeBase64LookingData12345AndMore7"): inheriting real mode
+      # on that re-entered unbounded redaction and swallowed every
+      # remaining line including Verdict:/Confidence:/Summary:, scoring the
+      # reviewer UNKNOWN off one benign sentence. "+", "/" and "=" cannot
+      # appear in an identifier, so requiring one gates the unbounded path
+      # on evidence prose cannot forge. Without that evidence the block
+      # still re-enters PEM mode, just BOUNDED -- key-shaped lines keep
+      # resetting the stray counter, so a genuinely resumed body stays
+      # redacted, and a false re-arm costs three lines instead of the
+      # whole report.
+      pem_real = (pem_prev_real && pem_check ~ /[+\/=]/) ? 1 : 0
       pem_watch = 0
     } else {
       pem_watch--
