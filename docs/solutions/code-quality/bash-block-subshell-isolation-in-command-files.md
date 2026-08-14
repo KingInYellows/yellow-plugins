@@ -449,3 +449,52 @@ that exists purely for document structure is exactly the shape that
 reintroduces this bug a fourth time.
 
 **Components (this Update):** `plugins/yellow-codex/commands/codex/review.md`.
+
+## Update — 2026-08-11: fourth recurrence, and the fix for it had the same bug one stage further down (PR #708)
+
+Fourth documented instance, and the second in `yellow-council` — after the
+2026-05-04 recurrence above, where `setup.md`'s Step 5 summary block read
+`$READY_COUNT`/`$GEMINI_STATUS`/`$OPENCODE_STATUS`/`$CODEX_STATUS` across the
+same kind of fence boundary. The pattern is not plugin-specific, and it has
+now bitten this plugin twice.
+
+`plugins/yellow-council/commands/council/council.md` Step 3 (`review` mode)
+parsed `--base <ref>` inside its own bash fence. Step 2 had set `REST`, but
+Step 3 is a separate Bash tool invocation, so `REST` was empty there,
+`set -- $REST` left `$#` at 0, the parse loop never ran, `EXPLICIT_BASE`
+stayed empty, and `--base` silently fell through to the `origin/main`
+default. The advertised flag had been non-functional since the plugin
+shipped, while every command in the block reported success.
+
+**The instructive part is the incomplete fix.** PR #708 re-derived `REST` at
+the top of the fence, which made the parse work — and stopped there. But
+`BASE_REF`, the *product* of that parse, was assigned inside the same fence
+and consumed by the diff-assembly bullets **below** the fence, i.e. in yet
+another subprocess. So `${BASE_REF}` expanded empty there and
+`git diff "...HEAD"` ran against an empty range. That command **succeeds**
+and emits nothing, so the reviewers were fanned out on a pack containing no
+diff at all. The fix moved the silent failure one stage downstream instead
+of removing it, and the second stage was worse: an empty pack makes every
+reviewer return an unfounded APPROVE, so four independent reviewers
+"agreeing" was the failure surfacing as a false success.
+
+Both halves were needed:
+
+1. Re-derive the *input* (`REST`) at the top of the consuming fence.
+2. `printf 'BASE_REF=%s\n' "$BASE_REF"` at the end of the producing fence,
+   with the consumers instructed to substitute the printed literal — the
+   same literal-path handoff this doc records as Fix D.
+
+**Rule this adds:** when auditing a fence for cross-block state loss, trace
+both directions. Re-deriving what a fence *reads* is only half the audit;
+anything the fence *computes* that a later block references needs an
+explicit handoff out. A fix that only restores the inputs will make the
+block behave correctly in isolation and still produce nothing usable
+downstream.
+
+**Second rule:** an empty-input path that "succeeds" needs an explicit
+guard. `git diff` against an empty range, like `grep` on an empty file,
+exits 0 — so every downstream consumer treats the absence of data as valid
+data. Step 3 now hard-stops on an empty diff rather than fanning out.
+
+**Components (this Update):** `plugins/yellow-council/commands/council/council.md`.

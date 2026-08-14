@@ -588,22 +588,164 @@ hyphens, and consecutive hyphens).
 
 ### Diff Truncation Algorithm (review mode)
 
+`BASE_REF` is resolved in a DIFFERENT bash block than the one that runs this
+algorithm, and shell variables do not survive between blocks — see
+`docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
+Referencing `${BASE_REF}` here would expand to empty, silently turning
+`git diff "...HEAD"` into a diff against the empty tree (or tripping the
+caller's empty-diff guard) instead of reviewing the real change. The caller
+prints the resolved value and substitutes it as a literal; do the same here.
+Set `BASE` from that printed literal at the top of THIS block so the rest of
+the algorithm has a single reference:
+
 ```bash
+# Substitute the literal BASE_REF value the caller printed — do NOT write
+# ${BASE_REF}, which is unset in this subprocess.
+BASE="<literal BASE_REF value printed by the caller>"
+
+# FAIL CLOSED on a placeholder that was never substituted. Left literal,
+# `git diff` exits 128 — but the redirect has already created the file, `wc -c`
+# reads 0, the size test below is simply false, and the block exits 0 with an
+# EMPTY diff. The reviewers then fan out over nothing and return APPROVE for a
+# change none of them saw. The caller's empty-diff guard does not cover this:
+# it ran before this block recomputed the diff.
+case "$BASE" in
+  ''|*'<'*|*'>'*)
+    printf '[council] Error: BASE was not substituted (got: %s)\n' "$BASE" >&2
+    exit 1
+    ;;
+esac
+git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null || {
+  printf '[council] Error: BASE does not resolve to a commit: %s\n' "$BASE" >&2
+  exit 1
+}
+
 DIFF_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt)
-git diff "${BASE_REF}...HEAD" > "$DIFF_FILE"
+# `>|` for the same reason as the staging redirect below: mktemp created this
+# file, and a plain `>` onto an existing path is an error under `noclobber`.
+# This one fails closed (the `||` fires), but it fails on every invocation for
+# anyone who has the option set — the command is simply unusable rather than
+# subtly wrong.
+git diff "${BASE}...HEAD" >| "$DIFF_FILE" || {
+  printf '[council] Error: git diff against %s failed\n' "$BASE" >&2
+  rm -f "$DIFF_FILE"
+  exit 1
+}
+# An empty diff is never a reviewable input. Refuse rather than hand the
+# reviewers a blank pack.
+[ -s "$DIFF_FILE" ] || {
+  printf '[council] Error: diff against %s is empty — refusing to fan out\n' "$BASE" >&2
+  rm -f "$DIFF_FILE"
+  exit 1
+}
 DIFF_BYTES=$(wc -c < "$DIFF_FILE")
 
-if [ "$DIFF_BYTES" -gt 200000 ]; then
+# Trigger on the DIFF BUDGET, not on some larger round number. A diff between
+# the budget and 200K used to skip truncation entirely, so the pack could not be
+# brought under the ceiling by dropping excerpts alone and OpenCode rejected it.
+if [ "$DIFF_BYTES" -gt 60000 ]; then
+  # Stage through mktemp (0600), NOT `> "$DIFF_FILE.truncated"`. A plain
+  # redirect creates the file at the ordinary umask, so the unredacted diff is
+  # briefly world-readable in /tmp and stays that way if the block dies before
+  # the mv. `mv` then carries the private mode onto $DIFF_FILE.
+  TRUNC_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt) || {
+    printf '[council] Error: cannot stage the truncated diff\n' >&2
+    rm -f "$DIFF_FILE"
+    exit 1
+  }
   # Truncate: stat header + first 200 lines + marker
   {
     printf '### git diff --stat\n\n'
-    git diff --stat "${BASE_REF}...HEAD"
+    # Bounded too. A diff big enough to reach this branch can touch thousands
+    # of files, and an unbounded stat is then its own budget overrun before a
+    # single diff line is emitted.
+    git diff --stat "${BASE}...HEAD" | LC_ALL=C awk -v cap=4000 '
+      { n += length($0) + 1; if (n > cap) exit; print }'
     printf '\n### Raw diff (first 200 lines of %d total)\n\n' "$(wc -l < "$DIFF_FILE")"
-    head -200 "$DIFF_FILE"
-    printf '\n[... truncated — full diff is %d bytes; showing first 200 lines ...]\n' "$DIFF_BYTES"
-  } > "$DIFF_FILE.truncated"
-  mv "$DIFF_FILE.truncated" "$DIFF_FILE"
+    # Bound by BYTES as well as lines. A line count alone is not a size bound:
+    # 200 lines of a minified bundle or a generated lockfile can exceed the
+    # 200K the truncation exists to stay under, so the "truncated" result comes
+    # back as large as the input and the pack budget is blown anyway. `head -c`
+    # can split a UTF-8 character, so trim to a line boundary afterwards.
+    # Bound below the TIGHTEST downstream consumer, not just below the raw
+    # diff size. The assembled pack also carries the stat header, up to three
+    # 4K changed-file excerpts and the fence framing, and it has to clear both
+    # the 100K total pack budget below and OpenCode`s 120000-byte rejection
+    # threshold (see opencode-reviewer.md) — a diff portion capped at 150000
+    # blows both on its own and deterministically marks that reviewer
+    # UNAVAILABLE. 60000 leaves roughly 40K of headroom for the rest.
+    # Cap at a LINE boundary inside the byte budget where the line fits, and
+    # cut WITHIN a line only when that single line is itself bigger than the
+    # whole remaining budget. Dropping such a line instead — the obvious
+    # `if (n > cap) exit` — means a minified bundle or generated file whose
+    # first changed line exceeds the cap contributes NOTHING: reviewers get the
+    # stat header and a marker claiming a byte-capped prefix was shown, with no
+    # change content behind it, and can return a verdict having seen no diff at
+    # all. LC_ALL=C makes awk's length()/substr() count bytes, so the budget is
+    # a real byte budget — which also means a naive cut can land mid-character,
+    # so back off any trailing incomplete UTF-8 sequence (continuation bytes
+    # 0x80-0xBF, then the lead byte they belonged to) before printing. Verified
+    # to emit valid UTF-8 under both mawk and gawk.
+    head -200 "$DIFF_FILE" | LC_ALL=C awk -v cap=60000 '
+      {
+        if (n >= cap) exit
+        remaining = cap - n
+        linelen = length($0) + 1
+        if (linelen > remaining) {
+          s = substr($0, 1, remaining)
+          # Walk back to the final character's LEAD byte, then drop that
+          # character only if the cut actually split it. Stripping every
+          # trailing continuation byte unconditionally would also discard a
+          # COMPLETE trailing character whenever the cut happens to land on a
+          # character boundary — still valid UTF-8, but it silently gives back
+          # budget the line was entitled to.
+          k = length(s)
+          while (k > 0 && substr(s, k, 1) ~ /[\200-\277]/) k--
+          if (k > 0) {
+            c = substr(s, k, 1)
+            if (c ~ /[\300-\337]/) need = 2
+            else if (c ~ /[\340-\357]/) need = 3
+            else if (c ~ /[\360-\367]/) need = 4
+            else need = 1
+            if (k + need - 1 > length(s)) s = substr(s, 1, k - 1)
+          }
+          if (length(s) > 0) print s
+          exit
+        }
+        n += linelen
+        print
+      }'
+    printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 60000 bytes ...]\n' "$DIFF_BYTES"
+  # `>|`, not `>`. mktemp CREATES the file, and a plain redirect onto an
+  # existing path fails outright under `noclobber` — which zsh users commonly
+  # have set, and these fences are not guaranteed to run under bash's default
+  # options. Without the force-clobber the redirect fails, and with no `set -e`
+  # and no error branch the `mv` below would still run, moving the empty
+  # TRUNC_FILE onto DIFF_FILE: an empty diff, reported as success. That is the
+  # same silent no-op this algorithm's own empty-diff guard exists to prevent.
+  # See docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md.
+  } >| "$TRUNC_FILE" || {
+    printf '[council] Error: cannot write the truncated diff\n' >&2
+    rm -f "$TRUNC_FILE" "$DIFF_FILE"
+    exit 1
+  }
+  # Re-check after staging, not just before. The guard above catches a failed
+  # redirect; this catches a redirect that succeeded but produced nothing.
+  [ -s "$TRUNC_FILE" ] || {
+    printf '[council] Error: truncated diff staged empty — refusing to emit an empty pack\n' >&2
+    rm -f "$TRUNC_FILE" "$DIFF_FILE"
+    exit 1
+  }
+  mv "$TRUNC_FILE" "$DIFF_FILE"
 fi
+
+# EMIT the result. This block runs in its own subprocess, so neither $DIFF_FILE
+# nor its randomized path survives to the pack-assembly step that consumes it —
+# a result left only on disk is unreachable, and a large review would fan out
+# with no diff at all, which every reviewer answers with an unfounded APPROVE.
+# Captured stdout IS the handoff, exactly as the BASE_REF literal above is.
+cat "$DIFF_FILE"
+rm -f "$DIFF_FILE"
 
 # Per changed file: cap at 4K chars per file
 # Total pack budget: 100K chars before injection fencing

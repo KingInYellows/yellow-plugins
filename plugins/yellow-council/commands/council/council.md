@@ -75,7 +75,7 @@ The user invokes `/council <mode> [args]`. Parse `$ARGUMENTS`:
 
 ```bash
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
-REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 
 case "$MODE" in
   plan|review|debug|question)
@@ -123,6 +123,13 @@ For each mode:
   fail loudly rather than silently falling back, otherwise the advertised
   flag would be non-functional.
   ```bash
+  # Re-derive REST — this is its own bash fence, i.e. a fresh subprocess, so
+  # Step 2's REST does not survive into it. Without this, `set -- $REST` sets
+  # $# to 0, the parse loop never runs, EXPLICIT_BASE stays empty, and
+  # `--base <ref>` silently falls through to the origin/main default —
+  # contradicting the loud-failure contract stated directly above.
+  REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
+
   EXPLICIT_BASE=""
   # shellcheck disable=SC2086
   set -- $REST
@@ -159,11 +166,27 @@ For each mode:
       exit 1
     }
   fi
+
+  # Print the resolved base. The diff-assembly steps below run in a SEPARATE
+  # fence, i.e. a separate subprocess, so `$BASE_REF` does not survive to
+  # them. Without this line it expands empty there and
+  # `git diff "...HEAD"` succeeds against an empty range — handing reviewers
+  # no diff at all while every command reports success. That silent no-op is
+  # the same class of bug this step exists to remove, one stage further down.
+  printf 'BASE_REF=%s\n' "$BASE_REF"
   ```
-- Get diff: `git diff "${BASE_REF}...HEAD"`
-- If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker).
-- Per changed file: `git diff --name-only "${BASE_REF}...HEAD"` then read each file capped at 4K chars.
+- Capture the printed `BASE_REF=` value and substitute it as a literal in the
+  commands below — do not reference `${BASE_REF}`, which is unset in their
+  subprocess.
+- Get diff: `git diff "<literal BASE_REF value printed above>...HEAD"`
+- If the diff is empty, stop and report `[council] Error: empty diff for the
+  resolved base — nothing to review`. Do NOT fan out reviewers on an empty
+  pack: every reviewer would return an unfounded APPROVE.
+- If diff exceeds **60K bytes** (the diff budget below, not 200K): apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker). That block runs in its own Bash call and prints the truncated diff on stdout; **capture that output** and use it as the diff for the rest of this step. Do not expect `$DIFF_FILE` or any other variable from it to be readable here.
+- Per changed file: `git diff --name-only "<literal BASE_REF value printed above>...HEAD"` then read each file capped at 4K chars. **The file COUNT is bounded too, by a total budget, not just per file.** Unlike `debug`/`question` there is no 3-file limit here, so a wide change would otherwise append excerpts without end. Add files in listed order until their combined content reaches 30K chars, then stop and append a single line naming how many files were omitted.
 - Pack: `## Task: review` + `### Diff` + truncated diff + `### Changed Files` + per-file content.
+- **After assembling, MEASURE the pack and cap it.** Stage the assembled pack inside a private directory minted with `mktemp -d`, then `Write` it to a **not-yet-existing** child of that directory and check `wc -c` on it. Do NOT stage into a file `mktemp` created: `Write` refuses to populate a file it has not read, and routing the pack through a Bash heredoc instead is unsafe — a crafted diff can terminate the delimiter and become shell input. `mktemp -d` gives a 0700 directory, which is what keeps the UNREDACTED pack private; this matches the `mktemp -u` minting contract the fenced-output staging in `council-patterns` uses for the same reason. Remove the directory on every path, success or failure. If it exceeds 100000 bytes, drop changed-file excerpts from the end (they are the lowest-value section) until it is under, and append a line naming how many were omitted. If dropping every excerpt still leaves it over, the diff itself is too big — re-run the truncation algorithm against a smaller byte cap rather than fanning out an oversized pack. A content-only budget is not a serialization bound: it counts neither the per-file path, heading and fence framing — which a diff touching hundreds of tiny files pays for every one of them — nor the fact that non-ASCII content costs more bytes than characters. The arithmetic below sizes the sections so this check rarely has to fire; the check is what makes the ceiling true.
+- **Hard ceiling on the assembled pack: 100K bytes.** It is the tightest budget the pack has to clear, and OpenCode rejects anything over 120000 bytes outright (`opencode-reviewer.md`), returning `UNAVAILABLE` without invoking its CLI. The bounds above are sized to land under it — truncated diff ≤ 60K, stat ≤ 4K, excerpt content ≤ 30K, framing ~3K. If a future change adds a pack section, re-derive these rather than assuming headroom exists — and rely on the measured check above, not on the arithmetic.
 
 **`debug` mode:** `$REST` starts with quoted symptom text, then optional `--paths file1,file2,...`.
 - Parse symptom (first quoted block).
@@ -971,7 +994,7 @@ and paste them at the top of the block (before the first call site).
 ```bash
 # Re-derive state — each bash block runs in a fresh subprocess
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
-REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
 cd "$GIT_ROOT"
 

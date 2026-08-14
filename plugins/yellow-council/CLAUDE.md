@@ -176,6 +176,15 @@ Codex agent.)
   rather than read. What is NOT enforced: the substitution itself is an LLM
   turn, not deterministic templating. Same class of prompt-plus-containment
   enforcement as the agy limitation below.
+- **`review` mode truncates large changes.** A diff over 60K bytes is reduced
+  to `git diff --stat` plus its first 200 lines; changed-file excerpts stop at a
+  30K combined budget; and if the measured pack still exceeds 100K bytes,
+  excerpts are dropped from the end until it fits. The thresholds are set by the
+  tightest consumer — OpenCode rejects packs over 120000 bytes and returns
+  `UNAVAILABLE` — not by what the reviewers could otherwise digest. Consequence
+  worth stating plainly: on a wide change the council forms verdicts on a
+  partial view. Both reductions are marked in the pack, so a reviewer that cites
+  a file it never received is a bug, not a hallucination to ignore.
 - **A cancelled claude-reviewer leaves its raw output readable until the
   sweep.** `claude-reviewer` creates its fenced-output file with the `Write`
   tool under the ordinary process umask (0644 on a default umask 022), and
