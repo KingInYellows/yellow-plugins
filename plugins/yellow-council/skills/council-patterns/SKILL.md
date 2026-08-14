@@ -674,13 +674,33 @@ if [ "$DIFF_BYTES" -gt 60000 ]; then
     # threshold (see opencode-reviewer.md) — a diff portion capped at 150000
     # blows both on its own and deterministically marks that reviewer
     # UNAVAILABLE. 60000 leaves roughly 40K of headroom for the rest.
-    # Cap at a LINE boundary inside the byte budget, never mid-line. `head -c`
-    # can split a multibyte character, and trimming an empty final line does
-    # not repair that — the result is invalid UTF-8 in a pack that then gets
-    # serialized to every reviewer. LC_ALL=C makes awk`s length() count bytes
-    # rather than characters, so the budget is a real byte budget.
+    # Cap at a LINE boundary inside the byte budget where the line fits, and
+    # cut WITHIN a line only when that single line is itself bigger than the
+    # whole remaining budget. Dropping such a line instead — the obvious
+    # `if (n > cap) exit` — means a minified bundle or generated file whose
+    # first changed line exceeds the cap contributes NOTHING: reviewers get the
+    # stat header and a marker claiming a byte-capped prefix was shown, with no
+    # change content behind it, and can return a verdict having seen no diff at
+    # all. LC_ALL=C makes awk's length()/substr() count bytes, so the budget is
+    # a real byte budget — which also means a naive cut can land mid-character,
+    # so back off any trailing incomplete UTF-8 sequence (continuation bytes
+    # 0x80-0xBF, then the lead byte they belonged to) before printing. Verified
+    # to emit valid UTF-8 under both mawk and gawk.
     head -200 "$DIFF_FILE" | LC_ALL=C awk -v cap=60000 '
-      { n += length($0) + 1; if (n > cap) exit; print }'
+      {
+        if (n >= cap) exit
+        remaining = cap - n
+        linelen = length($0) + 1
+        if (linelen > remaining) {
+          s = substr($0, 1, remaining)
+          while (length(s) > 0 && substr(s, length(s)) ~ /[\200-\277]/) s = substr(s, 1, length(s) - 1)
+          if (length(s) > 0 && substr(s, length(s)) ~ /[\300-\377]/) s = substr(s, 1, length(s) - 1)
+          if (length(s) > 0) print s
+          exit
+        }
+        n += linelen
+        print
+      }'
     printf '\n[... truncated — full diff is %d bytes; showing at most the first 200 lines and 60000 bytes ...]\n' "$DIFF_BYTES"
   # `>|`, not `>`. mktemp CREATES the file, and a plain redirect onto an
   # existing path fails outright under `noclobber` — which zsh users commonly
