@@ -1,5 +1,95 @@
 # Changelog
 
+## 1.3.6
+
+### Patch Changes
+
+- [#704](https://github.com/KingInYellows/yellow-plugins/pull/704)
+  [`fbe5df7`](https://github.com/KingInYellows/yellow-plugins/commit/fbe5df71338c94fe00f86923514aed8872d97f3c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  `workflows:` command namespace to `flow:`. Native Claude Code's built-in
+  `/workflows` occupies that autocomplete prefix, so typing `/workflows` no
+  longer narrows to these commands; `/flow` does.
+
+  The nine yellow-core commands are now `/flow:brainstorm`, `/flow:spec`,
+  `/flow:decompose`, `/flow:pick-next-shell`, `/flow:expand-shell`,
+  `/flow:plan`, `/flow:work`, `/flow:review`, and `/flow:compound`. Their
+  directory moved to `commands/flow/`, and `/flow:work`'s progressive-disclosure
+  reference moved to `references/flow-work/` alongside the `work.md` path that
+  loads it. Runtime surfaces moved with the names: `skill:` dispatch targets,
+  log tags, user-facing error text, and the `<!-- Updated by flow:work -->`
+  marker `/flow:work` stamps into plan files.
+
+  yellow-research's `/workflows:deepen-plan` becomes `/flow:deepen-plan`, moving
+  to `commands/flow/` alongside the yellow-core commands it shares a namespace
+  with. Its documented pipeline is now `/flow:plan` → `/flow:deepen-plan` →
+  `/flow:work`.
+
+  yellow-linear takes a `patch`: `/linear:work` dispatches into the renamed
+  namespace via `skill: "flow:plan"`, and those two dispatch strings would have
+  silently failed to resolve at runtime had they been left behind. No
+  yellow-linear command name changes.
+
+  yellow-review takes a `patch` for the same reason: `/review:sweep-all`'s
+  end-of-loop learning capture dispatches `skill: "flow:compound"`.
+
+  gt-workflow takes a `patch`: its stack-decomposition skills, output styles,
+  and docs name `/flow:work` / `/flow:plan` as the plan consumer, updated from
+  the retired `workflows:` names.
+
+  yellow-docs takes a `patch`: `/docs:review` Step 9 offers a compound handoff
+  to the user, and that offer named a command this release deletes. Swept here
+  rather than in the follow-up prose PR — a handoff a user can accept at runtime
+  is a functional surface, not prose.
+
+  `major` for both: the old `/workflows:*` command files are deleted outright
+  with no forwarding alias, and both AGENTS.md and `CONTRIBUTING.md` state the
+  bump-type rule as major for "removal of a command" / "removed or breaking
+  command interfaces" with no carve-out for a marketplace with no external
+  install base. The singular `yellow-core:workflow:*` agent namespace is
+  unchanged.
+
+  A new CI gate, `pnpm validate:flow-namespace`, walks the whole repository
+  (including hidden directories) for surviving `workflows:` references and fails
+  on any that is not in `scripts/flow-namespace-allowlist.json` at its exact
+  expected occurrence count. The allowlist shrinks to nothing as the remaining
+  prose sweep lands.
+
+- [#706](https://github.com/KingInYellows/yellow-plugins/pull/706)
+  [`91c755c`](https://github.com/KingInYellows/yellow-plugins/commit/91c755cc10c016e1618c46b0dc757a06aadcaf72)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Sweep the
+  remaining prose references to the retired `workflows:` command namespace under
+  `plugins/` — 59 references across 23 files in 5 plugins — so every documented
+  invocation matches the `flow:` names the commands actually carry.
+  Documentation only; no behavior changes.
+
+  Five plugins, not the seven the migration plan predicted, and not the eight an
+  earlier draft of this changeset claimed. The list is re-derived from this
+  commit's own diff rather than trusted, and it shrank twice during review as
+  references that turned out to be functional rather than prose were pulled
+  forward into the parent PR: `gt-workflow` and `yellow-research` (agent and
+  skill instructions), then `yellow-docs` (a `/docs:review` handoff a user can
+  accept at runtime). All three carry their bumps in the parent PR's changeset.
+  Listing them here would publish new versions of plugins this commit does not
+  touch.
+
+  Two findings worth recording:
+  - **The gate could not see the glob form.** `plugins/yellow-core/CLAUDE.md`
+    documented the namespace as `` `/workflows:*` ``, which
+    `scripts/validate-flow-namespace.js` matched against none of its ten
+    enumerated command names. It was found by hand, which is exactly the "sweep
+    misses N+1" mode the gate exists to prevent. The matcher now also bans the
+    collective forms `workflows:*` and `workflows:<cmd>`.
+  - **The glob rule needed a `(?!\*)` guard.** Markdown bold places `**`
+    immediately after a colon-terminated phrase —
+    `**Template-driven workflows:**` — which a bare `\*` alternative matches as
+    `workflows:` plus `*`. Three such false positives appeared the moment the
+    rule was added; a real glob is never followed by a second asterisk.
+
+  The sweep used `perl`, not `sed`, so the replacement could carry the same
+  `(?![a-z-])` tail guard the gate matches with. The singular
+  `yellow-core:workflow:*` agent namespace is untouched throughout.
+
 ## 1.3.5
 
 ### Patch Changes

@@ -1,5 +1,380 @@
 # yellow-council
 
+## 0.3.0
+
+### Minor Changes
+
+- [#705](https://github.com/KingInYellows/yellow-plugins/pull/705)
+  [`111c55a`](https://github.com/KingInYellows/yellow-plugins/commit/111c55acfca4e24ff4c985b535d48201fe329e8b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `claude-reviewer` as the council's fourth slot and extend the `/council`
+  fan-out, parsing, and report assembly from three reviewers to four.
+
+  `claude-reviewer` is the architecture's deliberate asymmetry: it runs
+  in-process with no CLI, no subprocess, and no `Bash` — it reads the pack from
+  its spawn prompt, investigates with Read/Grep/Glob, and returns the same 6-key
+  contract (`verdict=` / `confidence=` / `summary=` / `fenced_output_path=` /
+  `findings_block_begin`…`findings_block_end`) that `parse_reviewer_return`
+  already extracts uniformly, so no parser change was needed. It carries a
+  contrarian review stance so it decorrelates from the synthesizer it shares a
+  model family with, and it never self-identifies in its output.
+
+  Three consequences of being in-process are surfaced rather than hidden:
+  - `COUNCIL_TIMEOUT` does not bound it, and it has no not-installed degradation
+    branch — a failed spawn falls through to the same missing-return handling
+    and is recorded as `ERROR`.
+  - It cannot mint its own temp path (no `Bash`, no `mktemp`), so `council.md`
+    mints the fenced-output path with `mktemp -u` and passes the literal path in
+    the spawn prompt; the agent's single `Write` is therefore a create, not an
+    overwrite. `Write` on a `review/` agent is allowlisted in
+    `scripts/validate-agent-authoring.js` with that narrow rationale.
+  - Its credential-redaction and fence-escaping safeguards are prompt-level
+    prose, not the `awk`/`sed` mechanics the CLI wrappers run. The agent, the
+    `council-patterns` skill, and the plugin CLAUDE.md all state that weaker
+    guarantee plainly.
+
+  `council:setup` now reports `N of 4` with
+  `Claude=in-process (always available)`: `READY_COUNT` seeds at 1, the
+  previously unreachable zero-reviewer branch becomes a `MINIMAL` status, and
+  the full-council threshold moves to 4.
+
+  Because claude-reviewer's own redaction and fence-escaping rules are
+  prompt-level prose with nothing executing them, `council.md` mechanically
+  enforces both invariants for this leg from the orchestrator side:
+  - The 11-pattern credential/PEM `awk` redaction block (canonical copy in the
+    `council-patterns` skill) now runs twice for the claude leg — once in
+    `parse_reviewer_return` over `summary=`/`findings_block` and any non-enum
+    `verdict=`, before Step 5 synthesis ever sees them, and once in Step 7 over
+    the fenced-file appendix, before it lands in the persisted report. Both
+    copies are mawk-safe: no `{n,}` interval expressions, since mawk (the
+    default `/usr/bin/awk` on Debian/Ubuntu) matches those literally instead of
+    treating them as quantifiers; a `match()`+`RLENGTH` helper reproduces the
+    same minimum-length gate without interval syntax.
+  - Step 7 rebuilds claude-reviewer's injection-fence sandwich unconditionally
+    rather than trusting the file's own begin/end delimiters — the file it wrote
+    may be missing either delimiter or carry a forged extra copy, so every
+    delimiter-shaped line is escaped first, then `council.md`'s own fresh
+    begin/end pair wraps the result.
+  - Step 4's reclamation of orphaned fenced-output files from a prior
+    claude-reviewer run that never reached cleanup is age-gated (24 hours): only
+    files older than that are swept, so a second concurrent `/council`
+    invocation's own in-flight file is never at risk of being deleted out from
+    under it.
+
+  Three further fixes from review:
+  - The appendix fence-escaping pass matched only `council-output:` lines, so a
+    native `--- end codex-output ---` or `--- code end ---` in injected reviewer
+    output survived into the persisted report and any consumer recognising those
+    would read the text after it as unfenced. It now escapes every structural
+    form `claude-reviewer.md` Safeguard 2 names, including the two
+    `findings_block_*` sentinels (prefixed, since they carry no leading `--- `
+    to consume).
+  - `validate-agent-authoring.js` honoured a `REVIEW_AGENT_ALLOWLIST` entry
+    regardless of whether the agent still carried its
+    `Tool Surface — Documented … Exception` section, so the human-auditable
+    rationale for a Write-capable reviewer could be deleted with CI still green.
+    The allowlist is now only honoured while that section is present.
+  - `find` drives the stale-`/tmp` sweep but was never declared a prerequisite.
+    On a host without it the sweep silently produced no candidates with its
+    stderr suppressed, so a cancelled run left raw reviewer output in `/tmp`
+    despite the documented next-run reclamation. Added to both prerequisite
+    loops and the docs.
+
+  Two follow-ups from review: the documented-exception heading check accepts the
+  ASCII-hyphen spelling `AGENTS.md` uses as well as the em dash every shipped
+  agent uses; and `docs/testing/yellow-council-manual-tests.md` scenarios
+  3.1-3.3 are updated for four slots. They previously expected all reviewers to
+  time out or fail together, which the in-process slot cannot do — it has no
+  subprocess for `COUNCIL_TIMEOUT` to bound and needs no CLI auth — so a
+  maintainer following the checklist would have reported false failures and
+  never exercised the new slot.
+
+### Patch Changes
+
+- [#705](https://github.com/KingInYellows/yellow-plugins/pull/705)
+  [`111c55a`](https://github.com/KingInYellows/yellow-plugins/commit/111c55acfca4e24ff4c985b535d48201fe329e8b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Redact and fail
+  closed around the in-process Claude reviewer slot
+
+  `claude-reviewer` has no `Bash`, so it cannot run the credential-redaction
+  pass the three CLI reviewers run inside their own agent. `council.md`
+  therefore carries the pass on its behalf, in Step 4 over the returned fields
+  and in Step 7 over the persisted fenced file, so no reviewer content reaches
+  `docs/council/<report>.md` unredacted regardless of which slot produced it.
+
+  Closes the sanitized-field handoff: Step 4 redacted the summary and findings
+  into Bash associative arrays, but every Bash block runs in its own subprocess,
+  so those values were gone by the time Step 5 synthesized — Step 5 had nothing
+  sanitized to read and fell back to the raw Task return still in model context,
+  bypassing the redaction entirely. Step 4 now redacts the persisted fenced file
+  in place and Step 5 reads reviewer text from that file rather than the return.
+
+  Every branch around that file now fails CLOSED, because each one that did not
+  handed synthesis something it should not read:
+  - A returned path this run did not mint is discarded rather than merely left
+    un-redacted; it was still persisted to `$STATE_FILE`, and Step 5 reads each
+    reviewer summary from exactly that value, so a prompt-injected return naming
+    any readable file became an arbitrary-file-read into the report.
+  - A path that IS the minted one but is missing, not a regular file, or a
+    symlink now fails the slot instead of keeping an apparently valid vote.
+  - An empty `fenced_output_path=` fails the slot too, but only when it carries
+    an actual participating verdict — a TIMEOUT or UNAVAILABLE slot keeps its
+    more specific reason.
+  - The truncation that backstops a failed redaction no longer ignores its own
+    exit status; an unwritable file or I/O error would otherwise leave the raw
+    review at a path the function still reported as good.
+
+  Step 4b also `chmod 600`s the fenced file as soon as it takes ownership.
+  `claude-reviewer` creates it with the `Write` tool under the ordinary process
+  umask, so on a multi-user host the raw review was world-readable until the
+  redacted copy replaced it. The window between the agent's write and that line
+  remains, and a cancelled or hung run never reaches it at all — both are
+  recorded in the plugin's Known Limitations. Closing it fully needs a nested
+  `mktemp -d` path, which every path guard in `council.md` rejects on purpose.
+
+  The appendix fence-escaping pass now covers every structural form
+  `claude-reviewer.md` Safeguard 2 names, not just this command's own fence: a
+  native `--- end codex-output ---` or `--- code end ---` in injected output
+  previously survived into the persisted report, and the two `findings_block_*`
+  sentinels are prefixed rather than substituted since they carry no leading
+  `--- ` to consume.
+
+  Two supporting fixes: `validate-agent-authoring.js` now honours a
+  `REVIEW_AGENT_ALLOWLIST` entry only while the agent still carries its
+  `Tool Surface — Documented … Exception` section, so the rationale for a
+  Write-capable reviewer cannot be deleted with CI staying green; and `find`,
+  which drives the stale-`/tmp` sweep, is declared a prerequisite instead of
+  being depended on silently.
+
+  The slot now returns `summary=` and its findings block EMPTY, and `council.md`
+  reads both back out of the fenced file after redacting it. The CLI reviewers
+  redact inside their own agent before returning, so their prose is already
+  sanitized when the orchestrator sees it; the in-process slot has no `Bash` and
+  cannot, so anything it returned entered orchestrator context raw — and once
+  read, no later pass can retract it. Sanitizing the file afterwards was too
+  late by construction. Verdict and confidence are still returned directly,
+  being enum- constrained with no free text.
+
+  Four corrections to the above, from review of it:
+  - The EMPTY-return rule is scoped to the SUCCESS path. Step 1's malformed-pack
+    and Step 3's refused-path branches produce no fenced file, so their fixed
+    diagnostic summaries must still be returned or the reason is lost; they are
+    constant strings, not pack-derived prose, and are redacted on arrival.
+  - Only the claude leg is read from disk. The CLI legs redact inside their own
+    agent before returning, and `yellow-codex`'s reviewer writes only findings
+    to its fenced file — its summary exists solely in that already-redacted
+    return, so demanding the file for every leg would have dropped Codex's
+    explanation.
+  - The findings capture is bounded by the fence end and cut at the LAST
+    `Summary: ` line rather than the first, so a finding whose body starts with
+    that literal prefix no longer truncates every finding after it.
+  - The documented-exception heading check runs on live markdown, with fenced
+    blocks and HTML comments stripped first — otherwise a commented-out or
+    illustrative copy of the heading kept the privileged grant alive.
+
+  The vote is now derived from the same place as the prose. Reading only the
+  summary and findings from the sanitized file left the Task-return `verdict=`
+  authoritative, so a return claiming `APPROVE` while its own fenced file said
+  `Verdict: REVISE` produced a headline the persisted appendix visibly
+  contradicted. The two are compared and the slot fails closed when they differ
+  — a disagreement means one of them is not the reviewer's judgement and there
+  is no way to tell which.
+
+  Two corrections to that consistency check: a MISSING `Verdict:` line in the
+  fenced file is treated as a mismatch rather than an exemption, so the
+  Task-return vote cannot stand while the appendix shows no vote at all; and
+  both interpolated values are redacted before reaching stderr, since neither
+  has been through the enum coercion or the redaction pass at that point and a
+  malformed return can carry credential-shaped text in `verdict=`.
+
+  The fenced verdict must now be UNIQUE and inside the claude fence: a
+  first-match parser over the whole file accepted a forged `Verdict:` quoted
+  ahead of the real one, and a matching forged Layer-2 return would then pass
+  the consistency check. Zero or multiple matches both fail the slot. The
+  fenced-file schema also gains `UNKNOWN`, which Step 2 already requires for the
+  early-stop path — without it, following the template produced a verdict the
+  consistency check turned into ERROR on every partial review.
+
+  Summary and findings extraction is fence-scoped and unique too, matching the
+  verdict: a `Summary:` line appended after the end delimiter is outside the
+  reviewer's own fence, and a whole-file scan let that injected prose win.
+
+- [#703](https://github.com/KingInYellows/yellow-plugins/pull/703)
+  [`766268d`](https://github.com/KingInYellows/yellow-plugins/commit/766268d108f5cee2abc6bce7b80ca961a2937389)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Close
+  credential-redaction bypasses and add a regression suite
+  - `strip_deco` refused to strip git's `-` prefix from PEM delimiter lines, so
+    a key echoed as diff deletions (`------BEGIN…`, six dashes) was classified
+    as a prose mention and ran under the bounded window — a narrowly-wrapped
+    body then leaked past the stray cutoff.
+  - The real-vs-prose test runs on the decoration-stripped line and requires the
+    BEGIN marker to be the WHOLE line: a marker that merely terminates a line of
+    prose stays a mention and runs under the bounded window, so an ordinary
+    report quoting a header is not read as a key and redacted through EOF.
+    Decoration is stripped before the test, so a blockquoted, listed, numbered
+    or diff-prefixed real marker still reaches it anchored.
+  - `cred_hit` tested only `match()`'s leftmost occurrence, so a short
+    placeholder sharing a token's prefix shadowed a real credential later on the
+    same line and the line was emitted unredacted.
+  - The post-close re-arm window ran unconditionally and could overwrite the
+    mode of a block that had already begun inside it, misclassifying
+    back-to-back blocks.
+  - Decoration stripping was bounded by a CONSTANT (8, then 64). Output carrying
+    more prefixes than the bound left the loop with prefixes still attached, so
+    the anchored test above failed on a genuine key and the block leaked on the
+    bounded path. The bound is now derived from the input length, which no
+    attacker-chosen nesting depth can exceed, and exhausting it fails closed.
+
+  The re-arm now also requires a digit or base64 punctuation, so an ordinary
+  camelCase identifier no longer re-enters unbounded redaction and swallows
+  `Verdict:`/`Confidence:`/`Summary:` through EOF.
+
+  Adds `plugins/yellow-council/tests/redaction.bats`, which extracts the live
+  awk program from each file that ships it (rather than testing a copy that
+  drifts), asserts all copies are byte-identical, and pins both failure
+  directions — leaks and over-redaction — under every awk on the host.
+
+  Round two, from continued review of the above:
+  - Decoration stripping consumed a `+` run one character per pass while copying
+    the remainder, so an attacker-supplied run was quadratic in its length — a
+    100k-character run took roughly ten seconds and could outlast the timeout
+    meant to bound the redaction step. `+` runs are now taken whole. A long `-`
+    run still costs one pass per character, because the delimiter guard has to
+    re-test after each removal; that remains a known open cost rather than a
+    closed one.
+
+  An interim revision of this PR also normalized serialized markers (JSON
+  strings and markdown table cells) and capped line length with a fail-closed
+  guard. Both were reverted: reviewers demonstrated that each traded the leak
+  for the opposite failure. The length cap keyed "real key" off length alone, so
+  any long line merely MENTIONING a marker swallowed the report through EOF; the
+  wrapper strip ran after list/blockquote/numbered prefixes were already
+  removed, so `- "<marker>"` normalized to a bare marker and did the same. A key
+  serialized as a JSON string is therefore still classified as a mention and
+  takes the bounded window — the same accepted trade as an inline-prose mention,
+  recorded in the plugin Known Limitations. Handling serialized shapes safely
+  needs the bounded window's width floor reworked alongside it, which belongs in
+  its own change.
+
+  A re-arm window left over from an earlier block was never retired when a new
+  BEGIN opened. `pem_watch` only decrements while outside a block, so a
+  countdown still running was frozen for the whole of the next block and resumed
+  afterwards with a stale count — and the re-arm path restores the real/prose
+  mode from the PREVIOUS block, so a later base64-shaped prose line could
+  re-enter unbounded redaction on the strength of a key that had already closed,
+  swallowing the report. Opening a block now closes any window that belongs to
+  an earlier one.
+
+  The suite is now a REQUIRED CI step rather than part of the advisory
+  `continue-on-error` plugin glob. Left advisory, a change that reintroduced any
+  tested credential leak could merge with the whole regression suite red, which
+  defeats the reason for writing it.
+
+- [#708](https://github.com/KingInYellows/yellow-plugins/pull/708)
+  [`4fe52aa`](https://github.com/KingInYellows/yellow-plugins/commit/4fe52aaa113ce6d26bd25ef5d874c3d367dfd5da)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `/council review --base <ref>`, which was silently non-functional since the
+  plugin shipped.
+
+  The `--base` parsing lives in its own fenced bash block, and each block runs
+  as a fresh subprocess, but it never re-derived `$REST` (Step 2 derives it in a
+  different block). So `set -- $REST` left `$#` at 0, the parse loop never ran,
+  `EXPLICIT_BASE` stayed empty, and every invocation fell through to the
+  upstream-tracking / `origin/main` default — including one passing an explicit
+  `--base`. That directly contradicted the contract stated three lines above it:
+  "An invalid or non-existent ref must fail loudly rather than silently falling
+  back, otherwise the advertised flag would be non-functional."
+
+  `MODE`/`REST` are now re-derived at the top of that block, matching Step 6's
+  existing convention.
+
+  The skill's truncation snippet recomputes the diff in its own bash block, so
+  the caller's empty-diff guard does not cover it. Left unsubstituted, the
+  `BASE` placeholder made `git diff` exit 128 while the redirect still created
+  the file, `wc -c` read 0, and the block exited successfully with an empty diff
+  — fanning out reviewers over nothing, which returns an unfounded APPROVE. The
+  snippet now rejects an unsubstituted placeholder, requires `BASE` to resolve
+  to a commit, and aborts when `git diff` fails or produces an empty file.
+
+  The truncation block also never emitted its result. It wrote the truncated
+  diff to a randomized `$DIFF_FILE` and ended, but it runs in its own Bash call,
+  so neither the variable nor the path reaches the pack-assembly step that
+  consumes it — a review large enough to trigger truncation fanned out with no
+  diff at all, which every reviewer answers with an unfounded APPROVE. The block
+  now prints the diff on stdout and removes the file, and `council.md` states
+  that the captured stdout is the handoff.
+
+  The truncation is now bounded by bytes as well as lines. `head -200` alone is
+  not a size bound — 200 lines of a minified bundle or a generated lockfile can
+  exceed the 200K the truncation exists to stay under, so the truncated result
+  came back as large as the input and blew the pack budget anyway.
+
+  The byte cap is set from the tightest downstream consumer rather than from the
+  raw diff alone: the assembled pack also carries the stat header, up to three
+  4K changed-file excerpts and the fence framing, and must clear both the 100K
+  pack budget and OpenCode's 120000-byte argv rejection. A 150000-byte diff
+  portion exceeded both on its own and would have marked that reviewer
+  UNAVAILABLE on every large-diff run.
+
+  Correction to the above: the earlier derivation assumed at most three 4K
+  changed-file excerpts, which is the `debug`/`question` limit — `review` mode
+  has no file-count cap and appends every changed file, and the
+  `git diff --stat` was unbounded as well, so a wide change still blew the
+  budget with the diff portion capped. The stat is now bounded, changed-file
+  excerpts are added until a 30K combined budget is reached (then a count of
+  omissions), and the assembled-pack ceiling of 100K is stated with the
+  per-section arithmetic beside it.
+
+  The ceiling is now a measured post-assembly check rather than arithmetic: the
+  pack is written out, `wc -c` is taken, and changed-file excerpts are dropped
+  from the end until it is under 100000 bytes. A content-only budget counted
+  neither the per-file path/heading/fence framing — which a diff touching
+  hundreds of tiny files pays for every one of them — nor the byte cost of
+  non-ASCII content over its character count.
+
+  Two more from review of that check: the truncation trigger is lowered from
+  200K to the 60K diff budget, since a diff between the two skipped truncation
+  entirely and dropping every excerpt still could not bring the pack under
+  OpenCode's guard; and the measurement copy must be `mktemp`-staged (0600) and
+  removed on every path, because it holds the pack unredacted and a
+  Write-created file would persist at the ordinary umask.
+
+  Three fixes to the truncation work itself: byte caps now cut at a line
+  boundary via `LC_ALL=C awk` rather than `head -c`, which could split a
+  multibyte character and emit invalid UTF-8 into the pack; the truncated diff
+  is staged through `mktemp` (0600) instead of a `>` redirect that created it at
+  the ordinary umask; and the plugin README and CLAUDE.md now document the
+  thresholds and the omission policy, since a council review may legitimately
+  not inspect the complete change.
+
+- [#703](https://github.com/KingInYellows/yellow-plugins/pull/703)
+  [`766268d`](https://github.com/KingInYellows/yellow-plugins/commit/766268d108f5cee2abc6bce7b80ca961a2937389)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix a PEM
+  private-key redaction bypass in `gemini-reviewer` and `opencode-reviewer`.
+  Both matched the BEGIN/END markers with a fully anchored pattern
+  (`^-----BEGIN [A-Z ]+PRIVATE KEY-----[[:space:]]*$`), which diverged from the
+  canonical unanchored form documented in `council-patterns` SKILL.md. Two
+  shapes leaked through as a result: a key flattened onto one line or quoted
+  inline in prose never matched the anchor, and `[A-Z ]+` failed to match the
+  bare PKCS#8 header `-----BEGIN PRIVATE KEY-----` (no algorithm word) even in
+  the multi-line case. Both now use the canonical
+  `-----BEGIN [A-Z ]*PRIVATE KEY-----` substring match, so reviewer output
+  containing key material is redacted before it reaches the council report.
+
+  Unanchoring BEGIN also means it matches prose that merely quotes the marker,
+  and such a line has no matching END — which would have pinned the redaction
+  state on to EOF and replaced the entire remaining report with placeholders.
+  The state machine is now span-bounded: PEM armor is base64 plus the
+  `Proc-Type`/`DEK-Info` headers, so it counts consecutive lines that cannot be
+  key material and leaves PEM mode after three of them. A real key block stays
+  fully redacted (its body is base64 throughout, even when truncated with no END
+  marker), while a stray prose mention now costs four redacted lines instead of
+  the reviewer's whole verdict. Blockquote and list decoration is stripped
+  before that body test, so a reviewer that renders a key inside `> `, `1. `, or
+  a diff `-`/`+` prefix does not fall out of redaction mode partway through the
+  key. Blank lines are neutral for that counter — treating them as valid key
+  body would reset it at every paragraph gap in prose, defeating the bound.
+
 ## 0.2.12
 
 ### Patch Changes
