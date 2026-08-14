@@ -530,6 +530,26 @@ assert_survives_under_all() {
   assert_survives_under_all "$input" "Findings: none blocking"
 }
 
+@test "the line that ends the stray window is emitted, not redacted" {
+  # The window is THREE non-key lines wide, and the third one is the line that
+  # proves the window is over. An earlier revision overwrote `line` with the
+  # redaction marker before the state machine ran, so that third line was
+  # redacted anyway and the window cost four lines instead of three. With a
+  # mention quoted immediately before the report tail, that one-line overrun
+  # was the difference between `Summary:` surviving and being swallowed.
+  #
+  # Pins the boundary exactly: lines 2 and 3 after the mention are inside the
+  # window and may be redacted; the third non-key line is outside it and must
+  # be emitted verbatim. A regression that reinstates the overrun fails here
+  # even though the "window terminates" test above still passes, because that
+  # one only asserts the tail eventually survives, not where the edge is.
+  local input
+  input="$(printf '%s\n%s\n%s\n%s' \
+    "P2: prose quoting a ${BEGIN_PK} marker inline" \
+    "stray one" "stray two" "Summary: the third stray line must survive")"
+  assert_survives_under_all "$input" "Summary: the third stray line must survive"
+}
+
 # --- Block boundary --------------------------------------------------------
 
 @test "a second key block is classified on its own merits" {

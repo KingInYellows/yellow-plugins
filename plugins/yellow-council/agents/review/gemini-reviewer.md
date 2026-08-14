@@ -549,7 +549,15 @@ function is_base64_line(s, minlen) {
       pem_watch--
     }
   }
-  if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
+  # Decide the state transition BEFORE deciding whether to redact this line.
+  # The stray cutoff fires ON the line that proves the window is over, and
+  # that line is ordinary prose. Overwriting `line` first meant the cutoff
+  # line was redacted anyway, so one quoted marker cost the mention plus
+  # three following lines -- and with Verdict:/Confidence:/Summary: right
+  # after it, all three were swallowed and the reviewer scored UNKNOWN, the
+  # exact outcome this bounded window exists to prevent.
+  pem_was_in = in_pem
+  pem_release = 0
   if (in_pem) {
     if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
       pem_prev_real = pem_real
@@ -573,17 +581,24 @@ function is_base64_line(s, minlen) {
       # fooling the body classifier.
       if (++pem_span > 200) {
         in_pem = 0
+        pem_release = 1
       } else {
         pem_body = strip_deco($0)
         if (pem_body != "") {
           if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
               pem_body ~ /^(Proc-Type|DEK-Info):/ ||
               $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-          else if (++pem_stray >= 3) in_pem = 0
+          else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
         }
       }
     }
   }
+  # Redact when the line was ENTERED in PEM mode, unless the machine released
+  # on THIS line via the stray cutoff or the span backstop -- in both cases
+  # the line is the non-key prose that ended the window. The END branch
+  # deliberately does not set pem_release: an END marker belongs to the key
+  # block and must stay redacted.
+  if (pem_was_in && !pem_release) line = "--- redacted PEM key block at line " NR " ---"
   # Blank lines are NEUTRAL — they neither reset nor increment pem_stray
   # (is_base64_line("") is false and pem_body == "" short-circuits above).
   # Counting them as valid body would reset pem_stray on every paragraph
