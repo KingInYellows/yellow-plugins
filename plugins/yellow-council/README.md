@@ -74,10 +74,28 @@ Each invocation produces:
 - **Inline synthesis** — Headline (verdict count) + Agreement (findings cited
   by ≥2 reviewers) + Disagreement (unique findings or verdict conflicts).
 - **Persisted report** at `docs/council/<date>-<mode>-<slug>.md` — synthesis
-  plus four labeled raw reviewer outputs (each wrapped in injection fences
-  and credential-redacted).
+  plus four labeled raw reviewer outputs (each wrapped in injection fences and
+  passed through credential redaction — **best-effort, not a guarantee**; see
+  the note below before sharing a report).
 
 The user is asked for confirmation before the report file is written.
+
+> **Redaction is best-effort, not a guarantee.** The 11-pattern pass catches
+> API keys, tokens and cleanly-formatted PEM private key blocks. It classifies
+> a key block once, when it sees the `BEGIN` marker, and only treats the block
+> as a real key when that marker is the whole line. A genuine key whose marker
+> shares its line with prose (`leaked key: -----BEGIN PRIVATE KEY-----`), or
+> one wrapped by a serializer (a JSON string, a markdown table cell), is read
+> as a passing mention instead and runs under a bounded window — with a
+> narrowly wrapped body, the tail of that key and its `END` marker can survive
+> into the report. The alternative was measured and is worse: treating those
+> shapes as real keys lets any line ending in a `BEGIN` marker redact a whole
+> reviewer verdict, which a hostile diff can trigger deliberately.
+>
+> Treat `docs/council/` reports as you would any file that has passed through
+> a scrubber — review before sharing, and do not commit them to a public
+> repository without reading them first. Rationale and the follow-up work are
+> in the plugin's `CLAUDE.md` Known Limitations.
 
 ## Configuration
 

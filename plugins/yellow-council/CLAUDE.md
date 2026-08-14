@@ -210,6 +210,24 @@ Codex agent.)
   enforceable read-only tool policy flag, adopt it here and retire this
   limitation. Treat any unexpected file mutation after a council run as a
   bug report for this plugin.
+- **A key that shares its BEGIN line with prose, or is wrapped by a
+  serializer, leaks its tail.** Redaction classifies once, at BEGIN time: a
+  marker that is the whole line (after decoration stripping) is a real key and
+  is redacted unbounded; anything else is treated as a mention and runs under
+  the bounded window, which releases after three non-key-shaped lines. Three
+  shapes therefore land on the bounded path even though they carry a genuine
+  key — `leaked key: -----BEGIN PRIVATE KEY-----`, a JSON string
+  (`"-----BEGIN PRIVATE KEY-----",`, which OpenCode's `--format json` can
+  produce), and a markdown table cell. With a narrowly wrapped body the tail
+  of the key and its END marker survive into the report.
+  A revision that normalized those shapes was reverted: keying "real key" off
+  line length or off matched quote/table wrappers promoted ordinary MENTIONS
+  to real keys, and real mode never resets until END or EOF, so one long
+  paragraph or one `- "<marker>"` bullet swallowed `Verdict:`/`Confidence:`/
+  `Summary:` and scored the reviewer UNKNOWN. Both directions are
+  attacker-reachable. Closing the leak safely requires reworking the bounded
+  window's width floor at the same time, which is deliberately left to its own
+  change rather than patched shape-by-shape here.
 - **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
   tool permission request, including writes (same class as the retired
   gemini `--yolo`). yellow-council MUST NOT use it.
