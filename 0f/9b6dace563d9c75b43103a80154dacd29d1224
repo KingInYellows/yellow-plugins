@@ -1,0 +1,31 @@
+.changeset/council-pem-redaction-hardening.md
+  s_3bb494324db8bc::t_5e8a59f635ac4e 44-59
+plugins/yellow-council/tests/redaction.bats
+  s_3bb494324db8bc::t_5e4d5f2b3a89dd 295
+  s_3bb494324db8bc::t_fdb038350a6919 46-49,51,294,300-326
+  s_3bb494324db8bc::t_556c1cb80e86d8 276-282,285-287
+  s_3bb494324db8bc::t_68835a3bb16236 64,66,68-74
+  s_3bb494324db8bc::t_1d93a850a402a1 327
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_3bb494324db8bc::t_136a90faf57863 356-364,540
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_3bb494324db8bc::t_136a90faf57863 371-379,555
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_3bb494324db8bc::t_136a90faf57863 174-182,358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0f9b6dace563d9c75b43103a80154dacd29d1224",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
