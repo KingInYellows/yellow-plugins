@@ -693,8 +693,22 @@ if [ "$DIFF_BYTES" -gt 60000 ]; then
         linelen = length($0) + 1
         if (linelen > remaining) {
           s = substr($0, 1, remaining)
-          while (length(s) > 0 && substr(s, length(s)) ~ /[\200-\277]/) s = substr(s, 1, length(s) - 1)
-          if (length(s) > 0 && substr(s, length(s)) ~ /[\300-\377]/) s = substr(s, 1, length(s) - 1)
+          # Walk back to the final character's LEAD byte, then drop that
+          # character only if the cut actually split it. Stripping every
+          # trailing continuation byte unconditionally would also discard a
+          # COMPLETE trailing character whenever the cut happens to land on a
+          # character boundary — still valid UTF-8, but it silently gives back
+          # budget the line was entitled to.
+          k = length(s)
+          while (k > 0 && substr(s, k, 1) ~ /[\200-\277]/) k--
+          if (k > 0) {
+            c = substr(s, k, 1)
+            if (c ~ /[\300-\337]/) need = 2
+            else if (c ~ /[\340-\357]/) need = 3
+            else if (c ~ /[\360-\367]/) need = 4
+            else need = 1
+            if (k + need - 1 > length(s)) s = substr(s, 1, k - 1)
+          }
           if (length(s) > 0) print s
           exit
         }
