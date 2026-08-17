@@ -125,11 +125,16 @@ module.exports = {
     {
       // Scripts can use console and don't need type checking. Also covers
       // plugin-local Node hook scripts (e.g.
-      // plugins/gt-workflow/hooks/scripts/) — the same CommonJS
+      // plugins/gt-workflow/hooks/scripts/) and plugin-local Node
+      // libraries (e.g. plugins/yellow-core/lib/) — the same CommonJS
       // require/module.exports convention as scripts/lib/generate/, since
       // package.json has no "type": "module" and there is no ESM
       // precedent to match instead.
-      files: ['scripts/**/*.js', 'plugins/*/hooks/scripts/**/*.js'],
+      files: [
+        'scripts/**/*.js',
+        'plugins/*/hooks/scripts/**/*.js',
+        'plugins/*/lib/**/*.js',
+      ],
       extends: ['eslint:recommended'],
       parser: 'espree',
       parserOptions: {

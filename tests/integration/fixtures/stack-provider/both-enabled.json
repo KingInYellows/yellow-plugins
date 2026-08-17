@@ -1,0 +1,21 @@
+[
+  {
+    "id": "gt-workflow@yellow-plugins",
+    "version": "1.6.2",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/gt-workflow/1.6.2",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "github-workflow@yellow-plugins",
+    "version": "0.1.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/github-workflow/0.1.0",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z",
+    "projectPath": "/fixture/projects/yellow-plugins"
+  }
+]

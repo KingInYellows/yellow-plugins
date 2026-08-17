@@ -197,6 +197,12 @@ jobs:
               # match the committed catalog/ sources exactly (mirror of the
               # main workflow's `generated` target).
               node scripts/generate-manifests.js --check
+
+              # Capability-provider gate (mirror of the main workflow's
+              # `generated` target). Fork PRs need parity here so a fork
+              # contributor who leaks catalog-only provider metadata into a
+              # generated manifest sees the same blocking signal.
+              node scripts/validate-provider-groups.js
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"

@@ -44,6 +44,26 @@
       "type": "array",
       "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
     },
+    "capabilityProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "id"],
+      "description": "Catalog-only declaration that this plugin is one interchangeable implementation of a capability group (e.g. the `stacked-pr` group, provided by either Graphite or GitHub native stacks). Both emitters build their manifests from explicit key lists, so this field is never written into .claude-plugin/plugin.json, .claude-plugin/marketplace.json, or .codex-plugin/plugin.json; scripts/validate-provider-groups.js pins that non-emission. Runtime mutual exclusion (exactly one provider enabled) is NOT expressible here — it is enforced by plugins/yellow-core/lib/stack-provider-state.js and its fixture tests.",
+      "properties": {
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Capability group slug. Every plugin sharing a group is an alternative implementation of the same capability; at most one may be enabled at runtime."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Provider identity within the group. Must be unique across the group and is the token users type (e.g. `graphite`, `github`)."
+        }
+      }
+    },
     "marketplace": {
       "type": "object",
       "additionalProperties": false,

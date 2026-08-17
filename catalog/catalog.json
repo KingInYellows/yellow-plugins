@@ -11,6 +11,7 @@
   },
   "pluginOrder": [
     "gt-workflow",
+    "github-workflow",
     "yellow-core",
     "yellow-linear",
     "yellow-devin",

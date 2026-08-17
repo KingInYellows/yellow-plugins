@@ -138,6 +138,36 @@ export const ERROR_CODES = {
   SETUP_CREDENTIAL_LIST_DRIFT: 'ERROR-SETUP-006',
   SETUP_EXAMPLE_DRIFT: 'ERROR-SETUP-007',
 
+  // Capability-Provider Errors (PROVIDER) — scripts/validate-provider-groups.js
+  // gates the catalog-only `capabilityProvider` field (group + id) that marks
+  // a plugin as one interchangeable implementation of a capability group,
+  // e.g. the `stacked-pr` group provided by either gt-workflow (Graphite) or
+  // github-workflow (GitHub native stacks). See
+  // plans/stacked-pr-provider-abstraction.md.
+  //
+  // Scope boundary worth stating once: these codes cover the STATIC half
+  // only — declaration shape, uniqueness, referential integrity, and
+  // non-emission into generated artifacts. The RUNTIME rule ("exactly one
+  // provider in a group may be enabled") is not expressible in a catalog
+  // file and is enforced by plugins/yellow-core/lib/stack-provider-state.js
+  // plus its fixture tests.
+  //
+  // Prefix choice: PROVIDER is substring-safe against every existing prefix
+  // in both directions (lint-error-codes.js findPrefixCollisions, R14).
+  //
+  // Same ESM/CJS bridge constraint as SOL_*/PLAN_*/SETUP_*/NAMESPACE_*: the
+  // catalog is ESM, scripts/ is CJS, so the validator assembles the same
+  // strings via concatenation (`const PROVIDER = 'ERROR-' + 'PROVIDER';`)
+  // and `scripts/lint-error-codes.js` (CODE_PATTERN /ERROR-[A-Z]+-\d+/g)
+  // does not detect split-string assembly. Any change to the entries below
+  // requires a paired edit in scripts/validate-provider-groups.js.
+  PROVIDER_DUPLICATE_ID: 'ERROR-PROVIDER-001',
+  PROVIDER_UNKNOWN_PLUGIN: 'ERROR-PROVIDER-002',
+  PROVIDER_METADATA_LEAKED: 'ERROR-PROVIDER-003',
+  PROVIDER_GROUP_UNDERPOPULATED: 'ERROR-PROVIDER-004',
+  PROVIDER_SETUP_SECTION_DRIFT: 'ERROR-PROVIDER-005',
+  PROVIDER_ROUTER_TABLE_DRIFT: 'ERROR-PROVIDER-006',
+
   // Namespace Migration Errors (NAMESPACE) — scripts/validate-flow-namespace.js
   // gates the whole repo against surviving references to the retired
   // `workflows:` command namespace (renamed to `flow:`; see
@@ -391,6 +421,14 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.SETUP_PROBE_LIST_DRIFT,
       ERROR_CODES.SETUP_CREDENTIAL_LIST_DRIFT,
       ERROR_CODES.SETUP_EXAMPLE_DRIFT,
+    ],
+    [ErrorCategory.CAPABILITY_PROVIDER]: [
+      ERROR_CODES.PROVIDER_DUPLICATE_ID,
+      ERROR_CODES.PROVIDER_UNKNOWN_PLUGIN,
+      ERROR_CODES.PROVIDER_METADATA_LEAKED,
+      ERROR_CODES.PROVIDER_GROUP_UNDERPOPULATED,
+      ERROR_CODES.PROVIDER_SETUP_SECTION_DRIFT,
+      ERROR_CODES.PROVIDER_ROUTER_TABLE_DRIFT,
     ],
     [ErrorCategory.DISTRIBUTION]: [
       ERROR_CODES.DIST_MALFORMED_CATALOG_SOURCE,

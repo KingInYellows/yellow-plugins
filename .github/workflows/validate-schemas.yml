@@ -335,6 +335,19 @@ jobs:
                 echo "::group::Generated-artifact drift check"
                 node scripts/generate-manifests.js --check
                 echo "::endgroup::"
+
+                # Capability-provider gate. Lives in this arm (not its own
+                # matrix target) because its inputs are the same catalog/
+                # sources plus the artifacts the drift check just verified —
+                # running it after that check means a leak it reports is a
+                # real emitter bug, not stale committed bytes. Mirrored in
+                # validate-schemas-fork.yml's `generated` arm; a validator
+                # wired only into `pnpm validate:schemas` is green-by-absence
+                # in CI, since nothing here runs that script — only these
+                # matrix targets.
+                echo "::group::Capability-provider group validation"
+                node scripts/validate-provider-groups.js
+                echo "::endgroup::"
                 ;;
               *)
                 echo "::error::Unknown validation target: ${{ matrix.target }}"

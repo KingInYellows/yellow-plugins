@@ -278,7 +278,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -298,6 +298,21 @@ if [ -n "$_gh" ]; then
   "$_gh" auth status >/dev/null 2>&1 && printf 'gh_auth: OK\n' || printf 'gh_auth: NOT AUTHENTICATED\n'
 else
   printf 'gh_auth: SKIPPED (gh not found)\n'
+fi
+
+printf '\n=== Stacked-PR Provider Tooling ===\n'
+# Owner-scoped, not name-scoped: `gh extension search stack` returns three
+# third-party extensions that also expose a `gh stack` command, and only
+# github/gh-stack is first-party. Matching the bare name would report a
+# lookalike as READY.
+if [ -n "$_gh" ]; then
+  if "$_gh" extension list 2>/dev/null | grep -q 'github/gh-stack'; then
+    printf 'gh_stack_ext: OK (github/gh-stack)\n'
+  else
+    printf 'gh_stack_ext: MISSING\n'
+  fi
+else
+  printf 'gh_stack_ext: SKIPPED (gh not found)\n'
 fi
 ```
 
@@ -364,6 +379,20 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
   present OR `gt_trunk` not `UNAVAILABLE`) AND `.graphite.yml` missing
 - NEEDS SETUP: any core condition not met (`gt`, `jq`, `graphite_auth`,
   `graphite_repo`/`gt_trunk`)
+
+**github-workflow:**
+
+Alternative provider of the `stacked-pr` capability group (see the
+Alternative Provider Groups section below). It is classified like any other
+plugin, but its setup is only ever offered when it is the **enabled**
+provider — a user running Graphite must never be asked to configure GitHub
+stacks as well.
+
+- READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK
+- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `MISSING` — the
+  provider plugin is installed but the official `github/gh-stack` extension
+  is not; detail: "install with `gh extension install github/gh-stack`"
+- NEEDS SETUP: `gh` missing OR `gh_auth` NOT AUTHENTICATED
 
 **yellow-ruvector:**
 
@@ -604,6 +633,7 @@ Marketplace Setup Dashboard
   Plugin               Status          Detail
   -------------------  -----------     ------------------------------------------
   gt-workflow          READY           Graphite auth detected, repo initialized
+  github-workflow      PARTIAL         gh authenticated, github/gh-stack not installed
   yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
   yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
@@ -627,6 +657,40 @@ Marketplace Setup Dashboard
 
 Be specific in the Detail column. Name the missing tool, env var, config file,
 or bundled research source count rather than using generic labels.
+
+### Step 2.5: Alternative Provider Groups
+
+Some marketplace plugins are **alternative providers** of the same
+capability: interchangeable implementations, of which exactly one may be
+enabled at a time. Both may be installed — installing both is normal and
+supported — but enabling both is a conflict, not a redundancy.
+
+<!-- setup-all-provider-groups:start -->
+- `stacked-pr` (mutually exclusive: exactly one enabled)
+  - `gt-workflow` → `graphite`
+  - `github-workflow` → `github`
+<!-- setup-all-provider-groups:end -->
+
+`scripts/validate-provider-groups.js` gates this list against the
+`capabilityProvider` declarations in `catalog/plugins/*.json`, so it cannot
+drift from the marketplace silently.
+
+**Never ask the user to configure more than one member of a group.** Both
+appear in the dashboard, because both can be installed and their readiness
+is worth reporting. Only the **enabled** one is offered for setup:
+
+1. Determine the group's enabled member via `/stack:status` (or the
+   `stack-provider-router` skill, which reads `claude plugin list --json`).
+   Do not infer it from which CLI happens to be on PATH.
+2. Offer setup for that member only. Show the other member's row with its
+   status and the annotation `(alternative provider — not enabled)`.
+3. If the group's state is not `READY_GRAPHITE` or `READY_GITHUB` — no
+   provider enabled, both enabled, intent mismatch, or a managed-scope
+   conflict — do **not** pick one. Report the state and point at
+   `/stack:select`. There is no fallback between providers.
+4. If `yellow-core` is not installed, `/stack:status` is unavailable: report
+   both members' readiness, annotate that the active provider could not be
+   determined, and offer neither.
 
 ### Step 3: Decision — Interactive Setup
 
@@ -656,7 +720,10 @@ If `yellow-core` is not installed, stop after the summary.
 **If 1+ installed plugins are NEEDS SETUP or PARTIAL:**
 
 Count only installed plugins that are not READY. Exclude NOT INSTALLED plugins
-from the count and from selection lists. Use AskUserQuestion:
+from the count and from selection lists. Also exclude the non-enabled member
+of any alternative provider group (Step 2.5) — it is reported, never offered,
+and must not inflate the "N plugins need attention" count. Use
+AskUserQuestion:
 
 "N plugins need attention. How would you like to proceed?"
 
@@ -677,28 +744,32 @@ tool in this fixed order:
 
 <!-- setup-all-delegated-commands:start -->
 1. `gt-setup`
-2. `ruvector:setup`
-3. `morph:setup`
-4. `devin:setup`
-5. `semgrep:setup`
-6. `research:setup`
-7. `linear:setup`
-8. `debt:setup`
-9. `ci:setup`
-10. `review:setup`
-11. `browser-test:setup`
-12. `docs:setup`
-13. `composio:setup`
-14. `codex:setup`
-15. `council:setup`
-16. `mempalace:setup`
-17. `statusline:setup`
+2. `github-stack:setup`
+3. `ruvector:setup`
+4. `morph:setup`
+5. `devin:setup`
+6. `semgrep:setup`
+7. `research:setup`
+8. `linear:setup`
+9. `debt:setup`
+10. `ci:setup`
+11. `review:setup`
+12. `browser-test:setup`
+13. `docs:setup`
+14. `composio:setup`
+15. `codex:setup`
+16. `council:setup`
+17. `mempalace:setup`
+18. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
-Only invoke setups for plugins the user selected. Use this mapping:
+This list is the fixed **order**, not a to-do list. Only invoke setups for
+plugins the user selected, and never invoke both members of an alternative
+provider group in one run (see the section below). Use this mapping:
 
 <!-- setup-all-plugin-command-map:start -->
 - `gt-workflow` → `gt-setup`
+- `github-workflow` → `github-stack:setup`
 - `yellow-ruvector` → `ruvector:setup`
 - `yellow-morph` → `morph:setup`
 - `yellow-devin` → `devin:setup`

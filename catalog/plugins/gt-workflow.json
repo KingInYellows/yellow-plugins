@@ -48,6 +48,10 @@
       }
     ]
   },
+  "capabilityProvider": {
+    "group": "stacked-pr",
+    "id": "graphite"
+  },
   "marketplace": {
     "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
     "category": "development",
