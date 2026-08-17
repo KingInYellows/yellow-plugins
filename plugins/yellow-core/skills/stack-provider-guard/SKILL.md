@@ -48,6 +48,11 @@ the module is what the fixture tests cover.
 set -uo pipefail
 
 LIB="${CLAUDE_PLUGIN_ROOT}/lib/stack-provider-state.js"
+if [ ! -f "$LIB" ]; then
+  printf 'stack_provider_error: state library not found at %s\n' "$LIB"
+  exit 0
+fi
+
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 
 if ! plugin_json=$(claude plugin list --json 2>/dev/null); then
@@ -64,6 +69,11 @@ printf '%s' "$plugin_json" | node "$LIB" plan \
   --project-path "$repo_root" \
   || printf 'stack_provider_error: planning failed — no commands were produced\n'
 ```
+
+If the output contains a `stack_provider_error:` line, print that line and
+stop. There is no plan, and a missing plan is not an empty one — do not
+proceed to Step 2's refusal contract, which applies only to a `status:
+"refused"` JSON result.
 
 ### Step 2: Enforce the refusal contract
 

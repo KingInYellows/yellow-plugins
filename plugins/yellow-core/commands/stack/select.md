@@ -80,6 +80,10 @@ printf '%s' "$plugin_json" | node "$LIB" plan \
   || printf 'stack_provider_error: planning failed — no commands were produced\n'
 ```
 
+If the output contains a `stack_provider_error:` line, print that line and
+stop. There is no plan — do not fall through to the example in Step 4 and
+never execute a `claude plugin` command reconstructed from it.
+
 ### If the plan is refused
 
 `status: "refused"` always comes with `steps: []`. Print the `reason` and
