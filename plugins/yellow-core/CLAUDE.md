@@ -71,7 +71,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   background-compounding plan); RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (16)
+### Commands (18)
 
 - `/flow:brainstorm` — explore requirements through dialogue and research before planning
 - `/flow:spec` — draft a requirements spec (stable `R1..Rn` IDs + design)
@@ -134,6 +134,18 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `plan/archive-<slug>`; submitted via `gt submit --no-interactive`.
   The companion PR-diff-scoped validator `scripts/validate-plans.js`
   enforces the same no-stray-checkbox rule on archived files in CI
+- `/stack:status` — read-only classification of stacked-PR provider state
+  into one of seven states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
+  `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, `PARTIAL_TOOLING`).
+  Reads `claude plugin list --json` plus the repository's optional
+  `.yellow-stack.yml` intent through `lib/stack-provider-state.js`
+- `/stack:select` — switch the active stacked-PR provider (`graphite` /
+  `github`) at `user`, `project`, or `local` scope. Shows the exact
+  `claude plugin install|enable|disable` commands before running any of
+  them, installs only after confirmation, refuses managed-scope conflicts
+  with an empty plan, aborts at the first failed step, and directs the
+  user to `/reload-plugins`. Never edits settings JSON and never falls
+  back to the other provider
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
@@ -144,7 +156,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (20)
+### Skills (22)
 
 - `agent-native-architecture` — reference for the five agent-native
   architecture principles (action parity, context parity, shared workspace,
@@ -210,6 +222,14 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `session-history` — cross-vendor session-history user surface — dispatches
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend
+- `stack-provider-guard` — the four invariants that keep the provider
+  model single-provider: exactly one enabled, managed scope fails closed,
+  never edit settings JSON, never fall back. Consulted by `/stack:select`
+  before it proposes anything
+- `stack-provider-router` — resolves the active stacked-PR provider and
+  routes provider-specific work to it. Only `READY_GRAPHITE` and
+  `READY_GITHUB` route; the other five states stop with the classifier's
+  own `detail` string
 
 ### Codex Distribution
 
@@ -229,8 +249,22 @@ for why that opt-out exists.
 
 ### Shared Libraries
 
-`lib/` contains sourceable shell helpers that consumer plugins reach via the
-`${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh` cross-plugin pattern:
+`lib/` also carries one Node module, invoked rather than sourced:
+
+- `stack-provider-state.js` — the single owner of stacked-PR provider state.
+  Classifies `claude plugin list --json` plus the repository's optional
+  `.yellow-stack.yml` intent into the seven `/stack:status` states, and
+  builds (never executes) the ordered `claude plugin` command plan for a
+  provider switch. Dependency-free CJS with a small CLI
+  (`node lib/stack-provider-state.js classify|plan`). It ships a replica of
+  the catalog's `capabilityProvider` table because an installed plugin
+  cannot read `catalog/` at runtime; `scripts/validate-provider-groups.js`
+  fails CI (`ERROR-PROVIDER-006`) when that replica drifts. Fixture coverage
+  at `tests/integration/stack-provider-state.test.ts`
+
+`lib/` otherwise contains sourceable shell helpers that consumer plugins
+reach via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`
+cross-plugin pattern:
 
 - `credential-status.sh` — credential resolution and SessionStart hook helper
   for `/setup:all` dashboards

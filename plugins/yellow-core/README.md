@@ -31,6 +31,8 @@ TypeScript, Python, Rust, and Go.
 | `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
 | `/plan:status`          | Read-only dashboard of `plans/` (open) and `plans/complete/` (archived) with per-file checkbox progress |
 | `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence in three tiers — file-provenance (commit-to-PR lookup) first, then a strict slug match, then a loose token-coverage fallback |
+| `/stack:status`         | Report which stacked-PR provider is active and classify the state as `UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`, `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, or `PARTIAL_TOOLING` (read-only) |
+| `/stack:select`         | Select the active stacked-PR provider (`graphite` or `github`) at `user`/`project`/`local` scope — shows the exact `claude plugin` commands first, refuses managed-scope conflicts, never edits settings JSON, never falls back |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
@@ -98,6 +100,8 @@ TypeScript, Python, Rust, and Go.
 | `security-fencing`    | Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files) — single source of truth for the inlined `CRITICAL SECURITY RULES` block |
 | `session-handoff`     | Write a tracked session-handoff artifact at `plans/handoff/<date>-<slug>.md` — six fields (current task, workflow status, active artifact, open decisions, in-flight changes, next action), secret-redacted via `cs_redact_secrets` |
 | `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
+| `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
+| `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
 
 ## MCP Servers
 

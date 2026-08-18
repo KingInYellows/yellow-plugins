@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "github-workflow",
+  "version": "0.1.0",
+  "description": "GitHub-native stacked-PR provider. Foundation only: checks that the official github/gh-stack extension is installed and reports provider readiness. It performs no stack operations.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/github-workflow",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "github",
+    "gh-stack",
+    "gh-cli",
+    "stacked-prs",
+    "pull-requests",
+    "workflow",
+    "provider"
+  ],
+  "dependencies": [
+    "yellow-core"
+  ]
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "yellow-core@yellow-plugins",
+    "version": "1.24.5",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/yellow-core/1.24.5",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z"
+  }
+]
