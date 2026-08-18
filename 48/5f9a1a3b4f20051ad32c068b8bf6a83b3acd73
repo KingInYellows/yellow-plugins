@@ -1,0 +1,40 @@
+plugins/yellow-core/commands/stack/select.md
+  s_fcef036aa1a713::t_e80c904fa38c36 51-59
+  s_9c172f5cf66789::t_e7bccb86756638 114-116,118
+plugins/yellow-core/lib/stack-provider-state.js
+  s_9c172f5cf66789::t_8d56266c5d43b6 495-507
+  s_fcef036aa1a713::t_62d639c0130968 109-121,124
+  s_9c172f5cf66789::t_6fb5bdf75a7df0 464-469
+plugins/yellow-core/commands/stack/status.md
+  s_9c172f5cf66789::t_6f0829363c8b26 140-148
+  s_9c172f5cf66789::t_5e58ee8928c0ab 93-98
+  s_fcef036aa1a713::t_e80c904fa38c36 78-92
+plugins/yellow-core/skills/stack-provider-router/SKILL.md
+  s_9c172f5cf66789::t_6e10b5ab30caf1 99-118
+tests/integration/stack-provider-state.test.ts
+  s_9c172f5cf66789::t_3edce397ff7b46 255-287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "485f9a1a3b4f20051ad32c068b8bf6a83b3acd73",
+  "prompts": {},
+  "sessions": {
+    "s_9c172f5cf66789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2af9bbd8-fe95-4c8f-87be-8094c71ed057",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    },
+    "s_fcef036aa1a713": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2fa19796-a40a-47b7-a896-398e8d8c1dff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
