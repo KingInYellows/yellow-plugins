@@ -1,0 +1,61 @@
+tests/integration/validate-provider-groups.test.ts
+  s_fcef036aa1a713::t_a8e5981027d086 64-74,80
+  s_fcef036aa1a713::t_c4b918412341b0 15,19
+plugins/github-workflow/skills/github-stack-status/SKILL.md
+  s_fcef036aa1a713::t_b7034142e85846 37-47,49-52,54-55,61
+  s_fcef036aa1a713::t_f0200f4db47325 88,98-104
+  s_fcef036aa1a713::t_7d2918ee4abd13 3
+plugins/github-workflow/skills/github-stack-setup/SKILL.md
+  s_fcef036aa1a713::t_604ffae60f6eab 64-66,69,71
+  s_fcef036aa1a713::t_05a14ff3575472 100,107-116
+  s_fcef036aa1a713::t_606bddb5ec1f74 117-118
+plugins/yellow-core/lib/stack-provider-state.js
+  s_fcef036aa1a713::t_4eaa19542fcf90 456,469-472,498-508
+  s_fcef036aa1a713::t_e1da1d8e88c831 246-252
+  s_fcef036aa1a713::t_4ceb48f2d31a60 157-163
+  s_fcef036aa1a713::t_280d03a42c9767 509
+plans/stacked-pr-provider-abstraction.md
+  s_fcef036aa1a713::t_1913fd98b29f4b 152-159
+  s_fcef036aa1a713::t_7b24ed120c692c 229-234
+  s_fcef036aa1a713::t_69eaa502fc94d4 206
+  s_fcef036aa1a713::t_b5cc2591704ea0 67-69
+tests/integration/stack-provider-state.test.ts
+  s_fcef036aa1a713::t_82df917f410432 361-362
+  s_fcef036aa1a713::t_7181081a264494 227
+plugins/github-workflow/README.md
+  s_fcef036aa1a713::t_35dde67a4e1b2f 71
+packages/domain/src/validation/errorCatalog.ts
+  s_fcef036aa1a713::t_41dac47fedc6d6 170
+  s_fcef036aa1a713::t_4de3b5337a92da 433
+scripts/validate-provider-groups.js
+  s_fcef036aa1a713::t_322f54ffc77e55 159-165
+  s_fcef036aa1a713::t_d66add205b8440 448-464
+  s_fcef036aa1a713::t_042b86352fee2c 263-279
+  s_fcef036aa1a713::t_8a31245950900b 67
+  s_fcef036aa1a713::t_740fc8203fc2f5 24-26
+  s_fcef036aa1a713::t_170dcae1eee606 299-326
+  s_fcef036aa1a713::t_377793f31277e9 104-108
+  s_fcef036aa1a713::t_cd175f9a5164d0 262
+plugins/yellow-core/skills/stack-provider-router/SKILL.md
+  s_fcef036aa1a713::t_f0a41c71835af6 112-114
+plugins/yellow-core/commands/stack/select.md
+  s_fcef036aa1a713::t_7b173fe2826e57 163-177
+plugins/yellow-core/commands/stack/status.md
+  s_fcef036aa1a713::t_66d5dea289b055 111-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a38507e3e3d01cb41065be760cbb01e161a97da9",
+  "prompts": {},
+  "sessions": {
+    "s_fcef036aa1a713": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2fa19796-a40a-47b7-a896-398e8d8c1dff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
