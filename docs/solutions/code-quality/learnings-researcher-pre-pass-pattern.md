@@ -256,11 +256,12 @@ other citable learning.
 **How to apply:** when a memory-only "project" fact keeps proving
 relevant across multiple PRs (as both examples above did — each had
 already recurred once before PR #712's pre-pass cited them a third time),
-promote it to a real `docs/solutions/` entry via `/flow:compound` so the
-pre-pass can actually find it on its own, instead of relying on it
-having been injected by some other channel. A fact that recurs but never
-gets promoted is index rot waiting to happen: the next contributor who
-trusts "the pre-pass will catch this" is wrong.
+promote it to a real `docs/solutions/` entry via
+`/flow:compound --in-pr` so the pre-pass can actually find it on its
+own, instead of relying on it having been injected by some other
+channel. A fact that recurs but never gets promoted is index rot waiting
+to happen: the next contributor who trusts "the pre-pass will catch
+this" is wrong.
 
 ## References
 

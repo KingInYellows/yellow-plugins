@@ -48,13 +48,20 @@ if command -v gh >/dev/null 2>&1; then
   gh auth status >/dev/null 2>&1 && printf 'gh_auth:            OK\n' || printf 'gh_auth:            NOT AUTHENTICATED\n'
   # Identity check, not a name check: third-party extensions also expose a
   # `gh stack` command. Only github/gh-stack is first-party.
-  ext_list=$(gh extension list 2>/dev/null || true)
-  if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-    printf 'gh_stack_extension: OK (github/gh-stack)\n'
-  elif printf '%s\n' "$ext_list" | grep -qi 'gh-stack'; then
-    printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
+  # Capture the probe's own exit status directly in the `if` — do not
+  # discard it with `|| true`. A probe failure (network, gh internal
+  # error, auth expiry) must not be reported as the same state as a
+  # genuinely absent extension.
+  if ext_list=$(gh extension list 2>/dev/null); then
+    if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
+      printf 'gh_stack_extension: OK (github/gh-stack)\n'
+    elif printf '%s\n' "$ext_list" | grep -qi 'gh-stack'; then
+      printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
+    else
+      printf 'gh_stack_extension: MISSING\n'
+    fi
   else
-    printf 'gh_stack_extension: MISSING\n'
+    printf 'gh_stack_extension: UNAVAILABLE (could not query extensions)\n'
   fi
 else
   printf 'gh:                 MISSING\n'
@@ -102,6 +109,11 @@ Classify tooling as:
   `gh_stack_extension` reports `WRONG OWNER`, say a non-official `gh
   stack` extension is installed and must be removed before installing
   `github/gh-stack`.
+
+If `gh_stack_extension` reports `UNAVAILABLE`, say so explicitly: the probe
+could not determine whether the extension is installed (a `gh extension
+list` failure, not a "not installed" result) — report tooling as NOT READY
+for this unresolved reason and stop; do not treat it as `MISSING`.
 
 State the preview caveat once when tooling is READY: GitHub's native
 stacked pull requests were in public preview as of 2026-08-17 and

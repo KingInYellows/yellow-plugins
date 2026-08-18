@@ -30,8 +30,8 @@
  *   --intent-file <path>        `.yellow-stack.yml` (absent ⇒ no intent)
  *   --project-path <path>       repo root, filters foreign project/local rows
  *   --scope <user|project|local>  target scope for `plan` (default: user)
- *   --tooling-graphite <yes|no>   provider CLI probe result (omit ⇒ unknown)
- *   --tooling-github <yes|no>     provider CLI probe result (omit ⇒ unknown)
+ *   --tooling-graphite <yes|no|unknown>  probe result (omit/unknown ⇒ not checked)
+ *   --tooling-github <yes|no|unknown>    probe result (omit/unknown ⇒ not checked)
  *
  * Output is a single JSON object on stdout. Exit code is 0 for a successful
  * classification/plan (including a REFUSED plan — refusal is an answer, not
@@ -66,6 +66,25 @@ const DEFAULT_MARKETPLACE = 'yellow-plugins';
 
 /** Scopes a user-issued `claude plugin` command can actually write. */
 const WRITABLE_SCOPES = Object.freeze(['user', 'project', 'local']);
+
+/** Every scope value the model knows about, writable or not. */
+const KNOWN_SCOPES = Object.freeze([...WRITABLE_SCOPES, 'managed']);
+
+/**
+ * Normalize a scope value from `claude plugin list --json` for DISPLAY.
+ *
+ * The scope string is untrusted CLI output. `planProviderSwitch` refuses
+ * to build a command around a value outside `KNOWN_SCOPES` (see the
+ * `scopesRaw`/`enabledScopesRaw` fields it consumes instead); this
+ * function is for read-only reporting paths (`/stack:status`), which must
+ * never echo an unrecognized scope string verbatim into a report.
+ *
+ * @param {unknown} scope
+ * @returns {string}
+ */
+function sanitizeScope(scope) {
+  return KNOWN_SCOPES.includes(scope) ? scope : 'unknown';
+}
 
 /**
  * The seven provider states. Exported so consumers compare against a
@@ -106,14 +125,22 @@ function parseIntent(text) {
   if (typeof text !== 'string') {
     return null;
   }
-  const match = text
-    .replace(/\r\n/g, '\n')
-    .match(
-      /^provider:[ \t]*(?:"([^"\n]*)"|'([^'\n]*)'|([^\s#]*))[ \t]*(?:#.*)?$/m
-    );
-  if (!match) {
+  // Collect EVERY `provider:` root key, not just the first. A file with
+  // duplicate keys is malformed and its intent is ambiguous: another YAML
+  // consumer may take the last value or reject the file outright, so
+  // silently guessing from the first match could route operations to one
+  // provider while the rest of the toolchain believes another.
+  const matches = [
+    ...text
+      .replace(/\r\n/g, '\n')
+      .matchAll(
+        /^provider:[ \t]*(?:"([^"\n]*)"|'([^'\n]*)'|([^\s#]*))[ \t]*(?:#.*)?$/gm
+      ),
+  ];
+  if (matches.length !== 1) {
     return null;
   }
+  const match = matches[0];
   const value = (
     match[1] !== undefined
       ? match[1]
@@ -177,13 +204,21 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
     });
 
     const enabledEntries = entries.filter((entry) => entry.enabled === true);
+    const scopesRaw = entries.map((entry) => entry.scope);
+    const enabledScopesRaw = enabledEntries.map((entry) => entry.scope);
     summary[provider.id] = {
       id: provider.id,
       plugin: provider.plugin,
       installed: entries.length > 0,
       enabled: enabledEntries.length > 0,
-      scopes: entries.map((entry) => entry.scope),
-      enabledScopes: enabledEntries.map((entry) => entry.scope),
+      // Sanitized for display: an unrecognized scope string is never
+      // echoed verbatim (see sanitizeScope). Callers that must build a
+      // command around the real value — `planProviderSwitch` — use
+      // `scopesRaw`/`enabledScopesRaw` below instead.
+      scopes: scopesRaw.map(sanitizeScope),
+      enabledScopes: enabledScopesRaw.map(sanitizeScope),
+      scopesRaw,
+      enabledScopesRaw,
       managedEnabled: enabledEntries.some((entry) => entry.scope === 'managed'),
       managedPresent: entries.some((entry) => entry.scope === 'managed'),
       // A managed row that is explicitly disabled is a force-disable we
@@ -235,11 +270,28 @@ function classifyProviderState({
     (entry) => entry.enabled
   );
   const known = PROVIDERS.some((provider) => provider.id === intent);
+
+  // The classifier's output is printed (by `/stack:status` and the
+  // stack-provider-router skill) — it must never carry the raw,
+  // unsanitized `scopesRaw`/`enabledScopesRaw` CLI strings that exist
+  // solely for `planProviderSwitch`'s refusal check. Build fresh objects
+  // rather than mutating the ones `summarizeProviders` returned: this
+  // function's `providers` binding (used below for state logic) and
+  // `planProviderSwitch`'s own independent `summarizeProviders` call both
+  // still need the raw fields intact.
+  const displayProviders = {};
+  for (const [id, entry] of Object.entries(providers)) {
+    const safeEntry = { ...entry };
+    delete safeEntry.scopesRaw;
+    delete safeEntry.enabledScopesRaw;
+    displayProviders[id] = safeEntry;
+  }
+
   const result = {
     group: PROVIDER_GROUP,
     intent,
     intentKnown: intent === null ? null : known,
-    providers,
+    providers: displayProviders,
     projectScopeFiltered,
     // `false` means at least one relevant probe was never run. Callers must
     // say "not checked" rather than implying a clean tooling result.
@@ -289,6 +341,25 @@ function classifyProviderState({
         detail: `Repository intent is "${intent}", but ${target.plugin} is force-disabled at managed scope and cannot be enabled.`,
       };
     }
+  }
+
+  // A managed row force-disabling a provider that is STILL enabled at a
+  // lower scope is a MANAGED_CONFLICT independent of `.yellow-stack.yml`
+  // intent — the administrator's setting overrides any lower-scope row
+  // whether or not a repository has recorded an opinion. `managedDisabled`
+  // ALONE is not a conflict: a provider force-disabled and not enabled
+  // anywhere else is simply not enabled, the ordinary, correct state. The
+  // conflict is specifically the combination of both.
+  const overriddenByManaged = PROVIDERS.map(
+    (provider) => providers[provider.id]
+  ).filter((entry) => entry.managedDisabled && entry.enabled);
+  if (overriddenByManaged.length > 0) {
+    const target = overriddenByManaged[0];
+    return {
+      ...result,
+      state: STATES.MANAGED_CONFLICT,
+      detail: `${target.plugin} is force-disabled at managed scope, which cannot be changed, but it is still enabled at ${target.enabledScopes.join('/')} scope. The managed setting overrides lower-scope configuration.`,
+    };
   }
 
   // 2. CONFLICT — both providers enabled. Two stack providers active at
@@ -453,25 +524,17 @@ function planProviderSwitch({
   const targetMarketplace = targetEntry.marketplaces[0] || marketplace;
   const targetRef = `${targetEntry.plugin}@${targetMarketplace}`;
 
-  if (!targetEntry.scopes.includes(scope)) {
-    steps.push({
-      action: 'install',
-      provider: target,
-      scope,
-      // Installing pulls code onto the machine — the one step that always
-      // needs an explicit yes, even when the rest of the plan is approved.
-      requiresConfirmation: true,
-      description: `Install ${targetEntry.plugin} at ${scope} scope`,
-      command: `claude plugin install ${targetRef} --scope ${scope}`,
-    });
-  }
-
-  // Disable every other provider BEFORE enabling the target. Enabling first
-  // would open a window where both providers are enabled at once, violating
-  // the single-provider invariant (stack-provider-guard skill, invariant 1)
-  // even if only until the next step runs.
+  // Disable every other provider BEFORE installing or enabling the target.
+  // `claude plugin install` leaves the installed plugin enabled, so
+  // installing first (when the target is absent) would open a window where
+  // both providers are enabled at once, violating the single-provider
+  // invariant (stack-provider-guard skill, invariant 1) even if only until
+  // the next step runs.
   for (const other of others) {
-    for (const otherScope of [...new Set(other.enabledScopes)]) {
+    // Raw, unsanitized scopes: refusing on a malformed value here is the
+    // security control, so it must see the actual CLI output, not the
+    // "unknown" placeholder `enabledScopes` substitutes for display.
+    for (const otherScope of [...new Set(other.enabledScopesRaw)]) {
       if (otherScope === 'managed') {
         // Unreachable: the managed pre-check above already refused. Kept as
         // a fail-closed backstop so a future edit to the pre-check cannot
@@ -481,6 +544,18 @@ function planProviderSwitch({
           status: 'refused',
           reason: 'managed-conflict',
           detail: `${other.plugin} is enabled at managed scope and cannot be disabled.`,
+        };
+      }
+      if (!WRITABLE_SCOPES.includes(otherScope)) {
+        // `enabledScopes` is derived from `claude plugin list --json`,
+        // untrusted CLI output. A malformed or unexpected scope value must
+        // never reach the interpolated `command` string below — allowlist
+        // and refuse rather than escape.
+        return {
+          ...base,
+          status: 'refused',
+          reason: 'invalid-scope',
+          detail: `${other.plugin} reports an unrecognized scope "${otherScope}". Refusing to build a plan around it.`,
         };
       }
       const otherRef = `${other.plugin}@${other.marketplaces[0] || marketplace}`;
@@ -493,6 +568,19 @@ function planProviderSwitch({
         command: `claude plugin disable ${otherRef} --scope ${otherScope}`,
       });
     }
+  }
+
+  if (!targetEntry.scopesRaw.includes(scope)) {
+    steps.push({
+      action: 'install',
+      provider: target,
+      scope,
+      // Installing pulls code onto the machine — the one step that always
+      // needs an explicit yes, even when the rest of the plan is approved.
+      requiresConfirmation: true,
+      description: `Install ${targetEntry.plugin} at ${scope} scope`,
+      command: `claude plugin install ${targetRef} --scope ${scope}`,
+    });
   }
 
   steps.push({
@@ -606,6 +694,17 @@ function parseToolingFlag(value) {
   }
   if (value === 'no' || value === 'false') {
     return false;
+  }
+  // `unknown` is an EXPLICIT probe outcome, not a parse failure: the
+  // callers' `gh extension list` probe emits it when the command itself
+  // failed, so the extension's state was never read. It maps to
+  // `undefined` — the same "not checked" the flag's absence means — and
+  // must never map to `false`, which would classify as PARTIAL_TOOLING and
+  // tell the user to reinstall tooling that was never actually probed.
+  // Listed explicitly so a future tightening of this parser cannot
+  // silently turn that fail-open back on.
+  if (value === 'unknown') {
+    return undefined;
   }
   return undefined;
 }

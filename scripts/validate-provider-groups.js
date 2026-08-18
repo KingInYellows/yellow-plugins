@@ -48,6 +48,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { isCodexEnabled: isCodexEnabledSource } = require('./lib/generate/emit-codex');
+
 const ROOT = path.resolve(process.env.VALIDATE_PROVIDER_GROUPS_ROOT || path.join(__dirname, '..'));
 
 // Error codes assembled via concatenation, NOT literals: the catalog in
@@ -264,7 +266,10 @@ function validateReferencedPlugins(groups, marketplaceNames, errors) {
  * catalog/plugins/<name>.json directly rather than threading a field through
  * loadCatalogProviders()'s return shape — this check only needs a single
  * boolean, and declaringPlugins is a plain name array shared with other
- * validators in this file.
+ * validators in this file. The enablement predicate itself is imported from
+ * emit-codex.js (the generator, and the authority on what actually gets
+ * emitted) rather than re-implemented here, so validation and generation
+ * cannot disagree on what counts as "enabled".
  */
 function isCodexEnabled(name) {
   const sourcePath = path.join(ROOT, 'catalog', 'plugins', `${name}.json`);
@@ -274,7 +279,7 @@ function isCodexEnabled(name) {
   } catch (error) {
     fail(`Failed to read ${sourcePath}: ${error.message}`);
   }
-  return Boolean(source.targets && source.targets.codex && source.targets.codex.enabled);
+  return isCodexEnabledSource(source);
 }
 
 /**

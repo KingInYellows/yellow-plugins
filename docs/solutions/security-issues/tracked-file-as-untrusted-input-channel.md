@@ -26,11 +26,11 @@ During the 21-reviewer pass on PR #712 (stacked-PR provider foundation),
 requirement did not apply: "no PR titles/branch names/comment bodies are
 rendered anywhere in this diff." That conclusion was wrong. A separate
 `adversarial` reviewer found that `stack-provider-state.js`'s
-`CONFIG_MISMATCH` detail string interpolates the `intent` value parsed out
-of a repository's optional `.yellow-stack.yml` file verbatim, and
-`status.md:75-76` instructs the caller to print that `detail` string
+`CONFIG_MISMATCH` detail string interpolates the repository intent value
+parsed out of a repository's optional `.yellow-stack.yml` file verbatim,
+and `status.md:75-76` instructs the caller to print that `detail` string
 without fencing. `parseIntent`'s regex admits arbitrary text from the
-`intent:` key.
+`provider:` key.
 
 `.yellow-stack.yml` is a file **tracked in the repository** — any
 contributor, or anyone who can open a PR against the repo, can edit it. A
@@ -84,10 +84,12 @@ restriction and the display path has no fencing.
 
 Two independent, non-exclusive mitigations:
 
-- **Constrain the input at the source.** If `intent:` is meant to be one
-  of a small enum (`graphite`, `github`, `unset`), validate against that
-  enum at parse time and reject/ignore anything else — do not accept
-  arbitrary text into a field destined for verbatim display.
+- **Constrain the input at the source.** If `provider:` is meant to be one
+  of a small enum (`graphite`, `github`), validate against that enum at
+  parse time and reject/ignore anything else — do not accept arbitrary
+  text into a field destined for verbatim display. Absence of intent is
+  already represented as `null` by the parser, not by a literal enum
+  value, so the enum check only needs to cover the two real values.
 - **Fence at the display site.** If free text from a repo-tracked file
   must be shown to a human or fed to a downstream agent, wrap it in the
   same `--- begin/end ---` "(reference only)" delimiter convention this

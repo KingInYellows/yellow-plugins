@@ -12,6 +12,7 @@
  * fixtures/stack-provider/README.md.
  */
 
+import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -25,6 +26,7 @@ const {
   PROVIDERS,
   PROVIDER_GROUP,
   parseIntent,
+  summarizeProviders,
   classifyProviderState,
   planProviderSwitch,
   summarizeSwitchOutcome,
@@ -178,6 +180,59 @@ describe('classifyProviderState — the seven states', () => {
     expect(result.state).toBe(STATES.MANAGED_CONFLICT);
   });
 
+  it('case 7c: managed force-disable overridden by a lower-scope enable => MANAGED_CONFLICT, with NO .yellow-stack.yml intent', () => {
+    // The bug this guards: a managed row force-disabling a provider while
+    // a retained user-scope row still has `enabled: true` must classify as
+    // MANAGED_CONFLICT even when `.yellow-stack.yml` is absent (intent is
+    // null) — the administrator's setting overrides the lower scope
+    // regardless of repository intent.
+    const plugins = [
+      {
+        id: 'github-workflow@yellow-plugins',
+        version: '0.1.0',
+        scope: 'managed',
+        enabled: false,
+        installPath: '/fixture/managed/plugins/github-workflow/0.1.0',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'github-workflow@yellow-plugins',
+        version: '0.1.0',
+        scope: 'user',
+        enabled: true,
+        installPath: '/fixture/user/plugins/github-workflow/0.1.0',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const result = classifyProviderState({ plugins, projectPath: PROJECT_PATH });
+    expect(result.intent).toBeNull();
+    expect(result.state).toBe(STATES.MANAGED_CONFLICT);
+    expect(result.detail).toContain('github-workflow');
+    expect(result.detail).toContain('force-disabled');
+  });
+
+  it('case 7d: force-disabled-and-not-otherwise-enabled is the ordinary state, NOT a conflict', () => {
+    // `managedDisabled` alone must not become MANAGED_CONFLICT — a
+    // provider the administrator disabled and that is not enabled
+    // anywhere else is simply not enabled.
+    const plugins = [
+      {
+        id: 'github-workflow@yellow-plugins',
+        version: '0.1.0',
+        scope: 'managed',
+        enabled: false,
+        installPath: '/fixture/managed/plugins/github-workflow/0.1.0',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const result = classifyProviderState({ plugins, projectPath: PROJECT_PATH });
+    expect(result.state).not.toBe(STATES.MANAGED_CONFLICT);
+    expect(result.state).toBe(STATES.UNSELECTED);
+  });
+
   it('PARTIAL_TOOLING: right provider enabled, its CLI probed as missing', () => {
     const result = classifyProviderState({
       plugins: fixture('both-installed-graphite-enabled'),
@@ -197,6 +252,52 @@ describe('classifyProviderState — the seven states', () => {
     expect(result.toolingKnown).toBe(false);
   });
 
+  it('CLI: --tooling-github unknown means NOT CHECKED, never PARTIAL_TOOLING', () => {
+    // The probes in /stack:status, the router skill, and /setup:all emit
+    // `unknown` when `gh extension list` itself fails. That must land in
+    // "not checked", not in "checked and absent" — the latter tells the
+    // user to reinstall tooling whose state was never read. This exercises
+    // the real CLI flag rather than the library map, because the flag is
+    // what the command markdown actually passes.
+    const lib = join(
+      __dirname,
+      '..',
+      '..',
+      'plugins',
+      'yellow-core',
+      'lib',
+      'stack-provider-state.js'
+    );
+    const fixturePath = join(FIXTURE_DIR, 'both-installed-github-enabled.json');
+    const run = (toolingGithub: string): { state: string; toolingKnown: boolean } =>
+      JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            lib,
+            'classify',
+            '--plugins-file',
+            fixturePath,
+            '--tooling-graphite',
+            'no',
+            '--tooling-github',
+            toolingGithub,
+          ],
+          { encoding: 'utf8' }
+        )
+      );
+
+    const unknown = run('unknown');
+    expect(unknown.toolingKnown).toBe(false);
+    expect(unknown.state).toBe(STATES.READY_GITHUB);
+
+    // The contrast that matters: a probe that RAN and found nothing is a
+    // real PARTIAL_TOOLING, and must stay distinguishable from the above.
+    const absent = run('no');
+    expect(absent.toolingKnown).toBe(true);
+    expect(absent.state).toBe(STATES.PARTIAL_TOOLING);
+  });
+
   it('filters project-scope rows belonging to a different repository', () => {
     // Without filtering, another repo's enabled github-workflow row would
     // read as a second enabled provider here and report CONFLICT.
@@ -210,6 +311,86 @@ describe('classifyProviderState — the seven states', () => {
     const unfiltered = classifyProviderState({ plugins: fixture('foreign-project-scope') });
     expect(unfiltered.state).toBe(STATES.CONFLICT);
     expect(unfiltered.projectScopeFiltered).toBe(false);
+  });
+});
+
+describe('summarizeProviders — scope sanitization for display', () => {
+  it('does not propagate an unrecognized scope value verbatim into rendered scopes', () => {
+    // `claude plugin list --json` is untrusted CLI output. A crafted scope
+    // string must never reach a rendered report (e.g. /stack:status's
+    // Scopes column) verbatim.
+    const plugins = [
+      {
+        id: 'gt-workflow@yellow-plugins',
+        version: '0.1.0',
+        scope: 'user; printf PWNED',
+        enabled: true,
+        installPath: '/fixture/user/plugins/gt-workflow/0.1.0',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const { providers } = summarizeProviders(plugins, { projectPath: PROJECT_PATH });
+    expect(providers.graphite.scopes).toEqual(['unknown']);
+    expect(providers.graphite.enabledScopes).toEqual(['unknown']);
+    // The raw value must still be available to callers (planProviderSwitch)
+    // that need to refuse on it rather than mask it — see the
+    // "refuses a malformed scope" test in planProviderSwitch below.
+    expect(providers.graphite.scopesRaw).toEqual(['user; printf PWNED']);
+    expect(providers.graphite.enabledScopesRaw).toEqual(['user; printf PWNED']);
+  });
+
+  it('leaves known scope values (including managed) untouched', () => {
+    const { providers } = summarizeProviders(fixture('managed-conflict'), {
+      projectPath: PROJECT_PATH,
+    });
+    expect(providers.graphite.scopes).toEqual(['user']);
+    expect(providers.github.scopes).toEqual(['managed']);
+  });
+});
+
+describe('classifyProviderState — raw scopes never reach classifier output', () => {
+  // Same crafted scope string as the summarizeProviders/planProviderSwitch
+  // malformed-scope tests above/below — the classifier used to leak it
+  // under scopesRaw/enabledScopesRaw even after `scopes`/`enabledScopes`
+  // were sanitized (fresh evidence after the earlier scopes finding).
+  const MALFORMED_SCOPE = 'user; printf PWNED';
+  const plugins = [
+    {
+      id: 'gt-workflow@yellow-plugins',
+      version: '0.1.0',
+      scope: MALFORMED_SCOPE,
+      enabled: true,
+      installPath: '/fixture/user/plugins/gt-workflow/0.1.0',
+      installedAt: '2026-01-01T00:00:00.000Z',
+      lastUpdated: '2026-01-01T00:00:00.000Z',
+    },
+  ];
+
+  it('does not expose the raw scope anywhere in the serialized classifier output', () => {
+    const result = classifyProviderState({ plugins, projectPath: PROJECT_PATH });
+    expect(result.providers.graphite.scopesRaw).toBeUndefined();
+    expect(result.providers.graphite.enabledScopesRaw).toBeUndefined();
+    // Strongest form: assert the malformed value is absent from the WHOLE
+    // serialized object, not just the two known keys — this also catches
+    // any future field that starts leaking the same channel, which a
+    // key-by-key assertion would miss.
+    expect(JSON.stringify(result)).not.toContain(MALFORMED_SCOPE);
+  });
+
+  it('planProviderSwitch still refuses on the same malformed input', () => {
+    // Guards against "fixing" the classifier leak by sanitizing the value
+    // too early — planProviderSwitch needs the raw value intact to refuse
+    // correctly (see "refuses a malformed scope" below).
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('refused');
+    expect(plan.reason).toBe('invalid-scope');
+    expect(plan.steps).toEqual([]);
   });
 });
 
@@ -250,6 +431,39 @@ describe('planProviderSwitch — preview only, never executed', () => {
     expect(plan.steps[1].action).toBe('enable');
     // Nothing to disable — the other provider is not enabled anywhere.
     expect(plan.steps.some((s: { action: string }) => s.action === 'disable')).toBe(false);
+  });
+
+  it('disables the enabled provider BEFORE installing an absent target', () => {
+    // Regression guard for the install-first ordering bug: `claude plugin
+    // install` leaves the new plugin enabled, so emitting install before the
+    // disable would put both providers in the enabled state between steps,
+    // breaking the single-provider invariant. Order, not just membership, is
+    // the contract here.
+    const plugins = fixture('both-installed-graphite-enabled').filter(
+      (row) => (row as { id: string }).id !== 'github-workflow@yellow-plugins'
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    expect(plan.steps.map((s: { action: string }) => s.action)).toEqual([
+      'disable',
+      'install',
+      'enable',
+    ]);
+    expect(plan.steps.map((s: { command: string }) => s.command)).toEqual([
+      'claude plugin disable gt-workflow@yellow-plugins --scope user',
+      'claude plugin install github-workflow@yellow-plugins --scope user',
+      'claude plugin enable github-workflow@yellow-plugins --scope user',
+    ]);
+    // Installing still needs an explicit yes even when it is no longer first.
+    expect(
+      plan.steps.find((s: { action: string }) => s.action === 'install')
+        ?.requiresConfirmation
+    ).toBe(true);
   });
 
   it('disables the other provider at every writable scope where it is enabled', () => {
@@ -337,6 +551,32 @@ describe('planProviderSwitch — preview only, never executed', () => {
     expect(managedScope.status).toBe('refused');
     expect(managedScope.reason).toBe('invalid-scope');
     expect(managedScope.steps).toEqual([]);
+  });
+
+  it('refuses a malformed scope on the OTHER provider instead of interpolating it into a command', () => {
+    // `claude plugin list --json` is untrusted CLI output. A row reporting
+    // an unexpected scope must be refused before the disable loop builds a
+    // step around it — never shell-escaped, never passed through.
+    const plugins = [
+      {
+        id: 'gt-workflow@yellow-plugins',
+        version: '0.1.0',
+        scope: 'user; printf PWNED',
+        enabled: true,
+        installPath: '/fixture/user/plugins/gt-workflow/0.1.0',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('refused');
+    expect(plan.reason).toBe('invalid-scope');
+    expect(plan.steps).toEqual([]);
   });
 });
 

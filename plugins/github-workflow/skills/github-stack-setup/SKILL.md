@@ -65,13 +65,20 @@ fi
 # a whole whitespace-delimited field, not a substring — a substring check
 # would accept an owner like `notgithub/gh-stack` as official.
 if command -v gh >/dev/null 2>&1; then
-  ext_list=$(gh extension list 2>/dev/null || true)
-  if printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i == "github/gh-stack") found=1 } END { exit !found }'; then
-    printf 'gh_stack_extension: OK (github/gh-stack)\n'
-  elif printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^[^\/[:space:]]+\/gh-stack$/) found=1 } END { exit !found }'; then
-    printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
+  # Capture the probe's own exit status directly in the `if` — do not
+  # discard it with `|| true`. A probe failure (network, gh internal
+  # error, auth expiry) must not be reported as the same state as a
+  # genuinely absent extension.
+  if ext_list=$(gh extension list 2>/dev/null); then
+    if printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i == "github/gh-stack") found=1 } END { exit !found }'; then
+      printf 'gh_stack_extension: OK (github/gh-stack)\n'
+    elif printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^[^\/[:space:]]+\/gh-stack$/) found=1 } END { exit !found }'; then
+      printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
+    else
+      printf 'gh_stack_extension: MISSING\n'
+    fi
   else
-    printf 'gh_stack_extension: MISSING\n'
+    printf 'gh_stack_extension: UNAVAILABLE (could not query extensions)\n'
   fi
 else
   printf 'gh_stack_extension: SKIPPED (gh not found)\n'
@@ -95,19 +102,30 @@ third-party `gh stack` will answer commands but is not the extension this
 provider targets, and it must be removed before installing the official
 one.
 
+If `gh_stack_extension` reports `UNAVAILABLE`, say so explicitly: the probe
+could not determine whether the extension is installed (a `gh extension
+list` failure, not a "not installed" result) — treat it as unresolved, not
+as `MISSING`.
+
 ### Step 3: Offer the install (never perform it silently)
 
-If `gh_stack_extension` reports `MISSING` and `gh` is authenticated, use
-`AskUserQuestion` to offer:
+Both offers below additionally require `gh_version_gate: OK` — an
+authenticated `gh` below v2.0 must never reach `gh extension
+install`/`remove`. If `gh_version_gate` is not `OK` (`TOO OLD`, `UNKNOWN`,
+or `SKIPPED`), report the version gap and stop; do not offer either flow,
+regardless of what `gh_stack_extension` reports.
+
+If `gh_stack_extension` reports `MISSING` and `gh_version_gate` is `OK` and
+`gh` is authenticated, use `AskUserQuestion` to offer:
 
 - "Install github/gh-stack" — on confirmation, run
   `gh extension install github/gh-stack`, then re-run Step 1 and report.
 - "Skip" — report the gap and stop.
 
-If `gh_stack_extension` reports `WRONG OWNER` and `gh` is authenticated,
-the official extension cannot be installed until the third-party one is
-gone — use `AskUserQuestion` to offer the remove-then-install flow
-instead:
+If `gh_stack_extension` reports `WRONG OWNER` and `gh_version_gate` is `OK`
+and `gh` is authenticated, the official extension cannot be installed
+until the third-party one is gone — use `AskUserQuestion` to offer the
+remove-then-install flow instead:
 
 - "Remove the third-party extension and install github/gh-stack" — on
   confirmation, run `gh extension remove stack` (the command name is
@@ -115,6 +133,17 @@ instead:
   then `gh extension install github/gh-stack`, then re-run Step 1 and
   report.
 - "Skip" — report the gap and stop.
+
+If `gh_stack_extension` reports `UNAVAILABLE`, do not offer either flow —
+report that the extension state could not be determined and stop.
+
+Both install commands are deliberately unpinned. `--pin` is the right
+call for a third-party extension, but `github/gh-stack` is first-party
+(the Step 1 identity check exists to guarantee that) and is still in
+active preview, so pinning would freeze every installer to a tag that
+goes stale as GitHub ships fixes, in exchange for no reduction in trust
+surface for someone already running `gh`. Revisit if gh-stack leaves
+preview or ownership changes.
 
 Do not offer to install `gh` itself, change authentication, or install the
 `gh skill` package: `gh skill` is an explicitly preview surface ("subject to
@@ -128,7 +157,10 @@ provider-neutral command in `yellow-core`. Say it plainly; do not run it.
 
 ## Boundaries
 
-- Read-only apart from the confirmed `gh extension install`.
+- Read-only apart from the confirmed `gh extension install`, and — for the
+  `WRONG OWNER` replacement flow only — the confirmed `gh extension remove
+  stack` that immediately precedes it. Both mutations require explicit
+  `AskUserQuestion` confirmation; nothing else is mutated.
 - Never invokes `gh stack init`, `add`, `submit`, `push`, `sync`, `rebase`,
   `modify`, `merge`, `link`, or `unstack`.
 - Never touches `gt`, Graphite configuration, or `gt-workflow`.

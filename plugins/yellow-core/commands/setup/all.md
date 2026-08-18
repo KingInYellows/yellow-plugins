@@ -306,10 +306,18 @@ printf '\n=== Stacked-PR Provider Tooling ===\n'
 # github/gh-stack is first-party. Matching the bare name would report a
 # lookalike as READY.
 if [ -n "$_gh" ]; then
-  if "$_gh" extension list 2>/dev/null | grep -q 'github/gh-stack'; then
-    printf 'gh_stack_ext: OK (github/gh-stack)\n'
+  # Capture the probe's own exit status rather than losing it to the pipe:
+  # a failed `gh extension list` (network, or auth-required) must not be
+  # reported as MISSING, which would tell the user to install an extension
+  # whose state was never read.
+  if _ext_list=$("$_gh" extension list 2>/dev/null); then
+    if printf '%s\n' "$_ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
+      printf 'gh_stack_ext: OK (github/gh-stack)\n'
+    else
+      printf 'gh_stack_ext: MISSING\n'
+    fi
   else
-    printf 'gh_stack_ext: MISSING\n'
+    printf 'gh_stack_ext: UNAVAILABLE (could not query extensions)\n'
   fi
 else
   printf 'gh_stack_ext: SKIPPED (gh not found)\n'
@@ -392,6 +400,10 @@ stacks as well.
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `MISSING` — the
   provider plugin is installed but the official `github/gh-stack` extension
   is not; detail: "install with `gh extension install github/gh-stack`"
+- UNKNOWN: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `UNAVAILABLE` —
+  `gh extension list` itself failed, so the extension's state was never
+  read. Report it as undetermined; do NOT offer the install and do NOT
+  report READY. Suggest re-running after checking `gh auth status`.
 - NEEDS SETUP: `gh` missing OR `gh_auth` NOT AUTHENTICATED
 
 **yellow-ruvector:**
@@ -684,11 +696,16 @@ is worth reporting. Only the **enabled** one is offered for setup:
    Do not infer it from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show the other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
-3. If the group's state is not `READY_GRAPHITE` or `READY_GITHUB` — no
-   provider enabled, both enabled, intent mismatch, or a managed-scope
-   conflict — do **not** pick one. Report the state and point at
-   `/stack:select`. There is no fallback between providers.
-4. If `yellow-core` is not installed, `/stack:status` is unavailable: report
+3. If the group's state is not `READY_GRAPHITE`, `READY_GITHUB`, or
+   `PARTIAL_TOOLING` — no provider enabled, both enabled, intent mismatch, or
+   a managed-scope conflict — do **not** pick one. Report the state and
+   point at `/stack:select`. There is no fallback between providers.
+4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous
+   — only its CLI is missing. Offer that provider's own setup command
+   instead of `/stack:select`, which only changes plugin enablement and
+   cannot install the missing CLI: `/gt-setup` for `gt-workflow`,
+   `/github-stack:setup` for `github-workflow`.
+5. If `yellow-core` is not installed, `/stack:status` is unavailable: report
    both members' readiness, annotate that the active provider could not be
    determined, and offer neither.
 
