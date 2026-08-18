@@ -219,6 +219,49 @@ ruvector vector recall over a `docs/solutions/` namespace at that
 threshold (operational signal: agent reports false negatives on
 solutions known to exist).
 
+## Known blind spot: memory-only entries are invisible to the pre-pass
+
+`learnings-researcher`'s search scope is `docs/solutions/**/*.md` only
+(see the agent's frontmatter description and Step 2 above) — it never
+reads the project's auto-memory directory
+(`~/.claude/projects/<slug>/memory/*.md`). MEMORY.md links to both kinds
+of file with the same `[title](file.md)` bracket syntax, so a reader
+scanning MEMORY.md cannot tell, without following the link, whether a
+cited learning lives in the searchable catalog or only in memory.
+
+This surfaced concretely on PR #712 (2026-08-17): a learnings pre-pass
+injected three prior learnings as advisory context, including
+`release-build-gap-typecheck-noop` (the `pnpm build` / `ErrorCategory`
+TS2741 gap) and `ci-runs-matrix-targets-not-validate-schemas` (the
+four-wiring CI requirement for a new validator). Both are real,
+previously-confirmed learnings — but both live **only** as memory files,
+with no corresponding `docs/solutions/` entry. Five downstream reviewers
+independently re-verified the predictions and found the author had
+already closed both gaps; the predictions turned out to be non-issues
+this time, but the pre-pass could not have produced them via its own
+documented search path. Whatever process actually surfaced them (ruvector
+recall, a differently-scoped pre-pass, or direct memory read) is not the
+one described in this doc.
+
+**Why this matters:** MEMORY.md's `## Session Notes` line format
+(`[title](path.md) — hook`) does not distinguish a `docs/solutions/`
+path from a memory-directory-relative path, and both accumulate under
+the same auto-memory mechanism. A learning that stays memory-only forever
+(never promoted to `docs/solutions/`) is permanently unreachable by
+`learnings-researcher`, `review:pr`'s pre-pass, or any other consumer
+that follows this doc's "how to extend this pattern" section — even
+though it reads, to a human skimming MEMORY.md, exactly like every
+other citable learning.
+
+**How to apply:** when a memory-only "project" fact keeps proving
+relevant across multiple PRs (as both examples above did — each had
+already recurred once before PR #712's pre-pass cited them a third time),
+promote it to a real `docs/solutions/` entry via `/flow:compound` so the
+pre-pass can actually find it on its own, instead of relying on it
+having been injected by some other channel. A fact that recurs but never
+gets promoted is index rot waiting to happen: the next contributor who
+trusts "the pre-pass will catch this" is wrong.
+
 ## References
 
 - `plugins/yellow-core/agents/research/learnings-researcher.md` —
