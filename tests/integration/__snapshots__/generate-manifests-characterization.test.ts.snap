@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider (setup + status only; no stack operations yet)",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -226,7 +226,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GitHub-native stacked-PR provider. Foundation only: checks that the official github/gh-stack extension is installed and reports provider readiness. It performs no stack operations.",
   "author": {
     "name": "KingInYellows",
@@ -469,7 +469,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
