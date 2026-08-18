@@ -1,6 +1,6 @@
 ---
 name: github-stack-status
-description: 'Report GitHub-native stacked-PR provider readiness — tooling state plus whether this plugin is the enabled stacked-pr provider. Use when checking why gh stack tooling is unavailable or which stacked-PR provider is currently active.'
+description: 'Report GitHub-native stacked-PR tooling readiness and point to /stack:status (yellow-core) for the authoritative active-provider answer. Use when checking why gh stack tooling is unavailable or which stacked-PR provider is currently active.'
 user-invokable: false
 ---
 
@@ -34,15 +34,31 @@ skill never implies otherwise.
 set -uo pipefail
 
 if command -v gh >/dev/null 2>&1; then
-  printf 'gh:                 OK (%s)\n' "$(gh --version 2>/dev/null | head -1)"
+  gh_version=$(gh --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  printf 'gh:                 OK (%s)\n' "${gh_version:-unknown}"
+  gh_major=${gh_version%%.*}
+  case "$gh_major" in
+    ''|*[!0-9]*) printf 'gh_version_gate:    UNKNOWN (could not parse version)\n' ;;
+    *) if [ "$gh_major" -ge 2 ]; then
+         printf 'gh_version_gate:    OK (>= 2.0)\n'
+       else
+         printf 'gh_version_gate:    TOO OLD (need >= 2.0)\n'
+       fi ;;
+  esac
   gh auth status >/dev/null 2>&1 && printf 'gh_auth:            OK\n' || printf 'gh_auth:            NOT AUTHENTICATED\n'
-  if gh extension list 2>/dev/null | grep -q 'github/gh-stack'; then
+  # Identity check, not a name check: third-party extensions also expose a
+  # `gh stack` command. Only github/gh-stack is first-party.
+  ext_list=$(gh extension list 2>/dev/null || true)
+  if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
     printf 'gh_stack_extension: OK (github/gh-stack)\n'
+  elif printf '%s\n' "$ext_list" | grep -qi 'gh-stack'; then
+    printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
   else
     printf 'gh_stack_extension: MISSING\n'
   fi
 else
   printf 'gh:                 MISSING\n'
+  printf 'gh_version_gate:    SKIPPED (gh not found)\n'
   printf 'gh_auth:            SKIPPED (gh not found)\n'
   printf 'gh_stack_extension: SKIPPED (gh not found)\n'
 fi
@@ -69,6 +85,7 @@ GitHub stacked-PR provider
 ==========================
 
   gh                  OK (2.97.0)
+  gh_version_gate     OK (>= 2.0)
   gh auth             OK
   github/gh-stack     MISSING
 
@@ -78,8 +95,13 @@ GitHub stacked-PR provider
 
 Classify tooling as:
 
-- **READY** — `gh` OK, authenticated, and `github/gh-stack` installed.
-- **NOT READY** — anything else, naming the specific gap.
+- **READY** — `gh` OK, `gh_version_gate` OK, authenticated, and
+  `github/gh-stack` installed.
+- **NOT READY** — anything else, naming the specific gap. If
+  `gh_version_gate` reports `TOO OLD`, say `gh` must be upgraded. If
+  `gh_stack_extension` reports `WRONG OWNER`, say a non-official `gh
+  stack` extension is installed and must be removed before installing
+  `github/gh-stack`.
 
 State the preview caveat once when tooling is READY: GitHub's native
 stacked pull requests were in public preview as of 2026-08-17 and

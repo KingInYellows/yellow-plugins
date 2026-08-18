@@ -12,11 +12,11 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const VALIDATOR = join(REPO_ROOT, 'scripts', 'validate-provider-groups.js');
@@ -61,11 +61,23 @@ const DEFAULT_PROVIDERS = [
   { plugin: 'github-workflow', group: 'stacked-pr', id: 'github' },
 ];
 
+// Every root buildFixture() mkdtemps is tracked here and removed after each
+// test, matching the afterEach(rmSync(...)) convention used elsewhere in
+// tests/integration/ (e.g. backfill-solution-frontmatter.test.ts).
+const createdRoots: string[] = [];
+
+afterEach(() => {
+  while (createdRoots.length > 0) {
+    rmSync(createdRoots.pop()!, { recursive: true, force: true });
+  }
+});
+
 /** Build a minimal but structurally faithful fixture repository. */
 function buildFixture(options: FixtureOptions = {}): string {
   const providers = options.providers ?? DEFAULT_PROVIDERS;
   const marketplaceNames = options.marketplaceNames ?? providers.map((p) => p.plugin);
   const root = mkdtempSync(join(tmpdir(), 'provider-groups-'));
+  createdRoots.push(root);
 
   write(
     root,

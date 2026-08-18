@@ -68,7 +68,7 @@ Both are thin wrappers over same-named skills, matching the
 - No MCP server.
 - No hooks.
 - No mutating `gh stack` invocation (`init`, `add`, `submit`, `push`,
-  `sync`, `rebase`, `merge`, `unstack`).
+  `sync`, `rebase`, `modify`, `merge`, `link`, `unstack`).
 - No edits to settings JSON, branch protections, rulesets, merge queues, or
   required checks.
 - No duplicate command names with `gt-workflow`.

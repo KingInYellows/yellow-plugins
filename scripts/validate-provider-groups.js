@@ -21,6 +21,9 @@
  *   - the shipped router's replica of the provider table
  *     (plugins/yellow-core/lib/stack-provider-state.js) matches the catalog
  *     (-006)
+ *   - every provider-declaring plugin has its generated manifests present:
+ *     the Claude manifest always, the Codex manifest only when the catalog
+ *     source enables the Codex target (-007)
  *
  * SCOPE BOUNDARY — read this before assuming the gate covers more than it
  * does. Everything here is STATIC: declaration shape, uniqueness,
@@ -61,6 +64,7 @@ const PROVIDER_METADATA_LEAKED = PROVIDER + '-003';
 const PROVIDER_GROUP_UNDERPOPULATED = PROVIDER + '-004';
 const PROVIDER_SETUP_SECTION_DRIFT = PROVIDER + '-005';
 const PROVIDER_ROUTER_TABLE_DRIFT = PROVIDER + '-006';
+const PROVIDER_ARTIFACT_MISSING = PROVIDER + '-007';
 
 const SETUP_ALL_RELATIVE = path.join(
   'plugins',
@@ -96,6 +100,11 @@ const MIN_GROUP_MEMBERS = 2;
 // silently documenting a group as if both members could run.
 const GROUP_HEADING_RE = /^- `([a-z0-9-]+)` \(mutually exclusive: exactly one enabled\)$/gm;
 const GROUP_MEMBER_RE = /^ {2}- `([a-z0-9-]+)` → `([a-z0-9-]+)`$/gm;
+
+// catalog.pluginOrder entries are interpolated into a filesystem path below
+// (loadCatalogProviders). Anchored kebab-case only — no leading hyphen, no
+// path separators, no traversal segments — before that path is built.
+const PLUGIN_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -147,6 +156,13 @@ function loadCatalogProviders() {
   const declaringPlugins = [];
 
   for (const name of catalog.pluginOrder) {
+    // Reject traversal, absolute paths, leading hyphens, and unsafe
+    // characters before `name` is interpolated into a filesystem path — a
+    // crafted pluginOrder entry could otherwise make this standalone
+    // validator read outside catalog/plugins.
+    if (typeof name !== 'string' || !PLUGIN_NAME_RE.test(name)) {
+      fail(`${catalogPath} has an invalid pluginOrder entry: ${JSON.stringify(name)}`);
+    }
     const sourcePath = path.join(ROOT, 'catalog', 'plugins', `${name}.json`);
     let source;
     try {
@@ -244,6 +260,24 @@ function validateReferencedPlugins(groups, marketplaceNames, errors) {
 }
 
 /**
+ * Whether a plugin's catalog source opts into the Codex target. Re-reads
+ * catalog/plugins/<name>.json directly rather than threading a field through
+ * loadCatalogProviders()'s return shape — this check only needs a single
+ * boolean, and declaringPlugins is a plain name array shared with other
+ * validators in this file.
+ */
+function isCodexEnabled(name) {
+  const sourcePath = path.join(ROOT, 'catalog', 'plugins', `${name}.json`);
+  let source;
+  try {
+    source = readJson(sourcePath);
+  } catch (error) {
+    fail(`Failed to read ${sourcePath}: ${error.message}`);
+  }
+  return Boolean(source.targets && source.targets.codex && source.targets.codex.enabled);
+}
+
+/**
  * Non-emission gate. `capabilityProvider` is catalog-only by construction —
  * both emit-claude.js and emit-codex.js build their output from explicit key
  * lists rather than spreading the source object — but "by construction" is
@@ -262,13 +296,34 @@ function validateNonEmission(groups, declaringPlugins, errors) {
     targets.push(codexMarketplacePath);
   }
   for (const name of declaringPlugins) {
-    for (const manifest of [
-      path.join(ROOT, 'plugins', name, '.claude-plugin', 'plugin.json'),
-      path.join(ROOT, 'plugins', name, '.codex-plugin', 'plugin.json'),
-    ]) {
-      if (fs.existsSync(manifest)) {
-        targets.push(manifest);
-      }
+    // The Claude manifest is required, not optional: validateReferencedPlugins
+    // already confirmed every declaring plugin is a real Claude-enabled
+    // marketplace plugin, so a missing generated .claude-plugin/plugin.json
+    // here means the generation step is stale/broken, not that this plugin
+    // opted out of Claude. Silently skipping it would narrow the non-emission
+    // scan below and let leaked provider metadata slip through undetected —
+    // a fail-open in a CI gate. Fail loudly instead.
+    const claudeManifest = path.join(ROOT, 'plugins', name, '.claude-plugin', 'plugin.json');
+    if (fs.existsSync(claudeManifest)) {
+      targets.push(claudeManifest);
+    } else {
+      errors.push(
+        `${PROVIDER_ARTIFACT_MISSING}: expected generated Claude manifest plugins/${name}/.claude-plugin/plugin.json is missing for provider-declaring plugin "${name}" — regenerate with \`pnpm generate:manifests\` before this non-emission scan can be trusted`
+      );
+    }
+
+    // The Codex manifest is genuinely optional: a plugin can be Claude-only
+    // (targets.codex.enabled === false in its catalog source), in which case
+    // .codex-plugin/plugin.json is never generated and its absence is
+    // correct, not a gap. Only require it when the catalog source says Codex
+    // is enabled for this plugin.
+    const codexManifest = path.join(ROOT, 'plugins', name, '.codex-plugin', 'plugin.json');
+    if (fs.existsSync(codexManifest)) {
+      targets.push(codexManifest);
+    } else if (isCodexEnabled(name)) {
+      errors.push(
+        `${PROVIDER_ARTIFACT_MISSING}: expected generated Codex manifest plugins/${name}/.codex-plugin/plugin.json is missing for provider-declaring plugin "${name}" (targets.codex.enabled is true in catalog/plugins/${name}.json) — regenerate with \`pnpm generate:manifests\` before this non-emission scan can be trusted`
+      );
     }
   }
 
@@ -389,6 +444,23 @@ function validateSetupAllSection(groups, errors) {
       continue;
     }
     documented.set(heading.group, []);
+  }
+
+  // Any top-level bullet shaped like a provider-group heading (a backtick id
+  // right after "- `") but not exactly matching GROUP_HEADING_RE is drift by
+  // itself. Without this check it goes unnoticed whenever the section also
+  // contains one heading that matches exactly and the malformed heading has
+  // no member lines under it: the group-set and member-drift checks below
+  // only see the valid heading, so a second/third heading with missing or
+  // malformed mutual-exclusion wording passes validation silently.
+  const HEADING_SHAPED_RE = /^- `([a-z0-9-]+)`.*$/gm;
+  const validHeadingStarts = new Set(headings.map((heading) => heading.index));
+  for (const match of section.matchAll(HEADING_SHAPED_RE)) {
+    if (!validHeadingStarts.has(match.index)) {
+      errors.push(
+        `${PROVIDER_SETUP_SECTION_DRIFT}: heading-shaped line \`${match[0]}\` in ${SETUP_ALL_RELATIVE} does not match the required "(mutually exclusive: exactly one enabled)" wording`
+      );
+    }
   }
   for (const match of section.matchAll(GROUP_MEMBER_RE)) {
     const owning = [...headings].filter((heading) => heading.index < match.index).pop();

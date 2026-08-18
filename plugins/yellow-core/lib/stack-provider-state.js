@@ -154,8 +154,13 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
       ) {
         return false;
       }
-      const [name] = row.id.split('@');
-      if (name !== provider.plugin) {
+      // Match the canonical `plugin@yellow-plugins` ID, not just the
+      // plugin name. Splitting off the marketplace and comparing name
+      // alone would accept a same-named plugin published under a
+      // DIFFERENT marketplace (e.g. `gt-workflow@another-marketplace`)
+      // as the official provider, letting an unrelated install drive
+      // classification and command generation.
+      if (row.id !== `${provider.plugin}@${DEFAULT_MARKETPLACE}`) {
         return false;
       }
       // user/managed rows are global. project/local rows belong to one
@@ -238,9 +243,13 @@ function classifyProviderState({
     projectScopeFiltered,
     // `false` means at least one relevant probe was never run. Callers must
     // say "not checked" rather than implying a clean tooling result.
-    toolingKnown: enabled.every(
-      (entry) => typeof tooling[entry.id] === 'boolean'
-    ),
+    // `null` when nothing is enabled — `Array.every` is vacuously `true` on
+    // an empty array, which would otherwise misreport "checked" when no
+    // probe was relevant to consume in the first place.
+    toolingKnown:
+      enabled.length === 0
+        ? null
+        : enabled.every((entry) => typeof tooling[entry.id] === 'boolean'),
   };
 
   // 1. MANAGED_CONFLICT — a managed-scope entry makes the situation
@@ -444,7 +453,7 @@ function planProviderSwitch({
   const targetMarketplace = targetEntry.marketplaces[0] || marketplace;
   const targetRef = `${targetEntry.plugin}@${targetMarketplace}`;
 
-  if (!targetEntry.installed) {
+  if (!targetEntry.scopes.includes(scope)) {
     steps.push({
       action: 'install',
       provider: target,
@@ -457,18 +466,10 @@ function planProviderSwitch({
     });
   }
 
-  steps.push({
-    action: 'enable',
-    provider: target,
-    scope,
-    requiresConfirmation: false,
-    description: `Enable ${targetEntry.plugin} at ${scope} scope`,
-    // --scope is always explicit: `enable`/`disable` default to
-    // auto-detect, which would silently pick a scope the user did not ask
-    // for when the plugin is present at several.
-    command: `claude plugin enable ${targetRef} --scope ${scope}`,
-  });
-
+  // Disable every other provider BEFORE enabling the target. Enabling first
+  // would open a window where both providers are enabled at once, violating
+  // the single-provider invariant (stack-provider-guard skill, invariant 1)
+  // even if only until the next step runs.
   for (const other of others) {
     for (const otherScope of [...new Set(other.enabledScopes)]) {
       if (otherScope === 'managed') {
@@ -493,6 +494,18 @@ function planProviderSwitch({
       });
     }
   }
+
+  steps.push({
+    action: 'enable',
+    provider: target,
+    scope,
+    requiresConfirmation: false,
+    description: `Enable ${targetEntry.plugin} at ${scope} scope`,
+    // --scope is always explicit: `enable`/`disable` default to
+    // auto-detect, which would silently pick a scope the user did not ask
+    // for when the plugin is present at several.
+    command: `claude plugin enable ${targetRef} --scope ${scope}`,
+  });
 
   return { ...base, status: 'ok', steps };
 }

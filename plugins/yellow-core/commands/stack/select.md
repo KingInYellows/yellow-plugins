@@ -160,9 +160,21 @@ use, so a mismatch with runtime state is detectable (`CONFIG_MISMATCH`):
 provider: github
 ```
 
-Use `AskUserQuestion` to offer writing it. It is a tracked file that affects
-every collaborator, so never write it without an explicit yes, and never
-write it as a side effect of a switch.
+Use `AskUserQuestion` to offer writing it: "Record `provider: <TARGET_PROVIDER>`
+in `.yellow-stack.yml`?" with options "Write it" and "Skip". It is a
+tracked file that affects every collaborator, so never write it without an
+explicit yes, and never write it as a side effect of a switch.
+
+On "Write it", write the file with Bash — the only mutation-capable tool
+this command grants:
+
+```bash
+set -uo pipefail
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '.')
+printf 'provider: %s\n' "$TARGET_PROVIDER" > "$repo_root/.yellow-stack.yml"
+```
+
+On "Skip", leave any existing file untouched and say so.
 
 ## Boundaries
 

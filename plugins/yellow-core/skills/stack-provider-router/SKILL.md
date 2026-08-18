@@ -109,9 +109,9 @@ already names the specific problem. Then give the one relevant next step:
 
 ### Step 3: Report the tooling caveat honestly
 
-If `toolingKnown` is `false`, the tooling probe did not run for the enabled
-provider. Say "provider CLI not checked" rather than implying a clean
-result.
+Step 1 always probes both `gt` and `gh extension list` and passes both
+results to the classifier, so `toolingKnown` is always `true` for this
+skill — there is no "CLI not checked" case to report here.
 
 If `projectScopeFiltered` is `false`, `project`/`local` plugin rows could
 not be filtered to this repository, so the state may reflect another

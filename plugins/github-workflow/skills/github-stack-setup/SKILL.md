@@ -61,12 +61,14 @@ else
 fi
 
 # Identity check, not a name check: three third-party extensions also
-# expose a `gh stack` command. Only github/gh-stack is first-party.
+# expose a `gh stack` command. Only github/gh-stack is first-party. Match
+# a whole whitespace-delimited field, not a substring — a substring check
+# would accept an owner like `notgithub/gh-stack` as official.
 if command -v gh >/dev/null 2>&1; then
   ext_list=$(gh extension list 2>/dev/null || true)
-  if printf '%s\n' "$ext_list" | grep -q 'github/gh-stack'; then
+  if printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i == "github/gh-stack") found=1 } END { exit !found }'; then
     printf 'gh_stack_extension: OK (github/gh-stack)\n'
-  elif printf '%s\n' "$ext_list" | grep -qi 'gh-stack'; then
+  elif printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^[^\/[:space:]]+\/gh-stack$/) found=1 } END { exit !found }'; then
     printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
   else
     printf 'gh_stack_extension: MISSING\n'
@@ -95,11 +97,23 @@ one.
 
 ### Step 3: Offer the install (never perform it silently)
 
-If the extension is missing and `gh` is authenticated, use
+If `gh_stack_extension` reports `MISSING` and `gh` is authenticated, use
 `AskUserQuestion` to offer:
 
 - "Install github/gh-stack" — on confirmation, run
   `gh extension install github/gh-stack`, then re-run Step 1 and report.
+- "Skip" — report the gap and stop.
+
+If `gh_stack_extension` reports `WRONG OWNER` and `gh` is authenticated,
+the official extension cannot be installed until the third-party one is
+gone — use `AskUserQuestion` to offer the remove-then-install flow
+instead:
+
+- "Remove the third-party extension and install github/gh-stack" — on
+  confirmation, run `gh extension remove stack` (the command name is
+  shared, so this removes whichever extension currently provides it),
+  then `gh extension install github/gh-stack`, then re-run Step 1 and
+  report.
 - "Skip" — report the gap and stop.
 
 Do not offer to install `gh` itself, change authentication, or install the

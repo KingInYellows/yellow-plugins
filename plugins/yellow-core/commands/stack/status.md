@@ -108,8 +108,10 @@ Stacked-PR Provider Status
 
 ## Step 3: Report the caveats, do not hide them
 
-- `toolingKnown: false` → print "provider CLI not checked" rather than
-  implying a clean probe.
+Step 1 always probes both `gt` and `gh extension list` and passes both
+results to the classifier, so `toolingKnown` is always `true` for this
+command — there is no "CLI not checked" case to report here.
+
 - `projectScopeFiltered: false` → the repository root could not be
   resolved, so `project`/`local` plugin rows from other repositories could
   not be filtered out. Say so; the state may not be this repository's.

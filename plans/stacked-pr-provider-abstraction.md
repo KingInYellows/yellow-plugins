@@ -64,7 +64,9 @@ Invariants:
 - `yellow-core` owns the provider-neutral `/stack:*` surface.
 - `gt-workflow` and `github-workflow` are alternative providers in the
   `stacked-pr` group.
-- Both may be **installed**; exactly one may be **enabled**.
+- Both may be **installed**; at most one may be **enabled**. A `READY_*`
+  state requires exactly one enabled provider whose identity matches the
+  recorded intent — zero enabled (`UNSELECTED`) is a valid, non-error state.
 - **No silent fallback.** Ambiguity (both enabled, none enabled, intent
   mismatch, managed conflict) is reported, never guessed around.
 - `yellow-core` must not depend on either provider.
@@ -147,6 +149,14 @@ Parsing is deliberately minimal (a single anchored `provider:` line, no YAML
 dependency in a shipped plugin lib). Anything else in the file is ignored;
 a malformed/absent file is treated as "no intent", never as a default.
 
+Known limitation: `parseIntent()` returns `null` for "file absent", "no
+`provider:` line", and "`provider:` line present but unparseable" alike —
+`classifyProviderState()` cannot tell them apart, so `/stack:status` reports
+`UNSELECTED` instead of a configuration error, and `/stack:select` can offer
+to write a fresh intent over a file that already had (invalid) content
+without flagging that. Accepted for this foundation-only shell, not fixed
+here; tracked as deferred work below.
+
 ### Switch planning
 
 `planProviderSwitch()` returns an ordered, **unexecuted** command plan, or a
@@ -193,7 +203,7 @@ work items, and an unchecked box here would block archival forever.
 - Changes to the root Graphite authority (`CLAUDE.md`, `AGENTS.md`)
 - Removal of any `gt-workflow` command
 - Branch protections, rulesets, merge queues, required checks, apps
-- Disabling or uninstalling Graphite anywhere
+- Uninstalling Graphite, or disabling it outside a confirmed provider switch
 
 ## Deferred work — the GitHub authoring layer
 
@@ -216,3 +226,9 @@ The next shell(s), gated on the evidence in the research doc:
    third-party lookalikes.
 7. **Re-validate the preview surfaces** — GitHub stacked PRs, `gh skill`,
    and `gh-stack` itself were all pre-GA on 2026-08-17.
+8. **Malformed-intent detection** — give `parseIntent()` a way to
+   distinguish "absent" from "present but unparseable" `.yellow-stack.yml`
+   so `classifyProviderState()` can report a configuration-error state
+   instead of collapsing both into `UNSELECTED`, and `/stack:select` can
+   refuse (or warn before) overwriting an existing-but-invalid file. Add a
+   malformed-intent fixture alongside it.

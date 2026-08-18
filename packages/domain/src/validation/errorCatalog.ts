@@ -167,6 +167,7 @@ export const ERROR_CODES = {
   PROVIDER_GROUP_UNDERPOPULATED: 'ERROR-PROVIDER-004',
   PROVIDER_SETUP_SECTION_DRIFT: 'ERROR-PROVIDER-005',
   PROVIDER_ROUTER_TABLE_DRIFT: 'ERROR-PROVIDER-006',
+  PROVIDER_ARTIFACT_MISSING: 'ERROR-PROVIDER-007',
 
   // Namespace Migration Errors (NAMESPACE) — scripts/validate-flow-namespace.js
   // gates the whole repo against surviving references to the retired
@@ -429,6 +430,7 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.PROVIDER_GROUP_UNDERPOPULATED,
       ERROR_CODES.PROVIDER_SETUP_SECTION_DRIFT,
       ERROR_CODES.PROVIDER_ROUTER_TABLE_DRIFT,
+      ERROR_CODES.PROVIDER_ARTIFACT_MISSING,
     ],
     [ErrorCategory.DISTRIBUTION]: [
       ERROR_CODES.DIST_MALFORMED_CATALOG_SOURCE,

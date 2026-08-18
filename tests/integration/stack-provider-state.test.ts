@@ -223,8 +223,8 @@ describe('planProviderSwitch — preview only, never executed', () => {
     });
     expect(plan.status).toBe('ok');
     expect(plan.steps.map((s: { command: string }) => s.command)).toEqual([
-      'claude plugin enable github-workflow@yellow-plugins --scope user',
       'claude plugin disable gt-workflow@yellow-plugins --scope user',
+      'claude plugin enable github-workflow@yellow-plugins --scope user',
     ]);
     // Every step carries --scope explicitly: enable/disable default to
     // auto-detect, which would pick a scope the user never asked for.
@@ -358,8 +358,8 @@ describe('summarizeSwitchOutcome — case 8: enable/disable command failure', ()
   it('aborts at the first failure and reports the remaining steps as NOT RUN', () => {
     const outcome = summarizeSwitchOutcome(plan, [{ ok: false, exitCode: 1 }, { ok: true }]);
     expect(outcome.status).toBe('failed');
-    expect(outcome.failedStep.action).toBe('enable');
-    expect(outcome.notRun.map((s: { action: string }) => s.action)).toEqual(['disable']);
+    expect(outcome.failedStep.action).toBe('disable');
+    expect(outcome.notRun.map((s: { action: string }) => s.action)).toEqual(['enable']);
     // No silent fallback: the message must say the other provider was not
     // substituted in.
     expect(outcome.message).toContain('no other provider was enabled in its place');
