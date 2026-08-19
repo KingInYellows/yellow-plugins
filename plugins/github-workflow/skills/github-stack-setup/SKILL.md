@@ -30,101 +30,63 @@ installation is offered, never performed silently.
 
 ### Step 1: Probe prerequisites
 
-Run this single Bash call and read its output. It is read-only.
+`plugins/yellow-core/lib/stack-tooling-probe.js` is the single owner of
+this logic — do not re-derive `gh` presence, auth validity, or extension
+identity here. Run this single Bash call and read its JSON output.
 
 ```bash
 set -uo pipefail
 
-printf '=== GitHub stacked-PR provider probe ===\n'
-
-if command -v gh >/dev/null 2>&1; then
-  gh_version=$(gh --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  printf 'gh:                 OK (%s)\n' "${gh_version:-unknown}"
-  gh_major=${gh_version%%.*}
-  case "$gh_major" in
-    ''|*[!0-9]*) printf 'gh_version_gate:    UNKNOWN (could not parse version)\n' ;;
-    *) if [ "$gh_major" -ge 2 ]; then
-         printf 'gh_version_gate:    OK (>= 2.0)\n'
-       else
-         printf 'gh_version_gate:    TOO OLD (need >= 2.0)\n'
-       fi ;;
-  esac
-else
-  printf 'gh:                 MISSING\n'
-  printf 'gh_version_gate:    SKIPPED (gh not found)\n'
+PROBE="${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/stack-tooling-probe.js"
+if [ ! -f "$PROBE" ]; then
+  printf 'stack_provider_error: tooling probe not found at %s (is yellow-core installed?)\n' "$PROBE"
+  exit 0
 fi
 
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  printf 'gh_auth:            OK\n'
-else
-  printf 'gh_auth:            NOT AUTHENTICATED\n'
-fi
-
-# Identity check, not a name check: three third-party extensions also
-# expose a `gh stack` command. Only github/gh-stack is first-party. Match
-# a whole whitespace-delimited field, not a substring — a substring check
-# would accept an owner like `notgithub/gh-stack` as official.
-if command -v gh >/dev/null 2>&1; then
-  # Capture the probe's own exit status directly in the `if` — do not
-  # discard it with `|| true`. A probe failure (network, gh internal
-  # error, auth expiry) must not be reported as the same state as a
-  # genuinely absent extension.
-  if ext_list=$(gh extension list 2>/dev/null); then
-    if printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i == "github/gh-stack") found=1 } END { exit !found }'; then
-      printf 'gh_stack_extension: OK (github/gh-stack)\n'
-    elif printf '%s\n' "$ext_list" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^[^\/[:space:]]+\/gh-stack$/) found=1 } END { exit !found }'; then
-      printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
-    else
-      printf 'gh_stack_extension: MISSING\n'
-    fi
-  else
-    printf 'gh_stack_extension: UNAVAILABLE (could not query extensions)\n'
-  fi
-else
-  printf 'gh_stack_extension: SKIPPED (gh not found)\n'
-fi
+node "$PROBE" probe --provider github
 ```
 
 ### Step 2: Report
 
-Print one line per check using the probe output verbatim. Then classify:
+Read the `github` object's `readiness` (`ready`/`not-ready`/`unknown`) and
+`checks` (`present`, `version`, `authValid`, `extensionIdentity`:
+`verified`/`wrong-owner`/`missing`/`unavailable`). Print each check, then
+classify:
 
-- **READY** — `gh` OK, `gh_version_gate` OK, `gh_auth` OK, and
-  `gh_stack_extension` OK.
+- **READY** — `readiness: "ready"` (requires `present`, `authValid`, and
+  `extensionIdentity: "verified"` together).
 - **NEEDS SETUP** — anything else.
 
-Name the specific gap. "Install the official extension with
-`gh extension install github/gh-stack`" is useful; "prerequisites missing"
-is not.
+Name the specific gap using `detail` and `checks.extensionIdentity`.
+"Install the official extension with `gh extension install
+github/gh-stack`" is useful; "prerequisites missing" is not.
 
-If `gh_stack_extension` reports `WRONG OWNER`, say so explicitly: a
-third-party `gh stack` will answer commands but is not the extension this
-provider targets, and it must be removed before installing the official
-one.
+If `extensionIdentity` is `wrong-owner`, say so explicitly: a third-party
+`gh stack` will answer commands but is not the extension this provider
+targets, and it must be removed before installing the official one.
 
-If `gh_stack_extension` reports `UNAVAILABLE`, say so explicitly: the probe
-could not determine whether the extension is installed (a `gh extension
-list` failure, not a "not installed" result) — treat it as unresolved, not
-as `MISSING`.
+If `readiness` is `unknown`, say so explicitly: the probe could not
+determine readiness (a `gh auth status` or `gh extension list` failure,
+not a "not installed" result) — treat it as unresolved, not as `NEEDS
+SETUP`/`MISSING`.
 
 ### Step 3: Offer the install (never perform it silently)
 
-Both offers below additionally require `gh_version_gate: OK` — an
-authenticated `gh` below v2.0 must never reach `gh extension
-install`/`remove`. If `gh_version_gate` is not `OK` (`TOO OLD`, `UNKNOWN`,
-or `SKIPPED`), report the version gap and stop; do not offer either flow,
-regardless of what `gh_stack_extension` reports.
+Both offers below additionally require `checks.present: true` and
+`checks.authValid: true` — an unauthenticated `gh` must never reach `gh
+extension install`/`remove`. If either is false, report that gap and stop;
+do not offer either flow, regardless of what `extensionIdentity` reports.
 
-If `gh_stack_extension` reports `MISSING` and `gh_version_gate` is `OK` and
-`gh` is authenticated, use `AskUserQuestion` to offer:
+If `extensionIdentity` is `missing` and `gh` is present and authenticated,
+use `AskUserQuestion` to offer:
 
 - "Install github/gh-stack" — on confirmation, run
   `gh extension install github/gh-stack`, then re-run Step 1 and report.
 - "Skip" — report the gap and stop.
 
-If `gh_stack_extension` reports `WRONG OWNER` and `gh_version_gate` is `OK`
-and `gh` is authenticated, the official extension cannot be installed
-until the third-party one is gone — use `AskUserQuestion` to offer the
+If `extensionIdentity` is `wrong-owner` and `gh` is present and
+authenticated, the official extension cannot be installed until the
+third-party one is gone — use `AskUserQuestion` to offer the
 remove-then-install flow instead:
 
 - "Remove the third-party extension and install github/gh-stack" — on
@@ -134,8 +96,8 @@ remove-then-install flow instead:
   report.
 - "Skip" — report the gap and stop.
 
-If `gh_stack_extension` reports `UNAVAILABLE`, do not offer either flow —
-report that the extension state could not be determined and stop.
+If `extensionIdentity` is `unavailable`, do not offer either flow — report
+that the extension state could not be determined and stop.
 
 Both install commands are deliberately unpinned. `--pin` is the right
 call for a third-party extension, but `github/gh-stack` is first-party
