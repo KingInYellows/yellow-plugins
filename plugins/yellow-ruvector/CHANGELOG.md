@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.5
+
+### Patch Changes
+
+- [#718](https://github.com/KingInYellows/yellow-plugins/pull/718)
+  [`f7206e2`](https://github.com/KingInYellows/yellow-plugins/commit/f7206e29bf0338a824a52f47e44b0a3fa3d043cd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop Cursor
+  from blocking Shell and file edits when leftover `ruvector hooks init`
+  PreToolUse commands print empty stdout. Plugin hooks now emit dual-client
+  allow JSON, setup creates `.ruvector/` without `hooks init`, and a repair
+  script wraps existing empty-stdout PreToolUse entries.
+
 ## 1.2.4
 
 ### Patch Changes
