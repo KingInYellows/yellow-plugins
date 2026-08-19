@@ -76,7 +76,8 @@
         "gt-cleanup",
         "audit-review",
         "stack-decomposition-format",
-        "stack-plan-style"
+        "stack-plan-style",
+        "gt-merge"
       ],
       "componentPaths": {
         "skills": "./codex/skills"

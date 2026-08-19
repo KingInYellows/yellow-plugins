@@ -17,8 +17,8 @@ Graphite-native workflow commands for stacked PR development.
 
 ## Namespace exception
 
-The seven commands shipped by gt-workflow (`gt-amend`, `gt-sync`, `gt-nav`,
-`gt-stack-plan`, `gt-cleanup`, `gt-setup`, `smart-submit`) are
+The eight commands shipped by gt-workflow (`gt-amend`, `gt-sync`, `gt-nav`,
+`gt-stack-plan`, `gt-cleanup`, `gt-setup`, `gt-merge`, `smart-submit`) are
 **un-namespaced** — they do NOT carry the `namespace:verb` prefix that
 later marketplace conventions adopted (where `namespace` is the
 `commands/<namespace>/` directory the file ships under, producing forms
@@ -26,7 +26,7 @@ like `/ci:diagnose` or `/review:plan`). This is intentional, not a bug:
 
 1. **Historical:** these commands predate the `namespace:verb`
    namespacing convention and shipped under their bare names.
-2. **Low collision risk:** six of the seven are `gt-`-prefixed and no other
+2. **Low collision risk:** seven of the eight are `gt-`-prefixed and no other
    marketplace plugin would plausibly register them. `smart-submit` is the
    only generic name; no observed competing plugin ships it.
 3. **No re-flagging without a trigger:** future contributors and auditors
@@ -90,6 +90,11 @@ invoked directly, no command layer) execute.
   reconcile; optionally offers worktree cleanup via yellow-core
 - `/gt-sync` — Sync repo, restack, clean up
 - `/gt-nav` — Visualize and navigate the stack
+- `/gt-merge` — Merge the current stack's pull requests (trunk-up) via
+  `gt merge`, with a `--dry-run` preview and explicit confirmation before
+  landing anything. This registers the stacked-pr operation registry's
+  `merge` operation for Graphite — see
+  `plugins/yellow-core/lib/stack-operation-registry.js`
 
 Three additional skills exist with no command wrapper (Claude Code reaches
 them only via cross-references from the seven skills above, or the `Skill`
@@ -245,9 +250,9 @@ executed as a script, and cannot be exercised in bats.
 `targets.codex.enabled: true` in `catalog/plugins/gt-workflow.json` — the
 second plugin in this repo (after yellow-core) to enable Codex. Unlike
 yellow-core's narrow read-only allowlist, gt-workflow exposes its **entire**
-skill surface: all ten skills are allowlisted —
+skill surface: all eleven skills are allowlisted —
 `gt-setup`, `gt-nav`, `gt-stack-plan`, `gt-sync`, `smart-submit`, `gt-amend`,
-`gt-cleanup`, `audit-review`, `stack-decomposition-format`,
+`gt-cleanup`, `gt-merge`, `audit-review`, `stack-decomposition-format`,
 `stack-plan-style` — since gt-workflow's commands are thin wrappers with no
 Claude-only logic of their own (contrast yellow-core, which excludes 17 of
 its 20 skills along with all 21 agents and both hooks). `includeHooks` is
