@@ -36,9 +36,14 @@
  *     operation beyond `view`, even on failure, because a failed `submit`
  *     or `sync` may still have partially pushed or partially updated PRs
  *     (GOAL.md: "push and submit may be partially applied").
- *   - Output is bounded before it reaches model context: stdout/stderr
- *     are truncated to MAX_OUTPUT_CHARS with a truncation marker and an
- *     honest `truncated`/`totalChars` pair, never silently.
+ *   - Output is REDACTED and THEN bounded before it reaches model context:
+ *     stdout/stderr pass through `redact()` (credential-bearing URLs,
+ *     GitHub tokens, Bearer headers, JWTs, URL credential params) and are
+ *     only afterwards truncated to MAX_OUTPUT_CHARS with a truncation
+ *     marker and an honest `truncated`/`totalChars` pair, never silently.
+ *     Redaction precedes truncation deliberately — a size cap limits
+ *     volume, not disclosure, and a secret must not survive by sitting
+ *     past the truncation boundary.
  *
  * CLI:
  *   node github-stack-runtime.js <op> [--flag value ...] [--confirm] [--json-args <path|->]
@@ -124,8 +129,52 @@ function run(bin, args) {
   };
 }
 
-/** Truncate a string to MAX_OUTPUT_CHARS, reporting truncation honestly. */
-function bound(text) {
+/**
+ * Credential redaction for subprocess output, applied BEFORE truncation so a
+ * secret can never survive by sitting past the truncation boundary.
+ *
+ * A dependency-free JS subset of yellow-core's canonical `cs_redact_secrets`
+ * (lib/compound-staging.sh), narrowed to what `gh`/`git` can realistically
+ * emit: git echoes remote URLs verbatim in error messages, and a remote
+ * configured as `https://user:ghp_xxx@github.com/...` therefore leaks a live
+ * token into stderr on any push/fetch failure. `gh` can likewise surface
+ * Authorization headers in verbose/error paths. This runtime cannot source
+ * the shell helper (it is dependency-free CJS by contract), so the patterns
+ * are replicated here; keep them in sync with the shell version's
+ * corresponding rules when either changes.
+ *
+ * Bounded-output limits are NOT a substitute for this: truncation caps
+ * volume, not disclosure.
+ */
+const REDACTIONS = Object.freeze([
+  // Credential-bearing URLs — the highest-likelihood vector for git/gh output.
+  [/(https?):\/\/[^:\s/]+:[^@\s]+@/g, '$1://[REDACTED:basic-auth]@'],
+  [/ghp_[A-Za-z0-9_]{36,255}/g, '[REDACTED:github-token]'],
+  [/ghs_[A-Za-z0-9_]{36,255}/g, '[REDACTED:github-token]'],
+  [/gho_[A-Za-z0-9_]{36,255}/g, '[REDACTED:github-token]'],
+  [/github_pat_[A-Za-z0-9_]{22,255}/g, '[REDACTED:github-pat]'],
+  [/Bearer\s+[A-Za-z0-9._-]{20,}/g, 'Bearer [REDACTED]'],
+  [/eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}/g, '[REDACTED:jwt]'],
+  // Query-string credentials (e.g. a clone URL carrying ?token=...).
+  [/([?&])(token|api_key|secret|key|password)=[^&\s]*/gi, '$1$2=[REDACTED:url-param]'],
+]);
+
+/** Apply every redaction rule. Pure; safe on empty input. */
+function redact(text) {
+  let out = text;
+  for (const [pattern, replacement] of REDACTIONS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
+/**
+ * Redact credentials, then truncate to MAX_OUTPUT_CHARS, reporting
+ * truncation honestly. Redaction runs FIRST so `totalChars` and the
+ * truncation boundary are both computed over already-safe text.
+ */
+function bound(rawText) {
+  const text = redact(rawText);
   const totalChars = text.length;
   if (totalChars <= MAX_OUTPUT_CHARS) {
     return { text, truncated: false, totalChars };
@@ -567,6 +616,7 @@ if (require.main === module) {
 module.exports = {
   EXIT_STATUS,
   MERGE_METHODS,
+  redact,
   validateBranchName,
   validatePositiveInt,
   validateRepoRelativePath,

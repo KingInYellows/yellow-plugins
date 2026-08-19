@@ -12,9 +12,11 @@ the provider model:
   `plugins/github-workflow/lib/github-stack-runtime.js`** — never invoke
   `gh stack <verb>` directly from a command or skill's Bash block. The
   runtime adapter is the sole owner of argument validation, confirmation
-  gating, and exit-code interpretation for every mutating operation
-  (`init`, `add`, `checkout`, `rebase`, `sync`, `submit`, `merge`,
-  `unstack`).
+  gating, exit-code interpretation, and **credential redaction** for every
+  mutating operation (`init`, `add`, `checkout`, `rebase`, `sync`,
+  `submit`, `merge`, `unstack`). Calling `gh stack` directly from a Bash
+  block bypasses `redact()` and can surface a token from a
+  credential-bearing remote URL straight into model context.
 - **Never disable, uninstall, or work around `gt-workflow`.** Provider
   switching is `yellow-core`'s `/stack:select` and nothing else.
 - **Never fall back to the other provider.** If this provider is not

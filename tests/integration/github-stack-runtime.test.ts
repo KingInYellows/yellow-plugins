@@ -30,6 +30,7 @@ const {
   validateBranchName,
   validateRepoRelativePath,
   resolveRemote,
+  redact,
 } = runtime;
 
 const FIXTURE_BIN = join(__dirname, '..', '..', 'plugins', 'github-workflow', 'tests', 'fixtures', 'bin');
@@ -382,5 +383,48 @@ describe('CLI end to end', () => {
     expect(() =>
       execFileSync(process.execPath, [LIB, 'teleport'], { encoding: 'utf8', env: process.env })
     ).toThrow();
+  });
+});
+
+describe('credential redaction — subprocess output never carries secrets into the result', () => {
+  it('redacts a credential-bearing remote URL (the realistic git-error vector)', () => {
+    const out = redact('fatal: could not read from https://user:ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA@github.com/o/r.git');
+    expect(out).toContain('[REDACTED:basic-auth]');
+    expect(out).not.toContain('ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+  });
+
+  it('redacts bare GitHub tokens in every documented prefix form', () => {
+    const token = 'A'.repeat(36);
+    for (const prefix of ['ghp_', 'ghs_', 'gho_']) {
+      expect(redact(`token ${prefix}${token} leaked`)).toContain('[REDACTED:github-token]');
+      expect(redact(`token ${prefix}${token} leaked`)).not.toContain(token);
+    }
+    expect(redact(`github_pat_${'B'.repeat(30)}`)).toContain('[REDACTED:github-pat]');
+  });
+
+  it('redacts Authorization headers, JWTs, and URL credential params', () => {
+    expect(redact('Authorization: Bearer abcdefghijklmnopqrstuvwxyz')).toContain('Bearer [REDACTED]');
+    expect(redact(`eyJ${'a'.repeat(20)}.eyJ${'b'.repeat(20)}.${'c'.repeat(20)}`)).toBe('[REDACTED:jwt]');
+    expect(redact('https://h/x?token=deadbeef&z=1')).toContain('token=[REDACTED:url-param]');
+  });
+
+  it('leaves ordinary output untouched', () => {
+    const plain = 'Merging #1, #2 into main via merge...\n✓ Merged #1, #2 into main (f661738)';
+    expect(redact(plain)).toBe(plain);
+  });
+
+  it('redacts secrets that reach the result through real subprocess stderr, not just the helper', () => {
+    process.env.FAKE_GH_EXIT = '1';
+    process.env.FAKE_GH_STDERR = 'fatal: https://u:ghp_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC@github.com/o/r.git rejected';
+    const result = submit({});
+    expect(result.stderr).toContain('[REDACTED:basic-auth]');
+    expect(result.stderr).not.toContain('ghp_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC');
+  });
+
+  it('redacts BEFORE truncation, so a secret cannot survive past the output cap', () => {
+    const secret = `ghp_${'D'.repeat(36)}`;
+    const padded = `${'x'.repeat(9000)}${secret}`;
+    const out = redact(padded);
+    expect(out).not.toContain(secret);
   });
 });
