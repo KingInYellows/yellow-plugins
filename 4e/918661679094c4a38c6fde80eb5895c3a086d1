@@ -1,0 +1,21 @@
+scripts/provider-neutral-commands-allowlist.json
+  s_fd5d688b6eb948::t_a2ba72367ea2a4 2
+plugins/yellow-core/commands/flow/work.md
+  s_fd5d688b6eb948::t_8ffd5c5b7bbf9a 261-273,279-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4e918661679094c4a38c6fde80eb5895c3a086d1",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
