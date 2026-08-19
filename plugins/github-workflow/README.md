@@ -1,14 +1,16 @@
 # github-workflow
 
-GitHub-native stacked-PR **provider skeleton** for the `stacked-pr`
-capability group.
+GitHub-native stacked-PR **provider** for the `stacked-pr` capability
+group.
 
-> **Foundation only.** This plugin does not create, submit, amend,
-> synchronise, rebase, clean up, or merge stacks. It checks whether the
-> official GitHub tooling is present and reports provider readiness. Every
-> mutating `gh stack` subcommand is deliberately out of scope until the
-> authoring shell lands — see
-> [`plans/stacked-pr-provider-abstraction.md`](../../plans/stacked-pr-provider-abstraction.md).
+> **Full command surface.** This plugin creates, submits, amends,
+> synchronises, navigates, cleans up, and merges stacks via
+> `github-stack-runtime.js`, its dependency-free CLI adapter over the
+> official `gh stack` extension. Every mutating call is argument-array-only
+> (no shell interpolation), validated, and — for destructive operations —
+> gated behind an explicit confirmation. See
+> [`plans/stacked-pr-provider-abstraction.md`](../../plans/stacked-pr-provider-abstraction.md)
+> for the design history.
 
 ## Why it exists
 
@@ -59,21 +61,33 @@ ambiguous state is reported, never silently resolved.
 | --- | --- |
 | `/github-stack:setup` | Checks `gh`, auth, and that the installed `gh stack` extension is `github/gh-stack`. Reports what is missing; installs nothing without confirmation. |
 | `/github-stack:status` | Reports this provider's readiness and whether it is the enabled `stacked-pr` provider. Read-only. |
+| `/github-stack:plan` | Read-only stack view via the adapter's `view` operation. |
+| `/github-stack:submit` | Stages, commits, and submits uncommitted changes as a draft PR (`--open` to open immediately). |
+| `/github-stack:amend` | Amends the current branch's commit and re-submits. |
+| `/github-stack:sync` | Syncs the local stack with trunk; pruning merged branches requires confirmation. |
+| `/github-stack:nav` | Checks out a stack target (branch, PR number, PR URL, or stack number); prompts if none given. |
+| `/github-stack:cleanup` | Removes stack tracking (optionally local branches), always behind confirmation. |
+| `/github-stack:merge` | Merges a stacked PR via `gh stack merge` (never `gh pr merge`), always behind confirmation. |
 
-Both are thin wrappers over same-named skills, matching the
+Each is a thin wrapper over a same-named skill, matching the
 `/plan:status` → `plan-status` pattern used elsewhere in this marketplace.
 
 ## What this plugin does not do
 
 - No MCP server.
 - No hooks.
-- No mutating `gh stack` invocation (`init`, `add`, `submit`, `push`,
-  `sync`, `rebase`, `modify`, `merge`, `link`, `unstack`).
+- No mutating `gh stack` invocation outside `github-stack-runtime.js` — no
+  command or skill's Bash block calls `gh stack <verb>` directly.
 - No edits to settings JSON, branch protections, rulesets, merge queues, or
   required checks.
 - No duplicate command names with `gt-workflow`.
+- No `modify`/`switch` support — both are TUI-only in the upstream `gh
+  stack` CLI with no noninteractive flag surface; conflict recovery only
+  uses `rebase --continue`/`--abort`.
 
 ## Status
 
-Version 0.1.0 — skeleton. The command surface that maps `gt` operations onto
-`gh stack` is deferred; see "Deferred work" in the plan document.
+Full command surface implemented. GitHub's native stacked pull requests and
+`gh-stack` itself remain pre-GA as of 2026-08-17 — behavior may still
+change upstream; see
+[`docs/research/2026-08-16-github-native-stacks-vs-graphite.md`](../../docs/research/2026-08-16-github-native-stacks-vs-graphite.md).
