@@ -61,6 +61,18 @@ const MAX_OUTPUT_CHARS = 8000;
  * Exit 2 (ErrNotInStack) is included even though the task brief's own
  * exit-code list omitted it — that omission is recorded as a delta in the
  * research doc, not silently dropped here.
+ *
+ * LIVE-SMOKE FINDING (2026-08-19, docs/research/2026-08-18-github-stack-
+ * provider-operations-revalidation.md §9): the same underlying problem —
+ * merging a draft PR — surfaced as exit 2 (NOT_IN_STACK) when `merge` was
+ * invoked with no target (current-branch context: "nothing to merge:
+ * pull request #1 is a draft") and exit 5 (INVALID_ARGS) when invoked
+ * with an explicit `--target` ("pull request #1 is a draft; mark it ready
+ * for review before merging"). The exit-code taxonomy is coarser than a
+ * 1:1 status mapping implies — do not treat NOT_IN_STACK's recoveryAction
+ * as authoritative on its own; every caller of this module already
+ * surfaces `stderr` verbatim alongside `recoveryAction`, which is where
+ * the real reason lives.
  */
 const EXIT_STATUS = Object.freeze({
   0: 'SUCCESS',

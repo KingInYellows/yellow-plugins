@@ -181,7 +181,84 @@ Per `GOAL.md` Phases 1–8:
 3. Any change to branch protections, rulesets, merge queues, or required
    checks.
 
-## 8. Sources
+## 8. Live smoke test (2026-08-19, GOAL.md Phase 9)
+
+Real GitHub resources, user-confirmed before running. `gh-stack` v0.1.0
+installed fresh via `gh extension install github/gh-stack` (not previously
+installed on this machine) — confirmed identical version to the pinned SHA
+snapshot in §1.
+
+**Repo:** a private throwaway repo under the operator's own account
+(`yellow-stack-smoke-<timestamp>`), created via `gh repo create --private
+--clone`, deleted via `gh repo delete --yes` at the end. No shared,
+protected, or long-lived resource was touched.
+
+**Lifecycle exercised**, each command run for real and its result recorded:
+
+1. `gh stack init -b main layer-one` → exit 0, created and checked out
+   `layer-one`. Matches the runtime adapter's `init` exactly.
+2. `gh stack add -m "<message>" layer-two` (files pre-staged via plain
+   `git add`, no `-A`/`-u` passed) → exit 0, committed the pre-staged
+   files and created `layer-two` on top. **Confirms** the adapter's `add`
+   design (skills stage specific files themselves, then call `add` with
+   only `-m`) works exactly as assumed — `-A`/`-u` are for auto-staging,
+   not required when files are already staged.
+3. `gh stack submit --auto` → exit 0, created PR #1 (`layer-one` → `main`)
+   and PR #2 (`layer-two` → `layer-one`) as a linked stack, both **drafts**
+   by default (confirmed via `gh pr list --json isDraft`) — matches the
+   adapter's "no `--open` = draft" assumption exactly.
+4. `gh stack view --json` → exit 0. **Real output shape**, not previously
+   observed directly:
+   ```json
+   {"trunk": "main", "currentBranch": "layer-two",
+    "branches": [{"name": "layer-one", "head": "<sha>", "base": "<sha>",
+      "isCurrent": false, "isMerged": false, "isQueued": false,
+      "needsRebase": false, "pr": {"number": 1, "url": "...", "state": "OPEN"}},
+      {"name": "layer-two", ...}]}
+   ```
+   `head`/`base` are commit SHAs, not branch names. `github-stack-plan`'s
+   SKILL.md was updated with this confirmed shape.
+5. **Finding — exit-code taxonomy is coarser than assumed.** Merging a
+   draft PR surfaced two DIFFERENT exit codes for the same root cause,
+   depending on invocation form:
+   - `gh stack merge --yes` (no target, current-branch context) → **exit
+     2**, stderr `"nothing to merge: pull request #1 is a draft"`.
+   - `gh stack merge 1 --yes` (explicit target, run from the wrong
+     directory first) → exit 2, stderr `"#1 is not a stack number or a
+     stacked pull request"` (a genuinely different problem — confirms
+     exit 2 is reused for more than one condition, not `NOT_IN_STACK`
+     alone).
+   - `gh stack merge 1 --yes` (explicit target, correct directory, PR
+     still draft) → **exit 5**, stderr `"pull request #1 is a draft; mark
+     it ready for review before merging"`.
+
+   Recorded as a code comment in `github-stack-runtime.js` next to
+   `EXIT_STATUS`: the numeric status label is not authoritative on its
+   own for a caller's messaging — every skill already surfaces `stderr`
+   verbatim alongside `recoveryAction`, which is where the real reason
+   lives, so this does not change any skill's behavior, only the
+   documented confidence level in the status label alone.
+6. `gh pr ready 1` / `gh pr ready 2` → both PRs marked ready for review.
+7. `gh stack merge 2 --yes` (via the runtime adapter directly, `--target 2
+   --confirm`) → **exit 0, SUCCESS**. stderr: `"Merging #1, #2 into main
+   via merge...\n✓ Merged #1, #2 into main (<sha>)"`. Confirmed by
+   `git fetch` + `git log origin/main`: both commits genuinely landed on
+   `main` via a real merge commit, and `gh pr list --state merged` showed
+   both PRs merged. **The full init → add → submit → (draft-to-ready) →
+   merge round trip works end to end through the actual adapter code**,
+   not just the raw CLI.
+8. Cleanup: `gh repo delete --yes` — confirmed via a follow-up `gh repo
+   view` returning "Could not resolve to a Repository," and local scratch
+   directory removed.
+
+**Not exercised in this smoke run** (scope decision, not a blocker):
+`sync`, `rebase --mode continue/abort`, `unstack`, `checkout` against a
+PR-number/URL target. These were validated via `--help` text and the
+Phase 0 source read (§2–3 above) but not run against a live repo — deleting
+the throwaway repo achieved the same end state `unstack` would have,
+without an extra mutation round trip.
+
+## 9. Sources
 
 - `github/gh-stack` repository, cloned and inspected at
   `ab00aa4a3f2dddc51aa65849c68b391a1b079311` (`cmd/*.go`, `git log`,
