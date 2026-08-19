@@ -1,0 +1,58 @@
+plugins/yellow-core/commands/stack/select.md
+  s_fd5d688b6eb948::t_f9fd665a7fb134 210
+  s_fd5d688b6eb948::t_2825aeb862a48c 186-208
+  s_fd5d688b6eb948::t_07b2b97e7e11cc 259
+  s_fd5d688b6eb948::t_5cd657969126d3 209
+tests/integration/stack-provider-state.test.ts
+  s_fd5d688b6eb948::t_4f02d931fe91b9 20
+  s_fd5d688b6eb948::t_e81f4f144cb988 57,59-62,66-77,80-88,91-102,104-134,138-139,143-224
+  s_fd5d688b6eb948::t_193db3e82b9418 227
+  s_fd5d688b6eb948::t_ff7bd0dbdc0719 16-17,29-32
+  s_fd5d688b6eb948::t_4eedec73251b9c 140-142
+  s_fd5d688b6eb948::t_576df646c94dd6 314-357
+  s_fd5d688b6eb948::t_474b10e47d5df0 494-551
+  s_fd5d688b6eb948::t_8186f9397ebaf5 225-226
+plugins/yellow-core/commands/stack/status.md
+  s_fd5d688b6eb948::t_066624cf13133e 140,149,153-159
+  s_fd5d688b6eb948::t_aaae1396f8760e 3
+  s_fd5d688b6eb948::t_f76a6c0d8446eb 160
+plugins/yellow-core/skills/stack-provider-router/SKILL.md
+  s_fd5d688b6eb948::t_c0dca9e69d9e9e 136-137
+  s_fd5d688b6eb948::t_9ae5130a81af9a 14,19,28
+plugins/yellow-core/lib/stack-provider-state.js
+  s_fd5d688b6eb948::t_e6872e08fd14a4 935-939,952-953
+  s_fd5d688b6eb948::t_05ecc8d5ced89c 613
+  s_fd5d688b6eb948::t_55eda849f87675 128-136,138,141-142,144-156,158-163
+  s_fd5d688b6eb948::t_fcaa6f586d36cd 979,981-983
+  s_fd5d688b6eb948::t_b01734e753c5ca 423,431
+  s_fd5d688b6eb948::t_856acdfbef673c 410-418
+  s_fd5d688b6eb948::t_e5df1aed2c5522 99,104-118
+  s_fd5d688b6eb948::t_9b9b8b6027db00 596
+  s_fd5d688b6eb948::t_a0c513b58ce0d6 164-198,201-202,204-247,249-311
+  s_fd5d688b6eb948::t_5806f91ad80a23 199-200,203
+  s_fd5d688b6eb948::t_9590832d7ab551 625
+  s_fd5d688b6eb948::t_c7c9571fb440f1 463-465
+  s_fd5d688b6eb948::t_b411be4990e186 549-568
+  s_fd5d688b6eb948::t_e3fe8f4a1f97ae 43
+  s_fd5d688b6eb948::t_aa85361eba171f 119-120
+plugins/yellow-core/commands/setup/all.md
+  s_fd5d688b6eb948::t_5d9ee0651ad117 700-705
+plugins/yellow-core/CLAUDE.md
+  s_fd5d688b6eb948::t_24139458f227d0 138-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7d6e71c468e3efb24c7d33142bf138c785827c3e",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
