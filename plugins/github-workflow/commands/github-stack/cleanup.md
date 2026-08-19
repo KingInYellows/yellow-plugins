@@ -1,6 +1,6 @@
 ---
 name: github-stack:cleanup
-description: 'Remove stack tracking via gh stack unstack, optionally deleting local branches. Use when user says "clean up my stack" or "untrack this stack" on the github stacked-PR provider.'
+description: 'Remove local stack tracking, and by default also remote-unstack every PR via the GitHub API (--local skips the remote call). Use when user says "clean up my stack" or "untrack this stack" on the github stacked-PR provider.'
 argument-hint: '[--local]'
 allowed-tools:
   - Bash
@@ -10,8 +10,10 @@ allowed-tools:
 
 # github-workflow Cleanup
 
-Remove stack tracking via `gh stack unstack`, and optionally delete the
-local branches. Always destructive — requires confirmation.
+Remove local stack tracking via `gh stack unstack`. By default this ALSO
+remote-unstacks every PR in the stack via the GitHub API — pass `--local`
+to skip that and only remove local tracking. Neither form deletes local
+git branches. Always destructive — requires confirmation.
 
 ## Usage
 

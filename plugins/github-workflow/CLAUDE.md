@@ -67,9 +67,11 @@ the provider model:
 - `github-stack-nav` — check out a stack target via the runtime adapter's
   `checkout` operation; resolves an omitted target via `view` +
   `AskUserQuestion` rather than letting the underlying CLI pick.
-- `github-stack-cleanup` — remove stack tracking (and optionally local
-  branches) via the runtime adapter's `unstack` operation, always behind
-  an `AskUserQuestion` confirmation.
+- `github-stack-cleanup` — remove local stack tracking via the runtime
+  adapter's `unstack` operation; by default ALSO remote-unstacks every PR
+  via the GitHub API (`--local` skips that and stays local-only). Never
+  deletes local git branches, either form. Always behind an
+  `AskUserQuestion` confirmation that states which of the two happens.
 - `github-stack-merge` — merge a stacked PR via the runtime adapter's
   `merge` operation (Preview → Confirm → Merge → Report), always behind
   an `AskUserQuestion` confirmation; never calls `gh pr merge`.

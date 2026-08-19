@@ -313,6 +313,23 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
   });
 
+  it('accepts a github.com PR URL as target', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', 'https://github.com/o/r/pull/42', '--yes'] });
+  });
+
+  it('refuses a flag-shaped target instead of letting it reach argv (argv-smuggling guard)', () => {
+    const result = merge({ target: '--squash', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+  });
+
+  it('refuses a bare branch name as target — gh stack merge does not accept one', () => {
+    const result = merge({ target: 'my-feature-branch', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+  });
+
   it('validates mergeMethod against the fixed enum', () => {
     const result = merge({ target: '42', confirm: true, mergeMethod: 'octopus' });
     expect(result.status).toBe('INVALID_ARGS');
@@ -328,6 +345,19 @@ describe('unstack — destructive, always requires confirm: true', () => {
   it('refuses without confirmation', () => {
     const result = unstack({});
     expect(result.status).toBe('REQUIRES_CONFIRMATION');
+  });
+
+  it('refusal message for the default (no --local) call names the remote GitHub API unstack', () => {
+    const result = unstack({});
+    expect(result.safeSummary).toContain('remote-unstacks every PR');
+    expect(result.safeSummary).toContain('GitHub API');
+    expect(result.safeSummary).toContain('no branch deletion');
+  });
+
+  it('refusal message for --local names the local-only scope', () => {
+    const result = unstack({ local: true });
+    expect(result.safeSummary).toContain('local stack tracking only');
+    expect(result.safeSummary).toContain('no remote call');
   });
 
   it('runs once confirmed', () => {

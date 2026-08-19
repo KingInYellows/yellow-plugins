@@ -66,7 +66,7 @@ ambiguous state is reported, never silently resolved.
 | `/github-stack:amend` | Amends the current branch's commit and re-submits. |
 | `/github-stack:sync` | Syncs the local stack with trunk; pruning merged branches requires confirmation. |
 | `/github-stack:nav` | Checks out a stack target (branch, PR number, PR URL, or stack number); prompts if none given. |
-| `/github-stack:cleanup` | Removes stack tracking (optionally local branches), always behind confirmation. |
+| `/github-stack:cleanup` | Removes local stack tracking; by default also remote-unstacks every PR via the GitHub API (`--local` skips that). Never deletes local branches. Always behind confirmation. |
 | `/github-stack:merge` | Merges a stacked PR via `gh stack merge` (never `gh pr merge`), always behind confirmation. |
 
 Each is a thin wrapper over a same-named skill, matching the

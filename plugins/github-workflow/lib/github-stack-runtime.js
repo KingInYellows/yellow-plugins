@@ -3,7 +3,9 @@
 /**
  * github-stack-runtime.js — the single dependency-free runtime that every
  * github-workflow skill uses for deterministic `gh`, `gh stack`, and
- * required `git` execution (GOAL.md Phase 3).
+ * required `git` execution (GOAL.md Phase 3). GOAL.md is archived at
+ * plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md —
+ * "GOAL.md" citations throughout this file refer to that document.
  *
  * HARD RULES this module encodes:
  *   - Every external command runs via `spawnSync(bin, argv, { shell: false })`
@@ -456,6 +458,18 @@ function merge({ target, mergeMethod, confirm }) {
   if (typeof target !== 'string' || target.length === 0) {
     return refusalResult('merge', 'target must be an explicit PR number, PR URL, or stack number');
   }
+  // `gh stack merge` only accepts `[<stack-number> | <pr-number>]` (its
+  // own usage line) — no bare branch name, unlike `checkout`. Enforce the
+  // same argv-shape discipline every other validated field in this module
+  // gets (see the HARD RULE at the top of this file): a flag-shaped
+  // target (e.g. `--squash`) must never reach argv unvalidated, since
+  // cobra parses flags in any position and would silently redirect the
+  // merge to the current branch's PR context instead of refusing.
+  const looksLikeNumber = /^[1-9][0-9]*$/.test(target);
+  const looksLikeUrl = /^https:\/\/github\.com\//.test(target);
+  if (!looksLikeNumber && !looksLikeUrl) {
+    return refusalResult('merge', `target "${target}" is neither a positive integer (PR/stack number) nor a github.com URL`);
+  }
   if (confirm !== true) {
     return confirmationRequiredResult('merge', `merge target "${target}" lands code and cannot be undone by this runtime`);
   }
@@ -469,10 +483,25 @@ function merge({ target, mergeMethod, confirm }) {
   return shapeResult({ op: 'merge', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
-/** `gh stack unstack [--local]`. Always destructive; always requires confirm: true. */
+/**
+ * `gh stack unstack [--local]`. Verified against `cmd/unstack.go` at the
+ * pinned SHA: the DEFAULT (no `--local`) call removes local stack
+ * tracking AND remote-unstacks every PR in the stack via the GitHub API —
+ * `--local` is the SAFE-RESTRICTING flag that skips the remote call and
+ * only removes local tracking. Neither variant deletes local git branches
+ * (upstream's `--local` help text is literally "Only delete the stack
+ * locally," meaning the STACK — its tracking metadata — not the branches).
+ * Always destructive (the remote unstack cannot be undone by this
+ * runtime); always requires confirm: true regardless of `local`.
+ */
 function unstack({ local, confirm }) {
   if (confirm !== true) {
-    return confirmationRequiredResult('unstack', 'unstack removes stack tracking (and, with --local, local branches) and cannot be undone by this runtime');
+    return confirmationRequiredResult(
+      'unstack',
+      local
+        ? 'unstack --local removes local stack tracking only (no remote call, no branch deletion) and cannot be undone by this runtime'
+        : 'unstack removes local stack tracking AND remote-unstacks every PR in the stack via the GitHub API (no branch deletion) and cannot be undone by this runtime'
+    );
   }
   const args = ['stack', 'unstack'];
   if (local) args.push('--local');
