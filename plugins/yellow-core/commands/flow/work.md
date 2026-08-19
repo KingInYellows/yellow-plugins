@@ -258,17 +258,30 @@ in order from bottom (item 1) to top:
      captures the new name; only the literal `Other` label opens free-text
      input.
 
-   **GitHub:**
-   - **Linear topology:** If resuming, first
+   **GitHub:** `gh stack add` extends an EXISTING stack tracked on the
+   checked-out branch — it is not interchangeable with `init`. Use `init`
+   for the first branch of every independent stack (this is what the
+   registry's `initFirstLayer.github` vs `addLayer.github` split exists
+   for; matches `plan:complete`'s Phase 6, which documents the same
+   distinction), `add` only when continuing a stack an `init` already
+   started in this run:
+   - **Linear topology, this is the first item created in this run** (no
+     completed items yet — the "Fresh start" case from Phase 1 step 5, not
+     "Resume"): checkout `<trunk>` (from `<!-- stack-trunk: -->`
+     metadata), then
+     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" init --base <trunk> --branch "<branch-name>"`.
+   - **Linear topology, resuming or continuing a later item:** first
      `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" checkout --target <last-completed-branch>`,
      then
      `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" add --branch "<branch-name>" --message "<item description>"`
      (stacks on top of the checked-out branch). After checkout, verify with
      `git branch --show-current` that the expected branch is active.
-   - **Parallel topology:** First checkout `<trunk>` (from
-     `<!-- stack-trunk: -->` metadata) the same way, then run the same
-     `add` call. After checkout, verify with `git branch --show-current`
-     that trunk is active.
+   - **Parallel topology (every item):** each parallel item starts its OWN
+     independent stack from trunk — it never continues a previous item's
+     stack, so `add` is never correct here even for item 2+. First checkout
+     `<trunk>` the same way, then
+     `init --base <trunk> --branch "<branch-name>"`. After checkout, verify
+     with `git branch --show-current` that trunk is active.
 
    If the adapter's `status` is not `SUCCESS` (name collision, API failure):
    - Stop immediately
