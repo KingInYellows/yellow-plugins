@@ -4,15 +4,13 @@
 # Receives hook input as JSON on stdin. Must complete within 3 seconds.
 # Uses ruvector's built-in CLI hooks — no manual queue management needed.
 set -uo pipefail
-# Note: -e omitted intentionally — hook must output {"continue": true} on all paths
+# Note: -e omitted intentionally — hook must output allow JSON on all paths
 
-# --- json_exit: centralized exit for all early-return paths ---
-json_exit() {
-  local msg="${1:-}"
-  [ -n "$msg" ] && printf '[ruvector] %s\n' "$msg" >&2
-  printf '{"continue": true}\n'
-  exit 0
-}
+_HOOK_JSON="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/hook-json.sh"
+# shellcheck source=lib/hook-json.sh
+# Decision payload via json_exit: {"continue": true, "permission": "allow"}
+. "$_HOOK_JSON"
+unset _HOOK_JSON
 
 # Require jq for JSON parsing
 command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping session-start"
@@ -171,7 +169,7 @@ fi
 
 # Return learnings as systemMessage if available
 if [ -n "$learnings" ]; then
-  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true}'
+  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true, permission: "allow"}'
 else
-  printf '{"continue": true}\n'
+  json_exit
 fi

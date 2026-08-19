@@ -39,28 +39,28 @@ run_hook_failing_ruvector() {
   input='{"tool_name":"Edit","tool_input":{"file_path":"src-file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for Write tool" {
   input='{"tool_name":"Write","tool_input":{"file_path":"output.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for Bash tool with exit code 0" {
   input='{"tool_name":"Bash","tool_input":{"command":"echo hello"},"tool_result":{"exit_code":0}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for Bash tool with non-zero exit code" {
   input='{"tool_name":"Bash","tool_input":{"command":"false"},"tool_result":{"exit_code":1}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "exits silently when .ruvector does not exist" {
@@ -68,35 +68,35 @@ run_hook_failing_ruvector() {
   input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "ignores unknown tool names" {
   input='{"tool_name":"Read","tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles non-numeric exit_code gracefully" {
   input='{"tool_name":"Bash","tool_input":{"command":"test"},"tool_result":{"exit_code":"abc"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles missing tool_name gracefully" {
   input='{"tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true when ruvector CLI fails" {
   input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
   run --separate-stderr run_hook_failing_ruvector "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "skips silently when binary absent even if npx present (no npx fallback)" {
@@ -110,7 +110,7 @@ run_hook_failing_ruvector() {
   run bash -c 'printf "%s" "$1" | PATH="$2:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$3" bash "$4"' \
     _ "$input" "$NPX_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -f "$MARKER" ]
   rm -rf "$NPX_BIN"
 }

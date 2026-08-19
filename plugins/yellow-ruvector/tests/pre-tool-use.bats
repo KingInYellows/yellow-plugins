@@ -3,7 +3,7 @@
 bats_require_minimum_version 1.5.0
 # The hook delegates to ruvector CLI (hooks pre-edit / pre-command).
 # In tests, ruvector is mocked, so we assert on exit code
-# and continue:true output — not on ruvector side-effects.
+# and dual-client allow JSON (continue + permission) — not on ruvector side-effects.
 
 setup() {
   PROJECT_ROOT="$(mktemp -d)"
@@ -35,21 +35,21 @@ run_hook_no_ruvector() {
   input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for Write tool with valid file_path" {
   input='{"tool_name":"Write","tool_input":{"file_path":"out.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for Bash tool with command" {
   input='{"tool_name":"Bash","tool_input":{"command":"echo hello"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 # --- Early exit: .ruvector directory missing ---
@@ -59,7 +59,7 @@ run_hook_no_ruvector() {
   input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 # --- Early exit: ruvector binary not found ---
@@ -68,7 +68,7 @@ run_hook_no_ruvector() {
   input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
   run run_hook_no_ruvector "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 # --- Tool dispatch: MultiEdit iterates edits array ---
@@ -77,14 +77,14 @@ run_hook_no_ruvector() {
   input='{"tool_name":"MultiEdit","tool_input":{"edits":[{"file_path":"a.txt"},{"file_path":"b.txt"}]}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true for unknown tool name" {
   input='{"tool_name":"Read","tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 # --- Graceful handling of bad input ---
@@ -93,19 +93,19 @@ run_hook_no_ruvector() {
   input='{"tool_input":{"file_path":"file.txt"}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles completely empty input gracefully" {
   run --separate-stderr run_hook ""
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles malformed JSON input gracefully" {
   run --separate-stderr run_hook "not-json{{"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 # --- Ruvector stdout isolation ---
@@ -123,5 +123,5 @@ run_hook_no_ruvector() {
   [ "$status" -eq 0 ]
   # Output must be only the JSON line — no "LEAKED"
   [ "$(echo "$output" | wc -l)" -eq 1 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }

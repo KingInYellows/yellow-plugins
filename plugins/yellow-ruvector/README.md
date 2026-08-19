@@ -83,6 +83,12 @@ external services or API keys required.
 | Empty search results | Run `/ruvector:index` first                              |
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |
 | Queue growing large  | Check `/ruvector:status`, queue flushes on session start |
+| Cursor blocks Shell / edits | Re-run `/ruvector:setup`, then start a new Cursor session |
+
+`ruvector hooks init` writes empty-stdout PreToolUse commands into
+`~/.claude/settings.json`. Cursor treats that as invalid JSON and blocks
+Shell and file edits. `/ruvector:setup` wraps those commands with dual-client
+allow JSON. Do not re-run `ruvector hooks init` afterward.
 
 ## License
 

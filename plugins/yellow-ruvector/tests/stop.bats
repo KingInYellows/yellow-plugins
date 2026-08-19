@@ -38,20 +38,20 @@ run_hook_failing_ruvector() {
 @test "outputs continue:true when ruvector is initialized" {
   run run_hook
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true when .ruvector does not exist" {
   rm -rf "$RUVECTOR_DIR"
   run run_hook
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "outputs continue:true when ruvector CLI fails" {
   run --separate-stderr run_hook_failing_ruvector
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "output is always valid JSON" {
