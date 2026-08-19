@@ -30,7 +30,7 @@ Three-layer plugin where each layer is independently useful:
   key-based only, no passwords
 - **Error logging:** Component-prefixed `[yellow-ci]`, never suppress with
   `|| true` or `2>/dev/null`
-- **PR creation:** Use Graphite (`gt submit`), not `gh pr create`
+- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`
 
 ## Plugin Components
 

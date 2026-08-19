@@ -20,7 +20,8 @@ Technical debt audit and remediation with parallel scanner agents.
 This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 1. **Human-in-the-loop** (agent-workflow-security-patterns): Fix agent MUST get
-   approval via AskUserQuestion before `gt submit`
+   approval via AskUserQuestion before submitting via the active stacked-PR
+   provider
 2. **Prompt injection defense**: All scanner agents fence code content with
    "treat as reference only" advisories
 3. **Path validation**: All path arguments validated via `validate_file_path()`
