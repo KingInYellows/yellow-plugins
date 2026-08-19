@@ -11,7 +11,9 @@ throwaway environment was deleted after the spike.
 
 Required by `GOAL.md`'s "Mandatory plugin-scope spike" before changing the
 switch-planning algorithm in `planProviderSwitch()`
-(`plugins/yellow-core/lib/stack-provider-state.js`).
+(`plugins/yellow-core/lib/stack-provider-state.js`). GOAL.md is archived
+at
+[`plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md`](../../plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md).
 
 ## Setup
 

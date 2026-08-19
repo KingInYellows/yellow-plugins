@@ -17,7 +17,8 @@ re-verification where nothing could plausibly have changed in one day
 (`plans/stacked-pr-provider-abstraction.md` deferred-work item 1) needed to
 build the GitHub runtime adapter — Phase 3 of
 [`plans/stacked-pr-provider-abstraction.md`](../../plans/stacked-pr-provider-abstraction.md)'s
-deferred-work list, tracked in this task's `GOAL.md`.
+deferred-work list, tracked in this task's `GOAL.md` — archived at
+[`plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md`](../../plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md).
 
 Following
 [`docs/solutions/code-quality/upstream-concept-fork-snapshot-protocol.md`](../solutions/code-quality/upstream-concept-fork-snapshot-protocol.md):

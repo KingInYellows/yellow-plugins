@@ -3,7 +3,9 @@
 /**
  * stack-operation-registry.js — the fixed provider-operation contract owned
  * by yellow-core (GOAL.md Phase 2 / plans/stacked-pr-provider-abstraction.md
- * deferred-work item 1).
+ * deferred-work item 1). GOAL.md is archived at
+ * plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md —
+ * "GOAL.md Phase N" citations throughout this file refer to that document.
  *
  * Maps each of the nine neutral `/stack:*` operations, plus the lower-level
  * primitives `flow:work` needs for stack-aware execution, to exactly one

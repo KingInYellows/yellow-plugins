@@ -5,7 +5,8 @@
  * The registry module itself is dependency-free (no fs/path); THIS file
  * owns the filesystem cross-check GOAL.md requires: "Every registry target
  * resolves to a real skill/command" and "Catalog and runtime provider
- * tables agree."
+ * tables agree." (GOAL.md is archived at
+ * plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md.)
  */
 
 import { existsSync, readFileSync } from 'fs';

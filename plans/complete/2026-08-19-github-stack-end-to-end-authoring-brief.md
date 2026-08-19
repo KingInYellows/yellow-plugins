@@ -1,3 +1,14 @@
+> **Archived 2026-08-19.** This was the session-scoped authoring brief for
+> PR #716 (`agent/feat/github-stack-end-to-end`), originally checked in at
+> the repo root as `GOAL.md`. Moved here post-implementation, per the
+> `plans/complete/` archival convention, so a durable task brief isn't
+> mistaken for standing project documentation. Its operating instructions
+> ("do not run ultrareview," "do not merge," baseline SHAs, "when this
+> task was authored") describe that session, not an ongoing policy. The
+> durable design source this brief implements is
+> [`plans/stacked-pr-provider-abstraction.md`](../stacked-pr-provider-abstraction.md).
+> Content below is otherwise unedited from the original.
+
 # Objective
 
 Work in `KingInYellows/yellow-plugins` and implement the complete GitHub-native stacked-PR provider as one coherent, end-to-end pull request.
