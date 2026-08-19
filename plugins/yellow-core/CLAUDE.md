@@ -135,10 +135,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   The companion PR-diff-scoped validator `scripts/validate-plans.js`
   enforces the same no-stray-checkbox rule on archived files in CI
 - `/stack:status` — read-only classification of stacked-PR provider state
-  into one of seven states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
-  `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, `PARTIAL_TOOLING`).
-  Reads `claude plugin list --json` plus the repository's optional
-  `.yellow-stack.yml` intent through `lib/stack-provider-state.js`
+  into one of eight states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
+  `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`, `MANAGED_CONFLICT`,
+  `PARTIAL_TOOLING`). Reads `claude plugin list --json` plus the
+  repository's optional `.yellow-stack.yml` intent through
+  `lib/stack-provider-state.js`
 - `/stack:select` — switch the active stacked-PR provider (`graphite` /
   `github`) at `user`, `project`, or `local` scope. Shows the exact
   `claude plugin install|enable|disable` commands before running any of

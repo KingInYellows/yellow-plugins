@@ -11,12 +11,12 @@ active right now, and is it safe to act on that answer?**
 
 It resolves the answer from `plugins/yellow-core/lib/stack-provider-state.js`,
 which classifies `claude plugin list --json` plus the repository's
-`.yellow-stack.yml` intent into exactly one of seven states. The router
+`.yellow-stack.yml` intent into exactly one of eight states. The router
 never re-derives a state from tooling presence, branch shape, or the
 existence of a `.graphite.yml` — those are downstream symptoms, not the
 provider decision.
 
-Only two states route. The other five stop.
+Only two states route. The other six stop.
 
 | State | Router behaviour |
 | --- | --- |
@@ -25,6 +25,7 @@ Only two states route. The other five stop.
 | `PARTIAL_TOOLING` | STOP — provider chosen, its CLI missing |
 | `UNSELECTED` | STOP — no provider chosen |
 | `CONFIG_MISMATCH` | STOP — runtime disagrees with `.yellow-stack.yml` |
+| `CONFIG_INVALID` | STOP — `.yellow-stack.yml` exists but could not be parsed |
 | `CONFLICT` | STOP — both providers enabled |
 | `MANAGED_CONFLICT` | STOP — administrator-controlled, unfixable locally |
 
@@ -132,6 +133,8 @@ Then give the one relevant next step:
 
 - `UNSELECTED` → `/stack:select graphite` or `/stack:select github`
 - `CONFIG_MISMATCH` → `/stack:status` for the mismatch, then `/stack:select`
+- `CONFIG_INVALID` → fix or remove `.yellow-stack.yml` by hand; do not offer
+  to overwrite it automatically
 - `CONFLICT` → `/stack:select <provider>` to disable the other
 - `MANAGED_CONFLICT` → contact whoever controls managed settings; nothing
   local can fix it
