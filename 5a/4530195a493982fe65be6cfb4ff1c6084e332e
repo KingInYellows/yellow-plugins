@@ -1,0 +1,21 @@
+plugins/github-workflow/tests/hooks.bats
+  s_fd5d688b6eb948::t_76d581034fb200 25,33,38,43,51-56
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_fd5d688b6eb948::t_277f0cbf6850d9 31,35-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5a4530195a493982fe65be6cfb4ff1c6084e332e",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
