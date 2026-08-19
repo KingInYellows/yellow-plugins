@@ -141,6 +141,22 @@ EOF
   [ "$(cat "$WORK/settings.json")" = '{}' ]
 }
 
+# GNU stat first, BSD/macOS stat second.
+file_mode() {
+  stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"
+}
+
+@test "preserves the settings file mode across the rewrite" {
+  write_settings
+  chmod 644 "$SETTINGS"
+
+  run bash "$SCRIPT" "$SETTINGS"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Wrapped 1 PreToolUse command"* ]]
+
+  [ "$(file_mode "$SETTINGS")" = "644" ]
+}
+
 @test "repairs through a symlink without replacing the link" {
   mkdir -p "$WORK/dotfiles"
   write_settings "$WORK/dotfiles/settings.json"

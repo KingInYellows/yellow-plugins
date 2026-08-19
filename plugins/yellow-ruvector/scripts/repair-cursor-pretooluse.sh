@@ -188,7 +188,13 @@ for settings_path in "${PATHS[@]}"; do
   backup="${target_path}.bak-ruvector-cursor"
   cp -p -- "$target_path" "$backup"
 
+  # Seed the temp file from the target before writing: mktemp creates it
+  # 0600, and `mv` would install that over an ordinary 0644 / shared 0664
+  # settings.json, making it unreadable to other users. `cp -p` copies the
+  # mode and ownership; the `>` redirect then replaces the contents without
+  # touching the mode.
   tmp="$(mktemp "${target_path}.XXXXXX")"
+  cp -p -- "$target_path" "$tmp"
   wrap_file "$target_path" > "$tmp"
   mv -- "$tmp" "$target_path"
 
