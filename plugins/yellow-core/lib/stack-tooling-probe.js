@@ -75,8 +75,16 @@ function run(cmd, args) {
     windowsHide: true,
   });
   if (result.error || typeof result.status !== 'number') {
+    // `ok: false` alone cannot distinguish "the binary is not installed"
+    // from "it exists but could not be run" (EACCES, ETIMEDOUT, EPERM).
+    // Callers below MUST branch on `absent` rather than assuming absence,
+    // or a permission/timeout failure gets reported to the user as "not
+    // found on PATH" and sends them to reinstall something already present.
+    const code = result.error && result.error.code ? String(result.error.code) : '';
     return {
       ok: false,
+      absent: code === 'ENOENT',
+      failureCode: code || null,
       code: null,
       stdout: '',
       stderr: result.error ? String(result.error.message || result.error) : '',
@@ -96,6 +104,16 @@ function run(cmd, args) {
 function probeGraphite() {
   const version = run('gt', ['--version']);
   if (!version.ok) {
+    // Only ENOENT proves absence. A permission or timeout failure means the
+    // probe could not establish anything — report UNKNOWN so the classifier
+    // does not send the user to reinstall a tool that is already there.
+    if (!version.absent) {
+      return {
+        readiness: READINESS.UNKNOWN,
+        detail: `\`gt --version\` could not be run (${version.failureCode || 'spawn failure'}) — readiness could not be confirmed.`,
+        checks: { present: null },
+      };
+    }
     return {
       readiness: READINESS.NOT_READY,
       detail: '`gt` was not found on PATH.',
@@ -158,6 +176,14 @@ function parseExtensionIdentity(listOutput) {
 function probeGithub() {
   const version = run('gh', ['--version']);
   if (!version.ok) {
+    // Same ENOENT-vs-everything-else distinction as probeGraphite above.
+    if (!version.absent) {
+      return {
+        readiness: READINESS.UNKNOWN,
+        detail: `\`gh --version\` could not be run (${version.failureCode || 'spawn failure'}) — readiness could not be confirmed.`,
+        checks: { present: null, authValid: null, extensionIdentity: 'unavailable' },
+      };
+    }
     return {
       readiness: READINESS.NOT_READY,
       detail: '`gh` was not found on PATH.',

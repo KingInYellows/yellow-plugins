@@ -335,12 +335,19 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
   } else {
     status = EXIT_STATUS[execResult.code] || 'UNKNOWN_ERROR';
   }
+  // Arguments are redacted too, not just subprocess output. A validated
+  // argument can still CARRY credential material — a commit message that
+  // quotes a token (`add --message "...ghp_..."`), or a remote/URL value —
+  // and `command.args` + `safeSummary` are serialized into model context
+  // verbatim by every caller. Redacting only stdout/stderr would leave the
+  // documented guarantee half-true.
+  const safeArgs = args.map(redact);
   return {
     operation: op,
-    command: { bin, args },
+    command: { bin, args: safeArgs },
     exitCode: execResult.ok ? execResult.code : null,
     status,
-    safeSummary: `${bin} ${args.join(' ')} -> ${status}`,
+    safeSummary: `${bin} ${safeArgs.join(' ')} -> ${status}`,
     stdout: stdout.text,
     stdoutTruncated: stdout.truncated,
     stdoutTotalChars: stdout.totalChars,
@@ -352,7 +359,10 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
   };
 }
 
-function refusalResult(op, reason) {
+function refusalResult(op, rawReason) {
+  // Refusal reasons interpolate the rejected value verbatim, so they carry
+  // the same credential-leak risk as command.args (see shapeResult).
+  const reason = redact(rawReason);
   return {
     operation: op,
     command: null,
@@ -371,7 +381,9 @@ function refusalResult(op, reason) {
   };
 }
 
-function confirmationRequiredResult(op, detail) {
+function confirmationRequiredResult(op, rawDetail) {
+  // Same reasoning as refusalResult: the detail string quotes caller values.
+  const detail = redact(rawDetail);
   return {
     operation: op,
     command: null,

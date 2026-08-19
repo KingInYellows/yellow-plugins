@@ -17,8 +17,30 @@
  * Pure — no I/O, no console.*, no timestamps.
  */
 
-// Identical to gt-workflow's GIT_PUSH_RE: (^|[;&()|$`]|[[:space:]])git[[:space:]]+push
-const GIT_PUSH_RE = /(^|[;&()|$`]|\s)git\s+push/m;
+// gt-workflow's regex is `(^|[;&()|$`]|\s)git\s+push`, which only catches the
+// bare `git push` form. Two ordinary Git invocations slip past it:
+//
+//   /usr/bin/git push          — the char before `git` is `/`, not a listed
+//                                separator, so the leading alternation fails
+//   git -C repo push           — global options sit between `git` and `push`,
+//   git --git-dir=... push       so `git\s+push` never matches
+//
+// Both are normal usage, not exotic evasion, so the advertised
+// "provider-only submission path" was not actually enforced. This version
+// allows an optional absolute/relative path prefix on the binary and any run
+// of global options (`-C <dir>`, `--git-dir=...`, `-c k=v`, …) before the
+// subcommand. Kept deliberately broad: over-blocking a `git push` variant is
+// a recoverable annoyance, under-blocking silently defeats the hook.
+const GIT_PUSH_RE = new RegExp(
+  [
+    '(^|[;&()|$`]|\\s)', // command start or shell separator
+    '(?:[\\w./\\\\-]*/)?', // optional path prefix: /usr/bin/, ./bin/, ../
+    'git(?:\\.exe)?', // the binary (Windows-friendly)
+    '(?:\\s+(?:-[^\\s]+|--[^\\s]+(?:=[^\\s]+)?|-C\\s+[^\\s]+|-c\\s+[^\\s]+))*', // global options
+    '\\s+push', // the subcommand
+  ].join(''),
+  'm'
+);
 
 const BLOCK_MESSAGE = [
   '⛔  Raw `git push` is not allowed in this repo.',

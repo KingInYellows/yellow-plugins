@@ -39,6 +39,36 @@ run_entrypoint() {
   [ "$status" -eq 2 ]
 }
 
+@test "check-git-push: absolute-path git is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"/usr/bin/git push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: relative-path git is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"./bin/git push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: git with -C global option is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git -C repo push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: git with --git-dir global option is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/x/.git push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: git with -c config override is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git -c user.name=x push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: an unrelated command containing the word push is allowed" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"grep push file.txt"}}'
+  [ "$status" -eq 0 ]
+}
+
 @test "check-git-push: non-push git commands are allowed" {
   run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git status"}}'
   [ "$status" -eq 0 ]

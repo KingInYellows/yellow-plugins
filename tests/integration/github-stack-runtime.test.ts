@@ -430,6 +430,26 @@ describe('credential redaction — subprocess output never carries secrets into 
     expect(result.stderr).not.toContain(secret);
   });
 
+  it('redacts credentials carried in ARGUMENTS, not just subprocess output', () => {
+    // A validated argument can still carry credential material — e.g. a
+    // commit message quoting a token. command.args and safeSummary are
+    // serialized into model context verbatim, so redacting only
+    // stdout/stderr would leave the guarantee half-true.
+    const secret = fakeToken('ghp_', 'E');
+    process.env.FAKE_GH_EXIT = '0';
+    const result = add({ branch: 'feat/x', message: `paste accident ${secret}` });
+    expect(JSON.stringify(result.command)).not.toContain(secret);
+    expect(result.safeSummary).not.toContain(secret);
+    expect(JSON.stringify(result.command)).toContain('[REDACTED:github-token]');
+  });
+
+  it('redacts credentials echoed back in a refusal reason', () => {
+    const secret = fakeToken('ghp_', 'F');
+    const result = merge({ target: secret, confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(JSON.stringify(result)).not.toContain(secret);
+  });
+
   it('redacts BEFORE truncation, so a secret cannot survive past the output cap', () => {
     const secret = fakeToken('ghp_', 'D');
     const padded = `${'x'.repeat(9000)}${secret}`;

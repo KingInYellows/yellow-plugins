@@ -8,7 +8,7 @@
  */
 
 import { execFileSync } from 'child_process';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -80,6 +80,26 @@ describe('probeGraphite', () => {
     const result = probeGraphite();
     expect(result.readiness).toBe(READINESS.NOT_READY);
     expect(result.checks.present).toBe(false);
+  });
+
+  it('reports unknown (not not-ready) when gt exists but cannot be executed', () => {
+    // EACCES, not ENOENT: the binary is present but unrunnable. Reporting
+    // "not found on PATH" here would send the user to reinstall a tool that
+    // is already installed. Only ENOENT proves absence.
+    const blockedBin = mkdtempSync(join(tmpdir(), 'stack-tooling-probe-eacces-'));
+    const gtPath = join(blockedBin, 'gt');
+    writeFileSync(gtPath, '#!/usr/bin/env bash\nexit 0\n');
+    chmodSync(gtPath, 0o644); // readable, NOT executable
+    process.env.PATH = blockedBin;
+    try {
+      const result = probeGraphite();
+      expect(result.readiness).toBe(READINESS.UNKNOWN);
+      expect(result.checks.present).toBeNull();
+      expect(result.detail).toContain('could not be run');
+      expect(result.detail).not.toContain('not found on PATH');
+    } finally {
+      rmSync(blockedBin, { recursive: true, force: true });
+    }
   });
 
   it('reports unknown when gt --version exits non-zero', () => {
