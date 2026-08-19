@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Fake `git` for github-stack-runtime.js tests. Only implements the three
+# subcommands the runtime calls (check-ref-format, remote, config
+# remote.pushDefault); behavior for remote/config is env-var controlled so
+# tests never depend on this repository's real remotes.
+if [ "$1" = "check-ref-format" ] && [ "$2" = "--branch" ]; then
+  name="$3"
+  if [ -z "$name" ] || [[ "$name" == -* ]] || [[ "$name" == *..* ]] || \
+     [[ "$name" == *" "* ]] || [[ "$name" == /* ]] || [[ "$name" == */ ]] || \
+     [[ "$name" == *~* ]] || [[ "$name" == *^* ]] || [[ "$name" == *:* ]] || \
+     [[ "$name" == *"?"* ]] || [[ "$name" == *"*"* ]] || [[ "$name" == *"["* ]]; then
+    echo "fatal: '$name' is not a valid branch name" >&2
+    exit 128
+  fi
+  echo "$name"
+  exit 0
+fi
+if [ "$1" = "remote" ] && [ -z "${2:-}" ]; then
+  if [ -n "${FAKE_GIT_REMOTES:-}" ]; then
+    printf '%b' "$FAKE_GIT_REMOTES"
+  fi
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "remote.pushDefault" ]; then
+  if [ -n "${FAKE_GIT_PUSH_DEFAULT:-}" ]; then
+    printf '%s\n' "$FAKE_GIT_PUSH_DEFAULT"
+    exit 0
+  fi
+  exit 1
+fi
+echo "unrecognized fake git invocation: $*" >&2
+exit 5

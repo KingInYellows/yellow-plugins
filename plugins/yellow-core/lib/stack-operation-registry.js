@@ -117,9 +117,17 @@ const PRIMITIVES = Object.freeze({
     graphite: cli('gt', ['checkout']),
     github: adapter('checkout'),
   }),
+  // No gh-stack-specific "commit"/"amend" primitive exists in the verified
+  // command surface (docs/research/2026-08-18-github-stack-provider-
+  // operations-revalidation.md §3) — `gt modify -m` is gt-specific (it
+  // also updates Graphite's own stack tracking), but the GitHub side is
+  // plain `git commit` (`--amend` for the layer that owns the change);
+  // gh-stack itself only tracks branch/PR relationships, not commit
+  // content. `shared` here means "no stacked-PR-specific tool", not "the
+  // exact same command as graphite".
   commitOrAmend: Object.freeze({
     graphite: cli('gt', ['modify', '-m']),
-    github: adapter('commit'),
+    github: shared('git commit -m <message> (--amend for the layer that owns the change); no gh-stack-specific commit primitive exists.'),
   }),
   submitStack: Object.freeze({
     graphite: cli('gt', ['submit', '--no-interactive']),
