@@ -244,6 +244,31 @@ file_mode() {
   [ ! -e "$WORK/foreign/settings.json.bak-ruvector-cursor" ]
 }
 
+@test "refuses a .claude directory symlink when HOME is the project root" {
+  mkdir -p "$WORK/home" "$WORK/foreign"
+  write_settings "$WORK/foreign/settings.json"
+  before=$(cat "$WORK/foreign/settings.json")
+  rm -rf "$WORK/.claude"
+  ln -s "$WORK/foreign" "$WORK/.claude"
+
+  run env HOME="$WORK" CLAUDE_PROJECT_DIR="$WORK" bash "$SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"resolves outside the project"* ]]
+  [ "$(cat "$WORK/foreign/settings.json")" = "$before" ]
+  [ ! -e "$WORK/foreign/settings.json.bak-ruvector-cursor" ]
+}
+
+@test "exits 1 with a clear error when node is missing" {
+  mkdir -p "$WORK/bin"
+  ln -s "$(command -v jq)" "$WORK/bin/jq"
+  write_settings
+
+  run env PATH="$WORK/bin" HOME="$WORK/home" CLAUDE_PROJECT_DIR="$WORK" \
+    "$(command -v bash)" "$SCRIPT" "$SETTINGS"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"node is required"* ]]
+}
+
 @test "exits 0 when no settings files exist and no paths were given" {
   run env -u CLAUDE_PROJECT_DIR HOME="$WORK" bash -c 'cd "$HOME" && bash "$1"' _ "$SCRIPT"
   [ "$status" -eq 0 ]

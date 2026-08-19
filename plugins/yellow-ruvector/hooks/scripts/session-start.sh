@@ -169,7 +169,8 @@ fi
 
 # Return learnings as systemMessage if available
 if [ -n "$learnings" ]; then
-  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true, permission: "allow"}'
+  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true, permission: "allow"}' \
+    || json_exit
 else
   json_exit
 fi

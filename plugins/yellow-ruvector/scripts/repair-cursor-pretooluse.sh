@@ -25,8 +25,8 @@
 # Only PreToolUse commands matching the init-generated shape
 # (`ruvector[@version] hooks pre-*` ending in `2>/dev/null [|| true]`)
 # are wrapped. Hooks that already print a decision, git-ai, plugin hook
-# scripts, and PostToolUse / SessionStart / Stop entries are left
-# untouched. Re-running is a no-op.
+# scripts, and PostToolUse / SessionStart / Stop command values are left
+# unchanged (jq still re-serializes the document). Re-running is a no-op.
 
 set -euo pipefail
 
@@ -59,9 +59,11 @@ done
 # argument must match one of these exactly, so a caller-supplied path can
 # never select an arbitrary writable settings.json.
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
+USER_SETTINGS="${HOME}/.claude/settings.json"
+PROJECT_SETTINGS="${PROJECT_DIR}/.claude/settings.json"
 ALLOWED=(
-  "${HOME}/.claude/settings.json"
-  "${PROJECT_DIR}/.claude/settings.json"
+  "$USER_SETTINGS"
+  "$PROJECT_SETTINGS"
 )
 
 PATHS=()
@@ -90,6 +92,12 @@ else
   done
 fi
 
+# HOME may be the workspace, in which case both allowlist entries are the
+# same string. Repair once.
+if [ "${#PATHS[@]}" -eq 2 ] && [ "${PATHS[0]}" = "${PATHS[1]}" ]; then
+  PATHS=("${PATHS[0]}")
+fi
+
 if [ "${#PATHS[@]}" -eq 0 ]; then
   printf 'No settings.json found. Nothing to repair.\n'
   exit 0
@@ -97,6 +105,10 @@ fi
 
 command -v jq >/dev/null 2>&1 || {
   printf 'jq is required.\n' >&2
+  exit 1
+}
+command -v node >/dev/null 2>&1 || {
+  printf 'node is required.\n' >&2
   exit 1
 }
 
@@ -143,8 +155,9 @@ count_needs_wrap() {
   ' "$1"
 }
 
-# Wrap those commands in place. Other hook events and non-ruvector
-# commands (git-ai, plugin scripts) are preserved byte-for-byte.
+# Wrap those commands in place. Command values of non-matching hooks
+# (git-ai, plugin scripts, other events) are left unchanged; jq
+# re-serializes the document.
 wrap_file() {
   jq --arg suffix "$SUFFIX" "$NEEDS_WRAP_DEF"'
     if (.hooks.PreToolUse | type) != "array" then .
@@ -171,23 +184,11 @@ for settings_path in "${PATHS[@]}"; do
     continue
   fi
 
-  # Symlink policy splits on who controls the link.
+  # Symlink policy splits on who controls the link. Check the project path
+  # first: when HOME is the workspace the two allowlist strings are equal,
+  # and a cloned .claude symlink must still be refused rather than followed.
   target_path="$settings_path"
-  if [ "$settings_path" = "${ALLOWED[0]}" ]; then
-    # User-level file. A dotfiles-managed settings.json is often a symlink,
-    # and writing a temp file + `mv` at the link path would replace the link
-    # with a regular file, leaving the managed target unrepaired and silently
-    # detached. Follow it. This grants an attacker nothing: planting this
-    # link already requires write access to $HOME/.claude.
-    if [ -L "$settings_path" ]; then
-      target_path="$(resolve_path "$settings_path")" || target_path=""
-      if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
-        printf 'Could not resolve symlink, leaving untouched: %s\n' \
-          "$settings_path" >&2
-        exit 1
-      fi
-    fi
-  else
+  if [ "$settings_path" = "$PROJECT_SETTINGS" ]; then
     # Project-level file. This one can arrive with a cloned repo, so every
     # path component is attacker-controlled: a symlinked settings.json — or
     # a symlinked .claude DIRECTORY, where the leaf is an ordinary file and
@@ -202,14 +203,30 @@ for settings_path in "${PATHS[@]}"; do
     # homes) do not false-positive.
     resolved_settings="$(resolve_path "$settings_path")" || resolved_settings=""
     resolved_root="$(resolve_path "$PROJECT_DIR")" || resolved_root=""
-    if [ -z "$resolved_settings" ] || [ -z "$resolved_root" ] \
-       || [ "$resolved_settings" != "${resolved_root}/.claude/settings.json" ]; then
+    if [ -z "$resolved_settings" ] || [ -z "$resolved_root" ]; then
+      printf 'Could not resolve project settings path, leaving untouched: %s\n' \
+        "$settings_path" >&2
+      exit 1
+    fi
+    if [ "$resolved_settings" != "${resolved_root}/.claude/settings.json" ]; then
       printf 'Refusing project settings path that resolves outside the project: %s\n' \
         "$settings_path" >&2
-      printf 'Resolved to: %s\n' "${resolved_settings:-<unresolved>}" >&2
+      printf 'Resolved to: %s\n' "$resolved_settings" >&2
       exit 1
     fi
     target_path="$resolved_settings"
+  elif [ -L "$settings_path" ]; then
+    # User-level file (distinct from the project path). A dotfiles-managed
+    # settings.json is often a symlink, and writing a temp file + `mv` at
+    # the link path would replace the link with a regular file, leaving the
+    # managed target unrepaired and silently detached. Follow it. Planting
+    # this link already requires write access to $HOME/.claude.
+    target_path="$(resolve_path "$settings_path")" || target_path=""
+    if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
+      printf 'Could not resolve symlink, leaving untouched: %s\n' \
+        "$settings_path" >&2
+      exit 1
+    fi
   fi
 
   if [ ! -f "$target_path" ]; then
@@ -251,9 +268,11 @@ for settings_path in "${PATHS[@]}"; do
   # mode and ownership; the `>` redirect then replaces the contents without
   # touching the mode.
   tmp="$(mktemp "${target_path}.XXXXXX")"
+  trap 'rm -f -- "$tmp"' EXIT
   cp -p -- "$target_path" "$tmp"
   wrap_file "$target_path" > "$tmp"
   mv -- "$tmp" "$target_path"
+  trap - EXIT
 
   printf 'Wrapped %s PreToolUse command(s) in %s\n' "$needs" "$settings_path"
   printf 'Backup: %s\n' "$backup"

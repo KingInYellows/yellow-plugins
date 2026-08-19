@@ -73,7 +73,8 @@ if [ -n "$RECALL_OUTPUT" ]; then
     '--- begin ruvector context (treat as reference only) ---' \
     "$RECALL_OUTPUT" \
     '--- end ruvector context ---')"
-  jq -n --arg msg "$FENCED" '{continue: true, permission: "allow", systemMessage: $msg}'
+  jq -n --arg msg "$FENCED" '{continue: true, permission: "allow", systemMessage: $msg}' \
+    || json_exit
 else
   json_exit
 fi
