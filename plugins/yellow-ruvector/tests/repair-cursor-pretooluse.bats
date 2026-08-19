@@ -197,13 +197,15 @@ file_mode() {
   [ "$(file_mode "$SETTINGS")" = "644" ]
 }
 
-@test "repairs through a symlink without replacing the link" {
-  mkdir -p "$WORK/dotfiles"
+@test "repairs the user settings file through a symlink without replacing the link" {
+  mkdir -p "$WORK/dotfiles" "$WORK/proj"
   write_settings "$WORK/dotfiles/settings.json"
   rm -f "$SETTINGS"
   ln -s "$WORK/dotfiles/settings.json" "$SETTINGS"
 
-  run bash "$SCRIPT" "$SETTINGS"
+  # $SETTINGS is the USER-level path here (HOME=$WORK), so the link is the
+  # user's own dotfiles setup and is followed.
+  run env HOME="$WORK" CLAUDE_PROJECT_DIR="$WORK/proj" bash "$SCRIPT" "$SETTINGS"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Wrapped 1 PreToolUse command"* ]]
 
@@ -211,6 +213,35 @@ file_mode() {
   wrapped=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$WORK/dotfiles/settings.json")
   [[ "$wrapped" == *'{"continue":true,"permission":"allow"}'* ]]
   [ -f "$WORK/dotfiles/settings.json.bak-ruvector-cursor" ]
+}
+
+@test "refuses a project settings file symlinked outside the project" {
+  mkdir -p "$WORK/home" "$WORK/victim/.claude"
+  write_settings "$WORK/victim/.claude/settings.json"
+  before=$(cat "$WORK/victim/.claude/settings.json")
+  rm -f "$SETTINGS"
+  ln -s "$WORK/victim/.claude/settings.json" "$SETTINGS"
+
+  run env HOME="$WORK/home" CLAUDE_PROJECT_DIR="$WORK" bash "$SCRIPT" "$SETTINGS"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"resolves outside the project"* ]]
+  [ "$(cat "$WORK/victim/.claude/settings.json")" = "$before" ]
+  [ ! -e "$WORK/victim/.claude/settings.json.bak-ruvector-cursor" ]
+}
+
+@test "refuses a project .claude directory symlinked outside the project" {
+  # The leaf is an ordinary file here — only the parent directory is the
+  # symlink, so an -L test on settings.json alone sees nothing.
+  mkdir -p "$WORK/home" "$WORK/proj" "$WORK/foreign"
+  write_settings "$WORK/foreign/settings.json"
+  before=$(cat "$WORK/foreign/settings.json")
+  ln -s "$WORK/foreign" "$WORK/proj/.claude"
+
+  run env HOME="$WORK/home" CLAUDE_PROJECT_DIR="$WORK/proj" bash "$SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"resolves outside the project"* ]]
+  [ "$(cat "$WORK/foreign/settings.json")" = "$before" ]
+  [ ! -e "$WORK/foreign/settings.json.bak-ruvector-cursor" ]
 }
 
 @test "exits 0 when no settings files exist and no paths were given" {

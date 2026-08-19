@@ -15,6 +15,13 @@
 #   ${CLAUDE_PROJECT_DIR:-$PWD}/.claude/settings.json
 # With no arguments both are repaired if they exist.
 #
+# Symlinks are handled by trust, not uniformly. The user-level file is
+# followed to its target, so a dotfiles-managed config is repaired in place
+# and stays linked. The project-level file must resolve to the real
+# .claude/settings.json inside the project root — it can arrive with a
+# cloned repo, so a symlinked settings.json or a symlinked .claude
+# directory is refused rather than followed out of the project.
+#
 # Only PreToolUse commands matching the init-generated shape
 # (`ruvector[@version] hooks pre-*` ending in `2>/dev/null [|| true]`)
 # are wrapped. Hooks that already print a decision, git-ai, plugin hook
@@ -51,9 +58,10 @@ done
 # Allowlist — the only settings files this script may rewrite. An explicit
 # argument must match one of these exactly, so a caller-supplied path can
 # never select an arbitrary writable settings.json.
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
 ALLOWED=(
   "${HOME}/.claude/settings.json"
-  "${CLAUDE_PROJECT_DIR:-${PWD}}/.claude/settings.json"
+  "${PROJECT_DIR}/.claude/settings.json"
 )
 
 PATHS=()
@@ -90,6 +98,10 @@ fi
 command -v jq >/dev/null 2>&1 || {
   printf 'jq is required.\n' >&2
   exit 1
+}
+
+resolve_path() {
+  node -p 'require("fs").realpathSync(process.argv[1])' "$1" 2>/dev/null
 }
 
 SUFFIX='; printf '\''%s\n'\'' '\''{"continue":true,"permission":"allow"}'\'''
@@ -159,20 +171,45 @@ for settings_path in "${PATHS[@]}"; do
     continue
   fi
 
-  # A dotfiles-managed settings.json is often a symlink. Writing through a
-  # temp file + `mv` at the link path would replace the link with a regular
-  # file, leaving the managed target unrepaired and silently detached. Repair
-  # the resolved target instead so the link survives.
+  # Symlink policy splits on who controls the link.
   target_path="$settings_path"
-  if [ -L "$settings_path" ]; then
-    target_path="$(node -p \
-      'require("fs").realpathSync(process.argv[1])' "$settings_path" 2>/dev/null)" \
-      || target_path=""
-    if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
-      printf 'Could not resolve symlink, leaving untouched: %s\n' \
+  if [ "$settings_path" = "${ALLOWED[0]}" ]; then
+    # User-level file. A dotfiles-managed settings.json is often a symlink,
+    # and writing a temp file + `mv` at the link path would replace the link
+    # with a regular file, leaving the managed target unrepaired and silently
+    # detached. Follow it. This grants an attacker nothing: planting this
+    # link already requires write access to $HOME/.claude.
+    if [ -L "$settings_path" ]; then
+      target_path="$(resolve_path "$settings_path")" || target_path=""
+      if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
+        printf 'Could not resolve symlink, leaving untouched: %s\n' \
+          "$settings_path" >&2
+        exit 1
+      fi
+    fi
+  else
+    # Project-level file. This one can arrive with a cloned repo, so every
+    # path component is attacker-controlled: a symlinked settings.json — or
+    # a symlinked .claude DIRECTORY, where the leaf is an ordinary file and
+    # an `-L` test on it sees nothing — would otherwise land the rewrite on
+    # a foreign file. Require the whole path to resolve to the real
+    # .claude/settings.json inside the project root.
+    #
+    # Resolve the project ROOT and append the literal suffix. Resolving
+    # "${PROJECT_DIR}/.claude" instead would follow a hostile link and then
+    # compare it against itself, passing vacuously. Both sides are resolved
+    # so legitimate system symlinks (macOS /var -> /private/var, symlinked
+    # homes) do not false-positive.
+    resolved_settings="$(resolve_path "$settings_path")" || resolved_settings=""
+    resolved_root="$(resolve_path "$PROJECT_DIR")" || resolved_root=""
+    if [ -z "$resolved_settings" ] || [ -z "$resolved_root" ] \
+       || [ "$resolved_settings" != "${resolved_root}/.claude/settings.json" ]; then
+      printf 'Refusing project settings path that resolves outside the project: %s\n' \
         "$settings_path" >&2
+      printf 'Resolved to: %s\n' "${resolved_settings:-<unresolved>}" >&2
       exit 1
     fi
+    target_path="$resolved_settings"
   fi
 
   if [ ! -f "$target_path" ]; then
