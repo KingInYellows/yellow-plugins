@@ -1,0 +1,32 @@
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_e3fadf29225862::t_cadc9f05002fc4 172-173
+plugins/yellow-ruvector/hooks/scripts/user-prompt-submit.sh
+  s_e3fadf29225862::t_563861d136b580 76-77
+plugins/yellow-ruvector/tests/repair-cursor-pretooluse.bats
+  s_e3fadf29225862::t_30e1e7a5b70f38 267
+  s_e3fadf29225862::t_255e8b39fd3a80 247-266,268-271
+plugins/yellow-ruvector/scripts/repair-cursor-pretooluse.sh
+  s_e3fadf29225862::t_c836f7f57ba20f 28-29
+  s_e3fadf29225862::t_99ea5eba750971 187-189,191,206-211,214,218-229
+  s_e3fadf29225862::t_037bca07342383 271,275
+  s_e3fadf29225862::t_9c98e29c6b7494 95-100,110-111
+  s_e3fadf29225862::t_8ad914f84c8b8a 62-63,65-66
+  s_e3fadf29225862::t_8af88ac7343437 158-160
+  s_e3fadf29225862::t_c268add7647403 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "9e238d850ed90a209dc1d28b1e82c829ccfd3d4c",
+  "prompts": {},
+  "sessions": {
+    "s_e3fadf29225862": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f650f5b2-a87f-4c4b-aa1b-521559f3af23",
+        "model": "grok-4.6"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
