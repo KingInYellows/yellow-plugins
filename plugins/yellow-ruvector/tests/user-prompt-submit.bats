@@ -56,7 +56,7 @@ make_input() {
   input=$(make_input "implement a new feature for the project")
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   # No systemMessage when ruvector not initialized
   echo "$output" | jq -e '.systemMessage == null' > /dev/null
 }
@@ -65,7 +65,7 @@ make_input() {
   input=$(make_input "gt sync")
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage == null' > /dev/null
 }
 
@@ -74,7 +74,7 @@ make_input() {
   input=$(make_input "1234567890123456789")
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage == null' > /dev/null
 }
 
@@ -83,7 +83,7 @@ make_input() {
   input=$(make_input "12345678901234567890")
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   # Injection must have happened at exactly the threshold
   echo "$output" | jq -e '.systemMessage != null' > /dev/null
 }
@@ -92,7 +92,7 @@ make_input() {
   input=$(make_input "implement a new feature using the ruvector plugin")
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage != null' > /dev/null
   # systemMessage contains the injection fence markers
   [[ "$(echo "$output" | jq -r '.systemMessage')" == *"ruvector context"* ]]
@@ -111,20 +111,20 @@ make_input() {
   input=$(make_input "implement a new feature using the ruvector plugin")
   run --separate-stderr run_hook_failing_ruvector "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles missing user_prompt field gracefully" {
   input="{\"cwd\": \"$PROJECT_ROOT\"}"
   run run_hook "$input"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "handles empty JSON input gracefully" {
   run run_hook '{}'
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "output is always valid JSON" {

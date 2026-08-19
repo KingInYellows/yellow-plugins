@@ -42,7 +42,14 @@ ruvector.
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
 - **Hook architecture:** All hooks delegate to ruvector's built-in CLI hooks
   (`hooks session-start`, `hooks session-end`, `hooks post-edit`,
-  `hooks post-command`, `hooks recall`). No manual queue management.
+  `hooks post-command`) as **side effects** — their stdout is discarded and the
+  hook always prints dual-client allow JSON. `hooks recall` is the exception:
+  `session-start.sh` and `user-prompt-submit.sh` capture its stdout on purpose
+  and return it in `systemMessage`. Never run `ruvector hooks init` to
+  register hooks — even `--minimal` writes empty-stdout PreToolUse commands
+  into `.claude/settings.json` that Cursor rejects as invalid JSON. Use
+  `scripts/repair-cursor-pretooluse.sh` to wrap leftovers. No manual queue
+  management.
 - **Input validation:** All `$ARGUMENTS` values validated before use. See
   `ruvector-conventions` skill.
 - **Graceful degradation:** All agents and commands must work without ruvector —
@@ -86,15 +93,19 @@ ruvector.
   user prompt via `hooks recall` (1s budget)
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
   via `hooks recall` (3s budget)
-- `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/MultiEdit/Bash tools (1s budget)
+- `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/MultiEdit/Bash tools (1s budget). Stdout is dual-client allow JSON (`continue` + `permission`) so Cursor's Claude-plugin bridge does not block the tool.
 - `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
   `hooks post-edit` and `hooks post-command` (<50ms)
 - `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
 
-### Scripts (1)
+### Scripts (2)
 
 - `install.sh` — Install ruvector CLI via npm with dependency checks and error
   handling
+- `repair-cursor-pretooluse.sh` — Wrap leftover `ruvector hooks init`
+  PreToolUse commands in `~/.claude/settings.json` / project
+  `.claude/settings.json` so Cursor gets valid allow JSON. Idempotent;
+  does not touch git-ai or PostToolUse entries.
 
 ## When to Use What
 

@@ -15,11 +15,18 @@ Install the ruvector CLI and initialize `.ruvector/` for the current project.
 
 ## CLI Reference (verified against v0.1.96+)
 
-- `ruvector hooks init` — Initialize `.ruvector/` directory
+- `mkdir -p .ruvector` — Initialize `.ruvector/` directory (plugin-owned)
 - `npx ruvector mcp start` — Start the MCP server (stdio transport)
 - `ruvector doctor` — System health check
 
 **Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`.
+
+**Do NOT use** `ruvector hooks init` — even `--minimal` always writes
+PreToolUse commands that end in `2>/dev/null || true` and print empty
+stdout. Cursor's Claude-plugin bridge treats that as invalid JSON and
+blocks Shell and file edits. Claude Code reads this plugin's hooks from
+`plugin.json`, which already emit dual-client allow JSON. There is no
+`--no-hooks` flag.
 
 **Do NOT use** `npx ruvector hooks verify` — it checks `.claude/settings.json`
 for hooks, but Claude Code reads hooks from `plugin.json` at runtime. The verify
@@ -95,15 +102,17 @@ Combine initialization and .gitignore update:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
+mkdir -p .ruvector && \
 (grep -q '\.ruvector' .gitignore 2>/dev/null || printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> .gitignore) && \
 printf '\nInitialized .ruvector/ and updated .gitignore\n'
 ```
 
-The `--no-*` flags prevent `hooks init` from creating configs that conflict with
-what the plugin already manages (CLAUDE.md, MCP server, hooks, env vars).
+Do **not** run `ruvector hooks init` here. `--minimal` still overwrites
+`.claude/settings.json` PreToolUse with empty-stdout commands that break
+Cursor. The plugin's `pre-tool-use.sh` already covers Edit/Write/MultiEdit/Bash.
 
-If `.ruvector/` already exists, skip this step entirely.
+If `.ruvector/` already exists, skip the mkdir/gitignore work and still run
+Step 3 (the Cursor PreToolUse repair is in verify so existing installs get it).
 
 ### Step 3: Verify (ONE Bash call)
 
@@ -125,6 +134,12 @@ for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-u
     printf '  ✗ %s (missing)\n' "$script"; \
   fi; \
 done
+
+printf '\n=== Cursor PreToolUse repair ===\n'
+if ! bash "${PLUGIN_DIR}/scripts/repair-cursor-pretooluse.sh"; then \
+  printf 'FAILED: Cursor PreToolUse repair failed\n'; \
+  exit 1; \
+fi
 
 printf '\n=== Global Binary (REQUIRED) ===\n'
 if command -v ruvector >/dev/null 2>&1; then \
@@ -158,6 +173,10 @@ fi
 `plugin.json` at runtime. Instead, verify by checking that the hook scripts
 exist and are executable (as above).
 
+If the Cursor PreToolUse repair wrapped any commands, tell the user to start a
+**new Cursor agent session** so the repaired `~/.claude/settings.json` hooks
+are loaded. Do not re-run `ruvector hooks init` afterward.
+
 Summarize results in a table:
 
 ```
@@ -171,6 +190,7 @@ Summarize results in a table:
 | .gitignore entry     | Present     |
 | Health check         | Passing     |
 | Hooks (5)            | Active via plugin.json |
+| Cursor PreToolUse    | Repaired / already safe / skipped |
 | Global binary        | REQUIRED: In PATH / FAILED: Not found |
 | Smoke test (<1s)     | Passed / Failed / Skipped |
 ```
@@ -219,6 +239,6 @@ Use AskUserQuestion to offer:
 | Node.js not found       | Stop. Report: install from https://nodejs.org/ |
 | Node.js < 22.22.0       | Stop. Report version, suggest upgrade          |
 | npm install failed      | Suggest `--prefix "$HOME/.local"`              |
-| hooks init failed       | Check disk space, permissions, try `--force`   |
+| mkdir -p .ruvector failed | Check disk space and directory permissions   |
 | doctor reports failures | Show output, suggest `/ruvector:status`        |
 | .gitignore not writable | Report and suggest manual edit                 |

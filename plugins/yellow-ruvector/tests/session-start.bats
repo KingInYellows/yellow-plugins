@@ -62,7 +62,7 @@ gnu_timeout_available() {
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "includes recall output as systemMessage" {
@@ -70,7 +70,7 @@ gnu_timeout_available() {
 exit 0'
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage | contains("mock-learning")' > /dev/null
 }
 
@@ -79,7 +79,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
 @test "skips silently when binary absent even if npx present (no npx fallback)" {
@@ -91,7 +91,7 @@ exit 0'
   run bash -c 'printf "%s" "{}" | PATH="$1:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$2" bash "$3"' \
     _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -f "$MARKER" ]
 }
 
@@ -107,7 +107,7 @@ exit 0'
   end_s="$(date +%s)"
   elapsed_s=$(( end_s - start_s ))
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ "$elapsed_s" -le 3 ]
 }
 
@@ -123,7 +123,7 @@ exit 0'
   end_s="$(date +%s)"
   elapsed_s=$(( end_s - start_s ))
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ "$elapsed_s" -le 3 ]
 }
 
@@ -136,7 +136,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ -L "$PROJECT_ROOT/wt/.ruvector" ]
   [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
 }
@@ -150,7 +150,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -e "$RUVECTOR_DIR" ]
 }
 
@@ -189,7 +189,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
 }
 
@@ -201,7 +201,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run --separate-stderr run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ -d "$PROJECT_ROOT/wt/.ruvector" ]
   [ ! -L "$PROJECT_ROOT/wt/.ruvector" ]
   grep -q 'marker' "$PROJECT_ROOT/wt/.ruvector/intelligence.json"
@@ -215,7 +215,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -e "$PROJECT_ROOT/wt/.ruvector" ]
 }
 
@@ -230,7 +230,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -e "$PROJECT_ROOT/wt/.ruvector" ]
 }
 
@@ -257,7 +257,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt/pkg/sub"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ -L "$PROJECT_ROOT/wt/.ruvector" ]
   [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
   # Pin the documented nested-launch limitation: the heal plants the
@@ -276,7 +276,7 @@ exit 0'
   make_ruvector_stub 'exit 0'
   run --separate-stderr run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.continue == true' > /dev/null
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ -f "$PROJECT_ROOT/wt/.ruvector" ]
   [ ! -L "$PROJECT_ROOT/wt/.ruvector" ]
   grep -q 'not-a-store' "$PROJECT_ROOT/wt/.ruvector"
