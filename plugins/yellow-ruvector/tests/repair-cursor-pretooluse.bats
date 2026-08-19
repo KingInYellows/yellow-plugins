@@ -141,6 +141,46 @@ EOF
   [ "$(cat "$WORK/settings.json")" = '{}' ]
 }
 
+@test "leaves a hook that prints its decision before calling ruvector alone" {
+  cat > "$SETTINGS" <<'EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s' '{\"permission\": \"allow\"}'; npx ruvector@latest hooks pre-command \"$TOOL_INPUT_command\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+  original=$(cat "$SETTINGS")
+
+  run bash "$SCRIPT" "$SETTINGS"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no unsafe PreToolUse ruvector commands"* ]]
+  [ "$(cat "$SETTINGS")" = "$original" ]
+}
+
+@test "refuses a symlinked backup destination instead of writing through it" {
+  write_settings
+  printf 'victim contents\n' > "$WORK/victim"
+  ln -s "$WORK/victim" "$SETTINGS.bak-ruvector-cursor"
+  settings_before=$(cat "$SETTINGS")
+
+  run bash "$SCRIPT" "$SETTINGS"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Refusing unsafe backup destination"* ]]
+
+  [ "$(cat "$WORK/victim")" = "victim contents" ]
+  [ "$(cat "$SETTINGS")" = "$settings_before" ]
+}
+
 # GNU stat first, BSD/macOS stat second.
 file_mode() {
   stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"

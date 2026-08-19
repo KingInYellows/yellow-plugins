@@ -97,17 +97,28 @@ SUFFIX='; printf '\''%s\n'\'' '\''{"continue":true,"permission":"allow"}'\'''
 # Single source of truth for "this command needs wrapping", shared by the
 # count pass and the rewrite pass so the two can never disagree.
 #
-# The two `test` clauses pin the init-generated shape: a `ruvector hooks
-# pre-*` invocation whose stdout is empty because the command ends in the
-# terminal `2>/dev/null [|| true]` redirection. A hook that prints its own
-# decision does not end that way, so appending a second JSON document can
-# never make its stdout invalid.
+# The clauses pin the init-generated shape at BOTH ends:
+#
+#   1. The command must START with the ruvector invocation (bare, an
+#      absolute path, or behind `npx` with any leading flags). Anchoring
+#      matters: an unanchored substring match also hits a custom hook that
+#      prints its own decision first and then calls ruvector, e.g.
+#      `printf '{"permission": "allow"}'; npx ruvector hooks pre-command …`
+#      — wrapping that would put two JSON documents on stdout and get the
+#      tool blocked, the exact failure this script exists to prevent.
+#   2. It must END in the terminal `2>/dev/null [|| true]` redirection,
+#      which is why its stdout is empty.
+#   3. It must not mention `permission` at all. Deliberately broader than
+#      matching the exact payload: a hand-written decision may use any
+#      spacing (`{"permission": "allow"}`), and skipping one command too
+#      many only leaves it for the user to fix, whereas wrapping one too
+#      many corrupts working stdout.
 NEEDS_WRAP_DEF='
   def needs_wrap:
     (type == "string")
-    and test("ruvector(@\\S+)?\\s+hooks\\s+pre-")
+    and test("^\\s*(npx\\s+(-\\S+\\s+)*)?(\\S*/)?ruvector(@\\S+)?\\s+hooks\\s+pre-")
     and test("2>/dev/null\\s*(\\|\\|\\s*true)?\\s*$")
-    and (contains("\"permission\":\"allow\"") | not);
+    and (test("permission") | not);
 '
 
 # Count PreToolUse ruvector commands that still need wrapping.
@@ -186,6 +197,15 @@ for settings_path in "${PATHS[@]}"; do
   fi
 
   backup="${target_path}.bak-ruvector-cursor"
+  # `cp` writes THROUGH a symlinked destination. Since /ruvector:setup runs
+  # this repair automatically, a cloned repo could ship a project
+  # settings.json plus a backup path symlinked at any user-writable file and
+  # have setup clobber it. Only overwrite a plain regular file.
+  if [ -L "$backup" ] || { [ -e "$backup" ] && [ ! -f "$backup" ]; }; then
+    printf 'Refusing unsafe backup destination (not a regular file): %s\n' \
+      "$backup" >&2
+    exit 1
+  fi
   cp -p -- "$target_path" "$backup"
 
   # Seed the temp file from the target before writing: mktemp creates it
