@@ -145,6 +145,33 @@ command markdown always invokes `claude plugin list --json` from the
 resolved repo root via `git rev-parse --show-toplevel`, matching every
 probe that showed correct results.
 
+## Independent confirmation (parallel spike, same session)
+
+A second, independently-run isolated-`CLAUDE_CONFIG_DIR` spike (peer agent
+`scope-spike`, same date) reached the identical `local > project > user`
+precedence conclusion by a stronger method: it located the literal
+precedence array `["local","project","user"]` directly in the shipped CLI
+binary's (minified) source at two call sites — a scope auto-detect resolver
+and a per-scope-key resolver — rather than only inferring it from CLI
+behavior. It also directly source-confirmed the per-scope boolean fold
+(`enabledPlugins[scope] !== undefined ? enabledPlugins[scope] !== false :
+defaultEnabled`). This closes the residual uncertainty above at the
+mechanism level: the "folded effective boolean per directory" observed in
+finding #3 is exactly the `["local","project","user"]` scan applied to each
+scope's own settings file, not a caching or session-registration artifact.
+
+One additional nuance from that spike, checked against this repo's
+`planProviderSwitch()` and found NOT to affect it: `claude plugin list
+--json`'s `scope` field is install provenance (which scope's install
+recorded the row), not "the scope currently winning the enable/disable
+fold" — a project-scope `disable` of a user-scope install leaves the row's
+`scope` as `"user"` with `enabled:false`, it does not relabel the row. This
+repo's implementation is unaffected because `enabledScopesRaw` (consumed by
+the scope-substitution fix above) is built from `enabledEntries` — rows
+already filtered to `enabled === true` — so it never needs to know *which*
+scope decided the fold, only which scope(s) currently report the provider
+enabled.
+
 ## Managed scope
 
 Not independently reachable in an isolated `CLAUDE_CONFIG_DIR` (managed
