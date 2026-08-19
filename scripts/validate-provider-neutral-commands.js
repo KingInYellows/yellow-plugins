@@ -7,7 +7,9 @@
  * references outside provider-owned surfaces, so an active provider-neutral
  * workflow (yellow-core, yellow-review, yellow-linear, yellow-debt,
  * yellow-devin, root CLAUDE.md/AGENTS.md) cannot silently reintroduce a
- * hardcoded Graphite (or GitHub) assumption after this migration.
+ * hardcoded Graphite (or GitHub) assumption after this migration. GOAL.md
+ * is archived at
+ * plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md.
  *
  * Scope, deliberately narrow (per GOAL.md: "avoid a broad directory
  * allowlist that could hide future regressions"):
@@ -17,7 +19,9 @@
  *      own the commands they reference; that is the entire point of the
  *      provider split.
  *   2. PATH exclusion — historical record directories (`plans/complete/`,
- *      `docs/research/`, `plans/handoff/`). Content describing PAST
+ *      `docs/research/`, `plans/handoff/`), which `collectTargetFiles()`
+ *      scans specifically so this exclusion is load-bearing rather than
+ *      protecting paths that are never visited. Content describing PAST
  *      behavior accurately is not rewritten to satisfy a forward-looking
  *      gate.
  *   3. COUNT exclusion — `scripts/provider-neutral-commands-allowlist.json`,
@@ -55,7 +59,6 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..');
-const SELF_RELATIVE = 'scripts/validate-provider-neutral-commands.js';
 const ALLOWLIST_PATH = path.join(__dirname, 'provider-neutral-commands-allowlist.json');
 
 const OWNED_PREFIXES = ['plugins/gt-workflow/', 'plugins/github-workflow/'];
@@ -96,7 +99,6 @@ function toRelative(absPath) {
 }
 
 function isExcludedByPath(relPath) {
-  if (relPath === SELF_RELATIVE) return true;
   // CHANGELOG.md files are changeset-generated historical records of past
   // releases — the same "accurately describes past behavior" rationale as
   // the HISTORICAL_PREFIXES directories, just filename-keyed because
@@ -111,6 +113,14 @@ function isExcludedByPath(relPath) {
 
 function collectTargetFiles() {
   const files = walkMarkdown(path.join(REPO_ROOT, 'plugins'), []);
+  // HISTORICAL_PREFIXES is only a real exclusion if these directories are
+  // actually scanned — walking them here is what makes that path-exclusion
+  // branch load-bearing instead of dead code (a prior version scanned only
+  // plugins/ + the two root docs, so the historical exclusion below could
+  // never fire).
+  for (const historicalDir of HISTORICAL_PREFIXES) {
+    walkMarkdown(path.join(REPO_ROOT, historicalDir), files);
+  }
   for (const rootDoc of ['CLAUDE.md', 'AGENTS.md']) {
     const full = path.join(REPO_ROOT, rootDoc);
     if (fs.existsSync(full)) files.push(full);
