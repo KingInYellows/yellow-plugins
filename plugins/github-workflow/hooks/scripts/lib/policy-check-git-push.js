@@ -28,11 +28,20 @@ const BLOCK_MESSAGE = [
 ].join('\n');
 
 /**
- * @param {{command?: string}} camelCaseEnvelope
+ * @param {{toolInput?: {command?: string}}} camelCaseEnvelope
  * @returns {{decision: 'allow'|'deny', message: string|null}}
  */
 function checkGitPush(camelCaseEnvelope) {
-  const command = camelCaseEnvelope.command ?? '';
+  // Real PreToolUse envelopes nest the Bash command under `tool_input`
+  // (-> toolInput after snake->camel), the SAME shape as PostToolUse — NOT
+  // a root-level `.command`. See docs/solutions/code-quality/
+  // posttooluse-hook-input-schema-field-paths.md's 2026-07-20/07-22
+  // corrections: gt-workflow's sibling file reads root-level `.command` by
+  // design, preserved there only for characterization-testing parity with
+  // a deleted bash predecessor. This file has no such predecessor to
+  // preserve, so it reads the field path real Claude Code/Codex envelopes
+  // actually use.
+  const command = typeof camelCaseEnvelope.toolInput?.command === 'string' ? camelCaseEnvelope.toolInput.command : '';
 
   if (GIT_PUSH_RE.test(command)) {
     return { decision: 'deny', message: BLOCK_MESSAGE };

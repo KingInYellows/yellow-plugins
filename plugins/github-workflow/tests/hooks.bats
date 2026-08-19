@@ -22,7 +22,7 @@ run_entrypoint() {
 # --- check-git-push ---
 
 @test "check-git-push: plain git push is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"command":"git push origin main"}'
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git push origin main"}}'
   [ "$status" -eq 2 ]
   [ -z "$output" ]
   [[ "$stderr" == *"Raw \`git push\` is not allowed"* ]]
@@ -30,17 +30,17 @@ run_entrypoint() {
 }
 
 @test "check-git-push: git push after a semicolon is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"command":"echo hi; git push"}'
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"echo hi; git push"}}'
   [ "$status" -eq 2 ]
 }
 
 @test "check-git-push: git push inside a subshell is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"command":"$(git push)"}'
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"$(git push)"}}'
   [ "$status" -eq 2 ]
 }
 
 @test "check-git-push: non-push git commands are allowed" {
-  run --separate-stderr run_entrypoint check-git-push '{"command":"git status"}'
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git status"}}'
   [ "$status" -eq 0 ]
   [ -z "$output" ]
   [ -z "$stderr" ]
@@ -48,7 +48,12 @@ run_entrypoint() {
 
 @test "check-git-push: adapter submit command is allowed (not raw push)" {
   run --separate-stderr run_entrypoint check-git-push \
-    '{"command":"node lib/github-stack-runtime.js submit"}'
+    '{"tool_input":{"command":"node lib/github-stack-runtime.js submit"}}'
+  [ "$status" -eq 0 ]
+}
+
+@test "check-git-push: envelope missing tool_input fails open (defensive; real envelopes always have it)" {
+  run --separate-stderr run_entrypoint check-git-push '{"command":"git push origin main"}'
   [ "$status" -eq 0 ]
 }
 
