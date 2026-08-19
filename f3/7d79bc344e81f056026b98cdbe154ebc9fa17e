@@ -1,0 +1,33 @@
+plugins/gt-workflow/commands/gt-merge.md
+  s_fd5d688b6eb948::t_4c2b162281214f 1-18
+plugins/gt-workflow/CLAUDE.md
+  s_fd5d688b6eb948::t_7531deb71ffb83 253,255
+  s_fd5d688b6eb948::t_6479590444a715 20-21,29
+  s_fd5d688b6eb948::t_28d9e4f0e2062c 93-97
+tests/integration/stack-operation-registry.test.ts
+  s_fd5d688b6eb948::t_3da4c0713a51fc 1-145
+plugins/gt-workflow/skills/gt-merge/SKILL.md
+  s_fd5d688b6eb948::t_d7903bf2e455e1 1-72
+catalog/plugins/gt-workflow.json
+  s_fd5d688b6eb948::t_1faea63b10aa4a 79-80
+plugins/gt-workflow/codex/skills/gt-merge/SKILL.md
+  s_fd5d688b6eb948::t_f999491e47c4b4 1-71
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_fd5d688b6eb948::t_89bc49a2d81b19 1-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f37d79bc344e81f056026b98cdbe154ebc9fa17e",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
