@@ -74,7 +74,7 @@
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "1.2.4",
+      "version": "1.2.5",
       "author": {
         "name": "KingInYellows"
       },

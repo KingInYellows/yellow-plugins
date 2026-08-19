@@ -77,7 +77,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "1.2.4",
+      "version": "1.2.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -931,7 +931,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ruvector",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
   "author": {
     "name": "KingInYellows",
