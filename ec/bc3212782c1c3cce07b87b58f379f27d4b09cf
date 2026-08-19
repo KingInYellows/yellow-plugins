@@ -1,0 +1,39 @@
+.changeset/yellow-mempalace-provider-neutral-prose.md
+  s_fd5d688b6eb948::t_b2a28cad82a7a2 1-7
+.changeset/yellow-ci-provider-neutral-prose.md
+  s_fd5d688b6eb948::t_4814e0ea76877e 1-7
+.changeset/yellow-ruvector-provider-neutral-prose.md
+  s_fd5d688b6eb948::t_e1366b203f4db0 1-7
+.changeset/yellow-devin-provider-neutral-mutations.md
+  s_fd5d688b6eb948::t_69d9e71c8ff40e 1-7
+.changeset/github-workflow-full-command-surface.md
+  s_fd5d688b6eb948::t_386be209587d85 1-11
+.changeset/yellow-core-provider-abstraction-hardening.md
+  s_fd5d688b6eb948::t_bdcafb6dc1fdb6 1-13
+.changeset/yellow-review-provider-neutral-mutations.md
+  s_fd5d688b6eb948::t_8547090d2d48fb 1-10
+.changeset/yellow-debt-provider-neutral-mutations.md
+  s_fd5d688b6eb948::t_cca8d757c9ddc0 1-7
+.changeset/gt-workflow-yellow-core-dependency.md
+  s_fd5d688b6eb948::t_545a9b8d95a926 1-11
+.changeset/yellow-semgrep-provider-neutral-mutations.md
+  s_fd5d688b6eb948::t_7180f80c1958d9 1-7
+.changeset/yellow-linear-provider-neutral-mutations.md
+  s_fd5d688b6eb948::t_f18d9e2283ace0 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ecbc3212782c1c3cce07b87b58f379f27d4b09cf",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
