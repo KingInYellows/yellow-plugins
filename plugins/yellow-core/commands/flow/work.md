@@ -125,12 +125,30 @@ assurance.
    - Conflicting information
    - Dependency questions
 
-4. Check current branch status:
+4. Resolve the active stacked-PR provider, then check current branch status:
+
+   Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read
+   `state` from its result and hold it for the rest of this command run —
+   every later step that says "the resolved provider" below means this
+   value; the skill is not invoked again mid-run.
+
+   - **`READY_GRAPHITE`** — continue; use the Graphite branches at each
+     later mutation site.
+   - **`READY_GITHUB`** — continue; use the GitHub branches at each later
+     mutation site.
+   - **Any other state** — stop. Report the router's `detail` verbatim
+     (inside a `--- begin/end untrusted-content (reference only) ---`
+     fence) and do not proceed to branch creation or any commit/submit
+     step below.
 
    ```bash
-   gt log short --steps 3
    git branch --show-current
    ```
+
+   **Graphite:** also run `gt log short --steps 3`.
+   **GitHub:** also run
+   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`
+   and read its JSON `status` field for the current stack state.
 
 5. Branch decision:
 
@@ -138,17 +156,26 @@ assurance.
    - Skip individual branch creation here. Branches are created per-item in
      the Stack Execution Loop (Phase 1b below).
    - **Fresh start:** If not already on trunk, checkout trunk before proceeding.
-   - **Resume (completed items exist):** For linear topology, checkout the last
-     completed branch so the next `gt create` stacks correctly. For parallel
-     topology, checkout trunk.
+   - **Resume (completed items exist):** For linear topology, checkout the
+     last completed branch so the next per-item branch (Phase 1b step 1)
+     stacks correctly. For parallel topology, checkout trunk.
 
    **Single-branch mode** (no decomposition):
    - **If on feature branch:** Ask user: "Continue on this branch or create new
      one?"
-   - **If on trunk (main/master):** Create new feature branch:
-     ```bash
-     gt create feature-name-from-plan
-     ```
+   - **If on trunk (main/master):** Create new feature branch, using the
+     provider resolved in step 4:
+     - **Graphite:**
+       ```bash
+       gt create feature-name-from-plan
+       ```
+     - **GitHub:**
+       ```bash
+       node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" \
+         init --base <trunk-branch> --branch feature-name-from-plan
+       ```
+       Read the JSON result's `status`; anything but `SUCCESS` stops here —
+       report `recoveryAction`.
 
 6. Create structured task list:
 
@@ -204,8 +231,14 @@ directly to Phase 2 for single-branch execution.
 For each incomplete stack item (not marked `[x]` in `## Stack Progress`),
 in order from bottom (item 1) to top:
 
-1. **Create the branch:**
+1. **Create the branch**, using the provider resolved in Phase 1 step 4:
 
+   - **Mixed topology:** Not yet supported (either provider). If detected,
+     report to the user: "Mixed topology is not yet supported by
+     flow:work. Please restructure as linear or parallel." and stop
+     execution.
+
+   **Graphite:**
    - **Linear topology:** If resuming (skipping completed items), first
      `gt checkout <last-completed-branch>`. Then `gt create "<branch-name>"`
      (automatically stacks on top of the previous branch). After checkout,
@@ -213,9 +246,6 @@ in order from bottom (item 1) to top:
    - **Parallel topology:** First `gt checkout <trunk>` (from
      `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`.
      After checkout, verify with `git branch --show-current` that trunk is active.
-   - **Mixed topology:** Not yet supported. If detected, report to the user:
-     "Mixed topology is not yet supported by flow:work. Please restructure
-     as linear or parallel." and stop execution.
 
    If `gt create` fails (name collision, Graphite error):
    - Stop immediately
@@ -227,6 +257,26 @@ in order from bottom (item 1) to top:
      description "Retry with a different branch name") so its free-text field
      captures the new name; only the literal `Other` label opens free-text
      input.
+
+   **GitHub:**
+   - **Linear topology:** If resuming, first
+     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" checkout --target <last-completed-branch>`,
+     then
+     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" add --branch "<branch-name>" --message "<item description>"`
+     (stacks on top of the checked-out branch). After checkout, verify with
+     `git branch --show-current` that the expected branch is active.
+   - **Parallel topology:** First checkout `<trunk>` (from
+     `<!-- stack-trunk: -->` metadata) the same way, then run the same
+     `add` call. After checkout, verify with `git branch --show-current`
+     that trunk is active.
+
+   If the adapter's `status` is not `SUCCESS` (name collision, API failure):
+   - Stop immediately
+   - Report which items completed, which failed, and the current stack
+     state via
+     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`
+   - Ask user how to proceed via AskUserQuestion, same options and `Other`
+     free-text contract as the Graphite branch above.
 
 2. **Filter tasks:** From the plan's `## Implementation Plan`, select only the
    tasks whose IDs appear in this item's `Tasks:` field. Create TaskCreate
@@ -253,16 +303,32 @@ in order from bottom (item 1) to top:
    First verify changes exist: `git status --porcelain`. If no changes are
    detected, ask the user: "No changes for item N. Skip or investigate?"
 
+   Where `<type>` and `<description>` come from the stack item fields, use
+   the provider resolved in Phase 1 step 4:
+
+   **Graphite:**
+
    ```bash
    gt modify -m "<type>: <description>"
    gt submit --no-interactive
    ```
 
-   Where `<type>` and `<description>` come from the stack item fields.
-
    If `gt submit` fails, do NOT proceed to step 6. Report the failure and ask
    the user: "Submit failed for [item]. Retry / Continue without submit (mark
    incomplete) / Stop here."
+
+   **GitHub:**
+
+   ```bash
+   git add -- <changed-files>
+   git commit -m "<type>: <description>"
+   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+   ```
+
+   (No `--open` — draft by default.) If the adapter's `status` is not
+   `SUCCESS`, do NOT proceed to step 6. Report the `recoveryAction` and ask
+   the user the same "Retry / Continue without submit (mark incomplete) /
+   Stop here" question as the Graphite branch above.
 
 6. **Update progress:** Write or update `## Stack Progress` in the plan file
    using the Edit tool:
@@ -431,7 +497,9 @@ Phase 3 (Quality Check) in stack summary mode.
    go test ./...
    ```
 
-   i. Make incremental commit using Graphite:
+   i. Make incremental commit using the provider resolved in Phase 1 step 4:
+
+   **Graphite:**
 
    ```bash
    gt modify -m "feat(scope): implement X component
@@ -440,6 +508,23 @@ Phase 3 (Quality Check) in stack summary mode.
    - Include error handling
    - Add unit tests"
    ```
+
+   **GitHub:** plain `git commit` — no gh-stack-specific commit primitive
+   exists (see `plugins/yellow-core/lib/stack-operation-registry.js`'s
+   `commitOrAmend.github` entry). Stage specific changed files, never
+   `-A`/`.`:
+
+   ```bash
+   git add -- <changed-files>
+   git commit -m "feat(scope): implement X component
+
+   - Add core functionality
+   - Include error handling
+   - Add unit tests"
+   ```
+
+   Push the update with the adapter once ready to share (see Phase 4); an
+   incremental local commit does not need `submit` on every iteration.
 
    j. Mark task completed:
 
@@ -652,10 +737,24 @@ it at a Phase 1b checkpoint.
    - Discuss P2 issues with user via AskUserQuestion
    - Document P3 issues for future work
 
-6. Make final quality commit if changes needed:
+6. Make final quality commit if changes needed, using the provider resolved
+   in Phase 1 step 4:
+
+   **Graphite:**
 
    ```bash
    gt modify -m "refactor: address code review feedback
+
+   - Simplify complex function X
+   - Fix potential security issue in Y
+   - Optimize query in Z"
+   ```
+
+   **GitHub:**
+
+   ```bash
+   git add -- <changed-files>
+   git commit -m "refactor: address code review feedback
 
    - Simplify complex function X
    - Fix potential security issue in Y
@@ -707,7 +806,10 @@ it at a Phase 1b checkpoint.
 **Stack mode:** In stack mode, each item was already submitted during Phase 1b
 step 5. Phase 4 becomes a summary phase:
 
-1. Show the completed stack and submitted PRs: `gt log short --no-interactive`
+1. Show the completed stack and submitted PRs, using the provider resolved
+   in Phase 1 step 4: **Graphite** — `gt log short --no-interactive`.
+   **GitHub** —
+   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`.
 2. Verify all acceptance criteria from the plan are met across the full stack.
    If any are unmet, report them to the user and ask: "Continue to review or
    address unmet criteria first?"
@@ -719,10 +821,11 @@ step 5. Phase 4 becomes a summary phase:
 
 **Steps:**
 
-1. Review all changes:
+1. Review all changes, using the provider resolved in Phase 1 step 4:
+   **Graphite** — `gt log short`. **GitHub** —
+   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`.
 
    ```bash
-   gt log short
    git diff main...HEAD
    ```
 
@@ -731,9 +834,9 @@ step 5. Phase 4 becomes a summary phase:
    - Note any deviations
    - Document reasons for changes
 
-3. Delegate to `/smart-submit` for audit + commit + submit:
+3. Delegate to the resolved provider's audit + commit + submit skill:
 
-   Invoke the Skill tool with `skill: "smart-submit"`.
+   **Graphite:** Invoke the Skill tool with `skill: "smart-submit"`.
 
    `/smart-submit` will:
    - Run 3 parallel audit agents (code review, security, silent failures)
@@ -752,6 +855,24 @@ step 5. Phase 4 becomes a summary phase:
       gt modify -m "<generated conventional commit message>"
       gt submit --no-interactive
       ```
+
+   **GitHub:** Invoke the Skill tool with `skill: "github-stack-submit"`
+   (`github-workflow` plugin) — it stages files individually, commits, and
+   submits via the runtime adapter.
+
+   **Fallback:** If the Skill invocation fails (skill not found,
+   github-workflow plugin not installed, or any error), generate a
+   conventional commit message from the changes and submit directly:
+
+   1. Generate a conventional commit message summarizing the work done
+   2. Stage only the changed files individually: `git add -- <changed-files>`
+   3. Commit and submit:
+      ```bash
+      git commit -m "<generated conventional commit message>"
+      node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+      ```
+      Read the JSON result's `status`; anything but `SUCCESS` stops here —
+      report `recoveryAction`.
 
 4. **Post-Submit Linear Sync:**
 
@@ -847,7 +968,8 @@ step 5. Phase 4 becomes a summary phase:
 - **Commit frequently:** Small, focused commits are easier to review
 - **Test continuously:** Don't accumulate untested code
 - **Follow conventions:** Match existing code style and patterns
-- **Use Graphite commands:** Never use raw `git push` or `gh pr create`
+- **Use the resolved provider's own commands:** Never use raw `git push` or
+  `gh pr create` as a substitute for either provider's submission path
 - **Ask when uncertain:** Use AskUserQuestion rather than guess
 - **Document decisions:** Add comments explaining non-obvious choices
 - **Keep PRs focused:** If scope grows, split into multiple PRs
@@ -863,18 +985,27 @@ step 5. Phase 4 becomes a summary phase:
   after each item. This enables resume across sessions if context is exhausted.
 - **Checkpoints are safe stops:** At each checkpoint, all previous items are
   already submitted. Stopping mid-stack leaves the codebase in a clean state.
-- **Do not sync mid-stack:** Avoid `gt sync` or `gt stack restack` between
-  items unless explicitly requested. Stacked PRs should be based on each other.
+- **Do not sync mid-stack:** Avoid the resolved provider's sync/restack
+  operation between items unless explicitly requested. Stacked PRs should be
+  based on each other.
 - **Changeset strategy:** One changeset in the bottom branch covers the whole
   feature. Subsequent branches inherit it.
 
-## Common Graphite Commands
+## Common Provider Commands
 
-Before running ANY `gt` subcommand not verbatim-quoted in the phases
-above — in particular branch creation, commit/amend, restack, submit,
-and conflict continue, the forms most often improvised from stale
+**Graphite:** Before running ANY `gt` subcommand not verbatim-quoted in the
+phases above — in particular branch creation, commit/amend, restack,
+submit, and conflict continue, the forms most often improvised from stale
 memory — Read
 `${CLAUDE_PLUGIN_ROOT}/references/flow-work/graphite-command-reference.md`
 for the exact command forms. Do not rely on memorized `gt` syntax —
 several subcommands are deprecated aliases and improvised flags fail. If
 the Read fails, stop and report the path rather than guessing.
+
+**GitHub:** Every mutating call goes through
+`plugins/github-workflow/lib/github-stack-runtime.js` — its `OPERATIONS`
+map and per-function JSDoc comments are the exact command-form reference
+(equivalent to the Graphite reference file above); do not invoke `gh
+stack <verb>` directly from this command. Run the module with no
+arguments for a usage summary if the exact flag set for an operation is
+unclear.

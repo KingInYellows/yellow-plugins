@@ -167,9 +167,9 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   alternative providers (Graphite `gt-workflow`, GitHub-native
   `github-workflow`), exactly one enabled at a time. Only `READY_GRAPHITE`
   and `READY_GITHUB` route to work; every other state stops and reports
-  why. Use only the resolved provider's own commands
-  (`gt branch create`/`gt modify`/`gt stack submit`/`gt repo sync` for
-  Graphite; `github-workflow`'s runtime adapter for GitHub) — never fall
+  why. Use only the resolved provider's own commands (`gt-workflow`'s `gt`
+  wrappers for Graphite; `github-workflow`'s runtime adapter for GitHub) —
+  never fall
   back to raw `git push`/`gh pr create` as a substitute for either
   provider's submission path, and never fall back to the other provider.
   See `plugins/yellow-core/lib/stack-operation-registry.js` for the full
