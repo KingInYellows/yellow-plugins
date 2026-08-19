@@ -1,0 +1,24 @@
+docs/research/2026-08-18-github-stack-provider-operations-revalidation.md
+  s_fd5d688b6eb948::t_3341b72d127d2b 185-260
+  s_fd5d688b6eb948::t_f076b8423c0d5b 184,261
+plugins/github-workflow/skills/github-stack-plan/SKILL.md
+  s_fd5d688b6eb948::t_05121b5b8f74b9 32-40
+plugins/github-workflow/lib/github-stack-runtime.js
+  s_fd5d688b6eb948::t_38711d89ca9a66 64-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d076bf116eba99249f69f6dae50c3a39c6d7a6d2",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
