@@ -288,6 +288,17 @@ jobs:
                 echo "::group::flow: namespace sweep completeness"
                 node scripts/validate-flow-namespace.js
                 echo "::endgroup::"
+
+                # Provider-neutral-workflow gate: rejects hardcoded mutating
+                # `gt`/`gh stack` references outside provider-owned or
+                # historical paths, so an active workflow cannot silently
+                # reintroduce a single-provider assumption. Lives in this arm
+                # for the same reason as the flow-namespace sweep above: it
+                # is in `pnpm validate:schemas`, and nothing else in CI runs
+                # this script.
+                echo "::group::Provider-neutral command gate"
+                node scripts/validate-provider-neutral-commands.js
+                echo "::endgroup::"
                 ;;
               plans)
                 # Diff-scoped stray-checkbox validator for plans/complete/
