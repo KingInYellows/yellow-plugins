@@ -823,6 +823,121 @@ describe('planProviderSwitch — preview only, never executed', () => {
     ).toEqual(['claude plugin disable gt-workflow@yellow-plugins --scope local']);
   });
 
+  it('never disables a globally-enabled other provider when a narrower scope was requested', () => {
+    // Regression guard for the effective-scope-model bug confirmed by
+    // docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md:
+    // the other provider is enabled ONLY at `user` scope; the caller asks
+    // to switch at `project` scope. The old code emitted `disable ...
+    // --scope user`, which the spike confirmed disables the provider
+    // GLOBALLY across every project — not "an effective same-repository
+    // override is sufficient", exactly the bug GOAL.md describes.
+    const plan = planProviderSwitch({
+      plugins: fixture('both-installed-graphite-enabled'),
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('project');
+    expect(disableSteps[0].command).toBe(
+      'claude plugin disable gt-workflow@yellow-plugins --scope project'
+    );
+  });
+
+  it('same logic applies one tier down: a project-enabled other provider is overridden at local, not disabled at project, when local was requested', () => {
+    const plugins = fixture('both-installed-github-enabled').map(
+      (row: { id: string; scope?: string; enabled?: boolean }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'project', enabled: true, projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'local',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('a same-or-narrower-scope override is still cleared at its OWN scope, not substituted away', () => {
+    // The other provider is enabled at `local` scope while the caller asks
+    // for a `project`-scope switch. `local` is NARROWER than `project`, so
+    // it must be disabled at its own (local) scope — substituting it to
+    // `project` would leave the local override in place, and local beats
+    // project, so the switch would silently fail to take effect.
+    const plugins = fixture('both-installed-graphite-enabled').map(
+      (row: { id: string; scope?: string }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'local', projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('deduplicates disable steps when multiple broader scopes substitute to the same target scope', () => {
+    const plugins = [
+      ...fixture('both-installed-github-enabled'),
+      {
+        id: 'gt-workflow@yellow-plugins',
+        version: '1.6.2',
+        scope: 'project',
+        enabled: true,
+        installPath: '/fixture/.claude/plugins/cache/yellow-plugins/gt-workflow/1.6.2',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+        projectPath: PROJECT_PATH,
+      },
+    ];
+    // gt-workflow is now enabled at BOTH user and project scope; caller
+    // requests a `local`-scope switch. Both source scopes are broader than
+    // `local`, so both substitute to `local` — must collapse to ONE step,
+    // not two identical ones.
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'local',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('a genuine global (user-scope) switch still clears a narrower same-repo override', () => {
+    const plugins = fixture('both-installed-github-enabled').map(
+      (row: { id: string; scope?: string; enabled?: boolean }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'project', enabled: true, projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('project');
+  });
+
   it('case 7 (switch side): refuses a managed conflict and emits NO steps', () => {
     const plan = planProviderSwitch({
       plugins: fixture('managed-conflict'),

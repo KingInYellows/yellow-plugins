@@ -73,6 +73,15 @@ const DEFAULT_MARKETPLACE = 'yellow-plugins';
 /** Scopes a user-issued `claude plugin` command can actually write. */
 const WRITABLE_SCOPES = Object.freeze(['user', 'project', 'local']);
 
+/**
+ * Precedence tier per writable scope, narrowest-wins — empirically
+ * confirmed by an isolated `claude plugin` CLI spike (see
+ * docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md
+ * findings #3-4): a `project`-scope override beats `user`, and a
+ * `local`-scope override beats `project`. Higher number = narrower = wins.
+ */
+const SCOPE_TIER = Object.freeze({ user: 0, project: 1, local: 2 });
+
 /** Every scope value the model knows about, writable or not. */
 const KNOWN_SCOPES = Object.freeze([...WRITABLE_SCOPES, 'managed']);
 
@@ -727,7 +736,22 @@ function planProviderSwitch({
   // both providers are enabled at once, violating the single-provider
   // invariant (stack-provider-guard skill, invariant 1) even if only until
   // the next step runs.
+  //
+  // Scope substitution: NEVER disable at a scope BROADER than the one the
+  // caller requested. An other-provider row enabled at a broader scope
+  // than `scope` (e.g. enabled at `user` while the caller asked to switch
+  // at `project`) is handled by disabling it at `scope` instead — a
+  // same-repository (or same-machine, for `local`) override is sufficient
+  // to make the switch effective for this repository, confirmed safe by
+  // the isolated CLI spike (docs/research/
+  // 2026-08-18-claude-plugin-scope-precedence-spike.md, finding #2: an
+  // enable/disable override works even without a separate install at that
+  // scope). A row already at `scope` or narrower is disabled at its own
+  // scope unchanged — that override must still be cleared, or it would
+  // keep the other provider effectively enabled for this repository after
+  // the "switch" completes.
   for (const other of others) {
+    const scopesToDisable = new Set();
     // Raw, unsanitized scopes: refusing on a malformed value here is the
     // security control, so it must see the actual CLI output, not the
     // "unknown" placeholder `enabledScopes` substitutes for display.
@@ -755,14 +779,19 @@ function planProviderSwitch({
           detail: `${other.plugin} reports an unrecognized scope "${otherScope}". Refusing to build a plan around it.`,
         };
       }
-      const otherRef = `${other.plugin}@${other.marketplaces[0] || marketplace}`;
+      scopesToDisable.add(
+        SCOPE_TIER[otherScope] < SCOPE_TIER[scope] ? scope : otherScope
+      );
+    }
+    const otherRef = `${other.plugin}@${other.marketplaces[0] || marketplace}`;
+    for (const disableScope of scopesToDisable) {
       steps.push({
         action: 'disable',
         provider: other.id,
-        scope: otherScope,
+        scope: disableScope,
         requiresConfirmation: false,
-        description: `Disable ${other.plugin} at ${otherScope} scope`,
-        command: `claude plugin disable ${otherRef} --scope ${otherScope}`,
+        description: `Disable ${other.plugin} at ${disableScope} scope`,
+        command: `claude plugin disable ${otherRef} --scope ${disableScope}`,
       });
     }
   }
