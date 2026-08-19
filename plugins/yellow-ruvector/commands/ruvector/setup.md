@@ -136,7 +136,10 @@ for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-u
 done
 
 printf '\n=== Cursor PreToolUse repair ===\n'
-bash "${PLUGIN_DIR}/scripts/repair-cursor-pretooluse.sh"
+if ! bash "${PLUGIN_DIR}/scripts/repair-cursor-pretooluse.sh"; then \
+  printf 'FAILED: Cursor PreToolUse repair failed\n'; \
+  exit 1; \
+fi
 
 printf '\n=== Global Binary (REQUIRED) ===\n'
 if command -v ruvector >/dev/null 2>&1; then \
@@ -236,6 +239,6 @@ Use AskUserQuestion to offer:
 | Node.js not found       | Stop. Report: install from https://nodejs.org/ |
 | Node.js < 22.22.0       | Stop. Report version, suggest upgrade          |
 | npm install failed      | Suggest `--prefix "$HOME/.local"`              |
-| mkdir .ruvector failed  | Check disk space and directory permissions     |
+| mkdir -p .ruvector failed | Check disk space and directory permissions   |
 | doctor reports failures | Show output, suggest `/ruvector:status`        |
 | .gitignore not writable | Report and suggest manual edit                 |

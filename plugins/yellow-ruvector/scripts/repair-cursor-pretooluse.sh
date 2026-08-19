@@ -9,18 +9,22 @@
 # Usage:
 #   bash repair-cursor-pretooluse.sh [--dry-run] [settings.json ...]
 #
-# Default paths (used only when they exist):
+# An explicit path must be one of the two allowlisted settings files
+# (exact string match); anything else is refused:
 #   $HOME/.claude/settings.json
 #   ${CLAUDE_PROJECT_DIR:-$PWD}/.claude/settings.json
+# With no arguments both are repaired if they exist.
 #
-# Only PreToolUse ruvector commands with the empty-stdout pattern are
-# wrapped. git-ai, plugin hook scripts, and PostToolUse / SessionStart /
-# Stop entries are left untouched. Re-running is a no-op.
+# Only PreToolUse commands matching the init-generated shape
+# (`ruvector[@version] hooks pre-*` ending in `2>/dev/null [|| true]`)
+# are wrapped. Hooks that already print a decision, git-ai, plugin hook
+# scripts, and PostToolUse / SessionStart / Stop entries are left
+# untouched. Re-running is a no-op.
 
 set -euo pipefail
 
 DRY_RUN=0
-PATHS=()
+REQUESTED=()
 
 usage() {
   printf 'Usage: %s [--dry-run] [settings.json ...]\n' "${0##*/}" >&2
@@ -36,22 +40,46 @@ while [ $# -gt 0 ]; do
       printf 'Unknown option: %s\n' "$1" >&2
       usage
       ;;
-    *) PATHS+=("$1"); shift ;;
+    *) REQUESTED+=("$1"); shift ;;
   esac
 done
 while [ $# -gt 0 ]; do
-  PATHS+=("$1")
+  REQUESTED+=("$1")
   shift
 done
 
-if [ "${#PATHS[@]}" -eq 0 ]; then
-  if [ -f "${HOME}/.claude/settings.json" ]; then
-    PATHS+=("${HOME}/.claude/settings.json")
-  fi
-  project_dir="${CLAUDE_PROJECT_DIR:-${PWD}}"
-  if [ -f "${project_dir}/.claude/settings.json" ]; then
-    PATHS+=("${project_dir}/.claude/settings.json")
-  fi
+# Allowlist — the only settings files this script may rewrite. An explicit
+# argument must match one of these exactly, so a caller-supplied path can
+# never select an arbitrary writable settings.json.
+ALLOWED=(
+  "${HOME}/.claude/settings.json"
+  "${CLAUDE_PROJECT_DIR:-${PWD}}/.claude/settings.json"
+)
+
+PATHS=()
+if [ "${#REQUESTED[@]}" -eq 0 ]; then
+  for allowed_path in "${ALLOWED[@]}"; do
+    if [ -e "$allowed_path" ]; then
+      PATHS+=("$allowed_path")
+    fi
+  done
+else
+  for requested_path in "${REQUESTED[@]}"; do
+    match=0
+    for allowed_path in "${ALLOWED[@]}"; do
+      if [ "$requested_path" = "$allowed_path" ]; then
+        match=1
+        break
+      fi
+    done
+    if [ "$match" -eq 0 ]; then
+      printf 'Refusing settings path outside the allowlist: %s\n' \
+        "$requested_path" >&2
+      printf 'Allowed: %s\n' "${ALLOWED[@]}" >&2
+      exit 1
+    fi
+    PATHS+=("$requested_path")
+  done
 fi
 
 if [ "${#PATHS[@]}" -eq 0 ]; then
@@ -66,16 +94,28 @@ command -v jq >/dev/null 2>&1 || {
 
 SUFFIX='; printf '\''%s\n'\'' '\''{"continue":true,"permission":"allow"}'\'''
 
+# Single source of truth for "this command needs wrapping", shared by the
+# count pass and the rewrite pass so the two can never disagree.
+#
+# The two `test` clauses pin the init-generated shape: a `ruvector hooks
+# pre-*` invocation whose stdout is empty because the command ends in the
+# terminal `2>/dev/null [|| true]` redirection. A hook that prints its own
+# decision does not end that way, so appending a second JSON document can
+# never make its stdout invalid.
+NEEDS_WRAP_DEF='
+  def needs_wrap:
+    (type == "string")
+    and test("ruvector(@\\S+)?\\s+hooks\\s+pre-")
+    and test("2>/dev/null\\s*(\\|\\|\\s*true)?\\s*$")
+    and (contains("\"permission\":\"allow\"") | not);
+'
+
 # Count PreToolUse ruvector commands that still need wrapping.
 count_needs_wrap() {
-  jq -r '
+  jq -r "$NEEDS_WRAP_DEF"'
     [(.hooks.PreToolUse // [])[]
       | (.hooks // [])[]
-      | select(.command | type == "string")
-      | select(.command | test("ruvector"))
-      | select(.command | test("2>/dev/null|\\|\\| true"))
-      | select(.command | contains("\"permission\":\"allow\"") | not)
-      | select(.command | contains("permission\":\"allow\"") | not)
+      | select(.command | needs_wrap)
     ] | length
   ' "$1"
 }
@@ -83,17 +123,14 @@ count_needs_wrap() {
 # Wrap those commands in place. Other hook events and non-ruvector
 # commands (git-ai, plugin scripts) are preserved byte-for-byte.
 wrap_file() {
-  jq --arg suffix "$SUFFIX" '
+  jq --arg suffix "$SUFFIX" "$NEEDS_WRAP_DEF"'
     if (.hooks.PreToolUse | type) != "array" then .
     else
       .hooks.PreToolUse |= map(
         if (.hooks | type) != "array" then .
         else
           .hooks |= map(
-            if (.command | type) == "string"
-               and (.command | test("ruvector"))
-               and (.command | test("2>/dev/null|\\|\\| true"))
-               and (.command | contains("\"permission\":\"allow\"") | not)
+            if (.command | needs_wrap)
             then .command = (.command + $suffix)
             else .
             end
@@ -106,28 +143,37 @@ wrap_file() {
 
 total_changed=0
 for settings_path in "${PATHS[@]}"; do
-  case "$settings_path" in
-    *..*|*'
-'*)
-      printf 'Refusing unsafe settings path: %s\n' "$settings_path" >&2
-      exit 1
-      ;;
-  esac
-  base="${settings_path##*/}"
-  if [ "$base" != "settings.json" ]; then
-    printf 'Refusing to edit non-settings.json path: %s\n' "$settings_path" >&2
-    exit 1
-  fi
-  if [ ! -f "$settings_path" ]; then
+  if [ ! -e "$settings_path" ]; then
     printf 'Skipping missing file: %s\n' "$settings_path"
     continue
   fi
-  if ! jq -e . "$settings_path" >/dev/null 2>&1; then
+
+  # A dotfiles-managed settings.json is often a symlink. Writing through a
+  # temp file + `mv` at the link path would replace the link with a regular
+  # file, leaving the managed target unrepaired and silently detached. Repair
+  # the resolved target instead so the link survives.
+  target_path="$settings_path"
+  if [ -L "$settings_path" ]; then
+    target_path="$(node -p \
+      'require("fs").realpathSync(process.argv[1])' "$settings_path" 2>/dev/null)" \
+      || target_path=""
+    if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
+      printf 'Could not resolve symlink, leaving untouched: %s\n' \
+        "$settings_path" >&2
+      exit 1
+    fi
+  fi
+
+  if [ ! -f "$target_path" ]; then
+    printf 'Skipping non-regular file: %s\n' "$settings_path"
+    continue
+  fi
+  if ! jq -e . "$target_path" >/dev/null 2>&1; then
     printf 'Invalid JSON, leaving untouched: %s\n' "$settings_path" >&2
     exit 1
   fi
 
-  needs="$(count_needs_wrap "$settings_path")"
+  needs="$(count_needs_wrap "$target_path")"
   if [ "$needs" = "0" ]; then
     printf 'OK (no unsafe PreToolUse ruvector commands): %s\n' "$settings_path"
     continue
@@ -139,12 +185,12 @@ for settings_path in "${PATHS[@]}"; do
     continue
   fi
 
-  backup="${settings_path}.bak-ruvector-cursor"
-  cp -p -- "$settings_path" "$backup"
+  backup="${target_path}.bak-ruvector-cursor"
+  cp -p -- "$target_path" "$backup"
 
-  tmp="$(mktemp "${settings_path}.XXXXXX")"
-  wrap_file "$settings_path" > "$tmp"
-  mv -- "$tmp" "$settings_path"
+  tmp="$(mktemp "${target_path}.XXXXXX")"
+  wrap_file "$target_path" > "$tmp"
+  mv -- "$tmp" "$target_path"
 
   printf 'Wrapped %s PreToolUse command(s) in %s\n' "$needs" "$settings_path"
   printf 'Backup: %s\n' "$backup"

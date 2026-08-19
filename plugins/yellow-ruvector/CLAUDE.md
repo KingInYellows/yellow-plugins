@@ -42,8 +42,10 @@ ruvector.
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
 - **Hook architecture:** All hooks delegate to ruvector's built-in CLI hooks
   (`hooks session-start`, `hooks session-end`, `hooks post-edit`,
-  `hooks post-command`, `hooks recall`) as **side effects** (stdout discarded)
-  and always print dual-client allow JSON. Never run `ruvector hooks init` to
+  `hooks post-command`) as **side effects** — their stdout is discarded and the
+  hook always prints dual-client allow JSON. `hooks recall` is the exception:
+  `session-start.sh` and `user-prompt-submit.sh` capture its stdout on purpose
+  and return it in `systemMessage`. Never run `ruvector hooks init` to
   register hooks — even `--minimal` writes empty-stdout PreToolUse commands
   into `.claude/settings.json` that Cursor rejects as invalid JSON. Use
   `scripts/repair-cursor-pretooluse.sh` to wrap leftovers. No manual queue
