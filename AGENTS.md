@@ -430,3 +430,33 @@ Before making substantive changes:
    tests, manifests, and changeset.
 6. Run the targeted validation commands from this file and report exactly what
    passed or could not be run.
+
+## Cursor Cloud specific instructions
+
+This repo has no runtime service or GUI — the "product" is the plugin
+marketplace plus the Node/TypeScript validators that gate it. "Running the
+app" means running the validation/test suite. Standard commands live in the
+"Build, Test, And Development Commands" section above; do not duplicate them.
+
+- Node version gotcha (most important): the base image's default `node`
+  (`/exec-daemon/node`) is `v22.14.0`, which does **not** satisfy this repo's
+  `engines` range `>=22.22.0 <25.0.0`. `pnpm`'s `preinstall` gate
+  (`scripts/check-node-version.js`) fails under it. A satisfying version
+  (`v22.22.x`) is preinstalled via `nvm`. Interactive/login shells already
+  select it (a `~/.bashrc` prepend added during environment setup), but a bare
+  non-interactive `bash -c '...'` does not source `~/.bashrc` and falls back to
+  `v22.14.0`. When a command must run in a fresh non-interactive shell, prefix
+  PATH explicitly, e.g.
+  `PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH" pnpm <script>`, or run it
+  through a login shell (`bash -lc '...'`). The startup update script already
+  installs deps with the correct Node.
+- The update script runs `pnpm install --frozen-lockfile` (with the nvm Node).
+  It is fast and idempotent; `pnpm build` is also quick.
+- Lockfile drift: `plugins/github-workflow` is a committed pnpm workspace
+  member that was missing from `pnpm-lock.yaml`. `pnpm install
+  --frozen-lockfile` still exits 0 but appends an empty importer entry, so an
+  un-synced tree shows `pnpm-lock.yaml` modified after install — harmless.
+- No browser/computer-use testing applies; verify changes with the validators
+  and Vitest suites (`pnpm validate:schemas`, `pnpm validate:versions`,
+  `pnpm test:unit`, `pnpm test:integration`, `pnpm lint`, `pnpm typecheck`).
+  Some validators shell out to `bats` for a few plugins' suites.
