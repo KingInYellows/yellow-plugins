@@ -1,5 +1,18 @@
 {
   "plugins/yellow-core/commands/flow/work.md": 12,
   "plugins/yellow-core/references/flow-work/graphite-command-reference.md": 6,
-  "plugins/yellow-core/agents/workflow/staging-scorer.md": 2
+  "plugins/yellow-core/agents/workflow/staging-scorer.md": 2,
+  "plugins/yellow-core/commands/flow/review.md": 5,
+  "plugins/yellow-core/commands/plan/complete.md": 7,
+  "plugins/yellow-core/skills/debugging/SKILL.md": 8,
+  "plugins/yellow-debt/agents/remediation/debt-fixer.md": 1,
+  "plugins/yellow-devin/commands/devin/review-prs.md": 3,
+  "plugins/yellow-linear/skills/linear-workflows/SKILL.md": 1,
+  "plugins/yellow-review/commands/review/resolve-pr.md": 4,
+  "plugins/yellow-review/commands/review/resolve-stack.md": 3,
+  "plugins/yellow-review/commands/review/review-all.md": 3,
+  "plugins/yellow-review/commands/review/review-pr.md": 2,
+  "plugins/yellow-review/skills/pr-review-workflow/SKILL.md": 6,
+  "plugins/yellow-review/skills/stack-traversal/SKILL.md": 1,
+  "plugins/yellow-semgrep/commands/semgrep/fix.md": 1
 }

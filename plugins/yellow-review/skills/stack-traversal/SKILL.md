@@ -93,9 +93,20 @@ If `gt track` fails: warn "PR #<PR#> could not be adopted by Graphite.
 Proceeding with raw git." and continue in degraded mode — do not abort the
 walk.
 
+### Step 4b: Resolve the active stacked-PR provider
+
+Before Step 5, the consuming command invokes the `Skill` tool with
+`skill: "stack-provider-router"` once for the whole walk (not per PR) and
+reads `state` from its result. `READY_GRAPHITE` routes to the Graphite
+Steps 5-6 below; `READY_GITHUB` routes to the GitHub Steps 5-6 below; any
+other state stops the walk before it starts, reporting the router's
+`detail` verbatim inside an untrusted-content fence.
+
 ### Step 5: Per-PR checkout
 
-At the top of each loop iteration, check out the PR's branch:
+At the top of each loop iteration, check out the PR's branch.
+
+**Graphite:**
 
 ```bash
 gt checkout <branch>
@@ -105,10 +116,22 @@ If `gt checkout` fails (branch missing locally, stack in a bad state): log
 `[stack-traversal] checkout failed for <branch>; skipping` and continue to the
 next PR — do not abort the whole walk.
 
+**GitHub:**
+
+```bash
+git checkout <branch>
+```
+
+If `git checkout` fails: log
+`[stack-traversal] checkout failed for <branch>; skipping` and continue to
+the next PR — do not abort the whole walk.
+
 ### Step 6: Restack after the per-PR action
 
 After the consuming command's per-PR action completes and any changes are
-committed, restack the upstack so the next PR rests on the updated base:
+committed, restack the upstack so the next PR rests on the updated base.
+
+**Graphite:**
 
 ```bash
 gt upstack restack
@@ -119,6 +142,21 @@ conflicted restack (otherwise the repo stays mid-rebase and the next
 `gt checkout` fails), record the conflict for the command's final summary, and
 continue to the next PR. Do not pause for input — the consuming command
 surfaces restack conflicts in its summary so the user can restack manually.
+
+**GitHub:**
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+```
+
+Read the JSON result's `status` field. `CONFLICT`: run
+`node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort`
+to clear the conflicted rebase (otherwise the repo stays mid-rebase and the
+next checkout fails), record the conflict for the command's final summary,
+and continue to the next PR. Any other non-`SUCCESS` status: report the
+result's `recoveryAction`, record it for the summary, and continue. Do not
+pause for input — the consuming command surfaces restack conflicts in its
+summary so the user can restack manually.
 
 ### What belongs to the consuming command
 

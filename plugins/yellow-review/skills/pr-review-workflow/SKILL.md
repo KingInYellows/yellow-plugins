@@ -273,6 +273,13 @@ Paraphrasing re-introduces the drift this skill is meant to prevent (see
 | Merge conflict on restack | Abort restack, report to user for manual resolution           |
 | `gt track` failure        | Warn and proceed with raw git (degraded mode)                 |
 
+### GitHub Errors (github-workflow provider)
+
+| Error                     | Action                                                        |
+| ------------------------- | ------------------------------------------------------------- |
+| Adapter `submit` non-`SUCCESS` status | Report the result's `recoveryAction`             |
+| Adapter `rebase --mode upstack` returns `CONFLICT` | Run `rebase --mode abort`, report to user for manual resolution |
+
 ## Commit Conventions
 
 ### `/review:pr`
@@ -291,9 +298,14 @@ fix: resolve PR #<num> review comments
 
 Same per-PR messages as above, applied to each PR in sequence.
 
-All default single-commit branches use `gt modify -m "<message>"`. Only use
-`gt modify --commit -m "<message>"` when you intentionally want multiple
-commits on one branch. Push via `gt submit --no-interactive`.
+The commands that use these conventions resolve the active stacked-PR
+provider (`stack-provider-router` skill) before their first commit/push
+action; the message conventions above apply to both providers.
+
+On the Graphite provider, all default single-commit branches use
+`gt modify -m "<message>"`. Only use `gt modify --commit -m "<message>"`
+when you intentionally want multiple commits on one branch. Push via
+`gt submit --no-interactive`.
 
 ## Graphite Integration
 
@@ -313,6 +325,21 @@ commits on one branch. Push via `gt submit --no-interactive`.
 1. `gh pr checkout <PR#>` to create local branch
 2. `gt track` to adopt into Graphite
 3. If `gt track` fails: warn and proceed with raw git (degraded mode)
+
+## GitHub Integration
+
+The github-workflow provider has no `gt`-equivalent CLI of its own — commands
+call `plugins/github-workflow/lib/github-stack-runtime.js` directly.
+
+### Standard Operations
+
+- **Commit**: plain `git add -- <files>` + `git commit -m "fix: ..."` (no
+  gh-stack-specific commit primitive exists)
+- **Push**: `node github-stack-runtime.js submit`
+- **Restack**: `node github-stack-runtime.js rebase --mode upstack` (on
+  `CONFLICT` status, run `rebase --mode abort`, report to user)
+- **Checkout**: plain `git checkout <branch>`
+- **View stack**: `node github-stack-runtime.js view`
 
 ## Cross-Plugin Agent References
 

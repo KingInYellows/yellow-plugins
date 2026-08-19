@@ -75,10 +75,10 @@ re-querying would only add a failure surface to a known-good path.
 
 **When a PR number was passed explicitly**, confirm the checked-out branch
 actually corresponds to that PR *before* fetching comments or mutating anything.
-Otherwise the resolvers would edit this branch, `gt modify` (Step 6) would amend
-*this* branch's commit, and `gt submit` would push it — landing PR #`<PR#>`'s
-fixes on the wrong branch while Step 7 marks its threads resolved with no fix
-reaching the PR.
+Otherwise the resolvers would edit this branch, and Step 6's commit-and-push
+(via whichever stacked-PR provider is active) would land those fixes on the
+wrong branch while Step 7 marks its threads resolved with no fix reaching
+the PR.
 
 Resolve the current branch's PR with the same call Step 1 uses, then classify the
 result **inside the same Bash block**. Variables do not survive between Bash tool
@@ -347,6 +347,20 @@ If changes were made:
 - **Non-interactive mode.** Skip the `AskUserQuestion`. Print the `git diff
   --stat` summary for the log, then run the commit + submit below directly.
 
+### Resolve the active stacked-PR provider
+
+Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read `state`
+from its result.
+
+- **`READY_GRAPHITE`** — continue with the Graphite steps below.
+- **`READY_GITHUB`** — continue with the GitHub steps below.
+- **Any other state** — stop. Report the router's `detail` verbatim inside a
+  `--- begin untrusted-content (reference only) ---` /
+  `--- end untrusted-content ---` fence and do not attempt any
+  provider-specific mutation.
+
+#### Graphite
+
 ```bash
 gt modify -m "fix: resolve PR #<PR#> review comments"
 gt submit --no-interactive
@@ -355,13 +369,26 @@ gt submit --no-interactive
 If `gt submit` exits non-zero, report the error and skip Step 7 (see Step 7
 guard).
 
+#### GitHub
+
+```bash
+git add -- <specific files, never -A/.>
+git commit -m "fix: resolve PR #<PR#> review comments"
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+```
+
+Read the JSON result's `status` field. `SUCCESS` continues to Step 7.
+Anything else, report the result's `recoveryAction` and skip Step 7 (see
+Step 7 guard).
+
 ### Step 7: Mark Threads Resolved
 
-**Interactive mode:** only if the user approved the push in Step 6 AND
-`gt submit` exited 0. **Non-interactive mode:** only if `gt submit` exited 0.
-In both modes, if the push was rejected (interactive), `gt submit` failed, or
-**no changes were committed** (Step 6's "If changes were made" guard was false,
-so `gt submit` never ran), skip this step.
+**Interactive mode:** only if the user approved the push in Step 6 AND the
+push succeeded (Graphite `gt submit` exited 0, or GitHub's adapter `submit`
+call returned `status: SUCCESS`). **Non-interactive mode:** only if the push
+succeeded. In both modes, if the push was rejected (interactive), the push
+failed, or **no changes were committed** (Step 6's "If changes were made"
+guard was false, so the push never ran), skip this step.
 
 For each successfully-resolved **cluster** from Step 4, iterate over the
 cluster's `threadIds` and run:

@@ -212,7 +212,9 @@ Read-only agents never modify state.
 
 ## PR Convention
 
-- Create PRs via Graphite: `gt submit`
+- Create PRs via the active stacked-PR provider (resolved via the
+  `stack-provider-router` skill) — Graphite: `gt submit`; GitHub:
+  `github-stack-runtime.js submit`
 - Read PR state via GitHub: `gh pr view`, `gh api`
 - Never use `gh pr create` for PR creation
 - Link issues to PRs by adding a comment with the PR URL

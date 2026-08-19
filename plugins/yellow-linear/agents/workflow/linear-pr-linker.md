@@ -1,6 +1,6 @@
 ---
 name: linear-pr-linker
-description: "Suggest linking pull requests to Linear issues and syncing status. Use when user creates a pull request via gt submit (Graphite) or mentions submitting a PR and the branch name contains a Linear issue identifier. Also use when user says \"link to linear\", \"update issue from PR\", or \"sync status\". IMPORTANT: Always confirm with user before updating Linear issue status."
+description: "Suggest linking pull requests to Linear issues and syncing status. Use when user creates a pull request via the resolved stacked-PR provider or mentions submitting a PR and the branch name contains a Linear issue identifier. Also use when user says \"link to linear\", \"update issue from PR\", or \"sync status\". IMPORTANT: Always confirm with user before updating Linear issue status."
 model: inherit
 skills:
   - linear-workflows
@@ -17,17 +17,17 @@ tools:
 
 <examples>
 <example>
-Context: User just ran gt submit to create a PR from branch feat/ENG-789-fix-bug.
+Context: User just submitted a PR from branch feat/ENG-789-fix-bug via the active stacked-PR provider.
 user: "PR is up, can you link it to the Linear issue?"
 assistant: "I'll link your PR to ENG-789 and offer to update the issue status."
-<commentary>User submitted PR via Graphite (gt submit) and wants to link to Linear.</commentary>
+<commentary>User submitted a PR via the resolved stacked-PR provider and wants to link to Linear.</commentary>
 </example>
 
 <example>
 Context: User is about to submit their stack.
 user: "I'm ready to submit this PR"
 assistant: "Your branch references ENG-789. Want me to add the issue link to the PR description and update the Linear issue status to In Review?"
-<commentary>Branch contains issue ID and user is submitting via gt submit — suggest linking.</commentary>
+<commentary>Branch contains issue ID and user is submitting via the active stacked-PR provider — suggest linking.</commentary>
 </example>
 
 <example>
@@ -78,7 +78,7 @@ gh pr view --json url,title,state,mergedAt 2>/dev/null
 If no PR exists:
 
 - Report "No PR found for this branch"
-- Suggest: "Create a PR with `gt submit` first"
+- Suggest: "Create a PR via the active stacked-PR provider first (see `/stack:status`)"
 - Stop
 
 ### Step 4: Link PR to Issue
@@ -120,6 +120,6 @@ Report what was done:
 - **Never modify issue status without user confirmation** (security M3 —
   narrowed for this agent to status changes only; PR link comments are low-risk
   writes that proceed without confirmation)
-- Use `gh pr view` for reading PR state (works with Graphite-created PRs)
-- Never use `gh pr create` — PRs are created via `gt submit`
+- Use `gh pr view` for reading PR state (works with PRs created by either stacked-PR provider)
+- Never use `gh pr create` — PRs are created via the active stacked-PR provider (see `/stack:status`)
 - Keep comments concise — just the PR link and state
