@@ -32,6 +32,12 @@
  *   --scope <user|project|local>  target scope for `plan` (default: user)
  *   --tooling-graphite <yes|no|unknown>  probe result (omit/unknown ⇒ not checked)
  *   --tooling-github <yes|no|unknown>    probe result (omit/unknown ⇒ not checked)
+ *   --tooling-probe-file <path|->  raw `stack-tooling-probe.js probe` JSON
+ *                                  output; an alternative to the two flags
+ *                                  above that lets a caller pipe the probe's
+ *                                  output straight through with no bash-side
+ *                                  JSON parsing. When both are given, the
+ *                                  explicit --tooling-* flags win per key.
  *
  * Output is a single JSON object on stdout. Exit code is 0 for a successful
  * classification/plan (including a REFUSED plan — refusal is an answer, not
@@ -900,6 +906,30 @@ function parseToolingFlag(value) {
   return undefined;
 }
 
+/**
+ * Translate `stack-tooling-probe.js probe` JSON output into this module's
+ * tooling-flag shape (`{ graphite?: boolean, github?: boolean }`).
+ * `readiness: 'ready'` -> true, `'not-ready'` -> false, `'unknown'` (or a
+ * provider key that is absent because `--provider` narrowed the probe) ->
+ * omitted entirely, matching `parseToolingFlag`'s "unknown means not
+ * checked" contract.
+ *
+ * @param {unknown} probeJson - parsed `stack-tooling-probe.js probe` output.
+ */
+function toolingFromProbeResult(probeJson) {
+  const tooling = {};
+  if (probeJson && typeof probeJson === 'object') {
+    for (const id of ['graphite', 'github']) {
+      const entry = probeJson[id];
+      const readiness = entry && typeof entry === 'object' ? entry.readiness : undefined;
+      if (readiness === 'ready') tooling[id] = true;
+      else if (readiness === 'not-ready') tooling[id] = false;
+      // 'unknown', missing entry, or malformed shape: leave unset.
+    }
+  }
+  return tooling;
+}
+
 function main(argv) {
   const args = parseArgs(argv);
   const mode = args._[0];
@@ -942,7 +972,29 @@ function main(argv) {
     typeof args['project-path'] === 'string' ? args['project-path'] : null;
 
   if (mode === 'classify') {
-    const tooling = {};
+    let tooling = {};
+    const probeFile = args['tooling-probe-file'];
+    if (typeof probeFile === 'string') {
+      let probeRaw;
+      try {
+        probeRaw = readMaybe(probeFile);
+      } catch (error) {
+        console.error(`error: could not read tooling probe file: ${error.message}`);
+        return 1;
+      }
+      if (probeRaw !== null) {
+        try {
+          tooling = toolingFromProbeResult(JSON.parse(probeRaw));
+        } catch (error) {
+          console.error(`error: could not parse tooling probe file as JSON: ${error.message}`);
+          return 1;
+        }
+      }
+    }
+    // Explicit --tooling-graphite/--tooling-github always win over the
+    // probe file per key, so a caller can override one provider's result
+    // (tests, or a caller that only re-probed one side) without having to
+    // regenerate the whole probe JSON.
     const graphite = parseToolingFlag(args['tooling-graphite']);
     const github = parseToolingFlag(args['tooling-github']);
     if (graphite !== undefined) tooling.graphite = graphite;
@@ -981,6 +1033,7 @@ module.exports = {
   parseIntentText,
   readIntentFile,
   resolveIntent,
+  toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
   planProviderSwitch,

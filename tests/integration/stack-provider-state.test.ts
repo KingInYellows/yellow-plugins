@@ -30,6 +30,7 @@ const {
   parseIntentText,
   readIntentFile,
   resolveIntent,
+  toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
   planProviderSwitch,
@@ -562,6 +563,83 @@ describe('classifyProviderState — the eight states', () => {
     const unfiltered = classifyProviderState({ plugins: fixture('foreign-project-scope') });
     expect(unfiltered.state).toBe(STATES.CONFLICT);
     expect(unfiltered.projectScopeFiltered).toBe(false);
+  });
+});
+
+describe('toolingFromProbeResult', () => {
+  it('maps ready/not-ready/unknown to true/false/omitted', () => {
+    expect(
+      toolingFromProbeResult({
+        graphite: { readiness: 'ready' },
+        github: { readiness: 'not-ready' },
+      })
+    ).toEqual({ graphite: true, github: false });
+
+    expect(toolingFromProbeResult({ graphite: { readiness: 'unknown' } })).toEqual({});
+  });
+
+  it('omits a provider the probe narrowed away with --provider', () => {
+    expect(toolingFromProbeResult({ github: { readiness: 'ready' } })).toEqual({
+      github: true,
+    });
+  });
+
+  it('degrades to an empty object on a malformed or non-object input', () => {
+    expect(toolingFromProbeResult(null)).toEqual({});
+    expect(toolingFromProbeResult('not an object')).toEqual({});
+    expect(toolingFromProbeResult({})).toEqual({});
+  });
+
+  it('CLI: --tooling-probe-file feeds classify end to end, explicit flags still win', () => {
+    const lib = join(
+      __dirname,
+      '..',
+      '..',
+      'plugins',
+      'yellow-core',
+      'lib',
+      'stack-provider-state.js'
+    );
+    const fixturePath = join(FIXTURE_DIR, 'both-installed-github-enabled.json');
+    const scratch = mkdtempSync(join(tmpdir(), 'yellow-stack-probe-file-'));
+    const probePath = join(scratch, 'probe.json');
+    writeFileSync(
+      probePath,
+      JSON.stringify({ github: { readiness: 'ready' }, graphite: { readiness: 'ready' } }),
+      'utf8'
+    );
+    try {
+      const viaProbeFile = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [lib, 'classify', '--plugins-file', fixturePath, '--tooling-probe-file', probePath],
+          { encoding: 'utf8' }
+        )
+      );
+      expect(viaProbeFile.state).toBe(STATES.READY_GITHUB);
+      expect(viaProbeFile.toolingKnown).toBe(true);
+
+      // An explicit --tooling-github overrides the probe file's github entry.
+      const overridden = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            lib,
+            'classify',
+            '--plugins-file',
+            fixturePath,
+            '--tooling-probe-file',
+            probePath,
+            '--tooling-github',
+            'no',
+          ],
+          { encoding: 'utf8' }
+        )
+      );
+      expect(overridden.state).toBe(STATES.PARTIAL_TOOLING);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 

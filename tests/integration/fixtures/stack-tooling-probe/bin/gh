@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Fake `gh` for stack-tooling-probe.js tests. Behavior controlled entirely
+# by env vars so one fixture script covers every scenario the suite needs.
+if [ "$1" = "--version" ]; then
+  printf 'gh version %s\n' "${FAKE_GH_VERSION:-2.97.0 (2026-07-31)}"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  exit "${FAKE_GH_AUTH_EXIT:-0}"
+fi
+if [ "$1" = "extension" ] && [ "$2" = "list" ]; then
+  exit_code="${FAKE_GH_EXT_EXIT:-0}"
+  if [ "$exit_code" != "0" ]; then
+    exit "$exit_code"
+  fi
+  printf '%b' "${FAKE_GH_EXT_OUTPUT:-}"
+  exit 0
+fi
+if [ "$1" = "stack" ] && [ "$2" = "view" ]; then
+  exit "${FAKE_GH_STACK_VIEW_EXIT:-0}"
+fi
+echo "unrecognized fake gh invocation: $*" >&2
+exit 5

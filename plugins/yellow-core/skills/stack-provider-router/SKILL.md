@@ -52,35 +52,23 @@ Run this in a single Bash call. It is read-only.
 set -uo pipefail
 
 LIB="${CLAUDE_PLUGIN_ROOT}/lib/stack-provider-state.js"
+PROBE="${CLAUDE_PLUGIN_ROOT}/lib/stack-tooling-probe.js"
 if [ ! -f "$LIB" ]; then
   printf 'stack_provider_error: router library not found at %s\n' "$LIB"
+  exit 0
+fi
+if [ ! -f "$PROBE" ]; then
+  printf 'stack_provider_error: tooling probe not found at %s\n' "$PROBE"
   exit 0
 fi
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 intent_file="${repo_root:-.}/.yellow-stack.yml"
 
-# Provider CLI probes. Reported as explicit yes/no so the classifier can
-# distinguish "checked and missing" (PARTIAL_TOOLING) from "never checked".
-if command -v gt >/dev/null 2>&1; then tool_gt=yes; else tool_gt=no; fi
-if command -v gh >/dev/null 2>&1; then
-  # Identity check: only github/gh-stack is first-party. Capture the
-  # probe's own exit status directly in the `if` — do not lose it by
-  # piping into `grep -q`. A probe failure (network, or auth-required)
-  # must not collapse into the same `no` as a genuinely absent extension,
-  # or an enabled GitHub provider is misclassified as PARTIAL_TOOLING.
-  if ext_list=$(gh extension list 2>/dev/null); then
-    if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-      tool_gh=yes
-    else
-      tool_gh=no
-    fi
-  else
-    tool_gh=unknown
-  fi
-else
-  tool_gh=no
-fi
+# stack-tooling-probe.js is the single owner of gt/gh readiness (presence,
+# gh auth validity, and github/gh-stack extension identity) — this skill no
+# longer inlines its own copy of that logic.
+probe_json=$(node "$PROBE" probe --provider both)
 
 if ! plugin_json=$(claude plugin list --json 2>/dev/null); then
   printf 'stack_provider_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
@@ -91,8 +79,7 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
   --plugins-file - \
   --intent-file "$intent_file" \
   --project-path "$repo_root" \
-  --tooling-graphite "$tool_gt" \
-  --tooling-github "$tool_gh" \
+  --tooling-probe-file <(printf '%s' "$probe_json") \
   || printf 'stack_provider_error: classification failed — provider state is UNKNOWN\n'
 ```
 
