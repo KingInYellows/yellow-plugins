@@ -386,11 +386,19 @@ describe('CLI end to end', () => {
   });
 });
 
+// Token-shaped strings are BUILT at runtime, never written as literals:
+// a literal `ghp_` + 36 chars in the source is indistinguishable from a real
+// leaked credential to a secret scanner (GitGuardian flagged exactly that on
+// the first version of this suite), and a test for redaction must not itself
+// look like the thing it redacts.
+const fakeToken = (prefix: string, fill: string, len = 36) => `${prefix}${fill.repeat(len)}`;
+
 describe('credential redaction — subprocess output never carries secrets into the result', () => {
   it('redacts a credential-bearing remote URL (the realistic git-error vector)', () => {
-    const out = redact('fatal: could not read from https://user:ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA@github.com/o/r.git');
+    const secret = fakeToken('ghp_', 'A');
+    const out = redact(`fatal: could not read from https://user:${secret}@github.com/o/r.git`);
     expect(out).toContain('[REDACTED:basic-auth]');
-    expect(out).not.toContain('ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+    expect(out).not.toContain(secret);
   });
 
   it('redacts bare GitHub tokens in every documented prefix form', () => {
@@ -414,15 +422,16 @@ describe('credential redaction — subprocess output never carries secrets into 
   });
 
   it('redacts secrets that reach the result through real subprocess stderr, not just the helper', () => {
+    const secret = fakeToken('ghp_', 'C');
     process.env.FAKE_GH_EXIT = '1';
-    process.env.FAKE_GH_STDERR = 'fatal: https://u:ghp_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC@github.com/o/r.git rejected';
+    process.env.FAKE_GH_STDERR = `fatal: https://u:${secret}@github.com/o/r.git rejected`;
     const result = submit({});
     expect(result.stderr).toContain('[REDACTED:basic-auth]');
-    expect(result.stderr).not.toContain('ghp_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC');
+    expect(result.stderr).not.toContain(secret);
   });
 
   it('redacts BEFORE truncation, so a secret cannot survive past the output cap', () => {
-    const secret = `ghp_${'D'.repeat(36)}`;
+    const secret = fakeToken('ghp_', 'D');
     const padded = `${'x'.repeat(9000)}${secret}`;
     const out = redact(padded);
     expect(out).not.toContain(secret);
