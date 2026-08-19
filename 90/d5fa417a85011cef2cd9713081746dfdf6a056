@@ -1,0 +1,28 @@
+catalog/plugins/github-workflow.json
+  s_fd5d688b6eb948::t_af473e7a5e9bbc 3
+  s_fd5d688b6eb948::t_a9db81e3113840 26
+plugins/github-workflow/README.md
+  s_fd5d688b6eb948::t_576cf4bf2ac9b1 3-13
+  s_fd5d688b6eb948::t_0ee75cf3b6b7ad 90-93
+  s_fd5d688b6eb948::t_34c061d604f934 64-72,79-80,84-86
+.claude-plugin/marketplace.json
+  s_fd5d688b6eb948::t_981e7b8aa7db7d 26
+plugins/github-workflow/.claude-plugin/plugin.json
+  s_fd5d688b6eb948::t_ffc2629667d046 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "90d5fa417a85011cef2cd9713081746dfdf6a056",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
