@@ -72,10 +72,16 @@ ambiguous state is reported, never silently resolved.
 Each is a thin wrapper over a same-named skill, matching the
 `/plan:status` → `plan-status` pattern used elsewhere in this marketplace.
 
+## Hooks
+
+Two safety hooks, mirroring `gt-workflow`'s (independent implementations,
+not a shared runtime dependency): `check-git-push` blocks raw `git push`
+(PreToolUse), `check-commit-message` warns on a non-conventional commit
+message (PostToolUse). See `CLAUDE.md` for detail.
+
 ## What this plugin does not do
 
 - No MCP server.
-- No hooks.
 - No mutating `gh stack` invocation outside `github-stack-runtime.js` — no
   command or skill's Bash block calls `gh stack <verb>` directly.
 - No edits to settings JSON, branch protections, rulesets, merge queues, or

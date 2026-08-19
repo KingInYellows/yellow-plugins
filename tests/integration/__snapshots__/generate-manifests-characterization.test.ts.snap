@@ -244,6 +244,32 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
     "workflow",
     "provider"
   ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  },
   "dependencies": [
     "yellow-core"
   ]

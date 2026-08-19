@@ -74,11 +74,27 @@ the provider model:
   `merge` operation (Preview → Confirm → Merge → Report), always behind
   an `AskUserQuestion` confirmation; never calls `gh pr merge`.
 
-### MCP servers (0) · Hooks (0)
+### MCP servers (0) · Hooks (2)
 
-Deliberate. Neither is needed for this plugin's command surface — every
+No MCP server — not needed for this plugin's command surface; every
 mutating operation goes through the runtime adapter's own validation and
 confirmation gating instead.
+
+Two hooks, mirroring `gt-workflow`'s (independent copies, not a
+cross-plugin require — this plugin has no runtime dependency on
+`gt-workflow` being present, matching the "never require the other
+provider's files" reading of this repo's provider-neutrality invariant):
+
+- `check-git-push` (PreToolUse) — blocks raw `git push`, pointing at
+  `github-stack-submit` instead of Graphite's `gt submit`.
+- `check-commit-message` (PostToolUse) — warns on a non-conventional
+  commit message, triggered on `git commit` instead of `gt modify`/`gt
+  commit`/`gt create`.
+
+Both are pure policy functions (`hooks/scripts/lib/policy-check-*.js`) with
+direct behavior tests in `tests/hooks.bats` — not a bash-golden parity
+harness like `gt-workflow`'s, since there is no deleted bash predecessor
+for these to reproduce.
 
 ## Extension identity matters
 

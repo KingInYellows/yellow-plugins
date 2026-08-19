@@ -1,0 +1,29 @@
+{
+  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json (generated from catalog/plugins/github-workflow.json). Keep all numeric fields (e.g. timeout) in sync with plugin.json.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  }
+}
