@@ -1632,6 +1632,52 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
   }
 }
 
+// RULE 19 — a command or agent whose body instructs invoking the `Skill`
+// tool must declare `Skill` in its own tool grant (`allowed-tools` for
+// commands, `tools` for agents). Without the grant the invocation cannot
+// run at all — a hard runtime block, not a style nit — so this is an
+// error, not a warning.
+//
+// Deliberately broader than RULE 17 in two ways: RULE 17 only scans a
+// wrapper command's `## Usage` section (by design — see RULE 17's own
+// comment for why that scope exists) and only covers command files. Many
+// multi-phase orchestrators invoke the Skill tool mid-document, outside
+// any `## Usage` heading (`plan/complete.md` Phase 6, `review-pr.md`
+// step 9, `debt-fixer.md`'s fix-application section — an AGENT file,
+// which RULE 17 never covers at all since it only walks commandFiles).
+// This rule scans the whole body (fence + frontmatter stripped) of both
+// command and agent files. It overlaps RULE 17 on wrapper commands (both
+// may report the same missing grant on the same file); that redundancy is
+// harmless — neither rule alone covers every invocation site RULE 19
+// needs to catch.
+//
+// Detection matches the established phrasing this repo uses everywhere it
+// dispatches to the Skill tool: "Invoke the `Skill` tool ..." / "invoke
+// the Skill tool ...". Verified empirically against every command and
+// agent file that currently mentions the Skill tool at all — every match
+// already grants `Skill` except the files this rule was written to catch,
+// so this is a zero-false-positive introduction, not a heuristic guess.
+const SKILL_TOOL_MENTION_RE = /\bSkill`?\s+tool\b/;
+
+function validateSkillToolGrant(files, errors, { toolsKey }) {
+  for (const filePath of files) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (!SKILL_TOOL_MENTION_RE.test(stripFencedContent(content))) continue;
+
+    const frontmatter = extractFrontmatter(content);
+    const grantedTools = parseList(frontmatter, toolsKey);
+    if (!grantedTools.includes('Skill')) {
+      errors.push(
+        `${relative(filePath)}: RULE 19 — body invokes the \`Skill\` tool ` +
+          `but "${toolsKey}" frontmatter does not include "Skill" — add it ` +
+          `alongside the file's existing tools (do not replace them; same ` +
+          `class as RULE 17's command-scoped check, but this scan covers ` +
+          `the whole body and agent files too)`
+      );
+    }
+  }
+}
+
 // RULE 15 — SKILL.md authoring rules (see the constant block above for the
 // rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
 // only; ctx.errors receives just the malformed-YAML structural gate below —
@@ -1818,6 +1864,8 @@ function main() {
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
   validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors);
+  validateSkillToolGrant(commandFiles, errors, { toolsKey: 'allowed-tools' });
+  validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);

@@ -91,11 +91,12 @@ Read `state` from the JSON.
 Graphite-owned work there (for example `/smart-submit`, `/gt-sync`,
 `/gt-stack-plan`).
 
-**`READY_GITHUB`** — the active provider is `github-workflow`. As of this
-shell that plugin implements setup and status only, so a stack *operation*
-has no destination yet. Say exactly that — "the GitHub provider is active
-but stack operations are not implemented yet" — and stop. Do not silently
-run the Graphite equivalent.
+**`READY_GITHUB`** — the active provider is `github-workflow`. Dispatch
+GitHub-owned work to its `github-stack:*` command surface (for example
+`/github-stack:submit`, `/github-stack:sync`, `/github-stack:plan` — the
+full surface is setup/status/plan/submit/amend/sync/nav/cleanup/merge, see
+`plugins/github-workflow/CLAUDE.md`). Do not silently run the Graphite
+equivalent.
 
 **Any other state** — stop and report. Use the `detail` field verbatim; it
 already names the specific problem.

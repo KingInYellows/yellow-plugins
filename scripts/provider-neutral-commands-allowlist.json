@@ -5,7 +5,7 @@
   "plugins/yellow-core/commands/flow/review.md": 5,
   "plugins/yellow-core/commands/plan/complete.md": 7,
   "plugins/yellow-core/skills/debugging/SKILL.md": 8,
-  "plugins/yellow-debt/agents/remediation/debt-fixer.md": 1,
+  "plugins/yellow-debt/agents/remediation/debt-fixer.md": 8,
   "plugins/yellow-devin/commands/devin/review-prs.md": 3,
   "plugins/yellow-linear/skills/linear-workflows/SKILL.md": 1,
   "plugins/yellow-review/commands/review/resolve-pr.md": 4,

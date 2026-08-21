@@ -102,7 +102,7 @@ function sanitizeScope(scope) {
 }
 
 /**
- * The seven provider states. Exported so consumers compare against a
+ * The eight provider states. Exported so consumers compare against a
  * constant rather than a string literal that a typo can silently break.
  */
 const STATES = Object.freeze({

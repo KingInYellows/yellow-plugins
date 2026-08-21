@@ -233,6 +233,16 @@ in order from bottom (item 1) to top:
 
 1. **Create the branch**, using the provider resolved in Phase 1 step 4:
 
+   **Validate every branch name before it reaches a Bash command.** Before
+   embedding `<branch-name>`, `<trunk>`, or `<last-completed-branch>` in any
+   command below (either provider), run `git check-ref-format --branch
+   "<value>"` in its own Bash call and also reject the value if it contains
+   any of `$` `` ` `` `;` `&` `|` `(` `)` `<` `>` a literal quote character,
+   or whitespace — `check-ref-format` alone accepts all of those in a real
+   git ref name. If either check fails, stop and ask the user for a
+   corrected name via AskUserQuestion rather than embedding the rejected
+   value in any command.
+
    - **Mixed topology:** Not yet supported (either provider). If detected,
      report to the user: "Mixed topology is not yet supported by
      flow:work. Please restructure as linear or parallel." and stop
@@ -270,12 +280,16 @@ in order from bottom (item 1) to top:
      "Resume"): checkout `<trunk>` (from `<!-- stack-trunk: -->`
      metadata), then
      `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" init --base <trunk> --branch "<branch-name>"`.
-   - **Linear topology, resuming or continuing a later item:** first
-     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" checkout --target <last-completed-branch>`,
-     then
-     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" add --branch "<branch-name>" --message "<item description>"`
-     (stacks on top of the checked-out branch). After checkout, verify with
-     `git branch --show-current` that the expected branch is active.
+   - **Linear topology, resuming or continuing a later item:** checkout
+     only —
+     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" checkout --target <last-completed-branch>`.
+     Do NOT create the new branch here: this adapter has no branch-only
+     primitive — `add` stages, commits, AND creates the branch in one
+     atomic call — so this item's branch is created together with its
+     first commit in step 5, once step 3 has produced a diff to stage.
+     After checkout, verify with
+     `git branch --show-current` that `<last-completed-branch>` (not the
+     new branch — it doesn't exist yet) is checked out.
    - **Parallel topology (every item):** each parallel item starts its OWN
      independent stack from trunk — it never continues a previous item's
      stack, so `add` is never correct here even for item 2+. First checkout
@@ -296,8 +310,13 @@ in order from bottom (item 1) to top:
    entries for these tasks only.
 
 3. **Execute tasks:** Follow the same implementation logic as Phase 2 below
-   (read files, find patterns, implement, write tests, commit). All commits for
-   this item use the branch created in step 1.
+   (read files, find patterns, implement, write tests, commit). All commits
+   for this item use the branch created in step 1 — **except GitHub linear
+   continuation** (step 1's "resuming or continuing a later item" case):
+   that branch doesn't exist yet, so stage each task's changes but skip
+   Phase 2's per-task commit sub-step for this case; leave everything
+   staged until step 5, where the `add` call creates the branch and makes
+   the one commit for the whole item.
 
 4. **Run tests** scoped to changed files. If tests fail:
    - **Linear topology:** Stop and ask user (item N+1 depends on N)
@@ -316,27 +335,74 @@ in order from bottom (item 1) to top:
    First verify changes exist: `git status --porcelain`. If no changes are
    detected, ask the user: "No changes for item N. Skip or investigate?"
 
-   Where `<type>` and `<description>` come from the stack item fields, use
-   the provider resolved in Phase 1 step 4:
+   **Stage changed files safely** (both providers) — read the change list
+   as NUL-delimited output into a bash array; never interpolate filenames
+   as literal text (a filename containing `$(...)`, backticks, or a
+   leading `-` would otherwise be re-parsed by the shell or misread as a
+   flag):
+
+   ```bash
+   files=()
+   while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+   git add -- "${files[@]}"
+   ```
+
+   **Write the commit message to a file, not the command line.** A message
+   built from `<type>: <description>` can contain `$(...)`, backticks, or
+   quotes that a `-m "..."` argument would let the shell execute (same
+   class as `docs/solutions/security-issues/heredoc-delimiter-collision.md`):
+
+   ```bash
+   msgfile=$(mktemp -u /tmp/flow-work-msg-XXXXXX.txt)
+   printf 'msgfile=%s\n' "$msgfile"
+   ```
+
+   Use the **Write tool** (not Bash, not a heredoc — Write takes content as
+   a structured parameter, never shell-parsed) to create the file at the
+   literal `$msgfile` path just printed, with content exactly `<type>:
+   <description>`. `mktemp -u` only mints the name — the file doesn't
+   exist yet, so Write can create it directly without needing to Read it
+   first.
+
+   Then, in a fresh Bash call, re-declare `msgfile=<the literal path
+   printed above>` (Bash variables don't survive across separate tool
+   calls) and use the provider resolved in Phase 1 step 4:
 
    **Graphite:**
 
    ```bash
-   gt modify -m "<type>: <description>"
+   gt modify -m "$(tr -d '\r' < "$msgfile")"
    gt submit --no-interactive
    ```
+
+   (No file-message flag exists for this command (verified via `--help`),
+   so the quoted command substitution is the safe equivalent: its result
+   is inserted as one literal argument, never re-parsed for
+   `$()`/backticks. `tr -d '\r'` strips CRLF the Write tool can emit on
+   WSL2.)
 
    If `gt submit` fails, do NOT proceed to step 6. Report the failure and ask
    the user: "Submit failed for [item]. Retry / Continue without submit (mark
    incomplete) / Stop here."
 
-   **GitHub:**
+   **GitHub — branch already exists** (first item or parallel topology,
+   created via `init` in step 1):
 
    ```bash
-   git add -- <changed-files>
-   git commit -m "<type>: <description>"
+   git commit -F <(tr -d '\r' < "$msgfile")
    node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
    ```
+
+   **GitHub — linear continuation** (step 1 only checked out the
+   predecessor branch; this call creates the new branch AND makes the
+   commit together):
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" add --branch "<branch-name>" --message "$(tr -d '\r' < "$msgfile")"
+   ```
+
+   (`<branch-name>` must already have passed step 1's check-ref-format +
+   metacharacter validation before it reaches this call.)
 
    (No `--open` — draft by default.) If the adapter's `status` is not
    `SUCCESS`, do NOT proceed to step 6. Report the `recoveryAction` and ask
@@ -510,30 +576,37 @@ Phase 3 (Quality Check) in stack summary mode.
    go test ./...
    ```
 
-   i. Make incremental commit using the provider resolved in Phase 1 step 4:
+   i. Make incremental commit using the provider resolved in Phase 1 step 4.
+   Write the message to a file first — same `mktemp -u` + Write-tool
+   pattern as Phase 1b step 5 (never embed generated text directly in
+   `-m "..."`; a message summarizing the diff can contain `$(...)`,
+   backticks, or quotes a literal `-m` argument would let the shell
+   execute) — with content shaped like:
+
+   ```
+   feat(scope): implement X component
+
+   - Add core functionality
+   - Include error handling
+   - Add unit tests
+   ```
 
    **Graphite:**
 
    ```bash
-   gt modify -m "feat(scope): implement X component
-
-   - Add core functionality
-   - Include error handling
-   - Add unit tests"
+   gt modify -m "$(tr -d '\r' < "$msgfile")"
    ```
 
    **GitHub:** plain `git commit` — no gh-stack-specific commit primitive
    exists (see `plugins/yellow-core/lib/stack-operation-registry.js`'s
-   `commitOrAmend.github` entry). Stage specific changed files, never
-   `-A`/`.`:
+   `commitOrAmend.github` entry). Stage specific changed files via the
+   NUL-delimited array pattern from Phase 1b step 5, never `-A`/`.`:
 
    ```bash
-   git add -- <changed-files>
-   git commit -m "feat(scope): implement X component
-
-   - Add core functionality
-   - Include error handling
-   - Add unit tests"
+   files=()
+   while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+   git add -- "${files[@]}"
+   git commit -F <(tr -d '\r' < "$msgfile")
    ```
 
    Push the update with the adapter once ready to share (see Phase 4); an
@@ -751,27 +824,31 @@ it at a Phase 1b checkpoint.
    - Document P3 issues for future work
 
 6. Make final quality commit if changes needed, using the provider resolved
-   in Phase 1 step 4:
+   in Phase 1 step 4. Write the message to a file first — same `mktemp -u`
+   + Write-tool pattern as Phase 1b step 5 (never embed generated text
+   directly in `-m "..."`) — with content shaped like:
+
+   ```
+   refactor: address code review feedback
+
+   - Simplify complex function X
+   - Fix potential security issue in Y
+   - Optimize query in Z
+   ```
 
    **Graphite:**
 
    ```bash
-   gt modify -m "refactor: address code review feedback
-
-   - Simplify complex function X
-   - Fix potential security issue in Y
-   - Optimize query in Z"
+   gt modify -m "$(tr -d '\r' < "$msgfile")"
    ```
 
    **GitHub:**
 
    ```bash
-   git add -- <changed-files>
-   git commit -m "refactor: address code review feedback
-
-   - Simplify complex function X
-   - Fix potential security issue in Y
-   - Optimize query in Z"
+   files=()
+   while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+   git add -- "${files[@]}"
+   git commit -F <(tr -d '\r' < "$msgfile")
    ```
 
 7. **Polish loop — re-run review until clean (cap 3 iterations).** Steps 3–6 are
@@ -861,11 +938,19 @@ step 5. Phase 4 becomes a summary phase:
    plugin not installed, or any error), generate a conventional commit message
    from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done
-   2. Stage only the changed files individually: `git add -- <changed-files>`
-   3. Commit and submit:
+   1. Generate a conventional commit message summarizing the work done.
+   2. Stage changed files safely — same NUL-delimited array pattern as
+      Phase 1b step 5 (never interpolate filenames as literal text):
       ```bash
-      gt modify -m "<generated conventional commit message>"
+      files=()
+      while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+      git add -- "${files[@]}"
+      ```
+   3. Write the generated message to a file — same `mktemp -u` + Write-tool
+      pattern as Phase 1b step 5 (never embed generated text directly in
+      `-m "..."`) — then commit and submit:
+      ```bash
+      gt modify -m "$(tr -d '\r' < "$msgfile")"
       gt submit --no-interactive
       ```
 
@@ -877,11 +962,18 @@ step 5. Phase 4 becomes a summary phase:
    github-workflow plugin not installed, or any error), generate a
    conventional commit message from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done
-   2. Stage only the changed files individually: `git add -- <changed-files>`
-   3. Commit and submit:
+   1. Generate a conventional commit message summarizing the work done.
+   2. Stage changed files safely — same NUL-delimited array pattern as
+      Phase 1b step 5:
       ```bash
-      git commit -m "<generated conventional commit message>"
+      files=()
+      while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+      git add -- "${files[@]}"
+      ```
+   3. Write the generated message to a file — same `mktemp -u` + Write-tool
+      pattern as Phase 1b step 5 — then commit and submit:
+      ```bash
+      git commit -F <(tr -d '\r' < "$msgfile")
       node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
       ```
       Read the JSON result's `status`; anything but `SUCCESS` stops here —
