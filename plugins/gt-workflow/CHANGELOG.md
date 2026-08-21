@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [#716](https://github.com/KingInYellows/yellow-plugins/pull/716)
+  [`d422f55`](https://github.com/KingInYellows/yellow-plugins/commit/d422f55472f16bc14503236d7b64de5e9de4b15f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `dependencies: ["yellow-core"]`. **Breaking:** a standalone `gt-workflow`
+  install without `yellow-core` will now fail to enable — `claude plugin enable`
+  refuses when a declared dependency is missing. Required so `/gt-merge` and the
+  provider-router pattern have `yellow-core`'s `stack-operation-registry.js` and
+  `stack-provider-router` skill available. Also adds `/gt-merge`
+  (`gt merge -c`), closing the registry's previously missing Graphite `merge`
+  operation.
+
 ## 1.6.2
 
 ### Patch Changes

@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "1.6.2",
+      "version": "2.0.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -24,7 +24,7 @@
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "1.3.6",
+      "version": "1.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -54,7 +54,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.3.7",
+      "version": "2.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.2.9",
+      "version": "3.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.6.10",
+      "version": "1.7.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -104,7 +104,7 @@
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.2",
+      "version": "1.5.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "4.1.5",
+      "version": "4.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -184,7 +184,7 @@
     {
       "name": "yellow-mempalace",
       "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
-      "version": "1.1.6",
+      "version": "1.1.7",
       "author": {
         "name": "KingInYellows"
       },

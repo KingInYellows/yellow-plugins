@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- [#716](https://github.com/KingInYellows/yellow-plugins/pull/716)
+  [`d422f55`](https://github.com/KingInYellows/yellow-plugins/commit/d422f55472f16bc14503236d7b64de5e9de4b15f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `linear-pr-linker`, `linear:sync`, `linear:work`, and the `linear-workflows`
+  skill now resolve the active stacked-PR provider once via
+  `stack-provider-router` before committing or submitting, instead of hardcoding
+  Graphite. The Graphite path is unchanged.
+
 ## 1.3.6
 
 ### Patch Changes

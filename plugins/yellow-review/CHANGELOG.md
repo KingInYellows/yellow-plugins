@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.3.0
+
+### Minor Changes
+
+- [#716](https://github.com/KingInYellows/yellow-plugins/pull/716)
+  [`d422f55`](https://github.com/KingInYellows/yellow-plugins/commit/d422f55472f16bc14503236d7b64de5e9de4b15f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `resolve-pr`,
+  `resolve-stack`, `review-all`, `review-pr`, `sweep`, and `sweep-all` (plus the
+  `pr-review-workflow` and `stack-traversal` skills that describe their
+  behavior) now resolve the active stacked-PR provider once via
+  `stack-provider-router` before committing or submitting, instead of hardcoding
+  Graphite. The Graphite path is unchanged; a GitHub-provider repo now routes
+  through `github-workflow`'s runtime adapter instead of failing.
+
 ## 3.2.9
 
 ### Patch Changes

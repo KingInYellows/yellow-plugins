@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.6
+
+### Patch Changes
+
+- [#716](https://github.com/KingInYellows/yellow-plugins/pull/716)
+  [`d422f55`](https://github.com/KingInYellows/yellow-plugins/commit/d422f55472f16bc14503236d7b64de5e9de4b15f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Reword
+  CLAUDE.md's submission convention to point at the resolved active stacked-PR
+  provider (`/stack:status`) instead of naming `gt submit` specifically. No
+  functional change.
+
 ## 1.2.5
 
 ### Patch Changes
