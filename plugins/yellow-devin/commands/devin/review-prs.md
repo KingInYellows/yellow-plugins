@@ -243,7 +243,7 @@ For each PR, check out the branch and adopt into Graphite:
 gh pr checkout "$PR_NUM"
 ```
 
-If `GT_AVAILABLE` is true:
+If the router state (Step 1b) is `READY_GRAPHITE` and `GT_AVAILABLE`:
 
 ```bash
 GT_DEGRADED_PRS=()  # Initialize before the loop if not already set

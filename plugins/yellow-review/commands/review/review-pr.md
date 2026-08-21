@@ -14,6 +14,7 @@ allowed-tools:
   - TaskOutput
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
