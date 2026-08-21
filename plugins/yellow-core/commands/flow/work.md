@@ -825,7 +825,7 @@ it at a Phase 1b checkpoint.
 
 6. Make final quality commit if changes needed, using the provider resolved
    in Phase 1 step 4. Write the message to a file first — same `mktemp -u`
-   + Write-tool pattern as Phase 1b step 5 (never embed generated text
+   plus Write-tool pattern as Phase 1b step 5 (never embed generated text
    directly in `-m "..."`) — with content shaped like:
 
    ```
