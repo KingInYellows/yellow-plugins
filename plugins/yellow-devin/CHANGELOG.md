@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.0
+
+### Minor Changes
+
+- [#716](https://github.com/KingInYellows/yellow-plugins/pull/716)
+  [`d422f55`](https://github.com/KingInYellows/yellow-plugins/commit/d422f55472f16bc14503236d7b64de5e9de4b15f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `devin:review-prs` now resolves the active stacked-PR provider once via
+  `stack-provider-router` before committing, instead of hardcoding Graphite. The
+  Graphite path is unchanged.
+
 ## 2.3.7
 
 ### Patch Changes
