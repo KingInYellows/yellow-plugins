@@ -1,0 +1,19 @@
+plugins/yellow-core/commands/flow/work.md
+  s_6ce9b3eb15f4ee::t_4e4f0ed38fa9fb 828
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "9196a3d9c60740fbdd96f1ceb149914971fcc116",
+  "prompts": {},
+  "sessions": {
+    "s_6ce9b3eb15f4ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "619d5ba8-ff00-4add-aea7-d0b660485a2a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
