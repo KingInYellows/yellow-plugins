@@ -1,0 +1,19 @@
+.changeset/github-stack-review-findings.md
+  s_6ce9b3eb15f4ee::t_6fef6daf89a720 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "157142bc06b50507f497c0d3ab97b4fa89ee5703",
+  "prompts": {},
+  "sessions": {
+    "s_6ce9b3eb15f4ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "619d5ba8-ff00-4add-aea7-d0b660485a2a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
