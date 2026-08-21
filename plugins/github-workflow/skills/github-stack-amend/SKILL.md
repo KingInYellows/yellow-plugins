@@ -41,18 +41,21 @@ Options: "Amend anyway" / "Cancel". On "Cancel", stop.
 
 ### Step 2: Stage Specific Files
 
-Do **not** use `git add .`. Stage only the changed files by name:
+Do **not** use `git add .`. Enumerate the changed and untracked files
+NUL-delimited into a bash array — never interpolate filenames into a
+command string, since a crafted filename (containing `$(...)`, backticks,
+or a leading `-`) would otherwise execute or be parsed as a flag when
+staged:
 
 ```bash
-git diff --name-only
-git ls-files --others --exclude-standard
+mapfile -d '' -t files < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
 ```
 
-Exclude `.env*` files, credential files, binaries, and build artifacts.
-Then:
+Exclude `.env*` files, credential files, binaries, and build artifacts
+from `files`. Then stage the remaining entries via array expansion:
 
 ```bash
-git add -- "<file1>" "<file2>"
+git add -- "${files[@]}"
 ```
 
 ### Step 3: Amend
@@ -63,10 +66,14 @@ By default, keep the existing commit message:
 git commit --amend --no-edit
 ```
 
-If the argument text supplied a new commit message, use it instead:
+If the argument text supplied a new commit message, write it to a temp
+file and amend from it — never interpolate the new message into a `-m`
+string, since it may contain `$(...)`, backticks, or unescaped quotes:
 
 ```bash
-git commit --amend -m "<new message>"
+msgfile="$(mktemp)"
+# write the new commit message to "$msgfile"
+git commit --amend -F "$msgfile"
 ```
 
 ### Step 4: Re-submit

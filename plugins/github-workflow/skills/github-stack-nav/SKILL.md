@@ -23,10 +23,19 @@ The argument text provided after the skill name (if any) is the target
 
 ### Step 1: Resolve the Target
 
-If the argument text is non-empty, use it as the target and go to Step 2.
+If the argument text is non-empty, validate it before using it — it must
+be routed through the same check Step 2 requires below, never used as-is:
+it must match `^[1-9][0-9]*$` (a stack/PR number) or start with
+`https://github.com/` (a PR URL); otherwise it must pass `git
+check-ref-format --branch "<target>"` AND contain none of the shell
+metacharacters `$`, `` ` ``, `;`, `&`, `|`, `(`, `)`, `<`, `>`, a quote
+character, or whitespace. If it passes, use it as the target and go to
+Step 2. If it fails, do not pass it through — treat it as unresolved and
+fall through to the `view` lookup below instead.
 
-If the argument text is empty, call the adapter's `view` operation first
-to list available targets:
+If the argument text is empty, or it was rejected by the validation
+above, call the adapter's `view` operation first to list available
+targets:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
@@ -44,12 +53,15 @@ if the field structure is not self-evident:
 ```
 
 Use `AskUserQuestion` to ask which target to check out, offering the
-branches/PRs found in the listing.
+branches/PRs found in the listing. Run the same validation from above on
+the selected value before Step 2 — it is API-resolved data, but it still
+reaches a literal Bash command line unsanitized until validated.
 
 ### Step 2: Checkout
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" checkout --target "<target>"
+target="<validated target>"
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" checkout --target "$target"
 ```
 
 ### Step 3: Report

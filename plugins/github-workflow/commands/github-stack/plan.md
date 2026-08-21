@@ -3,7 +3,6 @@ name: github-stack:plan
 description: 'Report the current GitHub-native stack structure (read-only). Use when checking what branches/PRs are in the stack before submitting or merging.'
 argument-hint: ''
 allowed-tools:
-  - Bash
   - Skill
 ---
 

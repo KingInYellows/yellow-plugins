@@ -3,8 +3,6 @@ name: github-stack:setup
 description: 'Check GitHub-native stacked-PR prerequisites — gh CLI, authentication, and the official github/gh-stack extension. Use when first installing the plugin or when github stacked-PR tooling is unavailable.'
 argument-hint: ''
 allowed-tools:
-  - Bash
-  - AskUserQuestion
   - Skill
 ---
 

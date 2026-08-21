@@ -3,8 +3,6 @@ name: github-stack:amend
 description: 'Fold working-tree changes into the current branch commit and re-submit via gh stack. Use when user says "amend this" or "add this to the current PR" on the github stacked-PR provider.'
 argument-hint: ''
 allowed-tools:
-  - Bash
-  - AskUserQuestion
   - Skill
 ---
 
