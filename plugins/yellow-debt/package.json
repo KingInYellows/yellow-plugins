@@ -1,6 +1,6 @@
 {
   "name": "yellow-debt",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns"
 }
