@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -57,7 +57,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.4.0",
+      "version": "2.4.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -67,7 +67,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.3.0",
+      "version": "3.3.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -97,7 +97,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.7.0",
+      "version": "1.7.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -226,7 +226,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
@@ -498,7 +498,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -576,7 +576,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-debt",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
   "author": {
     "name": "KingInYellows",
@@ -626,7 +626,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
@@ -937,7 +937,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",

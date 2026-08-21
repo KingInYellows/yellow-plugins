@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
