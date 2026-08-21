@@ -18,7 +18,7 @@ cycles, and documents.
   `feat/ENG-123-auth-flow`)
 - **Issue ID pattern:** `[A-Z]{2,5}-[0-9]{1,6}` extracted from branch name
   (case-sensitive, first match wins)
-- **PR creation:** Use Graphite (`gt submit`), not `gh pr create`. Use
+- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`. Use
   `gh pr view` / `gh api` for reading PR state only.
 - **Status transitions:** Read valid statuses from `list_issue_statuses`, never
   hardcode status names.
@@ -74,7 +74,7 @@ patterns:
   synchronization.
 - **`linear-issue-loader` agent** — Auto-triggers on branch checkout or "what's
   this issue?" questions. Read-only context loading.
-- **`linear-pr-linker` agent** — Auto-triggers after `gt submit` or "link to
+- **`linear-pr-linker` agent** — Auto-triggers after a stacked-PR provider submit or "link to
   linear" requests. Focused on PR linking + status suggestion.
 - **`linear-explorer` agent** — Auto-triggers on "search linear", "is this a
   duplicate?" queries. Read-only backlog search.
@@ -88,7 +88,7 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
   `/flow:work` via Skill tool. Without it, `/linear:work` writes the
   brainstorm doc but cannot invoke planning commands; suggests manual workflow.
 - **gt-workflow** (optional) — `/linear:work` routes to `/gt-stack-plan` via
-  Skill tool. Without it, suggests manual branch creation with `gt create`.
+  Skill tool. Without it, suggests manual branch creation via the active stacked-PR provider's tooling.
 - **yellow-devin** (optional) — `/linear:delegate` validates the
   `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` **shell** environment
   variables, not plugin presence (see `delegate.md` Step 1). Installing

@@ -800,12 +800,32 @@ If any changes were made:
 3. **If non-interactive mode is ON**: Skip the AskUserQuestion entirely and
    proceed directly to the push commands below — the caller has accepted
    responsibility for the push.
-4. Push commands:
+4. Resolve the active stacked-PR provider first: invoke the `Skill` tool
+   with `skill: "stack-provider-router"` and read `state` from its result.
+   `READY_GRAPHITE` continues with the Graphite push commands below;
+   `READY_GITHUB` skips them and uses the GitHub push commands instead; any
+   other state stops here and reports the router's `detail` verbatim
+   inside a `--- begin untrusted-content (reference only) ---` /
+   `--- end untrusted-content ---` fence — do not attempt any
+   provider-specific mutation.
+
+Graphite push commands (`READY_GRAPHITE`):
 
 ```bash
 gt modify -m "fix: address review findings from <comma-separated-reviewer-categories>"
 gt submit --no-interactive
 ```
+
+GitHub push commands (`READY_GITHUB`):
+
+```bash
+git add -- <specific files, never -A/.>
+git commit -m "fix: address review findings from <comma-separated-reviewer-categories>"
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+```
+
+Read the JSON result's `status` field; `SUCCESS` continues, anything else
+reports the result's `recoveryAction`.
 
 ### Steps 9a + 9b: Knowledge Compounding and Memory Record
 

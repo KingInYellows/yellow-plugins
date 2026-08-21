@@ -32,6 +32,12 @@
  *   --scope <user|project|local>  target scope for `plan` (default: user)
  *   --tooling-graphite <yes|no|unknown>  probe result (omit/unknown ⇒ not checked)
  *   --tooling-github <yes|no|unknown>    probe result (omit/unknown ⇒ not checked)
+ *   --tooling-probe-file <path|->  raw `stack-tooling-probe.js probe` JSON
+ *                                  output; an alternative to the two flags
+ *                                  above that lets a caller pipe the probe's
+ *                                  output straight through with no bash-side
+ *                                  JSON parsing. When both are given, the
+ *                                  explicit --tooling-* flags win per key.
  *
  * Output is a single JSON object on stdout. Exit code is 0 for a successful
  * classification/plan (including a REFUSED plan — refusal is an answer, not
@@ -40,7 +46,7 @@
 
 'use strict';
 
-const { readFileSync } = require('fs');
+const { readFileSync, lstatSync } = require('fs');
 
 /**
  * Canonical provider table for the `stacked-pr` capability group.
@@ -66,6 +72,15 @@ const DEFAULT_MARKETPLACE = 'yellow-plugins';
 
 /** Scopes a user-issued `claude plugin` command can actually write. */
 const WRITABLE_SCOPES = Object.freeze(['user', 'project', 'local']);
+
+/**
+ * Precedence tier per writable scope, narrowest-wins — empirically
+ * confirmed by an isolated `claude plugin` CLI spike (see
+ * docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md
+ * findings #3-4): a `project`-scope override beats `user`, and a
+ * `local`-scope override beats `project`. Higher number = narrower = wins.
+ */
+const SCOPE_TIER = Object.freeze({ user: 0, project: 1, local: 2 });
 
 /** Every scope value the model knows about, writable or not. */
 const KNOWN_SCOPES = Object.freeze([...WRITABLE_SCOPES, 'managed']);
@@ -96,8 +111,26 @@ const STATES = Object.freeze({
   READY_GITHUB: 'READY_GITHUB',
   CONFLICT: 'CONFLICT',
   CONFIG_MISMATCH: 'CONFIG_MISMATCH',
+  CONFIG_INVALID: 'CONFIG_INVALID',
   MANAGED_CONFLICT: 'MANAGED_CONFLICT',
   PARTIAL_TOOLING: 'PARTIAL_TOOLING',
+});
+
+/**
+ * Fixed reason codes for an intent that could not be resolved to a valid
+ * provider id. Every branch of `resolveIntent`/`parseIntentText` returns one
+ * of these — never a free-text string — so `CONFIG_INVALID` consumers can
+ * switch on `reason` instead of pattern-matching prose.
+ */
+const INTENT_INVALID_REASONS = Object.freeze({
+  MISSING_KEY: 'missing-provider-key',
+  EMPTY_VALUE: 'empty-value',
+  UNKNOWN_PROVIDER: 'unknown-provider',
+  DUPLICATE_KEYS: 'duplicate-keys',
+  MALFORMED_SYNTAX: 'malformed-syntax',
+  UNREADABLE: 'unreadable',
+  NON_REGULAR_FILE: 'non-regular-file',
+  SYMLINK: 'symlink',
 });
 
 /** Provider id -> the READY_* state that id produces. */
@@ -107,48 +140,190 @@ const READY_STATE_BY_ID = Object.freeze({
 });
 
 /**
- * Parse `.yellow-stack.yml` for the repository's provider intent.
+ * Parse the value portion of one `provider:` line (everything after the
+ * key), returning either the extracted value or a MALFORMED_SYNTAX
+ * verdict. Split out of `parseIntentText` because a single combined regex
+ * alternation (quoted-or-bare) lets an UNTERMINATED quote silently fall
+ * through to the bare alternative — `"github` (missing closing quote) would
+ * otherwise be accepted as the literal bare value `"github`, misreported as
+ * UNKNOWN_PROVIDER instead of MALFORMED_SYNTAX. Once the value starts with
+ * a quote character, ONLY a properly closed quote is valid; there is no
+ * fallback to the bare grammar.
  *
- * Deliberately not a YAML parser: a shipped plugin library must not depend
- * on node_modules, and the file has exactly one field this repo defines. A
- * single anchored `provider:` line is recognised; everything else in the
- * file is ignored, and an unreadable/absent/malformed file means "no
- * intent" — never a default provider.
- *
- * The character class is `[ \t]*`, NOT `\s*`: `\s` matches newlines, so a
+ * The whitespace class is `[ \t]`, NOT `\s` — `\s` matches newlines, so a
  * `\s*`-separated pattern would happily read the value off the NEXT line.
  *
- * @param {string|null|undefined} text - raw file contents, or null if absent.
- * @returns {string|null} the declared provider id, or null.
+ * @param {string} afterKey - text following `provider:` on its line.
+ * @returns {{ ok: true, value: string } | { ok: false }}
  */
-function parseIntent(text) {
-  if (typeof text !== 'string') {
-    return null;
+function parseIntentValue(afterKey) {
+  const rest = afterKey.replace(/^[ \t]*/, '');
+  if (rest.startsWith('"') || rest.startsWith("'")) {
+    const quoteChar = rest[0];
+    const closeIndex = rest.indexOf(quoteChar, 1);
+    if (closeIndex === -1) {
+      return { ok: false };
+    }
+    const trailing = rest.slice(closeIndex + 1);
+    if (!/^[ \t]*(#.*)?$/.test(trailing)) {
+      return { ok: false };
+    }
+    return { ok: true, value: rest.slice(1, closeIndex) };
   }
-  // Collect EVERY `provider:` root key, not just the first. A file with
-  // duplicate keys is malformed and its intent is ambiguous: another YAML
-  // consumer may take the last value or reject the file outright, so
-  // silently guessing from the first match could route operations to one
-  // provider while the rest of the toolchain believes another.
-  const matches = [
-    ...text
-      .replace(/\r\n/g, '\n')
-      .matchAll(
-        /^provider:[ \t]*(?:"([^"\n]*)"|'([^'\n]*)'|([^\s#]*))[ \t]*(?:#.*)?$/gm
-      ),
-  ];
-  if (matches.length !== 1) {
-    return null;
+  const bareMatch = /^([^\s#]*)[ \t]*(#.*)?$/.exec(rest);
+  if (!bareMatch) {
+    return { ok: false };
   }
-  const match = matches[0];
-  const value = (
-    match[1] !== undefined
-      ? match[1]
-      : match[2] !== undefined
-        ? match[2]
-        : match[3] || ''
-  ).trim();
-  return value.length > 0 ? value : null;
+  return { ok: true, value: bareMatch[1] };
+}
+
+/**
+ * Parse already-read `.yellow-stack.yml` text into a structured intent
+ * result. Pure function, no I/O — `resolveIntent` below handles the
+ * filesystem-level cases (absent/symlink/non-regular/unreadable) before
+ * text ever reaches this function, so an empty string here means "the file
+ * exists, is a regular file, and is empty" (an INVALID case), never
+ * "absent" — those are deliberately not collapsible into one meaning
+ * anymore. See `plans/stacked-pr-provider-abstraction.md` deferred-work
+ * item 8, which this function resolves.
+ *
+ * @param {string} text - raw file contents (already confirmed readable).
+ * @returns {{ kind: 'valid', provider: string } |
+ *           { kind: 'invalid', reason: string, rawValue?: string }}
+ */
+function parseIntentText(text) {
+  const normalized = text.replace(/\r\n/g, '\n');
+  // Every line that BEGINS with the key, well-formed value or not — this is
+  // deliberately looser than INTENT_VALUE_LINE_RE so a malformed line still
+  // counts toward "how many provider: keys does this file declare",
+  // matching duplicate-key detection to what a real YAML parser would key
+  // on (the key, not whether the value happens to parse).
+  const keyLines = normalized.match(/^provider:.*$/gm) || [];
+
+  if (keyLines.length === 0) {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.MISSING_KEY };
+  }
+  if (keyLines.length > 1) {
+    // A file with duplicate keys is malformed and its intent is ambiguous:
+    // another YAML consumer may take the last value or reject the file
+    // outright, so silently guessing from one match could route operations
+    // to one provider while the rest of the toolchain believes another.
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS };
+  }
+
+  const parsedValue = parseIntentValue(keyLines[0].slice('provider:'.length));
+  if (!parsedValue.ok) {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.MALFORMED_SYNTAX };
+  }
+  const value = parsedValue.value.trim();
+  if (value.length === 0) {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.EMPTY_VALUE };
+  }
+  if (!PROVIDERS.some((provider) => provider.id === value)) {
+    return {
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.UNKNOWN_PROVIDER,
+      rawValue: value,
+    };
+  }
+  return { kind: 'valid', provider: value };
+}
+
+/**
+ * Read `.yellow-stack.yml` off disk WITHOUT following a symlink, and
+ * without assuming the path is a regular file. Returns one of:
+ *   - `{ kind: 'absent' }` — no file at this path (ENOENT).
+ *   - `{ kind: 'text', text }` — successfully read as a regular file.
+ *   - `{ kind: 'invalid', reason }` — exists but is a symlink, a
+ *     non-regular file (FIFO, device, directory, ...), or could not be
+ *     read for any other reason (permissions, race).
+ *
+ * `lstatSync` (not `statSync`) is deliberate: a symlinked
+ * `.yellow-stack.yml` could point outside the repository (e.g. `/etc/…` or
+ * an absolute path planted by a malicious contributor), and following it
+ * would read arbitrary filesystem content as "repository intent". Refusing
+ * to follow the link, rather than reading through it, is the security
+ * control — see the equivalent guard in `commands/stack/select.md`'s write
+ * path.
+ *
+ * @param {string|null|undefined} filePath
+ */
+function readIntentFile(filePath) {
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    return { kind: 'absent' };
+  }
+  if (filePath === '-') {
+    // Stdin has no filesystem identity to lstat; only used by tests/CLI
+    // callers that pipe text directly, never by the shipped commands.
+    try {
+      return { kind: 'text', text: readFileSync(0, 'utf8') };
+    } catch {
+      return { kind: 'invalid', reason: INTENT_INVALID_REASONS.UNREADABLE };
+    }
+  }
+
+  let stat;
+  try {
+    stat = lstatSync(filePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { kind: 'absent' };
+    }
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.UNREADABLE };
+  }
+  if (stat.isSymbolicLink()) {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.SYMLINK };
+  }
+  if (!stat.isFile()) {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.NON_REGULAR_FILE };
+  }
+  try {
+    return { kind: 'text', text: readFileSync(filePath, 'utf8') };
+  } catch {
+    return { kind: 'invalid', reason: INTENT_INVALID_REASONS.UNREADABLE };
+  }
+}
+
+/**
+ * Single entry point every caller uses to resolve `.yellow-stack.yml`
+ * intent — the ONLY function outside this module that reads the intent
+ * file. Combines `readIntentFile` (filesystem-level) with `parseIntentText`
+ * (grammar-level) into one of exactly three shapes:
+ *   - `{ kind: 'absent', provider: null, invalid: null }` — no intent
+ *     recorded. A normal, non-error state (`UNSELECTED` territory).
+ *   - `{ kind: 'valid', provider: <id>, invalid: null }` — a well-formed,
+ *     known provider id.
+ *   - `{ kind: 'invalid', provider: null, invalid: { reason, rawValue? } }`
+ *     — the file exists but could not be resolved to a provider id. Never
+ *     collapsed into `absent` — see deferred-work item 8.
+ *
+ * @param {string|null|undefined} filePath - path to `.yellow-stack.yml`, or
+ *   `"-"` for stdin, or a falsy value meaning "no path given".
+ */
+function resolveIntent(filePath) {
+  const fileResult = readIntentFile(filePath);
+  if (fileResult.kind === 'absent') {
+    return { kind: 'absent', provider: null, invalid: null };
+  }
+  if (fileResult.kind === 'invalid') {
+    return {
+      kind: 'invalid',
+      provider: null,
+      invalid: { reason: fileResult.reason },
+    };
+  }
+  const parsed = parseIntentText(fileResult.text);
+  if (parsed.kind === 'valid') {
+    return { kind: 'valid', provider: parsed.provider, invalid: null };
+  }
+  return {
+    kind: 'invalid',
+    provider: null,
+    invalid:
+      parsed.rawValue === undefined
+        ? { reason: parsed.reason }
+        : { reason: parsed.reason, rawValue: parsed.rawValue },
+  };
 }
 
 /**
@@ -247,12 +422,20 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
  *
  * Precedence is first-match-wins, worst-first, so an unfixable condition is
  * never masked by a merely-wrong one:
- *   MANAGED_CONFLICT > CONFLICT > CONFIG_MISMATCH > UNSELECTED >
- *   PARTIAL_TOOLING > READY_*
+ *   MANAGED_CONFLICT > CONFLICT > CONFIG_INVALID > CONFIG_MISMATCH >
+ *   UNSELECTED > PARTIAL_TOOLING > READY_*
+ *
+ * CONFIG_INVALID outranks CONFIG_MISMATCH deliberately: CONFIG_MISMATCH
+ * means "we know what you asked for and the runtime disagrees"; CONFIG_INVALID
+ * means "we could not even determine what you asked for" — a strictly worse
+ * starting point that must never be papered over by falling through to
+ * UNSELECTED (which would imply "no opinion recorded", not "an opinion was
+ * recorded but is broken").
  *
  * @param {{
  *   plugins: Array<object>,
  *   intent?: string|null,
+ *   intentInvalid?: { reason: string, rawValue?: string }|null,
  *   tooling?: { [providerId: string]: boolean|null|undefined },
  *   projectPath?: string|null,
  * }} input
@@ -260,6 +443,7 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
 function classifyProviderState({
   plugins,
   intent = null,
+  intentInvalid = null,
   tooling = {},
   projectPath = null,
 } = {}) {
@@ -291,6 +475,9 @@ function classifyProviderState({
     group: PROVIDER_GROUP,
     intent,
     intentKnown: intent === null ? null : known,
+    // Always present (null when the intent file was absent or valid) so
+    // every consumer can branch on its presence without an `in` check.
+    intentInvalid,
     providers: displayProviders,
     projectScopeFiltered,
     // `false` means at least one relevant probe was never run. Callers must
@@ -374,7 +561,26 @@ function classifyProviderState({
     };
   }
 
-  // 3. CONFIG_MISMATCH — .yellow-stack.yml records an intent the runtime
+  // 3. CONFIG_INVALID — .yellow-stack.yml exists but could not be resolved
+  //    to a valid provider id (missing key, empty value, unknown provider,
+  //    duplicate keys, malformed syntax, or an unreadable/non-regular/
+  //    symlink file). This must never collapse into UNSELECTED: the file
+  //    IS recorded intent, it is just broken, and /stack:select must
+  //    refuse to silently overwrite it (see commands/stack/select.md
+  //    Step 7).
+  if (intentInvalid !== null) {
+    const rawValueSuffix =
+      typeof intentInvalid.rawValue === 'string'
+        ? ` ("${intentInvalid.rawValue}")`
+        : '';
+    return {
+      ...result,
+      state: STATES.CONFIG_INVALID,
+      detail: `.yellow-stack.yml could not be resolved to a valid provider intent: ${intentInvalid.reason}${rawValueSuffix}. Fix or remove the file — /stack:select will not overwrite it automatically.`,
+    };
+  }
+
+  // 4. CONFIG_MISMATCH — .yellow-stack.yml records an intent the runtime
   //    does not match, including "intent set, nothing enabled".
   if (intent !== null) {
     if (!known) {
@@ -402,7 +608,7 @@ function classifyProviderState({
     }
   }
 
-  // 4. UNSELECTED — no intent recorded and nothing enabled.
+  // 5. UNSELECTED — no intent recorded and nothing enabled.
   if (enabled.length === 0) {
     const installed = PROVIDERS.map(
       (provider) => providers[provider.id]
@@ -419,7 +625,7 @@ function classifyProviderState({
     };
   }
 
-  // 5. PARTIAL_TOOLING — the right plugin is enabled but its CLI is
+  // 6. PARTIAL_TOOLING — the right plugin is enabled but its CLI is
   //    missing. Only an explicit `false` probe result counts; an unrun
   //    probe leaves the state READY_* with toolingKnown: false.
   const active = enabled[0];
@@ -431,7 +637,7 @@ function classifyProviderState({
     };
   }
 
-  // 6/7. READY_*.
+  // 7/8. READY_*.
   return {
     ...result,
     state: READY_STATE_BY_ID[active.id],
@@ -530,7 +736,22 @@ function planProviderSwitch({
   // both providers are enabled at once, violating the single-provider
   // invariant (stack-provider-guard skill, invariant 1) even if only until
   // the next step runs.
+  //
+  // Scope substitution: NEVER disable at a scope BROADER than the one the
+  // caller requested. An other-provider row enabled at a broader scope
+  // than `scope` (e.g. enabled at `user` while the caller asked to switch
+  // at `project`) is handled by disabling it at `scope` instead — a
+  // same-repository (or same-machine, for `local`) override is sufficient
+  // to make the switch effective for this repository, confirmed safe by
+  // the isolated CLI spike (docs/research/
+  // 2026-08-18-claude-plugin-scope-precedence-spike.md, finding #2: an
+  // enable/disable override works even without a separate install at that
+  // scope). A row already at `scope` or narrower is disabled at its own
+  // scope unchanged — that override must still be cleared, or it would
+  // keep the other provider effectively enabled for this repository after
+  // the "switch" completes.
   for (const other of others) {
+    const scopesToDisable = new Set();
     // Raw, unsanitized scopes: refusing on a malformed value here is the
     // security control, so it must see the actual CLI output, not the
     // "unknown" placeholder `enabledScopes` substitutes for display.
@@ -558,14 +779,19 @@ function planProviderSwitch({
           detail: `${other.plugin} reports an unrecognized scope "${otherScope}". Refusing to build a plan around it.`,
         };
       }
-      const otherRef = `${other.plugin}@${other.marketplaces[0] || marketplace}`;
+      scopesToDisable.add(
+        SCOPE_TIER[otherScope] < SCOPE_TIER[scope] ? scope : otherScope
+      );
+    }
+    const otherRef = `${other.plugin}@${other.marketplaces[0] || marketplace}`;
+    for (const disableScope of scopesToDisable) {
       steps.push({
         action: 'disable',
         provider: other.id,
-        scope: otherScope,
+        scope: disableScope,
         requiresConfirmation: false,
-        description: `Disable ${other.plugin} at ${otherScope} scope`,
-        command: `claude plugin disable ${otherRef} --scope ${otherScope}`,
+        description: `Disable ${other.plugin} at ${disableScope} scope`,
+        command: `claude plugin disable ${otherRef} --scope ${disableScope}`,
       });
     }
   }
@@ -709,6 +935,30 @@ function parseToolingFlag(value) {
   return undefined;
 }
 
+/**
+ * Translate `stack-tooling-probe.js probe` JSON output into this module's
+ * tooling-flag shape (`{ graphite?: boolean, github?: boolean }`).
+ * `readiness: 'ready'` -> true, `'not-ready'` -> false, `'unknown'` (or a
+ * provider key that is absent because `--provider` narrowed the probe) ->
+ * omitted entirely, matching `parseToolingFlag`'s "unknown means not
+ * checked" contract.
+ *
+ * @param {unknown} probeJson - parsed `stack-tooling-probe.js probe` output.
+ */
+function toolingFromProbeResult(probeJson) {
+  const tooling = {};
+  if (probeJson && typeof probeJson === 'object') {
+    for (const id of ['graphite', 'github']) {
+      const entry = probeJson[id];
+      const readiness = entry && typeof entry === 'object' ? entry.readiness : undefined;
+      if (readiness === 'ready') tooling[id] = true;
+      else if (readiness === 'not-ready') tooling[id] = false;
+      // 'unknown', missing entry, or malformed shape: leave unset.
+    }
+  }
+  return tooling;
+}
+
 function main(argv) {
   const args = parseArgs(argv);
   const mode = args._[0];
@@ -741,26 +991,47 @@ function main(argv) {
     return 1;
   }
 
-  let intentText;
-  try {
-    intentText = readMaybe(args['intent-file']);
-  } catch (error) {
-    console.error(`error: could not read intent file: ${error.message}`);
-    return 1;
-  }
+  // resolveIntent never throws — every filesystem failure it can hit
+  // (ENOENT, symlink, non-regular, permission) is captured in its return
+  // shape rather than propagated, so classification always produces a
+  // state rather than crashing on a hostile or broken intent file.
+  const resolvedIntent = resolveIntent(args['intent-file']);
 
   const projectPath =
     typeof args['project-path'] === 'string' ? args['project-path'] : null;
 
   if (mode === 'classify') {
-    const tooling = {};
+    let tooling = {};
+    const probeFile = args['tooling-probe-file'];
+    if (typeof probeFile === 'string') {
+      let probeRaw;
+      try {
+        probeRaw = readMaybe(probeFile);
+      } catch (error) {
+        console.error(`error: could not read tooling probe file: ${error.message}`);
+        return 1;
+      }
+      if (probeRaw !== null) {
+        try {
+          tooling = toolingFromProbeResult(JSON.parse(probeRaw));
+        } catch (error) {
+          console.error(`error: could not parse tooling probe file as JSON: ${error.message}`);
+          return 1;
+        }
+      }
+    }
+    // Explicit --tooling-graphite/--tooling-github always win over the
+    // probe file per key, so a caller can override one provider's result
+    // (tests, or a caller that only re-probed one side) without having to
+    // regenerate the whole probe JSON.
     const graphite = parseToolingFlag(args['tooling-graphite']);
     const github = parseToolingFlag(args['tooling-github']);
     if (graphite !== undefined) tooling.graphite = graphite;
     if (github !== undefined) tooling.github = github;
     const state = classifyProviderState({
       plugins,
-      intent: parseIntent(intentText),
+      intent: resolvedIntent.provider,
+      intentInvalid: resolvedIntent.invalid,
       tooling,
       projectPath,
     });
@@ -786,8 +1057,12 @@ module.exports = {
   PROVIDER_GROUP,
   PROVIDERS,
   STATES,
+  INTENT_INVALID_REASONS,
   WRITABLE_SCOPES,
-  parseIntent,
+  parseIntentText,
+  readIntentFile,
+  resolveIntent,
+  toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
   planProviderSwitch,

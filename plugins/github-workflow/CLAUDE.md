@@ -1,18 +1,22 @@
 # github-workflow Plugin
 
-GitHub-native stacked-PR provider skeleton. One of two members of the
-`stacked-pr` capability group; the other is `gt-workflow` (Graphite).
+GitHub-native stacked-PR provider. One of two members of the `stacked-pr`
+capability group; the other is `gt-workflow` (Graphite).
 
 ## Hard constraints
 
 These are not style preferences — a change that breaks one of them breaks
 the provider model:
 
-- **Never invoke a mutating `gh stack` subcommand** from this plugin:
-  `init`, `add`, `submit`, `push`, `sync`, `rebase`, `modify`, `merge`,
-  `link`, `unstack`. Read-only probes (`gh extension list`,
-  `gh stack --help`, `gh stack view --json`) are the only permitted contact
-  surface while this plugin is a skeleton.
+- **All mutating `gh stack` calls MUST go through
+  `plugins/github-workflow/lib/github-stack-runtime.js`** — never invoke
+  `gh stack <verb>` directly from a command or skill's Bash block. The
+  runtime adapter is the sole owner of argument validation, confirmation
+  gating, exit-code interpretation, and **credential redaction** for every
+  mutating operation (`init`, `add`, `checkout`, `rebase`, `sync`,
+  `submit`, `merge`, `unstack`). Calling `gh stack` directly from a Bash
+  block bypasses `redact()` and can surface a token from a
+  credential-bearing remote URL straight into model context.
 - **Never disable, uninstall, or work around `gt-workflow`.** Provider
   switching is `yellow-core`'s `/stack:select` and nothing else.
 - **Never fall back to the other provider.** If this provider is not
@@ -24,14 +28,28 @@ the provider model:
 
 ## Components
 
-### Commands (2)
+### Commands (9)
 
 - `/github-stack:setup` — thin wrapper invoking the `github-stack-setup`
   skill via the `Skill` tool.
 - `/github-stack:status` — thin wrapper invoking the `github-stack-status`
   skill via the `Skill` tool.
+- `/github-stack:plan` — thin wrapper invoking the `github-stack-plan`
+  skill via the `Skill` tool.
+- `/github-stack:submit` — thin wrapper invoking the `github-stack-submit`
+  skill via the `Skill` tool.
+- `/github-stack:amend` — thin wrapper invoking the `github-stack-amend`
+  skill via the `Skill` tool.
+- `/github-stack:sync` — thin wrapper invoking the `github-stack-sync`
+  skill via the `Skill` tool.
+- `/github-stack:nav` — thin wrapper invoking the `github-stack-nav`
+  skill via the `Skill` tool.
+- `/github-stack:cleanup` — thin wrapper invoking the `github-stack-cleanup`
+  skill via the `Skill` tool.
+- `/github-stack:merge` — thin wrapper invoking the `github-stack-merge`
+  skill via the `Skill` tool.
 
-### Skills (2)
+### Skills (9)
 
 - `github-stack-setup` — prerequisite check: `gh` present and authenticated,
   and the installed `gh stack` extension is the official `github/gh-stack`.
@@ -39,11 +57,48 @@ the provider model:
 - `github-stack-status` — read-only provider readiness report, including
   whether this plugin is the enabled `stacked-pr` provider (delegates that
   question to `yellow-core`'s `/stack:status`).
+- `github-stack-plan` — read-only stack view via the runtime adapter's
+  `view` operation.
+- `github-stack-submit` — stage, commit, and submit uncommitted changes via
+  the runtime adapter's `submit` operation (draft by default).
+- `github-stack-amend` — amend the current branch commit and re-submit via
+  the runtime adapter's `submit` operation.
+- `github-stack-sync` — sync the local stack with trunk via the runtime
+  adapter's `sync` operation; pruning merged branches requires an
+  `AskUserQuestion` confirmation before `--confirm` is passed.
+- `github-stack-nav` — check out a stack target via the runtime adapter's
+  `checkout` operation; resolves an omitted target via `view` +
+  `AskUserQuestion` rather than letting the underlying CLI pick.
+- `github-stack-cleanup` — remove local stack tracking via the runtime
+  adapter's `unstack` operation; by default ALSO remote-unstacks every PR
+  via the GitHub API (`--local` skips that and stays local-only). Never
+  deletes local git branches, either form. Always behind an
+  `AskUserQuestion` confirmation that states which of the two happens.
+- `github-stack-merge` — merge a stacked PR via the runtime adapter's
+  `merge` operation (Preview → Confirm → Merge → Report), always behind
+  an `AskUserQuestion` confirmation; never calls `gh pr merge`.
 
-### MCP servers (0) · Hooks (0)
+### MCP servers (0) · Hooks (2)
 
-Deliberate. Neither is needed to answer "is this provider usable?", and both
-would add install-time surface to a skeleton.
+No MCP server — not needed for this plugin's command surface; every
+mutating operation goes through the runtime adapter's own validation and
+confirmation gating instead.
+
+Two hooks, mirroring `gt-workflow`'s (independent copies, not a
+cross-plugin require — this plugin has no runtime dependency on
+`gt-workflow` being present, matching the "never require the other
+provider's files" reading of this repo's provider-neutrality invariant):
+
+- `check-git-push` (PreToolUse) — blocks raw `git push`, pointing at
+  `github-stack-submit` instead of Graphite's `gt submit`.
+- `check-commit-message` (PostToolUse) — warns on a non-conventional
+  commit message, triggered on `git commit` instead of `gt modify`/`gt
+  commit`/`gt create`.
+
+Both are pure policy functions (`hooks/scripts/lib/policy-check-*.js`) with
+direct behavior tests in `tests/hooks.bats` — not a bash-golden parity
+harness like `gt-workflow`'s, since there is no deleted bash predecessor
+for these to reproduce.
 
 ## Extension identity matters
 

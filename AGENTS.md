@@ -162,10 +162,18 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 
 ## Git, Changesets, And Release Workflow
 
-- Use Graphite (`gt`) for branch and PR work: `gt branch create`,
-  `gt commit create`, `gt modify`, `gt stack submit`, and `gt repo sync`. Avoid
-  raw `git push` and `gh pr create` except for operations Graphite does not
-  cover, such as tag pushes or release recovery.
+- Resolve the active stacked-PR provider via `/stack:status` (yellow-core)
+  before any branch/PR stack mutation — this repository supports two
+  alternative providers (Graphite `gt-workflow`, GitHub-native
+  `github-workflow`), exactly one enabled at a time. Only `READY_GRAPHITE`
+  and `READY_GITHUB` route to work; every other state stops and reports
+  why. Use only the resolved provider's own commands (`gt-workflow`'s `gt`
+  wrappers for Graphite; `github-workflow`'s runtime adapter for GitHub) —
+  never fall
+  back to raw `git push`/`gh pr create` as a substitute for either
+  provider's submission path, and never fall back to the other provider.
+  See `plugins/yellow-core/lib/stack-operation-registry.js` for the full
+  operation-to-provider mapping.
 - `.graphite.yml` is a `gt-workflow` plugin convention file, not a native
   Graphite CLI config file.
 - Follow Conventional Commits: `feat(scope): ...`, `fix(scope): ...`,

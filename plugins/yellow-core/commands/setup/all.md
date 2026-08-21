@@ -697,9 +697,12 @@ is worth reporting. Only the **enabled** one is offered for setup:
 2. Offer setup for that member only. Show the other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
 3. If the group's state is not `READY_GRAPHITE`, `READY_GITHUB`, or
-   `PARTIAL_TOOLING` — no provider enabled, both enabled, intent mismatch, or
-   a managed-scope conflict — do **not** pick one. Report the state and
-   point at `/stack:select`. There is no fallback between providers.
+   `PARTIAL_TOOLING` — no provider enabled, both enabled, an intent
+   mismatch, an unparseable `.yellow-stack.yml` (`CONFIG_INVALID`), or a
+   managed-scope conflict — do **not** pick one. Report the state and point
+   at `/stack:select` (or, for `CONFIG_INVALID`, at fixing/removing
+   `.yellow-stack.yml` by hand first). There is no fallback between
+   providers.
 4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous
    — only its CLI is missing. Offer that provider's own setup command
    instead of `/stack:select`, which only changes plugin enablement and

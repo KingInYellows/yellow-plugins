@@ -23,7 +23,7 @@
     },
     {
       "name": "github-workflow",
-      "description": "GitHub-native stacked-PR provider (setup + status only; no stack operations yet)",
+      "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
       "version": "0.2.0",
       "author": {
         "name": "KingInYellows"

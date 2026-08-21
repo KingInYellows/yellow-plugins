@@ -468,6 +468,19 @@ If `Cancel`, **stop the workflow** — do not proceed to Phase 6.
 
 ## Phase 6: Sync trunk + create archival branch
 
+### Resolve the active stacked-PR provider
+
+Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read `state`
+from its result.
+
+- **`READY_GRAPHITE`** — continue with the Graphite steps below.
+- **`READY_GITHUB`** — continue with the GitHub steps below.
+- **Any other state** — stop. Report the router's `detail` verbatim (inside
+  the untrusted-content fence this file already uses elsewhere for
+  CLI-derived text) and do not attempt any provider-specific mutation.
+
+#### Graphite
+
 ```bash
 set -euo pipefail
 ARG="$ARGUMENTS"
@@ -487,6 +500,36 @@ fi
 gt repo sync 2>/dev/null || gt sync 2>/dev/null || \
   printf '[plan:complete] WARNING: gt sync failed; proceeding on possibly-stale trunk\n' >&2
 gt create "plan/archive-$SLUG"
+mkdir -p plans/complete
+# git mv (not bare mv): records the rename in the index immediately
+# so `git commit` in Phase 7 produces a real commit (not empty).
+git mv -- "plans/$CLEAN_ARG" "plans/complete/$CLEAN_ARG"
+git status --short
+```
+
+#### GitHub
+
+```bash
+set -euo pipefail
+ARG="$ARGUMENTS"
+CLEAN_ARG="${ARG#plans/}"
+SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
+TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+[ -n "$TRUNK" ] || TRUNK=main
+git checkout "$TRUNK"
+git pull --ff-only 2>/dev/null || \
+  printf '[plan:complete] WARNING: git pull failed; proceeding on possibly-stale trunk\n' >&2
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" init --base "$TRUNK" --branch "plan/archive-$SLUG"
+```
+
+This is a first branch off trunk, so the GitHub adapter operation is `init`
+(not `add`). Read the JSON result's `status` field; `SUCCESS` continues below,
+anything else reports the result's `recoveryAction` and stops.
+
+```bash
+set -euo pipefail
+ARG="$ARGUMENTS"
+CLEAN_ARG="${ARG#plans/}"
 mkdir -p plans/complete
 # git mv (not bare mv): records the rename in the index immediately
 # so `git commit` in Phase 7 produces a real commit (not empty).
@@ -552,11 +595,30 @@ strict PASS) path omits any trailer.
 
 ## Phase 8: Submit
 
+Use the same provider resolved in Phase 6.
+
+#### Graphite
+
 ```bash
 set -euo pipefail
 gt submit --no-interactive
 # Print the resulting PR URL.
 gh pr view --json url -q .url 2>/dev/null || printf '[plan:complete] (submitted; PR URL unavailable — check `gt log short`)\n'
+```
+
+#### GitHub
+
+```bash
+set -euo pipefail
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+```
+
+Read the JSON result's `status` field. `SUCCESS` continues below, anything
+else reports the result's `recoveryAction` and stops.
+
+```bash
+set -euo pipefail
+gh pr view --json url -q .url 2>/dev/null || printf '[plan:complete] (submitted; PR URL unavailable — check `gh pr view`)\n'
 ```
 
 ## Done

@@ -37,7 +37,7 @@ with semantic search and a temporal knowledge graph for entity relationships.
 - **Duplicate checking:** Call `check_duplicate` before `add_drawer`
 - **Graceful degradation:** All commands report clearly when MCP tools are
   unavailable and suggest `/mempalace:setup`
-- **Git workflow:** Use Graphite (`gt submit`), not `git push`
+- **Git workflow:** Use the active stacked-PR provider (see `/stack:status`), not `git push`
 
 ## Plugin Components
 

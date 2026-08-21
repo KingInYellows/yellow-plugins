@@ -20,6 +20,7 @@
     "workflow",
     "pull-requests"
   ],
+  "dependencies": ["yellow-core"],
   "outputStyles": "./output-styles",
   "mcpServers": "./.mcp.json",
   "hooks": {
@@ -76,7 +77,8 @@
         "gt-cleanup",
         "audit-review",
         "stack-decomposition-format",
-        "stack-plan-style"
+        "stack-plan-style",
+        "gt-merge"
       ],
       "componentPaths": {
         "skills": "./codex/skills"

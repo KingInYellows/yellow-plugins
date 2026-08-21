@@ -195,8 +195,8 @@ Based on user's choice in Step 5:
 - Describe the manual workflow equivalent:
   - For `/flow:plan`: "Read the brainstorm doc at `<path>` and create a
     plan manually in `plans/`."
-  - For `/gt-stack-plan`: "Break the work into branches manually with
-    `gt create <branch-name>`."
+  - For `/gt-stack-plan`: "Break the work into branches manually via the
+    active stacked-PR provider's tooling (see `/stack:status`)."
 
 ## Security Patterns
 

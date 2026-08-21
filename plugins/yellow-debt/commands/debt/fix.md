@@ -150,7 +150,8 @@ Therefore:
    - No: Discard changes and keep todo in 'ready' state
    ```
 
-3. On "Yes": commit via `gt modify -m "fix: resolve <finding-title>"`
+3. On "Yes": commit via the active stacked-PR provider (see the debt-fixer
+   agent's step 6 for the per-provider commands)
 4. On "No": restore only touched files, reset todo to `ready`
 
 **Never auto-commit without human review.**
@@ -167,9 +168,10 @@ file's `TITLE`/`NEW_TODO_PATH`/`CATEGORY`/`SEVERITY`.)
 # Extract and sanitize title
 safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 
-# Use printf (prevents injection)
-gt modify -m "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
-  "$safe_title" "$todo_path" "$category" "$severity")"
+# Use printf (prevents injection); the actual commit command depends on
+# which stacked-PR provider is active — see debt-fixer.md step 6
+COMMIT_MSG=$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
+  "$safe_title" "$todo_path" "$category" "$severity")
 ```
 
 ## State Transitions

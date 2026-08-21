@@ -95,7 +95,8 @@ The `--non-interactive` flag suppresses `/review:pr`'s Step 9
 push-confirmation prompt and its Step 9b "save learnings to memory"
 prompt — so the review runs unattended end-to-end. `/review:pr` still
 runs its full pipeline (adaptive agent selection, parallel multi-agent
-review, autonomous P0/P1 fix application, auto-push via `gt submit`,
+review, autonomous P0/P1 fix application, auto-push via the resolved
+stacked-PR provider,
 final report); only the human prompts are suppressed.
 
 ### Step 2a: Verify branch alignment

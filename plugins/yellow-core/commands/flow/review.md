@@ -410,6 +410,20 @@ After all three dimensions produce findings:
 
 4. **Commit and submit fixes** per branch:
 
+   ### Resolve the active stacked-PR provider
+
+   Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read
+   `state` from its result.
+
+   - **`READY_GRAPHITE`** — continue with the Graphite steps below.
+   - **`READY_GITHUB`** — continue with the GitHub steps below.
+   - **Any other state** — stop. Report the router's `detail` verbatim
+     (inside the untrusted-content fence this file already uses for
+     ruvector recall context in Step 4) and do not attempt any
+     provider-specific mutation.
+
+   #### Graphite
+
    For each branch with uncommitted changes, checkout the branch first:
 
    ```bash
@@ -430,6 +444,31 @@ After all three dimensions produce findings:
    ```
 
    Run restack only once, after the per-branch loop completes — not inside it.
+
+   #### GitHub
+
+   For each branch with uncommitted changes, checkout the branch first:
+
+   ```bash
+   git checkout <branch>
+   git status --porcelain
+   git add -- <specific files, never -A/.>
+   git commit -m "fix: address session review findings"
+   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+   ```
+
+   Parse the JSON result's `status` field. `SUCCESS` continues to the next
+   branch. Anything else, report the result's `recoveryAction` and continue
+   to the next branch. Do not abort the entire loop.
+
+   **After all branches are committed and submitted**, if the session has a
+   linear stack and a base branch was modified:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+   ```
+
+   Run this only once, after the per-branch loop completes — not inside it.
 
 5. **Re-review and optional cycle 2:**
 

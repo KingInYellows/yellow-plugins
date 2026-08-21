@@ -147,22 +147,36 @@ CHANGELOG coherence, and manifest version match is the verification gate.
 
 ## Workflow Conventions
 
-### Graphite is mandatory
+### The enabled stacked-PR provider is mandatory
 
-Use `gt` for ALL branch and PR work. Never `git push` or `gh pr create`
-directly — only fall back to raw `git`/`gh` when Graphite cannot perform the
-operation (e.g., `gh issue`, `gh release`).
+This repository supports two alternative stacked-PR providers — Graphite
+(`gt-workflow`) and GitHub-native stacks (`github-workflow`) — exactly one
+of which may be enabled at a time. **Never hardcode either provider.**
+Resolve the active one before any branch/PR stack mutation:
 
-```bash
-gt branch create <name>
-gt commit create -m "feat: ..."
-gt stack submit
-gt repo sync
-```
+1. Run `/stack:status` (yellow-core). It classifies the current state into
+   one of eight fixed states: `READY_GRAPHITE`, `READY_GITHUB`,
+   `UNSELECTED`, `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`,
+   `MANAGED_CONFLICT`, `PARTIAL_TOOLING`.
+2. Only `READY_GRAPHITE` and `READY_GITHUB` route to work. Use **only**
+   that provider's commands for the rest of the session's branch/PR stack
+   mutations (`gt` + gt-workflow's commands for `READY_GRAPHITE`;
+   `gh stack` (via `github-workflow`'s runtime adapter) for
+   `READY_GITHUB`).
+3. Every other state STOPS the workflow and reports the classifier's
+   `detail` — it does not guess, does not fall back to the other provider,
+   and does not fall back to raw `git push` or `gh pr create` as a
+   substitute for either provider's own submission path.
 
-`.graphite.yml` holds gt-workflow plugin conventions (NOT a Graphite CLI
-feature — it is read by `smart-submit`, `gt-stack-plan`, `gt-amend`,
-`gt-setup`).
+This repository ships no `.yellow-stack.yml` (no committed repository
+intent) — `/stack:status` resolves purely from which provider plugin is
+currently enabled. `/stack:select` switches the active provider when
+needed; see `plugins/yellow-core/lib/stack-operation-registry.js` for the
+full operation-to-provider mapping.
+
+`.graphite.yml` (Graphite path only) holds gt-workflow plugin conventions
+(NOT a Graphite CLI feature — it is read by `smart-submit`, `gt-stack-plan`,
+`gt-amend`, `gt-setup`, `gt-merge`).
 
 ### Conventional commits
 

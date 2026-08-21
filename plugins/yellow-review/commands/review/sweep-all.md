@@ -177,7 +177,7 @@ Print a pipe-delimited markdown summary table:
 | 123 | feat(yellow-debt): add scanner   | attempted |                        |                              |
 | 124 | fix(yellow-ci): lint regression  | attempted |                        |                              |
 | 125 | refactor(yellow-core): split lib | skipped   | PR closed before sweep |                              |
-| 126 | docs: update CLAUDE.md           | attempted |                        | Error: gt track failed (…)   |
+| 126 | docs: update CLAUDE.md           | attempted |                        | Error: stack-provider adoption failed (…) |
 
 Totals: Attempted 3 | Skipped 1 | Total 4
 ```
@@ -235,8 +235,8 @@ Otherwise, with `attempted_count >= 1`:
   exits 0. Compounding is best-effort, not load-bearing.
 - **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at
   Step 1 does NOT serialize concurrent sweeps — `/review:pr` and
-  `/review:resolve` clean the working tree between PRs (via
-  `gt modify + gt submit`), so a second `sweep-all` that starts
+  `/review:resolve` clean the working tree between PRs (via a commit +
+  push through the resolved stacked-PR provider), so a second `sweep-all` that starts
   mid-loop will frequently see a clean tree and proceed, causing branch
   races (interleaved checkouts, conflicting commits, push races). Do
   not run two `sweep-all` instances simultaneously.

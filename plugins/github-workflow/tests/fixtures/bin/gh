@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Fake `gh` for github-stack-runtime.js tests. Behavior controlled by env
+# vars: FAKE_GH_EXIT (exit code), FAKE_GH_STDOUT/FAKE_GH_STDERR (%b-expanded).
+if [ -n "${FAKE_GH_STDOUT:-}" ]; then
+  printf '%b' "$FAKE_GH_STDOUT"
+fi
+if [ -n "${FAKE_GH_STDERR:-}" ]; then
+  printf '%b' "$FAKE_GH_STDERR" >&2
+fi
+exit "${FAKE_GH_EXIT:-0}"

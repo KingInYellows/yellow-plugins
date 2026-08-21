@@ -30,45 +30,20 @@ skill never implies otherwise.
 
 ### Step 1: Probe tooling
 
+`plugins/yellow-core/lib/stack-tooling-probe.js` is the single owner of
+this logic — do not re-derive `gh` presence, auth validity, or extension
+identity here.
+
 ```bash
 set -uo pipefail
 
-if command -v gh >/dev/null 2>&1; then
-  gh_version=$(gh --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  printf 'gh:                 OK (%s)\n' "${gh_version:-unknown}"
-  gh_major=${gh_version%%.*}
-  case "$gh_major" in
-    ''|*[!0-9]*) printf 'gh_version_gate:    UNKNOWN (could not parse version)\n' ;;
-    *) if [ "$gh_major" -ge 2 ]; then
-         printf 'gh_version_gate:    OK (>= 2.0)\n'
-       else
-         printf 'gh_version_gate:    TOO OLD (need >= 2.0)\n'
-       fi ;;
-  esac
-  gh auth status >/dev/null 2>&1 && printf 'gh_auth:            OK\n' || printf 'gh_auth:            NOT AUTHENTICATED\n'
-  # Identity check, not a name check: third-party extensions also expose a
-  # `gh stack` command. Only github/gh-stack is first-party.
-  # Capture the probe's own exit status directly in the `if` — do not
-  # discard it with `|| true`. A probe failure (network, gh internal
-  # error, auth expiry) must not be reported as the same state as a
-  # genuinely absent extension.
-  if ext_list=$(gh extension list 2>/dev/null); then
-    if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-      printf 'gh_stack_extension: OK (github/gh-stack)\n'
-    elif printf '%s\n' "$ext_list" | grep -qi 'gh-stack'; then
-      printf 'gh_stack_extension: WRONG OWNER (a non-github/gh-stack extension provides `gh stack`)\n'
-    else
-      printf 'gh_stack_extension: MISSING\n'
-    fi
-  else
-    printf 'gh_stack_extension: UNAVAILABLE (could not query extensions)\n'
-  fi
-else
-  printf 'gh:                 MISSING\n'
-  printf 'gh_version_gate:    SKIPPED (gh not found)\n'
-  printf 'gh_auth:            SKIPPED (gh not found)\n'
-  printf 'gh_stack_extension: SKIPPED (gh not found)\n'
+PROBE="${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/stack-tooling-probe.js"
+if [ ! -f "$PROBE" ]; then
+  printf 'stack_provider_error: tooling probe not found at %s (is yellow-core installed?)\n' "$PROBE"
+  exit 0
 fi
+
+node "$PROBE" probe --provider github
 ```
 
 ### Step 2: Ask who the active provider is
@@ -91,8 +66,7 @@ reporting that as "GitHub active" would be wrong.
 GitHub stacked-PR provider
 ==========================
 
-  gh                  OK (2.97.0)
-  gh_version_gate     OK (>= 2.0)
+  gh                  OK (gh version 2.97.0 (2026-07-31))
   gh auth             OK
   github/gh-stack     MISSING
 
@@ -100,20 +74,19 @@ GitHub stacked-PR provider
   Active provider:    run /stack:status (yellow-core) for the authoritative answer
 ```
 
-Classify tooling as:
+Classify tooling from the probe's `readiness` field:
 
-- **READY** — `gh` OK, `gh_version_gate` OK, authenticated, and
-  `github/gh-stack` installed.
-- **NOT READY** — anything else, naming the specific gap. If
-  `gh_version_gate` reports `TOO OLD`, say `gh` must be upgraded. If
-  `gh_stack_extension` reports `WRONG OWNER`, say a non-official `gh
-  stack` extension is installed and must be removed before installing
-  `github/gh-stack`.
+- **READY** — `readiness: "ready"` (present, authenticated, and
+  `extensionIdentity: "verified"`).
+- **NOT READY** — anything else, naming the specific gap from `detail` and
+  `checks.extensionIdentity`. If `extensionIdentity` is `wrong-owner`, say
+  a non-official `gh stack` extension is installed and must be removed
+  before installing `github/gh-stack`.
 
-If `gh_stack_extension` reports `UNAVAILABLE`, say so explicitly: the probe
-could not determine whether the extension is installed (a `gh extension
-list` failure, not a "not installed" result) — report tooling as NOT READY
-for this unresolved reason and stop; do not treat it as `MISSING`.
+If `readiness` is `unknown`, say so explicitly: the probe could not
+determine readiness (a `gh auth status` or `gh extension list` failure,
+not a "not installed" result) — report tooling as NOT READY for this
+unresolved reason and stop; do not treat it as `MISSING`.
 
 State the preview caveat once when tooling is READY: GitHub's native
 stacked pull requests were in public preview as of 2026-08-17 and

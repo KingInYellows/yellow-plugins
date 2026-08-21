@@ -131,14 +131,15 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   or zero loose matches prompt the user via `AskUserQuestion` "Other"
   label for a PR-number override; the decision is captured in a
   `Plan-Verifier-Override:` commit trailer. Archival branch is
-  `plan/archive-<slug>`; submitted via `gt submit --no-interactive`.
+  `plan/archive-<slug>`; submitted via the active stacked-PR provider.
   The companion PR-diff-scoped validator `scripts/validate-plans.js`
   enforces the same no-stray-checkbox rule on archived files in CI
 - `/stack:status` — read-only classification of stacked-PR provider state
-  into one of seven states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
-  `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, `PARTIAL_TOOLING`).
-  Reads `claude plugin list --json` plus the repository's optional
-  `.yellow-stack.yml` intent through `lib/stack-provider-state.js`
+  into one of eight states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
+  `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`, `MANAGED_CONFLICT`,
+  `PARTIAL_TOOLING`). Reads `claude plugin list --json` plus the
+  repository's optional `.yellow-stack.yml` intent through
+  `lib/stack-provider-state.js`
 - `/stack:select` — switch the active stacked-PR provider (`graphite` /
   `github`) at `user`, `project`, or `local` scope. Shows the exact
   `claude plugin install|enable|disable` commands before running any of
@@ -175,7 +176,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `debugging` — systematic root-cause debugging with causal-chain gate,
   prediction-for-uncertain-links hypothesis testing, three-failed-attempts
   smart escalation, and conditional defense-in-depth/post-mortem; routes to
-  `gt submit` / `/yellow-core:flow:brainstorm` / `/yellow-core:flow:compound`
+  the active stacked-PR provider / `/yellow-core:flow:brainstorm` / `/yellow-core:flow:compound`
 - `git-worktree` — git worktree management for parallel development;
   injects a `.ruvector/` symlink into new worktrees so the ruvector MCP
   server reaches the shared project DB instead of silently no-op'ing on
@@ -293,8 +294,9 @@ cross-plugin pattern:
 - **gt-workflow** — `/flow:work` delegates to `/smart-submit` for
   commit+submit and supports stack-aware execution when a
   `## Stack Decomposition` section exists in the plan (produced by
-  `/gt-stack-plan`). Without gt-workflow, falls back to inline `gt modify -m` +
-  `gt submit --no-interactive` and stack features are unavailable.
+  `/gt-stack-plan`). Without gt-workflow, falls back to committing and
+  submitting via the active stacked-PR provider and stack features are
+  unavailable.
 - **yellow-codex** — `/flow:work` offers Codex rescue
   (`codex-executor`) when tests fail during stack execution. Without
   yellow-codex, the rescue option is silently omitted.

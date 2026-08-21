@@ -26,7 +26,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "github-workflow",
-      "description": "GitHub-native stacked-PR provider (setup + status only; no stack operations yet)",
+      "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
       "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
@@ -227,7 +227,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
   "version": "0.2.0",
-  "description": "GitHub-native stacked-PR provider. Foundation only: checks that the official github/gh-stack extension is installed and reports provider readiness. It performs no stack operations.",
+  "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -244,6 +244,32 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
     "workflow",
     "provider"
   ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  },
   "dependencies": [
     "yellow-core"
   ]
@@ -303,7 +329,10 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
         ]
       }
     ]
-  }
+  },
+  "dependencies": [
+    "yellow-core"
+  ]
 }
 "
 `;

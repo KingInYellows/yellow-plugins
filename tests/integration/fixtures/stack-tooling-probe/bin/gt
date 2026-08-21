@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Fake `gt` for stack-tooling-probe.js tests. Behavior controlled entirely
+# by env vars so one fixture script covers every scenario the suite needs.
+# "gt absent from PATH" is simulated by pointing PATH at a directory that
+# does not contain this script at all, not by a flag here.
+if [ "$1" = "--version" ]; then
+  exit "${FAKE_GT_VERSION_EXIT:-0}"
+fi
+echo "unrecognized fake gt invocation: $*" >&2
+exit 5

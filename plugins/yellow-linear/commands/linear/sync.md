@@ -85,8 +85,8 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```
-- **If no PR:** Note that no PR exists yet. Suggest creating one with
-  `gt submit`.
+- **If no PR:** Note that no PR exists yet. Suggest creating one via the
+  active stacked-PR provider (see `/stack:status`).
 
 ### Step 5: Update Issue Status
 

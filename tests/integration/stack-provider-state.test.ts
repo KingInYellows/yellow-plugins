@@ -13,10 +13,11 @@
  */
 
 import { execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdtempSync, symlinkSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const provider = require('../../plugins/yellow-core/lib/stack-provider-state.js');
@@ -25,7 +26,11 @@ const {
   STATES,
   PROVIDERS,
   PROVIDER_GROUP,
-  parseIntent,
+  INTENT_INVALID_REASONS,
+  parseIntentText,
+  readIntentFile,
+  resolveIntent,
+  toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
   planProviderSwitch,
@@ -50,32 +55,177 @@ describe('provider table', () => {
   });
 });
 
-describe('parseIntent', () => {
+describe('parseIntentText — structured result, no I/O', () => {
   it('reads a bare provider value', () => {
-    expect(parseIntent('provider: github\n')).toBe('github');
+    expect(parseIntentText('provider: github\n')).toEqual({
+      kind: 'valid',
+      provider: 'github',
+    });
   });
 
   it('reads quoted values and ignores trailing comments', () => {
-    expect(parseIntent('provider: "graphite"\n')).toBe('graphite');
-    expect(parseIntent("provider: 'github'\n")).toBe('github');
-    expect(parseIntent('provider: github # chosen 2026-08\n')).toBe('github');
+    expect(parseIntentText('provider: "graphite"\n')).toEqual({
+      kind: 'valid',
+      provider: 'graphite',
+    });
+    expect(parseIntentText("provider: 'github'\n")).toEqual({
+      kind: 'valid',
+      provider: 'github',
+    });
+    expect(parseIntentText('provider: github # chosen 2026-08\n')).toEqual({
+      kind: 'valid',
+      provider: 'github',
+    });
   });
 
-  it('treats an absent, empty, or unrelated file as no intent', () => {
-    expect(parseIntent(null)).toBeNull();
-    expect(parseIntent('')).toBeNull();
-    expect(parseIntent('# nothing here\nother: value\n')).toBeNull();
-    expect(parseIntent('provider:\n')).toBeNull();
+  it('treats an empty or unrelated file as missing-provider-key, not a default', () => {
+    expect(parseIntentText('')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.MISSING_KEY,
+    });
+    expect(parseIntentText('# nothing here\nother: value\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.MISSING_KEY,
+    });
   });
 
-  it('does not read the value off the following line', () => {
+  it('treats a present-but-empty value as empty-value, distinct from missing-key', () => {
+    expect(parseIntentText('provider:\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.EMPTY_VALUE,
+    });
+    expect(parseIntentText('provider: ""\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.EMPTY_VALUE,
+    });
+  });
+
+  it('does not read the value off the following line — malformed, not a guess', () => {
     // `\s*` would match the newline and silently adopt "github" here; the
-    // pattern uses `[ \t]*` precisely to prevent that.
-    expect(parseIntent('provider:\ngithub\n')).toBeNull();
+    // pattern uses `[ \t]*` precisely to prevent that. The key line itself
+    // (`provider:` with nothing after it) is the same shape as
+    // `provider:\n` above: an empty value, not malformed syntax.
+    expect(parseIntentText('provider:\ngithub\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.EMPTY_VALUE,
+    });
+  });
+
+  it('flags an unknown provider id as invalid, not as a mismatch to resolve downstream', () => {
+    expect(parseIntentText('provider: phabricator\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.UNKNOWN_PROVIDER,
+      rawValue: 'phabricator',
+    });
+  });
+
+  it('flags duplicate provider: keys regardless of whether the values agree', () => {
+    expect(
+      parseIntentText('provider: github\nprovider: github\n')
+    ).toEqual({ kind: 'invalid', reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS });
+    expect(
+      parseIntentText('provider: github\nprovider: graphite\n')
+    ).toEqual({ kind: 'invalid', reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS });
+  });
+
+  it('flags an unterminated quote as malformed syntax', () => {
+    expect(parseIntentText('provider: "github\n')).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.MALFORMED_SYNTAX,
+    });
   });
 });
 
-describe('classifyProviderState — the seven states', () => {
+describe('readIntentFile / resolveIntent — filesystem-level cases', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'yellow-stack-intent-'));
+  afterAll(() => {
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it('reports absent for a path that does not exist', () => {
+    const missing = join(scratch, 'does-not-exist.yml');
+    expect(readIntentFile(missing)).toEqual({ kind: 'absent' });
+    expect(resolveIntent(missing)).toEqual({
+      kind: 'absent',
+      provider: null,
+      invalid: null,
+    });
+  });
+
+  it('reports absent when no path is given at all', () => {
+    expect(resolveIntent(null)).toEqual({
+      kind: 'absent',
+      provider: null,
+      invalid: null,
+    });
+    expect(resolveIntent(undefined)).toEqual({
+      kind: 'absent',
+      provider: null,
+      invalid: null,
+    });
+  });
+
+  it('reads a well-formed regular file end to end', () => {
+    const target = join(scratch, 'valid.yml');
+    writeFileSync(target, 'provider: github\n', 'utf8');
+    expect(resolveIntent(target)).toEqual({
+      kind: 'valid',
+      provider: 'github',
+      invalid: null,
+    });
+  });
+
+  it('refuses a symlink without following it, even to a valid file', () => {
+    const real = join(scratch, 'real-target.yml');
+    writeFileSync(real, 'provider: graphite\n', 'utf8');
+    const link = join(scratch, 'symlinked.yml');
+    symlinkSync(real, link);
+    expect(readIntentFile(link)).toEqual({
+      kind: 'invalid',
+      reason: INTENT_INVALID_REASONS.SYMLINK,
+    });
+    expect(resolveIntent(link)).toEqual({
+      kind: 'invalid',
+      provider: null,
+      invalid: { reason: INTENT_INVALID_REASONS.SYMLINK },
+    });
+  });
+
+  it('refuses a non-regular file (a directory at the intent path)', () => {
+    const dirPath = join(scratch, 'a-directory.yml');
+    mkdirSync(dirPath);
+    expect(resolveIntent(dirPath)).toEqual({
+      kind: 'invalid',
+      provider: null,
+      invalid: { reason: INTENT_INVALID_REASONS.NON_REGULAR_FILE },
+    });
+  });
+
+  it('surfaces an existing-but-empty file as invalid, never as absent', () => {
+    const empty = join(scratch, 'empty.yml');
+    writeFileSync(empty, '', 'utf8');
+    expect(resolveIntent(empty)).toEqual({
+      kind: 'invalid',
+      provider: null,
+      invalid: { reason: INTENT_INVALID_REASONS.MISSING_KEY },
+    });
+  });
+
+  it('carries rawValue through resolveIntent for an unknown provider', () => {
+    const target = join(scratch, 'unknown-provider.yml');
+    writeFileSync(target, 'provider: bitbucket\n', 'utf8');
+    expect(resolveIntent(target)).toEqual({
+      kind: 'invalid',
+      provider: null,
+      invalid: {
+        reason: INTENT_INVALID_REASONS.UNKNOWN_PROVIDER,
+        rawValue: 'bitbucket',
+      },
+    });
+  });
+});
+
+describe('classifyProviderState — the eight states', () => {
   it('case 1: neither provider installed => UNSELECTED', () => {
     const result = classifyProviderState({
       plugins: fixture('neither-installed'),
@@ -160,6 +310,50 @@ describe('classifyProviderState — the seven states', () => {
     });
     expect(result.state).toBe(STATES.CONFIG_MISMATCH);
     expect(result.intentKnown).toBe(false);
+  });
+
+  it('case 6d: CONFIG_INVALID — malformed intent file, never collapsed to UNSELECTED', () => {
+    const result = classifyProviderState({
+      plugins: fixture('both-installed-graphite-enabled'),
+      intent: null,
+      intentInvalid: { reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFIG_INVALID);
+    expect(result.intentInvalid).toEqual({ reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS });
+    expect(result.detail).toContain('duplicate-keys');
+  });
+
+  it('case 6e: CONFIG_INVALID outranks CONFIG_MISMATCH and UNSELECTED', () => {
+    // Even though nothing is enabled (which would otherwise be UNSELECTED),
+    // a broken intent file is a worse starting point and must win.
+    const result = classifyProviderState({
+      plugins: fixture('none-enabled'),
+      intent: null,
+      intentInvalid: { reason: INTENT_INVALID_REASONS.UNKNOWN_PROVIDER, rawValue: 'bitbucket' },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFIG_INVALID);
+    expect(result.detail).toContain('bitbucket');
+  });
+
+  it('case 6f: CONFLICT still outranks CONFIG_INVALID (worst-first)', () => {
+    const result = classifyProviderState({
+      plugins: fixture('both-enabled'),
+      intent: null,
+      intentInvalid: { reason: INTENT_INVALID_REASONS.MALFORMED_SYNTAX },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFLICT);
+  });
+
+  it('case 6g: a valid, known intent never carries intentInvalid', () => {
+    const result = classifyProviderState({
+      plugins: fixture('both-installed-graphite-enabled'),
+      intent: 'graphite',
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.intentInvalid).toBeNull();
   });
 
   it('case 7: a managed-scope provider outranks CONFLICT => MANAGED_CONFLICT', () => {
@@ -298,6 +492,64 @@ describe('classifyProviderState — the seven states', () => {
     expect(absent.state).toBe(STATES.PARTIAL_TOOLING);
   });
 
+  it('CLI: a malformed --intent-file produces CONFIG_INVALID end to end', () => {
+    const lib = join(
+      __dirname,
+      '..',
+      '..',
+      'plugins',
+      'yellow-core',
+      'lib',
+      'stack-provider-state.js'
+    );
+    const fixturePath = join(FIXTURE_DIR, 'both-installed-graphite-enabled.json');
+    const scratch = mkdtempSync(join(tmpdir(), 'yellow-stack-cli-intent-'));
+    const intentPath = join(scratch, '.yellow-stack.yml');
+    writeFileSync(intentPath, 'provider: github\nprovider: graphite\n', 'utf8');
+    try {
+      const result = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [lib, 'classify', '--plugins-file', fixturePath, '--intent-file', intentPath],
+          { encoding: 'utf8' }
+        )
+      );
+      expect(result.state).toBe(STATES.CONFIG_INVALID);
+      expect(result.intentInvalid).toEqual({ reason: INTENT_INVALID_REASONS.DUPLICATE_KEYS });
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('CLI: an absent --intent-file classifies exactly as before (no regression)', () => {
+    const lib = join(
+      __dirname,
+      '..',
+      '..',
+      'plugins',
+      'yellow-core',
+      'lib',
+      'stack-provider-state.js'
+    );
+    const fixturePath = join(FIXTURE_DIR, 'both-installed-graphite-enabled.json');
+    const result = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          lib,
+          'classify',
+          '--plugins-file',
+          fixturePath,
+          '--intent-file',
+          join(FIXTURE_DIR, 'does-not-exist.yml'),
+        ],
+        { encoding: 'utf8' }
+      )
+    );
+    expect(result.state).toBe(STATES.READY_GRAPHITE);
+    expect(result.intentInvalid).toBeNull();
+  });
+
   it('filters project-scope rows belonging to a different repository', () => {
     // Without filtering, another repo's enabled github-workflow row would
     // read as a second enabled provider here and report CONFLICT.
@@ -311,6 +563,83 @@ describe('classifyProviderState — the seven states', () => {
     const unfiltered = classifyProviderState({ plugins: fixture('foreign-project-scope') });
     expect(unfiltered.state).toBe(STATES.CONFLICT);
     expect(unfiltered.projectScopeFiltered).toBe(false);
+  });
+});
+
+describe('toolingFromProbeResult', () => {
+  it('maps ready/not-ready/unknown to true/false/omitted', () => {
+    expect(
+      toolingFromProbeResult({
+        graphite: { readiness: 'ready' },
+        github: { readiness: 'not-ready' },
+      })
+    ).toEqual({ graphite: true, github: false });
+
+    expect(toolingFromProbeResult({ graphite: { readiness: 'unknown' } })).toEqual({});
+  });
+
+  it('omits a provider the probe narrowed away with --provider', () => {
+    expect(toolingFromProbeResult({ github: { readiness: 'ready' } })).toEqual({
+      github: true,
+    });
+  });
+
+  it('degrades to an empty object on a malformed or non-object input', () => {
+    expect(toolingFromProbeResult(null)).toEqual({});
+    expect(toolingFromProbeResult('not an object')).toEqual({});
+    expect(toolingFromProbeResult({})).toEqual({});
+  });
+
+  it('CLI: --tooling-probe-file feeds classify end to end, explicit flags still win', () => {
+    const lib = join(
+      __dirname,
+      '..',
+      '..',
+      'plugins',
+      'yellow-core',
+      'lib',
+      'stack-provider-state.js'
+    );
+    const fixturePath = join(FIXTURE_DIR, 'both-installed-github-enabled.json');
+    const scratch = mkdtempSync(join(tmpdir(), 'yellow-stack-probe-file-'));
+    const probePath = join(scratch, 'probe.json');
+    writeFileSync(
+      probePath,
+      JSON.stringify({ github: { readiness: 'ready' }, graphite: { readiness: 'ready' } }),
+      'utf8'
+    );
+    try {
+      const viaProbeFile = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [lib, 'classify', '--plugins-file', fixturePath, '--tooling-probe-file', probePath],
+          { encoding: 'utf8' }
+        )
+      );
+      expect(viaProbeFile.state).toBe(STATES.READY_GITHUB);
+      expect(viaProbeFile.toolingKnown).toBe(true);
+
+      // An explicit --tooling-github overrides the probe file's github entry.
+      const overridden = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            lib,
+            'classify',
+            '--plugins-file',
+            fixturePath,
+            '--tooling-probe-file',
+            probePath,
+            '--tooling-github',
+            'no',
+          ],
+          { encoding: 'utf8' }
+        )
+      );
+      expect(overridden.state).toBe(STATES.PARTIAL_TOOLING);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 
@@ -492,6 +821,121 @@ describe('planProviderSwitch — preview only, never executed', () => {
         .filter((s: { action: string }) => s.action === 'disable')
         .map((s: { command: string }) => s.command)
     ).toEqual(['claude plugin disable gt-workflow@yellow-plugins --scope local']);
+  });
+
+  it('never disables a globally-enabled other provider when a narrower scope was requested', () => {
+    // Regression guard for the effective-scope-model bug confirmed by
+    // docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md:
+    // the other provider is enabled ONLY at `user` scope; the caller asks
+    // to switch at `project` scope. The old code emitted `disable ...
+    // --scope user`, which the spike confirmed disables the provider
+    // GLOBALLY across every project — not "an effective same-repository
+    // override is sufficient", exactly the bug GOAL.md describes.
+    const plan = planProviderSwitch({
+      plugins: fixture('both-installed-graphite-enabled'),
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('project');
+    expect(disableSteps[0].command).toBe(
+      'claude plugin disable gt-workflow@yellow-plugins --scope project'
+    );
+  });
+
+  it('same logic applies one tier down: a project-enabled other provider is overridden at local, not disabled at project, when local was requested', () => {
+    const plugins = fixture('both-installed-github-enabled').map(
+      (row: { id: string; scope?: string; enabled?: boolean }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'project', enabled: true, projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'local',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('a same-or-narrower-scope override is still cleared at its OWN scope, not substituted away', () => {
+    // The other provider is enabled at `local` scope while the caller asks
+    // for a `project`-scope switch. `local` is NARROWER than `project`, so
+    // it must be disabled at its own (local) scope — substituting it to
+    // `project` would leave the local override in place, and local beats
+    // project, so the switch would silently fail to take effect.
+    const plugins = fixture('both-installed-graphite-enabled').map(
+      (row: { id: string; scope?: string }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'local', projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('deduplicates disable steps when multiple broader scopes substitute to the same target scope', () => {
+    const plugins = [
+      ...fixture('both-installed-github-enabled'),
+      {
+        id: 'gt-workflow@yellow-plugins',
+        version: '1.6.2',
+        scope: 'project',
+        enabled: true,
+        installPath: '/fixture/.claude/plugins/cache/yellow-plugins/gt-workflow/1.6.2',
+        installedAt: '2026-01-01T00:00:00.000Z',
+        lastUpdated: '2026-01-01T00:00:00.000Z',
+        projectPath: PROJECT_PATH,
+      },
+    ];
+    // gt-workflow is now enabled at BOTH user and project scope; caller
+    // requests a `local`-scope switch. Both source scopes are broader than
+    // `local`, so both substitute to `local` — must collapse to ONE step,
+    // not two identical ones.
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'local',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('local');
+  });
+
+  it('a genuine global (user-scope) switch still clears a narrower same-repo override', () => {
+    const plugins = fixture('both-installed-github-enabled').map(
+      (row: { id: string; scope?: string; enabled?: boolean }) =>
+        row.id === 'gt-workflow@yellow-plugins'
+          ? { ...row, scope: 'project', enabled: true, projectPath: PROJECT_PATH }
+          : row
+    );
+    const plan = planProviderSwitch({
+      plugins,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    const disableSteps = plan.steps.filter((s: { action: string }) => s.action === 'disable');
+    expect(disableSteps).toHaveLength(1);
+    expect(disableSteps[0].scope).toBe('project');
   });
 
   it('case 7 (switch side): refuses a managed conflict and emits NO steps', () => {

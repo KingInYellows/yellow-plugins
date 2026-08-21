@@ -54,7 +54,7 @@ ruvector.
   `ruvector-conventions` skill.
 - **Graceful degradation:** All agents and commands must work without ruvector —
   fall back to Grep for search, skip memory operations silently.
-- **PR creation:** Use Graphite (`gt submit`), not `gh pr create`.
+- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`.
 
 ## Plugin Components
 

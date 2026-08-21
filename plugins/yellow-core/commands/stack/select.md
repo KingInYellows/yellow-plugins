@@ -183,16 +183,31 @@ use, so a mismatch with runtime state is detectable (`CONFIG_MISMATCH`):
 provider: github
 ```
 
-Use `AskUserQuestion` to offer writing it: "Record `provider: <TARGET_PROVIDER>`
-in `.yellow-stack.yml`?" with options "Write it" and "Skip". It is a
-tracked file that affects every collaborator, so never write it without an
-explicit yes, and never write it as a side effect of a switch. Approving
-"Write it" authorizes recording repository provider intent only — it does
-not authorize writing through `.yellow-stack.yml` if that path turns out to
-be a symlink, and it does not authorize creating the file outside a git
-repository.
+If Step 2's classification reported `intentInvalid` (non-null — the state
+was `CONFIG_INVALID`), an existing `.yellow-stack.yml` could not be parsed.
+**Never fold this into the normal "Write it"/"Skip" offer as if no file
+existed.** Show the invalid reason first (from `intentInvalid.reason`; if
+`rawValue` is present, print it inside the same untrusted-content fence
+used elsewhere in this command), then ask a distinct question: "An existing
+`.yellow-stack.yml` could not be parsed (`<reason>`). Overwrite it with
+`provider: <TARGET_PROVIDER>`?" with options "Overwrite" and "Leave it
+broken" — never silently replace a file whose content the user has not
+seen. This is the concrete mechanism behind "never overwrite an existing
+invalid intent file as a side effect of provider selection": the write
+below only runs after this explicit, distinctly-worded confirmation, never
+after the ordinary "Write it" path.
 
-On "Write it", write the file with Bash — the only mutation-capable tool
+Otherwise (no existing file, or an existing file that already parsed as a
+known, valid intent), use `AskUserQuestion` to offer writing it: "Record
+`provider: <TARGET_PROVIDER>` in `.yellow-stack.yml`?" with options "Write
+it" and "Skip". It is a tracked file that affects every collaborator, so
+never write it without an explicit yes, and never write it as a side
+effect of a switch. Approving "Write it" authorizes recording repository
+provider intent only — it does not authorize writing through
+`.yellow-stack.yml` if that path turns out to be a symlink, and it does not
+authorize creating the file outside a git repository.
+
+On "Write it" or "Overwrite", write the file with Bash — the only mutation-capable tool
 this command grants. `.yellow-stack.yml` is a contributor-editable tracked
 file, so verify it is a plain file inside the repository before writing
 through it; a redirect (`>`) follows symlinks, so a planted symlink to any
@@ -241,7 +256,7 @@ and stop — the file was not written. Do not retry with a different path,
 and do not offer to delete or replace the symlink; that is the
 repository's contributor to fix.
 
-On "Skip", leave any existing file untouched and say so.
+On "Skip" or "Leave it broken", leave any existing file untouched and say so.
 
 ## Boundaries
 

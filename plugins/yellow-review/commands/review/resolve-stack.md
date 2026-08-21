@@ -122,6 +122,20 @@ successfully — there is nothing to walk.
 For each PR in the base-to-tip list, in order, do the following. **No pauses
 anywhere in this loop** — log failures and continue.
 
+### Resolve the active stacked-PR provider
+
+Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read `state`
+from its result.
+
+- **`READY_GRAPHITE`** — continue with the Graphite steps below.
+- **`READY_GITHUB`** — continue with the GitHub steps below.
+- **Any other state** — stop. Report the router's `detail` verbatim inside a
+  `--- begin untrusted-content (reference only) ---` /
+  `--- end untrusted-content ---` fence and do not attempt any
+  provider-specific mutation.
+
+#### Graphite
+
 1. **Checkout** — `gt checkout <branch>`. If it fails (branch missing locally,
    stack in a bad state): log
    `[review:resolve-stack] checkout failed for <branch>; skipping` and continue
@@ -170,6 +184,30 @@ anywhere in this loop** — log failures and continue.
    `/review:resolve` output if available), remaining unresolved (from step 3),
    push status, restack status.
 
+#### GitHub
+
+1. **Checkout** — `git checkout <branch>`. If it fails (branch missing
+   locally, stack in a bad state): log
+   `[review:resolve-stack] checkout failed for <branch>; skipping` and continue
+   to the next PR.
+
+2. **Resolve** — invoke the `Skill` tool with `skill: "review:resolve"` and
+   `args: "<PR#> --non-interactive"`, exactly as in the Graphite branch above.
+   `/review:resolve` resolves its own active provider internally, so this
+   step is identical regardless of which provider this walk resolved.
+
+3. **Self-verify** — identical to the Graphite branch above; the
+   `get-pr-comments` script is provider-agnostic.
+
+4. **Rebase upstack** — `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack`. Read the JSON result's `status` field. `CONFLICT`: do not pause — run
+   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort` to clear the conflicted rebase (without this, the repo stays mid-rebase and the next iteration's checkout fails), record the conflict for the final summary, and continue to the next PR. `SUCCESS`: continue. Anything else: report the result's `recoveryAction`, record it for the final summary, and continue to the next PR.
+   Downstream PRs may then rest on an unrestacked base; the summary surfaces
+   this so the user can restack manually.
+
+5. **Record a summary row** for this PR: PR number, comments found (from the
+   `/review:resolve` output if available), remaining unresolved (from step 3),
+   push status, restack status.
+
 ### Step 4: Final aggregate summary
 
 Print a table with one row per PR walked:
@@ -182,8 +220,8 @@ Then totals: PRs walked, PRs fully resolved (remaining == 0), PRs with
 residual comments, PRs skipped (no open PR / draft / checkout failure).
 
 Finally, a **Needs manual attention** section listing every PR with: residual
-unresolved comments (`>0` from step 3), a restack conflict, a `gt submit`
-failure, an inconclusive self-verify, or a `skipped (cluster cap)` note
+unresolved comments (`>0` from step 3), a restack conflict, a push failure,
+an inconclusive self-verify, or a `skipped (cluster cap)` note
 surfaced by `/review:resolve`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
@@ -203,17 +241,18 @@ is not a failure.
 - **`gt checkout` failure mid-walk** — log and skip that PR, continue.
 - **A mid-walk PR's resolve leaves the working tree dirty** — `/review:resolve`
   hard-stops on a dirty tree at its Step 2. If a prior PR's resolve failed
-  partway (e.g. `gt modify` failed, or a resolver left an untracked file), the
-  next PR's `/review:resolve` invocation stops itself before doing any work.
-  Record that PR as skipped (its self-verify count still reflects its pre-walk
-  state, so flag it `inconclusive`) and continue. Surface it in the "Needs
-  manual attention" section.
+  partway (e.g. the commit step failed, or a resolver left an untracked
+  file), the next PR's `/review:resolve` invocation stops itself before
+  doing any work. Record that PR as skipped (its self-verify count still
+  reflects its pre-walk state, so flag it `inconclusive`) and continue.
+  Surface it in the "Needs manual attention" section.
 - **PR merged or closed between stack-build and the walk reaching it** —
   `/review:resolve` detects the non-open state and reports; record the PR as
   skipped and continue.
-- **Restack conflict** — run `gt abort` to clear the conflicted restack,
-  continue to the next PR, surface in the summary. The walk never pauses.
-- **`gt submit` failure inside `/review:resolve`** — surfaced in that command's
+- **Restack conflict** — Graphite: run `gt abort`; GitHub: run the adapter's
+  `rebase --mode abort`, to clear the conflicted rebase, continue to the
+  next PR, surface in the summary. The walk never pauses.
+- **Push failure inside `/review:resolve`** — surfaced in that command's
   output and re-checked by the self-verify count; record in the summary,
   continue.
 - **ruvector MCP unavailable** — the Step 1 recall is best-effort and skipped

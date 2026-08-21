@@ -11,12 +11,12 @@ active right now, and is it safe to act on that answer?**
 
 It resolves the answer from `plugins/yellow-core/lib/stack-provider-state.js`,
 which classifies `claude plugin list --json` plus the repository's
-`.yellow-stack.yml` intent into exactly one of seven states. The router
+`.yellow-stack.yml` intent into exactly one of eight states. The router
 never re-derives a state from tooling presence, branch shape, or the
 existence of a `.graphite.yml` — those are downstream symptoms, not the
 provider decision.
 
-Only two states route. The other five stop.
+Only two states route. The other six stop.
 
 | State | Router behaviour |
 | --- | --- |
@@ -25,6 +25,7 @@ Only two states route. The other five stop.
 | `PARTIAL_TOOLING` | STOP — provider chosen, its CLI missing |
 | `UNSELECTED` | STOP — no provider chosen |
 | `CONFIG_MISMATCH` | STOP — runtime disagrees with `.yellow-stack.yml` |
+| `CONFIG_INVALID` | STOP — `.yellow-stack.yml` exists but could not be parsed |
 | `CONFLICT` | STOP — both providers enabled |
 | `MANAGED_CONFLICT` | STOP — administrator-controlled, unfixable locally |
 
@@ -51,35 +52,23 @@ Run this in a single Bash call. It is read-only.
 set -uo pipefail
 
 LIB="${CLAUDE_PLUGIN_ROOT}/lib/stack-provider-state.js"
+PROBE="${CLAUDE_PLUGIN_ROOT}/lib/stack-tooling-probe.js"
 if [ ! -f "$LIB" ]; then
   printf 'stack_provider_error: router library not found at %s\n' "$LIB"
+  exit 0
+fi
+if [ ! -f "$PROBE" ]; then
+  printf 'stack_provider_error: tooling probe not found at %s\n' "$PROBE"
   exit 0
 fi
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 intent_file="${repo_root:-.}/.yellow-stack.yml"
 
-# Provider CLI probes. Reported as explicit yes/no so the classifier can
-# distinguish "checked and missing" (PARTIAL_TOOLING) from "never checked".
-if command -v gt >/dev/null 2>&1; then tool_gt=yes; else tool_gt=no; fi
-if command -v gh >/dev/null 2>&1; then
-  # Identity check: only github/gh-stack is first-party. Capture the
-  # probe's own exit status directly in the `if` — do not lose it by
-  # piping into `grep -q`. A probe failure (network, or auth-required)
-  # must not collapse into the same `no` as a genuinely absent extension,
-  # or an enabled GitHub provider is misclassified as PARTIAL_TOOLING.
-  if ext_list=$(gh extension list 2>/dev/null); then
-    if printf '%s\n' "$ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-      tool_gh=yes
-    else
-      tool_gh=no
-    fi
-  else
-    tool_gh=unknown
-  fi
-else
-  tool_gh=no
-fi
+# stack-tooling-probe.js is the single owner of gt/gh readiness (presence,
+# gh auth validity, and github/gh-stack extension identity) — this skill no
+# longer inlines its own copy of that logic.
+probe_json=$(node "$PROBE" probe --provider both)
 
 if ! plugin_json=$(claude plugin list --json 2>/dev/null); then
   printf 'stack_provider_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
@@ -90,8 +79,7 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
   --plugins-file - \
   --intent-file "$intent_file" \
   --project-path "$repo_root" \
-  --tooling-graphite "$tool_gt" \
-  --tooling-github "$tool_gh" \
+  --tooling-probe-file <(printf '%s' "$probe_json") \
   || printf 'stack_provider_error: classification failed — provider state is UNKNOWN\n'
 ```
 
@@ -132,6 +120,8 @@ Then give the one relevant next step:
 
 - `UNSELECTED` → `/stack:select graphite` or `/stack:select github`
 - `CONFIG_MISMATCH` → `/stack:status` for the mismatch, then `/stack:select`
+- `CONFIG_INVALID` → fix or remove `.yellow-stack.yml` by hand; do not offer
+  to overwrite it automatically
 - `CONFLICT` → `/stack:select <provider>` to disable the other
 - `MANAGED_CONFLICT` → contact whoever controls managed settings; nothing
   local can fix it
