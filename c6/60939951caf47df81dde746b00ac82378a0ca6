@@ -1,0 +1,19 @@
+pnpm-lock.yaml
+  s_6ce9b3eb15f4ee::t_968462dc80f74a 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "c660939951caf47df81dde746b00ac82378a0ca6",
+  "prompts": {},
+  "sessions": {
+    "s_6ce9b3eb15f4ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "619d5ba8-ff00-4add-aea7-d0b660485a2a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
