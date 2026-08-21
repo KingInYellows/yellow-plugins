@@ -1,0 +1,58 @@
+plugins/yellow-review/commands/review/review-pr.md
+  s_6ce9b3eb15f4ee::t_faf230ac8c9418 17
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_6ce9b3eb15f4ee::t_877a6125736490 246
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_6ce9b3eb15f4ee::t_98e1c7ec5123bd 157-161,168-172,175-176,182,193-204,206-221,224-230
+  s_6ce9b3eb15f4ee::t_866bb49593a5ce 14
+  s_6ce9b3eb15f4ee::t_f0ca8a055e5733 162-167,177-181
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_6ce9b3eb15f4ee::t_eb5a6c26a8ad4a 17
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_6ce9b3eb15f4ee::t_e419e449b10ba1 97,121-123,148,150-161,163-172,174
+  s_6ce9b3eb15f4ee::t_81b8fd5dd3a2d4 31-35,39-52,79-96
+  s_6ce9b3eb15f4ee::t_39e91712efc774 284-287
+  s_6ce9b3eb15f4ee::t_075830494e81cd 288-289
+  s_6ce9b3eb15f4ee::t_d0edaa5618093c 175
+  s_6ce9b3eb15f4ee::t_ac6f239c077864 180-182
+  s_6ce9b3eb15f4ee::t_4f395aa1231f5b 98,176,178
+plugins/yellow-review/tests/skill-content.bats
+  s_6ce9b3eb15f4ee::t_fa5337c648bfc3 1-45
+plugins/yellow-review/skills/stack-traversal/SKILL.md
+  s_6ce9b3eb15f4ee::t_56952bb11ce9e9 32-44,47-48,61-76,79,89-94,98-102,117,119-124,126-127,138-145
+  s_6ce9b3eb15f4ee::t_f475e7e06edccc 11-16
+plugins/yellow-review/commands/review/review-all.md
+  s_6ce9b3eb15f4ee::t_ac106415dcac6d 62-65,80-91
+  s_6ce9b3eb15f4ee::t_02aae7a546d96b 327-328
+  s_6ce9b3eb15f4ee::t_d613eebef02531 297-298
+  s_6ce9b3eb15f4ee::t_289848f2d8151e 112,116-120,127-130
+  s_6ce9b3eb15f4ee::t_177187901c5cc4 15
+  s_6ce9b3eb15f4ee::t_c069a185acba62 150-155
+  s_6ce9b3eb15f4ee::t_3d10aa1c61189f 28-35,40-52
+  s_6ce9b3eb15f4ee::t_96e7e20d74e57d 311-314
+  s_8cd07f7ccbecf7::t_d9716bec4d175c 53,92,131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "400564c6bafeef2187c8fd1d1806f0172a816b19",
+  "prompts": {},
+  "sessions": {
+    "s_6ce9b3eb15f4ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "619d5ba8-ff00-4add-aea7-d0b660485a2a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_8cd07f7ccbecf7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "aedea9ec-83db-49e7-b604-8a17dfcd89ea",
+        "model": "default"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
