@@ -3,7 +3,6 @@ name: github-stack:status
 description: 'Report GitHub-native stacked-PR provider readiness — tooling state plus a pointer to the authoritative active-provider answer. Use when checking whether gh stack tooling is usable.'
 argument-hint: ''
 allowed-tools:
-  - Bash
   - Skill
 ---
 

@@ -3,8 +3,6 @@ name: github-stack:nav
 description: 'Check out a stack target — stack number, PR number, PR URL, or branch. Use when user says "go to PR 42" or "show my stack and let me pick" on the github stacked-PR provider.'
 argument-hint: '[target]'
 allowed-tools:
-  - Bash
-  - AskUserQuestion
   - Skill
 ---
 

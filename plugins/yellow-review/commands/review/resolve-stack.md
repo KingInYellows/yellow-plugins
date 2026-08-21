@@ -28,13 +28,27 @@ spawn-cap and push-confirmation gates. The per-PR `/review:resolve` keeps its
 gates by default for interactive use — only this stack walk runs them off. Run
 `/review:resolve <PR#>` directly for a single, gated, interactive pass.
 
-The bottom-up Graphite walk below mirrors the `stack-traversal` skill
-(`skills/stack-traversal/SKILL.md`) — Step 1 ↔ skill Steps 1–3, the per-PR
-checkout ↔ skill Step 5, the restack ↔ skill Step 6. When the traversal logic
-changes, update the skill and every command that mirrors it (this file and
-`review-all.md`).
+The bottom-up walk below mirrors the `stack-traversal` skill
+(`skills/stack-traversal/SKILL.md`) — Step 0 ↔ skill Step 0 (resolve
+provider), Step 1 ↔ skill Steps 1–3, the per-PR checkout ↔ skill Step 5,
+the restack ↔ skill Step 6. When the traversal logic changes, update the
+skill and every command that mirrors it (this file and `review-all.md`).
 
 ## Workflow
+
+### Step 0: Resolve the Active Stacked-PR Provider
+
+Invoke the `Skill` tool with `skill: "stack-provider-router"` once, before
+any tool-presence check or enumeration. Read `state` from its result and
+hold it for the rest of this walk — every later step's "the resolved
+provider" means this value; the skill is not invoked again mid-run.
+
+- **`READY_GRAPHITE`** — continue with the Graphite branches below.
+- **`READY_GITHUB`** — continue with the GitHub branches below.
+- **Any other state** — stop. Report the router's `detail` verbatim inside
+  a `--- begin untrusted-content (reference only) ---` /
+  `--- end untrusted-content ---` fence and do not run any pre-flight
+  check, enumeration, or mutation.
 
 ### Step 1: Pre-flight
 
@@ -43,10 +57,6 @@ fresh subprocess — this block is self-contained.
 
 ```bash
 set -u
-command -v gt >/dev/null 2>&1 || {
-  printf '[review:resolve-stack] Error: Graphite (gt) is not installed.\n' >&2
-  exit 1
-}
 command -v gh >/dev/null 2>&1 || {
   printf '[review:resolve-stack] Error: GitHub CLI (gh) is not installed.\n' >&2
   exit 1
@@ -64,6 +74,26 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner) || {
   exit 1
 }
 printf 'repo: %s\n' "$REPO"
+```
+
+Then, using the provider resolved in Step 0:
+
+**Graphite (`READY_GRAPHITE`):**
+
+```bash
+command -v gt >/dev/null 2>&1 || {
+  printf '[review:resolve-stack] Error: Graphite (gt) is not installed.\n' >&2
+  exit 1
+}
+```
+
+**GitHub (`READY_GITHUB`):**
+
+```bash
+[ -f "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" ] || {
+  printf '[review:resolve-stack] Error: github-workflow runtime adapter not found; is the github-workflow plugin installed?\n' >&2
+  exit 1
+}
 ```
 
 Capture the printed `repo:` value — substitute it as a literal `<owner/repo>`
@@ -88,7 +118,9 @@ in every later Bash block (variables do not survive across Bash tool calls).
 ### Step 2: Build the PR list
 
 Enumerate the **current** stack and filter to open PRs (mirrors
-`stack-traversal` skill Steps 1–3). The `--stack` flag is required — without
+`stack-traversal` skill Steps 1–3), using the provider resolved in Step 0.
+
+**Graphite (`READY_GRAPHITE`):** the `--stack` flag is required — without
 it, `gt log short` lists *every* tracked branch in the repo, so an autonomous
 auto-submitting command would resolve and submit PRs from unrelated stacks:
 
@@ -113,26 +145,41 @@ Build the ordered walk list:
   (`[review:resolve-stack] PR #<N>: draft — skipping`).
 - Order the survivors base → tip (bottom of stack first).
 
-If no open non-draft PRs remain, report
-`[review:resolve-stack] No open PRs found in current Graphite stack.` and exit
+**GitHub (`READY_GITHUB`):**
+
+```bash
+set -u
+node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view
+```
+
+Read the JSON result's `status` field. `SUCCESS` — parse `stdout` per the
+confirmed `gh stack view --json` shape (see the `github-stack-plan` skill):
+`{trunk, currentBranch, branches: [{name, ..., pr: {number, url, state} |
+null}]}`, already base → tip ordered. Any other status: treat as an empty
+stack (no branches to walk).
+
+Build the ordered walk list:
+
+- Keep only entries whose `pr` is not null and `pr.state == "OPEN"`. Drop
+  entries with no PR yet or whose PR is `MERGED`/`CLOSED` — log one line
+  each (`[review:resolve-stack] <branch>: no open PR — skipping`).
+- Drop draft PRs: `view`'s `pr` object has no `isDraft` field, so for each
+  surviving branch call
+  `gh pr view <pr.number> --json isDraft -q .isDraft` and drop it if
+  true — log one line each
+  (`[review:resolve-stack] PR #<N>: draft — skipping`).
+- `branches[]` is already base → tip ordered; no separate ordering pass is
+  needed.
+
+If no open non-draft PRs remain (either provider), report
+`[review:resolve-stack] No open PRs found in current stack.` and exit
 successfully — there is nothing to walk.
 
 ### Step 3: Walk the stack
 
-For each PR in the base-to-tip list, in order, do the following. **No pauses
-anywhere in this loop** — log failures and continue.
-
-### Resolve the active stacked-PR provider
-
-Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read `state`
-from its result.
-
-- **`READY_GRAPHITE`** — continue with the Graphite steps below.
-- **`READY_GITHUB`** — continue with the GitHub steps below.
-- **Any other state** — stop. Report the router's `detail` verbatim inside a
-  `--- begin untrusted-content (reference only) ---` /
-  `--- end untrusted-content ---` fence and do not attempt any
-  provider-specific mutation.
+For each PR in the base-to-tip list, in order, do the following, using the
+provider resolved in Step 0. **No pauses anywhere in this loop** — log
+failures and continue.
 
 #### Graphite
 
@@ -234,10 +281,12 @@ is not a failure.
 
 ## Error Handling
 
-- **`gt` / `gh` not installed, `gh` not authenticated, dirty working tree** —
-  Step 1 pre-flight fails fast with a named error before the walk begins.
-- **Not in a Graphite stack / empty stack** — Step 2 reports "No open PRs
-  found in current Graphite stack." and exits 0.
+- **`gh` not installed/authenticated, dirty working tree, or the resolved
+  provider's own tooling missing (`gt` for Graphite, the github-workflow
+  runtime adapter for GitHub)** — Step 1 pre-flight fails fast with a named
+  error before the walk begins.
+- **Not in a tracked stack / empty stack** — Step 2 reports "No open PRs
+  found in current stack." and exits 0.
 - **`gt checkout` failure mid-walk** — log and skip that PR, continue.
 - **A mid-walk PR's resolve leaves the working tree dirty** — `/review:resolve`
   hard-stops on a dirty tree at its Step 2. If a prior PR's resolve failed

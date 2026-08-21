@@ -153,6 +153,7 @@ name: big-workflow
 description: 'Fixture large multi-step workflow. Use when testing RULE 17 scoping.'
 allowed-tools:
   - Bash
+  - Skill
 ---
 
 # Big Workflow
@@ -169,6 +170,9 @@ More steps here, no "## Usage" heading anywhere in this file.
     writeAgent(dir, 'demo-plugin/commands/big-workflow.md', body);
     // Deliberately do NOT create demo-plugin/skills/other-plugins-skill/ —
     // if RULE 17 scanned the whole body this would fail.
+    // `Skill` is granted in allowed-tools above so RULE 19 (whole-body
+    // Skill-tool-grant check) stays silent here too — this fixture is
+    // exercising RULE 17's "## Usage" scoping, not RULE 19.
     const { status, stderr } = runValidator(dir);
     expect(status).toBe(0);
     expect(stderr).not.toContain('RULE 17');

@@ -3,8 +3,6 @@ name: github-stack:cleanup
 description: 'Remove local stack tracking, and by default also remote-unstack every PR via the GitHub API (--local skips the remote call). Use when user says "clean up my stack" or "untrack this stack" on the github stacked-PR provider.'
 argument-hint: '[--local]'
 allowed-tools:
-  - Bash
-  - AskUserQuestion
   - Skill
 ---
 

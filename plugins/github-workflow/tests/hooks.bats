@@ -59,6 +59,31 @@ run_entrypoint() {
   [ "$status" -eq 2 ]
 }
 
+@test "check-git-push: git with space-separated --git-dir value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir /repo push origin main"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: git with space-separated --work-tree value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --work-tree /repo push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: git with space-separated --namespace value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --namespace ns push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: attached --git-dir=value form still blocked (regression)" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/repo push"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: space-separated --git-dir with a non-push subcommand is allowed" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir /repo status"}}'
+  [ "$status" -eq 0 ]
+}
+
 @test "check-git-push: git with -c config override is blocked" {
   run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git -c user.name=x push"}}'
   [ "$status" -eq 2 ]

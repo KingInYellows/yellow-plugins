@@ -36,12 +36,17 @@ skill name):
 
 ### Step 1: Resolve the Target
 
-If the argument text supplied a **numeric target or PR URL**, use it and go
-to Step 2.
+If the argument text supplied a **numeric target or PR URL**, validate it
+before using it: it must match `^[1-9][0-9]*$` (a stack/PR number) or
+`^https://github\.com/` (a PR URL) — the same rule the runtime adapter's
+own `checkout()` applies (`lib/github-stack-runtime.js`) — and must
+contain none of the shell metacharacters `$`, `` ` ``, `;`, `&`, `|`, `(`,
+`)`, `<`, `>`, a quote character, or whitespace. If it passes, use it and
+go to Step 2.
 
-If it supplied something else (a branch name), or no target was given at
-all, call the adapter's `view` operation to list what is available and map
-the branch to its PR number:
+If it supplied something else (a branch name), failed the validation
+above, or no target was given at all, call the adapter's `view` operation
+to list what is available and map the branch to its PR number:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view

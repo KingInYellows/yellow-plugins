@@ -3,8 +3,6 @@ name: github-stack:sync
 description: 'Sync the local stack with trunk via gh stack sync, optionally pruning merged branches. Use when user says "sync with main" or "pull latest" on the github stacked-PR provider.'
 argument-hint: '[--prune]'
 allowed-tools:
-  - Bash
-  - AskUserQuestion
   - Skill
 ---
 

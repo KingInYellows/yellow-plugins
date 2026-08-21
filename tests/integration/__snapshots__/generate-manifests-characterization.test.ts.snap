@@ -251,7 +251,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
+            "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-git-push",
             "timeout": 1
           }
         ]
@@ -263,7 +263,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
+            "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-commit-message",
             "timeout": 1
           }
         ]

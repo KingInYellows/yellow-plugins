@@ -229,7 +229,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   before it proposes anything
 - `stack-provider-router` — resolves the active stacked-PR provider and
   routes provider-specific work to it. Only `READY_GRAPHITE` and
-  `READY_GITHUB` route; the other five states stop with the classifier's
+  `READY_GITHUB` route; the other six states stop with the classifier's
   own `detail` string
 
 ### Codex Distribution
