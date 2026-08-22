@@ -48,9 +48,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const { isCodexEnabled: isCodexEnabledSource } = require('./lib/generate/emit-codex');
+const {
+  isCodexEnabled: isCodexEnabledSource,
+} = require('./lib/generate/emit-codex');
 
-const ROOT = path.resolve(process.env.VALIDATE_PROVIDER_GROUPS_ROOT || path.join(__dirname, '..'));
+const ROOT = path.resolve(
+  process.env.VALIDATE_PROVIDER_GROUPS_ROOT || path.join(__dirname, '..')
+);
 
 // Error codes assembled via concatenation, NOT literals: the catalog in
 // packages/domain/src/validation/errorCatalog.ts is the single source of
@@ -76,16 +80,29 @@ const SETUP_ALL_RELATIVE = path.join(
   'all.md'
 );
 
-// The shipped router's replica of the catalog's provider table. An installed
-// plugin cannot read this repo's catalog/ at runtime, so the table has to be
-// duplicated into the plugin — and a replica without a lint is drift waiting
-// to happen (the RULE 13/16 precedent in validate-agent-authoring.js).
-const ROUTER_TABLE_RELATIVE = path.join(
-  'plugins',
-  'yellow-core',
-  'lib',
-  'stack-provider-state.js'
-);
+// The shipped routers' replicas of the catalog's provider tables. An
+// installed plugin cannot read this repo's catalog/ at runtime, so each
+// table has to be duplicated into its owning plugin — and a replica without
+// a lint is drift waiting to happen (the RULE 13/16 precedent in
+// validate-agent-authoring.js). One router file per capability group this
+// repo currently ships; a group with no router file here simply isn't
+// cross-checked (nothing today declares a group without also shipping a
+// router for it).
+const ROUTER_TABLES = [
+  {
+    group: 'stacked-pr',
+    path: path.join('plugins', 'yellow-core', 'lib', 'stack-provider-state.js'),
+  },
+  {
+    group: 'remote-agent',
+    path: path.join(
+      'plugins',
+      'yellow-core',
+      'lib',
+      'remote-agent-provider-state.js'
+    ),
+  },
+];
 const ROUTER_TABLE_START = '// provider-table:start';
 const ROUTER_TABLE_END = '// provider-table:end';
 const ROUTER_GROUP_RE = /^const PROVIDER_GROUP = '([a-z0-9-]+)';$/m;
@@ -100,7 +117,8 @@ const MIN_GROUP_MEMBERS = 2;
 // part of the pattern deliberately: a group heading that drops the mutual-
 // exclusion clause stops matching and is reported as drift rather than
 // silently documenting a group as if both members could run.
-const GROUP_HEADING_RE = /^- `([a-z0-9-]+)` \(mutually exclusive: exactly one enabled\)$/gm;
+const GROUP_HEADING_RE =
+  /^- `([a-z0-9-]+)` \(mutually exclusive: exactly one enabled\)$/gm;
 const GROUP_MEMBER_RE = /^ {2}- `([a-z0-9-]+)` → `([a-z0-9-]+)`$/gm;
 
 // catalog.pluginOrder entries are interpolated into a filesystem path below
@@ -163,7 +181,9 @@ function loadCatalogProviders() {
     // crafted pluginOrder entry could otherwise make this standalone
     // validator read outside catalog/plugins.
     if (typeof name !== 'string' || !PLUGIN_NAME_RE.test(name)) {
-      fail(`${catalogPath} has an invalid pluginOrder entry: ${JSON.stringify(name)}`);
+      fail(
+        `${catalogPath} has an invalid pluginOrder entry: ${JSON.stringify(name)}`
+      );
     }
     const sourcePath = path.join(ROOT, 'catalog', 'plugins', `${name}.json`);
     let source;
@@ -296,7 +316,12 @@ function validateNonEmission(groups, declaringPlugins, errors) {
   if (fs.existsSync(marketplacePath)) {
     targets.push(marketplacePath);
   }
-  const codexMarketplacePath = path.join(ROOT, '.agents', 'plugins', 'marketplace.json');
+  const codexMarketplacePath = path.join(
+    ROOT,
+    '.agents',
+    'plugins',
+    'marketplace.json'
+  );
   if (fs.existsSync(codexMarketplacePath)) {
     targets.push(codexMarketplacePath);
   }
@@ -308,7 +333,13 @@ function validateNonEmission(groups, declaringPlugins, errors) {
     // opted out of Claude. Silently skipping it would narrow the non-emission
     // scan below and let leaked provider metadata slip through undetected —
     // a fail-open in a CI gate. Fail loudly instead.
-    const claudeManifest = path.join(ROOT, 'plugins', name, '.claude-plugin', 'plugin.json');
+    const claudeManifest = path.join(
+      ROOT,
+      'plugins',
+      name,
+      '.claude-plugin',
+      'plugin.json'
+    );
     if (fs.existsSync(claudeManifest)) {
       targets.push(claudeManifest);
     } else {
@@ -322,7 +353,13 @@ function validateNonEmission(groups, declaringPlugins, errors) {
     // .codex-plugin/plugin.json is never generated and its absence is
     // correct, not a gap. Only require it when the catalog source says Codex
     // is enabled for this plugin.
-    const codexManifest = path.join(ROOT, 'plugins', name, '.codex-plugin', 'plugin.json');
+    const codexManifest = path.join(
+      ROOT,
+      'plugins',
+      name,
+      '.codex-plugin',
+      'plugin.json'
+    );
     if (fs.existsSync(codexManifest)) {
       targets.push(codexManifest);
     } else if (isCodexEnabled(name)) {
@@ -350,7 +387,9 @@ function validateNonEmission(groups, declaringPlugins, errors) {
       raw = readText(target);
       parsed = JSON.parse(raw);
     } catch (error) {
-      fail(`Failed to read generated artifact ${path.relative(ROOT, target)}: ${error.message}`);
+      fail(
+        `Failed to read generated artifact ${path.relative(ROOT, target)}: ${error.message}`
+      );
     }
     const rel = path.relative(ROOT, target);
     if (findKeyDeep(parsed, 'capabilityProvider')) {
@@ -425,7 +464,8 @@ function validateSetupAllSection(groups, errors) {
   const start = '<!-- setup-all-provider-groups:start -->';
   const end = '<!-- setup-all-provider-groups:end -->';
   const startIndex = setupAll.indexOf(start);
-  const endIndex = startIndex === -1 ? -1 : setupAll.indexOf(end, startIndex + start.length);
+  const endIndex =
+    startIndex === -1 ? -1 : setupAll.indexOf(end, startIndex + start.length);
   if (startIndex === -1 || endIndex === -1) {
     errors.push(
       `${PROVIDER_SETUP_SECTION_DRIFT}: missing provider-group markers (${start} / ${end}) in ${SETUP_ALL_RELATIVE}`
@@ -468,7 +508,9 @@ function validateSetupAllSection(groups, errors) {
     }
   }
   for (const match of section.matchAll(GROUP_MEMBER_RE)) {
-    const owning = [...headings].filter((heading) => heading.index < match.index).pop();
+    const owning = [...headings]
+      .filter((heading) => heading.index < match.index)
+      .pop();
     if (!owning) {
       errors.push(
         `${PROVIDER_SETUP_SECTION_DRIFT}: member line \`${match[1]}\` → \`${match[2]}\` appears before any group heading in ${SETUP_ALL_RELATIVE}`
@@ -511,36 +553,52 @@ function validateSetupAllSection(groups, errors) {
 }
 
 /**
- * Cross-check the shipped router's provider table against the catalog.
+ * Cross-check one shipped router file's provider table against the catalog.
  *
- * Without this, `plugins/yellow-core/lib/stack-provider-state.js` could keep
- * routing to a provider the catalog no longer declares (or miss one it does)
- * and every static gate in the repo would stay green — the runtime would
- * simply never see the new provider.
+ * Without this, a router like `plugins/yellow-core/lib/stack-provider-state.js`
+ * could keep routing to a provider the catalog no longer declares (or miss
+ * one it does) and every static gate in the repo would stay green — the
+ * runtime would simply never see the new provider.
+ *
+ * Only runs for a `{group, path}` entry whose `group` the catalog actually
+ * declares — a router table configured for a group with zero catalog
+ * declarations (e.g. `remote-agent` before its plugins land
+ * `capabilityProvider`) is silently skipped rather than reported as
+ * "router file missing", so this check never regresses for a group that
+ * simply hasn't been catalog-declared yet in a given fixture or repo state.
  */
-function validateRouterTable(groups, errors) {
-  const routerPath = path.join(ROOT, ROUTER_TABLE_RELATIVE);
+function validateOneRouterTable(entry, groups, errors) {
+  const routerPath = path.join(ROOT, entry.path);
   let router;
   try {
     router = readText(routerPath);
   } catch (error) {
-    fail(`Failed to read ${ROUTER_TABLE_RELATIVE}: ${error.message}`);
+    if (error.code === 'ENOENT') {
+      errors.push(
+        `${PROVIDER_ROUTER_TABLE_DRIFT}: expected router table ${entry.path} (for catalog group "${entry.group}") is missing from disk`
+      );
+      return;
+    }
+    fail(`Failed to read ${entry.path}: ${error.message}`);
   }
 
   const groupMatch = router.match(ROUTER_GROUP_RE);
   if (!groupMatch) {
     errors.push(
-      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${ROUTER_TABLE_RELATIVE} has no parseable \`const PROVIDER_GROUP = '<group>';\` declaration`
+      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${entry.path} has no parseable \`const PROVIDER_GROUP = '<group>';\` declaration`
     );
     return;
   }
   const routerGroup = groupMatch[1];
 
   const start = router.indexOf(ROUTER_TABLE_START);
-  const end = start === -1 ? -1 : router.indexOf(ROUTER_TABLE_END, start + ROUTER_TABLE_START.length);
+  const end =
+    start === -1
+      ? -1
+      : router.indexOf(ROUTER_TABLE_END, start + ROUTER_TABLE_START.length);
   if (start === -1 || end === -1) {
     errors.push(
-      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${ROUTER_TABLE_RELATIVE} is missing the ${ROUTER_TABLE_START} / ${ROUTER_TABLE_END} markers the catalog cross-check parses`
+      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${entry.path} is missing the ${ROUTER_TABLE_START} / ${ROUTER_TABLE_END} markers the catalog cross-check parses`
     );
     return;
   }
@@ -553,7 +611,7 @@ function validateRouterTable(groups, errors) {
   const catalogMembers = groups.get(routerGroup);
   if (!catalogMembers) {
     errors.push(
-      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${ROUTER_TABLE_RELATIVE} routes group "${routerGroup}", which no catalog plugin declares (catalog groups: ${[...groups.keys()].join(', ') || 'none'})`
+      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${entry.path} routes group "${routerGroup}", which no catalog plugin declares (catalog groups: ${[...groups.keys()].join(', ') || 'none'})`
     );
     return;
   }
@@ -568,8 +626,17 @@ function validateRouterTable(groups, errors) {
     .join(', ');
   if (expected !== actual) {
     errors.push(
-      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${ROUTER_TABLE_RELATIVE} provider table drifts from the catalog's "${routerGroup}" group: router=[${actual}] catalog=[${expected}]`
+      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${entry.path} provider table drifts from the catalog's "${routerGroup}" group: router=[${actual}] catalog=[${expected}]`
     );
+  }
+}
+
+function validateRouterTable(groups, errors) {
+  for (const entry of ROUTER_TABLES) {
+    if (!groups.has(entry.group)) {
+      continue;
+    }
+    validateOneRouterTable(entry, groups, errors);
   }
 }
 
@@ -583,7 +650,9 @@ function main() {
     if (!Array.isArray(marketplace.plugins)) {
       fail(`${marketplacePath} has no \`plugins\` array`);
     }
-    marketplaceNames = new Set(marketplace.plugins.map((plugin) => plugin.name));
+    marketplaceNames = new Set(
+      marketplace.plugins.map((plugin) => plugin.name)
+    );
   } catch (error) {
     fail(`Failed to read ${marketplacePath}: ${error.message}`);
   }
@@ -605,7 +674,10 @@ function main() {
     return;
   }
   const summary = [...groups]
-    .map(([group, members]) => `${group} (${members.map((member) => member.id).join(', ')})`)
+    .map(
+      ([group, members]) =>
+        `${group} (${members.map((member) => member.id).join(', ')})`
+    )
     .join('; ');
   console.log(
     `[validate-provider-groups] OK: ${groups.size} capability group(s) verified — ${summary}`

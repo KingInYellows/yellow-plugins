@@ -103,6 +103,14 @@ elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json"
 else
   printf 'MORPH_API_KEY:             NOT SET (run /morph:setup if you configured via keychain)\n'
 fi
+if [ -n "${CURSOR_API_KEY:-}" ]; then
+  printf 'CURSOR_API_KEY:            set (shell env)\n'
+elif grep -qE '"cursor_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+  printf 'CURSOR_API_KEY:            set (userConfig)\n'
+else
+  printf 'CURSOR_API_KEY:            NOT SET (run /cursor:setup if you configured via keychain or `cursor login`)\n'
+fi
+[ -f "$HOME/.cursor/sdk/auth.json" ] && printf 'cursor_stored_login:       present\n' || printf 'cursor_stored_login:       missing\n'
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
   printf 'DEVIN_SERVICE_USER_TOKEN:  set (shell env)\n'
 elif grep -qE '"devin_service_user_token"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
@@ -278,7 +286,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -321,6 +329,38 @@ if [ -n "$_gh" ]; then
   fi
 else
   printf 'gh_stack_ext: SKIPPED (gh not found)\n'
+fi
+
+printf '\n=== Remote-Agent Provider Tooling ===\n'
+# Coarse "is the yellow-cursor CLI resolvable" proxy: checks that
+# `dist/cli.js` exists at the plugin's installPath (from `claude plugin
+# list --json`, NEVER a `${CLAUDE_PLUGIN_ROOT}/../yellow-cursor` relative
+# guess — the real plugin cache is version-suffixed). This is a coarse
+# signal — file presence, not a live `@cursor/sdk` resolution or auth
+# check — the authoritative live check is `/cursor:setup`.
+_cursor_root=""
+if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  _cursor_root=$(printf '%s' "$_plugin_list_json" | node -e '
+    const fs = require("fs");
+    let rows;
+    try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
+    if (!Array.isArray(rows)) rows = [];
+    const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+    const candidates = rows
+      .filter((row) =>
+        row && typeof row === "object" &&
+        row.id === "yellow-cursor@yellow-plugins" &&
+        row.enabled === true &&
+        typeof row.installPath === "string" && row.installPath.length > 0
+      )
+      .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+    process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
+  ' 2>/dev/null)
+fi
+if [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ]; then
+  printf 'cursor_cli_resolved: OK (%s)\n' "$_cursor_root"
+else
+  printf 'cursor_cli_resolved: NOT FOUND\n'
 fi
 ```
 
@@ -437,9 +477,31 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
 - NEEDS SETUP: any local prerequisite missing (`node18_check`, `npm`, or
   `rg`).
 
+**yellow-cursor:**
+
+Alternative provider of the `remote-agent` capability group (see the
+Alternative Provider Groups section below) and the **preferred** member —
+`yellow-devin` below is the legacy path. `credential-status.json` is not
+emitted for this plugin in v1 (it has no MCP server and no SessionStart
+hook writing that file), so classification reads Step 1's `CURSOR_API_KEY`
+row plus the `cursor_stored_login` and `cursor_cli_resolved` probes
+directly, the same way yellow-morph's block does before it joins that
+protocol.
+
+- READY: `cursor_cli_resolved` is `OK` AND (`CURSOR_API_KEY` shows
+  `set (shell env)`/`set (userConfig)` OR `cursor_stored_login` is
+  `present`)
+- PARTIAL: plugin enabled but `cursor_cli_resolved` is `NOT FOUND`, OR the
+  CLI resolved but no credential source was found (`CURSOR_API_KEY` is
+  `NOT SET` AND `cursor_stored_login` is `missing`) — detail: "run
+  `/cursor:setup` to resolve the SDK and configure credentials"
+- NEEDS SETUP: neither the CLI nor any credential source resolved
+
 **yellow-devin:**
 
-Credentials may come from shell env vars or the plugin's `userConfig`
+Legacy remote-agent provider — `yellow-cursor` above is preferred; this
+plugin remains supported for existing Devin workflows and security fixes
+only. Credentials may come from shell env vars or the plugin's `userConfig`
 prompt, but 8 of 9 devin commands read `$DEVIN_SERVICE_USER_TOKEN` /
 `$DEVIN_ORG_ID` directly via curl — only shell env is fully functional.
 Classification derives from the two Step 1 rows (`set (shell env)` /
@@ -648,6 +710,7 @@ Marketplace Setup Dashboard
   github-workflow      PARTIAL         gh authenticated, github/gh-stack not installed
   yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
   yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
+  yellow-cursor        READY           CLI resolved, credentials configured (alternative provider — not enabled)
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/6 bundled sources available
@@ -681,6 +744,9 @@ supported — but enabling both is a conflict, not a redundancy.
 - `stacked-pr` (mutually exclusive: exactly one enabled)
   - `gt-workflow` → `graphite`
   - `github-workflow` → `github`
+- `remote-agent` (mutually exclusive: exactly one enabled)
+  - `yellow-cursor` → `cursor`
+  - `yellow-devin` → `devin`
 <!-- setup-all-provider-groups:end -->
 
 `scripts/validate-provider-groups.js` gates this list against the
@@ -691,26 +757,38 @@ drift from the marketplace silently.
 appear in the dashboard, because both can be installed and their readiness
 is worth reporting. Only the **enabled** one is offered for setup:
 
-1. Determine the group's enabled member via `/stack:status` (or the
-   `stack-provider-router` skill, which reads `claude plugin list --json`).
-   Do not infer it from which CLI happens to be on PATH.
+1. Determine the group's enabled member. For `stacked-pr`, use
+   `/stack:status` (or the `stack-provider-router` skill). For
+   `remote-agent`, there is no dedicated status command yet — run
+   `plugins/yellow-core/lib/remote-agent-provider-state.js classify`
+   against `claude plugin list --json`, the same classifier
+   `/linear:delegate` uses. Do not infer either group's active member from
+   which CLI happens to be on PATH.
 2. Offer setup for that member only. Show the other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
-3. If the group's state is not `READY_GRAPHITE`, `READY_GITHUB`, or
-   `PARTIAL_TOOLING` — no provider enabled, both enabled, an intent
-   mismatch, an unparseable `.yellow-stack.yml` (`CONFIG_INVALID`), or a
-   managed-scope conflict — do **not** pick one. Report the state and point
-   at `/stack:select` (or, for `CONFIG_INVALID`, at fixing/removing
-   `.yellow-stack.yml` by hand first). There is no fallback between
-   providers.
+3. If the group's state is not one of its READY states or
+   `PARTIAL_TOOLING` — `stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`,
+   or `PARTIAL_TOOLING` (no provider enabled, both enabled, an intent
+   mismatch, an unparseable `.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a
+   managed-scope conflict); `remote-agent`: not `READY_CURSOR`,
+   `READY_DEVIN`, or `PARTIAL_TOOLING` (`UNSELECTED`, `CONFLICT`, or
+   `CONFIG_INVALID`) — do **not** pick one. Report the state and its
+   `detail` (fenced as untrusted, same as `/stack:status` and
+   `/linear:delegate` do), and point at `/stack:select` for `stacked-pr`
+   (or, for `CONFIG_INVALID`, at fixing/removing `.yellow-stack.yml` by
+   hand first) — `remote-agent` has no switch command in v1, so for that
+   group just report which provider(s) need to be enabled/disabled by
+   hand. There is no fallback between providers in either group.
 4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous
-   — only its CLI is missing. Offer that provider's own setup command
-   instead of `/stack:select`, which only changes plugin enablement and
-   cannot install the missing CLI: `/gt-setup` for `gt-workflow`,
-   `/github-stack:setup` for `github-workflow`.
-5. If `yellow-core` is not installed, `/stack:status` is unavailable: report
-   both members' readiness, annotate that the active provider could not be
-   determined, and offer neither.
+   — only its tooling is missing. Offer that provider's own setup command
+   rather than a provider-switch command (which only changes plugin
+   enablement and cannot install missing tooling): `/gt-setup` for
+   `gt-workflow`, `/github-stack:setup` for `github-workflow`,
+   `/cursor:setup` for `yellow-cursor`, `/devin:setup` for `yellow-devin`.
+5. If `yellow-core` is not installed, neither group's status can be
+   determined (both classifiers live in `plugins/yellow-core/lib/`): report
+   every member's readiness, annotate that the active provider could not be
+   determined for either group, and offer neither.
 
 ### Step 3: Decision — Interactive Setup
 
@@ -767,20 +845,21 @@ tool in this fixed order:
 2. `github-stack:setup`
 3. `ruvector:setup`
 4. `morph:setup`
-5. `devin:setup`
-6. `semgrep:setup`
-7. `research:setup`
-8. `linear:setup`
-9. `debt:setup`
-10. `ci:setup`
-11. `review:setup`
-12. `browser-test:setup`
-13. `docs:setup`
-14. `composio:setup`
-15. `codex:setup`
-16. `council:setup`
-17. `mempalace:setup`
-18. `statusline:setup`
+5. `cursor:setup`
+6. `devin:setup`
+7. `semgrep:setup`
+8. `research:setup`
+9. `linear:setup`
+10. `debt:setup`
+11. `ci:setup`
+12. `review:setup`
+13. `browser-test:setup`
+14. `docs:setup`
+15. `composio:setup`
+16. `codex:setup`
+17. `council:setup`
+18. `mempalace:setup`
+19. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 This list is the fixed **order**, not a to-do list. Only invoke setups for
@@ -792,6 +871,7 @@ provider group in one run (see the section below). Use this mapping:
 - `github-workflow` → `github-stack:setup`
 - `yellow-ruvector` → `ruvector:setup`
 - `yellow-morph` → `morph:setup`
+- `yellow-cursor` → `cursor:setup`
 - `yellow-devin` → `devin:setup`
 - `yellow-semgrep` → `semgrep:setup`
 - `yellow-research` → `research:setup`
