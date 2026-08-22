@@ -4,6 +4,7 @@ description: "Delegate a Linear issue to a remote coding agent — a Cursor clou
 argument-hint: '[issue-id] [--provider cursor|devin]'
 allowed-tools:
   - Bash
+  - Write
   - AskUserQuestion
   - ToolSearch
   - Skill
@@ -308,54 +309,179 @@ before Step 7's launch, with no other step in between).
 
 **Cursor.**
 
-> Shell variables do NOT persist across separate Bash tool calls. Everything
-> this launch needs — `YELLOW_CURSOR_ROOT` (Step 3), `REPO_URL` / `BRANCH` /
-> `ISSUE_ID` (Steps 1-3), `IDEMPOTENCY_KEY` (Step 4), and `PACKET` (Steps 4
-> and 6) — must be re-assigned with its concrete value inside the single launch
-> block below. Do not rely on assignments made in an earlier block; an unset
-> `YELLOW_CURSOR_ROOT` silently becomes `node "/dist/cli.js"`, and an empty
-> `PACKET` launches a billable agent with no instructions.
+> Shell variables do NOT persist across separate Bash tool calls. The launch
+> block below re-derives every git- and plugin-root value itself so nothing
+> from Step 3/4 assignments can be lost between calls. Only `ISSUE_ID` and
+> `delegation-rev` (from Steps 1 and 4) are substituted into the block —
+> both are format-validated before use. Never substitute `REPO_URL`, `BRANCH`,
+> `YELLOW_CURSOR_ROOT`, or `IDEMPOTENCY_KEY` literals: those are computed
+> inside the block from `git` and `claude plugin list --json`.
 
-**First, write the packet to a file with the `Write` tool — never into the Bash
-source.** The packet contains untrusted Linear issue text. Any scheme that
-embeds it in shell source is unsafe: bare substitution makes quotes and
-`$(...)` executable, and a heredoc is escaped by an issue line that happens to
-match its delimiter. `Write` does not interpret shell syntax, so routing the
-text through a file removes that entire class of problem — the shell only ever
-sees a path.
+**First, route the packet through a file with the `Write` tool — never into Bash
+source.** The packet contains untrusted Linear issue text; embedding it in
+shell source makes quotes and `$(...)` executable. `Write` does not interpret
+shell syntax.
 
-Write the packet verbatim to `.git/yellow-linear-packet.txt` (inside the repo,
-already git-ignored, and removed by the block below). Then run the whole launch
-as ONE Bash call — the assignments, the `CURSOR_REPO_URL` derivation, the
-guards, and the `node` invocation. Splitting them across calls loses every
-variable between them, and the guards would then reject the launch. Replace
-each `YELLOW_TODO_` token with the concrete value computed earlier in this run:
+**Then resolve the packet path** (one Bash call — copy the printed path for
+`Write`). Replace each `YELLOW_TODO_` token with the concrete value from this
+run:
 
 ```bash
-# Every YELLOW_TODO_ token below MUST be replaced with its concrete value.
-# The guard further down refuses to launch while any survives, so a forgotten
-# substitution costs nothing; leaving one in would otherwise start a billable
-# agent whose prompt is this template text.
-YELLOW_CURSOR_ROOT="YELLOW_TODO_installPath_from_step_3"
-REPO_URL="YELLOW_TODO_repository_remote_url"
-BRANCH="YELLOW_TODO_branch_name"   # set to "" on a detached HEAD
-IDEMPOTENCY_KEY="YELLOW_TODO_key_from_step_4"
-ISSUE_ID="YELLOW_TODO_issue_id"
+set -uo pipefail
 
-# The packet is READ FROM THE FILE the Write tool just produced. Its bytes
-# never pass through the shell parser — command substitution captures the
-# file's contents as a single string and "$PACKET" hands it to the CLI as one
-# argv element, so no issue content can be interpreted as shell syntax.
-PACKET_FILE=".git/yellow-linear-packet.txt"
+ISSUE_ID="YELLOW_TODO_issue_id"
+DELEGATION_REV="YELLOW_TODO_delegation_rev"
+
+case "$ISSUE_ID" in
+  *YELLOW_TODO_*|'')
+    printf 'ERROR: ISSUE_ID is missing or unsubstituted — set the concrete issue id before resolving the packet path.\n' >&2
+    exit 1
+    ;;
+esac
+if ! printf '%s' "$ISSUE_ID" | grep -qE '^[A-Z]{2,5}-[0-9]{1,6}$'; then
+  printf 'ERROR: ISSUE_ID "%s" failed format validation.\n' "$ISSUE_ID" >&2
+  exit 1
+fi
+
+case "$DELEGATION_REV" in
+  *YELLOW_TODO_*|'')
+    printf 'ERROR: DELEGATION_REV is missing or unsubstituted — set the delegation-rev integer from Step 4.\n' >&2
+    exit 1
+    ;;
+  *[!0-9]*)
+    printf 'ERROR: DELEGATION_REV "%s" is not a non-negative integer.\n' "$DELEGATION_REV" >&2
+    exit 1
+    ;;
+esac
+
+PACKET_REL="tmp/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
+PACKET_FILE=$(git rev-parse --git-path "$PACKET_REL" 2>/dev/null || true)
+if [ -z "$PACKET_FILE" ]; then
+  PACKET_FILE="${TMPDIR:-/tmp}/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
+fi
+mkdir -p "$(dirname "$PACKET_FILE")"
+printf '%s\n' "$PACKET_FILE"
+```
+
+Write the packet verbatim to the printed path with the `Write` tool.
+
+**Finally, run the whole launch as ONE Bash call** — plugin-root resolution,
+git remote/branch reads, `CURSOR_REPO_URL` derivation, idempotency-key
+computation, guards, and the `node` invocation. Do not split these across
+calls. Replace the two `YELLOW_TODO_` tokens with the same concrete values used
+for the path step:
+
+```bash
+set -uo pipefail
+
+ISSUE_ID="YELLOW_TODO_issue_id"
+DELEGATION_REV="YELLOW_TODO_delegation_rev"
+PROVIDER="cursor"
+
+case "$ISSUE_ID" in
+  *YELLOW_TODO_*|'')
+    printf 'ERROR: ISSUE_ID is missing or unsubstituted.\n' >&2
+    exit 1
+    ;;
+esac
+if ! printf '%s' "$ISSUE_ID" | grep -qE '^[A-Z]{2,5}-[0-9]{1,6}$'; then
+  printf 'ERROR: ISSUE_ID "%s" failed format validation.\n' "$ISSUE_ID" >&2
+  exit 1
+fi
+
+case "$DELEGATION_REV" in
+  *YELLOW_TODO_*|'')
+    printf 'ERROR: DELEGATION_REV is missing or unsubstituted.\n' >&2
+    exit 1
+    ;;
+  *[!0-9]*)
+    printf 'ERROR: DELEGATION_REV "%s" is not a non-negative integer.\n' "$DELEGATION_REV" >&2
+    exit 1
+    ;;
+esac
+
+PACKET_REL="tmp/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
+PACKET_FILE=$(git rev-parse --git-path "$PACKET_REL" 2>/dev/null || true)
+if [ -z "$PACKET_FILE" ]; then
+  PACKET_FILE="${TMPDIR:-/tmp}/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
+fi
+
+trap 'rm -f -- "$PACKET_FILE"' EXIT INT TERM
+
 if [ ! -f "$PACKET_FILE" ]; then
   printf 'ERROR: %s does not exist — write the delegation packet with the Write tool before running this block.\n' "$PACKET_FILE" >&2
   exit 1
 fi
 PACKET="$(cat -- "$PACKET_FILE")"
+if [ -z "$PACKET" ]; then
+  printf 'ERROR: %s is empty — the delegation packet must not be blank.\n' "$PACKET_FILE" >&2
+  exit 1
+fi
+
+# Re-read git metadata here — never substitute remote/branch strings into this
+# template; branch names and remote URLs can contain shell metacharacters.
+REPO_URL=$(git remote get-url origin 2>/dev/null || true)
+BRANCH=$(git branch --show-current 2>/dev/null || true)
+
+resolve_plugin_root() {
+  local name="$1" required="$2" root=""
+  if [ -n "${_plugin_list_json:-}" ]; then
+    root=$(printf '%s' "$_plugin_list_json" | node -e '
+      const fs = require("fs");
+      let rows;
+      try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
+      if (!Array.isArray(rows)) rows = [];
+      const name = process.argv[1];
+      const projectPath = process.argv[2] || "";
+      const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+      const candidates = rows
+        .filter((row) => {
+          if (
+            row === null ||
+            typeof row !== "object" ||
+            row.id !== `${name}@yellow-plugins` ||
+            row.enabled !== true ||
+            typeof row.installPath !== "string" ||
+            row.installPath.length === 0
+          ) {
+            return false;
+          }
+          if (
+            (row.scope === "project" || row.scope === "local") &&
+            projectPath.length > 0
+          ) {
+            return row.projectPath === projectPath;
+          }
+          return true;
+        })
+        .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+      process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
+    ' "$name" "${repo_root:-}" 2>/dev/null)
+  fi
+  if [ -z "$root" ] || [ ! -f "$root/$required" ]; then
+    local repo_root_local
+    repo_root_local=$(git rev-parse --show-toplevel 2>/dev/null || true)
+    if [ -n "$repo_root_local" ] && [ -f "$repo_root_local/plugins/$name/$required" ]; then
+      root="$repo_root_local/plugins/$name"
+    else
+      root=""
+    fi
+  fi
+  printf '%s' "$root"
+}
+
+if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  printf 'ERROR: claude plugin list --json failed — cannot resolve yellow-cursor install path.\n' >&2
+  exit 1
+fi
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+YELLOW_CURSOR_ROOT=$(resolve_plugin_root yellow-cursor dist/cli.js)
+if [ -z "$YELLOW_CURSOR_ROOT" ]; then
+  printf 'ERROR: yellow-cursor CLI not resolved — install or enable yellow-cursor before delegating.\n' >&2
+  exit 1
+fi
 
 # CURSOR_REPO_URL is REPO_URL in the https:// form the Cursor CLI requires.
-# That CLI's own validate.ts is the single authority on repo/ref shape — do
-# not replicate its regexes here; just convert scheme and strip a trailing .git.
 case "$REPO_URL" in
   https://*) CURSOR_REPO_URL="${REPO_URL%.git}" ;;
   git@*)
@@ -371,36 +497,13 @@ if [ -z "$CURSOR_REPO_URL" ]; then
   exit 1
 fi
 
-# BRANCH is deliberately NOT required: `git branch --show-current` is empty on
-# a detached HEAD, and --ref is optional to the CLI (it defaults to the repo's
-# default branch). Everything else is mandatory.
-# The YELLOW_TODO_ scan covers only the values typed into this template.
-# PACKET is deliberately excluded: it comes from the file, and real issue text
-# containing that token would otherwise be refused for no reason.
-for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID; do
-  value="${!required:-}"
-  if [ -z "$value" ]; then
-    printf 'ERROR: %s is empty — substitute its concrete value above before launching (shell state does not cross Bash calls).\n' "$required" >&2
-    exit 1
-  fi
-  # An unsubstituted template value is non-empty, so an emptiness check alone
-  # would happily launch a billable agent prompted with this template text.
-  case "$value" in
-    *YELLOW_TODO_*)
-      printf 'ERROR: %s still holds an unsubstituted YELLOW_TODO_ template value — replace it with the concrete value before launching.\n' "$required" >&2
-      exit 1
-      ;;
-  esac
-done
-# BRANCH may legitimately be empty (detached HEAD), so it is token-checked only.
-case "$BRANCH" in
-  *YELLOW_TODO_*)
-    printf 'ERROR: BRANCH still holds an unsubstituted YELLOW_TODO_ template value — set it to the branch name, or to "" on a detached HEAD.\n' >&2
-    exit 1
-    ;;
-esac
-if [ -z "$PACKET" ]; then
-  printf 'ERROR: %s is empty — the delegation packet must not be blank.\n' "$PACKET_FILE" >&2
+IDEMPOTENCY_INPUT="${REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
+if command -v sha256sum >/dev/null 2>&1; then
+  IDEMPOTENCY_KEY=$(printf '%s' "$IDEMPOTENCY_INPUT" | sha256sum | cut -d' ' -f1)
+elif command -v shasum >/dev/null 2>&1; then
+  IDEMPOTENCY_KEY=$(printf '%s' "$IDEMPOTENCY_INPUT" | shasum -a 256 | cut -d' ' -f1)
+else
+  printf 'ERROR: neither sha256sum nor shasum is available — cannot compute idempotency key.\n' >&2
   exit 1
 fi
 
@@ -415,11 +518,6 @@ node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
   --calling-host yellow-linear \
   --prompt "$PACKET" \
   --yes
-launch_status=$?
-
-# The packet file is scratch, not a record — the Linear issue is the record.
-rm -f -- "$PACKET_FILE"
-exit "$launch_status"
 ```
 
 Parse the single JSON object on stdout. On `{ok:true}`: capture `agentId`,
@@ -511,9 +609,10 @@ title, Devin URL, status) — do not re-derive or reformat those fields.
   `claude plugin list --json`'s `installPath` field, never via a
   `${CLAUDE_PLUGIN_ROOT}/../<plugin>` relative guess (the real plugin cache
   is version-suffixed)
-- **No shell injection**: the Cursor CLI invocation passes arguments as an
-  argv array (not interpolated into a shell string); the packet text is
-  quoted, never `eval`'d
+- **No shell injection**: git remote/branch strings are read inside the launch
+  block via `git`, never substituted into the template; the packet bytes pass
+  through a `Write`-produced file; the Cursor CLI invocation uses an argv
+  array (not interpolated into a shell string)
 
 ## Error Handling
 
