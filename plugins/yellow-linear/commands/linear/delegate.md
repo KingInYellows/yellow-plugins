@@ -323,19 +323,23 @@ reject the launch. Replace each `<...>` placeholder with the concrete value
 computed earlier in this run before executing:
 
 ```bash
-YELLOW_CURSOR_ROOT="<installPath resolved in Step 3>"
-REPO_URL="<repository remote URL>"
-BRANCH="<branch name, or leave empty on a detached HEAD>"
-IDEMPOTENCY_KEY="<key computed in Step 4>"
-ISSUE_ID="<TEAM-123>"
+# Every YELLOW_TODO_ token below MUST be replaced with its concrete value.
+# The guard further down refuses to launch while any survives, so a forgotten
+# substitution costs nothing; leaving one in would otherwise start a billable
+# agent whose prompt is this template text.
+YELLOW_CURSOR_ROOT="YELLOW_TODO_installPath_from_step_3"
+REPO_URL="YELLOW_TODO_repository_remote_url"
+BRANCH="YELLOW_TODO_branch_name"   # set to "" on a detached HEAD
+IDEMPOTENCY_KEY="YELLOW_TODO_key_from_step_4"
+ISSUE_ID="YELLOW_TODO_issue_id"
 
 # PACKET carries untrusted Linear issue text. It MUST arrive through this
-# quoted heredoc — never as a bare "<packet>" substitution inside double
-# quotes, where a quote, backtick or $(...) in the issue body would become
-# executable shell. The quoted 'YELLOW_PACKET_EOF' delimiter disables all
-# expansion and command substitution inside the body.
+# quoted heredoc — never as a bare substitution inside double quotes, where a
+# quote, backtick or $(...) in the issue body would become executable shell.
+# The quoted 'YELLOW_PACKET_EOF' delimiter disables all expansion and command
+# substitution inside the body.
 PACKET="$(cat <<'YELLOW_PACKET_EOF'
-<delegation packet assembled in Steps 4 and 6, pasted verbatim>
+YELLOW_TODO_paste_the_delegation_packet_from_steps_4_and_6_here
 YELLOW_PACKET_EOF
 )"
 
@@ -361,11 +365,26 @@ fi
 # a detached HEAD, and --ref is optional to the CLI (it defaults to the repo's
 # default branch). Everything else is mandatory.
 for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID PACKET; do
-  if [ -z "${!required:-}" ]; then
+  value="${!required:-}"
+  if [ -z "$value" ]; then
     printf 'ERROR: %s is empty — substitute its concrete value above before launching (shell state does not cross Bash calls).\n' "$required" >&2
     exit 1
   fi
+  # An unsubstituted template value is non-empty, so an emptiness check alone
+  # would happily launch a billable agent prompted with this template text.
+  case "$value" in
+    *YELLOW_TODO_*)
+      printf 'ERROR: %s still holds an unsubstituted YELLOW_TODO_ template value — replace it with the concrete value before launching.\n' "$required" >&2
+      exit 1
+      ;;
+  esac
 done
+case "$BRANCH" in
+  *YELLOW_TODO_*)
+    printf 'ERROR: BRANCH still holds an unsubstituted YELLOW_TODO_ template value — set it to the branch name, or to "" on a detached HEAD.\n' >&2
+    exit 1
+    ;;
+esac
 
 REF_ARGS=()
 [ -n "$BRANCH" ] && REF_ARGS=(--ref "$BRANCH")

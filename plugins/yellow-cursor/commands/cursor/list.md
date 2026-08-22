@@ -43,7 +43,16 @@ SHOW_ARCHIVED=""
 set -- $ARGS_TEXT
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --cursor) CURSOR_TOKEN="${2:-}"; shift 2 ;;
+    --cursor)
+      # `shift 2` is a no-op when only one positional remains, which would
+      # spin this loop forever — reject the missing value instead.
+      if [ "$#" -lt 2 ]; then
+        printf 'ERROR: --cursor requires a value.\n' >&2
+        exit 1
+      fi
+      CURSOR_TOKEN="$2"
+      shift 2
+      ;;
     --archived) SHOW_ARCHIVED=1; shift ;;
     *) shift ;;
   esac
