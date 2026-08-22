@@ -16,10 +16,10 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 
 - `plugins/`: Installable plugins. Current plugin directories are `gt-workflow`,
   `yellow-browser-test`, `yellow-chatprd`, `yellow-ci`, `yellow-codex`,
-  `yellow-composio`, `yellow-core`, `yellow-council`, `yellow-debt`,
-  `yellow-devin`, `yellow-docs`, `yellow-linear`, `yellow-mempalace`,
-  `yellow-morph`, `yellow-research`, `yellow-review`, `yellow-ruvector`, and
-  `yellow-semgrep`.
+  `yellow-composio`, `yellow-core`, `yellow-council`, `yellow-cursor`,
+  `yellow-debt`, `yellow-devin`, `yellow-docs`, `yellow-linear`,
+  `yellow-mempalace`, `yellow-morph`, `yellow-research`, `yellow-review`,
+  `yellow-ruvector`, and `yellow-semgrep`.
 - `plugins/<plugin-name>/.claude-plugin/plugin.json`: Required manifest. Most
   plugins rely on Claude Code's default discovery of `commands/`, `agents/`, and
   `skills/`; only add explicit manifest paths when a plugin needs a non-default
@@ -293,6 +293,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `plugins/yellow-ci/references/`, loaded by Claude-only agents via
   `${CLAUDE_PLUGIN_ROOT}`). Three plugins enable Codex today, in canonical order:
   `gt-workflow`, `yellow-core`, `yellow-ci`; see `docs/codex-distribution.md`.
+  The Cursor target (`emit-cursor.js` / `validate-cursor.js`) mirrors the same
+  allowlist, containment, and exposure-lint discipline for its own
+  single-plugin pilot (`yellow-cursor`); see `docs/cursor-distribution.md`
+  rather than duplicating the rules here.
 - A thin-wrapper command whose `## Usage` section reads "Invoke the `Skill`
   tool with `skill: "<name>"`." (the cross-host pattern: the command is a
   Claude-only entrypoint, the skill is what both Claude and Codex actually

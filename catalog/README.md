@@ -23,17 +23,29 @@ files carry no in-JSON "generated" marker — drift enforcement runs via
 - `catalog.json` — marketplace identity (`name`, `description`, `owner`,
   `metadata`), the canonical plugin order (`pluginOrder`, an explicit name
   array — marketplace entries are emitted in exactly this order), and
-  per-target presentation defaults (`targets.claude`, `targets.codex`). The
-  `targets.codex` block is inert data for the Codex distribution target
-  (consumed by later tooling); nothing reads it during Claude generation.
+  per-target presentation defaults (`targets.claude`, `targets.codex`,
+  `targets.cursor`). The `targets.codex` and `targets.cursor` blocks are
+  inert data for their respective generated distribution targets (consumed
+  by later tooling); nothing reads them during Claude generation.
+  `targets.cursor` is entirely optional at the root — its absence means no
+  root `.cursor-plugin/marketplace.json` is emitted at all, even if a
+  per-plugin source enables Cursor (see `docs/cursor-distribution.md`).
 - `plugins/<name>.json` — one source per plugin, filename = exact plugin
   `name`. Holds the shared metadata (`description`, `author`, `homepage`,
   `repository`, `license`, `keywords`), the Claude component fields verbatim
   (`outputStyles`, `userConfig`, `mcpServers`, `hooks`, `dependencies`,
   `$schema`), the marketplace entry fields (`marketplace.category`,
   `marketplace.source`, plus `marketplace.description` ONLY when the
-  marketplace listing text differs from the plugin description), and target
-  enablement (`targets: {"claude": true, "codex": {"enabled": false}}`).
+  marketplace listing text differs from the plugin description), target
+  enablement (`targets: {"claude": true, "codex": {"enabled": false},
+  "cursor": {"enabled": false}}` — `codex` and `cursor` both fail closed:
+  an absent block, or an absent/non-`true` `enabled`, means disabled), and
+  an optional catalog-only `lifecycle` object (`status:
+  active|experimental|legacy|deprecated`, `installPolicy?: auto|manual`,
+  `support?: full|security-only`, `replacement?: <plugin-name>`) describing
+  a plugin's standing relative to a newer replacement. `lifecycle` is never
+  emitted into any generated artifact — `pnpm validate:cursor`'s lifecycle
+  non-emission scan enforces this across every target's output.
 
 ## Versions
 

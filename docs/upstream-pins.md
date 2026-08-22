@@ -36,6 +36,32 @@ the per-pin `npm view` network calls would add registry flakiness to every PR.
 | yellow-research  | `ast-grep-mcp`                   | `674272f`| git SHA  | Installed via `uvx` from `github.com/ast-grep/ast-grep-mcp`. No npm release. |
 | yellow-ruvector  | `ruvector`                       | _latest_ | npm      | No version pin — ruvector handles its own DB migration. Consider pinning after v1.0 cut. |
 
+## Cursor Distribution Pins
+
+Two kinds of Cursor pin, tracked separately from the npm/uvx table above
+since neither is a runtime `npx`/`uvx` invocation:
+
+**Upstream schema snapshots** (local mirrors, not installed packages):
+
+| Local mirror                                | Upstream source                                                                             | Snapshot date | Divergence |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------- | ---------- |
+| `schemas/cursor-plugin.schema.json`          | `https://raw.githubusercontent.com/cursor/plugins/main/schemas/plugin.schema.json`            | 2026-08-21    | None       |
+| `schemas/cursor-marketplace.schema.json`     | `https://raw.githubusercontent.com/cursor/plugins/main/schemas/marketplace.schema.json`       | 2026-08-21    | None       |
+
+Both were fetched and quoted directly (not paraphrased) and cross-checked
+against real examples in the same upstream repo. Re-fetch and diff both
+URLs before any structural change to `scripts/lib/generate/emit-cursor.js`
+or the generated `.cursor-plugin/` shape; see `docs/cursor-distribution.md`
+"Upstream schema provenance" for the three known differences from this
+repo's own (locally-invented, non-upstream) Codex schemas.
+
+**`@cursor/sdk`** — pinned `1.0.28` **exact** (not `^1.0.28`) in
+`plugins/yellow-cursor/package.json`. This SDK surface was verified live
+against that exact version (see `plugins/yellow-cursor/CLAUDE.md` "SDK pin
+policy"); treat any bump as a breaking change requiring re-verification of
+the `instanceof` error-branching in `sdk-adapter.ts` before merging, since
+the SDK's error class shapes are not guaranteed stable across versions.
+
 ## Bump Checklist
 
 When bumping a pin:

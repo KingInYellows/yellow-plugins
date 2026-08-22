@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 18 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 19 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -30,6 +30,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 18 commands, 22 skills              |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
+| `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 1 skill                           |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
@@ -40,6 +41,16 @@ Add the marketplace, then install individual plugins:
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 7 commands, 2 skills                |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
+
+## Cursor Distribution (pilot)
+
+`yellow-cursor` is also generated as a native Cursor plugin
+(`.cursor-plugin/plugin.json` + a listing in the root
+`.cursor-plugin/marketplace.json`), alongside its normal Claude Code install
+path. This is a **single-plugin pilot, explicit opt-in** — no other plugin in
+this marketplace is Cursor-enabled, and this repo does not claim repository-wide
+Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
+for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication
 
@@ -275,6 +286,7 @@ yellow-plugins/
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (21 agents, 18 commands, 22 skills)
 │   ├── yellow-council/        # Cross-lineage code council (3 agents, 2 commands, 1 skill)
+│   ├── yellow-cursor/         # Cursor Cloud Agent delegation, pilot target (10 commands, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
