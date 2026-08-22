@@ -316,11 +316,20 @@ before Step 7's launch, with no other step in between).
 > `YELLOW_CURSOR_ROOT` silently becomes `node "/dist/cli.js"`, and an empty
 > `PACKET` launches a billable agent with no instructions.
 
-Run the whole launch as ONE Bash call — the reassignments, the `CURSOR_REPO_URL`
-derivation, the emptiness checks, and the `node` invocation. Splitting them
-across calls loses every variable between them, and the checks below would then
-reject the launch. Replace each `<...>` placeholder with the concrete value
-computed earlier in this run before executing:
+**First, write the packet to a file with the `Write` tool — never into the Bash
+source.** The packet contains untrusted Linear issue text. Any scheme that
+embeds it in shell source is unsafe: bare substitution makes quotes and
+`$(...)` executable, and a heredoc is escaped by an issue line that happens to
+match its delimiter. `Write` does not interpret shell syntax, so routing the
+text through a file removes that entire class of problem — the shell only ever
+sees a path.
+
+Write the packet verbatim to `.git/yellow-linear-packet.txt` (inside the repo,
+already git-ignored, and removed by the block below). Then run the whole launch
+as ONE Bash call — the assignments, the `CURSOR_REPO_URL` derivation, the
+guards, and the `node` invocation. Splitting them across calls loses every
+variable between them, and the guards would then reject the launch. Replace
+each `YELLOW_TODO_` token with the concrete value computed earlier in this run:
 
 ```bash
 # Every YELLOW_TODO_ token below MUST be replaced with its concrete value.
@@ -333,15 +342,16 @@ BRANCH="YELLOW_TODO_branch_name"   # set to "" on a detached HEAD
 IDEMPOTENCY_KEY="YELLOW_TODO_key_from_step_4"
 ISSUE_ID="YELLOW_TODO_issue_id"
 
-# PACKET carries untrusted Linear issue text. It MUST arrive through this
-# quoted heredoc — never as a bare substitution inside double quotes, where a
-# quote, backtick or $(...) in the issue body would become executable shell.
-# The quoted 'YELLOW_PACKET_EOF' delimiter disables all expansion and command
-# substitution inside the body.
-PACKET="$(cat <<'YELLOW_PACKET_EOF'
-YELLOW_TODO_paste_the_delegation_packet_from_steps_4_and_6_here
-YELLOW_PACKET_EOF
-)"
+# The packet is READ FROM THE FILE the Write tool just produced. Its bytes
+# never pass through the shell parser — command substitution captures the
+# file's contents as a single string and "$PACKET" hands it to the CLI as one
+# argv element, so no issue content can be interpreted as shell syntax.
+PACKET_FILE=".git/yellow-linear-packet.txt"
+if [ ! -f "$PACKET_FILE" ]; then
+  printf 'ERROR: %s does not exist — write the delegation packet with the Write tool before running this block.\n' "$PACKET_FILE" >&2
+  exit 1
+fi
+PACKET="$(cat -- "$PACKET_FILE")"
 
 # CURSOR_REPO_URL is REPO_URL in the https:// form the Cursor CLI requires.
 # That CLI's own validate.ts is the single authority on repo/ref shape — do
@@ -364,7 +374,10 @@ fi
 # BRANCH is deliberately NOT required: `git branch --show-current` is empty on
 # a detached HEAD, and --ref is optional to the CLI (it defaults to the repo's
 # default branch). Everything else is mandatory.
-for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID PACKET; do
+# The YELLOW_TODO_ scan covers only the values typed into this template.
+# PACKET is deliberately excluded: it comes from the file, and real issue text
+# containing that token would otherwise be refused for no reason.
+for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID; do
   value="${!required:-}"
   if [ -z "$value" ]; then
     printf 'ERROR: %s is empty — substitute its concrete value above before launching (shell state does not cross Bash calls).\n' "$required" >&2
@@ -379,12 +392,17 @@ for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID PACK
       ;;
   esac
 done
+# BRANCH may legitimately be empty (detached HEAD), so it is token-checked only.
 case "$BRANCH" in
   *YELLOW_TODO_*)
     printf 'ERROR: BRANCH still holds an unsubstituted YELLOW_TODO_ template value — set it to the branch name, or to "" on a detached HEAD.\n' >&2
     exit 1
     ;;
 esac
+if [ -z "$PACKET" ]; then
+  printf 'ERROR: %s is empty — the delegation packet must not be blank.\n' "$PACKET_FILE" >&2
+  exit 1
+fi
 
 REF_ARGS=()
 [ -n "$BRANCH" ] && REF_ARGS=(--ref "$BRANCH")
@@ -397,6 +415,11 @@ node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
   --calling-host yellow-linear \
   --prompt "$PACKET" \
   --yes
+launch_status=$?
+
+# The packet file is scratch, not a record — the Linear issue is the record.
+rm -f -- "$PACKET_FILE"
+exit "$launch_status"
 ```
 
 Parse the single JSON object on stdout. On `{ok:true}`: capture `agentId`,
