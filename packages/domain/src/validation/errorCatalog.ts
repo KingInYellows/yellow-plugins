@@ -191,6 +191,40 @@ export const ERROR_CODES = {
   NAMESPACE_ALLOWLIST_COUNT_DRIFT: 'ERROR-NAMESPACE-002',
   NAMESPACE_ALLOWLIST_PATH_MISSING: 'ERROR-NAMESPACE-003',
 
+  // Cursor Distribution Errors (CURSOR) — scripts/validate-cursor.js gates
+  // the generated Cursor-target artifacts (plugins/<name>/.cursor-plugin/
+  // plugin.json, the root .cursor-plugin/marketplace.json) against
+  // schemas/cursor-plugin.schema.json and schemas/cursor-marketplace.schema.json
+  // (local mirrors of the verified upstream Cursor plugin schemas), plus an
+  // exposure lint (mirroring validate-codex.js's Claude-only-construct scan)
+  // and a lifecycle non-emission scan (the catalog-only "lifecycle" field —
+  // see catalog-plugin.schema.json — must never reach a generated artifact
+  // on any target). scripts/validate-versions.js reuses this same category
+  // for the Cursor two-way version check and marketplace membership/order/
+  // path drift, mirroring how the Codex two-way check has no dedicated
+  // category of its own either.
+  //
+  // Prefix choice: CURSOR is substring-safe against every existing prefix
+  // in both directions (lint-error-codes.js findPrefixCollisions, R14):
+  // SCHEMA, COMPAT, INST, DISC, PERM, NET, SOL, PLAN, SETUP, PROVIDER,
+  // NAMESPACE, DIST.
+  //
+  // Same ESM/CJS bridge constraint as SOL_*/PLAN_*/SETUP_*/PROVIDER_*/
+  // NAMESPACE_*: the catalog is ESM, scripts/ is CJS, so
+  // scripts/validate-cursor.js and scripts/validate-versions.js assemble
+  // the same strings via concatenation (`const CURSOR = 'ERROR-' +
+  // 'CURSOR';`) and `scripts/lint-error-codes.js` (CODE_PATTERN
+  // /ERROR-[A-Z]+-\d+/g) does not detect split-string assembly. Any change
+  // to the entries below requires a paired edit in those two scripts.
+  CURSOR_ARTIFACT_MISSING: 'ERROR-CURSOR-001',
+  CURSOR_SCHEMA_VIOLATION: 'ERROR-CURSOR-002',
+  CURSOR_MARKETPLACE_DRIFT: 'ERROR-CURSOR-003',
+  CURSOR_VERSION_DRIFT: 'ERROR-CURSOR-004',
+  CURSOR_EXPOSURE_LEAK: 'ERROR-CURSOR-005',
+  CURSOR_LIFECYCLE_INVALID: 'ERROR-CURSOR-006',
+  CURSOR_LIFECYCLE_LEAKED: 'ERROR-CURSOR-007',
+  CURSOR_SKILL_MISSING: 'ERROR-CURSOR-008',
+
   // Codex Distribution Errors (DIST) — see ./error-codes.json for the
   // canonical values; re-exported here (not redeclared as literals) so
   // scripts/lint-error-codes.js's CATALOG must scan error-codes.json too
@@ -411,9 +445,7 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.SOL_SLUG_COLLISION,
       ERROR_CODES.SOL_FRONTMATTER_INVALID,
     ],
-    [ErrorCategory.PLAN_LIFECYCLE]: [
-      ERROR_CODES.PLAN_STRAY_CHECKBOX,
-    ],
+    [ErrorCategory.PLAN_LIFECYCLE]: [ERROR_CODES.PLAN_STRAY_CHECKBOX],
     [ErrorCategory.SETUP_COVERAGE]: [
       ERROR_CODES.SETUP_MISSING_MARKERS,
       ERROR_CODES.SETUP_COVERAGE_DRIFT,

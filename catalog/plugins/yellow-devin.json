@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "description": "Devin.AI V3 API integration \u2014 delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -8,13 +8,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-devin",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": [
-    "devin",
-    "deepwiki",
-    "delegation",
-    "orchestration",
-    "ai-collaboration"
-  ],
+  "keywords": ["devin", "delegation", "orchestration", "ai-collaboration"],
   "userConfig": {
     "devin_service_user_token": {
       "type": "string",
@@ -30,10 +24,6 @@
     }
   },
   "mcpServers": {
-    "deepwiki": {
-      "type": "http",
-      "url": "https://mcp.deepwiki.com/mcp"
-    },
     "devin": {
       "type": "http",
       "url": "https://mcp.devin.ai/mcp"
@@ -43,10 +33,20 @@
     "category": "development",
     "source": "./plugins/yellow-devin"
   },
+  "capabilityProvider": {
+    "group": "remote-agent",
+    "id": "devin"
+  },
   "targets": {
     "claude": true,
     "codex": {
       "enabled": false
     }
+  },
+  "lifecycle": {
+    "status": "legacy",
+    "installPolicy": "manual",
+    "support": "security-only",
+    "replacement": "yellow-cursor"
   }
 }

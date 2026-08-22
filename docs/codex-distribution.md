@@ -9,7 +9,10 @@ source of truth.
 ## The neutral-catalog model
 
 Plugins are authored once under `catalog/` and `plugins/<name>/`, then **per-host
-artifacts are generated** — never hand-edited:
+artifacts are generated** — never hand-edited. Three distribution targets exist
+today: Claude, Codex, and Cursor (the last is a single-plugin pilot; see
+[cursor-distribution.md](cursor-distribution.md) for its own canonical doc).
+This doc covers the Codex target only:
 
 - `catalog/catalog.json` — `pluginOrder` (canonical marketplace order) and the
   release track.

@@ -1,0 +1,17 @@
+{
+  "name": "yellow-plugins",
+  "owner": {
+    "name": "Yellow Plugins",
+    "email": "plugins@example.com"
+  },
+  "metadata": {
+    "description": "Example Cursor marketplace."
+  },
+  "plugins": [
+    {
+      "name": "hello-world",
+      "source": "plugins/hello-world",
+      "description": "Example Cursor-enabled plugin."
+    }
+  ]
+}

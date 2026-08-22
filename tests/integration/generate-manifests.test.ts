@@ -27,12 +27,27 @@ import { join, resolve } from 'node:path';
 
 import { describe, it, expect, afterAll } from 'vitest';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+/* eslint-disable @typescript-eslint/no-var-requires -- scripts/ is plain
+   CJS, so these are require()'d rather than imported; prettier wraps the
+   longer destructured imports below across multiple lines, which would
+   desync a per-line eslint-disable-next-line comment from the actual
+   require() call. */
 const { generateManifests } = require('../../scripts/generate-manifests.js');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { loadCatalog, loadPluginSources } = require('../../scripts/lib/generate/catalog-reader.js');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { isCodexEnabled, buildCodexHookConfig, buildCodexSkillTree } = require('../../scripts/lib/generate/emit-codex.js');
+const {
+  loadCatalog,
+  loadPluginSources,
+} = require('../../scripts/lib/generate/catalog-reader.js');
+const {
+  isCodexEnabled,
+  buildCodexHookConfig,
+  buildCodexSkillTree,
+} = require('../../scripts/lib/generate/emit-codex.js');
+const {
+  isCursorEnabled,
+  buildCursorMarketplace,
+  buildCursorSkillTree,
+} = require('../../scripts/lib/generate/emit-cursor.js');
+/* eslint-enable @typescript-eslint/no-var-requires */
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'generate-manifests.js');
@@ -47,7 +62,10 @@ const SCRIPT = join(REPO_ROOT, 'scripts', 'generate-manifests.js');
 // more plugins flip codex.enabled: true.
 function countRealCodexTargets(): number {
   const { data: catalog } = loadCatalog(join(REPO_ROOT, 'catalog'));
-  const { sources } = loadPluginSources(join(REPO_ROOT, 'catalog'), catalog.pluginOrder);
+  const { sources } = loadPluginSources(
+    join(REPO_ROOT, 'catalog'),
+    catalog.pluginOrder
+  );
   let count = 0;
   for (const name of catalog.pluginOrder) {
     const source = sources[name];
@@ -56,6 +74,36 @@ function countRealCodexTargets(): number {
     if (buildCodexHookConfig(source) !== null) count += 1; // hooks/codex-hooks.json
     const skillTree = buildCodexSkillTree(REPO_ROOT, name, source);
     if (skillTree.status === 'ok') count += skillTree.targets.length;
+  }
+  return count;
+}
+
+// Same rationale and shape as countRealCodexTargets() above, for the Cursor
+// target: real per-plugin manifest + skill-tree file counts, derived from
+// the live catalog via the same pure emit-cursor.js functions the real
+// generator uses (never a hardcoded literal). Also counts the root
+// .cursor-plugin/marketplace.json — but only when buildCursorMarketplace
+// actually emits one (it returns null, not an empty-array object, when the
+// root catalog.targets.cursor config is absent or zero plugins are
+// Cursor-enabled — see emit-cursor.js), unlike Codex's always-present
+// empty-state marketplace which countRealCodexTargets() doesn't need to
+// count separately (it's covered by the fixed "+2" in TARGET_COUNT below).
+function countRealCursorTargets(): number {
+  const { data: catalog } = loadCatalog(join(REPO_ROOT, 'catalog'));
+  const { sources } = loadPluginSources(
+    join(REPO_ROOT, 'catalog'),
+    catalog.pluginOrder
+  );
+  let count = 0;
+  for (const name of catalog.pluginOrder) {
+    const source = sources[name];
+    if (!isCursorEnabled(source)) continue;
+    count += 1; // .cursor-plugin/plugin.json
+    const skillTree = buildCursorSkillTree(REPO_ROOT, name, source);
+    if (skillTree.status === 'ok') count += skillTree.targets.length;
+  }
+  if (buildCursorMarketplace(catalog, sources) !== null) {
+    count += 1; // .cursor-plugin/marketplace.json
   }
   return count;
 }
@@ -75,7 +123,8 @@ const TARGET_COUNT =
 // itself (not a fixture) — so it must include whatever real Codex targets
 // the live catalog actually produces (R22 makes this non-zero as of
 // yellow-core).
-const REAL_TARGET_COUNT = TARGET_COUNT + countRealCodexTargets();
+const REAL_TARGET_COUNT =
+  TARGET_COUNT + countRealCodexTargets() + countRealCursorTargets();
 
 const fixtureRoots: string[] = [];
 afterAll(() => {
@@ -88,15 +137,21 @@ afterAll(() => {
 function makeFixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'yellow-generate-'));
   fixtureRoots.push(root);
-  cpSync(join(REPO_ROOT, 'catalog'), join(root, 'catalog'), { recursive: true });
+  cpSync(join(REPO_ROOT, 'catalog'), join(root, 'catalog'), {
+    recursive: true,
+  });
   cpSync(join(REPO_ROOT, '.claude-plugin'), join(root, '.claude-plugin'), {
     recursive: true,
   });
-  const plugins = readdirSync(join(REPO_ROOT, 'plugins'), { withFileTypes: true })
+  const plugins = readdirSync(join(REPO_ROOT, 'plugins'), {
+    withFileTypes: true,
+  })
     .filter((e) => e.isDirectory())
     .map((e) => e.name);
   for (const name of plugins) {
-    mkdirSync(join(root, 'plugins', name, '.claude-plugin'), { recursive: true });
+    mkdirSync(join(root, 'plugins', name, '.claude-plugin'), {
+      recursive: true,
+    });
     cpSync(
       join(REPO_ROOT, 'plugins', name, 'package.json'),
       join(root, 'plugins', name, 'package.json')
@@ -113,10 +168,16 @@ function makeFixtureRoot(): string {
     // into this file's Claude-only TARGET_COUNT/diff assertions. Without this,
     // a --check run here would also try to read plugins/<name>/skills/ off
     // disk for buildCodexSkillTree, which this loop deliberately never copies.
+    // Same rationale for targets.cursor (e.g. yellow-cursor, once its own
+    // catalog flip landed) — Cursor-specific scenarios live in
+    // generate-manifests-cursor.test.ts's self-contained fixtures.
     const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
     const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
     if (source.targets && source.targets.codex) {
       source.targets.codex = { enabled: false };
+    }
+    if (source.targets && source.targets.cursor) {
+      source.targets.cursor = { enabled: false };
     }
     writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
   }
@@ -124,13 +185,23 @@ function makeFixtureRoot(): string {
   // marketplace is always the empty-state artifact — derive it from the
   // fixture's own copied catalog.json rather than assuming the live repo's
   // current .agents/plugins/marketplace.json is still empty-state (it isn't,
-  // once any real plugin sets codex.enabled: true).
-  const catalogJson = JSON.parse(readFileSync(join(root, 'catalog', 'catalog.json'), 'utf8'));
+  // once any real plugin sets codex.enabled: true). No equivalent stub is
+  // written for .cursor-plugin/marketplace.json: every fixture source is
+  // also forced Cursor-disabled above, and buildCursorMarketplace() returns
+  // null (no artifact at all — see emit-cursor.js) once zero plugins are
+  // Cursor-enabled, unlike Codex's always-present empty-state file.
+  const catalogJson = JSON.parse(
+    readFileSync(join(root, 'catalog', 'catalog.json'), 'utf8')
+  );
   mkdirSync(join(root, '.agents', 'plugins'), { recursive: true });
   writeFileSync(
     join(root, '.agents', 'plugins', 'marketplace.json'),
     JSON.stringify(
-      { name: catalogJson.name, interface: { displayName: catalogJson.targets.codex.displayName }, plugins: [] },
+      {
+        name: catalogJson.name,
+        interface: { displayName: catalogJson.targets.codex.displayName },
+        plugins: [],
+      },
       null,
       2
     ) + '\n',
@@ -147,7 +218,9 @@ function targetPaths(root: string): string[] {
   return [
     join(root, '.claude-plugin', 'marketplace.json'),
     join(root, '.agents', 'plugins', 'marketplace.json'),
-    ...plugins.map((n) => join(root, 'plugins', n, '.claude-plugin', 'plugin.json')),
+    ...plugins.map((n) =>
+      join(root, 'plugins', n, '.claude-plugin', 'plugin.json')
+    ),
   ];
 }
 
@@ -165,7 +238,11 @@ interface CliRun {
   stderr: string;
 }
 
-function runCli(root: string, args: string[], envExtra: Record<string, string> = {}): CliRun {
+function runCli(
+  root: string,
+  args: string[],
+  envExtra: Record<string, string> = {}
+): CliRun {
   try {
     const stdout = execFileSync('node', [SCRIPT, ...args], {
       env: { ...process.env, GENERATE_MANIFESTS_ROOT: root, ...envExtra },
@@ -201,13 +278,21 @@ describe('byte-identity and determinism', () => {
 
   it('apply mode corrects a stale target and reports it in written', () => {
     const root = makeFixtureRoot();
-    const target = join(root, 'plugins', 'yellow-core', '.claude-plugin', 'plugin.json');
+    const target = join(
+      root,
+      'plugins',
+      'yellow-core',
+      '.claude-plugin',
+      'plugin.json'
+    );
     const original = readFileSync(target, 'utf8');
     writeFileSync(target, original.replace('"MIT"', '"Apache-2.0"'), 'utf8');
 
     const result = generateManifests({ mode: 'apply', rootDir: root });
     expect(result.status).toBe('ok');
-    expect(result.written).toContain('plugins/yellow-core/.claude-plugin/plugin.json');
+    expect(result.written).toContain(
+      'plugins/yellow-core/.claude-plugin/plugin.json'
+    );
     expect(readFileSync(target, 'utf8')).toBe(original);
   });
 });
@@ -224,16 +309,23 @@ describe('target enablement', () => {
     expect(result.status).toBe('ok');
     // One fewer target: yellow-docs's plugin.json is not generated at all.
     expect(result.checked).toBe(TARGET_COUNT - 1);
-    expect(result.diffs.some((d: { path: string }) => d.path.includes('yellow-docs'))).toBe(false);
+    expect(
+      result.diffs.some((d: { path: string }) => d.path.includes('yellow-docs'))
+    ).toBe(false);
     // The committed marketplace still lists it, so the generated one differs.
     expect(
-      result.diffs.some((d: { path: string }) => d.path === '.claude-plugin/marketplace.json')
+      result.diffs.some(
+        (d: { path: string }) => d.path === '.claude-plugin/marketplace.json'
+      )
     ).toBe(true);
   });
 });
 
 describe('source value-shape validation', () => {
-  function mutateSource(root: string, mutate: (source: Record<string, unknown>) => void): void {
+  function mutateSource(
+    root: string,
+    mutate: (source: Record<string, unknown>) => void
+  ): void {
     const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
     const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
     mutate(source);
@@ -350,7 +442,9 @@ describe('source value-shape validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('ok');
-    expect(result.errors.some((e: string) => e.includes('marketplace.source'))).toBe(false);
+    expect(
+      result.errors.some((e: string) => e.includes('marketplace.source'))
+    ).toBe(false);
   });
 
   it('rejects an object marketplace.source that is not { source: "url", url }', () => {
@@ -367,7 +461,10 @@ describe('source value-shape validation', () => {
 });
 
 describe('catalog.json validation', () => {
-  function mutateCatalog(root: string, mutate: (catalog: Record<string, unknown>) => void): void {
+  function mutateCatalog(
+    root: string,
+    mutate: (catalog: Record<string, unknown>) => void
+  ): void {
     const catalogPath = join(root, 'catalog', 'catalog.json');
     const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
     mutate(catalog);
@@ -379,7 +476,9 @@ describe('catalog.json validation', () => {
     rmSync(join(root, 'catalog', 'catalog.json'));
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors.some((e: string) => e.startsWith('catalog not found at'))).toBe(true);
+    expect(
+      result.errors.some((e: string) => e.startsWith('catalog not found at'))
+    ).toBe(true);
   });
 
   it('rejects a missing top-level required key', () => {
@@ -389,13 +488,16 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: missing required key "owner"');
+    expect(result.errors).toContain(
+      'catalog.json: missing required key "owner"'
+    );
   });
 
   it('rejects a missing targets.claude.marketplaceSchema', () => {
     const root = makeFixtureRoot();
     mutateCatalog(root, (c) => {
-      delete (c.targets as { claude: Record<string, unknown> }).claude.marketplaceSchema;
+      delete (c.targets as { claude: Record<string, unknown> }).claude
+        .marketplaceSchema;
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
@@ -411,7 +513,9 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: "pluginOrder" must be a non-empty array');
+    expect(result.errors).toContain(
+      'catalog.json: "pluginOrder" must be a non-empty array'
+    );
   });
 
   it('rejects a duplicate pluginOrder entry', () => {
@@ -421,7 +525,9 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: duplicate pluginOrder entry "yellow-core"');
+    expect(result.errors).toContain(
+      'catalog.json: duplicate pluginOrder entry "yellow-core"'
+    );
     // Catalog-wide errors do not attribute to any plugin: the catalog is
     // rejected before per-plugin results are computed, so `results` stays
     // empty while `status` carries the global error.
@@ -437,7 +543,9 @@ describe('catalog.json validation', () => {
     );
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: top-level value must be an object');
+    expect(result.errors).toContain(
+      'catalog.json: top-level value must be an object'
+    );
   });
 
   it('rejects a null owner (would emit "owner": null into the marketplace)', () => {
@@ -457,7 +565,9 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: "description" must be a string');
+    expect(result.errors).toContain(
+      'catalog.json: "description" must be a string'
+    );
   });
 
   it('rejects an empty catalog name (schema minLength: 1)', () => {
@@ -467,7 +577,9 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: "name" must be a non-empty string');
+    expect(result.errors).toContain(
+      'catalog.json: "name" must be a non-empty string'
+    );
   });
 
   it('rejects an empty owner name (schema minLength: 1)', () => {
@@ -477,7 +589,9 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain('catalog.json: "owner.name" must be a non-empty string');
+    expect(result.errors).toContain(
+      'catalog.json: "owner.name" must be a non-empty string'
+    );
   });
 
   it('rejects a non-semver metadata.version', () => {
@@ -534,7 +648,9 @@ describe('catalog source safety', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(
-      result.errors.some((e: string) => e.includes('fails the [a-zA-Z0-9_-] allowlist'))
+      result.errors.some((e: string) =>
+        e.includes('fails the [a-zA-Z0-9_-] allowlist')
+      )
     ).toBe(true);
   });
 
@@ -563,7 +679,9 @@ describe('catalog source safety', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(
-      result.errors.some((e: string) => e.startsWith('catalog/plugins/yellow-core.json:'))
+      result.errors.some((e: string) =>
+        e.startsWith('catalog/plugins/yellow-core.json:')
+      )
     ).toBe(true);
   });
 
@@ -598,7 +716,9 @@ describe('catalog source safety', () => {
     expect(result.errors).toContain(
       'pluginOrder entry "__proto__" has no catalog/plugins/__proto__.json source file'
     );
-    expect(Object.prototype.hasOwnProperty.call(result.results, '__proto__')).toBe(true);
+    expect(
+      Object.prototype.hasOwnProperty.call(result.results, '__proto__')
+    ).toBe(true);
     expect(result.results['__proto__']).toBe('error');
     expect(result.results['yellow-review']).toBe('ok');
   });
@@ -607,13 +727,23 @@ describe('catalog source safety', () => {
 describe('--check stale-artifact detection (subprocess)', () => {
   it('exits nonzero while ANY diff remains, and performs zero writes', () => {
     const root = makeFixtureRoot();
-    const pluginTarget = join(root, 'plugins', 'yellow-core', '.claude-plugin', 'plugin.json');
+    const pluginTarget = join(
+      root,
+      'plugins',
+      'yellow-core',
+      '.claude-plugin',
+      'plugin.json'
+    );
     const marketplaceTarget = join(root, '.claude-plugin', 'marketplace.json');
     const pluginBytes = readFileSync(pluginTarget, 'utf8');
     const marketplaceBytes = readFileSync(marketplaceTarget, 'utf8');
 
     // Two distinct mutations at once.
-    writeFileSync(pluginTarget, pluginBytes.replace('"MIT"', '"Apache-2.0"'), 'utf8');
+    writeFileSync(
+      pluginTarget,
+      pluginBytes.replace('"MIT"', '"Apache-2.0"'),
+      'utf8'
+    );
     writeFileSync(marketplaceTarget, marketplaceBytes + '\n', 'utf8');
 
     const before: Record<string, { bytes: string; mtimeMs: number }> = {};
@@ -626,7 +756,9 @@ describe('--check stale-artifact detection (subprocess)', () => {
 
     const bothDirty = runCli(root, ['--check']);
     expect(bothDirty.status).toBe(1);
-    expect(bothDirty.stdout).toContain('plugins/yellow-core/.claude-plugin/plugin.json');
+    expect(bothDirty.stdout).toContain(
+      'plugins/yellow-core/.claude-plugin/plugin.json'
+    );
     expect(bothDirty.stdout).toContain('.claude-plugin/marketplace.json');
 
     // Zero writes: bytes AND mtimes untouched by --check.
@@ -651,17 +783,27 @@ describe('--check stale-artifact detection (subprocess)', () => {
 
   it('reports a missing target as drift', () => {
     const root = makeFixtureRoot();
-    rmSync(join(root, 'plugins', 'yellow-docs', '.claude-plugin', 'plugin.json'));
+    rmSync(
+      join(root, 'plugins', 'yellow-docs', '.claude-plugin', 'plugin.json')
+    );
     const result = runCli(root, ['--check']);
     expect(result.status).toBe(1);
-    expect(result.stdout).toContain('plugins/yellow-docs/.claude-plugin/plugin.json (missing)');
+    expect(result.stdout).toContain(
+      'plugins/yellow-docs/.claude-plugin/plugin.json (missing)'
+    );
   });
 });
 
 describe('--dry-run (subprocess)', () => {
   it('prints the same diff report as --check but exits 0', () => {
     const root = makeFixtureRoot();
-    const target = join(root, 'plugins', 'yellow-core', '.claude-plugin', 'plugin.json');
+    const target = join(
+      root,
+      'plugins',
+      'yellow-core',
+      '.claude-plugin',
+      'plugin.json'
+    );
     writeFileSync(target, readFileSync(target, 'utf8') + '\n', 'utf8');
 
     const result = runCli(root, ['--dry-run']);

@@ -1,0 +1,22 @@
+{
+  "name": "yellow-cursor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --dir tests"
+  },
+  "dependencies": {
+    "@cursor/sdk": "1.0.28"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=22.22.0 <25.0.0"
+  }
+}

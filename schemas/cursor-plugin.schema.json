@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/cursor-plugin.schema.json",
+  "title": "Cursor Plugin Manifest Schema",
+  "description": "Local mirror of the upstream Cursor plugin manifest schema for the generated plugins/<name>/.cursor-plugin/plugin.json (Cursor-target counterpart to plugins/<name>/.claude-plugin/plugin.json).",
+  "$comment": "Mirrored verbatim from https://raw.githubusercontent.com/cursor/plugins/main/schemas/plugin.schema.json (fetched and quoted directly, not paraphrased), cross-checked against the real example at https://raw.githubusercontent.com/cursor/plugins/main/ralph-loop/.cursor-plugin/plugin.json. Snapshot date: 2026-08-21. No intentional divergence from upstream. Key differences from this repo's OWN codex-plugin.schema.json (a local invention, not an upstream mirror): 'name' uses the real upstream kebab pattern (allows dots, must start/end alphanumeric) rather than codex's simpler ^[a-z0-9-]+$; 'displayName'/'category' are FLAT top-level fields here, not nested under an 'interface' object; 'author' has no 'url' field. This repo's generator (scripts/lib/generate/emit-cursor.js) currently emits only a subset of these fields (name, displayName, version, description, author, homepage, repository, license, keywords, category, skills) — the remaining optional fields (publisher, logo, tags, commands, agents, rules, hooks, mcpServers, variables, minClientVersions) are modeled here for schema fidelity even though nothing in this repo emits them yet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+      "description": "Kebab-case identifier. Must match the plugin's directory name and its package.json 'name' (sole version/name authority, mirrors R3)."
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "description": "Bare string — upstream does not enforce a semver pattern on the plugin's own version field (unlike marketplace pluginEntry.minClientVersions)."
+    },
+    "minClientVersions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      },
+      "description": "Keyed by client id (e.g. \"cursor\"), values validated against a strict semver regex per upstream."
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX string, unvalidated per upstream."
+    },
+    "logo": {
+      "type": "string",
+      "description": "Relative path or absolute URL per upstream; not format-validated here since a relative path is not a valid 'uri'."
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "category": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "commands": {
+      "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }],
+      "description": "Glob/path(s) to command files."
+    },
+    "agents": {
+      "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }],
+      "description": "Glob/path(s) to agent definition files."
+    },
+    "skills": {
+      "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }],
+      "description": "Glob/path(s) to skill files (directories containing SKILL.md, per docs)."
+    },
+    "rules": {
+      "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }],
+      "description": "Glob/path(s) to rule files (.mdc, per docs)."
+    },
+    "hooks": {
+      "oneOf": [{ "type": "string" }, { "type": "object" }],
+      "description": "String path to a hooks config file, or an inline object, per upstream."
+    },
+    "mcpServers": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "object" },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [{ "type": "string" }, { "type": "object" }]
+          }
+        }
+      ],
+      "description": "String path, inline object, or array of string|object — the most flexible component field per upstream."
+    },
+    "variables": {
+      "type": "object",
+      "description": "A JSON-Schema-shaped object describing user-configurable plugin variables (type: \"object\" const, properties, required[]) per upstream. Pass-through/unvalidated by this local schema — this repo's generator never emits it."
+    }
+  }
+}

@@ -34,15 +34,21 @@ afterAll(() => {
 function makeFixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'yellow-sync-'));
   fixtureRoots.push(root);
-  cpSync(join(REPO_ROOT, 'catalog'), join(root, 'catalog'), { recursive: true });
+  cpSync(join(REPO_ROOT, 'catalog'), join(root, 'catalog'), {
+    recursive: true,
+  });
   cpSync(join(REPO_ROOT, '.claude-plugin'), join(root, '.claude-plugin'), {
     recursive: true,
   });
-  const plugins = readdirSync(join(REPO_ROOT, 'plugins'), { withFileTypes: true })
+  const plugins = readdirSync(join(REPO_ROOT, 'plugins'), {
+    withFileTypes: true,
+  })
     .filter((e) => e.isDirectory())
     .map((e) => e.name);
   for (const name of plugins) {
-    mkdirSync(join(root, 'plugins', name, '.claude-plugin'), { recursive: true });
+    mkdirSync(join(root, 'plugins', name, '.claude-plugin'), {
+      recursive: true,
+    });
     cpSync(
       join(REPO_ROOT, 'plugins', name, 'package.json'),
       join(root, 'plugins', name, 'package.json')
@@ -57,11 +63,14 @@ function makeFixtureRoot(): string {
     // fix in generate-manifests.test.ts) so a live plugin flipping
     // codex.enabled: true (R22) can't make the delegated generateManifests()
     // call fail trying to build a Codex skill tree from files this fixture
-    // never copied.
+    // never copied. Same rationale for targets.cursor (e.g. yellow-cursor).
     const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
     const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
     if (source.targets && source.targets.codex) {
       source.targets.codex = { enabled: false };
+    }
+    if (source.targets && source.targets.cursor) {
+      source.targets.cursor = { enabled: false };
     }
     writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
   }
@@ -75,7 +84,10 @@ function bumpVersion(root: string, plugin: string, version: string): void {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
 }
 
-function runSync(root: string, args: string[] = []): { status: number; stdout: string } {
+function runSync(
+  root: string,
+  args: string[] = []
+): { status: number; stdout: string } {
   try {
     const stdout = execFileSync('node', [SCRIPT, ...args], {
       env: { ...process.env, GENERATE_MANIFESTS_ROOT: root },
@@ -98,28 +110,43 @@ describe('sync-manifests apply path (delegated to generateManifests)', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Synced yellow-docs plugin.json:');
     expect(result.stdout).toContain('Synced marketplace.json yellow-docs:');
-    expect(result.stdout).toContain('1 plugin.json synced, 1 marketplace entries synced');
+    expect(result.stdout).toContain(
+      '1 plugin.json synced, 1 marketplace entries synced'
+    );
 
     const manifest = JSON.parse(
-      readFileSync(join(root, 'plugins', 'yellow-docs', '.claude-plugin', 'plugin.json'), 'utf8')
+      readFileSync(
+        join(root, 'plugins', 'yellow-docs', '.claude-plugin', 'plugin.json'),
+        'utf8'
+      )
     );
     expect(manifest.version).toBe('9.9.9');
     const marketplace = JSON.parse(
       readFileSync(join(root, '.claude-plugin', 'marketplace.json'), 'utf8')
     );
-    const entry = marketplace.plugins.find((p: { name: string }) => p.name === 'yellow-docs');
+    const entry = marketplace.plugins.find(
+      (p: { name: string }) => p.name === 'yellow-docs'
+    );
     expect(entry.version).toBe('9.9.9');
   });
 
   it('--dry-run reports drift without writing', () => {
     const root = makeFixtureRoot();
     bumpVersion(root, 'yellow-docs', '9.9.9');
-    const manifestPath = join(root, 'plugins', 'yellow-docs', '.claude-plugin', 'plugin.json');
+    const manifestPath = join(
+      root,
+      'plugins',
+      'yellow-docs',
+      '.claude-plugin',
+      'plugin.json'
+    );
     const before = readFileSync(manifestPath, 'utf8');
 
     const result = runSync(root, ['--dry-run']);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[DRY RUN] Would sync yellow-docs plugin.json:');
+    expect(result.stdout).toContain(
+      '[DRY RUN] Would sync yellow-docs plugin.json:'
+    );
     expect(result.stdout).toContain('Dry run complete');
     expect(readFileSync(manifestPath, 'utf8')).toBe(before);
   });
@@ -131,7 +158,9 @@ describe('sync-manifests apply path (delegated to generateManifests)', () => {
 
     const result = runSync(root);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('0 plugin.json synced, 0 marketplace entries synced');
+    expect(result.stdout).toContain(
+      '0 plugin.json synced, 0 marketplace entries synced'
+    );
     expect(readFileSync(marketplacePath, 'utf8')).toBe(before);
   });
 });

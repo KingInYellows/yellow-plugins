@@ -1,0 +1,20 @@
+[
+  {
+    "id": "yellow-cursor@yellow-plugins",
+    "version": "0.1.0",
+    "scope": "user",
+    "enabled": false,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/yellow-cursor/0.1.0",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "yellow-devin@yellow-plugins",
+    "version": "1.4.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/yellow-devin/1.4.0",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z"
+  }
+]

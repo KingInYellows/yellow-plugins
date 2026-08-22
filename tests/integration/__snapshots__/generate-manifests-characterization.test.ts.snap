@@ -55,8 +55,18 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
       "category": "productivity"
     },
     {
+      "name": "yellow-cursor",
+      "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-cursor",
+      "category": "development"
+    },
+    {
       "name": "yellow-devin",
-      "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+      "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
       "version": "2.4.1",
       "author": {
         "name": "KingInYellows"
@@ -126,7 +136,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "yellow-research",
-      "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+      "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
       "version": "4.0.0",
       "author": {
         "name": "KingInYellows"
@@ -209,6 +219,7 @@ exports[`manifest byte-identity baseline > plugin inventory (explicit sorted nam
   "yellow-composio",
   "yellow-core",
   "yellow-council",
+  "yellow-cursor",
   "yellow-debt",
   "yellow-devin",
   "yellow-docs",
@@ -572,6 +583,31 @@ exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin
 "
 `;
 
+exports[`manifest byte-identity baseline > plugins/yellow-cursor/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-cursor",
+  "version": "0.1.0",
+  "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-cursor",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "cursor",
+    "cloud-agents",
+    "remote-agent",
+    "delegation",
+    "ai-agent",
+    "automation"
+  ]
+}
+"
+`;
+
 exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/plugin.json raw bytes 1`] = `
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
@@ -627,7 +663,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
   "version": "2.4.1",
-  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -637,7 +673,6 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
   "license": "MIT",
   "keywords": [
     "devin",
-    "deepwiki",
     "delegation",
     "orchestration",
     "ai-collaboration"
@@ -657,10 +692,6 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
     }
   },
   "mcpServers": {
-    "deepwiki": {
-      "type": "http",
-      "url": "https://mcp.deepwiki.com/mcp"
-    },
     "devin": {
       "type": "http",
       "url": "https://mcp.devin.ai/mcp"
@@ -823,7 +854,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-research",
   "version": "4.0.0",
-  "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+  "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -835,6 +866,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
     "research",
     "deep-research",
     "ceramic",
+    "deepwiki",
     "perplexity",
     "exa",
     "tavily",
@@ -895,6 +927,10 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
     "ceramic": {
       "type": "http",
       "url": "https://mcp.ceramic.ai/mcp"
+    },
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
     },
     "ast-grep": {
       "command": "uvx",

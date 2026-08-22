@@ -45,13 +45,27 @@
 const { readFileSync, readdirSync, statSync, existsSync } = require('fs');
 const { join, resolve, sep } = require('path');
 
-const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
+const {
+  loadCatalog,
+  loadPluginSources,
+} = require('./lib/generate/catalog-reader');
 const { isCodexEnabled } = require('./lib/generate/emit-codex');
+const { isCursorEnabled } = require('./lib/generate/emit-cursor');
 
 const ROOT = resolve(__dirname, '..');
 const PLUGINS_DIR = join(ROOT, 'plugins');
 const MARKETPLACE_PATH = join(ROOT, '.claude-plugin', 'marketplace.json');
-const CODEX_MARKETPLACE_PATH = join(ROOT, '.agents', 'plugins', 'marketplace.json');
+const CODEX_MARKETPLACE_PATH = join(
+  ROOT,
+  '.agents',
+  'plugins',
+  'marketplace.json'
+);
+const CURSOR_MARKETPLACE_PATH = join(
+  ROOT,
+  '.cursor-plugin',
+  'marketplace.json'
+);
 
 const SEMVER_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9][a-zA-Z0-9.]*)?$/;
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -59,7 +73,10 @@ const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 function assertWithinRoot(filePath, rootDir) {
   const canonical = resolve(filePath);
   const rootCanonical = resolve(rootDir);
-  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + sep)) {
+  if (
+    canonical !== rootCanonical &&
+    !canonical.startsWith(rootCanonical + sep)
+  ) {
     throw new Error(`[validate-versions] Path traversal detected: ${filePath}`);
   }
 }
@@ -96,7 +113,10 @@ function computeCodexTwoWayDrift(pkgVersion, codexManifestVersion) {
  *   - the parsed .agents/plugins/marketplace.json "plugins" array.
  * @returns {string[]} issue descriptions (empty when consistent).
  */
-function computeCodexMarketplaceIssues(codexEnabledPluginNames, marketplaceEntries) {
+function computeCodexMarketplaceIssues(
+  codexEnabledPluginNames,
+  marketplaceEntries
+) {
   const issues = [];
   const entryNames = marketplaceEntries.map((e) => e.name);
   const entryNameSet = new Set(entryNames);
@@ -104,20 +124,28 @@ function computeCodexMarketplaceIssues(codexEnabledPluginNames, marketplaceEntri
 
   for (const name of codexEnabledPluginNames) {
     if (!entryNameSet.has(name)) {
-      issues.push(`Codex marketplace: "${name}" is Codex-enabled but has no entry in .agents/plugins/marketplace.json`);
+      issues.push(
+        `Codex marketplace: "${name}" is Codex-enabled but has no entry in .agents/plugins/marketplace.json`
+      );
     }
   }
   for (const name of entryNames) {
     if (!expectedNameSet.has(name)) {
-      issues.push(`Codex marketplace: "${name}" has an entry but is not Codex-enabled in the catalog`);
+      issues.push(
+        `Codex marketplace: "${name}" has an entry but is not Codex-enabled in the catalog`
+      );
     }
   }
 
   // Order: the subsequence of entryNames that ARE Codex-enabled must equal
   // codexEnabledPluginNames exactly (ignores unrelated/orphan entries
   // already reported above, so order drift isn't double-counted with them).
-  const relevantEntryOrder = entryNames.filter((name) => expectedNameSet.has(name));
-  const expectedOrder = codexEnabledPluginNames.filter((name) => entryNameSet.has(name));
+  const relevantEntryOrder = entryNames.filter((name) =>
+    expectedNameSet.has(name)
+  );
+  const expectedOrder = codexEnabledPluginNames.filter((name) =>
+    entryNameSet.has(name)
+  );
   if (relevantEntryOrder.join(',') !== expectedOrder.join(',')) {
     issues.push(
       `Codex marketplace: entry order [${relevantEntryOrder.join(', ')}] does not match catalog canonical order [${expectedOrder.join(', ')}]`
@@ -129,7 +157,90 @@ function computeCodexMarketplaceIssues(codexEnabledPluginNames, marketplaceEntri
     const expectedPath = `./plugins/${entry.name}`;
     const actualPath = entry.source && entry.source.path;
     if (actualPath !== expectedPath) {
-      issues.push(`Codex marketplace: "${entry.name}" source.path is "${actualPath}" (expected "${expectedPath}")`);
+      issues.push(
+        `Codex marketplace: "${entry.name}" source.path is "${actualPath}" (expected "${expectedPath}")`
+      );
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Pure two-way comparison for the Cursor target, mirroring
+ * computeCodexTwoWayDrift exactly. No I/O.
+ *
+ * @param {string} pkgVersion - plugins/<name>/package.json version.
+ * @param {string|null} cursorManifestVersion - plugins/<name>/.cursor-plugin/
+ *   plugin.json version, or null if missing/unreadable.
+ * @returns {string|null} issue description, or null when in sync.
+ */
+function computeCursorTwoWayDrift(pkgVersion, cursorManifestVersion) {
+  if (cursorManifestVersion === null) {
+    return 'Cursor-enabled but plugins/<name>/.cursor-plugin/plugin.json version is missing or unreadable';
+  }
+  if (cursorManifestVersion !== pkgVersion) {
+    return `.cursor-plugin/plugin.json: ${cursorManifestVersion} (expected ${pkgVersion})`;
+  }
+  return null;
+}
+
+/**
+ * Pure membership/name/order/path check for the Cursor marketplace,
+ * mirroring computeCodexMarketplaceIssues exactly except for the expected
+ * source-path form: Cursor marketplace entries carry a bare "plugins/<name>"
+ * string (no "./" prefix — see emit-cursor.js's buildCursorMarketplace),
+ * unlike Codex's "{ source: 'local', path: './plugins/<name>' }" object.
+ *
+ * @param {string[]} cursorEnabledPluginNames - in catalog canonical order,
+ *   filtered to Cursor-enabled.
+ * @param {{ name: string, source?: string }[]} marketplaceEntries - the
+ *   parsed .cursor-plugin/marketplace.json "plugins" array.
+ * @returns {string[]} issue descriptions (empty when consistent).
+ */
+function computeCursorMarketplaceIssues(
+  cursorEnabledPluginNames,
+  marketplaceEntries
+) {
+  const issues = [];
+  const entryNames = marketplaceEntries.map((e) => e.name);
+  const entryNameSet = new Set(entryNames);
+  const expectedNameSet = new Set(cursorEnabledPluginNames);
+
+  for (const name of cursorEnabledPluginNames) {
+    if (!entryNameSet.has(name)) {
+      issues.push(
+        `Cursor marketplace: "${name}" is Cursor-enabled but has no entry in .cursor-plugin/marketplace.json`
+      );
+    }
+  }
+  for (const name of entryNames) {
+    if (!expectedNameSet.has(name)) {
+      issues.push(
+        `Cursor marketplace: "${name}" has an entry but is not Cursor-enabled in the catalog`
+      );
+    }
+  }
+
+  const relevantEntryOrder = entryNames.filter((name) =>
+    expectedNameSet.has(name)
+  );
+  const expectedOrder = cursorEnabledPluginNames.filter((name) =>
+    entryNameSet.has(name)
+  );
+  if (relevantEntryOrder.join(',') !== expectedOrder.join(',')) {
+    issues.push(
+      `Cursor marketplace: entry order [${relevantEntryOrder.join(', ')}] does not match catalog canonical order [${expectedOrder.join(', ')}]`
+    );
+  }
+
+  for (const entry of marketplaceEntries) {
+    if (!expectedNameSet.has(entry.name)) continue; // already reported as orphan
+    const expectedPath = `plugins/${entry.name}`;
+    if (entry.source !== expectedPath) {
+      issues.push(
+        `Cursor marketplace: "${entry.name}" source is "${entry.source}" (expected "${expectedPath}")`
+      );
     }
   }
 
@@ -139,9 +250,12 @@ function computeCodexMarketplaceIssues(codexEnabledPluginNames, marketplaceEntri
 function main() {
   const DRY_RUN = process.argv.includes('--dry-run');
   const PLUGIN_FLAG_IDX = process.argv.indexOf('--plugin');
-  const rawPlugin = PLUGIN_FLAG_IDX !== -1 ? process.argv[PLUGIN_FLAG_IDX + 1] : null;
+  const rawPlugin =
+    PLUGIN_FLAG_IDX !== -1 ? process.argv[PLUGIN_FLAG_IDX + 1] : null;
   if (PLUGIN_FLAG_IDX !== -1 && (!rawPlugin || rawPlugin.startsWith('--'))) {
-    console.error('[validate-versions] --plugin requires a plugin name (e.g. --plugin yellow-core)');
+    console.error(
+      '[validate-versions] --plugin requires a plugin name (e.g. --plugin yellow-core)'
+    );
     process.exit(1);
   }
   const SINGLE_PLUGIN = rawPlugin;
@@ -151,19 +265,24 @@ function main() {
   try {
     marketplace = JSON.parse(readFileSync(MARKETPLACE_PATH, 'utf8'));
   } catch (e) {
-    console.error(`[validate-versions] Cannot read marketplace.json: ${e.message}`);
+    console.error(
+      `[validate-versions] Cannot read marketplace.json: ${e.message}`
+    );
     process.exit(1);
   }
 
   if (!Array.isArray(marketplace.plugins)) {
-    console.error('[validate-versions] marketplace.json has no "plugins" array');
+    console.error(
+      '[validate-versions] marketplace.json has no "plugins" array'
+    );
     process.exit(1);
   }
 
   // Build marketplace lookup: name -> version
   const marketplaceVersions = {};
   for (const entry of marketplace.plugins) {
-    marketplaceVersions[entry.name] = entry.version != null ? String(entry.version) : null;
+    marketplaceVersions[entry.name] =
+      entry.version != null ? String(entry.version) : null;
   }
 
   // --- Load the catalog, for Codex-enablement (R12). Only a genuinely
@@ -178,30 +297,47 @@ function main() {
   // already used for marketplace.json above.
   const catalogResult = loadCatalog(join(ROOT, 'catalog'));
   let codexEnabledPluginNames = [];
+  let cursorEnabledPluginNames = [];
   if (catalogResult.status === 'invalid') {
-    console.error(`[validate-versions] Invalid catalog: ${catalogResult.errors.join('; ')}`);
+    console.error(
+      `[validate-versions] Invalid catalog: ${catalogResult.errors.join('; ')}`
+    );
     process.exit(1);
   } else if (catalogResult.status === 'ok') {
     const catalogPluginOrder = catalogResult.data.pluginOrder;
-    const sourcesResult = loadPluginSources(join(ROOT, 'catalog'), catalogPluginOrder);
+    const sourcesResult = loadPluginSources(
+      join(ROOT, 'catalog'),
+      catalogPluginOrder
+    );
     if (sourcesResult.status === 'invalid') {
-      console.error(`[validate-versions] Invalid catalog plugin sources: ${sourcesResult.errors.join('; ')}`);
+      console.error(
+        `[validate-versions] Invalid catalog plugin sources: ${sourcesResult.errors.join('; ')}`
+      );
       process.exit(1);
     }
     const sources = sourcesResult.sources;
-    codexEnabledPluginNames = catalogPluginOrder.filter((name) => isCodexEnabled(sources[name]));
+    codexEnabledPluginNames = catalogPluginOrder.filter((name) =>
+      isCodexEnabled(sources[name])
+    );
+    cursorEnabledPluginNames = catalogPluginOrder.filter((name) =>
+      isCursorEnabled(sources[name])
+    );
   }
 
   // --- Collect plugins to check ---
   if (!existsSync(PLUGINS_DIR)) {
-    console.error(`[validate-versions] plugins/ directory not found at ${PLUGINS_DIR}`);
+    console.error(
+      `[validate-versions] plugins/ directory not found at ${PLUGINS_DIR}`
+    );
     process.exit(1);
   }
 
   let pluginNames;
   if (SINGLE_PLUGIN) {
     if (!NAME_RE.test(SINGLE_PLUGIN)) {
-      console.error(`[validate-versions] Invalid plugin name: "${SINGLE_PLUGIN}"`);
+      console.error(
+        `[validate-versions] Invalid plugin name: "${SINGLE_PLUGIN}"`
+      );
       process.exit(1);
     }
     pluginNames = [SINGLE_PLUGIN];
@@ -213,11 +349,17 @@ function main() {
       // Only check plugins that have a package.json
       return existsSync(join(p, 'package.json'));
     });
-    // Union in every Codex-enabled catalog plugin, even ones missing
-    // package.json — otherwise such a plugin is silently dropped from the
-    // worklist before it ever reaches the Codex two-way check below, and
-    // the missing artifact never surfaces as drift.
-    pluginNames = Array.from(new Set([...dirBasedNames, ...codexEnabledPluginNames]));
+    // Union in every Codex- or Cursor-enabled catalog plugin, even ones
+    // missing package.json — otherwise such a plugin is silently dropped
+    // from the worklist before it ever reaches the two-way checks below,
+    // and the missing artifact never surfaces as drift.
+    pluginNames = Array.from(
+      new Set([
+        ...dirBasedNames,
+        ...codexEnabledPluginNames,
+        ...cursorEnabledPluginNames,
+      ])
+    );
   }
 
   const drifts = [];
@@ -237,12 +379,20 @@ function main() {
       pkgVersion = typeof pkg.version === 'string' ? pkg.version : null;
     } catch (e) {
       if (e.code === 'ENOENT') {
-        // Codex-enabled plugins are always reported, even outside
+        // Codex- or Cursor-enabled plugins are always reported, even outside
         // --plugin mode, since a missing package.json is real drift for
-        // them (there's nothing to compare .codex-plugin/plugin.json
-        // against) rather than "not a versioned plugin yet".
-        if (SINGLE_PLUGIN || codexEnabledPluginNames.includes(name)) {
-          drifts.push({ plugin: name, issue: `package.json not found at ${pkgPath}` });
+        // them (there's nothing to compare .codex-plugin/plugin.json or
+        // .cursor-plugin/plugin.json against) rather than "not a versioned
+        // plugin yet".
+        if (
+          SINGLE_PLUGIN ||
+          codexEnabledPluginNames.includes(name) ||
+          cursorEnabledPluginNames.includes(name)
+        ) {
+          drifts.push({
+            plugin: name,
+            issue: `package.json not found at ${pkgPath}`,
+          });
         }
         continue; // not a versioned plugin (or already added to drifts)
       }
@@ -266,14 +416,51 @@ function main() {
       const codexManifestPath = join(pluginDir, '.codex-plugin', 'plugin.json');
       let codexManifestVersion = null;
       try {
-        const codexManifest = JSON.parse(readFileSync(codexManifestPath, 'utf8'));
-        codexManifestVersion = typeof codexManifest.version === 'string' ? codexManifest.version : null;
+        const codexManifest = JSON.parse(
+          readFileSync(codexManifestPath, 'utf8')
+        );
+        codexManifestVersion =
+          typeof codexManifest.version === 'string'
+            ? codexManifest.version
+            : null;
       } catch {
         codexManifestVersion = null;
       }
-      const codexIssue = computeCodexTwoWayDrift(pkgVersion, codexManifestVersion);
+      const codexIssue = computeCodexTwoWayDrift(
+        pkgVersion,
+        codexManifestVersion
+      );
       if (codexIssue !== null) {
         drifts.push({ plugin: name, issue: codexIssue });
+      }
+    }
+
+    // --- Cursor two-way comparison --- same rationale as the Codex block
+    // above: runs before the Claude-only early exits below.
+    if (cursorEnabledPluginNames.includes(name)) {
+      const cursorManifestPath = join(
+        pluginDir,
+        '.cursor-plugin',
+        'plugin.json'
+      );
+      let cursorManifestVersion = null;
+      try {
+        const cursorManifest = JSON.parse(
+          readFileSync(cursorManifestPath, 'utf8')
+        );
+        cursorManifestVersion =
+          typeof cursorManifest.version === 'string'
+            ? cursorManifest.version
+            : null;
+      } catch {
+        cursorManifestVersion = null;
+      }
+      const cursorIssue = computeCursorTwoWayDrift(
+        pkgVersion,
+        cursorManifestVersion
+      );
+      if (cursorIssue !== null) {
+        drifts.push({ plugin: name, issue: cursorIssue });
       }
     }
 
@@ -282,7 +469,9 @@ function main() {
     if (mktVersion === undefined) {
       if (!existsSync(manifestPath)) {
         // Truly new plugin — not yet registered anywhere, skip
-        console.warn(`[validate-versions] WARN: "${name}" has package.json but no manifest yet — skipping`);
+        console.warn(
+          `[validate-versions] WARN: "${name}" has package.json but no manifest yet — skipping`
+        );
         continue;
       }
       drifts.push({ plugin: name, issue: `no entry in marketplace.json` });
@@ -293,7 +482,8 @@ function main() {
     let manifestVersion;
     try {
       const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      manifestVersion = typeof manifest.version === 'string' ? manifest.version : null;
+      manifestVersion =
+        typeof manifest.version === 'string' ? manifest.version : null;
     } catch (e) {
       drifts.push({
         plugin: name,
@@ -311,9 +501,13 @@ function main() {
       const parts = [];
       if (!pkgOk) parts.push(`package.json: ${pkgVersion ?? '(none)'}`);
       if (!manifestOk)
-        parts.push(`plugin.json: ${manifestVersion ?? '(none)'} (expected ${pkgVersion})`);
+        parts.push(
+          `plugin.json: ${manifestVersion ?? '(none)'} (expected ${pkgVersion})`
+        );
       if (!mktOk)
-        parts.push(`marketplace.json: ${mktVersion ?? '(none)'} (expected ${pkgVersion})`);
+        parts.push(
+          `marketplace.json: ${mktVersion ?? '(none)'} (expected ${pkgVersion})`
+        );
       drifts.push({ plugin: name, issue: parts.join(', ') });
     }
   }
@@ -333,7 +527,9 @@ function main() {
   // as an orphan instead of silently skipped.
   if (catalogResult.status !== 'missing') {
     try {
-      const codexMarketplace = JSON.parse(readFileSync(CODEX_MARKETPLACE_PATH, 'utf8'));
+      const codexMarketplace = JSON.parse(
+        readFileSync(CODEX_MARKETPLACE_PATH, 'utf8')
+      );
       if (!Array.isArray(codexMarketplace.plugins)) {
         drifts.push({
           plugin: '(codex marketplace)',
@@ -344,33 +540,97 @@ function main() {
         const scopedEnabledNames = SINGLE_PLUGIN
           ? codexEnabledPluginNames.filter((n) => n === SINGLE_PLUGIN)
           : codexEnabledPluginNames;
-        const scopedEntries = SINGLE_PLUGIN ? entries.filter((e) => e.name === SINGLE_PLUGIN) : entries;
-        for (const issue of computeCodexMarketplaceIssues(scopedEnabledNames, scopedEntries)) {
+        const scopedEntries = SINGLE_PLUGIN
+          ? entries.filter((e) => e.name === SINGLE_PLUGIN)
+          : entries;
+        for (const issue of computeCodexMarketplaceIssues(
+          scopedEnabledNames,
+          scopedEntries
+        )) {
           drifts.push({ plugin: '(codex marketplace)', issue });
         }
       }
     } catch (e) {
-      drifts.push({ plugin: '(codex marketplace)', issue: `cannot read .agents/plugins/marketplace.json: ${e.message}` });
+      drifts.push({
+        plugin: '(codex marketplace)',
+        issue: `cannot read .agents/plugins/marketplace.json: ${e.message}`,
+      });
+    }
+  }
+
+  // --- Cursor marketplace membership/name/order/path --- Unlike Codex's
+  // always-present empty-state marketplace, .cursor-plugin/marketplace.json
+  // legitimately does not exist when zero plugins are Cursor-enabled (see
+  // emit-cursor.js's buildCursorMarketplace) — an absent file is only real
+  // drift when at least one plugin in scope IS Cursor-enabled.
+  if (catalogResult.status !== 'missing') {
+    const scopedCursorEnabledNames = SINGLE_PLUGIN
+      ? cursorEnabledPluginNames.filter((n) => n === SINGLE_PLUGIN)
+      : cursorEnabledPluginNames;
+    if (!existsSync(CURSOR_MARKETPLACE_PATH)) {
+      if (scopedCursorEnabledNames.length > 0) {
+        drifts.push({
+          plugin: '(cursor marketplace)',
+          issue: `.cursor-plugin/marketplace.json not found but ${scopedCursorEnabledNames.length} plugin(s) are Cursor-enabled`,
+        });
+      }
+      // Else: legitimately absent (no root config, or zero enabled) — no drift.
+    } else {
+      try {
+        const cursorMarketplace = JSON.parse(
+          readFileSync(CURSOR_MARKETPLACE_PATH, 'utf8')
+        );
+        if (!Array.isArray(cursorMarketplace.plugins)) {
+          drifts.push({
+            plugin: '(cursor marketplace)',
+            issue: '.cursor-plugin/marketplace.json has no "plugins" array',
+          });
+        } else {
+          const entries = cursorMarketplace.plugins;
+          const scopedEntries = SINGLE_PLUGIN
+            ? entries.filter((e) => e.name === SINGLE_PLUGIN)
+            : entries;
+          for (const issue of computeCursorMarketplaceIssues(
+            scopedCursorEnabledNames,
+            scopedEntries
+          )) {
+            drifts.push({ plugin: '(cursor marketplace)', issue });
+          }
+        }
+      } catch (e) {
+        drifts.push({
+          plugin: '(cursor marketplace)',
+          issue: `cannot read .cursor-plugin/marketplace.json: ${e.message}`,
+        });
+      }
     }
   }
 
   // --- Report ---
   if (drifts.length === 0) {
-    const scope = SINGLE_PLUGIN ? `plugin "${SINGLE_PLUGIN}"` : `${pluginNames.length} plugins`;
+    const scope = SINGLE_PLUGIN
+      ? `plugin "${SINGLE_PLUGIN}"`
+      : `${pluginNames.length} plugins`;
     console.log(`[validate-versions] OK: ${scope} — all versions in sync`);
     process.exit(0);
   }
 
-  console.error(`[validate-versions] Version drift detected (${drifts.length} plugin(s)):`);
+  console.error(
+    `[validate-versions] Version drift detected (${drifts.length} plugin(s)):`
+  );
   for (const { plugin, issue } of drifts) {
     console.error(`  ${plugin}: ${issue}`);
   }
 
   if (DRY_RUN) {
-    console.log('[validate-versions] Dry run: run `pnpm apply:changesets` to sync versions');
+    console.log(
+      '[validate-versions] Dry run: run `pnpm apply:changesets` to sync versions'
+    );
     process.exit(0);
   } else {
-    console.error('[validate-versions] Run `pnpm apply:changesets` to sync versions');
+    console.error(
+      '[validate-versions] Run `pnpm apply:changesets` to sync versions'
+    );
     process.exit(1);
   }
 }
@@ -379,4 +639,9 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { computeCodexTwoWayDrift, computeCodexMarketplaceIssues };
+module.exports = {
+  computeCodexTwoWayDrift,
+  computeCodexMarketplaceIssues,
+  computeCursorTwoWayDrift,
+  computeCursorMarketplaceIssues,
+};

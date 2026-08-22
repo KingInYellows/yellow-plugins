@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 18 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 19 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -20,47 +20,58 @@ Add the marketplace, then install individual plugins:
 
 ## Plugins
 
-| Plugin                | Description                                                                                                 | Components                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 7 commands, 2 hooks, 1 MCP                     |
-| `github-workflow`     | GitHub-native stacked-PR provider skeleton — setup and status only; no stack operations yet                 | 2 commands, 2 skills                           |
-| `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
-| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 9 commands, 8 skills, 1 hook         |
-| `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
-| `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 21 agents, 18 commands, 22 skills              |
+| Plugin                | Description                                                                                                                            | Components                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 7 commands, 2 hooks, 1 MCP                     |
+| `github-workflow`     | GitHub-native stacked-PR provider skeleton — setup and status only; no stack operations yet                                            | 2 commands, 2 skills                           |
+| `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
+| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
+| `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 1 skill                  |
+| `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 18 commands, 22 skills              |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
-| `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
-| `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
-| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 10 agents, 6 commands, 1 skill                 |
-| `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
-| `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                     | 2 agents, 6 commands, 2 skills, 1 MCP          |
-| `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 2 skills, 6 MCPs         |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 16 agents, 7 commands, 2 skills                |
-| `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP |
-| `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
+| `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 1 skill                           |
+| `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
+| `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
+| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
+| `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
+| `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                                                | 2 agents, 6 commands, 2 skills, 1 MCP          |
+| `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
+| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 2 skills, 7 MCPs         |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 7 commands, 2 skills                |
+| `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP |
+| `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
+
+## Cursor Distribution (pilot)
+
+`yellow-cursor` is also generated as a native Cursor plugin
+(`.cursor-plugin/plugin.json` + a listing in the root
+`.cursor-plugin/marketplace.json`), alongside its normal Claude Code install
+path. This is a **single-plugin pilot, explicit opt-in** — no other plugin in
+this marketplace is Cursor-enabled, and this repo does not claim repository-wide
+Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
+for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication
 
 Nine plugins connect to MCP servers. Authentication requirements vary by server.
 
-| Plugin            | MCP Server | Auth                                                                |
-| ----------------- | ---------- | ------------------------------------------------------------------- |
-| `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
+| Plugin            | MCP Server | Auth                                                                                                              |
+| ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                                                              |
 | `yellow-composio` | Composio   | User-configured (userConfig or shell env) — bundled stdio wrapper injects `X-API-Key`; `claude mcp add` is legacy |
-| `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
-| `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
-| `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                  |
-| `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                            |
-| `yellow-research` | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                 |
-| `yellow-research` | Perplexity | `PERPLEXITY_API_KEY` required                                       |
-| `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                           |
-| `yellow-research` | EXA        | `EXA_API_KEY` required                                              |
-| `yellow-research` | Parallel   | No API key — auto-authenticated by Claude Code                      |
-| `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                       |
-| `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
-| `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
+| `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                                                              |
+| `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                                                                |
+| `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                                                                          |
+| `yellow-research` | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                                                               |
+| `yellow-research` | DeepWiki   | None (public repos only)                                                                                          |
+| `yellow-research` | Perplexity | `PERPLEXITY_API_KEY` required                                                                                     |
+| `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                                                                         |
+| `yellow-research` | EXA        | `EXA_API_KEY` required                                                                                            |
+| `yellow-research` | Parallel   | No API key — auto-authenticated by Claude Code                                                                    |
+| `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                                                                     |
+| `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                    |
+| `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                      |
 
 `yellow-mempalace` also bundles an MCP server (local stdio) but is deprecated
 pending removal per `docs/memory-routing-protocol.md`.
@@ -82,14 +93,16 @@ with lower rate limits.
 # "headers": { "CONTEXT7_API_KEY": "ctx7sk_your_key_here" }
 ```
 
-### DeepWiki & Devin (yellow-devin)
+### DeepWiki (yellow-research)
 
-**DeepWiki (public repos):** Works out of the box at
-`https://mcp.deepwiki.com/mcp`. No authentication needed for public
-repositories.
+Works out of the box at `https://mcp.deepwiki.com/mcp`. No authentication needed
+— public repositories only, no private-repo path. `/devin:wiki` (yellow-devin)
+still queries it as a backward-compatible fallback, discovering the tool at its
+current location at runtime.
 
-**DeepWiki (private repos) + Devin sessions:** Both require a
-`DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`.
+### Devin (yellow-devin)
+
+Devin sessions require a `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -105,8 +118,8 @@ Never commit tokens to version control.
 ### Linear (OAuth)
 
 On first MCP tool call, Claude Code opens a browser popup to authenticate with
-your Linear account. Tokens are stored in your system keychain and
-refresh automatically.
+your Linear account. Tokens are stored in your system keychain and refresh
+automatically.
 
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
@@ -146,8 +159,8 @@ environment variables at startup.
   [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api)
 - **Tavily:** [app.tavily.com](https://app.tavily.com)
 - **EXA:** [dashboard.exa.ai](https://dashboard.exa.ai)
-- **Ceramic:** No API key needed for the MCP — OAuth 2.1 (browser popup on
-  first `ceramic_search` use)
+- **Ceramic:** No API key needed for the MCP — OAuth 2.1 (browser popup on first
+  `ceramic_search` use)
 - **Parallel Task MCP:** No API key needed — Claude Code handles authentication
   automatically
 - **ast-grep MCP:** No API key needed — install the `ast-grep` binary locally or
@@ -273,13 +286,14 @@ yellow-plugins/
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (21 agents, 18 commands, 22 skills)
 │   ├── yellow-council/        # Cross-lineage code council (3 agents, 2 commands, 1 skill)
+│   ├── yellow-cursor/         # Cursor Cloud Agent delegation, pilot target (10 commands, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
-│   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
+│   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-mempalace/      # MemPalace memory (2 agents, 6 commands, 2 skills, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
-│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 6 MCPs)
+│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 7 MCPs)
 │   ├── yellow-review/         # PR review (16 agents, 7 commands, 2 skills)
 │   ├── yellow-ruvector/       # Vector memory (2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP)
 │   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
@@ -293,11 +307,12 @@ yellow-plugins/
 ### `claude doctor` says "descriptions dropped"
 
 If `claude doctor` shows a warning like
-`157 descriptions dropped (4.9%/1% of context)`, your skill listing budget
-is too small for the total skill descriptions installed across all your
-plugins. This is a **per-user Claude Code setting**, not a plugin problem
-— yellow-plugins skill descriptions are well under the official 1,536-char
-per-skill cap (per [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)).
+`157 descriptions dropped (4.9%/1% of context)`, your skill listing budget is
+too small for the total skill descriptions installed across all your plugins.
+This is a **per-user Claude Code setting**, not a plugin problem —
+yellow-plugins skill descriptions are well under the official 1,536-char
+per-skill cap (per
+[code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)).
 
 The default budget is 1% of the context window, with an 8,000-character
 fallback. Two ways to give Claude Code more room:
@@ -306,25 +321,24 @@ fallback. Two ways to give Claude Code more room:
 
    ```jsonc
    {
-     "skillListingBudgetFraction": 0.04
+     "skillListingBudgetFraction": 0.04,
    }
    ```
 
-   `0.04` (4%) is enough to fit the full yellow-plugins marketplace plus
-   typical adjacent installs, at the cost of roughly 8K extra characters
-   reserved from the per-session context window. Note: this setting is
-   community-discovered (decompiled from Claude Code 2.1.129) and not yet
-   in the official docs — it may be renamed before public documentation.
+   `0.04` (4%) is enough to fit the full yellow-plugins marketplace plus typical
+   adjacent installs, at the cost of roughly 8K extra characters reserved from
+   the per-session context window. Note: this setting is community-discovered
+   (decompiled from Claude Code 2.1.129) and not yet in the official docs — it
+   may be renamed before public documentation.
 
-2. **Set `SLASH_COMMAND_TOOL_CHAR_BUDGET`** as an environment variable for
-   a one-off raise without editing settings. Default is 15,000 characters;
-   set higher (e.g. `SLASH_COMMAND_TOOL_CHAR_BUDGET=40000`) to fit larger
-   skill listings.
+2. **Set `SLASH_COMMAND_TOOL_CHAR_BUDGET`** as an environment variable for a
+   one-off raise without editing settings. Default is 15,000 characters; set
+   higher (e.g. `SLASH_COMMAND_TOOL_CHAR_BUDGET=40000`) to fit larger skill
+   listings.
 
-(Disabling skills via `/skills` or `skillOverrides` is intentionally
-omitted: those knobs apply to user-scoped skills, not plugin-provided
-skills, and would not reduce yellow-plugins' contribution to the
-budget.)
+(Disabling skills via `/skills` or `skillOverrides` is intentionally omitted:
+those knobs apply to user-scoped skills, not plugin-provided skills, and would
+not reduce yellow-plugins' contribution to the budget.)
 
 The warning is informational — Claude Code drops the lowest-priority
 descriptions first. Critical skills you use frequently stay listed.

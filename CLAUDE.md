@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Repository Purpose
 
 `yellow-plugins` is a pnpm monorepo that ships a Claude Code plugin
-marketplace (18 plugins under `plugins/`) plus the TypeScript validation and
+marketplace (19 plugins under `plugins/`) plus the TypeScript validation and
 release tooling that gates it. There is no published runtime — the
 TypeScript packages exist solely to validate manifests, schemas, and authoring
 rules. Plugin install/uninstall/rollback is handled natively by Claude Code,
@@ -30,7 +30,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex + flow-namespace
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex + cursor + flow-namespace
 pnpm validate:marketplace     # .claude-plugin/marketplace.json only
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
@@ -41,6 +41,7 @@ pnpm validate:snippets        # install-script generated blocks match scripts/sn
 pnpm validate:solutions       # diff-scoped slug-collision + frontmatter gate for docs/solutions/
 pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
 pnpm validate:codex           # Codex artifact validation + exposure lint
+pnpm validate:cursor          # Cursor artifact validation + exposure lint + lifecycle non-emission scan
 pnpm validate:flow-namespace  # no unallowlisted refs to the ten renamed commands outside the shrinking allowlist
 pnpm generate:manifests       # regenerate .claude-plugin/ + .agents/ from catalog/ sources
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
@@ -178,6 +179,11 @@ full operation-to-provider mapping.
 (NOT a Graphite CLI feature — it is read by `smart-submit`, `gt-stack-plan`,
 `gt-amend`, `gt-setup`, `gt-merge`).
 
+A similar exactly-one-enabled resolution pattern governs the `remote-agent`
+capability provider group (Cursor cloud agents via `yellow-cursor`,
+preferred, vs. legacy Devin sessions via `yellow-devin`) — see
+`docs/cursor-distribution.md`.
+
 ### Conventional commits
 
 `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:` — atomic and
@@ -281,6 +287,7 @@ not the same as skipping a gate the skill defines.
 - A specific plugin's conventions? `plugins/<name>/CLAUDE.md`
 - A solved problem you want context on? `docs/solutions/<category>/`
 - Schema drift / hooks-format weirdness? `docs/solutions/build-errors/`
+- Cursor distribution target / the `yellow-cursor` pilot? `docs/cursor-distribution.md`
 
 ## Behavioral Guidelines
 

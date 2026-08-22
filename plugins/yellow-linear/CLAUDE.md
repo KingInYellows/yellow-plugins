@@ -18,8 +18,8 @@ cycles, and documents.
   `feat/ENG-123-auth-flow`)
 - **Issue ID pattern:** `[A-Z]{2,5}-[0-9]{1,6}` extracted from branch name
   (case-sensitive, first match wins)
-- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`. Use
-  `gh pr view` / `gh api` for reading PR state only.
+- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not
+  `gh pr create`. Use `gh pr view` / `gh api` for reading PR state only.
 - **Status transitions:** Read valid statuses from `list_issue_statuses`, never
   hardcode status names.
 - **Input validation:** All `$ARGUMENTS` values must be validated before use.
@@ -42,10 +42,11 @@ cycles, and documents.
 - `/linear:plan-cycle` — Plan sprint cycle by selecting backlog issues. Offers
   "What Next?" routing after planning.
 - `/linear:status` — Generate project and initiative health report
-- `/linear:delegate` — Delegate a Linear issue to a Devin AI session (requires
-  `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` as **shell** env exports;
-  installing yellow-devin sets up the credentials but you must still `export`
-  them to your shell, not a hard plugin dependency)
+- `/linear:delegate` — Delegate a Linear issue to a remote coding agent via the
+  `remote-agent` capability group. Resolves the enabled provider automatically
+  (`--provider cursor|devin` breaks a tie only when both are enabled) —
+  yellow-cursor is the preferred provider, yellow-devin is the legacy path.
+  Requires yellow-core installed (owns the group's classifier)
 
 ### Agents (3)
 
@@ -74,8 +75,9 @@ patterns:
   synchronization.
 - **`linear-issue-loader` agent** — Auto-triggers on branch checkout or "what's
   this issue?" questions. Read-only context loading.
-- **`linear-pr-linker` agent** — Auto-triggers after a stacked-PR provider submit or "link to
-  linear" requests. Focused on PR linking + status suggestion.
+- **`linear-pr-linker` agent** — Auto-triggers after a stacked-PR provider
+  submit or "link to linear" requests. Focused on PR linking + status
+  suggestion.
 - **`linear-explorer` agent** — Auto-triggers on "search linear", "is this a
   duplicate?" queries. Read-only backlog search.
 
@@ -85,18 +87,27 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
 ## Cross-Plugin Dependencies
 
 - **yellow-core** (optional) — `/linear:work` routes to `/flow:plan` and
-  `/flow:work` via Skill tool. Without it, `/linear:work` writes the
-  brainstorm doc but cannot invoke planning commands; suggests manual workflow.
+  `/flow:work` via Skill tool. Without it, `/linear:work` writes the brainstorm
+  doc but cannot invoke planning commands; suggests manual workflow.
 - **gt-workflow** (optional) — `/linear:work` routes to `/gt-stack-plan` via
-  Skill tool. Without it, suggests manual branch creation via the active stacked-PR provider's tooling.
-- **yellow-devin** (optional) — `/linear:delegate` validates the
-  `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` **shell** environment
-  variables, not plugin presence (see `delegate.md` Step 1). Installing
-  yellow-devin provides setup guidance and userConfig/keychain storage for its
-  own `/devin:*` commands, but `/linear:delegate` reads shell env directly —
-  userConfig-only values must still be `export`ed to your shell (per
-  `yellow-devin/commands/devin/setup.md`) for it to see them. Without the
-  exports, `/linear:delegate` reports which variables to set.
+  Skill tool. Without it, suggests manual branch creation via the active
+  stacked-PR provider's tooling.
+- **yellow-core** (required for `/linear:delegate`) — provider resolution for
+  the `remote-agent` capability group lives in
+  `plugins/yellow-core/lib/remote-agent-provider-state.js`. Without yellow-core
+  installed, `/linear:delegate` stops with install guidance before resolving a
+  provider.
+- **yellow-cursor** (optional, preferred remote-agent provider) —
+  `/linear:delegate` launches Cursor cloud agents directly through the
+  yellow-cursor CLI (resolved via `claude plugin list --json`'s `installPath`,
+  never a relative plugin-root guess). Not a hard plugin dependency: if
+  yellow-cursor isn't the enabled member of the `remote-agent` group,
+  `/linear:delegate` simply doesn't route to it.
+- **yellow-devin** (optional, legacy remote-agent provider) — `/linear:delegate`
+  never calls the Devin API itself; when yellow-devin is the enabled
+  `remote-agent` provider, it invokes the existing `/devin:delegate` command via
+  `Skill`, which owns its own credential validation and Devin session creation
+  entirely.
 
 ## Known Limitations
 

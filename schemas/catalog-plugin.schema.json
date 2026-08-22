@@ -6,7 +6,17 @@
   "$comment": "Repo-derived schema, not an official Anthropic or OpenAI schema. The targets.codex override block (interface, description, skillAllowlist, componentPaths) is derived from the July 2026 Codex plugin contract recorded in docs/research/2026-07-16-codex-plugin-contract-spike.md; no plugin populates it yet (all 17 sources carry targets.codex.enabled: false as of this PR) — fields are validated unconditionally so a later shell's override cannot reach a generated manifest silently malformed.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "description", "author", "homepage", "repository", "license", "keywords", "marketplace", "targets"],
+  "required": [
+    "$schema",
+    "description",
+    "author",
+    "homepage",
+    "repository",
+    "license",
+    "keywords",
+    "marketplace",
+    "targets"
+  ],
   "properties": {
     "$schema": { "type": "string", "format": "uri" },
     "description": { "type": "string", "minLength": 1 },
@@ -157,8 +167,89 @@
               }
             }
           }
+        },
+        "cursor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": { "const": true }
+                },
+                "required": ["enabled"]
+              },
+              "then": {
+                "required": ["interface"],
+                "properties": {
+                  "interface": true
+                }
+              }
+            }
+          ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "interface": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["displayName", "category"],
+              "properties": {
+                "displayName": { "type": "string", "minLength": 1 },
+                "category": { "type": "string", "minLength": 1 }
+              },
+              "description": "Required once targets.cursor.enabled is true (buildCursorPluginManifest dereferences both fields unconditionally); optional while enabled is false. Flattened onto the generated .cursor-plugin/plugin.json's top-level displayName/category fields — the upstream Cursor manifest has no nested 'interface' object of its own (that nesting is a catalog-authoring convenience shared with targets.codex, not an emitted shape)."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Overrides the top-level description in the generated Cursor manifest when present."
+            },
+            "skillAllowlist": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Skill directory names under skills/ that buildCursorSkillTree copies into plugins/<name>/cursor/skills/. Skills not listed here are excluded from the Cursor distribution."
+            },
+            "componentPaths": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "skills": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manifest-relative path the generated Cursor plugin manifest declares for its skill tree."
+                }
+              }
+            }
+          },
+          "description": "OPTIONAL, unlike targets.codex above (which is required on every plugin): absence means Cursor-disabled, matching isCursorEnabled's fail-closed Boolean(...) && enabled === true check — existing catalog sources do not need an explicit { enabled: false } entry."
         }
       }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["active", "experimental", "legacy", "deprecated"]
+        },
+        "installPolicy": {
+          "type": "string",
+          "enum": ["auto", "manual"]
+        },
+        "support": {
+          "type": "string",
+          "enum": ["full", "security-only"]
+        },
+        "replacement": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Names another catalog plugin (must exist in catalog.json's pluginOrder — checked by scripts/generate-manifests.js's validateLifecycle, not expressible in this static schema)."
+        }
+      },
+      "description": "Catalog-only lifecycle metadata (e.g. marking a plugin legacy with a named replacement). Never emitted into any generated artifact (.claude-plugin/plugin.json, .codex-plugin/plugin.json, .cursor-plugin/plugin.json, or any marketplace file) — scripts/validate-cursor.js scans every generated artifact for a literal \"lifecycle\" key as a non-emission gate."
     }
   }
 }

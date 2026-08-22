@@ -12,7 +12,14 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
@@ -54,12 +61,68 @@ interface FixtureOptions {
   routerEntries?: Array<{ id: string; plugin: string }>;
   marketplaceNames?: string[];
   emitProviderInto?: string;
+  /**
+   * Per-group router-file overrides, keyed by catalog group name. Only
+   * consulted when neither `routerGroup` nor `routerEntries` is set (those
+   * two remain the single-group legacy path, always targeting the
+   * `stacked-pr` router file, unchanged from before this option existed).
+   * `omit: true` skips writing that group's router file entirely (for a
+   * "router missing" case); `group`/`entries` override what gets written
+   * for a "router routes the wrong group" / "member drift" case.
+   */
+  routerFiles?: Record<
+    string,
+    {
+      group?: string;
+      entries?: Array<{ id: string; plugin: string }>;
+      omit?: boolean;
+    }
+  >;
 }
 
 const DEFAULT_PROVIDERS = [
   { plugin: 'gt-workflow', group: 'stacked-pr', id: 'graphite' },
   { plugin: 'github-workflow', group: 'stacked-pr', id: 'github' },
 ];
+
+// Mirrors the real ROUTER_TABLES map in scripts/validate-provider-groups.js —
+// duplicated here deliberately, the same way a fixture harness always
+// duplicates the thing it's testing against, so the test fails loudly if the
+// two ever drift apart rather than silently testing the wrong path.
+const ROUTER_TABLE_PATHS: Record<string, string> = {
+  'stacked-pr': join(
+    'plugins',
+    'yellow-core',
+    'lib',
+    'stack-provider-state.js'
+  ),
+  'remote-agent': join(
+    'plugins',
+    'yellow-core',
+    'lib',
+    'remote-agent-provider-state.js'
+  ),
+};
+
+function routerFileContent(
+  group: string,
+  entries: Array<{ id: string; plugin: string }>
+): string {
+  return [
+    "'use strict';",
+    `const PROVIDER_GROUP = '${group}';`,
+    '// provider-table:start',
+    'const PROVIDERS = Object.freeze([',
+    ...entries.map(
+      (entry) =>
+        `  Object.freeze({ id: '${entry.id}', plugin: '${entry.plugin}' }),`
+    ),
+    ']);',
+    '// provider-table:end',
+    'module.exports = { PROVIDER_GROUP, PROVIDERS };',
+    '',
+  ].join('\n');
+}
 
 // Every root buildFixture() mkdtemps is tracked here and removed after each
 // test, matching the afterEach(rmSync(...)) convention used elsewhere in
@@ -75,7 +138,8 @@ afterEach(() => {
 /** Build a minimal but structurally faithful fixture repository. */
 function buildFixture(options: FixtureOptions = {}): string {
   const providers = options.providers ?? DEFAULT_PROVIDERS;
-  const marketplaceNames = options.marketplaceNames ?? providers.map((p) => p.plugin);
+  const marketplaceNames =
+    options.marketplaceNames ?? providers.map((p) => p.plugin);
   const root = mkdtempSync(join(tmpdir(), 'provider-groups-'));
   createdRoots.push(root);
 
@@ -106,7 +170,11 @@ function buildFixture(options: FixtureOptions = {}): string {
   write(
     root,
     join('.claude-plugin', 'marketplace.json'),
-    JSON.stringify({ plugins: marketplaceNames.map((name) => ({ name })) }, null, 2)
+    JSON.stringify(
+      { plugins: marketplaceNames.map((name) => ({ name })) },
+      null,
+      2
+    )
   );
 
   const defaultSection = [
@@ -126,30 +194,55 @@ function buildFixture(options: FixtureOptions = {}): string {
     options.setupSection ?? defaultSection
   );
 
-  const routerEntries = options.routerEntries ?? providers.map((p) => ({ id: p.id, plugin: p.plugin }));
-  const routerGroup = options.routerGroup ?? providers[0]?.group ?? 'stacked-pr';
-  write(
-    root,
-    join('plugins', 'yellow-core', 'lib', 'stack-provider-state.js'),
-    [
-      "'use strict';",
-      `const PROVIDER_GROUP = '${routerGroup}';`,
-      '// provider-table:start',
-      'const PROVIDERS = Object.freeze([',
-      ...routerEntries.map(
-        (entry) => `  Object.freeze({ id: '${entry.id}', plugin: '${entry.plugin}' }),`
-      ),
-      ']);',
-      '// provider-table:end',
-      'module.exports = { PROVIDER_GROUP, PROVIDERS };',
-      '',
-    ].join('\n')
-  );
+  if (
+    options.routerGroup !== undefined ||
+    options.routerEntries !== undefined
+  ) {
+    // Legacy single-router-file path — unchanged behavior, always targets
+    // the stacked-pr router regardless of `providers`.
+    const routerEntries =
+      options.routerEntries ??
+      providers.map((p) => ({ id: p.id, plugin: p.plugin }));
+    const routerGroup =
+      options.routerGroup ?? providers[0]?.group ?? 'stacked-pr';
+    write(
+      root,
+      ROUTER_TABLE_PATHS['stacked-pr'],
+      routerFileContent(routerGroup, routerEntries)
+    );
+  } else {
+    // Generalized default: one router file per distinct group present in
+    // `providers`, written at that group's canonical path. With the
+    // default two-member stacked-pr `providers` list, this writes exactly
+    // one file at exactly the same path with exactly the same content the
+    // old hardcoded block did — the two branches are behaviorally
+    // identical for every pre-existing test.
+    for (const group of [...new Set(providers.map((p) => p.group))]) {
+      const override = options.routerFiles?.[group];
+      if (override?.omit) {
+        continue;
+      }
+      const routerPath = ROUTER_TABLE_PATHS[group];
+      if (!routerPath) {
+        continue;
+      }
+      const groupDeclared = override?.group ?? group;
+      const entries =
+        override?.entries ??
+        providers
+          .filter((p) => p.group === group)
+          .map((p) => ({ id: p.id, plugin: p.plugin }));
+      write(root, routerPath, routerFileContent(groupDeclared, entries));
+    }
+  }
 
   if (options.emitProviderInto) {
     const target = join(root, options.emitProviderInto);
     const existing = JSON.parse(readFileSync(target, 'utf8'));
-    existing.capabilityProvider = { group: providers[0].group, id: providers[0].id };
+    existing.capabilityProvider = {
+      group: providers[0].group,
+      id: providers[0].id,
+    };
     writeFileSync(target, JSON.stringify(existing, null, 2), 'utf8');
   }
 
@@ -177,7 +270,9 @@ describe('validate-provider-groups', () => {
   });
 
   it('fails when a declared provider plugin is not in the marketplace', () => {
-    const run = runValidator(buildFixture({ marketplaceNames: ['gt-workflow'] }));
+    const run = runValidator(
+      buildFixture({ marketplaceNames: ['gt-workflow'] })
+    );
     expect(run.status).toBe(1);
     expect(run.stderr).toContain('ERROR-PROVIDER-002');
     expect(run.stderr).toContain('github-workflow');
@@ -186,7 +281,12 @@ describe('validate-provider-groups', () => {
   it('fails when provider metadata leaks into a generated plugin manifest', () => {
     const run = runValidator(
       buildFixture({
-        emitProviderInto: join('plugins', 'gt-workflow', '.claude-plugin', 'plugin.json'),
+        emitProviderInto: join(
+          'plugins',
+          'gt-workflow',
+          '.claude-plugin',
+          'plugin.json'
+        ),
       })
     );
     expect(run.status).toBe(1);
@@ -196,7 +296,9 @@ describe('validate-provider-groups', () => {
   it('fails when a group has only one member', () => {
     const run = runValidator(
       buildFixture({
-        providers: [{ plugin: 'gt-workflow', group: 'stacked-pr', id: 'graphite' }],
+        providers: [
+          { plugin: 'gt-workflow', group: 'stacked-pr', id: 'graphite' },
+        ],
       })
     );
     expect(run.status).toBe(1);
@@ -204,7 +306,9 @@ describe('validate-provider-groups', () => {
   });
 
   it('fails when the setup:all section is missing entirely', () => {
-    const run = runValidator(buildFixture({ setupSection: '# setup all\n\nno markers here\n' }));
+    const run = runValidator(
+      buildFixture({ setupSection: '# setup all\n\nno markers here\n' })
+    );
     expect(run.status).toBe(1);
     expect(run.stderr).toContain('ERROR-PROVIDER-005');
   });
@@ -248,7 +352,9 @@ describe('validate-provider-groups', () => {
 
   it('fails when the shipped router table drifts from the catalog', () => {
     const run = runValidator(
-      buildFixture({ routerEntries: [{ id: 'graphite', plugin: 'gt-workflow' }] })
+      buildFixture({
+        routerEntries: [{ id: 'graphite', plugin: 'gt-workflow' }],
+      })
     );
     expect(run.status).toBe(1);
     expect(run.stderr).toContain('ERROR-PROVIDER-006');
@@ -262,13 +368,90 @@ describe('validate-provider-groups', () => {
   });
 });
 
+describe('validate-provider-groups — remote-agent group (multi-router-table generalization)', () => {
+  const REMOTE_AGENT_PROVIDERS = [
+    { plugin: 'yellow-cursor', group: 'remote-agent', id: 'cursor' },
+    { plugin: 'yellow-devin', group: 'remote-agent', id: 'devin' },
+  ];
+  const TWO_GROUP_PROVIDERS = [...DEFAULT_PROVIDERS, ...REMOTE_AGENT_PROVIDERS];
+
+  it('passes when both the stacked-pr and remote-agent router tables match the catalog', () => {
+    const run = runValidator(buildFixture({ providers: TWO_GROUP_PROVIDERS }));
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('2 capability group(s) verified');
+  });
+
+  it('does NOT look up the remote-agent router file when the catalog declares only stacked-pr', () => {
+    // Regression guard for the generalization itself: a fixture that never
+    // mentions remote-agent must behave exactly as it did before this
+    // change added a second table to iterate — no remote-agent-shaped
+    // error should appear even though no remote-agent router file exists
+    // anywhere under this fixture root.
+    const run = runValidator(buildFixture());
+    expect(run.status).toBe(0);
+    expect(run.stderr).not.toContain('remote-agent');
+  });
+
+  it('fails when the remote-agent router file is missing from disk', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: TWO_GROUP_PROVIDERS,
+        routerFiles: { 'remote-agent': { omit: true } },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-006');
+    expect(run.stderr).toContain('missing from disk');
+    expect(run.stderr).toContain('remote-agent-provider-state.js');
+  });
+
+  it('fails when the remote-agent router table drifts (a member missing from the shipped table)', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: TWO_GROUP_PROVIDERS,
+        routerFiles: {
+          'remote-agent': {
+            entries: [{ id: 'cursor', plugin: 'yellow-cursor' }],
+          },
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-006');
+    expect(run.stderr).toContain('provider table drifts');
+    expect(run.stderr).toContain('remote-agent');
+  });
+
+  it('a stacked-pr-only router drift is unaffected by an otherwise-healthy remote-agent table', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: TWO_GROUP_PROVIDERS,
+        routerFiles: {
+          'stacked-pr': {
+            entries: [{ id: 'graphite', plugin: 'gt-workflow' }],
+          },
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-006');
+    expect(run.stderr).toContain('stack-provider-state.js');
+    expect(run.stderr).not.toContain(
+      'remote-agent-provider-state.js provider table drifts'
+    );
+  });
+});
+
 describe('generated-manifest non-emission (live repository)', () => {
   const declaring = ['gt-workflow', 'github-workflow'];
 
   it('declares capabilityProvider in the catalog sources', () => {
     for (const name of declaring) {
       const source = JSON.parse(
-        readFileSync(join(REPO_ROOT, 'catalog', 'plugins', `${name}.json`), 'utf8')
+        readFileSync(
+          join(REPO_ROOT, 'catalog', 'plugins', `${name}.json`),
+          'utf8'
+        )
       );
       expect(source.capabilityProvider).toEqual({
         group: 'stacked-pr',
