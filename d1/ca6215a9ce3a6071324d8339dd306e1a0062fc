@@ -1,0 +1,27 @@
+tests/integration/sync-manifests.test.ts
+  s_ca129cb3ac489c::t_62840702ea1f59 66,72-73
+  s_ca129cb3ac489c::t_45345959c49164 37-39,43-45,49-51,87-90,113-115,118-121,127-129,136-142,147-149,161-163
+  s_ca129cb3ac489c::t_44759911195cf9 74
+tests/integration/generate-manifests.test.ts
+  s_ca129cb3ac489c::t_45345959c49164 36-49,65-68,93-96,126-127,140-142,146-148,152-154,193-195,200-204,221-223,241-245,281-287,293-295,312-314,317-319,325-328,445-447,464-467,479-481,491-493,499-500,516-518,528-530,546-548,568-570,580-582,592-594,651-653,682-684,719-721,730-736,742-746,759-761,786-788,791-793,800-806
+  s_ca129cb3ac489c::t_0dd39e820db1ce 171-173,179-181,188-192
+  s_ca129cb3ac489c::t_cd8ca72e269a78 81-92,97-107
+  s_ca129cb3ac489c::t_e0aa097b6390b6 30-34,50
+  s_ca129cb3ac489c::t_e4e6d2316bdb9a 108-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d1ca6215a9ce3a6071324d8339dd306e1a0062fc",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
