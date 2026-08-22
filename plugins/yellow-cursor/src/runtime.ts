@@ -162,9 +162,16 @@ async function countActiveAgentsForRepo(
     if (result.nextCursor === undefined) return count;
     cursor = result.nextCursor;
   }
+  // recoveryAction is overridden because the catalog default ("raise
+  // --max-active") is actively wrong here: this branch throws before any count
+  // exists to compare the cap against, so raising it can never clear the error.
   return throwAppError(
     'CURSOR_CONCURRENCY_LIMIT',
-    `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely. Raising --max-active does NOT clear this — the sweep never reached a total to compare it against. Archive agents you no longer need (/cursor:archive removes them from this listing) until it fits.`
+    `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely.`,
+    {
+      recoveryAction:
+        'Archive agents you no longer need (/cursor:archive removes them from this listing) until it fits within the page bound. Raising --max-active does not help here.',
+    }
   );
 }
 

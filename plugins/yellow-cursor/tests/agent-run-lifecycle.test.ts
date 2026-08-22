@@ -329,6 +329,7 @@ describe('archive hides an agent from the default listing', () => {
       archived,
       metadata: {},
       repository: 'https://github.com/org/repo',
+      createdAt: '2026-08-22T00:00:00.000Z',
       runs: new Map(),
     });
   }
