@@ -113,6 +113,31 @@ setup() {
   printf '%s\n' "$cursor_block" | grep -q -- '--yes'
 }
 
+@test "allowed-tools grants Write for the delegation packet file" {
+  run grep -F '  - Write' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "packet scratch path uses git-path tmp for worktree safety" {
+  run grep -F 'git rev-parse --git-path' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'yellow-linear-packet-' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "packet scratch file is removed via trap on all exit paths" {
+  run grep -F 'trap '"'"'rm -f -- "$PACKET_FILE"'"'"' EXIT INT TERM' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "launch block re-reads git remote and branch instead of template substitution" {
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -q 'git remote get-url origin'
+  printf '%s\n' "$launch_block" | grep -q 'git branch --show-current'
+  run grep -F 'YELLOW_TODO_repository_remote_url' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+}
+
 @test "resolves sibling plugin roots via installPath, never via a relative .. guess" {
   run grep -F 'installPath' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
