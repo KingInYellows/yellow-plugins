@@ -306,23 +306,21 @@ before Step 7's launch, with no other step in between).
 
 ### Step 7: Launch
 
-**Cursor** (`YELLOW_CURSOR_ROOT` resolved in Step 3):
+**Cursor.**
 
-```bash
-node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
-  --repo "$CURSOR_REPO_URL" \
-  --ref "$BRANCH" \
-  --idempotency-key "$IDEMPOTENCY_KEY" \
-  --linear-issue "$ISSUE_ID" \
-  --calling-host yellow-linear \
-  --prompt "$PACKET" \
-  --yes
-```
+> Shell variables do NOT persist across separate Bash tool calls. Everything
+> this launch needs — `YELLOW_CURSOR_ROOT` (Step 3), `REPO_URL` / `BRANCH` /
+> `ISSUE_ID` (Steps 1-3), `IDEMPOTENCY_KEY` (Step 4), and `PACKET` (Steps 4
+> and 6) — must be re-assigned with its concrete value at the top of THIS
+> block, or substituted literally into it. Do not rely on assignments made in
+> an earlier block; an unset `YELLOW_CURSOR_ROOT` silently becomes
+> `node "/dist/cli.js"`, and an empty `PACKET` launches a billable agent with
+> no instructions.
 
-`CURSOR_REPO_URL` is `REPO_URL` converted to the `https://` form the Cursor
-CLI requires (its own `validate.ts` is the single authority on repo/ref
-shape — do not replicate its regexes here; just convert scheme and strip a
-trailing `.git`):
+First derive `CURSOR_REPO_URL` — `REPO_URL` converted to the `https://` form
+the Cursor CLI requires (its own `validate.ts` is the single authority on
+repo/ref shape — do not replicate its regexes here; just convert scheme and
+strip a trailing `.git`):
 
 ```bash
 case "$REPO_URL" in
@@ -339,6 +337,26 @@ if [ -z "$CURSOR_REPO_URL" ]; then
   printf 'ERROR: could not derive an https repository URL from "%s" — Cursor requires https://{github.com,gitlab.com,dev.azure.com,bitbucket.org}/...\n' "$REPO_URL" >&2
   exit 1
 fi
+```
+
+Then launch, in the same Bash call, after asserting nothing needed is empty:
+
+```bash
+for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL BRANCH IDEMPOTENCY_KEY ISSUE_ID PACKET; do
+  if [ -z "${!required:-}" ]; then
+    printf 'ERROR: %s is empty — re-derive it in this block before launching (shell state does not cross Bash calls).\n' "$required" >&2
+    exit 1
+  fi
+done
+
+node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
+  --repo "$CURSOR_REPO_URL" \
+  --ref "$BRANCH" \
+  --idempotency-key "$IDEMPOTENCY_KEY" \
+  --linear-issue "$ISSUE_ID" \
+  --calling-host yellow-linear \
+  --prompt "$PACKET" \
+  --yes
 ```
 
 Parse the single JSON object on stdout. On `{ok:true}`: capture `agentId`,

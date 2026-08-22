@@ -1,7 +1,7 @@
 ---
 name: cursor:list
 description: 'List Cursor Cloud Agents merged with local state. Use when user asks "what Cursor agents are running", "show my Cursor sessions", or wants to find an agent id for status/cancel/archive.'
-argument-hint: '[--cursor <token>]'
+argument-hint: '[--cursor <token>] [--archived]'
 allowed-tools:
   - Bash
 ---
@@ -9,7 +9,9 @@ allowed-tools:
 # List Cursor Cloud Agents
 
 Show one page of agents from `Agent.list()`, merged with the local index
-(matched by idempotency key, falling back to agent id).
+(matched by idempotency key, falling back to agent id). Archived agents are
+excluded unless `--archived` is passed — that is what makes `/cursor:archive`
+actually hide an agent.
 
 ## Workflow
 
@@ -32,6 +34,7 @@ command -v jq >/dev/null 2>&1 || {
 ```bash
 args=(list)
 [ -n "$CURSOR_TOKEN" ] && args+=(--cursor "$CURSOR_TOKEN")
+[ -n "$SHOW_ARCHIVED" ] && args+=(--archived)
 
 OUTPUT=$(node "$CLI" "${args[@]}")
 OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
@@ -39,6 +42,12 @@ OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
 
 `$CURSOR_TOKEN` here is the pagination cursor parsed from an optional
 `--cursor <token>` in `$ARGUMENTS` — unrelated to `CURSOR_API_KEY`.
+`$SHOW_ARCHIVED` is set non-empty only when `$ARGUMENTS` contained
+`--archived`. Both are parsed and assigned in this same Bash block — shell
+variables do not persist across separate Bash calls.
+
+If `items` is empty without `--archived`, mention that archived agents were
+excluded before concluding the account has no agents.
 
 ### Step 3: Report
 

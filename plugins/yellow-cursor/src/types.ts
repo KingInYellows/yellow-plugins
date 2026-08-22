@@ -118,7 +118,16 @@ export interface SdkAdapter {
   createAgent(options: CreateAgentOptions): Promise<AdapterAgentHandle>;
   resumeAgent(agentId: string): Promise<AdapterAgentHandle>;
   getAgent(agentId: string): Promise<AdapterAgentInfo>;
-  listAgents(options?: { cursor?: string }): Promise<ListAgentsResult>;
+  listAgents(options?: {
+    cursor?: string;
+    /**
+     * Ask the service to include archived agents in the page. Reconciliation
+     * paths pass true so an archived agent is still discoverable by its
+     * `yellowIdempotencyKey`; the user-facing `list` leaves it off so
+     * `/cursor:archive` actually hides the agent as its contract promises.
+     */
+    includeArchived?: boolean;
+  }): Promise<ListAgentsResult>;
   /** agentId is required — the SDK's cloud GetRunOptions needs it to route the lookup. */
   getRun(runId: string, agentId: string): Promise<AdapterRun>;
   cancelRun(runId: string, agentId: string): Promise<void>;

@@ -177,11 +177,15 @@ async function dispatch(operation, rest, deps) {
         case 'list': {
             const { values } = (0, node_util_1.parseArgs)({
                 args: rest,
-                options: { cursor: { type: 'string' } },
+                options: {
+                    cursor: { type: 'string' },
+                    archived: { type: 'boolean' },
+                },
                 strict: true,
                 allowPositionals: false,
             });
             return await runtime.list(deps, {
+                archived: values.archived === true,
                 ...(values.cursor !== undefined
                     ? { cursor: values.cursor }
                     : {}),

@@ -106,17 +106,28 @@ async function sendWithOutcomeTracking(handle, prompt, idempotencyKey, clock) {
         throw err;
     }
 }
-async function countActiveAgentsForRepo(adapter, repoUrl) {
+/** Safety bound on remote pagination sweeps, so a huge account can't hang a launch. */
+const MAX_LIST_PAGES = 5;
+/**
+ * Counts running cloud agents for `repoUrl`, and FAILS CLOSED if the account
+ * has more pages than MAX_LIST_PAGES: an undercount here would authorize a
+ * billable launch past the user's --max-active cap, so an incomplete sweep is
+ * reported as a concurrency refusal rather than treated as "not at the cap".
+ */
+async function countActiveAgentsForRepo(adapter, repoUrl, maxActive) {
     let count = 0;
     let cursor;
-    for (let page = 0; page < 5; page += 1) {
-        const result = await adapter.listAgents(cursor !== undefined ? { cursor } : undefined);
+    for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+        const result = await adapter.listAgents({
+            includeArchived: false,
+            ...(cursor !== undefined ? { cursor } : {}),
+        });
         count += result.items.filter((item) => item.repository === repoUrl && item.status === 'running').length;
         if (result.nextCursor === undefined)
-            break;
+            return count;
         cursor = result.nextCursor;
     }
-    return count;
+    return (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely. Archive old agents, or raise --max-active only after checking /cursor:list yourself.`);
 }
 async function readHealthyIndex(stateFilePath) {
     const result = await (0, state_js_1.readIndex)(stateFilePath);
@@ -216,7 +227,7 @@ async function delegate(deps, args) {
             (0, errors_js_1.throwAppError)('CURSOR_DUPLICATE_LAUNCH', `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`);
         }
     });
-    const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+    const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl, maxActive);
     await (0, state_js_1.withStateLock)(deps.stateFilePath, async () => {
         const readResult = await (0, state_js_1.readIndex)(deps.stateFilePath);
         (0, state_js_1.throwIfQuarantined)(readResult);
@@ -303,8 +314,13 @@ async function delegate(deps, args) {
  *   3. never return the provisional id — it 404s on Agent.get/getRun/list.
  *      A failed reconciliation after a billable send() is CURSOR_UNKNOWN_OUTCOME
  *      so the caller reconciles via list metadata instead of persisting a dead id.
- * Best-effort by design: a reconciliation failure must never turn a
- * successful billable launch into a reported error.
+ *
+ * CURSOR_UNKNOWN_OUTCOME is deliberately NOT a claim that the launch failed —
+ * it is the "launched, but this CLI cannot name the agent" outcome, and its
+ * recovery action is `status --reconcile` rather than "relaunch". Reporting
+ * that is strictly better than returning ok:true with a provisional id that
+ * every subsequent follow-up/cancel/status call would 404 on, so do not
+ * "simplify" this into a best-effort fallback that persists the provisional id.
  */
 async function resolveCanonicalAgentId(deps, provisionalId, run, idempotencyKey) {
     if (run.agentId !== '' && run.agentId !== provisionalId) {
@@ -312,8 +328,13 @@ async function resolveCanonicalAgentId(deps, provisionalId, run, idempotencyKey)
     }
     try {
         let cursor;
-        for (let page = 0; page < 5; page++) {
-            const res = await deps.adapter.listAgents(cursor !== undefined ? { cursor } : undefined);
+        for (let page = 0; page < MAX_LIST_PAGES; page++) {
+            // includeArchived: reconciliation must still find an agent that was
+            // archived between the send() and this sweep.
+            const res = await deps.adapter.listAgents({
+                includeArchived: true,
+                ...(cursor !== undefined ? { cursor } : {}),
+            });
             const match = res.items.find((a) => a.metadata['yellowIdempotencyKey'] === idempotencyKey);
             if (match !== undefined)
                 return match.agentId;
@@ -436,7 +457,10 @@ async function status(deps, args) {
 }
 async function list(deps, args) {
     const cursor = (0, validate_js_1.validateCursor)(args.cursor);
-    const result = await deps.adapter.listAgents(cursor !== undefined ? { cursor } : undefined);
+    const result = await deps.adapter.listAgents({
+        includeArchived: args.archived === true,
+        ...(cursor !== undefined ? { cursor } : {}),
+    });
     const index = await readHealthyIndex(deps.stateFilePath);
     const items = result.items.map((info) => {
         const idempotencyKey = info.metadata['yellowIdempotencyKey'];
