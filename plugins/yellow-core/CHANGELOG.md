@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- [#726](https://github.com/KingInYellows/yellow-plugins/pull/726)
+  [`575f8cd`](https://github.com/KingInYellows/yellow-plugins/commit/575f8cd83ab3afc63174af8254029b7070957876)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - yellow-core
+  adds the `remote-agent` capability provider group: a new dependency-free
+  resolver (`lib/remote-agent-provider-state.js`) classifies the Cursor/Devin
+  remote-agent providers into
+  READY_CURSOR/READY_DEVIN/UNSELECTED/CONFLICT/PARTIAL_TOOLING/CONFIG_INVALID
+  with Cursor as the preferred recommendation (never auto-selected), and
+  `/setup:all` gains yellow-cursor coverage plus the remote-agent group section.
+
 ## 2.2.1
 
 ### Patch Changes
