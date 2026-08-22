@@ -1,0 +1,72 @@
+---
+name: cursor:unarchive
+description: "Restore an archived Cursor Cloud Agent to default listing, after user confirmation. Use when user wants to bring back a previously archived Cursor agent."
+argument-hint: '--agent-id <id>'
+allowed-tools:
+  - Bash
+  - AskUserQuestion
+---
+
+# Unarchive a Cursor Cloud Agent
+
+Mirror of `/cursor:archive` — restores an archived agent to `/cursor:list`'s
+default view.
+
+## Workflow
+
+### Step 1: Validate Prerequisites
+
+```bash
+CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
+if [ ! -f "$CLI" ]; then
+  printf 'ERROR: yellow-cursor CLI not found at %s. Reinstall the plugin or report a bug.\n' "$CLI" >&2
+  exit 1
+fi
+command -v jq >/dev/null 2>&1 || {
+  printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n' >&2
+  exit 1
+}
+```
+
+### Step 2: Parse Arguments
+
+Parse `$ARGUMENTS` for `--agent-id <id>` (required). If missing, ask via
+AskUserQuestion (suggest `/cursor:list --archived`-style filtering is not
+available — use `/cursor:status --agent-id <id>` if the id is already known, or
+ask the user for it directly).
+
+### Step 3: Confirm
+
+AskUserQuestion:
+
+- "Unarchive Cursor agent `<id>`? It will reappear in default `/cursor:list`
+  output."
+- Options: "Yes, unarchive" / "No, cancel"
+
+If declined, stop.
+
+### Step 4: Unarchive
+
+```bash
+args=(unarchive --agent-id "$AGENT_ID" --yes)
+OUTPUT=$(node "$CLI" "${args[@]}")
+OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
+```
+
+### Step 5: Report
+
+On `ok:true`, check `alreadyInState`:
+
+- `true` — report "Agent `<id>` was not archived; nothing to do."
+- `false` — report "Agent `<id>` unarchived."
+
+## Error Handling
+
+| Code                           | Retryable | Recovery Action                                                                                   |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------- |
+| `CURSOR_CONFIRMATION_REQUIRED` | false     | should not occur (this command always passes `--yes` after confirming) — if seen, report as a bug |
+| `CURSOR_NOT_FOUND`             | false     | verify the agent id                                                                               |
+| `CURSOR_AUTH_FAILED`           | false     | set `CURSOR_API_KEY` or run `/cursor:setup`                                                       |
+
+Any other `error.code` — report the code, message, and `error.recoveryAction`
+from the JSON as-is.
