@@ -1,0 +1,72 @@
+plugins/yellow-linear/CLAUDE.md
+  s_ca129cb3ac489c::t_377000e43fa919 93-108
+  s_ca129cb3ac489c::t_b868e2e8208709 45-49
+plugins/yellow-linear/commands/linear/delegate.md
+  s_ca129cb3ac489c::t_bf56ce9bc8fb26 289,331,340,380,396
+  s_ca129cb3ac489c::t_3046389152fdcc 408-409
+  s_ca129cb3ac489c::t_751350e0181df7 3-4,9,17,19-24,30-33,37,39-41,44-45,47-49,52-53,57-71,74-88,91-128,130-132,135-138,141-169,171-172,174-177,179-182,185,187-195,197,199,201-203,206-219,223-224,228-229,232,240-242,245-252,255-262,266-275,278,280,282,284-288,290,292,295-302,305-308,311-323,327-330,332-335,341,345-346,348-349,352-355,357-358,361,363,368,375,377-379,381-388,391,394-395,401-407,410-418,425-431
+  s_ca129cb3ac489c::t_eeb258bdafc285 336-339
+tests/integration/fixtures/remote-agent-provider/both-enabled.json
+  s_ca129cb3ac489c::t_953d32328e18b4 1-20
+plugins/yellow-core/lib/remote-agent-provider-state.js
+  s_ca129cb3ac489c::t_2f40596f5cfb0c 1-376
+tests/integration/fixtures/remote-agent-provider/README.md
+  s_ca129cb3ac489c::t_b1463106189a0b 1-15
+plugins/yellow-linear/tests/delegate.bats
+  s_ca129cb3ac489c::t_d0211bb97a86db 124,127-130
+  s_ca129cb3ac489c::t_1ac2bf420edcf5 25-29,33-34
+  s_ca129cb3ac489c::t_6c5d252570e59c 1-24,30-32,35-68,74-123,125-126,131
+  s_ca129cb3ac489c::t_a6dd952fd528fb 69-73
+tests/integration/fixtures/remote-agent-provider/both-installed-cursor-enabled.json
+  s_ca129cb3ac489c::t_940d8376a3db96 1-20
+tests/integration/fixtures/remote-agent-provider/neither-installed.json
+  s_ca129cb3ac489c::t_dd840c1a4feb71 1
+scripts/validate-provider-groups.js
+  s_ca129cb3ac489c::t_f7f2871dccac28 83-97,104-105
+  s_ca129cb3ac489c::t_bf56ce9bc8fb26 640-642
+  s_ca129cb3ac489c::t_87d90559c73dd0 51-53,55-57,98-103,120-121,184-186,319-324,336-342,356-362,390-392,467-468,511-513,595-598,653-655,677-680
+  s_ca129cb3ac489c::t_e2874b1eb68c35 556-561,563-568,570-571,576-582,588,601,614,629,634-639
+tests/integration/fixtures/remote-agent-provider/both-installed-devin-enabled.json
+  s_ca129cb3ac489c::t_7549800bfe6b8a 1-20
+tests/integration/fixtures/remote-agent-provider/none-enabled.json
+  s_ca129cb3ac489c::t_19b31f4e3a3fba 1-20
+plugins/yellow-core/commands/setup/all.md
+  s_ca129cb3ac489c::t_2d2ac778bdc1d9 106-112
+  s_ca129cb3ac489c::t_202402dcd4b69a 747-749,760-766,769-781,783-791
+  s_ca129cb3ac489c::t_c1f23668c9252d 113
+  s_ca129cb3ac489c::t_4e91b268b9b053 480-499,502-504
+  s_ca129cb3ac489c::t_97490889e1206f 289
+  s_ca129cb3ac489c::t_48622846219018 333-364
+  s_ca129cb3ac489c::t_40360099f68483 713
+  s_ca129cb3ac489c::t_aeb554b69d6222 848-862
+  s_ca129cb3ac489c::t_a7a2aa2445440a 874
+tests/integration/fixtures/remote-agent-provider/foreign-project-scope.json
+  s_ca129cb3ac489c::t_cf3e0bc5227990 1-21
+tests/integration/validate-provider-groups.test.ts
+  s_ca129cb3ac489c::t_5f1182c9a3392e 201-203,213-231,235-237
+  s_ca129cb3ac489c::t_87d90559c73dd0 15-22,75-79,93-104,116-119,141-142,173-177,197-200,204-212,232-234,242-245,273-275,284-289,299-301,309-311,355-357,413-415,430-432,439-441,451-454
+  s_ca129cb3ac489c::t_f68447f7d426cd 64-74,80,88-92,105-115,120-125
+  s_ca129cb3ac489c::t_51533a4c47b3a1 371-412,416-429,433-435,438
+  s_ca129cb3ac489c::t_bf56ce9bc8fb26 436-437,442-444
+  s_ca129cb3ac489c::t_4957d099b39cb0 126
+tests/integration/remote-agent-provider-state.test.ts
+  s_ca129cb3ac489c::t_dc4f91e6681b4f 277-281,283-308
+  s_ca129cb3ac489c::t_f21d637cf24c15 1-14,17-18,20-276,282,309-310
+  s_ca129cb3ac489c::t_20b03d83ed2ef8 15-16,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "14b145de50e75296a1f4141a1cfb3e4c7d694951",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
