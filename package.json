@@ -1,6 +1,6 @@
 {
   "name": "yellow-plugins-root",
-  "version": "2.0.16",
+  "version": "2.1.0",
   "private": true,
   "description": "Git-native, schema-validated plugin marketplace for Claude Code",
   "author": "KingInYellows",
@@ -29,7 +29,7 @@
     "validate:generated": "node scripts/generate-manifests.js --check",
     "validate:provider-groups": "node scripts/validate-provider-groups.js",
     "validate:codex": "node scripts/validate-codex.js",
-  "validate:cursor": "node scripts/validate-cursor.js",
+    "validate:cursor": "node scripts/validate-cursor.js",
     "validate:flow-namespace": "node scripts/validate-flow-namespace.js",
     "validate:provider-neutral": "node scripts/validate-provider-neutral-commands.js",
     "generate:manifests": "node scripts/generate-manifests.js",
