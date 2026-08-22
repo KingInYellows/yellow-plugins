@@ -198,11 +198,12 @@ class CursorSdkAdapter {
         try {
             // runtime: 'cloud' is required — without it the SDK lists LOCAL agents
             // (live-verified 2026-08-22: the default returned an empty list while
-            // cloud agents existed). includeArchived keeps archived agents visible
-            // so list/reconcile can still find them.
+            // cloud agents existed). includeArchived is caller-driven: reconciliation
+            // paths opt in so archived agents stay discoverable, while the
+            // user-facing `list` leaves it off so archiving actually hides an agent.
             const result = await sdk.Agent.list({
                 runtime: 'cloud',
-                includeArchived: true,
+                includeArchived: options?.includeArchived === true,
                 ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
             });
             const items = result.items.map(toAdapterAgentInfo);

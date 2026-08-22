@@ -114,12 +114,21 @@ export class FakeSdkAdapter implements SdkAdapter {
     return this.toInfo(state);
   };
 
-  listAgentsImpl: (options?: { cursor?: string }) => Promise<ListAgentsResult> =
-    async () => ({
-      items: Array.from(this.agents.values()).map((state) =>
-        this.toInfo(state)
-      ),
-    });
+  /** Every listAgents() call's options, in order — lets tests assert what the runtime asked for. */
+  readonly listAgentsCalls: Array<
+    { cursor?: string; includeArchived?: boolean } | undefined
+  > = [];
+
+  listAgentsImpl: (options?: {
+    cursor?: string;
+    includeArchived?: boolean;
+  }) => Promise<ListAgentsResult> = async (options) => ({
+    // Mirrors the service contract the adapter relies on: archived agents are
+    // only in the page when the caller opted in.
+    items: Array.from(this.agents.values())
+      .filter((state) => options?.includeArchived === true || !state.archived)
+      .map((state) => this.toInfo(state)),
+  });
 
   getRunImpl: (runId: string, agentId: string) => Promise<AdapterRun> = async (
     runId,
@@ -235,7 +244,11 @@ export class FakeSdkAdapter implements SdkAdapter {
     return this.getAgentImpl(agentId);
   }
 
-  listAgents(options?: { cursor?: string }): Promise<ListAgentsResult> {
+  listAgents(options?: {
+    cursor?: string;
+    includeArchived?: boolean;
+  }): Promise<ListAgentsResult> {
+    this.listAgentsCalls.push(options);
     return this.listAgentsImpl(options);
   }
 

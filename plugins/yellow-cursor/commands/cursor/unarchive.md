@@ -30,10 +30,11 @@ command -v jq >/dev/null 2>&1 || {
 
 ### Step 2: Parse Arguments
 
-Parse `$ARGUMENTS` for `--agent-id <id>` (required). If missing, ask via
-AskUserQuestion (suggest `/cursor:list --archived`-style filtering is not
-available — use `/cursor:status --agent-id <id>` if the id is already known, or
-ask the user for it directly).
+Parse `$ARGUMENTS` for `--agent-id <id>` (required). If missing, suggest
+`/cursor:list --archived`, which includes archived agents in its listing and is
+the discovery path for an id the user no longer has.
+`/cursor:status --agent-id <id>` also works when the id is already known.
+Otherwise ask via AskUserQuestion.
 
 ### Step 3: Confirm
 

@@ -1,7 +1,7 @@
 ---
 name: cursor:list
 description: 'List Cursor Cloud Agents merged with local state. Use when user asks "what Cursor agents are running", "show my Cursor sessions", or wants to find an agent id for status/cancel/archive.'
-argument-hint: '[--cursor <token>]'
+argument-hint: '[--cursor <token>] [--archived]'
 allowed-tools:
   - Bash
 ---
@@ -9,7 +9,9 @@ allowed-tools:
 # List Cursor Cloud Agents
 
 Show one page of agents from `Agent.list()`, merged with the local index
-(matched by idempotency key, falling back to agent id).
+(matched by idempotency key, falling back to agent id). Archived agents are
+excluded unless `--archived` is passed — that is what makes `/cursor:archive`
+actually hide an agent.
 
 ## Workflow
 
@@ -29,16 +31,32 @@ command -v jq >/dev/null 2>&1 || {
 
 ### Step 2: Run
 
+**Read `$ARGUMENTS` yourself — never substitute its raw text into the Bash
+source.** A user argument such as `--cursor '"; $(id); #'` becomes executable
+shell the moment it lands inside a double-quoted assignment, before any
+validation can run. Decide from `$ARGUMENTS` which of the two optional flags
+were supplied, then emit the invocation below with the corresponding lines
+present or absent. Only the pagination token is passed through, and only after
+you have checked it matches `^[A-Za-z0-9._~+/=-]{1,512}$` — refuse with
+"`--cursor` value has an unexpected shape" if it does not.
+
+Start from this exact invocation and delete the lines that do not apply:
+
 ```bash
 args=(list)
-[ -n "$CURSOR_TOKEN" ] && args+=(--cursor "$CURSOR_TOKEN")
+args+=(--cursor 'PASTE_VALIDATED_CURSOR_TOKEN')   # only if --cursor was given
+args+=(--archived)                                # only if --archived was given
 
 OUTPUT=$(node "$CLI" "${args[@]}")
 OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
 ```
 
-`$CURSOR_TOKEN` here is the pagination cursor parsed from an optional
-`--cursor <token>` in `$ARGUMENTS` — unrelated to `CURSOR_API_KEY`.
+The token sits in **single** quotes: it is inert there, and the charset check
+above already excludes `'`, so it cannot close them. If `--cursor` was supplied
+with no value, stop and report that instead of running anything.
+
+If `items` is empty without `--archived`, mention that archived agents were
+excluded before concluding the account has no agents.
 
 ### Step 3: Report
 
@@ -55,9 +73,13 @@ suggest `/cursor:status --agent-id <id> --reconcile` for those rows.
 
 If `nextCursor` is present, tell the user they can re-run
 `/cursor:list --cursor <nextCursor>` to see the next page — do not
-auto-paginate.
+auto-paginate. **Carry `--archived` into that suggestion whenever this
+invocation used it** (`/cursor:list --archived --cursor <nextCursor>`); omitting
+it silently drops back to the non-archived filter, so archived agents on later
+pages would never be shown.
 
-If `items` is empty, report "No Cursor agents found."
+If `items` is empty, report "No Cursor agents found." — adding that archived
+agents were excluded, when `--archived` was not used.
 
 ## Error Handling
 

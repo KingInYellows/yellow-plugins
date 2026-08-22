@@ -10,6 +10,7 @@ import {
   cancel,
   delegate,
   followUp,
+  list,
   unarchive,
   type RuntimeDeps,
 } from '../src/runtime.js';
@@ -312,5 +313,52 @@ describe('canonical agent-id resolution (live-verified server behavior)', () => 
     await expect(delegate(deps, delegateArgs)).rejects.toMatchObject({
       appError: { code: 'CURSOR_UNKNOWN_OUTCOME' },
     });
+  });
+});
+
+describe('archive hides an agent from the default listing', () => {
+  const LIVE_ID = 'bc-00000000-0000-0000-0000-000000001111';
+  const ARCHIVED_ID = 'bc-00000000-0000-0000-0000-000000002222';
+
+  function seedAgent(agentId: string, archived: boolean): void {
+    adapter.agents.set(agentId, {
+      agentId,
+      name: agentId,
+      summary: '',
+      status: 'finished',
+      archived,
+      metadata: {},
+      repository: 'https://github.com/org/repo',
+      createdAt: '2026-08-22T00:00:00.000Z',
+      runs: new Map(),
+    });
+  }
+
+  it('omits archived agents unless --archived is requested', async () => {
+    seedAgent(LIVE_ID, false);
+    seedAgent(ARCHIVED_ID, true);
+
+    const defaultList = await list(deps, {});
+    expect(defaultList.items.map((i) => i.agentId)).toEqual([LIVE_ID]);
+    expect(adapter.listAgentsCalls.at(-1)?.includeArchived).toBe(false);
+
+    const withArchived = await list(deps, { archived: true });
+    expect(withArchived.items.map((i) => i.agentId).sort()).toEqual(
+      [ARCHIVED_ID, LIVE_ID].sort()
+    );
+    expect(adapter.listAgentsCalls.at(-1)?.includeArchived).toBe(true);
+  });
+
+  it('drops the agent from the default listing after archive() succeeds', async () => {
+    seedAgent(LIVE_ID, false);
+
+    await archive(deps, {
+      agentId: LIVE_ID,
+      yes: true,
+      force: false,
+    });
+
+    const after = await list(deps, {});
+    expect(after.items).toHaveLength(0);
   });
 });

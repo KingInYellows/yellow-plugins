@@ -148,6 +148,95 @@ describe('--max-active enforcement', () => {
       })
     ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
   });
+
+  it('fails CLOSED when the agent listing has more pages than the sweep bound', async () => {
+    // Every page reports another cursor, so the sweep can never confirm the
+    // true active count. Undercounting here would authorize a billable launch
+    // past the cap, so an exhausted bound must refuse rather than proceed.
+    adapter.listAgentsImpl = async () => ({
+      items: [],
+      nextCursor: 'always-more',
+    });
+
+    await expect(
+      delegate(deps, {
+        repoUrl: REPO,
+        prompt: 'go',
+        idempotencyKey: 'unbounded-pages',
+        maxActive: 3,
+        yes: true,
+        dryRun: false,
+        autoCreatePr: true,
+      })
+    ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
+
+    // Nothing billable was dispatched.
+    expect(adapter.agents.size).toBe(0);
+  });
+
+  it('counts a force-archived but still-RUNNING agent toward the cap', async () => {
+    // /cursor:archive --force archives an agent with an active run and does
+    // NOT cancel that run, so it keeps consuming a billable slot while being
+    // hidden from the default listing. The cap must still see it.
+    adapter.listAgentsImpl = async (options) => ({
+      items: [
+        {
+          agentId: 'bc-archived',
+          name: 'a',
+          summary: '',
+          status: 'running',
+          archived: true,
+          metadata: {},
+          repository: REPO,
+        },
+      ].filter(() => options?.includeArchived === true),
+    });
+
+    await expect(
+      delegate(deps, {
+        repoUrl: REPO,
+        prompt: 'go',
+        idempotencyKey: 'archived-still-counts',
+        maxActive: 1,
+        yes: true,
+        dryRun: false,
+        autoCreatePr: true,
+      })
+    ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
+
+    // The cap sweep must opt into archived agents to see it at all.
+    expect(adapter.listAgentsCalls[0]?.includeArchived).toBe(true);
+    expect(adapter.agents.size).toBe(0);
+  });
+
+  it('does not count archived agents that have already FINISHED', async () => {
+    // Archived + terminal consumes nothing; only `status` gates the count.
+    adapter.listAgentsImpl = async (options) => ({
+      items: [
+        {
+          agentId: 'bc-archived-done',
+          name: 'a',
+          summary: '',
+          status: 'finished',
+          archived: true,
+          metadata: {},
+          repository: REPO,
+        },
+      ].filter(() => options?.includeArchived === true),
+    });
+
+    const result = await delegate(deps, {
+      repoUrl: REPO,
+      prompt: 'go',
+      idempotencyKey: 'archived-finished-free',
+      maxActive: 1,
+      yes: true,
+      dryRun: false,
+      autoCreatePr: true,
+    });
+
+    expect(result.operation).toBe('delegate');
+  });
 });
 
 describe('nested-delegation guard', () => {
