@@ -31,44 +31,29 @@ command -v jq >/dev/null 2>&1 || {
 
 ### Step 2: Run
 
-Substitute the literal `$ARGUMENTS` text for `<arguments>` below, then run the
-parse and the invocation as ONE Bash call — shell variables do not survive
-between calls:
+**Read `$ARGUMENTS` yourself — never substitute its raw text into the Bash
+source.** A user argument such as `--cursor '"; $(id); #'` becomes executable
+shell the moment it lands inside a double-quoted assignment, before any
+validation can run. Decide from `$ARGUMENTS` which of the two optional flags
+were supplied, then emit the invocation below with the corresponding lines
+present or absent. Only the pagination token is passed through, and only after
+you have checked it matches `^[A-Za-z0-9._~+/=-]{1,512}$` — refuse with
+"`--cursor` value has an unexpected shape" if it does not.
+
+Start from this exact invocation and delete the lines that do not apply:
 
 ```bash
-ARGS_TEXT="<arguments>"
-
-CURSOR_TOKEN=""
-SHOW_ARCHIVED=""
-set -- $ARGS_TEXT
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --cursor)
-      # `shift 2` is a no-op when only one positional remains, which would
-      # spin this loop forever — reject the missing value instead.
-      if [ "$#" -lt 2 ]; then
-        printf 'ERROR: --cursor requires a value.\n' >&2
-        exit 1
-      fi
-      CURSOR_TOKEN="$2"
-      shift 2
-      ;;
-    --archived) SHOW_ARCHIVED=1; shift ;;
-    *) shift ;;
-  esac
-done
-
 args=(list)
-[ -n "$CURSOR_TOKEN" ] && args+=(--cursor "$CURSOR_TOKEN")
-[ -n "$SHOW_ARCHIVED" ] && args+=(--archived)
+args+=(--cursor 'PASTE_VALIDATED_CURSOR_TOKEN')   # only if --cursor was given
+args+=(--archived)                                # only if --archived was given
 
 OUTPUT=$(node "$CLI" "${args[@]}")
 OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
 ```
 
-`$CURSOR_TOKEN` is the pagination cursor from an optional `--cursor <token>` —
-unrelated to `CURSOR_API_KEY`. `$SHOW_ARCHIVED` is set only when `--archived`
-was passed.
+The token sits in **single** quotes: it is inert there, and the charset check
+above already excludes `'`, so it cannot close them. If `--cursor` was supplied
+with no value, stop and report that instead of running anything.
 
 If `items` is empty without `--archived`, mention that archived agents were
 excluded before concluding the account has no agents.
@@ -88,9 +73,13 @@ suggest `/cursor:status --agent-id <id> --reconcile` for those rows.
 
 If `nextCursor` is present, tell the user they can re-run
 `/cursor:list --cursor <nextCursor>` to see the next page — do not
-auto-paginate.
+auto-paginate. **Carry `--archived` into that suggestion whenever this
+invocation used it** (`/cursor:list --archived --cursor <nextCursor>`); omitting
+it silently drops back to the non-archived filter, so archived agents on later
+pages would never be shown.
 
-If `items` is empty, report "No Cursor agents found."
+If `items` is empty, report "No Cursor agents found." — adding that archived
+agents were excluded, when `--archived` was not used.
 
 ## Error Handling
 
