@@ -164,7 +164,7 @@ async function countActiveAgentsForRepo(
   }
   return throwAppError(
     'CURSOR_CONCURRENCY_LIMIT',
-    `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely. Archive old agents, or raise --max-active only after checking /cursor:list yourself.`
+    `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely. Raising --max-active does NOT clear this — the sweep never reached a total to compare it against. Archive agents you no longer need (/cursor:archive removes them from this listing) until it fits.`
   );
 }
 

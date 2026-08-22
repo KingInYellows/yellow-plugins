@@ -31,7 +31,24 @@ command -v jq >/dev/null 2>&1 || {
 
 ### Step 2: Run
 
+Substitute the literal `$ARGUMENTS` text for `<arguments>` below, then run the
+parse and the invocation as ONE Bash call — shell variables do not survive
+between calls:
+
 ```bash
+ARGS_TEXT="<arguments>"
+
+CURSOR_TOKEN=""
+SHOW_ARCHIVED=""
+set -- $ARGS_TEXT
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --cursor) CURSOR_TOKEN="${2:-}"; shift 2 ;;
+    --archived) SHOW_ARCHIVED=1; shift ;;
+    *) shift ;;
+  esac
+done
+
 args=(list)
 [ -n "$CURSOR_TOKEN" ] && args+=(--cursor "$CURSOR_TOKEN")
 [ -n "$SHOW_ARCHIVED" ] && args+=(--archived)
@@ -40,11 +57,9 @@ OUTPUT=$(node "$CLI" "${args[@]}")
 OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
 ```
 
-`$CURSOR_TOKEN` here is the pagination cursor parsed from an optional
-`--cursor <token>` in `$ARGUMENTS` — unrelated to `CURSOR_API_KEY`.
-`$SHOW_ARCHIVED` is set non-empty only when `$ARGUMENTS` contained `--archived`.
-Both are parsed and assigned in this same Bash block — shell variables do not
-persist across separate Bash calls.
+`$CURSOR_TOKEN` is the pagination cursor from an optional `--cursor <token>` —
+unrelated to `CURSOR_API_KEY`. `$SHOW_ARCHIVED` is set only when `--archived`
+was passed.
 
 If `items` is empty without `--archived`, mention that archived agents were
 excluded before concluding the account has no agents.
