@@ -1,0 +1,21 @@
+plugins/yellow-linear/CLAUDE.md
+  s_ca129cb3ac489c::t_588fd15ca1bf5f 21-22,45-49,78-80,90-91,93-99,102-110
+tests/integration/fixtures/remote-agent-provider/README.md
+  s_ca129cb3ac489c::t_24fa55ffc5b3f8 5-6,8-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d02076f191d0220008e44765e14e30249871a4f7",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
