@@ -31,10 +31,16 @@ command -v jq >/dev/null 2>&1 || {
 ### Step 2: Parse Arguments
 
 Parse `$ARGUMENTS` for `--agent-id <id>` (required). **Validate the value
-against `^bc-[0-9a-fA-F-]{1,64}$` before using it anywhere**, and reject any
-argument other than `--agent-id` and its value — never pass an unvalidated
+against `^[bB][cC]-[0-9a-fA-F-]{1,125}$` before using it anywhere**, and reject
+any argument other than `--agent-id` and its value — never pass an unvalidated
 `$ARGUMENTS` fragment to the CLI. (The CLI validates again, but a malformed id
 should be refused here rather than round-tripped.)
+
+That pattern mirrors `validateAgentId` in `src/validate.ts` exactly: 4–128
+characters overall, and the `bc-` prefix is matched case-insensitively there
+because its regex carries the `i` flag. **Do not narrow it.** A pre-check
+stricter than the CLI rejects ids every other command in this plugin accepts,
+turning a valid id into a refusal the user cannot act on.
 
 If the id is missing or fails that check, suggest `/cursor:list --archived`,
 which includes archived agents in its listing and is the discovery path for an
