@@ -19,10 +19,10 @@ gates the count, so archived-and-finished agents cost nothing.
 `/cursor:archive` did not actually hide anything: the adapter always requested
 archived agents, so they stayed in `/cursor:list` despite the archive and
 unarchive command contracts promising the opposite. Archived visibility is now
-caller-driven — excluded from the default listing and the concurrency sweep,
-included for canonical-id reconciliation, which must still find an agent
-archived between `send()` and the sweep — and opt-in via
-`/cursor:list --archived`.
+caller-driven — excluded from the default listing only, and included both for
+canonical-id reconciliation (which must still find an agent archived between
+`send()` and the sweep) and for the concurrency sweep described above — and
+opt-in via `/cursor:list --archived`.
 
 `/linear:delegate`'s launch step consumed shell variables assigned in earlier
 Bash calls, which do not persist, and derived `CURSOR_REPO_URL` after the block

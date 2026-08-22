@@ -147,7 +147,9 @@ async function countActiveAgentsForRepo(adapter, repoUrl, maxActive) {
         recoveryAction: 'No flag clears this: the account has more cloud agents than the ' +
             'bounded sweep can enumerate, and neither raising --max-active nor ' +
             'archiving reduces the page count. Review running agents yourself ' +
-            'with /cursor:list, then launch via /cursor:delegate once you have ' +
+            'with /cursor:list --archived (the sweep counts archived agents that ' +
+            'are still running, which the default listing hides), then launch via ' +
+            '/cursor:delegate once you have ' +
             'confirmed there is capacity.',
     });
 }

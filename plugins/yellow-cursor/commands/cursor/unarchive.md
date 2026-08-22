@@ -30,11 +30,16 @@ command -v jq >/dev/null 2>&1 || {
 
 ### Step 2: Parse Arguments
 
-Parse `$ARGUMENTS` for `--agent-id <id>` (required). If missing, suggest
-`/cursor:list --archived`, which includes archived agents in its listing and is
-the discovery path for an id the user no longer has.
-`/cursor:status --agent-id <id>` also works when the id is already known.
-Otherwise ask via AskUserQuestion.
+Parse `$ARGUMENTS` for `--agent-id <id>` (required). **Validate the value
+against `^bc-[0-9a-fA-F-]{1,64}$` before using it anywhere**, and reject any
+argument other than `--agent-id` and its value — never pass an unvalidated
+`$ARGUMENTS` fragment to the CLI. (The CLI validates again, but a malformed id
+should be refused here rather than round-tripped.)
+
+If the id is missing or fails that check, suggest `/cursor:list --archived`,
+which includes archived agents in its listing and is the discovery path for an
+id the user no longer has. `/cursor:status --agent-id <id>` also works when the
+id is already known. Otherwise ask via AskUserQuestion.
 
 ### Step 3: Confirm
 
