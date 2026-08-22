@@ -242,9 +242,15 @@ export class CursorSdkAdapter implements SdkAdapter {
   async listAgents(options?: { cursor?: string }): Promise<ListAgentsResult> {
     const sdk = this.sdk();
     try {
-      const result = await sdk.Agent.list(
-        options?.cursor !== undefined ? { cursor: options.cursor } : undefined
-      );
+      // runtime: 'cloud' is required — without it the SDK lists LOCAL agents
+      // (live-verified 2026-08-22: the default returned an empty list while
+      // cloud agents existed). includeArchived keeps archived agents visible
+      // so list/reconcile can still find them.
+      const result = await sdk.Agent.list({
+        runtime: 'cloud',
+        includeArchived: true,
+        ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+      });
       const items = result.items.map(toAdapterAgentInfo);
       return {
         items,

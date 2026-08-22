@@ -345,10 +345,16 @@ export async function delegate(
       idempotencyKey,
       deps.clock
     );
+    const canonicalAgentId = await resolveCanonicalAgentId(
+      deps,
+      handle.agentId,
+      run,
+      idempotencyKey
+    );
     const branch = run.branches[0];
     await upsertRecord(deps.stateFilePath, {
       ...reservation,
-      agentId: handle.agentId,
+      agentId: canonicalAgentId,
       runId: run.id,
       status: run.status,
       updatedAt: nowIso(deps),
@@ -359,7 +365,7 @@ export async function delegate(
     return {
       operation: 'delegate',
       idempotencyKey,
-      agentId: handle.agentId,
+      agentId: canonicalAgentId,
       runId: run.id,
       status: run.status,
       repository: repoUrl,
@@ -388,6 +394,50 @@ export async function delegate(
     });
     throw err;
   }
+}
+
+/**
+ * The SDK's cloud Agent.create() mints a client-side PROVISIONAL agent id;
+ * the server assigns the CANONICAL id when the first send() actually creates
+ * the agent remotely. Live-verified 2026-08-22: Agent.get/getRun/list 404'd
+ * the provisional id while the real agent existed under a different id.
+ * Resolution order:
+ *   1. the send() run's own agentId, when the server populated it with
+ *      something different from the provisional id;
+ *   2. reconciliation through the cloud agent list by the
+ *      metadata.yellowIdempotencyKey marker this CLI stamps on every agent
+ *      it creates (live-verified to read back);
+ *   3. the provisional id as a last resort — `status --reconcile` can still
+ *      recover the record later.
+ * Best-effort by design: a reconciliation failure must never turn a
+ * successful billable launch into a reported error.
+ */
+async function resolveCanonicalAgentId(
+  deps: RuntimeDeps,
+  provisionalId: string,
+  run: AdapterRun,
+  idempotencyKey: string
+): Promise<string> {
+  if (run.agentId !== '' && run.agentId !== provisionalId) {
+    return run.agentId;
+  }
+  try {
+    let cursor: string | undefined;
+    for (let page = 0; page < 5; page++) {
+      const res = await deps.adapter.listAgents(
+        cursor !== undefined ? { cursor } : undefined
+      );
+      const match = res.items.find(
+        (a) => a.metadata['yellowIdempotencyKey'] === idempotencyKey
+      );
+      if (match !== undefined) return match.agentId;
+      if (res.nextCursor === undefined) break;
+      cursor = res.nextCursor;
+    }
+  } catch {
+    // best-effort — fall through to the provisional id
+  }
+  return provisionalId;
 }
 
 // ---------------------------------------------------------------------------

@@ -218,3 +218,102 @@ describe('follow-up re-fetches agent state before sending', () => {
     ).rejects.toMatchObject({ appError: { code: 'CURSOR_INVALID_INPUT' } });
   });
 });
+
+describe('canonical agent-id resolution (live-verified server behavior)', () => {
+  // The real SDK mints a client-side PROVISIONAL id in Agent.create(); the
+  // server assigns the CANONICAL id at the first send(). Live-verified
+  // 2026-08-22: Agent.get/getRun 404'd the provisional id while the agent
+  // existed under a different id, discoverable via the run's agentId and via
+  // metadata.yellowIdempotencyKey on the cloud agent list.
+  const delegateArgs = {
+    repoUrl: 'https://github.com/org/repo',
+    prompt: 'do it',
+    idempotencyKey: 'canon-key',
+    maxActive: 3,
+    yes: true,
+    dryRun: false,
+    autoCreatePr: true,
+  };
+
+  it('prefers the send() run agentId when it differs from the provisional handle id', async () => {
+    adapter.sendImpl = async (state) => {
+      const run = {
+        id: 'run-canon-1',
+        agentId: 'bc-server-canonical-0001',
+        status: 'running' as const,
+        branches: [],
+      };
+      state.runs.set(run.id, run);
+      return run;
+    };
+
+    const result = await delegate(deps, delegateArgs);
+    expect(result.agentId).toBe('bc-server-canonical-0001');
+  });
+
+  it('reconciles through the metadata idempotency marker when the run echoes the provisional id', async () => {
+    adapter.sendImpl = async (state) => {
+      const run = {
+        id: 'run-canon-2',
+        // Server unhelpfully echoes the provisional id on the run.
+        agentId: state.agentId,
+        status: 'running' as const,
+        branches: [],
+      };
+      state.runs.set(run.id, run);
+      return run;
+    };
+    adapter.listAgentsImpl = async () => ({
+      items: [
+        {
+          agentId: 'bc-other-agent-0000',
+          name: 'other',
+          summary: '',
+          archived: false,
+          metadata: { yellowIdempotencyKey: 'someone-else' },
+        },
+        {
+          agentId: 'bc-server-canonical-0002',
+          name: 'ours',
+          summary: '',
+          archived: false,
+          metadata: { yellowIdempotencyKey: 'canon-key' },
+        },
+      ],
+    });
+
+    const result = await delegate(deps, delegateArgs);
+    expect(result.agentId).toBe('bc-server-canonical-0002');
+  });
+
+  it('falls back to the provisional id when reconciliation finds nothing (recoverable via status --reconcile)', async () => {
+    adapter.sendImpl = async (state) => {
+      const run = {
+        id: 'run-canon-3',
+        agentId: state.agentId,
+        status: 'running' as const,
+        branches: [],
+      };
+      state.runs.set(run.id, run);
+      return run;
+    };
+    // First call serves the pre-launch concurrency check; the reconcile pass
+    // then finds no metadata match — fallback must be the provisional id,
+    // never a thrown error (a successful billable launch already happened).
+    adapter.listAgentsImpl = async () => ({
+      items: [
+        {
+          agentId: 'bc-unrelated-agent-0000',
+          name: 'other',
+          summary: '',
+          archived: false,
+          metadata: { yellowIdempotencyKey: 'someone-else' },
+        },
+      ],
+    });
+
+    const result = await delegate(deps, delegateArgs);
+    expect(result.agentId).toMatch(/^bc-/);
+    expect(result.agentId).not.toBe('bc-unrelated-agent-0000');
+  });
+});
