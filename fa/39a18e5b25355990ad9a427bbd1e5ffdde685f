@@ -1,0 +1,19 @@
+plugins/yellow-cursor/tests/credential-redaction.test.ts
+  s_ca129cb3ac489c::t_d6f165cb6da95e 33-36,38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "fa39a18e5b25355990ad9a427bbd1e5ffdde685f",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
