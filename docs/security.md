@@ -5,23 +5,22 @@
 All remote MCP servers used by plugins in this marketplace. Review before
 enterprise deployment.
 
-| Plugin          | Server Key | Endpoint                                | Transport | Auth                        | Data Sent                     |
-| --------------- | ---------- | --------------------------------------- | --------- | --------------------------- | ----------------------------- |
-| yellow-core     | context7   | `https://mcp.context7.com/mcp`          | HTTP      | None                        | Library names, search queries |
-| yellow-linear   | linear     | `https://mcp.linear.app/mcp`            | HTTP      | OAuth (browser popup)       | Issue data, team info         |
-| yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
-| yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio | None (local)          | Code embeddings (local only)  |
+| Plugin          | Server Key | Endpoint                                         | Transport | Auth                        | Data Sent                     |
+| --------------- | ---------- | ------------------------------------------------ | --------- | --------------------------- | ----------------------------- |
+| yellow-core     | context7   | `https://mcp.context7.com/mcp`                   | HTTP      | None                        | Library names, search queries |
+| yellow-linear   | linear     | `https://mcp.linear.app/mcp`                     | HTTP      | OAuth (browser popup)       | Issue data, team info         |
+| yellow-research | deepwiki   | `https://mcp.deepwiki.com/mcp`                   | HTTP      | None                        | Repo names, search queries    |
+| yellow-devin    | devin      | `https://mcp.devin.ai/mcp`                       | HTTP      | TBD (may require API token) | Code, task prompts            |
+| yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio     | None (local)                | Code embeddings (local only)  |
 
 The `ruvector` stdio command is only network-free once `npx` has a warm npm
 exec-cache entry for the pinned version — `npx` resolves from local project
-dependencies, then the npm exec cache, and does **not** consult global
-installs, so the global binary from [Local npm
-Dependencies](#local-npm-dependencies) does not by itself prevent this
-fetch. On a cold-cache machine it fetches `ruvector@0.2.34` from the npm
-registry first; warm the cache with a one-time online run (`npx -y
---ignore-scripts ruvector@0.2.34 --version`) or by starting the MCP server
-once while online.
+dependencies, then the npm exec cache, and does **not** consult global installs,
+so the global binary from [Local npm Dependencies](#local-npm-dependencies) does
+not by itself prevent this fetch. On a cold-cache machine it fetches
+`ruvector@0.2.34` from the npm registry first; warm the cache with a one-time
+online run (`npx -y --ignore-scripts ruvector@0.2.34 --version`) or by starting
+the MCP server once while online.
 
 ### Plugins Without MCP Servers
 
@@ -30,9 +29,9 @@ once while online.
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
 - **yellow-council** — Ships no MCP server. Three of its four reviewers are
-  shelled-out CLIs (`agy`, `opencode`, and Codex reused from yellow-codex);
-  the fourth, `claude-reviewer`, runs in-process with no subprocess at all
-  and holds a narrowly-scoped `Write` grant (see "In-Process Reviewer" below)
+  shelled-out CLIs (`agy`, `opencode`, and Codex reused from yellow-codex); the
+  fourth, `claude-reviewer`, runs in-process with no subprocess at all and holds
+  a narrowly-scoped `Write` grant (see "In-Process Reviewer" below)
 
 ## Setting Up Authentication
 
@@ -45,8 +44,8 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
 
 1. On first MCP tool call, Claude Code opens a browser popup for login
 2. Authenticate with your Linear account
-3. Token is stored securely in your operating system's credential manager
-   (macOS Keychain, Windows Credential Manager, or libsecret on Linux)
+3. Token is stored securely in your operating system's credential manager (macOS
+   Keychain, Windows Credential Manager, or libsecret on Linux)
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
    authentication"
 
@@ -63,40 +62,38 @@ export DEVIN_SERVICE_USER_TOKEN="cog_your_token_here"  # Enterprise Settings > S
 export DEVIN_ORG_ID="your_org_id"                      # Enterprise Settings > Organizations
 ```
 
-Never commit tokens to version control. The `.gitignore` already excludes
-`.env` files if you use one locally.
+Never commit tokens to version control. The `.gitignore` already excludes `.env`
+files if you use one locally.
 
-### No-auth servers (yellow-core, yellow-ruvector, yellow-devin deepwiki)
+### No-auth servers (yellow-core, yellow-ruvector, yellow-research deepwiki)
 
 These servers require no configuration. They work immediately after plugin
 installation:
 
 - **context7** (yellow-core) — public library documentation endpoint
 - **ruvector** (yellow-ruvector) — local stdio server, no auth configuration
-  (its `npx` startup command can still reach the npm registry on a cold
-  machine — see [MCP Servers Inventory](#mcp-servers-inventory) above)
-- **deepwiki** (yellow-devin) — public repository documentation endpoint
+  (its `npx` startup command can still reach the npm registry on a cold machine
+  — see [MCP Servers Inventory](#mcp-servers-inventory) above)
+- **deepwiki** (yellow-research) — public repository documentation endpoint
 
 ### CLI keyring auth (yellow-council)
 
 yellow-council's Gemini-lineage reviewer shells out to the Antigravity CLI
-(`agy`) rather than an MCP server, so it doesn't fit the three patterns
-above:
+(`agy`) rather than an MCP server, so it doesn't fit the three patterns above:
 
-1. `agy`'s first interactive run migrates any existing Gemini CLI OAuth
-   session tokens into the OS keyring (per Google's documentation) — Google
-   retired Gemini CLI for consumer subscription tiers on 2026-06-18, and
-   `agy` is the replacement
-2. No API key or environment variable is configured by or read from plugin
-   code; auth is subscription-based (Google AI Pro/Ultra or the free
-   individual tier), same as the CLI it replaces
-3. `council:setup` does not verify authentication — run bare `agy` once
-   before the first `/council` invocation so interactive onboarding
-   completes (trust + token migration; `-p` is explicitly noninteractive
-   and does not perform onboarding), then optionally `agy -p "test"` to
-   confirm headless auth works
-4. Credential lifecycle (re-auth, revocation) is entirely `agy`'s own; this
-   repo provides no revoke path and does not manage the keyring entry
+1. `agy`'s first interactive run migrates any existing Gemini CLI OAuth session
+   tokens into the OS keyring (per Google's documentation) — Google retired
+   Gemini CLI for consumer subscription tiers on 2026-06-18, and `agy` is the
+   replacement
+2. No API key or environment variable is configured by or read from plugin code;
+   auth is subscription-based (Google AI Pro/Ultra or the free individual tier),
+   same as the CLI it replaces
+3. `council:setup` does not verify authentication — run bare `agy` once before
+   the first `/council` invocation so interactive onboarding completes (trust +
+   token migration; `-p` is explicitly noninteractive and does not perform
+   onboarding), then optionally `agy -p "test"` to confirm headless auth works
+4. Credential lifecycle (re-auth, revocation) is entirely `agy`'s own; this repo
+   provides no revoke path and does not manage the keyring entry
 
 See [Trust Boundaries](#trust-boundaries) below for the containment posture
 around `agy` having no read-only mode.
@@ -111,7 +108,7 @@ uses:
 ```
 mcp.linear.app       — yellow-linear (issue management)
 mcp.context7.com     — yellow-core (library documentation)
-mcp.deepwiki.com     — yellow-devin (public repo docs)
+mcp.deepwiki.com     — yellow-research (public repo docs)
 mcp.devin.ai         — yellow-devin (Devin orchestration)
 ```
 
@@ -133,15 +130,14 @@ These plugins work entirely offline with no external network calls:
 
 - `gt-workflow` — Graphite CLI wrapper
 - `yellow-debt` — Local codebase analysis
-- `yellow-ruvector` — Local vector search (stdio MCP, no network at
-  runtime). Exception: MCP startup runs `npx -y ruvector@0.2.34`, which
-  hits the npm registry on first use unless the npm exec cache already
-  holds `ruvector@0.2.34` from a prior online run. The global install that
-  `install.sh` performs serves the CLI-hook path only — it does **not**
-  satisfy this npx resolution, so a cold-cache offline machine fails MCP
-  startup even with the global binary present. Warm the cache once while
-  online (see the "Local npm Dependencies" section below) to avoid the
-  fetch at MCP startup.
+- `yellow-ruvector` — Local vector search (stdio MCP, no network at runtime).
+  Exception: MCP startup runs `npx -y ruvector@0.2.34`, which hits the npm
+  registry on first use unless the npm exec cache already holds
+  `ruvector@0.2.34` from a prior online run. The global install that
+  `install.sh` performs serves the CLI-hook path only — it does **not** satisfy
+  this npx resolution, so a cold-cache offline machine fails MCP startup even
+  with the global binary present. Warm the cache once while online (see the
+  "Local npm Dependencies" section below) to avoid the fetch at MCP startup.
 
 ## Hook Safety
 
@@ -151,50 +147,50 @@ Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
 yellow-composio, yellow-morph, yellow-research, and yellow-semgrep are shell;
 yellow-ci and gt-workflow run a dependency-free Node runtime:
 
-| Plugin | Hook Events | Purpose |
-|---|---|---|
-| yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle |
-| yellow-ci | SessionStart | Check for recent CI failures (Node runtime, cached, 3s budget) |
-| yellow-debt | SessionStart | Remind about high/critical debt findings |
-| gt-workflow | PreToolUse, PostToolUse | Block `git push`, validate commit messages |
-| yellow-core | SessionStart, Stop | Drain the background compounding-pipeline staging queue; capture session transcript tail |
-| yellow-composio | SessionStart | Warn if `composio_mcp_url` is non-HTTPS (advisory only) |
-| yellow-morph | SessionStart | Pre-warm `@morphllm/morphmcp` install for fast first tool call |
-| yellow-research | SessionStart | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all` |
-| yellow-semgrep | SessionStart | Emit `credential-status.json` for `/setup:all` |
+| Plugin          | Hook Events                                       | Purpose                                                                                  |
+| --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle                                          |
+| yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
+| yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
+| gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
+| yellow-core     | SessionStart, Stop                                | Drain the background compounding-pipeline staging queue; capture session transcript tail |
+| yellow-composio | SessionStart                                      | Warn if `composio_mcp_url` is non-HTTPS (advisory only)                                  |
+| yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
+| yellow-research | SessionStart                                      | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`             |
+| yellow-semgrep  | SessionStart                                      | Emit `credential-status.json` for `/setup:all`                                           |
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
-dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated by
-`tests/hook-parity.bats`. It is **fail-open** — always emits valid
+dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated
+by `tests/hook-parity.bats`. It is **fail-open** — always emits valid
 `{"continue": true}` JSON and never blocks startup. Runtime cache writes were
-relocated to a plugin-data dir (`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`)
-with a read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is
-carried into the generated Codex manifest (`hooks/codex-hooks.json`) but is
-**inert on Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its
-Codex-side behavior is schema/unit/parity-tested, not live-verified.
+relocated to a plugin-data dir
+(`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`) with a
+read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is carried
+into the generated Codex manifest (`hooks/codex-hooks.json`) but is **inert on
+Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its Codex-side
+behavior is schema/unit/parity-tested, not live-verified.
 
 ### yellow-ruvector Hooks (detailed)
 
 yellow-ruvector has the most hooks. Its shell scripts:
 
-| Hook                | Event             | Script                  | Time Budget | What It Does                      |
-| ------------------- | ----------------- | ----------------------- | ----------- | --------------------------------- |
-| session-start       | SessionStart      | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
-| user-prompt-submit  | UserPromptSubmit  | `user-prompt-submit.sh` | 50ms        | Recall relevant memories          |
-| post-tool-use       | PostToolUse       | `post-tool-use.sh`      | 50ms        | Append file changes to queue      |
-| stop                | Stop              | `stop.sh`               | N/A         | Delegate queue flush to agent     |
+| Hook               | Event            | Script                  | Time Budget | What It Does                                           |
+| ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
+| session-start      | SessionStart     | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
+| user-prompt-submit | UserPromptSubmit | `user-prompt-submit.sh` | 50ms        | Recall relevant memories                               |
+| post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 50ms        | Append file changes to queue                           |
+| stop               | Stop             | `stop.sh`               | N/A         | Delegate queue flush to agent                          |
 
 **Security properties:**
 
 - All scripts validate input via shared `lib/validate.sh`
 - Path traversal rejected (`..`, `/`, `~` in arguments)
 - `session-start.sh`'s worktree store-heal creates a symlink
-  `<worktree>/.ruvector -> <main-checkout>/.ruvector` only when the
-  session runs in a linked git worktree (`.git` is a file), the local
-  entry is absent or a dangling symlink, and the main checkout has a
-  store. The link target derives from `git rev-parse --git-common-dir`
-  (never user input); a pre-existing non-symlink path (directory or regular file) is never replaced
-  (warn-only)
+  `<worktree>/.ruvector -> <main-checkout>/.ruvector` only when the session runs
+  in a linked git worktree (`.git` is a file), the local entry is absent or a
+  dangling symlink, and the main checkout has a store. The link target derives
+  from `git rev-parse --git-common-dir` (never user input); a pre-existing
+  non-symlink path (directory or regular file) is never replaced (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
 - No network calls in any hook script
 - Scripts run with user's permissions (no escalation)
@@ -226,88 +222,84 @@ Before enabling any plugin with hooks:
 
 ### External CLI Reviewers (yellow-council)
 
-`/council`'s Gemini-lineage reviewer shells out to the Antigravity CLI
-(`agy`) instead of talking to a remote MCP server, so its trust boundary
-doesn't match either pattern above:
+`/council`'s Gemini-lineage reviewer shells out to the Antigravity CLI (`agy`)
+instead of talking to a remote MCP server, so its trust boundary doesn't match
+either pattern above:
 
-- **Credential store**: OS keyring, holding Gemini OAuth session tokens
-  migrated on `agy`'s first interactive run (per Google's documentation) —
-  no API key is configured by or read from plugin code
+- **Credential store**: OS keyring, holding Gemini OAuth session tokens migrated
+  on `agy`'s first interactive run (per Google's documentation) — no API key is
+  configured by or read from plugin code
 - **Auth model**: subscription (Google AI Pro/Ultra or the free individual
   tier), the same model the retired Gemini CLI used
-- **Data sent**: the council pack (diff, plan, or question content) is
-  staged to a throwaway pack directory and handed to `agy` as a workspace
-  file; `agy` may send that content to Google's Antigravity service to
-  produce a review
-- **Containment posture — weaker than the retired plan**: `agy` has no
-  read-only or `--approval-mode plan` equivalent; `--sandbox` restricts the
-  terminal only and does not block file writes (spike-verified
-  2026-08-01, `docs/spikes/antigravity-cli-headless-2026-08.md`). The
-  reviewer mitigates by running `agy` with its `cwd` isolated to the
-  throwaway pack directory — the real repo checkout is never inside its
-  workspace — plus a prompt-level instruction not to modify files. That is
-  a prompt-plus-containment control, not a CLI-enforced one. See
-  `plugins/yellow-council/CLAUDE.md` "Known Limitations" for the full
-  writeup, including the standing recommendation to treat any unexpected
-  file mutation after a `/council` run as a bug report.
-- **Never use** `agy --dangerously-skip-permissions` — it auto-approves
-  every tool permission request, including writes (same class as the
-  retired Gemini `--yolo`)
+- **Data sent**: the council pack (diff, plan, or question content) is staged to
+  a throwaway pack directory and handed to `agy` as a workspace file; `agy` may
+  send that content to Google's Antigravity service to produce a review
+- **Containment posture — weaker than the retired plan**: `agy` has no read-only
+  or `--approval-mode plan` equivalent; `--sandbox` restricts the terminal only
+  and does not block file writes (spike-verified 2026-08-01,
+  `docs/spikes/antigravity-cli-headless-2026-08.md`). The reviewer mitigates by
+  running `agy` with its `cwd` isolated to the throwaway pack directory — the
+  real repo checkout is never inside its workspace — plus a prompt-level
+  instruction not to modify files. That is a prompt-plus-containment control,
+  not a CLI-enforced one. See `plugins/yellow-council/CLAUDE.md` "Known
+  Limitations" for the full writeup, including the standing recommendation to
+  treat any unexpected file mutation after a `/council` run as a bug report.
+- **Never use** `agy --dangerously-skip-permissions` — it auto-approves every
+  tool permission request, including writes (same class as the retired Gemini
+  `--yolo`)
 
 ### In-Process Reviewer (yellow-council `claude-reviewer`)
 
-`/council`'s fourth slot does not shell out at all. It runs inside Claude
-Code with `tools: [Read, Grep, Glob, Write]` and no `Bash`, which makes its
-trust boundary different from the three CLI reviewers above in three ways
-that matter:
+`/council`'s fourth slot does not shell out at all. It runs inside Claude Code
+with `tools: [Read, Grep, Glob, Write]` and no `Bash`, which makes its trust
+boundary different from the three CLI reviewers above in three ways that matter:
 
 - **`Write` on a `review/` agent.** The W1.5 rule in
   `scripts/validate-agent-authoring.js` denies `Write` to `review/` agents by
   default; `gemini-reviewer` and `opencode-reviewer` are also allowlisted
   exceptions, but for a different reason — they shell out to an external CLI
-  binary via `Bash` and need `Write` alongside it. `claude-reviewer` is the
-  only allowlisted reviewer with `Write` and no `Bash` at all: the exception
-  exists solely so it can materialize its fenced-output file in-process,
-  with no CLI invocation to justify it. The bound is a prompt constraint
-  plus that review-time gate — **Claude Code has no runtime path-scoping for
-  `Write`**, so nothing at execution time confines it. This is weaker than a
-  sandbox and is stated as such in the agent body.
+  binary via `Bash` and need `Write` alongside it. `claude-reviewer` is the only
+  allowlisted reviewer with `Write` and no `Bash` at all: the exception exists
+  solely so it can materialize its fenced-output file in-process, with no CLI
+  invocation to justify it. The bound is a prompt constraint plus that
+  review-time gate — **Claude Code has no runtime path-scoping for `Write`**, so
+  nothing at execution time confines it. This is weaker than a sandbox and is
+  stated as such in the agent body.
 - **A two-hop path trust chain.** `council.md` mints the output path with
   `mktemp -u` in a Bash block, but the value reaches the agent because the
-  orchestrating model copied the printed literal into the spawn prompt — a
-  turn whose context already holds the untrusted pack. The `mktemp` suffix
-  carries real entropy, so no attacker-chosen target is reachable, and both
-  `council.md` and the agent shape-check the path against
-  `/tmp/council-claude-fenced-*.txt` (rejecting `..`, extra separators, and
-  symlinks) before reading, writing, or unlinking it. What is **not**
-  enforced: the substitution itself is an LLM turn, not deterministic
-  templating.
+  orchestrating model copied the printed literal into the spawn prompt — a turn
+  whose context already holds the untrusted pack. The `mktemp` suffix carries
+  real entropy, so no attacker-chosen target is reachable, and both `council.md`
+  and the agent shape-check the path against `/tmp/council-claude-fenced-*.txt`
+  (rejecting `..`, extra separators, and symlinks) before reading, writing, or
+  unlinking it. What is **not** enforced: the substitution itself is an LLM
+  turn, not deterministic templating.
 - **Prose safeguards, not mechanical ones.** The CLI reviewers redact
-  credentials with an 11-pattern `awk` block and escape fence delimiters
-  with `sed`. Both need `Bash`. `claude-reviewer` states the same rules as
-  prompt-level self-discipline with nothing executing them — a genuine
-  reduction in guarantee, not a formality.
+  credentials with an 11-pattern `awk` block and escape fence delimiters with
+  `sed`. Both need `Bash`. `claude-reviewer` states the same rules as
+  prompt-level self-discipline with nothing executing them — a genuine reduction
+  in guarantee, not a formality.
 - **No timeout bound.** `COUNCIL_TIMEOUT` wraps the CLI reviewers in
-  `timeout(1)`; there is no subprocess here to kill, so a run that never
-  returns blocks the fan-out. Mitigation is prompt-level only.
+  `timeout(1)`; there is no subprocess here to kill, so a run that never returns
+  blocks the fan-out. Mitigation is prompt-level only.
 
-Full writeup in `plugins/yellow-council/CLAUDE.md` "Known Limitations" and
-in the agent's own "Tool Surface — Documented Exception" section.
+Full writeup in `plugins/yellow-council/CLAUDE.md` "Known Limitations" and in
+the agent's own "Tool Surface — Documented Exception" section.
 
 ### Shell Commands
 
 Plugins that execute shell commands:
 
-| Plugin              | Commands Used                        | Purpose                              |
-| ------------------- | ------------------------------------ | ------------------------------------ |
-| yellow-linear       | `git`, `gh`                          | Branch detection, PR context         |
-| yellow-devin        | `curl`, `jq`, `git`, `gh`            | Devin API calls, JSON construction   |
-| yellow-review       | `gt`, `gh`, `git`, `jq`              | PR management, GraphQL queries       |
-| yellow-ruvector     | `npx`, `npm`, `jq`, `git`, `pgrep`, `grep` | ruvector CLI, hook scripts, seed-solutions guards |
-| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup            |
-| yellow-debt         | `git`, `gt`, `jq`, `yq`              | Codebase analysis, commit generation |
-| gt-workflow         | `gt`, `git`                          | Branch and PR management             |
-| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review |
+| Plugin              | Commands Used                                | Purpose                                           |
+| ------------------- | -------------------------------------------- | ------------------------------------------------- |
+| yellow-linear       | `git`, `gh`                                  | Branch detection, PR context                      |
+| yellow-devin        | `curl`, `jq`, `git`, `gh`                    | Devin API calls, JSON construction                |
+| yellow-review       | `gt`, `gh`, `git`, `jq`                      | PR management, GraphQL queries                    |
+| yellow-ruvector     | `npx`, `npm`, `jq`, `git`, `pgrep`, `grep`   | ruvector CLI, hook scripts, seed-solutions guards |
+| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                         |
+| yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation              |
+| gt-workflow         | `gt`, `git`                                  | Branch and PR management                          |
+| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review                     |
 
 ### Prompt Injection Boundaries
 
@@ -325,8 +317,8 @@ include prompt injection defenses:
 
 ### yellow-ruvector
 
-Installs `ruvector` globally via npm, version-pinned (an unpinned global
-was the root cause of a machine-global store-pollution incident):
+Installs `ruvector` globally via npm, version-pinned (an unpinned global was the
+root cause of a machine-global store-pollution incident):
 
 ```bash
 npm install -g ruvector@0.2.34 --ignore-scripts
@@ -336,9 +328,9 @@ npm install -g ruvector@0.2.34 --ignore-scripts
 performs dependency checks and error handling and installs with
 `--ignore-scripts`; the MCP server's own npx launch spec (catalog →
 `plugin.json` args) and the `seed-solutions` reembed commands carry
-`--ignore-scripts` as well, so the lazily-fetched npx path is covered, not
-just the global install. The pinned default (`RUVECTOR_DEFAULT_VERSION`)
-must match the catalog npx spec — bats tests enforce the sync.
+`--ignore-scripts` as well, so the lazily-fetched npx path is covered, not just
+the global install. The pinned default (`RUVECTOR_DEFAULT_VERSION`) must match
+the catalog npx spec — bats tests enforce the sync.
 
 ### yellow-browser-test
 

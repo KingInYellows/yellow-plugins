@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+  "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -12,6 +12,7 @@
     "research",
     "deep-research",
     "ceramic",
+    "deepwiki",
     "perplexity",
     "exa",
     "tavily",
@@ -72,6 +73,10 @@
     "ceramic": {
       "type": "http",
       "url": "https://mcp.ceramic.ai/mcp"
+    },
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
     },
     "ast-grep": {
       "command": "uvx",

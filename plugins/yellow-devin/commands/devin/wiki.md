@@ -7,6 +7,9 @@ allowed-tools:
   - Skill
   - ToolSearch
   - AskUserQuestion
+  - mcp__plugin_yellow-research_deepwiki__ask_question
+  - mcp__plugin_yellow-research_deepwiki__read_wiki_structure
+  - mcp__plugin_yellow-research_deepwiki__read_wiki_contents
   - mcp__plugin_yellow-devin_deepwiki__ask_question
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_contents
@@ -19,6 +22,14 @@ allowed-tools:
 
 Search DeepWiki or Devin Wiki for documentation about a repository's
 architecture, patterns, and implementation details.
+
+**DeepWiki ownership moved:** the DeepWiki MCP server now ships with the
+`yellow-research` plugin, not `yellow-devin`. This command keeps working
+for backward compatibility — it discovers the right DeepWiki tools at
+runtime (see Step 3) — but for new setups the canonical way to query
+DeepWiki directly is via `yellow-research` (`/research:setup` reports its
+status). The Devin Wiki path below is unaffected; it stays owned by
+`yellow-devin`.
 
 ## Workflow
 
@@ -65,17 +76,30 @@ Determine visibility with
 
 - If repo is private (`true`): report "Cannot query private repos via
   DeepWiki. Check that Devin MCP is configured correctly."
-- If repo is public (`false`): use DeepWiki MCP tools
-  (`ask_question`, `read_wiki_structure`, `read_wiki_contents`)
+- If repo is public (`false`): discover the DeepWiki tools before calling
+  anything — DeepWiki's plugin home changed, so the tool name is no longer
+  a static pin. Use ToolSearch with keyword `read_wiki_structure`:
+  - If `mcp__plugin_yellow-research_deepwiki__*` is found, use it — this is
+    the canonical home for DeepWiki as of yellow-research's bundling of the
+    server.
+  - Else if `mcp__plugin_yellow-devin_deepwiki__*` is found, use it and
+    note in the output: "Using yellow-devin's bundled DeepWiki server —
+    newer yellow-devin releases no longer ship it; install or enable
+    yellow-research to keep DeepWiki working after upgrading."
+  - Else, do not attempt the query. Report: "DeepWiki now ships with the
+    yellow-research plugin — install/enable yellow-research."
 - If the lookup fails (`gh` missing, unauthenticated, network error) —
   visibility is unknown: do NOT query DeepWiki silently, since the repo
   identifier and question would go to a third-party service that only
   serves public repos. Ask the user to confirm the repository is public
   (or authenticate `gh`) before falling back.
 
-**Important:** The exact tool names are pinned in this command's
-`allowed-tools` frontmatter (`devin` server for primary, `deepwiki` server for
-fallback) — call them directly; no runtime discovery is needed.
+**Important:** The Devin MCP tool names are pinned in this command's
+`allowed-tools` frontmatter and called directly — no discovery needed for
+that path. The DeepWiki tool names are NOT pinned to a single source
+anymore (see the ToolSearch discovery above); both the `yellow-research`-
+and `yellow-devin`-qualified DeepWiki names are declared in
+`allowed-tools` so either can be called once discovered.
 
 ### Step 4: Present Results
 

@@ -149,6 +149,38 @@ Fix tool names in Phase 2 or as a follow-up PR:
 
 ## Update 2026-04-29
 
-**yellow-core no longer bundles context7 as a plugin MCP.** Per CE PR #486 parity (and to avoid the dual-OAuth-pop-up issue when users have context7 installed both at user level and bundled in yellow-core), the `mcpServers.context7` block was removed from `plugins/yellow-core/.claude-plugin/plugin.json`. References under `mcp__plugin_yellow-core_context7__*` no longer exist; live yellow-research callers (`code-researcher`, `/research:code`, `/research:setup`, `best-practices-researcher`) now reference user-level `mcp__context7__*` tool names with ToolSearch availability checks and EXA fallback. Install user-level context7 via `/plugin install context7@upstash` to retain library-doc lookup capability.
+**yellow-core no longer bundles context7 as a plugin MCP.** Per CE PR #486
+parity (and to avoid the dual-OAuth-pop-up issue when users have context7
+installed both at user level and bundled in yellow-core), the
+`mcpServers.context7` block was removed from
+`plugins/yellow-core/.claude-plugin/plugin.json`. References under
+`mcp__plugin_yellow-core_context7__*` no longer exist; live yellow-research
+callers (`code-researcher`, `/research:code`, `/research:setup`,
+`best-practices-researcher`) now reference user-level `mcp__context7__*` tool
+names with ToolSearch availability checks and EXA fallback. Install user-level
+context7 via `/plugin install context7@upstash` to retain library-doc lookup
+capability.
 
-This change supersedes the "Expected prefix: `mcp__plugin_yellow-core_context7__`" line above. Other MCPs in this verification document remain at their bundled prefixes.
+This change supersedes the "Expected prefix:
+`mcp__plugin_yellow-core_context7__`" line above. Other MCPs in this
+verification document remain at their bundled prefixes.
+
+## Update 2026-08-21
+
+**DeepWiki moved from `yellow-devin` to `yellow-research`.** The
+`mcpServers.deepwiki` entry (and its `read_wiki_structure` /
+`read_wiki_contents` / `ask_question` tools) now lives in
+`plugins/yellow-research/.claude-plugin/plugin.json`, so its current tool names
+are `mcp__plugin_yellow-research_deepwiki__*`, not
+`mcp__plugin_yellow-devin_deepwiki__*`. `yellow-devin` keeps only its `devin`
+server (`mcp__plugin_yellow-devin_devin__*`), which is unaffected by this move.
+`yellow-devin`'s `/devin:wiki` command discovers the current DeepWiki tool name
+at runtime via ToolSearch (preferring the `yellow-research` prefix, falling back
+to the `yellow-devin` prefix only for older installs that still bundle it)
+rather than assuming a single static prefix — see that command's frontmatter and
+workflow steps.
+
+This supersedes the yellow-devin section's `deepwiki` prefix above for current
+installs; the original section is left as historical record of the
+naming-mismatch audit it documents (the fix for the `deepwiki`/`devin`
+short-name mismatch itself still applies to the `devin` server unchanged).

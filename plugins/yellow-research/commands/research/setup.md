@@ -10,7 +10,7 @@ allowed-tools:
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-morph_morph__codebase_search
   - mcp__filesystem-with-morph__codebase_search
-  - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
+  - mcp__plugin_yellow-research_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
 ---
 
@@ -604,12 +604,12 @@ exists.
 Check for the plugin-namespaced tool first. If not found, fall back to the
 global MCP tool name. Report which variant is active.
 
-**DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
+**DeepWiki** (bundled HTTP — AI-powered repo documentation, public repos only):
 
 ```text
 ToolSearch keyword: "read_wiki_structure"
-Tool name: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
-Test call: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure with repoName: "facebook/react"
+Tool name: mcp__plugin_yellow-research_deepwiki__read_wiki_structure
+Test call: mcp__plugin_yellow-research_deepwiki__read_wiki_structure with repoName: "facebook/react"
 ```
 
 **ast-grep MCP** (bundled stdio — AST structural code search):
@@ -692,7 +692,7 @@ MCP Sources (no API key required — always available if plugin/MCP installed)
   Context7       (user-level MCP)      ACTIVE
   Grep MCP       (global)              ACTIVE
   WarpGrep       (global)              UNAVAILABLE
-  DeepWiki       yellow-devin          ACTIVE
+  DeepWiki       (bundled)             ACTIVE
   ast-grep       (bundled)             ACTIVE
   Parallel Task  (bundled)             ACTIVE (ToolSearch only — server reachability not verified)
   Ceramic        (bundled)             ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
@@ -806,7 +806,7 @@ To enable missing MCP sources:
   Grep MCP:   Configure grep MCP globally in Claude Code MCP settings
   WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
               Or configure filesystem-with-morph MCP globally in Claude Code MCP settings
-  DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
+  DeepWiki:   Bundled — public repos only; no install needed. If FAIL, restart Claude Code
   ast-grep:   Bundled — install prerequisites: ast-grep binary and uv (see above)
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
   Ceramic:    Bundled — OAuth auto-managed on first ceramic_search use; if FAIL, restart Claude Code
