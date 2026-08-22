@@ -47,7 +47,7 @@ lifetime as you follow up on it.
 | ------------------- | ------------------------------------------------------------------------------------------------ |
 | `/cursor:setup`     | Detect credentials and SDK, optionally install `@cursor/sdk`                                     |
 | `/cursor:delegate`  | Launch a new Cursor Cloud Agent against a repo + prompt (dry-run validated, confirmed, billable) |
-| `/cursor:list`      | List agents, merged with local state                                                             |
+| `/cursor:list`      | List agents, merged with local state (`--archived` to include archived ones)                     |
 | `/cursor:status`    | Check live status of an agent (and optionally a run), with reconciliation                        |
 | `/cursor:follow-up` | Send a follow-up prompt to an existing agent (confirmed, billable)                               |
 | `/cursor:cancel`    | Cancel a running run (confirmed)                                                                 |
@@ -59,7 +59,7 @@ lifetime as you follow up on it.
 ### Example
 
 ```text
-/cursor:delegate --repo https://github.com/org/repo --prompt "Fix the flaky retry test in tests/retry.spec.ts" --ref main
+/cursor:delegate --repo https://github.com/org/repo --prompt "Fix flaky retry test" --ref main
 ```
 
 This first runs a zero-network dry run and shows you the resolved plan

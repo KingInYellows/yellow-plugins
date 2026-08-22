@@ -38,6 +38,7 @@ import type {
   AdapterUsage,
   CapabilityResult,
   Clock,
+  ListAgentsResult,
   SdkAdapter,
 } from './types.js';
 import {
@@ -134,23 +135,65 @@ async function sendWithOutcomeTracking(
   }
 }
 
+/** Safety bound on remote pagination sweeps, so a huge account can't hang a launch. */
+const MAX_LIST_PAGES = 5;
+
+/**
+ * Counts running cloud agents for `repoUrl`, and FAILS CLOSED if the account
+ * has more pages than MAX_LIST_PAGES: an undercount here would authorize a
+ * billable launch past the user's --max-active cap, so an incomplete sweep is
+ * reported as a concurrency refusal rather than treated as "not at the cap".
+ *
+ * includeArchived is TRUE here even though the user-facing `list` hides
+ * archived agents. `/cursor:archive --force` archives an agent whose run is
+ * still running and does NOT cancel that run, so an archived agent can still
+ * be consuming a billable slot. The cap counts what is actually running, not
+ * what is visible; filtering on status alone keeps archived-but-finished
+ * agents out of the count.
+ */
 async function countActiveAgentsForRepo(
   adapter: SdkAdapter,
-  repoUrl: string
+  repoUrl: string,
+  maxActive: number
 ): Promise<number> {
   let count = 0;
   let cursor: string | undefined;
-  for (let page = 0; page < 5; page += 1) {
-    const result = await adapter.listAgents(
-      cursor !== undefined ? { cursor } : undefined
-    );
+  for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+    const result: ListAgentsResult = await adapter.listAgents({
+      includeArchived: true,
+      ...(cursor !== undefined ? { cursor } : {}),
+    });
     count += result.items.filter(
       (item) => item.repository === repoUrl && item.status === 'running'
     ).length;
-    if (result.nextCursor === undefined) break;
+    if (result.nextCursor === undefined) return count;
     cursor = result.nextCursor;
   }
-  return count;
+  // recoveryAction is overridden because the catalog default ("raise
+  // --max-active") is actively wrong here: this branch throws before any count
+  // exists to compare the cap against, so raising it can never clear the error.
+  return throwAppError(
+    'CURSOR_CONCURRENCY_LIMIT',
+    `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely.`,
+    {
+      // This text names NO user action that resolves the refusal, because none
+      // exists. Raising --max-active throws before any count is compared;
+      // archiving leaves the pages intact (the sweep passes includeArchived:
+      // true); and re-running delegate re-enters the identical bound. Only a
+      // smaller account or a larger MAX_LIST_PAGES changes the outcome. Every
+      // earlier version of this string suggested a remedy that silently did
+      // nothing — do not reintroduce one.
+      recoveryAction:
+        'Delegation is blocked for this account through this command. The ' +
+        'bounded sweep cannot enumerate enough pages to enforce max-active, ' +
+        'and re-running hits the same bound; raising --max-active, archiving ' +
+        'agents, and retrying all leave the page count unchanged. Inspect ' +
+        'agents with /cursor:list --archived (the sweep counts archived ' +
+        'agents that are still running, which the default listing hides). ' +
+        'Unblocking requires either fewer cloud agents on the account or a ' +
+        'higher sweep bound in the CLI.',
+    }
+  );
 }
 
 async function readHealthyIndex(stateFilePath: string): Promise<AgentIndex> {
@@ -335,7 +378,11 @@ export async function delegate(
     }
   });
 
-  const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+  const remoteActive = await countActiveAgentsForRepo(
+    deps.adapter,
+    repoUrl,
+    maxActive
+  );
 
   await withStateLock(deps.stateFilePath, async () => {
     const readResult = await readIndex(deps.stateFilePath);
@@ -449,8 +496,13 @@ export async function delegate(
  *   3. never return the provisional id — it 404s on Agent.get/getRun/list.
  *      A failed reconciliation after a billable send() is CURSOR_UNKNOWN_OUTCOME
  *      so the caller reconciles via list metadata instead of persisting a dead id.
- * Best-effort by design: a reconciliation failure must never turn a
- * successful billable launch into a reported error.
+ *
+ * CURSOR_UNKNOWN_OUTCOME is deliberately NOT a claim that the launch failed —
+ * it is the "launched, but this CLI cannot name the agent" outcome, and its
+ * recovery action is `status --reconcile` rather than "relaunch". Reporting
+ * that is strictly better than returning ok:true with a provisional id that
+ * every subsequent follow-up/cancel/status call would 404 on, so do not
+ * "simplify" this into a best-effort fallback that persists the provisional id.
  */
 async function resolveCanonicalAgentId(
   deps: RuntimeDeps,
@@ -463,10 +515,13 @@ async function resolveCanonicalAgentId(
   }
   try {
     let cursor: string | undefined;
-    for (let page = 0; page < 5; page++) {
-      const res = await deps.adapter.listAgents(
-        cursor !== undefined ? { cursor } : undefined
-      );
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      // includeArchived: reconciliation must still find an agent that was
+      // archived between the send() and this sweep.
+      const res = await deps.adapter.listAgents({
+        includeArchived: true,
+        ...(cursor !== undefined ? { cursor } : {}),
+      });
       const match = res.items.find(
         (a) => a.metadata['yellowIdempotencyKey'] === idempotencyKey
       );
@@ -680,6 +735,14 @@ export async function status(
 
 export interface ListArgs {
   readonly cursor?: string;
+  /**
+   * Include archived agents. Off by default so `/cursor:archive` genuinely
+   * hides an agent from the default listing, per that command's contract.
+   * Requested service-side rather than filtered here: dropping archived rows
+   * from an already-fetched page would yield an empty `items` alongside a
+   * `nextCursor`, which reads as "no agents" to the caller.
+   */
+  readonly archived?: boolean;
 }
 
 export interface ListItem {
@@ -703,9 +766,10 @@ export async function list(
   args: ListArgs
 ): Promise<ListResult> {
   const cursor = validateCursor(args.cursor);
-  const result = await deps.adapter.listAgents(
-    cursor !== undefined ? { cursor } : undefined
-  );
+  const result = await deps.adapter.listAgents({
+    includeArchived: args.archived === true,
+    ...(cursor !== undefined ? { cursor } : {}),
+  });
   const index = await readHealthyIndex(deps.stateFilePath);
 
   const items = result.items.map((info) => {

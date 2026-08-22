@@ -113,6 +113,76 @@ setup() {
   printf '%s\n' "$cursor_block" | grep -q -- '--yes'
 }
 
+@test "allowed-tools grants Write for the delegation packet file" {
+  run grep -F '  - Write' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "packet scratch path uses mktemp under an absolute git dir" {
+  run grep -F 'mktemp -d "${GIT_TMP}/yellow-linear-packet.XXXXXX"' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  # --absolute-git-dir, NOT --git-path: --git-path is relative to the CWD and
+  # returns ../.git/tmp from any subdirectory. The launch block recursively
+  # deletes this directory, so the path must be absolute and free of "..".
+  run grep -F 'git rev-parse --absolute-git-dir' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'git rev-parse --git-path tmp' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+}
+
+@test "packet allocation aborts instead of printing a bogus path" {
+  # Without set -e a failed mktemp leaves PACKET_DIR empty, the block prints
+  # "/packet.txt", and the launch block's recursive cleanup then targets "/".
+  alloc_block=$(awk '/Then allocate a unique packet path/,/Write the packet verbatim/' "$DELEGATE_MD")
+  printf '%s\n' "$alloc_block" | grep -qF 'set -euo pipefail'
+}
+
+@test "launch metadata is substituted into single quotes, never double" {
+  # Substitution happens before this block's own checks run. In double quotes
+  # bash expands $(...) at assignment time, so validation would only reject a
+  # value whose payload had already executed. Single quotes keep it inert text.
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -qF "ISSUE_ID='YELLOW_TODO_issue_id'"
+  printf '%s\n' "$launch_block" | grep -qF "DELEGATION_REV='YELLOW_TODO_delegation_rev'"
+  printf '%s\n' "$launch_block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
+  run grep -F 'ISSUE_ID="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+  run grep -F 'DELEGATION_REV="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+  run grep -F 'PACKET_FILE="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+}
+
+@test "cleanup target is shape-checked before the recursive delete" {
+  # dirname "/packet.txt" is "/" and dirname "packet.txt" is "."; the EXIT trap
+  # would delete either wholesale, so only an allocated packet path is accepted.
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -qF '/*/yellow-linear-packet.??????/packet.txt'
+  printf '%s\n' "$launch_block" | grep -qF 'is not an allocated packet path'
+}
+
+@test "packet scratch directory is removed via trap on all exit paths" {
+  run grep -F 'trap cleanup EXIT' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F "trap 'exit 130' INT" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F "trap 'exit 143' TERM" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "idempotency key uses canonical CURSOR_REPO_URL" {
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -q 'IDEMPOTENCY_INPUT="${CURSOR_REPO_URL}'
+}
+
+@test "launch block re-reads git remote and branch instead of template substitution" {
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -q 'git remote get-url origin'
+  printf '%s\n' "$launch_block" | grep -q 'git branch --show-current'
+  run grep -F 'YELLOW_TODO_repository_remote_url' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+}
+
 @test "resolves sibling plugin roots via installPath, never via a relative .. guess" {
   run grep -F 'installPath' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
