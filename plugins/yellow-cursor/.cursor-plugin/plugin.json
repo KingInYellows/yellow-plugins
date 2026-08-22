@@ -1,7 +1,7 @@
 {
   "name": "yellow-cursor",
   "displayName": "Yellow Cursor",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
   "author": {
     "name": "KingInYellows"
