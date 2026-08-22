@@ -42,9 +42,9 @@ OK=$(printf '%s' "$OUTPUT" | jq -r '.ok')
 
 `$CURSOR_TOKEN` here is the pagination cursor parsed from an optional
 `--cursor <token>` in `$ARGUMENTS` — unrelated to `CURSOR_API_KEY`.
-`$SHOW_ARCHIVED` is set non-empty only when `$ARGUMENTS` contained
-`--archived`. Both are parsed and assigned in this same Bash block — shell
-variables do not persist across separate Bash calls.
+`$SHOW_ARCHIVED` is set non-empty only when `$ARGUMENTS` contained `--archived`.
+Both are parsed and assigned in this same Bash block — shell variables do not
+persist across separate Bash calls.
 
 If `items` is empty without `--archived`, mention that archived agents were
 excluded before concluding the account has no agents.

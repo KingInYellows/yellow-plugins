@@ -174,7 +174,8 @@ function buildCursorPluginManifest(source, pkg) {
   // componentPaths.skills is omitted — otherwise the tree would be written
   // but the manifest would not point at it.
   const skillsPath =
-    (cursor.componentPaths && cursor.componentPaths.skills) || './cursor/skills';
+    (cursor.componentPaths && cursor.componentPaths.skills) ||
+    './cursor/skills';
   const hasAllowlistedSkills =
     Array.isArray(cursor.skillAllowlist) && cursor.skillAllowlist.length > 0;
   if (skillsPath && hasAllowlistedSkills) {
