@@ -174,7 +174,10 @@ describe('--max-active enforcement', () => {
     expect(adapter.agents.size).toBe(0);
   });
 
-  it('does not count archived agents toward the cap', async () => {
+  it('counts a force-archived but still-RUNNING agent toward the cap', async () => {
+    // /cursor:archive --force archives an agent with an active run and does
+    // NOT cancel that run, so it keeps consuming a billable slot while being
+    // hidden from the default listing. The cap must still see it.
     adapter.listAgentsImpl = async (options) => ({
       items: [
         {
@@ -189,10 +192,43 @@ describe('--max-active enforcement', () => {
       ].filter(() => options?.includeArchived === true),
     });
 
+    await expect(
+      delegate(deps, {
+        repoUrl: REPO,
+        prompt: 'go',
+        idempotencyKey: 'archived-still-counts',
+        maxActive: 1,
+        yes: true,
+        dryRun: false,
+        autoCreatePr: true,
+      })
+    ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
+
+    // The cap sweep must opt into archived agents to see it at all.
+    expect(adapter.listAgentsCalls[0]?.includeArchived).toBe(true);
+    expect(adapter.agents.size).toBe(0);
+  });
+
+  it('does not count archived agents that have already FINISHED', async () => {
+    // Archived + terminal consumes nothing; only `status` gates the count.
+    adapter.listAgentsImpl = async (options) => ({
+      items: [
+        {
+          agentId: 'bc-archived-done',
+          name: 'a',
+          summary: '',
+          status: 'finished',
+          archived: true,
+          metadata: {},
+          repository: REPO,
+        },
+      ].filter(() => options?.includeArchived === true),
+    });
+
     const result = await delegate(deps, {
       repoUrl: REPO,
       prompt: 'go',
-      idempotencyKey: 'archived-not-counted',
+      idempotencyKey: 'archived-finished-free',
       maxActive: 1,
       yes: true,
       dryRun: false,
@@ -200,8 +236,6 @@ describe('--max-active enforcement', () => {
     });
 
     expect(result.operation).toBe('delegate');
-    // The cap sweep must not have opted into archived agents.
-    expect(adapter.listAgentsCalls[0]?.includeArchived).toBe(false);
   });
 });
 

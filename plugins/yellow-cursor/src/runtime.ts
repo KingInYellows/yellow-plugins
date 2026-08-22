@@ -143,6 +143,13 @@ const MAX_LIST_PAGES = 5;
  * has more pages than MAX_LIST_PAGES: an undercount here would authorize a
  * billable launch past the user's --max-active cap, so an incomplete sweep is
  * reported as a concurrency refusal rather than treated as "not at the cap".
+ *
+ * includeArchived is TRUE here even though the user-facing `list` hides
+ * archived agents. `/cursor:archive --force` archives an agent whose run is
+ * still running and does NOT cancel that run, so an archived agent can still
+ * be consuming a billable slot. The cap counts what is actually running, not
+ * what is visible; filtering on status alone keeps archived-but-finished
+ * agents out of the count.
  */
 async function countActiveAgentsForRepo(
   adapter: SdkAdapter,
@@ -153,7 +160,7 @@ async function countActiveAgentsForRepo(
   let cursor: string | undefined;
   for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
     const result: ListAgentsResult = await adapter.listAgents({
-      includeArchived: false,
+      includeArchived: true,
       ...(cursor !== undefined ? { cursor } : {}),
     });
     count += result.items.filter(
