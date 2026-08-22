@@ -1,0 +1,22 @@
+{
+  "name": "yellow-cursor",
+  "displayName": "Yellow Cursor",
+  "version": "0.1.0",
+  "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
+  "author": {
+    "name": "KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-cursor",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "cursor",
+    "cloud-agents",
+    "remote-agent",
+    "delegation",
+    "ai-agent",
+    "automation"
+  ],
+  "category": "automation",
+  "skills": "./cursor/skills"
+}

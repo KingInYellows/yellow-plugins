@@ -1,0 +1,13 @@
+{
+  "name": "yellow-plugins",
+  "metadata": {
+    "description": "Cursor Cloud Agents distribution for the yellow-plugins marketplace."
+  },
+  "plugins": [
+    {
+      "name": "yellow-cursor",
+      "source": "plugins/yellow-cursor",
+      "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
   "version": "2.4.1",
-  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -12,7 +12,6 @@
   "license": "MIT",
   "keywords": [
     "devin",
-    "deepwiki",
     "delegation",
     "orchestration",
     "ai-collaboration"
@@ -32,10 +31,6 @@
     }
   },
   "mcpServers": {
-    "deepwiki": {
-      "type": "http",
-      "url": "https://mcp.deepwiki.com/mcp"
-    },
     "devin": {
       "type": "http",
       "url": "https://mcp.devin.ai/mcp"
