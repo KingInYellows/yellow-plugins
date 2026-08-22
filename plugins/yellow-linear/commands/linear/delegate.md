@@ -510,9 +510,14 @@ fi
 REF_ARGS=()
 [ -n "$BRANCH" ] && REF_ARGS=(--ref "$BRANCH")
 
+# ${REF_ARGS[@]+"${REF_ARGS[@]}"} rather than a bare "${REF_ARGS[@]}": with
+# `set -u` active, expanding an EMPTY array is an "unbound variable" error on
+# bash < 4.4 (stock macOS ships 3.2). BRANCH is empty on a detached HEAD, so
+# the bare form would abort every such delegation before reaching node. The
+# +alternate form expands to nothing when unset and is a no-op otherwise.
 node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
   --repo "$CURSOR_REPO_URL" \
-  "${REF_ARGS[@]}" \
+  ${REF_ARGS[@]+"${REF_ARGS[@]}"} \
   --idempotency-key "$IDEMPOTENCY_KEY" \
   --linear-issue "$ISSUE_ID" \
   --calling-host yellow-linear \
