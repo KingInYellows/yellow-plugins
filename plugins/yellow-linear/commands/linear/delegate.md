@@ -325,10 +325,19 @@ computed earlier in this run before executing:
 ```bash
 YELLOW_CURSOR_ROOT="<installPath resolved in Step 3>"
 REPO_URL="<repository remote URL>"
-BRANCH="<branch name>"
+BRANCH="<branch name, or leave empty on a detached HEAD>"
 IDEMPOTENCY_KEY="<key computed in Step 4>"
 ISSUE_ID="<TEAM-123>"
-PACKET="<delegation packet assembled in Steps 4 and 6>"
+
+# PACKET carries untrusted Linear issue text. It MUST arrive through this
+# quoted heredoc — never as a bare "<packet>" substitution inside double
+# quotes, where a quote, backtick or $(...) in the issue body would become
+# executable shell. The quoted 'YELLOW_PACKET_EOF' delimiter disables all
+# expansion and command substitution inside the body.
+PACKET="$(cat <<'YELLOW_PACKET_EOF'
+<delegation packet assembled in Steps 4 and 6, pasted verbatim>
+YELLOW_PACKET_EOF
+)"
 
 # CURSOR_REPO_URL is REPO_URL in the https:// form the Cursor CLI requires.
 # That CLI's own validate.ts is the single authority on repo/ref shape — do
@@ -348,16 +357,22 @@ if [ -z "$CURSOR_REPO_URL" ]; then
   exit 1
 fi
 
-for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL BRANCH IDEMPOTENCY_KEY ISSUE_ID PACKET; do
+# BRANCH is deliberately NOT required: `git branch --show-current` is empty on
+# a detached HEAD, and --ref is optional to the CLI (it defaults to the repo's
+# default branch). Everything else is mandatory.
+for required in YELLOW_CURSOR_ROOT CURSOR_REPO_URL IDEMPOTENCY_KEY ISSUE_ID PACKET; do
   if [ -z "${!required:-}" ]; then
     printf 'ERROR: %s is empty — substitute its concrete value above before launching (shell state does not cross Bash calls).\n' "$required" >&2
     exit 1
   fi
 done
 
+REF_ARGS=()
+[ -n "$BRANCH" ] && REF_ARGS=(--ref "$BRANCH")
+
 node "${YELLOW_CURSOR_ROOT}/dist/cli.js" delegate \
   --repo "$CURSOR_REPO_URL" \
-  --ref "$BRANCH" \
+  "${REF_ARGS[@]}" \
   --idempotency-key "$IDEMPOTENCY_KEY" \
   --linear-issue "$ISSUE_ID" \
   --calling-host yellow-linear \
