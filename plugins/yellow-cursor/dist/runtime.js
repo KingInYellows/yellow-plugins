@@ -138,19 +138,21 @@ async function countActiveAgentsForRepo(adapter, repoUrl, maxActive) {
     // --max-active") is actively wrong here: this branch throws before any count
     // exists to compare the cap against, so raising it can never clear the error.
     return (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely.`, {
-        // Deliberately promises no remedy. Raising --max-active cannot help (this
-        // throws before any count exists to compare it against) and neither can
-        // archiving, since the sweep requests includeArchived: true — archived
-        // agents still occupy these pages. At this account size the cap is simply
-        // not automatically enforceable, and saying so is more useful than naming
-        // an action that does nothing.
-        recoveryAction: 'No flag clears this: the account has more cloud agents than the ' +
-            'bounded sweep can enumerate, and neither raising --max-active nor ' +
-            'archiving reduces the page count. Review running agents yourself ' +
-            'with /cursor:list --archived (the sweep counts archived agents that ' +
-            'are still running, which the default listing hides), then launch via ' +
-            '/cursor:delegate once you have ' +
-            'confirmed there is capacity.',
+        // This text names NO user action that resolves the refusal, because none
+        // exists. Raising --max-active throws before any count is compared;
+        // archiving leaves the pages intact (the sweep passes includeArchived:
+        // true); and re-running delegate re-enters the identical bound. Only a
+        // smaller account or a larger MAX_LIST_PAGES changes the outcome. Every
+        // earlier version of this string suggested a remedy that silently did
+        // nothing — do not reintroduce one.
+        recoveryAction: 'Delegation is blocked for this account through this command. The ' +
+            'bounded sweep cannot enumerate enough pages to enforce max-active, ' +
+            'and re-running hits the same bound; raising --max-active, archiving ' +
+            'agents, and retrying all leave the page count unchanged. Inspect ' +
+            'agents with /cursor:list --archived (the sweep counts archived ' +
+            'agents that are still running, which the default listing hides). ' +
+            'Unblocking requires either fewer cloud agents on the account or a ' +
+            'higher sweep bound in the CLI.',
     });
 }
 async function readHealthyIndex(stateFilePath) {
