@@ -1,0 +1,59 @@
+catalog/plugins/yellow-research.json
+  s_ca129cb3ac489c::t_88fa3803ffff5e 77-79
+  s_ca129cb3ac489c::t_f4b2bd95d683e8 15
+  s_ca129cb3ac489c::t_d0fc2a72fee3fc 3
+  s_ca129cb3ac489c::t_459fea306aaed5 80
+plugins/yellow-devin/CLAUDE.md
+  s_ca129cb3ac489c::t_845aeae444b7cf 9-18,23-25,30-32,34-38,41-43,49-55,68-74,77-78,99-104,123-124,127-128,142-150,154-164,183-186
+  s_ca129cb3ac489c::t_855d3b47cbb24a 3-8,19-22
+plugins/yellow-research/CLAUDE.md
+  s_ca129cb3ac489c::t_841b48c302c188 81-86,93
+  s_ca129cb3ac489c::t_845aeae444b7cf 65-67,69-72,74-78,87-92,129-130,132-133,135-138,144-145,147-148,150-151,159-164,166-167,172-187,201,203-205,212-214,217-218,238-239
+  s_ca129cb3ac489c::t_15bf736d483eb2 3
+plugins/yellow-devin/README.md
+  s_ca129cb3ac489c::t_7c09e469168fc7 3-10,13,16-18
+  s_ca129cb3ac489c::t_845aeae444b7cf 11-12,14-15,19-20,73-82,86-87,92-93,98-105,109-110,117-118
+plugins/yellow-devin/commands/devin/wiki.md
+  s_ca129cb3ac489c::t_ecbecc67f3b077 10-12,26-33,79-90,97-102
+plugins/yellow-research/commands/research/setup.md
+  s_ca129cb3ac489c::t_62c224e7fc933f 607,611-612
+  s_ca129cb3ac489c::t_3bb495739bdaf3 809
+  s_ca129cb3ac489c::t_8b04699c467486 695
+  s_ca129cb3ac489c::t_d76fd39ffe8f24 13
+plugins/yellow-devin/package.json
+  s_ca129cb3ac489c::t_feed33b072b955 5
+docs/security.md
+  s_ca129cb3ac489c::t_68536f3de59270 111
+  s_ca129cb3ac489c::t_845aeae444b7cf 8-14,18-23,32-34,47-48,65-66,75-76,82-96,133-140,150-160,163-164,166-171,177-182,189-193,225-227,229-231,234-249,253-255,261-267,270-276,278-281,283-284,286-287,293-302,320-321,331-333
+  s_ca129cb3ac489c::t_fbfeb25cca8042 68,77
+docs/mcp-tool-naming-verification.md
+  s_ca129cb3ac489c::t_9ac47e7f4578bd 167-172,186
+  s_ca129cb3ac489c::t_845aeae444b7cf 152-166,173-185
+catalog/plugins/yellow-devin.json
+  s_ca129cb3ac489c::t_704e6cf969faf7 3
+  s_ca129cb3ac489c::t_f4264c8ab1293d 41-46
+  s_ca129cb3ac489c::t_3fecc544186c18 11
+plugins/yellow-devin/commands/devin/README.md
+  s_ca129cb3ac489c::t_845aeae444b7cf 8-18
+README.md
+  s_ca129cb3ac489c::t_b06b4885936001 85,92-94
+  s_ca129cb3ac489c::t_e4da438afc8b30 284
+  s_ca129cb3ac489c::t_a4315a56819849 279
+  s_ca129cb3ac489c::t_845aeae444b7cf 23-31,33-42,48-50,52-63,87-90,110-111,151-152,298-303,312,316-329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "619adc3c33cd05d40e3605a87c4bf2847bdb10e2",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
