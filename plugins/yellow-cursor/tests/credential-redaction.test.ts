@@ -30,10 +30,13 @@ describe('redact', () => {
   });
 
   it('redacts Authorization headers', () => {
-    const token = 'A'.repeat(26) + '012345';
-    const header = ['Authorization', ': ', 'Bearer', ' ', token].join('');
-    const out = redact(header);
-    expect(out.toLowerCase()).not.toContain(`bearer ${token}`.toLowerCase());
+    // Token assembled at runtime so no committed line ever contains a
+    // credential-shaped literal (keeps secret scanners quiet and honest).
+    const token = ['abcdefghijklm', 'nopqrstuvwxyz', '012345'].join('');
+    const out = redact(`Authorization: Bearer ${token}`);
+    expect(out.toLowerCase()).not.toContain(
+      `bearer ${token.slice(0, 26)}`.toLowerCase()
+    );
     expect(out).toContain('***REDACTED***');
   });
 
