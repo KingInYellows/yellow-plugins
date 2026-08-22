@@ -1,0 +1,31 @@
+.changeset/core-remote-agent-group.md
+  s_ca129cb3ac489c::t_bd9713bbcd8f0e 1-7
+  s_ca129cb3ac489c::t_f736ddbe46407b 8-10
+.changeset/devin-legacy-deepwiki-move.md
+  s_ca129cb3ac489c::t_f736ddbe46407b 7-13
+  s_ca129cb3ac489c::t_11a62f12168bff 1-6
+.changeset/linear-provider-neutral-delegate.md
+  s_ca129cb3ac489c::t_f736ddbe46407b 7-8
+  s_ca129cb3ac489c::t_36923c1ec423b9 1-6,9-15
+.changeset/cursor-initial-release.md
+  s_ca129cb3ac489c::t_412e88400dd56c 1-16
+.changeset/research-deepwiki-canonical.md
+  s_ca129cb3ac489c::t_f736ddbe46407b 5-6
+  s_ca129cb3ac489c::t_52b91357c31dc5 1-4,7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ce61bacde60cc760bf38cfac00cc414eeaf10936",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
