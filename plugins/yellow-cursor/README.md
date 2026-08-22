@@ -43,18 +43,18 @@ lifetime as you follow up on it.
 
 ## Commands
 
-| Command             | Description                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------ |
-| `/cursor:setup`     | Detect credentials and SDK, optionally install `@cursor/sdk`                                     |
-| `/cursor:delegate`  | Launch a new Cursor Cloud Agent against a repo + prompt (dry-run validated, confirmed, billable) |
-| `/cursor:list`      | List agents, merged with local state (`--archived` to include archived ones)                     |
-| `/cursor:status`    | Check live status of an agent (and optionally a run), with reconciliation                        |
-| `/cursor:follow-up` | Send a follow-up prompt to an existing agent (confirmed, billable)                               |
-| `/cursor:cancel`    | Cancel a running run (confirmed)                                                                 |
-| `/cursor:artifacts` | List or download artifacts a run produced                                                        |
-| `/cursor:usage`     | Show token usage and cost for an agent                                                           |
-| `/cursor:archive`   | Hide an agent from default listing (confirmed)                                                   |
-| `/cursor:unarchive` | Restore an archived agent to default listing (confirmed)                                         |
+| Command | Description |
+| --- | --- |
+| `/cursor:setup` | Detect credentials and SDK, optionally install `@cursor/sdk` |
+| `/cursor:delegate` | Launch a new Cursor Cloud Agent on a repo + prompt (dry-run validated, confirmed, billable) |
+| `/cursor:list` | List agents, merged with local state (`--archived` to include archived ones) |
+| `/cursor:status` | Check live status of an agent (and optionally a run), with reconciliation |
+| `/cursor:follow-up` | Send a follow-up prompt to an existing agent (confirmed, billable) |
+| `/cursor:cancel` | Cancel a running run (confirmed) |
+| `/cursor:artifacts` | List or download artifacts a run produced |
+| `/cursor:usage` | Show token usage and cost for an agent |
+| `/cursor:archive` | Hide an agent from default listing (confirmed) |
+| `/cursor:unarchive` | Restore an archived agent to default listing (confirmed) |
 
 ### Example
 
