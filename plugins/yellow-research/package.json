@@ -1,6 +1,6 @@
 {
   "name": "yellow-research",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "private": true,
   "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers"
 }
