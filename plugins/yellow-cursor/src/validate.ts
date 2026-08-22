@@ -1,0 +1,254 @@
+/**
+ * All input validation for the CLI. Every function either returns a
+ * normalized value or throws AppErrorException(CURSOR_INVALID_INPUT) via
+ * throwAppError — nothing here talks to the SDK or the network, which is
+ * what keeps `delegate --dry-run` a zero-network operation.
+ */
+
+import * as path from 'node:path';
+
+import { throwAppError } from './errors.js';
+
+const ALLOWED_REPO_HOSTS = new Set([
+  'github.com',
+  'gitlab.com',
+  'dev.azure.com',
+  'bitbucket.org',
+]);
+
+export function validateRepoUrl(input: string): string {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      `Invalid repository URL: ${input}`
+    );
+  }
+  if (url.protocol !== 'https:') {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'Repository URL must use https://'
+    );
+  }
+  if (url.username !== '' || url.password !== '') {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'Repository URL must not contain userinfo (user:pass@)'
+    );
+  }
+  if (url.hash !== '') {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'Repository URL must not contain a fragment'
+    );
+  }
+  if (!ALLOWED_REPO_HOSTS.has(url.hostname.toLowerCase())) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      `Repository host "${url.hostname}" is not allowlisted (github.com, gitlab.com, dev.azure.com, bitbucket.org)`
+    );
+  }
+  return url.toString();
+}
+
+const REF_METACHAR_RE = /[\s~^:?*[\\`;|&$()<>'"\r\n]/;
+
+export function validateRef(input: string): string {
+  if (input.length === 0 || input.length > 255) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref must be 1-255 characters'
+    );
+  }
+  if (input.startsWith('-')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref must not start with a dash'
+    );
+  }
+  if (input.startsWith('/') || input.endsWith('/') || input.endsWith('.lock')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref must not start/end with "/" or end with ".lock"'
+    );
+  }
+  if (input.includes('..') || input.includes('//')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref must not contain ".." or "//"'
+    );
+  }
+  if (REF_METACHAR_RE.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref contains whitespace or shell/git metacharacters'
+    );
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'ref contains control characters'
+    );
+  }
+  return input;
+}
+
+export function validateModelId(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined;
+  if (input.length === 0 || input.length > 128) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'model id must be 1-128 characters'
+    );
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'model id contains control characters'
+    );
+  }
+  return input;
+}
+
+const AGENT_ID_RE = /^bc-[0-9a-f-]+$/i;
+
+export function validateAgentId(input: string): string {
+  if (input.length < 4 || input.length > 128) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'agent id must be 4-128 characters'
+    );
+  }
+  if (!AGENT_ID_RE.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'agent id has an unexpected shape (expected bc-<hex/dashes>)'
+    );
+  }
+  return input;
+}
+
+const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+export function validateRunId(input: string): string {
+  if (!SAFE_ID_RE.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'run id must be 1-128 characters of [A-Za-z0-9_-]'
+    );
+  }
+  return input;
+}
+
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._:-]{1,200}$/;
+
+export function validateIdempotencyKey(input: string): string {
+  if (!IDEMPOTENCY_KEY_RE.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'idempotency key must be 1-200 characters of [A-Za-z0-9._:-]'
+    );
+  }
+  return input;
+}
+
+const MAX_PROMPT_BYTES = 100 * 1024;
+
+export function validatePrompt(input: string): string {
+  if (input.length === 0) {
+    return throwAppError('CURSOR_INVALID_INPUT', 'prompt must not be empty');
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/\x00/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'prompt must not contain NUL bytes'
+    );
+  }
+  if (Buffer.byteLength(input, 'utf8') > MAX_PROMPT_BYTES) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      `prompt exceeds ${MAX_PROMPT_BYTES} byte cap`
+    );
+  }
+  return input;
+}
+
+export function validateArtifactRemotePath(input: string): string {
+  if (input.length === 0 || input.length > 4096) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'artifact path must be 1-4096 characters'
+    );
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'artifact path contains control characters'
+    );
+  }
+  if (path.isAbsolute(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'artifact path must be relative'
+    );
+  }
+  const segments = input.split('/');
+  if (segments.some((segment) => segment === '..')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'artifact path must not contain ".." segments'
+    );
+  }
+  return input;
+}
+
+export function validateLocalOutPath(input: string): string {
+  if (input.length === 0 || input.length > 4096) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path must be 1-4096 characters'
+    );
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path contains control characters'
+    );
+  }
+  return input;
+}
+
+export function validateMaxActive(input: number): number {
+  if (!Number.isInteger(input) || input < 1 || input > 50) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'max-active must be an integer between 1 and 50'
+    );
+  }
+  return input;
+}
+
+export function validateCursor(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined;
+  if (input.length === 0 || input.length > 512) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'cursor must be 1-512 characters'
+    );
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'cursor contains control characters'
+    );
+  }
+  return input;
+}
