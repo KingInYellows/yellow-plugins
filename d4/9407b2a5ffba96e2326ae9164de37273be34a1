@@ -1,0 +1,57 @@
+plugins/yellow-cursor/tsconfig.json
+  s_ca129cb3ac489c::t_983a769db5e8cf 8-11
+plugins/yellow-cursor/tests/cli-json-contract.test.ts
+  s_ca129cb3ac489c::t_8a407099ebd4b9 24-28,33-36,43-44,57-58
+plugins/yellow-cursor/dist/errors.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-148
+plugins/yellow-cursor/dist/sdk-resolver.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-114
+.github/workflows/validate-schemas-fork.yml
+  s_ca129cb3ac489c::t_dd3c3ef9804b3c 184-189
+  s_ca129cb3ac489c::t_a7901ef582ac7a 70
+plugins/yellow-cursor/dist/sdk-adapter.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-312
+plugins/yellow-cursor/dist/validate.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-200
+package.json
+  s_ca129cb3ac489c::t_571991dc77f3e0 20
+  s_ca129cb3ac489c::t_92d4a42710287e 18
+  s_ca129cb3ac489c::t_db021caada1905 32
+  s_ca129cb3ac489c::t_bc194bf5f6a3ae 16
+plugins/yellow-cursor/dist/config.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-104
+plugins/yellow-cursor/dist/redact.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-101
+plugins/yellow-cursor/dist/cli.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-347
+plugins/yellow-cursor/dist/state.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-175
+plugins/yellow-cursor/dist/types.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-8
+plugins/yellow-cursor/CLAUDE.md
+  s_ca129cb3ac489c::t_29f9f240e2379d 13
+plugins/yellow-cursor/dist/runtime.js
+  s_ca129cb3ac489c::t_845aeae444b7cf 1-496
+.github/workflows/validate-schemas.yml
+  s_ca129cb3ac489c::t_43b9a4e4c67a6e 1057-1063
+  s_ca129cb3ac489c::t_c97c9808e011aa 321-328
+  s_ca129cb3ac489c::t_1775d049a031f5 115
+.gitignore
+  s_ca129cb3ac489c::t_82edd3addbd6a8 57-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d49407b2a5ffba96e2326ae9164de37273be34a1",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
