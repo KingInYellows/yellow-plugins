@@ -118,11 +118,31 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "packet scratch path uses mktemp under git-path tmp" {
+@test "packet scratch path uses mktemp under an absolute git dir" {
   run grep -F 'mktemp -d "${GIT_TMP}/yellow-linear-packet.XXXXXX"' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
-  run grep -F 'git rev-parse --git-path tmp' "$DELEGATE_MD"
+  # --absolute-git-dir, NOT --git-path: --git-path is relative to the CWD and
+  # returns ../.git/tmp from any subdirectory. The launch block recursively
+  # deletes this directory, so the path must be absolute and free of "..".
+  run grep -F 'git rev-parse --absolute-git-dir' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
+  run grep -F 'git rev-parse --git-path tmp' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+}
+
+@test "packet allocation aborts instead of printing a bogus path" {
+  # Without set -e a failed mktemp leaves PACKET_DIR empty, the block prints
+  # "/packet.txt", and the launch block's recursive cleanup then targets "/".
+  alloc_block=$(awk '/Then allocate a unique packet path/,/Write the packet verbatim/' "$DELEGATE_MD")
+  printf '%s\n' "$alloc_block" | grep -qF 'set -euo pipefail'
+}
+
+@test "cleanup target is shape-checked before the recursive delete" {
+  # dirname "/packet.txt" is "/" and dirname "packet.txt" is "."; the EXIT trap
+  # would delete either wholesale, so only an allocated packet path is accepted.
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -qF '/*/yellow-linear-packet.??????/packet.txt'
+  printf '%s\n' "$launch_block" | grep -qF 'is not an allocated packet path'
 }
 
 @test "packet scratch directory is removed via trap on all exit paths" {

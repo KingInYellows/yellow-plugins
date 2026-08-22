@@ -329,13 +329,30 @@ the `Write` tool creates it. Each invocation gets its own `mktemp` directory so
 concurrent delegations of the same issue cannot overwrite each other's packets.
 
 ```bash
-set -uo pipefail
+set -euo pipefail
 
-GIT_TMP=$(git rev-parse --git-path tmp 2>/dev/null || true)
-if [ -z "$GIT_TMP" ]; then
+# --absolute-git-dir (not --git-path) because --git-path returns a path
+# relative to the CWD: `.git/tmp` from the repo root but `../.git/tmp` from any
+# subdirectory. The launch block deletes this directory, so it must be absolute
+# and free of `..` segments. This stays correct in a linked worktree, where it
+# resolves to that worktree's own git dir.
+GIT_DIR_ABS=$(git rev-parse --absolute-git-dir 2>/dev/null || true)
+if [ -n "$GIT_DIR_ABS" ]; then
+  GIT_TMP="${GIT_DIR_ABS}/tmp"
+else
   GIT_TMP="${TMPDIR:-/tmp}"
 fi
+case "$GIT_TMP" in
+  /*) ;;
+  *)
+    printf 'ERROR: could not resolve an absolute scratch directory (got "%s").\n' "$GIT_TMP" >&2
+    exit 1
+    ;;
+esac
 mkdir -p "$GIT_TMP"
+# set -e above is load-bearing: without it a failed mktemp leaves PACKET_DIR
+# empty, this prints "/packet.txt", and the launch block's cleanup would then
+# target "/".
 PACKET_DIR=$(mktemp -d "${GIT_TMP}/yellow-linear-packet.XXXXXX")
 PACKET_FILE="${PACKET_DIR}/packet.txt"
 printf '%s\n' "$PACKET_FILE"
@@ -385,13 +402,26 @@ case "$PACKET_FILE" in
     exit 1
     ;;
 esac
-PACKET_DIR=$(dirname -- "$PACKET_FILE")
-case "$PACKET_DIR" in
-  ../*|*/..|*/../*)
-    printf 'ERROR: PACKET_FILE "%s" is outside an allowed scratch directory.\n' "$PACKET_FILE" >&2
+# `cleanup` below is a RECURSIVE delete of this file's parent, so PACKET_FILE
+# must match exactly the shape the allocation step prints — an absolute
+# .../yellow-linear-packet.XXXXXX/packet.txt. Never weaken this to "dirname of
+# whatever was pasted": dirname "/packet.txt" is "/" and dirname "packet.txt"
+# is ".", and the EXIT trap would delete either one wholesale, including on the
+# missing-file refusal path below.
+case "$PACKET_FILE" in
+  /*/yellow-linear-packet.??????/packet.txt) ;;
+  *)
+    printf 'ERROR: PACKET_FILE "%s" is not an allocated packet path — re-run the allocation step and paste its printed path verbatim.\n' "$PACKET_FILE" >&2
     exit 1
     ;;
 esac
+case "$PACKET_FILE" in
+  */../*|*/..)
+    printf 'ERROR: PACKET_FILE "%s" contains a parent-directory segment.\n' "$PACKET_FILE" >&2
+    exit 1
+    ;;
+esac
+PACKET_DIR=$(dirname -- "$PACKET_FILE")
 
 cleanup() { rm -rf -- "$PACKET_DIR"; }
 trap cleanup EXIT
