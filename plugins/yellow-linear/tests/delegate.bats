@@ -118,16 +118,25 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "packet scratch path uses git-path tmp for worktree safety" {
-  run grep -F 'git rev-parse --git-path' "$DELEGATE_MD"
+@test "packet scratch path uses mktemp under git-path tmp" {
+  run grep -F 'mktemp -d "${GIT_TMP}/yellow-linear-packet.XXXXXX"' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
-  run grep -F 'yellow-linear-packet-' "$DELEGATE_MD"
+  run grep -F 'git rev-parse --git-path tmp' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
 }
 
-@test "packet scratch file is removed via trap on all exit paths" {
-  run grep -F 'trap '"'"'rm -f -- "$PACKET_FILE"'"'"' EXIT INT TERM' "$DELEGATE_MD"
+@test "packet scratch directory is removed via trap on all exit paths" {
+  run grep -F 'trap cleanup EXIT' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
+  run grep -F "trap 'exit 130' INT" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F "trap 'exit 143' TERM" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "idempotency key uses canonical CURSOR_REPO_URL" {
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -q 'IDEMPOTENCY_INPUT="${CURSOR_REPO_URL}'
 }
 
 @test "launch block re-reads git remote and branch instead of template substitution" {

@@ -264,13 +264,14 @@ as before; only truncate after that confirmation.
 
 **Idempotency key** (used for the Cursor launch only — Devin's V3 API has no
 idempotent-create field, so its own title-based dedup in `/devin:delegate`
-applies instead):
+applies instead). The Step 7 launch block derives the key from the canonical
+`CURSOR_REPO_URL` (https form passed to the CLI), not raw `git remote get-url`
+output, so SSH and HTTPS remotes for the same repository share one key:
 
 ```bash
-# REPO_URL / ISSUE_ID / PROVIDER / DELEGATION_REV are illustrative names —
-# substitute the concrete values already computed in the earlier steps of
-# this run (shell variables do not persist across separate Bash calls).
-IDEMPOTENCY_INPUT="${REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
+# Illustrative — Step 7 recomputes this inside the launch block after
+# CURSOR_REPO_URL is derived. Do not substitute REPO_URL here.
+IDEMPOTENCY_INPUT="${CURSOR_REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
 if command -v sha256sum >/dev/null 2>&1; then
   IDEMPOTENCY_KEY=$(printf '%s' "$IDEMPOTENCY_INPUT" | sha256sum | cut -d' ' -f1)
 elif command -v shasum >/dev/null 2>&1; then
@@ -311,55 +312,32 @@ before Step 7's launch, with no other step in between).
 
 > Shell variables do NOT persist across separate Bash tool calls. The launch
 > block below re-derives every git- and plugin-root value itself so nothing
-> from Step 3/4 assignments can be lost between calls. Only `ISSUE_ID` and
-> `delegation-rev` (from Steps 1 and 4) are substituted into the block —
-> both are format-validated before use. Never substitute `REPO_URL`, `BRANCH`,
-> `YELLOW_CURSOR_ROOT`, or `IDEMPOTENCY_KEY` literals: those are computed
-> inside the block from `git` and `claude plugin list --json`.
+> from Step 3/4 assignments can be lost between calls. Substitute `ISSUE_ID`,
+> `delegation-rev`, and the `PACKET_FILE` path printed by the path-allocation
+> step below — all three are format-validated before use. Never substitute
+> `REPO_URL`, `BRANCH`, `YELLOW_CURSOR_ROOT`, or `IDEMPOTENCY_KEY` literals:
+> those are computed inside the block from `git` and `claude plugin list --json`.
 
 **First, route the packet through a file with the `Write` tool — never into Bash
 source.** The packet contains untrusted Linear issue text; embedding it in
 shell source makes quotes and `$(...)` executable. `Write` does not interpret
 shell syntax.
 
-**Then resolve the packet path** (one Bash call — copy the printed path for
-`Write`). Replace each `YELLOW_TODO_` token with the concrete value from this
-run:
+**Then allocate a unique packet path** (one Bash call — copy the printed path for
+`Write`). The directory is created empty; do not create `packet.txt` in Bash —
+the `Write` tool creates it. Each invocation gets its own `mktemp` directory so
+concurrent delegations of the same issue cannot overwrite each other's packets.
 
 ```bash
 set -uo pipefail
 
-ISSUE_ID="YELLOW_TODO_issue_id"
-DELEGATION_REV="YELLOW_TODO_delegation_rev"
-
-case "$ISSUE_ID" in
-  *YELLOW_TODO_*|'')
-    printf 'ERROR: ISSUE_ID is missing or unsubstituted — set the concrete issue id before resolving the packet path.\n' >&2
-    exit 1
-    ;;
-esac
-if ! printf '%s' "$ISSUE_ID" | grep -qE '^[A-Z]{2,5}-[0-9]{1,6}$'; then
-  printf 'ERROR: ISSUE_ID "%s" failed format validation.\n' "$ISSUE_ID" >&2
-  exit 1
+GIT_TMP=$(git rev-parse --git-path tmp 2>/dev/null || true)
+if [ -z "$GIT_TMP" ]; then
+  GIT_TMP="${TMPDIR:-/tmp}"
 fi
-
-case "$DELEGATION_REV" in
-  *YELLOW_TODO_*|'')
-    printf 'ERROR: DELEGATION_REV is missing or unsubstituted — set the delegation-rev integer from Step 4.\n' >&2
-    exit 1
-    ;;
-  *[!0-9]*)
-    printf 'ERROR: DELEGATION_REV "%s" is not a non-negative integer.\n' "$DELEGATION_REV" >&2
-    exit 1
-    ;;
-esac
-
-PACKET_REL="tmp/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
-PACKET_FILE=$(git rev-parse --git-path "$PACKET_REL" 2>/dev/null || true)
-if [ -z "$PACKET_FILE" ]; then
-  PACKET_FILE="${TMPDIR:-/tmp}/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
-fi
-mkdir -p "$(dirname "$PACKET_FILE")"
+mkdir -p "$GIT_TMP"
+PACKET_DIR=$(mktemp -d "${GIT_TMP}/yellow-linear-packet.XXXXXX")
+PACKET_FILE="${PACKET_DIR}/packet.txt"
 printf '%s\n' "$PACKET_FILE"
 ```
 
@@ -368,14 +346,15 @@ Write the packet verbatim to the printed path with the `Write` tool.
 **Finally, run the whole launch as ONE Bash call** — plugin-root resolution,
 git remote/branch reads, `CURSOR_REPO_URL` derivation, idempotency-key
 computation, guards, and the `node` invocation. Do not split these across
-calls. Replace the two `YELLOW_TODO_` tokens with the same concrete values used
-for the path step:
+calls. Replace each `YELLOW_TODO_` token with the concrete value from this
+run (the packet path is the exact string printed above):
 
 ```bash
 set -uo pipefail
 
 ISSUE_ID="YELLOW_TODO_issue_id"
 DELEGATION_REV="YELLOW_TODO_delegation_rev"
+PACKET_FILE="YELLOW_TODO_packet_path_from_path_step"
 PROVIDER="cursor"
 
 case "$ISSUE_ID" in
@@ -400,13 +379,24 @@ case "$DELEGATION_REV" in
     ;;
 esac
 
-PACKET_REL="tmp/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
-PACKET_FILE=$(git rev-parse --git-path "$PACKET_REL" 2>/dev/null || true)
-if [ -z "$PACKET_FILE" ]; then
-  PACKET_FILE="${TMPDIR:-/tmp}/yellow-linear-packet-${ISSUE_ID}-${DELEGATION_REV}.txt"
-fi
+case "$PACKET_FILE" in
+  *YELLOW_TODO_*|'')
+    printf 'ERROR: PACKET_FILE is missing or unsubstituted — paste the path printed by the packet-allocation step.\n' >&2
+    exit 1
+    ;;
+esac
+PACKET_DIR=$(dirname -- "$PACKET_FILE")
+case "$PACKET_DIR" in
+  ../*|*/..|*/../*)
+    printf 'ERROR: PACKET_FILE "%s" is outside an allowed scratch directory.\n' "$PACKET_FILE" >&2
+    exit 1
+    ;;
+esac
 
-trap 'rm -f -- "$PACKET_FILE"' EXIT INT TERM
+cleanup() { rm -rf -- "$PACKET_DIR"; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if [ ! -f "$PACKET_FILE" ]; then
   printf 'ERROR: %s does not exist — write the delegation packet with the Write tool before running this block.\n' "$PACKET_FILE" >&2
@@ -497,7 +487,7 @@ if [ -z "$CURSOR_REPO_URL" ]; then
   exit 1
 fi
 
-IDEMPOTENCY_INPUT="${REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
+IDEMPOTENCY_INPUT="${CURSOR_REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
 if command -v sha256sum >/dev/null 2>&1; then
   IDEMPOTENCY_KEY=$(printf '%s' "$IDEMPOTENCY_INPUT" | sha256sum | cut -d' ' -f1)
 elif command -v shasum >/dev/null 2>&1; then
