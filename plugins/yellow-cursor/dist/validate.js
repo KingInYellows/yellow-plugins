@@ -49,8 +49,10 @@ exports.validatePrompt = validatePrompt;
 exports.validateArtifactRemotePath = validateArtifactRemotePath;
 exports.validateLocalOutPath = validateLocalOutPath;
 exports.resolveLocalOutPath = resolveLocalOutPath;
+exports.ensureContainedPathForWrite = ensureContainedPathForWrite;
 exports.validateMaxActive = validateMaxActive;
 exports.validateCursor = validateCursor;
+const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const errors_js_1 = require("./errors.js");
 const ALLOWED_REPO_HOSTS = new Set([
@@ -208,6 +210,60 @@ function resolveLocalOutPath(rootDir, input) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path escapes the artifact download directory');
     }
     return resolved;
+}
+async function lstatRejectSymlink(target) {
+    let stat;
+    try {
+        stat = await fs.promises.lstat(target);
+    }
+    catch (err) {
+        if (err.code === 'ENOENT')
+            return;
+        throw err;
+    }
+    if (stat.isSymbolicLink()) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', `refusing to follow symlink at ${target}`);
+    }
+}
+/**
+ * Create parent directories without following symlinks and verify every
+ * existing component under `rootDir` is a real directory (not a symlink).
+ */
+async function ensureContainedPathForWrite(rootDir, filePath) {
+    const resolvedRoot = path.resolve(rootDir);
+    const resolvedFile = path.resolve(filePath);
+    const rel = path.relative(resolvedRoot, resolvedFile);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path escapes the artifact download directory');
+    }
+    await lstatRejectSymlink(resolvedRoot);
+    try {
+        await fs.promises.mkdir(resolvedRoot, { recursive: false, mode: 0o700 });
+    }
+    catch (err) {
+        if (err.code !== 'EEXIST')
+            throw err;
+    }
+    const dirRel = path.dirname(rel);
+    if (dirRel === '.' || dirRel === '') {
+        await lstatRejectSymlink(resolvedFile);
+        return;
+    }
+    const segments = dirRel.split(path.sep).filter((segment) => segment.length > 0);
+    let current = resolvedRoot;
+    for (const segment of segments) {
+        current = path.join(current, segment);
+        await lstatRejectSymlink(current);
+        try {
+            await fs.promises.mkdir(current, { mode: 0o700 });
+        }
+        catch (err) {
+            if (err.code !== 'EEXIST')
+                throw err;
+        }
+        await lstatRejectSymlink(current);
+    }
+    await lstatRejectSymlink(resolvedFile);
 }
 function validateMaxActive(input) {
     if (!Number.isInteger(input) || input < 1 || input > 50) {

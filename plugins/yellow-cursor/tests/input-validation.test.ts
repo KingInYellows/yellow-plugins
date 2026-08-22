@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AppErrorException } from '../src/errors.js';
 import {
@@ -13,6 +17,7 @@ import {
   validateRunId,
   validateLocalOutPath,
   resolveLocalOutPath,
+  ensureContainedPathForWrite,
 } from '../src/validate.js';
 
 function expectInvalid(fn: () => unknown): void {
@@ -244,6 +249,36 @@ describe('resolveLocalOutPath', () => {
       '/tmp/artifact-downloads/nested/out.txt'
     );
     expectInvalid(() => resolveLocalOutPath(root, '../outside.txt'));
+  });
+});
+
+describe('ensureContainedPathForWrite', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'yellow-cursor-path-')
+    );
+  });
+
+  afterEach(async () => {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('rejects symlink directory components under the download root', async () => {
+    const root = path.join(tmpDir, 'artifact-downloads');
+    await fs.promises.mkdir(root, { recursive: true });
+    const escapeTarget = path.join(tmpDir, 'outside');
+    await fs.promises.mkdir(escapeTarget);
+    await fs.promises.symlink(escapeTarget, path.join(root, 'escape-link'));
+    await expect(
+      ensureContainedPathForWrite(
+        root,
+        path.join(root, 'escape-link', 'stolen.txt')
+      )
+    ).rejects.toMatchObject({
+      appError: { code: 'CURSOR_INVALID_INPUT' },
+    });
   });
 });
 

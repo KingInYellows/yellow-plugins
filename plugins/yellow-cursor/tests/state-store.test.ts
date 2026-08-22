@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { AppErrorException } from '../src/errors.js';
 import {
   findByAgentId,
   findByIdempotencyKey,
@@ -14,7 +15,6 @@ import {
   writeIndex,
   type AgentRecord,
 } from '../src/state.js';
-import { AppErrorException } from '../src/errors.js';
 
 let tmpDir: string;
 let stateFile: string;

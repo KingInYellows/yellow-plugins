@@ -5,6 +5,7 @@
  * what keeps `delegate --dry-run` a zero-network operation.
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { throwAppError } from './errors.js';
@@ -271,6 +272,69 @@ export function resolveLocalOutPath(rootDir: string, input: string): string {
     );
   }
   return resolved;
+}
+
+async function lstatRejectSymlink(target: string): Promise<void> {
+  let stat: fs.Stats;
+  try {
+    stat = await fs.promises.lstat(target);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw err;
+  }
+  if (stat.isSymbolicLink()) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      `refusing to follow symlink at ${target}`
+    );
+  }
+}
+
+/**
+ * Create parent directories without following symlinks and verify every
+ * existing component under `rootDir` is a real directory (not a symlink).
+ */
+export async function ensureContainedPathForWrite(
+  rootDir: string,
+  filePath: string
+): Promise<void> {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedFile = path.resolve(filePath);
+  const rel = path.relative(resolvedRoot, resolvedFile);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path escapes the artifact download directory'
+    );
+  }
+
+  await lstatRejectSymlink(resolvedRoot);
+  try {
+    await fs.promises.mkdir(resolvedRoot, { recursive: false, mode: 0o700 });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+  }
+
+  const dirRel = path.dirname(rel);
+  if (dirRel === '.' || dirRel === '') {
+    await lstatRejectSymlink(resolvedFile);
+    return;
+  }
+
+  const segments = dirRel.split(path.sep).filter((segment) => segment.length > 0);
+  let current = resolvedRoot;
+  for (const segment of segments) {
+    current = path.join(current, segment);
+    await lstatRejectSymlink(current);
+    try {
+      await fs.promises.mkdir(current, { mode: 0o700 });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+    await lstatRejectSymlink(current);
+  }
+
+  await lstatRejectSymlink(resolvedFile);
 }
 
 export function validateMaxActive(input: number): number {

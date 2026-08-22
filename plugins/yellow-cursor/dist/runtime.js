@@ -52,7 +52,6 @@ exports.unarchive = unarchive;
 exports.artifacts = artifacts;
 exports.usage = usage;
 const fs = __importStar(require("node:fs"));
-const path = __importStar(require("node:path"));
 const config_js_1 = require("./config.js");
 const config_js_2 = require("./config.js");
 const errors_js_1 = require("./errors.js");
@@ -216,10 +215,18 @@ async function delegate(deps, args) {
         if (existing && !(0, state_js_1.isTerminalStatus)(existing.status)) {
             (0, errors_js_1.throwAppError)('CURSOR_DUPLICATE_LAUNCH', `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`);
         }
-        const localActive = (0, state_js_1.countLocalActiveForRepo)(readResult.index, repoUrl);
-        const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
-        if (remoteActive + localActive >= maxActive) {
-            (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `${remoteActive + localActive} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`);
+    });
+    const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+    await (0, state_js_1.withStateLock)(deps.stateFilePath, async () => {
+        const readResult = await (0, state_js_1.readIndex)(deps.stateFilePath);
+        (0, state_js_1.throwIfQuarantined)(readResult);
+        const existing = (0, state_js_1.findByIdempotencyKey)(readResult.index, idempotencyKey);
+        if (existing && !(0, state_js_1.isTerminalStatus)(existing.status)) {
+            (0, errors_js_1.throwAppError)('CURSOR_DUPLICATE_LAUNCH', `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`);
+        }
+        const localPending = (0, state_js_1.countLocalPendingReservationsForRepo)(readResult.index, repoUrl);
+        if (remoteActive + localPending >= maxActive) {
+            (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `${remoteActive + localPending} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`);
         }
         await (0, state_js_1.upsertRecordUnderLock)(deps.stateFilePath, reservation);
     });
@@ -511,19 +518,8 @@ async function unarchive(deps, args) {
     await touchLocalRecordForAgent(deps, agentId, info.status ?? 'unknown');
     return { operation: 'unarchive', agentId, alreadyInState: false };
 }
-async function writeArtifactFile(localPath, buffer) {
-    const dir = path.dirname(localPath);
-    await fs.promises.mkdir(dir, { recursive: true });
-    try {
-        const stat = await fs.promises.lstat(localPath);
-        if (stat.isSymbolicLink()) {
-            (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', `refusing to write through symlink at ${localPath}`);
-        }
-    }
-    catch (err) {
-        if (err.code !== 'ENOENT')
-            throw err;
-    }
+async function writeArtifactFile(downloadRoot, localPath, buffer) {
+    await (0, validate_js_1.ensureContainedPathForWrite)(downloadRoot, localPath);
     await fs.promises.writeFile(localPath, buffer, { mode: 0o600 });
 }
 async function artifacts(deps, args) {
@@ -542,7 +538,7 @@ async function artifacts(deps, args) {
     const downloadRoot = (0, config_js_2.resolveArtifactDownloadDir)(deps.dataDir);
     const localPath = (0, validate_js_1.resolveLocalOutPath)(downloadRoot, args.out);
     const buffer = await deps.adapter.downloadArtifact(agentId, remotePath);
-    await writeArtifactFile(localPath, buffer);
+    await writeArtifactFile(downloadRoot, localPath, buffer);
     return {
         operation: 'artifacts',
         agentId,

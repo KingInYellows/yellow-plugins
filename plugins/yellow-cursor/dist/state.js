@@ -54,7 +54,7 @@ exports.upsertRecord = upsertRecord;
 exports.findByIdempotencyKey = findByIdempotencyKey;
 exports.findByAgentId = findByAgentId;
 exports.isTerminalStatus = isTerminalStatus;
-exports.countLocalActiveForRepo = countLocalActiveForRepo;
+exports.countLocalPendingReservationsForRepo = countLocalPendingReservationsForRepo;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
@@ -286,9 +286,7 @@ exports.LOCAL_ONLY_STATUSES = new Set(['pending-launch', 'unknown']);
 function isTerminalStatus(status) {
     return exports.TERMINAL_AGENT_STATUSES.has(status);
 }
-/** Non-terminal local records that occupy a concurrency slot for a repository. */
-function countLocalActiveForRepo(index, repoUrl) {
-    return Object.values(index).filter((record) => record.repository === repoUrl &&
-        !isTerminalStatus(record.status) &&
-        record.status !== 'unknown').length;
+/** Local pending-launch reservations not yet visible in remote agent listings. */
+function countLocalPendingReservationsForRepo(index, repoUrl) {
+    return Object.values(index).filter((record) => record.repository === repoUrl && record.status === 'pending-launch').length;
 }

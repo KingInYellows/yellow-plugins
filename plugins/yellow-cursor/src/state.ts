@@ -321,15 +321,13 @@ export function isTerminalStatus(status: string): boolean {
   return TERMINAL_AGENT_STATUSES.has(status);
 }
 
-/** Non-terminal local records that occupy a concurrency slot for a repository. */
-export function countLocalActiveForRepo(
+/** Local pending-launch reservations not yet visible in remote agent listings. */
+export function countLocalPendingReservationsForRepo(
   index: AgentIndex,
   repoUrl: string
 ): number {
   return Object.values(index).filter(
     (record) =>
-      record.repository === repoUrl &&
-      !isTerminalStatus(record.status) &&
-      record.status !== 'unknown'
+      record.repository === repoUrl && record.status === 'pending-launch'
   ).length;
 }

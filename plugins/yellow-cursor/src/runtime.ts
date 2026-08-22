@@ -7,7 +7,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 import { hasEnvApiKey, type CredentialSource } from './config.js';
 import { resolveArtifactDownloadDir } from './config.js';
@@ -18,7 +17,7 @@ import {
   type SdkResolutionState,
 } from './sdk-resolver.js';
 import {
-  countLocalActiveForRepo,
+  countLocalPendingReservationsForRepo,
   digestPrompt,
   findByAgentId,
   findByIdempotencyKey,
@@ -47,6 +46,7 @@ import {
   validateCursor,
   validateIdempotencyKey,
   resolveLocalOutPath,
+  ensureContainedPathForWrite,
   validateMaxActive,
   validateModelId,
   validatePrompt,
@@ -333,13 +333,32 @@ export async function delegate(
         `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`
       );
     }
+  });
 
-    const localActive = countLocalActiveForRepo(readResult.index, repoUrl);
-    const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
-    if (remoteActive + localActive >= maxActive) {
+  const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+
+  await withStateLock(deps.stateFilePath, async () => {
+    const readResult = await readIndex(deps.stateFilePath);
+    throwIfQuarantined(readResult);
+    const existing = findByIdempotencyKey(
+      readResult.index,
+      idempotencyKey
+    );
+    if (existing && !isTerminalStatus(existing.status)) {
+      throwAppError(
+        'CURSOR_DUPLICATE_LAUNCH',
+        `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`
+      );
+    }
+
+    const localPending = countLocalPendingReservationsForRepo(
+      readResult.index,
+      repoUrl
+    );
+    if (remoteActive + localPending >= maxActive) {
       throwAppError(
         'CURSOR_CONCURRENCY_LIMIT',
-        `${remoteActive + localActive} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`
+        `${remoteActive + localPending} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`
       );
     }
 
@@ -860,22 +879,11 @@ export interface ArtifactsResult {
 }
 
 async function writeArtifactFile(
+  downloadRoot: string,
   localPath: string,
   buffer: Buffer
 ): Promise<void> {
-  const dir = path.dirname(localPath);
-  await fs.promises.mkdir(dir, { recursive: true });
-  try {
-    const stat = await fs.promises.lstat(localPath);
-    if (stat.isSymbolicLink()) {
-      throwAppError(
-        'CURSOR_INVALID_INPUT',
-        `refusing to write through symlink at ${localPath}`
-      );
-    }
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-  }
+  await ensureContainedPathForWrite(downloadRoot, localPath);
   await fs.promises.writeFile(localPath, buffer, { mode: 0o600 });
 }
 
@@ -903,7 +911,7 @@ export async function artifacts(
   const downloadRoot = resolveArtifactDownloadDir(deps.dataDir);
   const localPath = resolveLocalOutPath(downloadRoot, args.out);
   const buffer = await deps.adapter.downloadArtifact(agentId, remotePath);
-  await writeArtifactFile(localPath, buffer);
+  await writeArtifactFile(downloadRoot, localPath, buffer);
   return {
     operation: 'artifacts',
     agentId,
