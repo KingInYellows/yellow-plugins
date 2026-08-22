@@ -144,7 +144,11 @@ async function countActiveAgentsForRepo(adapter, repoUrl, maxActive) {
         // agents still occupy these pages. At this account size the cap is simply
         // not automatically enforceable, and saying so is more useful than naming
         // an action that does nothing.
-        recoveryAction: 'No flag clears this: the account has more cloud agents than the bounded sweep can enumerate, and neither raising --max-active nor archiving reduces the page count. Review running agents yourself with /cursor:list, then launch via /cursor:delegate once you have confirmed there is capacity.',
+        recoveryAction: 'No flag clears this: the account has more cloud agents than the ' +
+            'bounded sweep can enumerate, and neither raising --max-active nor ' +
+            'archiving reduces the page count. Review running agents yourself ' +
+            'with /cursor:list, then launch via /cursor:delegate once you have ' +
+            'confirmed there is capacity.',
     });
 }
 async function readHealthyIndex(stateFilePath) {
