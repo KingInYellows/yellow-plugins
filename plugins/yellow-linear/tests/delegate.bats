@@ -137,6 +137,22 @@ setup() {
   printf '%s\n' "$alloc_block" | grep -qF 'set -euo pipefail'
 }
 
+@test "launch metadata is substituted into single quotes, never double" {
+  # Substitution happens before this block's own checks run. In double quotes
+  # bash expands $(...) at assignment time, so validation would only reject a
+  # value whose payload had already executed. Single quotes keep it inert text.
+  launch_block=$(awk '/^### Step 7: Launch/,/^### Step 8:/' "$DELEGATE_MD")
+  printf '%s\n' "$launch_block" | grep -qF "ISSUE_ID='YELLOW_TODO_issue_id'"
+  printf '%s\n' "$launch_block" | grep -qF "DELEGATION_REV='YELLOW_TODO_delegation_rev'"
+  printf '%s\n' "$launch_block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
+  run grep -F 'ISSUE_ID="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+  run grep -F 'DELEGATION_REV="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+  run grep -F 'PACKET_FILE="YELLOW_TODO' "$DELEGATE_MD"
+  [ "$status" -ne 0 ]
+}
+
 @test "cleanup target is shape-checked before the recursive delete" {
   # dirname "/packet.txt" is "/" and dirname "packet.txt" is "."; the EXIT trap
   # would delete either wholesale, so only an allocated packet path is accepted.

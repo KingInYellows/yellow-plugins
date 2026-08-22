@@ -314,9 +314,15 @@ before Step 7's launch, with no other step in between).
 > block below re-derives every git- and plugin-root value itself so nothing
 > from Step 3/4 assignments can be lost between calls. Substitute `ISSUE_ID`,
 > `delegation-rev`, and the `PACKET_FILE` path printed by the path-allocation
-> step below — all three are format-validated before use. Never substitute
-> `REPO_URL`, `BRANCH`, `YELLOW_CURSOR_ROOT`, or `IDEMPOTENCY_KEY` literals:
-> those are computed inside the block from `git` and `claude plugin list --json`.
+> step below — **each into the single-quoted slot provided, never into double
+> quotes**. Substitution happens before the block's own checks run, so a value
+> in double quotes is expanded by bash first and a `$(...)` in it executes
+> before any validation can reject it; single quotes keep it inert text. If a
+> value contains a single quote, stop and report it rather than pasting — it
+> would close the quoting, and none of the three formats permits one. Never
+> substitute `REPO_URL`, `BRANCH`, `YELLOW_CURSOR_ROOT`, or `IDEMPOTENCY_KEY`
+> literals: those are computed inside the block from `git` and
+> `claude plugin list --json`.
 
 **First, route the packet through a file with the `Write` tool — never into Bash
 source.** The packet contains untrusted Linear issue text; embedding it in
@@ -369,9 +375,16 @@ run (the packet path is the exact string printed above):
 ```bash
 set -uo pipefail
 
-ISSUE_ID="YELLOW_TODO_issue_id"
-DELEGATION_REV="YELLOW_TODO_delegation_rev"
-PACKET_FILE="YELLOW_TODO_packet_path_from_path_step"
+# The single quotes below are load-bearing. These three values are substituted
+# into this source before any check in this block runs, so inside DOUBLE quotes
+# bash would expand $(...) at assignment time and the validation further down
+# would only reject a value whose payload had already executed. Single quotes
+# make the text inert, so the format checks decide. Refuse to substitute any
+# value containing a single quote — none of the three formats permits one, and
+# it would close the quoting.
+ISSUE_ID='YELLOW_TODO_issue_id'
+DELEGATION_REV='YELLOW_TODO_delegation_rev'
+PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'
 PROVIDER="cursor"
 
 case "$ISSUE_ID" in
