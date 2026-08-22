@@ -10,7 +10,7 @@ of their own.
 ```
 plugins/yellow-cursor/
   package.json          # yellow-cursor, private, @cursor/sdk "1.0.28" (exact)
-  tsconfig.json          # extends ../../tsconfig.base.json, module commonjs
+  tsconfig.json          # extends ../../tsconfig.base.json, module node16 (CJS emit)
   src/
     cli.ts               # entry: parseArgs, subcommands, JSON->stdout, exit codes
     runtime.ts            # typed operations layer, takes an SdkAdapter via DI

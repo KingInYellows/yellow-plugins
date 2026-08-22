@@ -21,19 +21,27 @@ const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 );
-const distDir = path.join(packageRoot, 'dist');
-const cliPath = path.join(distDir, 'cli.js');
+// Build into a per-run temp directory rather than the package's dist/ —
+// dist/ is COMMITTED (installed plugins ship the compiled CLI), so the test
+// must never delete or overwrite it.
+let buildDir: string;
+let cliPath: string;
 
 let dataDir: string;
 
 beforeAll(async () => {
-  await fs.promises.rm(distDir, { recursive: true, force: true });
+  buildDir = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), 'yellow-cursor-build-')
+  );
+  cliPath = path.join(buildDir, 'cli.js');
   execFileSync(
     'node',
     [
       path.join(packageRoot, 'node_modules', 'typescript', 'bin', 'tsc'),
       '-p',
       'tsconfig.json',
+      '--outDir',
+      buildDir,
     ],
     {
       cwd: packageRoot,
@@ -46,7 +54,8 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await fs.promises.rm(distDir, { recursive: true, force: true });
+  if (buildDir)
+    await fs.promises.rm(buildDir, { recursive: true, force: true });
   if (dataDir) await fs.promises.rm(dataDir, { recursive: true, force: true });
 });
 

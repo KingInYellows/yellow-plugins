@@ -67,6 +67,7 @@ jobs:
           - solutions
           - authoring
           - codex
+          - cursor
           - generated
 
     steps:
@@ -179,6 +180,12 @@ jobs:
               # need parity so a fork contributor changing catalog/ or
               # committed .agents/ artifacts sees the same blocking signal.
               node scripts/validate-codex.js
+              ;;
+            cursor)
+              # Cursor-artifact schema validation + exposure lint + lifecycle
+              # non-emission scan (mirror of the main workflow's `cursor`
+              # target) so fork PRs see the same blocking signal.
+              node scripts/validate-cursor.js
               ;;
             generated)
               # Schema conformance gate (mirror of the main workflow's

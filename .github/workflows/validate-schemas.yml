@@ -112,6 +112,7 @@ jobs:
           - authoring
           - plans
           - codex
+          - cursor
           - generated
 
     steps:
@@ -315,6 +316,14 @@ jobs:
                 # scripts/validate-codex.js.
                 echo "::group::Codex artifact + exposure validation"
                 node scripts/validate-codex.js
+                echo "::endgroup::"
+                ;;
+              cursor)
+                # Cursor-artifact schema validation + the exposure lint over
+                # every Cursor-enabled plugin's generated output, plus the
+                # lifecycle non-emission scan. See scripts/validate-cursor.js.
+                echo "::group::Cursor artifact + exposure validation"
+                node scripts/validate-cursor.js
                 echo "::endgroup::"
                 ;;
               generated)
@@ -1044,6 +1053,13 @@ jobs:
           {
             echo "::group::Building workspace packages"
             pnpm build
+            echo "::endgroup::"
+            echo "::group::Committed yellow-cursor dist drift check"
+            # plugins/yellow-cursor/dist is committed (gitignore negation) so
+            # installed plugins ship a runnable CLI; the rebuild above must
+            # reproduce it byte-for-byte from src/ at the lockfile's
+            # TypeScript version.
+            git diff --exit-code -- plugins/yellow-cursor/dist
             echo "::endgroup::"
           } 2>&1 | tee -a "$LOG_PATH"
 
