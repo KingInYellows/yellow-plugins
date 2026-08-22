@@ -1,0 +1,42 @@
+catalog/README.md
+  s_ca129cb3ac489c::t_f68feb73cb3aa1 26-32,39-48
+CLAUDE.md
+  s_ca129cb3ac489c::t_4e3579fc34c1ce 8,183-184,290
+  s_ca129cb3ac489c::t_21a29aed9b118d 182,185-186
+  s_ca129cb3ac489c::t_d9dcec162fc92b 33
+  s_ca129cb3ac489c::t_53fe75b445bedb 44
+docs/codex-distribution.md
+  s_ca129cb3ac489c::t_0737d767bdbadf 12-15
+README.md
+  s_ca129cb3ac489c::t_8fd6c434508ca4 33
+  s_ca129cb3ac489c::t_b3d953576aa842 45-48,54
+  s_ca129cb3ac489c::t_95426293c203d9 49-53
+  s_ca129cb3ac489c::t_220b882f132811 289
+  s_ca129cb3ac489c::t_58f62e4d76b4bd 3
+docs/upstream-pins.md
+  s_ca129cb3ac489c::t_dc1dcf279be6f4 41-42,46-49,52-56,59-63
+  s_ca129cb3ac489c::t_8742d50bb7be3e 39-40,43-45,50-51,57-58
+  s_ca129cb3ac489c::t_259f6d9a5c6f3e 64
+AGENTS.md
+  s_ca129cb3ac489c::t_97f6df3004bd78 19-22
+  s_ca129cb3ac489c::t_5657d7f0a2e5af 296-299
+docs/cursor-distribution.md
+  s_ca129cb3ac489c::t_95426293c203d9 4-8,16-19,28-29,31-33,37-39,41-42,46-60,65-68,73-75,82-83,85,89-95,103-119,126-128,131-134,138-140,150-151,155-156,161-165,173-176,180-190,196-199,202-203,207-227,231-232,235-236
+  s_ca129cb3ac489c::t_db241606abe0c3 1-3,9-15,20-27,30,34-36,40,43-45,61-64,69-72,76-81,84,86-88,96-102,120-125,129-130,135-137,141-149,152-154,157-160,166-172,177-179,191-195,200-201,204-206,228-230,233-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a54cb6fc586010909f7459a047510f2fbd41eec1",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
