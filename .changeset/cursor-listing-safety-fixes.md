@@ -17,11 +17,11 @@ archived agents, so they stayed in `/cursor:list` despite the archive and
 unarchive command contracts promising the opposite. Archived visibility is now
 caller-driven — excluded from the default listing and the concurrency sweep,
 included for canonical-id reconciliation, which must still find an agent
-archived between `send()` and the sweep — and opt-in via `/cursor:list
---archived`.
+archived between `send()` and the sweep — and opt-in via
+`/cursor:list --archived`.
 
 `/linear:delegate`'s launch step consumed shell variables assigned in earlier
 Bash calls, which do not persist, and derived `CURSOR_REPO_URL` after the block
-that used it. The derivation now precedes the launch and every required value
-is asserted non-empty first, so a missing plugin root or empty delegation packet
+that used it. The derivation now precedes the launch and every required value is
+asserted non-empty first, so a missing plugin root or empty delegation packet
 fails loudly instead of launching a billable agent with no instructions.
