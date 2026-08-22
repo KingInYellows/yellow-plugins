@@ -1,0 +1,67 @@
+plugins/yellow-cursor/commands/cursor/cancel.md
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 13-14,34-35,49-50,73-74,79-85
+  s_ca129cb3ac489c::t_8c1c0a7a42703d 1-2,4-12,15-33,36-48,51-72,75-78,86-88
+  s_ca129cb3ac489c::t_f02b4a14292871 3
+plugins/yellow-cursor/commands/cursor/archive.md
+  s_ca129cb3ac489c::t_ad56687f559f44 3
+  s_ca129cb3ac489c::t_51bf6c4b40468a 1-2,4-11,14-39,42-55,59-83,90-92
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12-13,40-41,56-58,84-89
+plugins/yellow-cursor/skills/cursor-delegation/SKILL.md
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 11-15,20-25,29-32,38-45,47-48,50-51,55-57,61-66,68-84,88-89,93-101
+  s_ca129cb3ac489c::t_8848bfda07f39f 3
+  s_ca129cb3ac489c::t_6778a897ccb038 1-2,4-10,16-19,26-28,33-37,46,49,52-54,58-60,67,85-87,90-92,102-105
+plugins/yellow-cursor/CLAUDE.md
+  s_ca129cb3ac489c::t_61a5ae97f5324e 1-2,7-31,37-39,45-47,56-61,89-92,101-103,106-114,120-129,132-139,146-149,152,158-159
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 3-6,32-36,40-44,48-55,62-88,93-100,104-105,115-119,130-131,140-145,150-151,153-157,160-161
+plugins/yellow-cursor/commands/cursor/status.md
+  s_ca129cb3ac489c::t_1b88306f56cafc 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12,32-33,35-36,56-57,61-62,66-70
+  s_ca129cb3ac489c::t_48c21e9ce6b2ed 1-2,4-11,13-31,34,37-55,58-60,63-65,71-73
+plugins/yellow-cursor/commands/cursor/usage.md
+  s_ca129cb3ac489c::t_51a924793a172b 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 11-12,32-33,45-46,50-54
+  s_ca129cb3ac489c::t_cc927dc98e548a 1-2,4-10,13-31,34-44,47-49,55-57
+plugins/yellow-cursor/commands/cursor/follow-up.md
+  s_ca129cb3ac489c::t_c8727df059cd1e 1-2,4-11,16-34,38-60,63-65,68,72,77-79,90-91
+  s_ca129cb3ac489c::t_981fc710133788 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12-15,35-37,61-62,66-67,69-71,73-76,80-89
+plugins/yellow-cursor/README.md
+  s_ca129cb3ac489c::t_0349af7e0b2c9f 1-2,7-14,16-20,27,30-31,34-36,43-45,58-65,68-77,83,88-91,94-96,99,106-111,114,124-127
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 3-6,15,21-26,28-29,32-33,37-42,46-57,66-67,78-82,84-87,92-93,97-98,100-105,112-113,115-123
+plugins/yellow-cursor/commands/cursor/delegate.md
+  s_ca129cb3ac489c::t_674be9e6c4c777 1-2,5-11,15-37,40-71,80-98,102-122,127,131-133
+  s_ca129cb3ac489c::t_8f41b1a2b6cd2e 3-4
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12-14,38-39,72-79,99-101,123-126,128-130,134-149
+plugins/yellow-cursor/commands/cursor/artifacts.md
+  s_ca129cb3ac489c::t_5dedfb7cc6c37a 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12-13,34-37,39-40,68-73
+  s_ca129cb3ac489c::t_ee8a24924d8b8c 1-2,4-11,14-33,38,41-67,74-76
+plugins/yellow-cursor/commands/cursor/setup.md
+  s_ca129cb3ac489c::t_461766504848e4 1-2,4-16,20-21,28-46,49-80,84-92
+  s_ca129cb3ac489c::t_ef1363d95b6f9c 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 17-19,22-27,47-48,81-83,93-100
+plugins/yellow-cursor/commands/cursor/unarchive.md
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 12-13,35-36,42-43,65-69
+  s_ca129cb3ac489c::t_b9377215be614f 3
+  s_ca129cb3ac489c::t_ad913988f55c9b 1-2,4-11,14-34,37-41,44-64,70-72
+plugins/yellow-cursor/commands/cursor/list.md
+  s_ca129cb3ac489c::t_a3881ee2909d06 1-2,4-52,55-63,69-71
+  s_ca129cb3ac489c::t_66805a229f5d97 3
+  s_ca129cb3ac489c::t_e8cd76897c2cfd 53-54,64-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "4e63640829e1937a05cbbc5ff47eaadeb3f4e95c",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
