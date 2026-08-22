@@ -103,17 +103,31 @@ resolve_plugin_root() {
       try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
       if (!Array.isArray(rows)) rows = [];
       const name = process.argv[1];
+      const projectPath = process.argv[2] || '';
       const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
       const candidates = rows
-        .filter((row) =>
-          row && typeof row === "object" &&
-          row.id === `${name}@yellow-plugins` &&
-          row.enabled === true &&
-          typeof row.installPath === "string" && row.installPath.length > 0
-        )
+        .filter((row) => {
+          if (
+            row === null ||
+            typeof row !== 'object' ||
+            row.id !== `${name}@yellow-plugins` ||
+            row.enabled !== true ||
+            typeof row.installPath !== 'string' ||
+            row.installPath.length === 0
+          ) {
+            return false;
+          }
+          if (
+            (row.scope === 'project' || row.scope === 'local') &&
+            projectPath.length > 0
+          ) {
+            return row.projectPath === projectPath;
+          }
+          return true;
+        })
         .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
       process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
-    ' "$name" 2>/dev/null)
+    ' "$name" "${repo_root:-}" 2>/dev/null)
   fi
   if [ -z "$root" ] || [ ! -f "$root/$required" ]; then
     local repo_root
@@ -132,6 +146,8 @@ if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
   exit 0
 fi
 
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+
 YELLOW_CORE_ROOT=$(resolve_plugin_root yellow-core lib/remote-agent-provider-state.js)
 if [ -z "$YELLOW_CORE_ROOT" ]; then
   printf 'remote_agent_error: yellow-core is not installed (or its remote-agent-provider-state.js is missing) — install yellow-core to enable remote-agent delegation.\n'
@@ -147,8 +163,6 @@ fi
 YELLOW_CURSOR_ROOT=$(resolve_plugin_root yellow-cursor dist/cli.js)
 TOOLING_CURSOR=$([ -n "$YELLOW_CURSOR_ROOT" ] && printf yes || printf no)
 TOOLING_DEVIN=$([ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -n "${DEVIN_ORG_ID:-}" ] && printf yes || printf no)
-
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 
 CLASSIFICATION=$(printf '%s' "$_plugin_list_json" | node -e '
   const fs = require("fs");

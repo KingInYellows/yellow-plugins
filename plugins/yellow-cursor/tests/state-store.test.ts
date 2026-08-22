@@ -8,11 +8,13 @@ import {
   findByAgentId,
   findByIdempotencyKey,
   readIndex,
+  throwIfQuarantined,
   upsertRecord,
   withStateLock,
   writeIndex,
   type AgentRecord,
 } from '../src/state.js';
+import { AppErrorException } from '../src/errors.js';
 
 let tmpDir: string;
 let stateFile: string;
@@ -148,6 +150,21 @@ describe('corrupt-file quarantine', () => {
     await upsertRecord(stateFile, makeRecord({ idempotencyKey: 'fresh' }));
     const { index } = await readIndex(stateFile);
     expect(index['fresh']).toBeDefined();
+  });
+
+  it('throwIfQuarantined surfaces CURSOR_STATE_CORRUPT instead of silent empty index', async () => {
+    await fs.promises.mkdir(path.dirname(stateFile), { recursive: true });
+    await fs.promises.writeFile(stateFile, 'garbage');
+    const result = await readIndex(stateFile);
+    expect(() => throwIfQuarantined(result)).toThrow(AppErrorException);
+    try {
+      throwIfQuarantined(result);
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppErrorException);
+      expect((err as AppErrorException).appError.code).toBe(
+        'CURSOR_STATE_CORRUPT'
+      );
+    }
   });
 });
 

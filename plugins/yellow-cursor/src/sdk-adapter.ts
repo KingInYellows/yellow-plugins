@@ -307,7 +307,7 @@ export class CursorSdkAdapter implements SdkAdapter {
       return { supported: true, value: toAdapterUsage(usage) };
     } catch (err) {
       const adapterErr = classifySdkError(err, sdk);
-      if (adapterErr.kind === 'unknown' || adapterErr.kind === 'not_found') {
+      if (adapterErr.kind === 'unknown') {
         return { supported: false, reason: adapterErr.message };
       }
       throw adapterErr;
@@ -324,7 +324,7 @@ export class CursorSdkAdapter implements SdkAdapter {
       return { supported: true, value: artifacts.map(toAdapterArtifact) };
     } catch (err) {
       const adapterErr = classifySdkError(err, sdk);
-      if (adapterErr.kind === 'unknown' || adapterErr.kind === 'not_found') {
+      if (adapterErr.kind === 'unknown') {
         return { supported: false, reason: adapterErr.message };
       }
       throw adapterErr;

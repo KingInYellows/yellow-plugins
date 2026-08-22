@@ -46,15 +46,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LOCAL_ONLY_STATUSES = exports.TERMINAL_AGENT_STATUSES = exports.TERMINAL_RUN_STATUSES = void 0;
 exports.digestPrompt = digestPrompt;
 exports.readIndex = readIndex;
+exports.throwIfQuarantined = throwIfQuarantined;
 exports.writeIndex = writeIndex;
 exports.withStateLock = withStateLock;
+exports.upsertRecordUnderLock = upsertRecordUnderLock;
 exports.upsertRecord = upsertRecord;
 exports.findByIdempotencyKey = findByIdempotencyKey;
 exports.findByAgentId = findByAgentId;
 exports.isTerminalStatus = isTerminalStatus;
+exports.countLocalActiveForRepo = countLocalActiveForRepo;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
+const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
 function digestPrompt(prompt) {
     return crypto.createHash('sha256').update(prompt, 'utf8').digest('hex');
@@ -133,6 +137,14 @@ async function readIndex(stateFilePath) {
         return { index: {}, quarantined: true, quarantinePath };
     }
     return { index: parsed, quarantined: false };
+}
+function throwIfQuarantined(result) {
+    if (!result.quarantined)
+        return;
+    const detail = result.quarantinePath !== undefined
+        ? `local state was quarantined to ${result.quarantinePath}`
+        : 'local state was quarantined';
+    (0, errors_js_1.throwAppError)('CURSOR_STATE_CORRUPT', detail);
 }
 async function writeIndex(stateFilePath, index) {
     (0, redact_js_1.assertNoSecretShapedValues)(index);
@@ -235,13 +247,22 @@ async function withStateLock(stateFilePath, fn, config = DEFAULT_LOCK_CONFIG) {
         await releaseLock(stateDir, owner);
     }
 }
+/**
+ * Read-modify-write without acquiring the lock — caller must already hold it
+ * via `withStateLock`.
+ */
+async function upsertRecordUnderLock(stateFilePath, record) {
+    const readResult = await readIndex(stateFilePath);
+    throwIfQuarantined(readResult);
+    const next = {
+        ...readResult.index,
+        [record.idempotencyKey]: record,
+    };
+    await writeIndex(stateFilePath, next);
+    return next;
+}
 async function upsertRecord(stateFilePath, record) {
-    return withStateLock(stateFilePath, async () => {
-        const { index } = await readIndex(stateFilePath);
-        const next = { ...index, [record.idempotencyKey]: record };
-        await writeIndex(stateFilePath, next);
-        return next;
-    });
+    return withStateLock(stateFilePath, async () => upsertRecordUnderLock(stateFilePath, record));
 }
 function findByIdempotencyKey(index, idempotencyKey) {
     return index[idempotencyKey];
@@ -264,4 +285,10 @@ exports.TERMINAL_AGENT_STATUSES = new Set([
 exports.LOCAL_ONLY_STATUSES = new Set(['pending-launch', 'unknown']);
 function isTerminalStatus(status) {
     return exports.TERMINAL_AGENT_STATUSES.has(status);
+}
+/** Non-terminal local records that occupy a concurrency slot for a repository. */
+function countLocalActiveForRepo(index, repoUrl) {
+    return Object.values(index).filter((record) => record.repository === repoUrl &&
+        !isTerminalStatus(record.status) &&
+        record.status !== 'unknown').length;
 }

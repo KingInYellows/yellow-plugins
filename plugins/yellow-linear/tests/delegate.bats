@@ -121,6 +121,11 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
+@test "resolve_plugin_root filters project/local rows to the current repository" {
+  run grep -F 'row.projectPath === projectPath' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
 @test "--provider documented as overriding only the CONFLICT state" {
   run grep -F 'CONFLICT' "$DELEGATE_MD"
   [ "$status" -eq 0 ]

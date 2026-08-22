@@ -262,7 +262,7 @@ class CursorSdkAdapter {
         }
         catch (err) {
             const adapterErr = classifySdkError(err, sdk);
-            if (adapterErr.kind === 'unknown' || adapterErr.kind === 'not_found') {
+            if (adapterErr.kind === 'unknown') {
                 return { supported: false, reason: adapterErr.message };
             }
             throw adapterErr;
@@ -277,7 +277,7 @@ class CursorSdkAdapter {
         }
         catch (err) {
             const adapterErr = classifySdkError(err, sdk);
-            if (adapterErr.kind === 'unknown' || adapterErr.kind === 'not_found') {
+            if (adapterErr.kind === 'unknown') {
                 return { supported: false, reason: adapterErr.message };
             }
             throw adapterErr;

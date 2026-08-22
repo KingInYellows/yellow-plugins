@@ -13,6 +13,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { throwAppError } from './errors.js';
 import { assertNoSecretShapedValues } from './redact.js';
 
 export interface AgentRecord {
@@ -125,6 +126,15 @@ export async function readIndex(
   }
 
   return { index: parsed, quarantined: false };
+}
+
+export function throwIfQuarantined(result: ReadIndexResult): void {
+  if (!result.quarantined) return;
+  const detail =
+    result.quarantinePath !== undefined
+      ? `local state was quarantined to ${result.quarantinePath}`
+      : 'local state was quarantined';
+  throwAppError('CURSOR_STATE_CORRUPT', detail);
 }
 
 export async function writeIndex(
@@ -252,16 +262,31 @@ export async function withStateLock<T>(
   }
 }
 
+/**
+ * Read-modify-write without acquiring the lock — caller must already hold it
+ * via `withStateLock`.
+ */
+export async function upsertRecordUnderLock(
+  stateFilePath: string,
+  record: AgentRecord
+): Promise<AgentIndex> {
+  const readResult = await readIndex(stateFilePath);
+  throwIfQuarantined(readResult);
+  const next: AgentIndex = {
+    ...readResult.index,
+    [record.idempotencyKey]: record,
+  };
+  await writeIndex(stateFilePath, next);
+  return next;
+}
+
 export async function upsertRecord(
   stateFilePath: string,
   record: AgentRecord
 ): Promise<AgentIndex> {
-  return withStateLock(stateFilePath, async () => {
-    const { index } = await readIndex(stateFilePath);
-    const next: AgentIndex = { ...index, [record.idempotencyKey]: record };
-    await writeIndex(stateFilePath, next);
-    return next;
-  });
+  return withStateLock(stateFilePath, async () =>
+    upsertRecordUnderLock(stateFilePath, record)
+  );
 }
 
 export function findByIdempotencyKey(
@@ -294,4 +319,17 @@ export const LOCAL_ONLY_STATUSES = new Set(['pending-launch', 'unknown']);
 
 export function isTerminalStatus(status: string): boolean {
   return TERMINAL_AGENT_STATUSES.has(status);
+}
+
+/** Non-terminal local records that occupy a concurrency slot for a repository. */
+export function countLocalActiveForRepo(
+  index: AgentIndex,
+  repoUrl: string
+): number {
+  return Object.values(index).filter(
+    (record) =>
+      record.repository === repoUrl &&
+      !isTerminalStatus(record.status) &&
+      record.status !== 'unknown'
+  ).length;
 }

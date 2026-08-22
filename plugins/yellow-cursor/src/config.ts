@@ -83,3 +83,8 @@ export function resolveStateFilePath(dataDir: string): string {
 export function resolveStateDir(dataDir: string): string {
   return path.join(dataDir, 'state');
 }
+
+/** Approved root for `artifacts --download --out` writes (contained under dataDir). */
+export function resolveArtifactDownloadDir(dataDir: string): string {
+  return path.join(dataDir, 'artifact-downloads');
+}

@@ -144,7 +144,7 @@ describe('createAgent() failure does not strand the reservation', () => {
     // Restore a working createAgent and confirm the same key can retry.
     adapter.createImpl = async (options) => {
       const state = {
-        agentId: 'bc-retry-created',
+        agentId: 'bc-retry-provisional',
         name: 'agent',
         summary: '',
         status: 'running' as const,
@@ -156,6 +156,16 @@ describe('createAgent() failure does not strand the reservation', () => {
       };
       adapter.agents.set(state.agentId, state);
       return state;
+    };
+    adapter.sendImpl = async (state) => {
+      const run = {
+        id: 'run-retry',
+        agentId: 'bc-retry-created',
+        status: 'running' as const,
+        branches: [],
+      };
+      state.runs.set(run.id, run);
+      return run;
     };
     const result = await delegate(deps, baseArgs());
     expect(result.status).toBe('running');

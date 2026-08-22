@@ -214,6 +214,8 @@ export function validateArtifactRemotePath(input: string): string {
   return input;
 }
 
+const OUT_PATH_METACHAR_RE = /[;|&$()<>'"`\\]/;
+
 export function validateLocalOutPath(input: string): string {
   if (input.length === 0 || input.length > 4096) {
     return throwAppError(
@@ -228,7 +230,47 @@ export function validateLocalOutPath(input: string): string {
       'output path contains control characters'
     );
   }
+  if (path.isAbsolute(input)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path must be relative to the artifact download directory'
+    );
+  }
+  if (input.startsWith('-')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path must not start with a dash'
+    );
+  }
+  const segments = input.split(/[/\\]/);
+  if (segments.some((segment) => segment === '..')) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path must not contain ".." segments'
+    );
+  }
+  if (segments.some((segment) => segment.length > 0 && OUT_PATH_METACHAR_RE.test(segment))) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path contains unsafe shell metacharacters'
+    );
+  }
   return input;
+}
+
+/** Resolve a validated relative path under an approved root; rejects symlink escapes. */
+export function resolveLocalOutPath(rootDir: string, input: string): string {
+  const relative = validateLocalOutPath(input);
+  const resolvedRoot = path.resolve(rootDir);
+  const resolved = path.resolve(resolvedRoot, relative);
+  const rel = path.relative(resolvedRoot, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'output path escapes the artifact download directory'
+    );
+  }
+  return resolved;
 }
 
 export function validateMaxActive(input: number): number {

@@ -43,6 +43,7 @@ exports.resolveDataDir = resolveDataDir;
 exports.resolveRuntimeDir = resolveRuntimeDir;
 exports.resolveStateFilePath = resolveStateFilePath;
 exports.resolveStateDir = resolveStateDir;
+exports.resolveArtifactDownloadDir = resolveArtifactDownloadDir;
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
 /**
@@ -101,4 +102,8 @@ function resolveStateFilePath(dataDir) {
 }
 function resolveStateDir(dataDir) {
     return path.join(dataDir, 'state');
+}
+/** Approved root for `artifacts --download --out` writes (contained under dataDir). */
+function resolveArtifactDownloadDir(dataDir) {
+    return path.join(dataDir, 'artifact-downloads');
 }

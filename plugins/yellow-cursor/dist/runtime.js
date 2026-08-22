@@ -54,6 +54,7 @@ exports.usage = usage;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const config_js_1 = require("./config.js");
+const config_js_2 = require("./config.js");
 const errors_js_1 = require("./errors.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
 const state_js_1 = require("./state.js");
@@ -118,8 +119,13 @@ async function countActiveAgentsForRepo(adapter, repoUrl) {
     }
     return count;
 }
+async function readHealthyIndex(stateFilePath) {
+    const result = await (0, state_js_1.readIndex)(stateFilePath);
+    (0, state_js_1.throwIfQuarantined)(result);
+    return result.index;
+}
 async function touchLocalRecordForAgent(deps, agentId, status) {
-    const { index } = await (0, state_js_1.readIndex)(deps.stateFilePath);
+    const index = await readHealthyIndex(deps.stateFilePath);
     const existing = (0, state_js_1.findByAgentId)(index, agentId);
     if (!existing)
         return;
@@ -183,17 +189,8 @@ async function delegate(deps, args) {
     if (!args.yes) {
         (0, errors_js_1.throwAppError)('CURSOR_CONFIRMATION_REQUIRED', 'delegate requires --yes to confirm.');
     }
-    const { index } = await (0, state_js_1.readIndex)(deps.stateFilePath);
-    const existing = (0, state_js_1.findByIdempotencyKey)(index, idempotencyKey);
-    if (existing && !(0, state_js_1.isTerminalStatus)(existing.status)) {
-        (0, errors_js_1.throwAppError)('CURSOR_DUPLICATE_LAUNCH', `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`);
-    }
     if (deps.env['YELLOW_REMOTE_AGENT_CONTEXT']) {
         (0, errors_js_1.throwAppError)('CURSOR_NESTED_DELEGATION', 'refusing to delegate from inside a remote agent run.');
-    }
-    const activeForRepo = await countActiveAgentsForRepo(deps.adapter, repoUrl);
-    if (activeForRepo >= maxActive) {
-        (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `${activeForRepo} active agent(s) already running for ${repoUrl} (max-active=${maxActive}).`);
     }
     const promptDigest = (0, state_js_1.digestPrompt)(prompt);
     const reservation = {
@@ -212,7 +209,20 @@ async function delegate(deps, args) {
             ? { callingHost: args.callingHost }
             : {}),
     };
-    await (0, state_js_1.upsertRecord)(deps.stateFilePath, reservation);
+    await (0, state_js_1.withStateLock)(deps.stateFilePath, async () => {
+        const readResult = await (0, state_js_1.readIndex)(deps.stateFilePath);
+        (0, state_js_1.throwIfQuarantined)(readResult);
+        const existing = (0, state_js_1.findByIdempotencyKey)(readResult.index, idempotencyKey);
+        if (existing && !(0, state_js_1.isTerminalStatus)(existing.status)) {
+            (0, errors_js_1.throwAppError)('CURSOR_DUPLICATE_LAUNCH', `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`);
+        }
+        const localActive = (0, state_js_1.countLocalActiveForRepo)(readResult.index, repoUrl);
+        const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+        if (remoteActive + localActive >= maxActive) {
+            (0, errors_js_1.throwAppError)('CURSOR_CONCURRENCY_LIMIT', `${remoteActive + localActive} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`);
+        }
+        await (0, state_js_1.upsertRecordUnderLock)(deps.stateFilePath, reservation);
+    });
     // Hoisted so the catch block can tell "createAgent() itself failed" (handle
     // never assigned) apart from "createAgent() succeeded but send() failed"
     // (handle assigned) — both must terminal-mark the reservation, but only the
@@ -283,8 +293,9 @@ async function delegate(deps, args) {
  *   2. reconciliation through the cloud agent list by the
  *      metadata.yellowIdempotencyKey marker this CLI stamps on every agent
  *      it creates (live-verified to read back);
- *   3. the provisional id as a last resort — `status --reconcile` can still
- *      recover the record later.
+ *   3. never return the provisional id — it 404s on Agent.get/getRun/list.
+ *      A failed reconciliation after a billable send() is CURSOR_UNKNOWN_OUTCOME
+ *      so the caller reconciles via list metadata instead of persisting a dead id.
  * Best-effort by design: a reconciliation failure must never turn a
  * successful billable launch into a reported error.
  */
@@ -305,9 +316,9 @@ async function resolveCanonicalAgentId(deps, provisionalId, run, idempotencyKey)
         }
     }
     catch {
-        // best-effort — fall through to the provisional id
+        // fall through to UNKNOWN_OUTCOME — provisional id is not usable
     }
-    return provisionalId;
+    return (0, errors_js_1.throwAppError)('CURSOR_UNKNOWN_OUTCOME', 'launch succeeded but the canonical agent id could not be resolved; run list or status --reconcile.');
 }
 async function followUp(deps, args) {
     const agentId = (0, validate_js_1.validateAgentId)(args.agentId);
@@ -326,7 +337,7 @@ async function followUp(deps, args) {
     const handle = await deps.adapter.resumeAgent(agentId);
     const run = await sendWithOutcomeTracking(handle, prompt, idempotencyKey, deps.clock);
     const branch = run.branches[0];
-    const { index } = await (0, state_js_1.readIndex)(deps.stateFilePath);
+    const index = await readHealthyIndex(deps.stateFilePath);
     const existing = (0, state_js_1.findByAgentId)(index, agentId);
     await (0, state_js_1.upsertRecord)(deps.stateFilePath, {
         repository: info.repository ?? existing?.repository ?? '',
@@ -360,15 +371,17 @@ async function status(deps, args) {
         const runId = (0, validate_js_1.validateRunId)(args.runId);
         run = await deps.adapter.getRun(runId, agentId);
     }
-    const { index } = await (0, state_js_1.readIndex)(deps.stateFilePath);
+    const index = await readHealthyIndex(deps.stateFilePath);
     const localRecord = (0, state_js_1.findByAgentId)(index, agentId);
     const idempotencyKey = localRecord?.idempotencyKey ?? info.metadata['yellowIdempotencyKey'];
     let drift;
     if ((args.reconcile || localRecord !== undefined) &&
         idempotencyKey !== undefined) {
+        const agentStatus = info.status ?? localRecord?.status ?? 'unknown';
         drift =
             localRecord !== undefined &&
-                localRecord.status !== (info.status ?? localRecord.status);
+                info.status !== undefined &&
+                localRecord.status !== info.status;
         const branch = run?.branches[0];
         await (0, state_js_1.upsertRecord)(deps.stateFilePath, {
             repository: info.repository ?? localRecord?.repository ?? '',
@@ -376,8 +389,9 @@ async function status(deps, args) {
             ...localRecord,
             agentId: info.agentId,
             idempotencyKey,
-            status: run?.status ?? info.status ?? localRecord?.status ?? 'unknown',
+            status: agentStatus,
             updatedAt: nowIso(deps),
+            ...(run !== undefined ? { runId: run.id } : {}),
             ...(branch?.branch !== undefined ? { targetBranch: branch.branch } : {}),
             ...(branch?.prUrl !== undefined ? { prUrl: branch.prUrl } : {}),
         });
@@ -416,7 +430,7 @@ async function status(deps, args) {
 async function list(deps, args) {
     const cursor = (0, validate_js_1.validateCursor)(args.cursor);
     const result = await deps.adapter.listAgents(cursor !== undefined ? { cursor } : undefined);
-    const { index } = await (0, state_js_1.readIndex)(deps.stateFilePath);
+    const index = await readHealthyIndex(deps.stateFilePath);
     const items = result.items.map((info) => {
         const idempotencyKey = info.metadata['yellowIdempotencyKey'];
         const local = idempotencyKey !== undefined
@@ -525,7 +539,8 @@ async function artifacts(deps, args) {
         (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', '--download requires --out <local-path>');
     }
     const remotePath = (0, validate_js_1.validateArtifactRemotePath)(args.download);
-    const localPath = (0, validate_js_1.validateLocalOutPath)(args.out);
+    const downloadRoot = (0, config_js_2.resolveArtifactDownloadDir)(deps.dataDir);
+    const localPath = (0, validate_js_1.resolveLocalOutPath)(downloadRoot, args.out);
     const buffer = await deps.adapter.downloadArtifact(agentId, remotePath);
     await writeArtifactFile(localPath, buffer);
     return {

@@ -48,6 +48,7 @@ exports.validateIdempotencyKey = validateIdempotencyKey;
 exports.validatePrompt = validatePrompt;
 exports.validateArtifactRemotePath = validateArtifactRemotePath;
 exports.validateLocalOutPath = validateLocalOutPath;
+exports.resolveLocalOutPath = resolveLocalOutPath;
 exports.validateMaxActive = validateMaxActive;
 exports.validateCursor = validateCursor;
 const path = __importStar(require("node:path"));
@@ -173,6 +174,7 @@ function validateArtifactRemotePath(input) {
     }
     return input;
 }
+const OUT_PATH_METACHAR_RE = /[;|&$()<>'"`\\]/;
 function validateLocalOutPath(input) {
     if (input.length === 0 || input.length > 4096) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path must be 1-4096 characters');
@@ -181,7 +183,31 @@ function validateLocalOutPath(input) {
     if (/[\x00-\x1f\x7f]/.test(input)) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path contains control characters');
     }
+    if (path.isAbsolute(input)) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path must be relative to the artifact download directory');
+    }
+    if (input.startsWith('-')) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path must not start with a dash');
+    }
+    const segments = input.split(/[/\\]/);
+    if (segments.some((segment) => segment === '..')) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path must not contain ".." segments');
+    }
+    if (segments.some((segment) => segment.length > 0 && OUT_PATH_METACHAR_RE.test(segment))) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path contains unsafe shell metacharacters');
+    }
     return input;
+}
+/** Resolve a validated relative path under an approved root; rejects symlink escapes. */
+function resolveLocalOutPath(rootDir, input) {
+    const relative = validateLocalOutPath(input);
+    const resolvedRoot = path.resolve(rootDir);
+    const resolved = path.resolve(resolvedRoot, relative);
+    const rel = path.relative(resolvedRoot, resolved);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'output path escapes the artifact download directory');
+    }
+    return resolved;
 }
 function validateMaxActive(input) {
     if (!Number.isInteger(input) || input < 1 || input > 50) {

@@ -11,6 +11,8 @@ import {
   validateRef,
   validateRepoUrl,
   validateRunId,
+  validateLocalOutPath,
+  resolveLocalOutPath,
 } from '../src/validate.js';
 
 function expectInvalid(fn: () => unknown): void {
@@ -219,6 +221,29 @@ describe('validateMaxActive', () => {
     expectInvalid(() => validateMaxActive(-1));
     expectInvalid(() => validateMaxActive(1.5));
     expectInvalid(() => validateMaxActive(51));
+  });
+});
+
+describe('validateLocalOutPath', () => {
+  it('accepts a simple relative path', () => {
+    expect(validateLocalOutPath('logs/output.txt')).toBe('logs/output.txt');
+  });
+
+  it('rejects absolute paths, traversal, leading hyphens, and metacharacters', () => {
+    expectInvalid(() => validateLocalOutPath('/etc/passwd'));
+    expectInvalid(() => validateLocalOutPath('../../.git/hooks/pre-commit'));
+    expectInvalid(() => validateLocalOutPath('-rf'));
+    expectInvalid(() => validateLocalOutPath('out;rm'));
+  });
+});
+
+describe('resolveLocalOutPath', () => {
+  it('resolves under the approved root and rejects escapes', () => {
+    const root = '/tmp/artifact-downloads';
+    expect(resolveLocalOutPath(root, 'nested/out.txt')).toBe(
+      '/tmp/artifact-downloads/nested/out.txt'
+    );
+    expectInvalid(() => resolveLocalOutPath(root, '../outside.txt'));
   });
 });
 

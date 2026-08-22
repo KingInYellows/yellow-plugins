@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { hasEnvApiKey, type CredentialSource } from './config.js';
+import { resolveArtifactDownloadDir } from './config.js';
 import { AdapterError, AppErrorException, throwAppError } from './errors.js';
 import {
   installSdk,
@@ -17,13 +18,18 @@ import {
   type SdkResolutionState,
 } from './sdk-resolver.js';
 import {
+  countLocalActiveForRepo,
   digestPrompt,
   findByAgentId,
   findByIdempotencyKey,
   isTerminalStatus,
   readIndex,
   TERMINAL_RUN_STATUSES,
+  throwIfQuarantined,
   upsertRecord,
+  upsertRecordUnderLock,
+  withStateLock,
+  type AgentIndex,
   type AgentRecord,
 } from './state.js';
 import type {
@@ -40,7 +46,7 @@ import {
   validateArtifactRemotePath,
   validateCursor,
   validateIdempotencyKey,
-  validateLocalOutPath,
+  resolveLocalOutPath,
   validateMaxActive,
   validateModelId,
   validatePrompt,
@@ -147,12 +153,18 @@ async function countActiveAgentsForRepo(
   return count;
 }
 
+async function readHealthyIndex(stateFilePath: string): Promise<AgentIndex> {
+  const result = await readIndex(stateFilePath);
+  throwIfQuarantined(result);
+  return result.index;
+}
+
 async function touchLocalRecordForAgent(
   deps: RuntimeDeps,
   agentId: string,
   status: string
 ): Promise<void> {
-  const { index } = await readIndex(deps.stateFilePath);
+  const index = await readHealthyIndex(deps.stateFilePath);
   const existing = findByAgentId(index, agentId);
   if (!existing) return;
   await upsertRecord(deps.stateFilePath, {
@@ -283,27 +295,10 @@ export async function delegate(
     );
   }
 
-  const { index } = await readIndex(deps.stateFilePath);
-  const existing = findByIdempotencyKey(index, idempotencyKey);
-  if (existing && !isTerminalStatus(existing.status)) {
-    throwAppError(
-      'CURSOR_DUPLICATE_LAUNCH',
-      `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`
-    );
-  }
-
   if (deps.env['YELLOW_REMOTE_AGENT_CONTEXT']) {
     throwAppError(
       'CURSOR_NESTED_DELEGATION',
       'refusing to delegate from inside a remote agent run.'
-    );
-  }
-
-  const activeForRepo = await countActiveAgentsForRepo(deps.adapter, repoUrl);
-  if (activeForRepo >= maxActive) {
-    throwAppError(
-      'CURSOR_CONCURRENCY_LIMIT',
-      `${activeForRepo} active agent(s) already running for ${repoUrl} (max-active=${maxActive}).`
     );
   }
 
@@ -324,7 +319,32 @@ export async function delegate(
       ? { callingHost: args.callingHost }
       : {}),
   };
-  await upsertRecord(deps.stateFilePath, reservation);
+
+  await withStateLock(deps.stateFilePath, async () => {
+    const readResult = await readIndex(deps.stateFilePath);
+    throwIfQuarantined(readResult);
+    const existing = findByIdempotencyKey(
+      readResult.index,
+      idempotencyKey
+    );
+    if (existing && !isTerminalStatus(existing.status)) {
+      throwAppError(
+        'CURSOR_DUPLICATE_LAUNCH',
+        `an operation with idempotency key "${idempotencyKey}" is already in flight (status: ${existing.status}).`
+      );
+    }
+
+    const localActive = countLocalActiveForRepo(readResult.index, repoUrl);
+    const remoteActive = await countActiveAgentsForRepo(deps.adapter, repoUrl);
+    if (remoteActive + localActive >= maxActive) {
+      throwAppError(
+        'CURSOR_CONCURRENCY_LIMIT',
+        `${remoteActive + localActive} active agent slot(s) already reserved or running for ${repoUrl} (max-active=${maxActive}).`
+      );
+    }
+
+    await upsertRecordUnderLock(deps.stateFilePath, reservation);
+  });
 
   // Hoisted so the catch block can tell "createAgent() itself failed" (handle
   // never assigned) apart from "createAgent() succeeded but send() failed"
@@ -407,8 +427,9 @@ export async function delegate(
  *   2. reconciliation through the cloud agent list by the
  *      metadata.yellowIdempotencyKey marker this CLI stamps on every agent
  *      it creates (live-verified to read back);
- *   3. the provisional id as a last resort — `status --reconcile` can still
- *      recover the record later.
+ *   3. never return the provisional id — it 404s on Agent.get/getRun/list.
+ *      A failed reconciliation after a billable send() is CURSOR_UNKNOWN_OUTCOME
+ *      so the caller reconciles via list metadata instead of persisting a dead id.
  * Best-effort by design: a reconciliation failure must never turn a
  * successful billable launch into a reported error.
  */
@@ -435,9 +456,12 @@ async function resolveCanonicalAgentId(
       cursor = res.nextCursor;
     }
   } catch {
-    // best-effort — fall through to the provisional id
+    // fall through to UNKNOWN_OUTCOME — provisional id is not usable
   }
-  return provisionalId;
+  return throwAppError(
+    'CURSOR_UNKNOWN_OUTCOME',
+    'launch succeeded but the canonical agent id could not be resolved; run list or status --reconcile.'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +524,7 @@ export async function followUp(
   );
   const branch = run.branches[0];
 
-  const { index } = await readIndex(deps.stateFilePath);
+  const index = await readHealthyIndex(deps.stateFilePath);
   const existing = findByAgentId(index, agentId);
   await upsertRecord(deps.stateFilePath, {
     repository: info.repository ?? existing?.repository ?? '',
@@ -569,7 +593,7 @@ export async function status(
     run = await deps.adapter.getRun(runId, agentId);
   }
 
-  const { index } = await readIndex(deps.stateFilePath);
+  const index = await readHealthyIndex(deps.stateFilePath);
   const localRecord = findByAgentId(index, agentId);
   const idempotencyKey =
     localRecord?.idempotencyKey ?? info.metadata['yellowIdempotencyKey'];
@@ -579,9 +603,11 @@ export async function status(
     (args.reconcile || localRecord !== undefined) &&
     idempotencyKey !== undefined
   ) {
+    const agentStatus = info.status ?? localRecord?.status ?? 'unknown';
     drift =
       localRecord !== undefined &&
-      localRecord.status !== (info.status ?? localRecord.status);
+      info.status !== undefined &&
+      localRecord.status !== info.status;
     const branch = run?.branches[0];
     await upsertRecord(deps.stateFilePath, {
       repository: info.repository ?? localRecord?.repository ?? '',
@@ -589,8 +615,9 @@ export async function status(
       ...localRecord,
       agentId: info.agentId,
       idempotencyKey,
-      status: run?.status ?? info.status ?? localRecord?.status ?? 'unknown',
+      status: agentStatus,
       updatedAt: nowIso(deps),
+      ...(run !== undefined ? { runId: run.id } : {}),
       ...(branch?.branch !== undefined ? { targetBranch: branch.branch } : {}),
       ...(branch?.prUrl !== undefined ? { prUrl: branch.prUrl } : {}),
     });
@@ -660,7 +687,7 @@ export async function list(
   const result = await deps.adapter.listAgents(
     cursor !== undefined ? { cursor } : undefined
   );
-  const { index } = await readIndex(deps.stateFilePath);
+  const index = await readHealthyIndex(deps.stateFilePath);
 
   const items = result.items.map((info) => {
     const idempotencyKey = info.metadata['yellowIdempotencyKey'];
@@ -873,7 +900,8 @@ export async function artifacts(
     );
   }
   const remotePath = validateArtifactRemotePath(args.download);
-  const localPath = validateLocalOutPath(args.out);
+  const downloadRoot = resolveArtifactDownloadDir(deps.dataDir);
+  const localPath = resolveLocalOutPath(downloadRoot, args.out);
   const buffer = await deps.adapter.downloadArtifact(agentId, remotePath);
   await writeArtifactFile(localPath, buffer);
   return {

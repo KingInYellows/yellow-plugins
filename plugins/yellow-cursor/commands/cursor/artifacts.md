@@ -48,7 +48,10 @@ args=(artifacts --agent-id "$AGENT_ID")
 OUTPUT=$(node "$CLI" "${args[@]}")
 ```
 
-Download mode (only when both `--download` and `--out` were given):
+Download mode (only when both `--download` and `--out` were given). `--out`
+must be a **relative** path (no leading `/` or `..` segments); the CLI resolves
+it under `${YELLOW_CURSOR_DATA_DIR}/artifact-downloads/` (or the default
+data-dir when unset) and refuses escapes outside that directory.
 
 ```bash
 args=(artifacts --agent-id "$AGENT_ID" --download "$REMOTE_PATH" --out "$LOCAL_PATH")

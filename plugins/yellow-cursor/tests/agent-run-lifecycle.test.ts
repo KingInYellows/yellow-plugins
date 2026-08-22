@@ -286,7 +286,7 @@ describe('canonical agent-id resolution (live-verified server behavior)', () => 
     expect(result.agentId).toBe('bc-server-canonical-0002');
   });
 
-  it('falls back to the provisional id when reconciliation finds nothing (recoverable via status --reconcile)', async () => {
+  it('returns CURSOR_UNKNOWN_OUTCOME when reconciliation cannot resolve a canonical id', async () => {
     adapter.sendImpl = async (state) => {
       const run = {
         id: 'run-canon-3',
@@ -297,9 +297,6 @@ describe('canonical agent-id resolution (live-verified server behavior)', () => 
       state.runs.set(run.id, run);
       return run;
     };
-    // First call serves the pre-launch concurrency check; the reconcile pass
-    // then finds no metadata match — fallback must be the provisional id,
-    // never a thrown error (a successful billable launch already happened).
     adapter.listAgentsImpl = async () => ({
       items: [
         {
@@ -312,8 +309,8 @@ describe('canonical agent-id resolution (live-verified server behavior)', () => 
       ],
     });
 
-    const result = await delegate(deps, delegateArgs);
-    expect(result.agentId).toMatch(/^bc-/);
-    expect(result.agentId).not.toBe('bc-unrelated-agent-0000');
+    await expect(delegate(deps, delegateArgs)).rejects.toMatchObject({
+      appError: { code: 'CURSOR_UNKNOWN_OUTCOME' },
+    });
   });
 });

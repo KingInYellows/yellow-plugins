@@ -124,6 +124,30 @@ describe('--max-active enforcement', () => {
     });
     expect(result.status).toBe('running');
   });
+
+  it('counts a local pending-launch reservation toward max-active under the lock', async () => {
+    adapter.listAgentsImpl = async () => ({ items: [] });
+    const { upsertRecord } = await import('../src/state.js');
+    await upsertRecord(deps.stateFilePath, {
+      repository: REPO,
+      status: 'pending-launch',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      idempotencyKey: 'other-in-flight',
+    });
+
+    await expect(
+      delegate(deps, {
+        repoUrl: REPO,
+        prompt: 'go',
+        idempotencyKey: 'new-key',
+        maxActive: 1,
+        yes: true,
+        dryRun: false,
+        autoCreatePr: true,
+      })
+    ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
+  });
 });
 
 describe('nested-delegation guard', () => {

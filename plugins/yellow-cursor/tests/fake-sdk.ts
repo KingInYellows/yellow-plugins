@@ -83,9 +83,11 @@ export class FakeSdkAdapter implements SdkAdapter {
     options: { idempotencyKey: string }
   ) => Promise<AdapterRun> = async (state) => {
     const runId = makeFakeRunId();
+    // Mimic live SDK: create() mints a provisional id; send() assigns the canonical id.
+    const canonicalId = makeFakeAgentId();
     const run: AdapterRun = {
       id: runId,
-      agentId: state.agentId,
+      agentId: canonicalId,
       status: 'running',
       branches:
         state.repository !== undefined
@@ -93,6 +95,13 @@ export class FakeSdkAdapter implements SdkAdapter {
           : [],
       requestId: `req-${runId}`,
     };
+    const canonicalState: FakeAgentState = {
+      ...state,
+      agentId: canonicalId,
+      runs: new Map(state.runs),
+    };
+    canonicalState.runs.set(runId, run);
+    this.agents.set(canonicalId, canonicalState);
     state.runs.set(runId, run);
     state.status = 'running';
     return run;
