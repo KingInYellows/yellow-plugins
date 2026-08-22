@@ -47,7 +47,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -57,7 +57,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-cursor",
       "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -587,7 +587,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-cursor/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-cursor",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
   "author": {
     "name": "KingInYellows",
@@ -729,7 +729,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-linear/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-linear",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
   "author": {
     "name": "KingInYellows",
