@@ -56,9 +56,13 @@ or the generated `.cursor-plugin/` shape; see `docs/cursor-distribution.md`
 repo's own (locally-invented, non-upstream) Codex schemas.
 
 **`@cursor/sdk`** — pinned `1.0.28` **exact** (not `^1.0.28`) in
-`plugins/yellow-cursor/package.json`. This SDK surface was verified live
-against that exact version (see `plugins/yellow-cursor/CLAUDE.md` "SDK pin
-policy"); treat any bump as a breaking change requiring re-verification of
+`plugins/yellow-cursor/package.json`. The SDK's type surface and error
+classes were verified against that exact installed version during contract
+research (installed `.d.ts` inspection plus a handful of authenticated and
+unauthenticated API probes) — NOT an end-to-end live delegate flow; the full
+live smoke remains pending per `docs/cursor-distribution.md` "Limitations"
+(see also `plugins/yellow-cursor/CLAUDE.md` "SDK pin policy"). Treat any
+bump as a breaking change requiring re-verification of
 the `instanceof` error-branching in `sdk-adapter.ts` before merging, since
 the SDK's error class shapes are not guaranteed stable across versions.
 

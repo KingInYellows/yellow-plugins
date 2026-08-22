@@ -147,14 +147,121 @@ export async function writeIndex(
   await fs.promises.chmod(stateFilePath, 0o600);
 }
 
+function lockFilePath(stateDir: string): string {
+  return path.join(stateDir, '.agents.json.lock');
+}
+
+export interface LockConfig {
+  /** How long an unrefreshed lock is considered abandoned and eligible for takeover. */
+  readonly staleMs: number;
+  /** Total time to keep retrying acquisition before giving up. */
+  readonly timeoutMs: number;
+  /** Delay between acquisition attempts while the lock is held (and not yet stale). */
+  readonly pollMs: number;
+}
+
+const DEFAULT_LOCK_CONFIG: LockConfig = {
+  staleMs: 10_000,
+  timeoutMs: 15_000,
+  pollMs: 50,
+};
+
+/**
+ * `wx` (O_CREAT|O_EXCL) atomically fails if anything — including a symlink —
+ * already occupies the path, so this is safe against symlink races without a
+ * separate lstat check. The lock file's content is a random owner token so
+ * release() only ever deletes a lock it still owns, never one a stale-lock
+ * takeover has since replaced.
+ */
+async function acquireLock(
+  stateDir: string,
+  config: LockConfig
+): Promise<string> {
+  const lockPath = lockFilePath(stateDir);
+  const owner = crypto.randomUUID();
+  const deadline = Date.now() + config.timeoutMs;
+
+  for (;;) {
+    try {
+      const handle = await fs.promises.open(lockPath, 'wx');
+      try {
+        await handle.writeFile(owner);
+      } finally {
+        await handle.close();
+      }
+      return owner;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+
+    try {
+      const stat = await fs.promises.stat(lockPath);
+      if (Date.now() - stat.mtimeMs > config.staleMs) {
+        await fs.promises.unlink(lockPath).catch((unlinkErr: unknown) => {
+          if ((unlinkErr as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw unlinkErr;
+          }
+        });
+        continue; // retry acquisition immediately after a stale-lock takeover
+      }
+    } catch (statErr) {
+      if ((statErr as NodeJS.ErrnoException).code !== 'ENOENT') throw statErr;
+      continue; // lock disappeared between our EEXIST and this stat — retry immediately
+    }
+
+    if (Date.now() > deadline) {
+      throw new Error(`timed out acquiring state lock at ${lockPath}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, config.pollMs));
+  }
+}
+
+async function releaseLock(stateDir: string, owner: string): Promise<void> {
+  const lockPath = lockFilePath(stateDir);
+  try {
+    const content = await fs.promises.readFile(lockPath, 'utf8');
+    if (content === owner) {
+      await fs.promises.unlink(lockPath);
+    }
+    // A different owner means a stale-lock takeover already replaced ours —
+    // nothing to release, and deleting it would clobber the new owner.
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+}
+
+/**
+ * Serializes a read-modify-write cycle against the state file across
+ * processes on the same machine/dataDir. tmp+rename alone only makes a
+ * single write atomic — without this, two concurrent read-modify-write
+ * cycles can both read the same starting index and the second write
+ * silently drops the first writer's update (lost-update race).
+ */
+export async function withStateLock<T>(
+  stateFilePath: string,
+  fn: () => Promise<T>,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<T> {
+  const stateDir = path.dirname(stateFilePath);
+  await ensureStateDir(stateDir);
+  const owner = await acquireLock(stateDir, config);
+  try {
+    return await fn();
+  } finally {
+    await releaseLock(stateDir, owner);
+  }
+}
+
 export async function upsertRecord(
   stateFilePath: string,
   record: AgentRecord
 ): Promise<AgentIndex> {
-  const { index } = await readIndex(stateFilePath);
-  const next: AgentIndex = { ...index, [record.idempotencyKey]: record };
-  await writeIndex(stateFilePath, next);
-  return next;
+  return withStateLock(stateFilePath, async () => {
+    const { index } = await readIndex(stateFilePath);
+    const next: AgentIndex = { ...index, [record.idempotencyKey]: record };
+    await writeIndex(stateFilePath, next);
+    return next;
+  });
 }
 
 export function findByIdempotencyKey(

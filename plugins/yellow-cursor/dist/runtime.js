@@ -213,14 +213,19 @@ async function delegate(deps, args) {
             : {}),
     };
     await (0, state_js_1.upsertRecord)(deps.stateFilePath, reservation);
-    const handle = await deps.adapter.createAgent({
-        repoUrl,
-        autoCreatePR: args.autoCreatePr,
-        idempotencyKey,
-        ...(startingRef !== undefined ? { startingRef } : {}),
-        ...(model !== undefined ? { model } : {}),
-    });
+    // Hoisted so the catch block can tell "createAgent() itself failed" (handle
+    // never assigned) apart from "createAgent() succeeded but send() failed"
+    // (handle assigned) — both must terminal-mark the reservation, but only the
+    // latter has an agentId to record.
+    let handle;
     try {
+        handle = await deps.adapter.createAgent({
+            repoUrl,
+            autoCreatePR: args.autoCreatePr,
+            idempotencyKey,
+            ...(startingRef !== undefined ? { startingRef } : {}),
+            ...(model !== undefined ? { model } : {}),
+        });
         const run = await sendWithOutcomeTracking(handle, prompt, idempotencyKey, deps.clock);
         const branch = run.branches[0];
         await (0, state_js_1.upsertRecord)(deps.stateFilePath, {
@@ -252,9 +257,14 @@ async function delegate(deps, args) {
             err.appError.code === 'CURSOR_UNKNOWN_OUTCOME'
             ? 'unknown'
             : 'error';
+        // Terminal-mark the reservation regardless of WHERE it failed — a
+        // createAgent() failure never got an agentId; a send() failure did.
+        // Either way this makes the idempotencyKey non-terminal-free so a
+        // same-key retry is allowed instead of permanently hitting
+        // CURSOR_DUPLICATE_LAUNCH against a reservation nothing will ever advance.
         await (0, state_js_1.upsertRecord)(deps.stateFilePath, {
             ...reservation,
-            agentId: handle.agentId,
+            ...(handle !== undefined ? { agentId: handle.agentId } : {}),
             status: failedStatus,
             updatedAt: nowIso(deps),
         });

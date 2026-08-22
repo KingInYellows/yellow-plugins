@@ -252,6 +252,9 @@ idempotent-create field, so its own title-based dedup in `/devin:delegate`
 applies instead):
 
 ```bash
+# REPO_URL / ISSUE_ID / PROVIDER / DELEGATION_REV are illustrative names —
+# substitute the concrete values already computed in the earlier steps of
+# this run (shell variables do not persist across separate Bash calls).
 IDEMPOTENCY_INPUT="${REPO_URL}|${ISSUE_ID}|${PROVIDER}|${DELEGATION_REV}"
 if command -v sha256sum >/dev/null 2>&1; then
   IDEMPOTENCY_KEY=$(printf '%s' "$IDEMPOTENCY_INPUT" | sha256sum | cut -d' ' -f1)

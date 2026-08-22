@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AdapterError } from '../src/errors.js';
 import { delegate, type RuntimeDeps } from '../src/runtime.js';
-import { readIndex } from '../src/state.js';
+import { isTerminalStatus, readIndex } from '../src/state.js';
 
 import {
   FakeSdkAdapter,
@@ -114,6 +114,68 @@ describe('unknown-outcome marking', () => {
     await expect(delegate(deps, baseArgs())).rejects.toMatchObject({
       appError: { code: 'CURSOR_DUPLICATE_LAUNCH' },
     });
+  });
+});
+
+describe('createAgent() failure does not strand the reservation', () => {
+  it('an auth-shaped createAgent() failure surfaces its normal code and allows a same-key retry', async () => {
+    adapter.createImpl = async () => {
+      throw new AdapterError('auth', 'Invalid User API Key', {
+        isRetryable: false,
+      });
+    };
+
+    let caught: unknown;
+    try {
+      await delegate(deps, baseArgs());
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AdapterError);
+    expect((caught as AdapterError).kind).toBe('auth');
+
+    // The pending-launch reservation must have been terminal-marked, not
+    // left stranded — otherwise every retry with the same key would
+    // permanently hit CURSOR_DUPLICATE_LAUNCH with no path to recovery.
+    const { index } = await readIndex(deps.stateFilePath);
+    expect(index['fixed-key']?.status).toBe('error');
+    expect(index['fixed-key']?.agentId).toBeUndefined();
+
+    // Restore a working createAgent and confirm the same key can retry.
+    adapter.createImpl = async (options) => {
+      const state = {
+        agentId: 'bc-retry-created',
+        name: 'agent',
+        summary: '',
+        status: 'running' as const,
+        archived: false,
+        metadata: { yellowIdempotencyKey: options.idempotencyKey },
+        createdAt: new Date().toISOString(),
+        runs: new Map(),
+        repository: options.repoUrl,
+      };
+      adapter.agents.set(state.agentId, state);
+      return state;
+    };
+    const result = await delegate(deps, baseArgs());
+    expect(result.status).toBe('running');
+    expect(result.agentId).toBe('bc-retry-created');
+  });
+
+  it('a rate-limit-shaped createAgent() failure also terminal-marks the reservation for retry', async () => {
+    adapter.createImpl = async () => {
+      throw new AdapterError('rate_limited', 'too many requests', {
+        isRetryable: true,
+      });
+    };
+
+    await expect(delegate(deps, baseArgs())).rejects.toMatchObject({
+      kind: 'rate_limited',
+    });
+
+    const { index } = await readIndex(deps.stateFilePath);
+    expect(index['fixed-key']?.status).toBe('error');
+    expect(isTerminalStatus(index['fixed-key']?.status as string)).toBe(true);
   });
 });
 

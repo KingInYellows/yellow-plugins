@@ -218,6 +218,27 @@ describe('stdout/stderr/exit-code contract', () => {
     expect(body.error.code).toBe('CURSOR_INVALID_INPUT');
   });
 
+  it('--max-active with trailing garbage exits 2 rather than silently truncating to a leading-digit prefix', async () => {
+    // Number.parseInt('3abc', 10) === 3 — without a strict digit check this
+    // would silently succeed as max-active=3 instead of rejecting the flag.
+    const result = await runCli([
+      'delegate',
+      '--repo',
+      'https://github.com/org/repo',
+      '--prompt',
+      'do it',
+      '--max-active',
+      '3abc',
+    ]);
+    expect(result.exitCode).toBe(2);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      error: { code: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe('CURSOR_INVALID_INPUT');
+  });
+
   it('no subcommand at all exits 2', async () => {
     const result = await runCli([]);
     expect(result.exitCode).toBe(2);

@@ -44,6 +44,12 @@ export function validateRepoUrl(input: string): string {
       'Repository URL must not contain a fragment'
     );
   }
+  if (url.port !== '') {
+    return throwAppError(
+      'CURSOR_INVALID_INPUT',
+      'Repository URL must not contain an explicit port'
+    );
+  }
   if (!ALLOWED_REPO_HOSTS.has(url.hostname.toLowerCase())) {
     return throwAppError(
       'CURSOR_INVALID_INPUT',

@@ -38,10 +38,12 @@ do not reach for `@cursor/sdk` directly from `cli.ts` or `runtime.ts`.
 ### SDK pin policy
 
 `@cursor/sdk` is pinned to `1.0.28` **exact** (not `^1.0.28`) in `package.json`.
-This SDK surface was verified live against that version; treat any bump as a
-breaking change requiring re-verification of the `instanceof` error-branching in
-`sdk-adapter.ts` (error class shapes are not guaranteed stable across SDK
-versions) before merging.
+The SDK's type surface and error classes were verified against that installed
+version during contract research (types inspection plus limited live API probes)
+— the end-to-end live smoke is still pending per `docs/cursor-distribution.md`
+"Limitations". Treat any bump as a breaking change requiring re-verification of
+the `instanceof` error-branching in `sdk-adapter.ts` (error class shapes are not
+guaranteed stable across SDK versions) before merging.
 
 ### CLI contract
 
@@ -98,6 +100,15 @@ an empty index. `promptDigest` is a sha256 hex digest — the raw prompt is neve
 persisted. Any field that looks secret-shaped (or is named
 `apiKey`/`token`/`secret`/`password`/`prompt`) is refused at write time, not
 just redacted at read time.
+
+Every read-modify-write cycle (reservation, status updates, reconciliation) is
+serialized by an `O_EXCL` lock file in the state dir, with stale-lock takeover
+after 10s. This only serializes invocations on the **same machine** against the
+**same `dataDir`** — the `--max-active` concurrency cap in `delegate` still has
+an inherent race against the true remote agent count when multiple machines (or
+multiple `dataDir`s) delegate against the same repo concurrently. The lock is a
+same-process/same-host correctness guarantee, not a claim of distributed
+enforcement.
 
 ## Testing
 

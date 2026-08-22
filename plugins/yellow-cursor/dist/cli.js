@@ -121,10 +121,13 @@ async function dispatch(operation, rest, deps) {
                 crypto.randomUUID();
             pendingIdempotencyKey = idempotencyKey;
             const maxActiveRaw = values['max-active'];
-            const maxActive = Number.parseInt(maxActiveRaw, 10);
-            if (!Number.isFinite(maxActive)) {
-                throw new UsageError(`--max-active must be a number, got "${maxActiveRaw}"`);
+            // Number.parseInt('3abc', 10) === 3 — parses a leading numeric prefix
+            // and silently ignores trailing garbage. Require the whole flag value
+            // to be digits before parsing so "3abc" is rejected, not truncated.
+            if (!/^\d+$/.test(maxActiveRaw)) {
+                throw new UsageError(`--max-active must be a positive integer, got "${maxActiveRaw}"`);
             }
+            const maxActive = Number.parseInt(maxActiveRaw, 10);
             return await runtime.delegate(deps, {
                 repoUrl: repo,
                 prompt,

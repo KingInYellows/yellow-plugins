@@ -9,6 +9,7 @@ import {
   findByIdempotencyKey,
   readIndex,
   upsertRecord,
+  withStateLock,
   writeIndex,
   type AgentRecord,
 } from '../src/state.js';
@@ -147,5 +148,98 @@ describe('corrupt-file quarantine', () => {
     await upsertRecord(stateFile, makeRecord({ idempotencyKey: 'fresh' }));
     const { index } = await readIndex(stateFile);
     expect(index['fresh']).toBeDefined();
+  });
+});
+
+describe('concurrency locking', () => {
+  it('serializes concurrent upsertRecord read-modify-write cycles so no update is lost', async () => {
+    const keys = Array.from({ length: 15 }, (_, i) => `concurrent-${i}`);
+    await Promise.all(
+      keys.map((key) =>
+        upsertRecord(stateFile, makeRecord({ idempotencyKey: key }))
+      )
+    );
+
+    const { index } = await readIndex(stateFile);
+    for (const key of keys) {
+      expect(index[key]).toBeDefined();
+    }
+    expect(Object.keys(index)).toHaveLength(keys.length);
+  });
+
+  it('a fresh (non-stale) lock blocks a second acquirer until the first releases', async () => {
+    const order: string[] = [];
+    const release = async (): Promise<void> => {
+      order.push('first-released');
+    };
+
+    const firstHeld = withStateLock(
+      stateFile,
+      async () => {
+        order.push('first-acquired');
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await release();
+      },
+      { staleMs: 10_000, timeoutMs: 5_000, pollMs: 10 }
+    );
+    // Give the first lock a moment to actually acquire before starting the second.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const second = withStateLock(
+      stateFile,
+      async () => {
+        order.push('second-acquired');
+      },
+      { staleMs: 10_000, timeoutMs: 5_000, pollMs: 10 }
+    );
+
+    await Promise.all([firstHeld, second]);
+    expect(order).toEqual([
+      'first-acquired',
+      'first-released',
+      'second-acquired',
+    ]);
+  });
+
+  it('times out acquiring a lock that is held and not yet stale', async () => {
+    const holdForever = withStateLock(
+      stateFile,
+      () => new Promise(() => {}), // never resolves — holds the lock for the test's duration
+      { staleMs: 10_000, timeoutMs: 5_000, pollMs: 10 }
+    );
+    // Swallow the eventual unhandled rejection this generates at test teardown; not the assertion under test.
+    holdForever.catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await expect(
+      withStateLock(stateFile, async () => 'unreachable', {
+        staleMs: 10_000,
+        timeoutMs: 100,
+        pollMs: 10,
+      })
+    ).rejects.toThrow(/timed out acquiring state lock/);
+  });
+
+  it('takes over a stale lock left behind by a crashed process instead of hanging', async () => {
+    await fs.promises.mkdir(path.dirname(stateFile), { recursive: true });
+    const lockPath = path.join(path.dirname(stateFile), '.agents.json.lock');
+    await fs.promises.writeFile(lockPath, 'some-other-process-owner-token');
+    const staleTime = new Date(Date.now() - 60_000);
+    await fs.promises.utimes(lockPath, staleTime, staleTime);
+
+    const result = await withStateLock(stateFile, async () => 'done', {
+      staleMs: 50,
+      timeoutMs: 2_000,
+      pollMs: 10,
+    });
+
+    expect(result).toBe('done');
+    // The stale lock file itself is gone (taken over, then released) — a
+    // subsequent normal upsert isn't blocked behind the abandoned owner.
+    expect(fs.existsSync(lockPath)).toBe(false);
+
+    await upsertRecord(stateFile, makeRecord({ idempotencyKey: 'took-over' }));
+    const { index } = await readIndex(stateFile);
+    expect(index['took-over']).toBeDefined();
   });
 });

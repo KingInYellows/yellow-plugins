@@ -186,6 +186,12 @@ jobs:
               # non-emission scan (mirror of the main workflow's `cursor`
               # target) so fork PRs see the same blocking signal.
               node scripts/validate-cursor.js
+              # Committed-dist drift gate for fork PRs too: the main
+              # workflow's build job never runs on fork PRs, so without this
+              # a fork PR touching plugins/yellow-cursor/src could land with
+              # stale committed dist/. Local tsc build only — no secrets.
+              pnpm --filter yellow-cursor run build
+              git diff --exit-code -- plugins/yellow-cursor/dist
               ;;
             generated)
               # Schema conformance gate (mirror of the main workflow's

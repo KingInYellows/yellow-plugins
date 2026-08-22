@@ -75,6 +75,9 @@ function validateRepoUrl(input) {
     if (url.hash !== '') {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'Repository URL must not contain a fragment');
     }
+    if (url.port !== '') {
+        return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'Repository URL must not contain an explicit port');
+    }
     if (!ALLOWED_REPO_HOSTS.has(url.hostname.toLowerCase())) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', `Repository host "${url.hostname}" is not allowlisted (github.com, gitlab.com, dev.azure.com, bitbucket.org)`);
     }
