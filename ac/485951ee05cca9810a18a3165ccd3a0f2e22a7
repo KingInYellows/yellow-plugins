@@ -1,0 +1,54 @@
+plugins/yellow-cursor/tests/state-store.test.ts
+  s_ca129cb3ac489c::t_95549bd70e67e3 237-241
+  s_ca129cb3ac489c::t_38f68f02d5c3df 12
+  s_ca129cb3ac489c::t_55ede574dfcb4c 153-229,235-236,242-245
+  s_ca129cb3ac489c::t_e6a5b5c985b7d6 230-234
+plugins/yellow-cursor/tests/idempotency.test.ts
+  s_ca129cb3ac489c::t_4a85df25b323c4 9
+  s_ca129cb3ac489c::t_4849759b6ec8c3 120-181
+plugins/yellow-cursor/src/validate.ts
+  s_ca129cb3ac489c::t_322e33cba1dd98 47-52
+plugins/yellow-cursor/dist/cli.js
+  s_ca129cb3ac489c::t_2d19722a17a714 124-128,130
+plugins/yellow-linear/commands/linear/delegate.md
+  s_ca129cb3ac489c::t_e9dd7de0d9bdd1 255-257
+plugins/yellow-cursor/src/state.ts
+  s_ca129cb3ac489c::t_a62e6cbec9721e 150-254,259-264
+plugins/yellow-cursor/CLAUDE.md
+  s_ca129cb3ac489c::t_e6a5b5c985b7d6 42-46,108-110
+  s_ca129cb3ac489c::t_c4cac31b004479 104-107,111-112
+  s_ca129cb3ac489c::t_3b4273ff193060 41
+docs/upstream-pins.md
+  s_ca129cb3ac489c::t_231a37b76aa76e 59-65
+plugins/yellow-cursor/src/cli.ts
+  s_ca129cb3ac489c::t_087358dcb56f88 119-122,124,127
+plugins/yellow-cursor/dist/validate.js
+  s_ca129cb3ac489c::t_2d19722a17a714 78-80
+.github/workflows/validate-schemas-fork.yml
+  s_ca129cb3ac489c::t_1ba7d50603399b 189-194
+plugins/yellow-cursor/tests/cli-json-contract.test.ts
+  s_ca129cb3ac489c::t_3045ec0f537a4b 221-241
+plugins/yellow-cursor/dist/runtime.js
+  s_ca129cb3ac489c::t_2d19722a17a714 216-220,222-228,260-264,267
+plugins/yellow-cursor/dist/state.js
+  s_ca129cb3ac489c::t_2d19722a17a714 50,149-237,239-244
+plugins/yellow-cursor/src/runtime.ts
+  s_ca129cb3ac489c::t_5cb084ae1e37f7 329-333,335-341
+  s_ca129cb3ac489c::t_31d2c12a25fce6 378-382,385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ac485951ee05cca9810a18a3165ccd3a0f2e22a7",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
