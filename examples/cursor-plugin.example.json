@@ -1,0 +1,16 @@
+{
+  "name": "hello-world",
+  "displayName": "Hello World",
+  "version": "1.0.0",
+  "description": "Example Cursor plugin manifest with a single skill.",
+  "author": {
+    "name": "Yellow Plugins",
+    "email": "plugins@example.com"
+  },
+  "homepage": "https://example.com",
+  "repository": "https://example.com/repo",
+  "license": "MIT",
+  "keywords": ["example"],
+  "category": "Developer Tools",
+  "skills": "./cursor/skills"
+}

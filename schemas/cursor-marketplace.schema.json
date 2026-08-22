@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/cursor-marketplace.schema.json",
+  "title": "Cursor Marketplace Schema",
+  "description": "Local mirror of the upstream Cursor marketplace schema for the generated .cursor-plugin/marketplace.json — the Cursor-target counterpart to .claude-plugin/marketplace.json, listing only Cursor-enabled plugins.",
+  "$comment": "Mirrored verbatim from https://raw.githubusercontent.com/cursor/plugins/main/schemas/marketplace.schema.json (fetched and quoted directly, not paraphrased), cross-checked against the real example at https://raw.githubusercontent.com/cursor/plugins/main/.cursor-plugin/marketplace.json. Snapshot date: 2026-08-21. No intentional divergence from upstream. Key differences from this repo's OWN codex-marketplace.schema.json (a local invention, not an upstream mirror): no root 'interface' wrapper (name is a bare top-level string, no displayName nesting); no per-entry 'policy' object; per-entry 'source' is a bare string (a relative path OR a remote URL per upstream — this repo's generator only ever emits the relative-path form, 'plugins/<name>'), not a { source: 'local', path } object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "plugins"],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "description": { "type": "string" }
+      },
+      "description": "additionalProperties: true per upstream — looser than the plugin manifest's own metadata handling."
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/CursorPluginEntry" },
+      "description": "Filtered to Cursor-enabled plugins only, in catalog canonical order. This repo never commits an empty-array empty-state artifact for Cursor (unlike Codex) — the root .cursor-plugin/marketplace.json is only emitted when at least one plugin is Cursor-enabled; absence is the no-op state."
+    }
+  },
+  "definitions": {
+    "CursorPluginEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+          "description": "Matches the plugin's name in its own .cursor-plugin/plugin.json, per upstream."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A relative path to the plugin directory or a remote URL per upstream (no further path-vs-URL discrimination in the schema itself). This repo's generator only emits the relative-path form."
+        },
+        "description": {
+          "type": "string"
+        },
+        "minClientVersions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -29,11 +29,27 @@
 
 'use strict';
 
-const { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } = require('fs');
+const {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+} = require('fs');
 const { dirname, join, relative, resolve, sep } = require('path');
 
-const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
-const { buildPluginManifest, buildMarketplace, isClaudeEnabled } = require('./lib/generate/emit-claude');
+const {
+  loadCatalog,
+  loadPluginSources,
+} = require('./lib/generate/catalog-reader');
+const {
+  buildPluginManifest,
+  buildMarketplace,
+  isClaudeEnabled,
+} = require('./lib/generate/emit-claude');
 const {
   isCodexEnabled,
   buildCodexMarketplace,
@@ -41,7 +57,17 @@ const {
   buildCodexHookConfig,
   buildCodexSkillTree,
 } = require('./lib/generate/emit-codex');
-const { assertWithinRoot, atomicWrite, serializeJson } = require('./lib/generate/write');
+const {
+  isCursorEnabled,
+  buildCursorMarketplace,
+  buildCursorPluginManifest,
+  buildCursorSkillTree,
+} = require('./lib/generate/emit-cursor');
+const {
+  assertWithinRoot,
+  atomicWrite,
+  serializeJson,
+} = require('./lib/generate/write');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -50,8 +76,15 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 // complete manifest + marketplace entry. Checked up front so apply mode can
 // never write a manifest with silently-dropped keys.
 const REQUIRED_SOURCE_KEYS = [
-  '$schema', 'description', 'author', 'homepage', 'repository', 'license',
-  'keywords', 'marketplace', 'targets',
+  '$schema',
+  'description',
+  'author',
+  'homepage',
+  'repository',
+  'license',
+  'keywords',
+  'marketplace',
+  'targets',
 ];
 
 // Required fields the emitters splice verbatim into the generated manifest
@@ -60,13 +93,19 @@ const REQUIRED_SOURCE_KEYS = [
 // the value shape — not just key presence — is checked. (All of these are
 // also in REQUIRED_SOURCE_KEYS, so presence is enforced by the loop above.)
 const REQUIRED_STRING_KEYS = [
-  '$schema', 'description', 'homepage', 'repository', 'license',
+  '$schema',
+  'description',
+  'homepage',
+  'repository',
+  'license',
 ];
 
-function validateSource(name, source, errors) {
+function validateSource(name, source, errors, pluginOrder) {
   for (const key of REQUIRED_SOURCE_KEYS) {
     if (!(key in source)) {
-      errors.push(`catalog/plugins/${name}.json: missing required key "${key}"`);
+      errors.push(
+        `catalog/plugins/${name}.json: missing required key "${key}"`
+      );
     }
   }
   // Value-shape checks for every field the builders dereference — enumerated
@@ -82,25 +121,43 @@ function validateSource(name, source, errors) {
     (!Array.isArray(source.keywords) ||
       !source.keywords.every((k) => typeof k === 'string'))
   ) {
-    errors.push(`catalog/plugins/${name}.json: "keywords" must be an array of strings`);
+    errors.push(
+      `catalog/plugins/${name}.json: "keywords" must be an array of strings`
+    );
   }
-  if ('marketplace' in source && source.marketplace !== null && typeof source.marketplace === 'object') {
+  if (
+    'marketplace' in source &&
+    source.marketplace !== null &&
+    typeof source.marketplace === 'object'
+  ) {
     const mp = source.marketplace;
     if (!('category' in mp)) {
-      errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.category"`);
+      errors.push(
+        `catalog/plugins/${name}.json: missing required key "marketplace.category"`
+      );
     } else if (typeof mp.category !== 'string') {
-      errors.push(`catalog/plugins/${name}.json: "marketplace.category" must be a string`);
+      errors.push(
+        `catalog/plugins/${name}.json: "marketplace.category" must be a string`
+      );
     }
     // marketplace.source is oneOf [string path, { source: 'url', url }] per
     // schemas/official-marketplace.schema.json — accept both; reject only a
     // scalar/array/null that could never serialize to a valid entry.
     if (!('source' in mp)) {
-      errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.source"`);
+      errors.push(
+        `catalog/plugins/${name}.json: missing required key "marketplace.source"`
+      );
     } else if (typeof mp.source === 'string') {
       if (mp.source.length === 0) {
-        errors.push(`catalog/plugins/${name}.json: "marketplace.source" string path must be non-empty`);
+        errors.push(
+          `catalog/plugins/${name}.json: "marketplace.source" string path must be non-empty`
+        );
       }
-    } else if (mp.source !== null && typeof mp.source === 'object' && !Array.isArray(mp.source)) {
+    } else if (
+      mp.source !== null &&
+      typeof mp.source === 'object' &&
+      !Array.isArray(mp.source)
+    ) {
       // Object form must match the schema's oneOf branch exactly:
       // { source: "url", url: <string> } (official-marketplace.schema.json).
       if (mp.source.source !== 'url' || typeof mp.source.url !== 'string') {
@@ -116,10 +173,14 @@ function validateSource(name, source, errors) {
     // marketplace.description is optional (falls back to source.description),
     // but when present the emitter uses it verbatim, so it must be a string.
     if ('description' in mp && typeof mp.description !== 'string') {
-      errors.push(`catalog/plugins/${name}.json: "marketplace.description" must be a string`);
+      errors.push(
+        `catalog/plugins/${name}.json: "marketplace.description" must be a string`
+      );
     }
   } else if ('marketplace' in source) {
-    errors.push(`catalog/plugins/${name}.json: "marketplace" must be an object`);
+    errors.push(
+      `catalog/plugins/${name}.json: "marketplace" must be an object`
+    );
   }
   // A string-shaped author would silently emit "author": {} into the
   // marketplace, and a non-boolean target flag would silently drop the
@@ -135,13 +196,30 @@ function validateSource(name, source, errors) {
     );
   }
   validateCapabilityProvider(name, source, errors);
-  if ('targets' in source && source.targets !== null && typeof source.targets === 'object') {
+  if (
+    'targets' in source &&
+    source.targets !== null &&
+    typeof source.targets === 'object'
+  ) {
     if (typeof source.targets.claude !== 'boolean') {
-      errors.push(`catalog/plugins/${name}.json: "targets.claude" must be a boolean`);
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.claude" must be a boolean`
+      );
     }
     validateCodexTarget(name, source.targets.codex, errors);
+    // Unlike targets.codex, targets.cursor is OPTIONAL on a catalog source
+    // (catalog-plugin.schema.json does not list it in targets.required) —
+    // only validate its shape when the plugin author actually populated it.
+    // Absence is the fail-closed "disabled" state isCursorEnabled already
+    // handles; nothing to validate.
+    if ('cursor' in source.targets) {
+      validateCursorTarget(name, source.targets.cursor, errors);
+    }
   } else if ('targets' in source) {
     errors.push(`catalog/plugins/${name}.json: "targets" must be an object`);
+  }
+  if ('lifecycle' in source) {
+    validateLifecycle(name, source.lifecycle, errors, pluginOrder);
   }
 }
 
@@ -158,15 +236,28 @@ function validateCapabilityProvider(name, source, errors) {
     return;
   }
   const provider = source.capabilityProvider;
-  if (provider === null || typeof provider !== 'object' || Array.isArray(provider)) {
-    errors.push(`catalog/plugins/${name}.json: "capabilityProvider" must be an object`);
+  if (
+    provider === null ||
+    typeof provider !== 'object' ||
+    Array.isArray(provider)
+  ) {
+    errors.push(
+      `catalog/plugins/${name}.json: "capabilityProvider" must be an object`
+    );
     return;
   }
   for (const key of ['group', 'id']) {
     if (!(key in provider)) {
-      errors.push(`catalog/plugins/${name}.json: missing required key "capabilityProvider.${key}"`);
-    } else if (typeof provider[key] !== 'string' || provider[key].trim().length === 0) {
-      errors.push(`catalog/plugins/${name}.json: "capabilityProvider.${key}" must be a non-empty string`);
+      errors.push(
+        `catalog/plugins/${name}.json: missing required key "capabilityProvider.${key}"`
+      );
+    } else if (
+      typeof provider[key] !== 'string' ||
+      provider[key].trim().length === 0
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "capabilityProvider.${key}" must be a non-empty string`
+      );
     }
   }
 }
@@ -180,11 +271,15 @@ function validateCapabilityProvider(name, source, errors) {
 // override can never reach a generated manifest silently.
 function validateCodexTarget(name, codex, errors) {
   if (codex === null || typeof codex !== 'object' || Array.isArray(codex)) {
-    errors.push(`catalog/plugins/${name}.json: "targets.codex" must be an object`);
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.codex" must be an object`
+    );
     return;
   }
   if (typeof codex.enabled !== 'boolean') {
-    errors.push(`catalog/plugins/${name}.json: "targets.codex.enabled" must be a boolean`);
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.codex.enabled" must be a boolean`
+    );
   }
   // buildCodexPluginManifest() dereferences codex.interface.displayName and
   // .category unconditionally once enabled, so a malformed opt-in (enabled
@@ -196,39 +291,58 @@ function validateCodexTarget(name, codex, errors) {
   } else if ('interface' in codex) {
     const iface = codex.interface;
     if (iface === null || typeof iface !== 'object' || Array.isArray(iface)) {
-      errors.push(`catalog/plugins/${name}.json: "targets.codex.interface" must be an object`);
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.codex.interface" must be an object`
+      );
     } else {
       if (typeof iface.displayName !== 'string') {
-        errors.push(`catalog/plugins/${name}.json: "targets.codex.interface.displayName" must be a string`);
+        errors.push(
+          `catalog/plugins/${name}.json: "targets.codex.interface.displayName" must be a string`
+        );
       }
       if (typeof iface.category !== 'string') {
-        errors.push(`catalog/plugins/${name}.json: "targets.codex.interface.category" must be a string`);
+        errors.push(
+          `catalog/plugins/${name}.json: "targets.codex.interface.category" must be a string`
+        );
       }
     }
   }
   if ('description' in codex && typeof codex.description !== 'string') {
-    errors.push(`catalog/plugins/${name}.json: "targets.codex.description" must be a string`);
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.codex.description" must be a string`
+    );
   }
   // buildCodexHookConfig() only skips hook carryover on a strict
   // `codex.includeHooks === false` check — a non-boolean value (e.g. a
   // string "false") silently falls through to the default carryover
   // behavior instead of the intended opt-out, so it must fail validation.
   if ('includeHooks' in codex && typeof codex.includeHooks !== 'boolean') {
-    errors.push(`catalog/plugins/${name}.json: "targets.codex.includeHooks" must be a boolean`);
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.codex.includeHooks" must be a boolean`
+    );
   }
   if (
     'skillAllowlist' in codex &&
     (!Array.isArray(codex.skillAllowlist) ||
       !codex.skillAllowlist.every((s) => typeof s === 'string'))
   ) {
-    errors.push(`catalog/plugins/${name}.json: "targets.codex.skillAllowlist" must be an array of strings`);
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.codex.skillAllowlist" must be an array of strings`
+    );
   }
   if ('componentPaths' in codex) {
     const cp = codex.componentPaths;
     if (cp === null || typeof cp !== 'object' || Array.isArray(cp)) {
-      errors.push(`catalog/plugins/${name}.json: "targets.codex.componentPaths" must be an object`);
-    } else if ('skills' in cp && (typeof cp.skills !== 'string' || cp.skills.trim().length === 0)) {
-      errors.push(`catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" must be a non-empty string`);
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.codex.componentPaths" must be an object`
+      );
+    } else if (
+      'skills' in cp &&
+      (typeof cp.skills !== 'string' || cp.skills.trim().length === 0)
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" must be a non-empty string`
+      );
     }
   }
   // buildCodexSkillTree() copies every allowlisted skill, but
@@ -236,7 +350,8 @@ function validateCodexTarget(name, codex, errors) {
   // componentPaths.skills is set AND the allowlist is non-empty — without
   // the path, the copied skills would be unreachable from the installed
   // plugin. Require the path whenever the allowlist is non-empty.
-  const hasSkillAllowlist = Array.isArray(codex.skillAllowlist) && codex.skillAllowlist.length > 0;
+  const hasSkillAllowlist =
+    Array.isArray(codex.skillAllowlist) && codex.skillAllowlist.length > 0;
   const hasSkillsPath =
     codex.componentPaths &&
     typeof codex.componentPaths === 'object' &&
@@ -246,6 +361,215 @@ function validateCodexTarget(name, codex, errors) {
     errors.push(
       `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" is required when "targets.codex.skillAllowlist" is non-empty`
     );
+  }
+}
+
+// `targets.cursor` mirrors `targets.codex`'s validated shape exactly (see
+// validateCodexTarget above for the field-by-field rationale) with one
+// structural difference: this function is only ever called when the plugin
+// source actually populated `targets.cursor` (catalog-plugin.schema.json
+// does not require the key, unlike targets.codex) — absence is validated
+// nowhere because isCursorEnabled's Boolean(...) guard already treats it as
+// disabled.
+function validateCursorTarget(name, cursor, errors) {
+  if (cursor === null || typeof cursor !== 'object' || Array.isArray(cursor)) {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor" must be an object`
+    );
+    return;
+  }
+  if (typeof cursor.enabled !== 'boolean') {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor.enabled" must be a boolean`
+    );
+  }
+  // buildCursorPluginManifest() dereferences cursor.interface.displayName
+  // and .category unconditionally once enabled, so a malformed opt-in
+  // (enabled without interface) must fail validation rather than crash
+  // generation.
+  if (cursor.enabled === true && !('interface' in cursor)) {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor.interface" is required when "targets.cursor.enabled" is true`
+    );
+  } else if ('interface' in cursor) {
+    const iface = cursor.interface;
+    if (iface === null || typeof iface !== 'object' || Array.isArray(iface)) {
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.cursor.interface" must be an object`
+      );
+    } else {
+      if (typeof iface.displayName !== 'string') {
+        errors.push(
+          `catalog/plugins/${name}.json: "targets.cursor.interface.displayName" must be a string`
+        );
+      }
+      if (typeof iface.category !== 'string') {
+        errors.push(
+          `catalog/plugins/${name}.json: "targets.cursor.interface.category" must be a string`
+        );
+      }
+    }
+  }
+  if ('description' in cursor && typeof cursor.description !== 'string') {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor.description" must be a string`
+    );
+  }
+  if (
+    'skillAllowlist' in cursor &&
+    (!Array.isArray(cursor.skillAllowlist) ||
+      !cursor.skillAllowlist.every((s) => typeof s === 'string'))
+  ) {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor.skillAllowlist" must be an array of strings`
+    );
+  }
+  if ('componentPaths' in cursor) {
+    const cp = cursor.componentPaths;
+    if (cp === null || typeof cp !== 'object' || Array.isArray(cp)) {
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.cursor.componentPaths" must be an object`
+      );
+    } else if (
+      'skills' in cp &&
+      (typeof cp.skills !== 'string' || cp.skills.trim().length === 0)
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" must be a non-empty string`
+      );
+    }
+  }
+  const hasSkillAllowlist =
+    Array.isArray(cursor.skillAllowlist) && cursor.skillAllowlist.length > 0;
+  const hasSkillsPath =
+    cursor.componentPaths &&
+    typeof cursor.componentPaths === 'object' &&
+    typeof cursor.componentPaths.skills === 'string' &&
+    cursor.componentPaths.skills.trim().length > 0;
+  if (hasSkillAllowlist && !hasSkillsPath) {
+    errors.push(
+      `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" is required when "targets.cursor.skillAllowlist" is non-empty`
+    );
+  }
+}
+
+const LIFECYCLE_STATUSES = ['active', 'experimental', 'legacy', 'deprecated'];
+const LIFECYCLE_INSTALL_POLICIES = ['auto', 'manual'];
+const LIFECYCLE_SUPPORT_LEVELS = ['full', 'security-only'];
+const LIFECYCLE_KNOWN_KEYS = new Set([
+  'status',
+  'installPolicy',
+  'support',
+  'replacement',
+]);
+
+// `lifecycle` is catalog-only metadata (never emitted into any generated
+// artifact — scripts/validate-cursor.js's non-emission scan is the runtime
+// gate for that); this only validates the closed vocabulary and the
+// `replacement` cross-reference, since the emitters themselves never
+// dereference this field. Unlike every other hand-rolled validator in this
+// file (which only checks presence/shape of known keys and never rejects
+// extras — additionalProperties:false is otherwise left to an AJV schema
+// pass this catalog-level schema doesn't currently have in the pipeline),
+// this one explicitly rejects unknown keys to match
+// catalog-plugin.schema.json's additionalProperties:false on "lifecycle".
+function validateLifecycle(name, lifecycle, errors, pluginOrder) {
+  if (
+    lifecycle === null ||
+    typeof lifecycle !== 'object' ||
+    Array.isArray(lifecycle)
+  ) {
+    errors.push(`catalog/plugins/${name}.json: "lifecycle" must be an object`);
+    return;
+  }
+  for (const key of Object.keys(lifecycle)) {
+    if (!LIFECYCLE_KNOWN_KEYS.has(key)) {
+      errors.push(
+        `catalog/plugins/${name}.json: "lifecycle.${key}" is not a recognized field`
+      );
+    }
+  }
+  if (!('status' in lifecycle)) {
+    errors.push(
+      `catalog/plugins/${name}.json: missing required key "lifecycle.status"`
+    );
+  } else if (!LIFECYCLE_STATUSES.includes(lifecycle.status)) {
+    errors.push(
+      `catalog/plugins/${name}.json: "lifecycle.status" must be one of ${LIFECYCLE_STATUSES.join(', ')}`
+    );
+  }
+  if (
+    'installPolicy' in lifecycle &&
+    !LIFECYCLE_INSTALL_POLICIES.includes(lifecycle.installPolicy)
+  ) {
+    errors.push(
+      `catalog/plugins/${name}.json: "lifecycle.installPolicy" must be one of ${LIFECYCLE_INSTALL_POLICIES.join(', ')}`
+    );
+  }
+  if (
+    'support' in lifecycle &&
+    !LIFECYCLE_SUPPORT_LEVELS.includes(lifecycle.support)
+  ) {
+    errors.push(
+      `catalog/plugins/${name}.json: "lifecycle.support" must be one of ${LIFECYCLE_SUPPORT_LEVELS.join(', ')}`
+    );
+  }
+  if ('replacement' in lifecycle) {
+    if (
+      typeof lifecycle.replacement !== 'string' ||
+      lifecycle.replacement.length === 0
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "lifecycle.replacement" must be a non-empty string`
+      );
+    } else if (
+      Array.isArray(pluginOrder) &&
+      !pluginOrder.includes(lifecycle.replacement)
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "lifecycle.replacement" ("${lifecycle.replacement}") must name a plugin in catalog.json's pluginOrder`
+      );
+    }
+  }
+}
+
+// Root `catalog.targets.cursor` config — OPTIONAL, unlike `catalog.targets.
+// codex` (which catalog-reader.js already validates as required
+// unconditionally; that file is outside this module's ownership). Validated
+// here instead, once per generateManifests() run, right after the catalog
+// loads successfully. Absence is a legitimate no-op state buildCursorMarketplace
+// already handles by returning null — nothing to validate in that case.
+function validateCursorRootConfig(catalog, errors) {
+  if (!catalog.targets || !('cursor' in catalog.targets)) {
+    return;
+  }
+  const cursor = catalog.targets.cursor;
+  if (cursor === null || typeof cursor !== 'object' || Array.isArray(cursor)) {
+    errors.push('catalog.json: "targets.cursor" must be an object');
+    return;
+  }
+  if (typeof cursor.name !== 'string' || cursor.name.length === 0) {
+    errors.push(
+      'catalog.json: "targets.cursor.name" must be a non-empty string'
+    );
+  }
+  if (
+    'description' in cursor &&
+    (typeof cursor.description !== 'string' || cursor.description.length === 0)
+  ) {
+    errors.push(
+      'catalog.json: "targets.cursor.description" must be a non-empty string'
+    );
+  }
+  if ('owner' in cursor) {
+    const owner = cursor.owner;
+    if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
+      errors.push('catalog.json: "targets.cursor.owner" must be an object');
+    } else if (typeof owner.name !== 'string' || owner.name.length === 0) {
+      errors.push(
+        'catalog.json: "targets.cursor.owner.name" must be a non-empty string'
+      );
+    }
   }
 }
 
@@ -280,7 +604,14 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // instead of creating an own property, silently dropping the plugin from
   // every `Object.entries(result.results)` consumer (main()'s error
   // reporting included).
-  const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: Object.create(null) };
+  const result = {
+    status: 'ok',
+    errors,
+    diffs: [],
+    written: [],
+    checked: 0,
+    results: Object.create(null),
+  };
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
   if (catalogResult.status === 'missing') {
@@ -295,6 +626,15 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   }
   const catalog = catalogResult.data;
 
+  // Root Cursor config is optional (unlike targets.codex, which
+  // catalog-reader.js already validates unconditionally) — validated here,
+  // once, since catalog-reader.js is outside this module's ownership.
+  validateCursorRootConfig(catalog, errors);
+  if (errors.length > 0) {
+    result.status = 'error';
+    return result;
+  }
+
   // Populated for every plugin in pluginOrder so callers can inspect
   // per-plugin state from a failed run — but only for the attributed error
   // classes listed above: a run that fails in the write phase reports
@@ -303,7 +643,10 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     result.results[name] = 'ok';
   }
 
-  const sourcesResult = loadPluginSources(join(rootDir, 'catalog'), catalog.pluginOrder);
+  const sourcesResult = loadPluginSources(
+    join(rootDir, 'catalog'),
+    catalog.pluginOrder
+  );
   if (sourcesResult.status === 'invalid') {
     errors.push(...sourcesResult.errors);
     // Attribute the plugins the loader itself implicates (missing /
@@ -324,7 +667,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const pkgs = {};
   for (const name of catalog.pluginOrder) {
     const errorsBeforeValidate = errors.length;
-    validateSource(name, sources[name], errors);
+    validateSource(name, sources[name], errors, catalog.pluginOrder);
     if (errors.length > errorsBeforeValidate) {
       result.results[name] = 'error';
     }
@@ -348,7 +691,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // TypeError on pkg.name below, escaping the documented { status: 'error' }
     // contract with an uncaught stack trace (mirrors catalog-reader's guard).
     if (pkg === null || typeof pkg !== 'object' || Array.isArray(pkg)) {
-      errors.push(`plugins/${name}/package.json: top-level value must be an object`);
+      errors.push(
+        `plugins/${name}/package.json: top-level value must be an object`
+      );
       result.results[name] = 'error';
       continue;
     }
@@ -387,7 +732,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // input can currently reach these catch blocks. They exist so a future
     // loosening of an upstream guard degrades to an attributed error
     // instead of an uncaught throw past the {status, errors} contract.
-    const targetPath = join(rootDir, 'plugins', name, '.claude-plugin', 'plugin.json');
+    const targetPath = join(
+      rootDir,
+      'plugins',
+      name,
+      '.claude-plugin',
+      'plugin.json'
+    );
     try {
       assertWithinRoot(targetPath, join(rootDir, 'plugins'));
     } catch (err) {
@@ -414,7 +765,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       continue;
     }
     const hookConfig = buildCodexHookConfig(source);
-    const manifestTargetPath = join(rootDir, 'plugins', name, '.codex-plugin', 'plugin.json');
+    const manifestTargetPath = join(
+      rootDir,
+      'plugins',
+      name,
+      '.codex-plugin',
+      'plugin.json'
+    );
     try {
       assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
     } catch (err) {
@@ -424,10 +781,18 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     targets.push({
       path: manifestTargetPath,
-      bytes: serializeJson(buildCodexPluginManifest(source, pkgs[name], hookConfig)),
+      bytes: serializeJson(
+        buildCodexPluginManifest(source, pkgs[name], hookConfig)
+      ),
     });
     if (hookConfig !== null) {
-      const hooksTargetPath = join(rootDir, 'plugins', name, 'hooks', 'codex-hooks.json');
+      const hooksTargetPath = join(
+        rootDir,
+        'plugins',
+        name,
+        'hooks',
+        'codex-hooks.json'
+      );
       try {
         assertWithinRoot(hooksTargetPath, join(rootDir, 'plugins'));
       } catch (err) {
@@ -462,6 +827,77 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     bytes: serializeJson(buildCodexMarketplace(catalog, sources)),
   });
 
+  // Cursor targets. Unlike the Codex loop above, buildCursorMarketplace
+  // returns null (not an empty-array object) when either the root
+  // catalog.targets.cursor config is absent or zero plugins are
+  // Cursor-enabled — in both cases NO root .cursor-plugin/marketplace.json
+  // target is pushed here at all; the stale-artifact sweep below removes
+  // any leftover file from a prior generation.
+  for (const name of catalog.pluginOrder) {
+    const source = sources[name];
+    if (!isCursorEnabled(source)) {
+      continue;
+    }
+    const manifestTargetPath = join(
+      rootDir,
+      'plugins',
+      name,
+      '.cursor-plugin',
+      'plugin.json'
+    );
+    try {
+      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+    } catch (err) {
+      errors.push(err.message);
+      result.results[name] = 'error';
+      continue;
+    }
+    targets.push({
+      path: manifestTargetPath,
+      bytes: serializeJson(buildCursorPluginManifest(source, pkgs[name])),
+    });
+    const skillTreeResult = buildCursorSkillTree(rootDir, name, source);
+    if (skillTreeResult.status === 'error') {
+      errors.push(...skillTreeResult.errors);
+      result.results[name] = 'error';
+      continue;
+    }
+    for (const target of skillTreeResult.targets) {
+      try {
+        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+      } catch (err) {
+        errors.push(err.message);
+        result.results[name] = 'error';
+        continue;
+      }
+      targets.push(target);
+    }
+  }
+  const cursorMarketplaceObj = buildCursorMarketplace(catalog, sources);
+  const cursorMarketplacePath = join(
+    rootDir,
+    '.cursor-plugin',
+    'marketplace.json'
+  );
+  if (cursorMarketplaceObj !== null) {
+    targets.push({
+      path: cursorMarketplacePath,
+      bytes: serializeJson(cursorMarketplaceObj),
+    });
+  } else if (existsSync(cursorMarketplacePath)) {
+    // No-op emission state (root config absent, or zero plugins enabled) but
+    // a prior generation left a file behind — stale-sweep it. This candidate
+    // lives OUTSIDE plugins/ (unlike every other stale candidate below), so
+    // it is containment-checked against rootDir directly rather than
+    // rootDir/plugins.
+    try {
+      assertWithinRoot(cursorMarketplacePath, rootDir);
+      targets.push({ path: cursorMarketplacePath, bytes: null });
+    } catch (err) {
+      errors.push(err.message);
+    }
+  }
+
   // Stale Codex artifact sweep: unlike the loop above, which only ever adds
   // targets, this catches files a prior generation wrote that no longer
   // correspond to a current target — Codex disabled for a plugin, a skill
@@ -472,7 +908,8 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   for (const name of catalog.pluginOrder) {
     const sweepErrorsBefore = errors.length;
     const codex = sources[name].targets.codex;
-    const skillsPath = (codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
+    const skillsPath =
+      (codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
     const pluginRoot = join(rootDir, 'plugins', name);
     const skillsDir = join(pluginRoot, skillsPath);
     const staleCandidates = [
@@ -534,7 +971,10 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       try {
         const pluginRootReal = realpathSync(pluginRoot);
         const skillsDirReal = realpathSync(skillsDir);
-        if (skillsDirReal !== pluginRootReal && !skillsDirReal.startsWith(pluginRootReal + sep)) {
+        if (
+          skillsDirReal !== pluginRootReal &&
+          !skillsDirReal.startsWith(pluginRootReal + sep)
+        ) {
           skillsDirWithinPlugin = false;
           errors.push(
             `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" ("${skillsPath}") resolves outside the plugin's own directory through a symlink`
@@ -555,7 +995,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
           } catch (err) {
             if (err.code !== 'ENOENT') {
               skillsDirWithinPlugin = false;
-              errors.push(`cannot resolve real path of ${join(pluginRoot, 'skills')}: ${err.message}`);
+              errors.push(
+                `cannot resolve real path of ${join(pluginRoot, 'skills')}: ${err.message}`
+              );
             }
           }
           if (
@@ -573,7 +1015,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       } catch (err) {
         if (err.code !== 'ENOENT') {
           skillsDirWithinPlugin = false;
-          errors.push(`cannot resolve real path of ${skillsDir}: ${err.message}`);
+          errors.push(
+            `cannot resolve real path of ${skillsDir}: ${err.message}`
+          );
         }
         // ENOENT: skillsDir doesn't exist on disk — nothing to sweep, so
         // fall through with skillsDirWithinPlugin still true; the
@@ -623,7 +1067,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
                 );
               } else if (refDirStat.isDirectory()) {
                 try {
-                  for (const refEntry of readdirSync(refDir, { withFileTypes: true })) {
+                  for (const refEntry of readdirSync(refDir, {
+                    withFileTypes: true,
+                  })) {
                     if (refEntry.isFile()) {
                       staleCandidates.push(join(refDir, refEntry.name));
                     } else {
@@ -657,11 +1103,16 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
             entryReal = realpathSync(entryPath);
           } catch (err) {
             if (err.code !== 'ENOENT') {
-              errors.push(`cannot resolve real path of ${entryPath}: ${err.message}`);
+              errors.push(
+                `cannot resolve real path of ${entryPath}: ${err.message}`
+              );
             }
             continue; // broken symlink: no target to sweep
           }
-          if (entryReal !== skillsDirReal && !entryReal.startsWith(skillsDirReal + sep)) {
+          if (
+            entryReal !== skillsDirReal &&
+            !entryReal.startsWith(skillsDirReal + sep)
+          ) {
             errors.push(
               `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" ("${skillsPath}") skill entry "${entry.name}" is a symlink that resolves outside the skills directory`
             );
@@ -701,6 +1152,192 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       result.results[name] = 'error';
     }
   }
+
+  // Stale Cursor artifact sweep — same rationale and containment discipline
+  // as the Codex sweep above (Cursor disabled for a plugin, or a skill
+  // dropped from cursor.skillAllowlist), with two adjustments: (a)
+  // `targets.cursor` is OPTIONAL on a catalog source (unlike targets.codex,
+  // which is always present), so this loop reads
+  // `(source.targets && source.targets.cursor) || {}` rather than
+  // dereferencing unconditionally; (b) there is no hooks file to sweep
+  // (Cursor plugins carry no generated hooks/cursor-hooks.json equivalent).
+  for (const name of catalog.pluginOrder) {
+    const sweepErrorsBefore = errors.length;
+    const cursor =
+      (sources[name].targets && sources[name].targets.cursor) || {};
+    const skillsPath =
+      (cursor.componentPaths && cursor.componentPaths.skills) ||
+      './cursor/skills';
+    const pluginRoot = join(rootDir, 'plugins', name);
+    const skillsDir = join(pluginRoot, skillsPath);
+    const staleCandidates = [join(pluginRoot, '.cursor-plugin', 'plugin.json')];
+    let skillsDirWithinPlugin = true;
+    try {
+      assertWithinRoot(skillsDir, pluginRoot);
+    } catch (_) {
+      skillsDirWithinPlugin = false;
+      errors.push(
+        `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") must stay within the plugin's own directory`
+      );
+    }
+    if (skillsDirWithinPlugin) {
+      const sourceSkillsDir = join(pluginRoot, 'skills');
+      if (
+        skillsDir === sourceSkillsDir ||
+        skillsDir.startsWith(sourceSkillsDir + sep) ||
+        sourceSkillsDir.startsWith(skillsDir + sep)
+      ) {
+        skillsDirWithinPlugin = false;
+        errors.push(
+          `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") must not overlap the plugin's own source "skills/" directory`
+        );
+      }
+    }
+    if (skillsDirWithinPlugin) {
+      try {
+        const pluginRootReal = realpathSync(pluginRoot);
+        const skillsDirReal = realpathSync(skillsDir);
+        if (
+          skillsDirReal !== pluginRootReal &&
+          !skillsDirReal.startsWith(pluginRootReal + sep)
+        ) {
+          skillsDirWithinPlugin = false;
+          errors.push(
+            `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") resolves outside the plugin's own directory through a symlink`
+          );
+        } else {
+          let sourceSkillsDirReal = null;
+          try {
+            sourceSkillsDirReal = realpathSync(join(pluginRoot, 'skills'));
+          } catch (err) {
+            if (err.code !== 'ENOENT') {
+              skillsDirWithinPlugin = false;
+              errors.push(
+                `cannot resolve real path of ${join(pluginRoot, 'skills')}: ${err.message}`
+              );
+            }
+          }
+          if (
+            sourceSkillsDirReal !== null &&
+            (skillsDirReal === sourceSkillsDirReal ||
+              skillsDirReal.startsWith(sourceSkillsDirReal + sep) ||
+              sourceSkillsDirReal.startsWith(skillsDirReal + sep))
+          ) {
+            skillsDirWithinPlugin = false;
+            errors.push(
+              `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") resolves through a symlink to overlap the plugin's own source "skills/" directory`
+            );
+          }
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          skillsDirWithinPlugin = false;
+          errors.push(
+            `cannot resolve real path of ${skillsDir}: ${err.message}`
+          );
+        }
+      }
+    }
+    if (skillsDirWithinPlugin) {
+      try {
+        const skillsDirReal = realpathSync(skillsDir);
+        const skillsDirResolved = resolve(skillsDir);
+        if (skillsDirReal !== skillsDirResolved) {
+          skillsDirWithinPlugin = false;
+          errors.push(
+            `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") is or contains a symlink — symlinked skills directories are not allowed in generated output`
+          );
+        }
+        for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            staleCandidates.push(join(skillsDir, entry.name, 'SKILL.md'));
+            const refDir = join(skillsDir, entry.name, 'references');
+            let refDirStat = null;
+            try {
+              refDirStat = lstatSync(refDir);
+            } catch (err) {
+              if (err.code !== 'ENOENT') {
+                errors.push(`cannot read ${refDir}: ${err.message}`);
+              }
+            }
+            if (refDirStat !== null) {
+              if (refDirStat.isSymbolicLink()) {
+                errors.push(
+                  `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") skill entry "${entry.name}" has a symlinked references directory — not allowed in generated output`
+                );
+              } else if (refDirStat.isDirectory()) {
+                try {
+                  for (const refEntry of readdirSync(refDir, {
+                    withFileTypes: true,
+                  })) {
+                    if (refEntry.isFile()) {
+                      staleCandidates.push(join(refDir, refEntry.name));
+                    } else {
+                      errors.push(
+                        `unexpected non-file entry in generated ${refDir}: ${refEntry.name}`
+                      );
+                    }
+                  }
+                } catch (err) {
+                  errors.push(`cannot read ${refDir}: ${err.message}`);
+                }
+              } else {
+                staleCandidates.push(refDir);
+              }
+            }
+            continue;
+          }
+          if (!entry.isSymbolicLink()) {
+            continue;
+          }
+          const entryPath = join(skillsDir, entry.name);
+          let entryReal;
+          try {
+            entryReal = realpathSync(entryPath);
+          } catch (err) {
+            if (err.code !== 'ENOENT') {
+              errors.push(
+                `cannot resolve real path of ${entryPath}: ${err.message}`
+              );
+            }
+            continue;
+          }
+          if (
+            entryReal !== skillsDirReal &&
+            !entryReal.startsWith(skillsDirReal + sep)
+          ) {
+            errors.push(
+              `catalog/plugins/${name}.json: "targets.cursor.componentPaths.skills" ("${skillsPath}") skill entry "${entry.name}" is a symlink that resolves outside the skills directory`
+            );
+            continue;
+          }
+          if (statSync(entryPath).isDirectory()) {
+            staleCandidates.push(entryPath);
+          }
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          errors.push(`cannot read ${skillsDir}: ${err.message}`);
+        }
+      }
+    }
+    for (const candidate of staleCandidates) {
+      if (expectedPaths.has(candidate) || !existsSync(candidate)) {
+        continue;
+      }
+      try {
+        assertWithinRoot(candidate, join(rootDir, 'plugins'));
+      } catch (err) {
+        errors.push(err.message);
+        continue;
+      }
+      targets.push({ path: candidate, bytes: null });
+    }
+    if (errors.length > sweepErrorsBefore) {
+      result.results[name] = 'error';
+    }
+  }
+
   if (errors.length > 0) {
     result.status = 'error';
     return result;
@@ -755,7 +1392,10 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       continue;
     }
     const rel = relative(rootDir, target.path);
-    result.diffs.push({ path: rel, state: current === null ? 'missing' : 'differs' });
+    result.diffs.push({
+      path: rel,
+      state: current === null ? 'missing' : 'differs',
+    });
     if (mode === 'apply') {
       try {
         mkdirSync(dirname(target.path), { recursive: true });
@@ -777,15 +1417,25 @@ function main() {
   const known = new Set(['--check', '--dry-run']);
   const unknown = args.filter((a) => !known.has(a));
   if (unknown.length > 0) {
-    console.error(`[generate-manifests] ERROR: Unknown argument(s): ${unknown.join(' ')}`);
-    console.error('[generate-manifests] Usage: node scripts/generate-manifests.js [--check | --dry-run]');
+    console.error(
+      `[generate-manifests] ERROR: Unknown argument(s): ${unknown.join(' ')}`
+    );
+    console.error(
+      '[generate-manifests] Usage: node scripts/generate-manifests.js [--check | --dry-run]'
+    );
     process.exit(1);
   }
   if (args.includes('--check') && args.includes('--dry-run')) {
-    console.error('[generate-manifests] ERROR: --check and --dry-run are mutually exclusive');
+    console.error(
+      '[generate-manifests] ERROR: --check and --dry-run are mutually exclusive'
+    );
     process.exit(1);
   }
-  const mode = args.includes('--check') ? 'check' : args.includes('--dry-run') ? 'dry-run' : 'apply';
+  const mode = args.includes('--check')
+    ? 'check'
+    : args.includes('--dry-run')
+      ? 'dry-run'
+      : 'apply';
 
   // Test hook (validator-harness precedent): point the CLI at a fixture tree.
   // Resolved to an absolute path (keeps join()/relative() below well-defined
@@ -815,14 +1465,16 @@ function main() {
         continue;
       }
       const count = result.errors.filter(
-        (e) => e.includes(`plugins/${name}/`) || e.includes(`plugins/${name}.json`)
+        (e) =>
+          e.includes(`plugins/${name}/`) || e.includes(`plugins/${name}.json`)
       ).length;
       // The substring count is informational only and the predicate can
       // miss: it hardcodes '/' while join() uses path.sep (win32), and a
       // path-escaping componentPaths override can bleed another plugin's
       // name into a message. Cheap insurance — never render a misleading
       // "0 error(s)" for a plugin that IS marked 'error'.
-      const detail = count > 0 ? `${count} error(s)` : 'error(s) present — see error list';
+      const detail =
+        count > 0 ? `${count} error(s)` : 'error(s) present — see error list';
       console.error(`[generate-manifests] ERROR: plugin ${name}: ${detail}`);
       if (IS_CI) {
         console.log(
@@ -860,7 +1512,9 @@ function main() {
     // --check fails while ANY diff remains; --dry-run always reports cleanly.
     process.exit(mode === 'check' ? 1 : 0);
   }
-  console.log(`[generate-manifests] All ${result.checked} generated files match catalog/ sources`);
+  console.log(
+    `[generate-manifests] All ${result.checked} generated files match catalog/ sources`
+  );
 }
 
 if (require.main === module) {
