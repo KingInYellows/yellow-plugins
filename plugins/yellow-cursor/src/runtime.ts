@@ -176,8 +176,14 @@ async function countActiveAgentsForRepo(
     'CURSOR_CONCURRENCY_LIMIT',
     `could not confirm the active-agent count for ${repoUrl}: the cloud agent listing still had more pages after ${MAX_LIST_PAGES}, so the max-active=${maxActive} cap cannot be enforced safely.`,
     {
+      // Deliberately promises no remedy. Raising --max-active cannot help (this
+      // throws before any count exists to compare it against) and neither can
+      // archiving, since the sweep requests includeArchived: true — archived
+      // agents still occupy these pages. At this account size the cap is simply
+      // not automatically enforceable, and saying so is more useful than naming
+      // an action that does nothing.
       recoveryAction:
-        'Archive agents you no longer need (/cursor:archive removes them from this listing) until it fits within the page bound. Raising --max-active does not help here.',
+        'No flag clears this: the account has more cloud agents than the bounded sweep can enumerate, and neither raising --max-active nor archiving reduces the page count. Review running agents yourself with /cursor:list, then launch via /cursor:delegate once you have confirmed there is capacity.',
     }
   );
 }

@@ -10,7 +10,11 @@ stopped after a fixed page bound and returned the partial count as if it were
 the total, so an account with more pages of cloud agents silently undercounted
 and a billable launch was authorized past the configured cap. The sweep now
 fails closed with `CURSOR_CONCURRENCY_LIMIT` when the listing is still
-paginating at the bound, and no longer counts archived agents toward the cap.
+paginating at the bound. Archived agents remain **in** the concurrency count
+whenever their status is still `running`: `/cursor:archive --force` archives an
+agent without cancelling its run, so force-archiving hides an agent from the
+default listing but never frees a `--max-active` slot. Only the agent's status
+gates the count, so archived-and-finished agents cost nothing.
 
 `/cursor:archive` did not actually hide anything: the adapter always requested
 archived agents, so they stayed in `/cursor:list` despite the archive and
