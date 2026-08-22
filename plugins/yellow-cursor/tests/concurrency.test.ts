@@ -148,6 +148,61 @@ describe('--max-active enforcement', () => {
       })
     ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
   });
+
+  it('fails CLOSED when the agent listing has more pages than the sweep bound', async () => {
+    // Every page reports another cursor, so the sweep can never confirm the
+    // true active count. Undercounting here would authorize a billable launch
+    // past the cap, so an exhausted bound must refuse rather than proceed.
+    adapter.listAgentsImpl = async () => ({
+      items: [],
+      nextCursor: 'always-more',
+    });
+
+    await expect(
+      delegate(deps, {
+        repoUrl: REPO,
+        prompt: 'go',
+        idempotencyKey: 'unbounded-pages',
+        maxActive: 3,
+        yes: true,
+        dryRun: false,
+        autoCreatePr: true,
+      })
+    ).rejects.toMatchObject({ appError: { code: 'CURSOR_CONCURRENCY_LIMIT' } });
+
+    // Nothing billable was dispatched.
+    expect(adapter.agents.size).toBe(0);
+  });
+
+  it('does not count archived agents toward the cap', async () => {
+    adapter.listAgentsImpl = async (options) => ({
+      items: [
+        {
+          agentId: 'bc-archived',
+          name: 'a',
+          summary: '',
+          status: 'running',
+          archived: true,
+          metadata: {},
+          repository: REPO,
+        },
+      ].filter(() => options?.includeArchived === true),
+    });
+
+    const result = await delegate(deps, {
+      repoUrl: REPO,
+      prompt: 'go',
+      idempotencyKey: 'archived-not-counted',
+      maxActive: 1,
+      yes: true,
+      dryRun: false,
+      autoCreatePr: true,
+    });
+
+    expect(result.operation).toBe('delegate');
+    // The cap sweep must not have opted into archived agents.
+    expect(adapter.listAgentsCalls[0]?.includeArchived).toBe(false);
+  });
 });
 
 describe('nested-delegation guard', () => {

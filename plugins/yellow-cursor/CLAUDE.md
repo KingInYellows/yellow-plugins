@@ -135,7 +135,8 @@ hand-edit `dist/cli.js`.
 
 - `/cursor:setup` — credential/SDK detection, optional `@cursor/sdk` install
 - `/cursor:delegate` — dry-run validate → confirm → billable launch
-- `/cursor:list` — merged live + local agent listing
+- `/cursor:list` — merged live + local agent listing (archived agents
+  excluded unless `--archived`)
 - `/cursor:status` — live status + reconciliation
 - `/cursor:follow-up` — confirm → billable send to an existing agent
 - `/cursor:cancel` — confirm → cancel a run (TOCTOU-safe, idempotent on

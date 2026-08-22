@@ -170,7 +170,11 @@ function buildCursorPluginManifest(source, pkg) {
   // copy at least one skill there — mirrors buildCodexPluginManifest's same
   // guard so the manifest never points at a skills directory the generator
   // never wrote.
-  const skillsPath = cursor.componentPaths && cursor.componentPaths.skills;
+  // Same './cursor/skills' default buildCursorSkillTree() copies to when
+  // componentPaths.skills is omitted — otherwise the tree would be written
+  // but the manifest would not point at it.
+  const skillsPath =
+    (cursor.componentPaths && cursor.componentPaths.skills) || './cursor/skills';
   const hasAllowlistedSkills =
     Array.isArray(cursor.skillAllowlist) && cursor.skillAllowlist.length > 0;
   if (skillsPath && hasAllowlistedSkills) {
