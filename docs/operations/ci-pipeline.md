@@ -70,12 +70,15 @@ the following triggers:
 
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
 
-Stale workflow runs are automatically cancelled when new commits are pushed to
-the same PR or branch, preventing resource waste and queue congestion.
+Only a newer run for the same pull request cancels an older pull-request
+validation run, preventing obsolete PR work from consuming runner capacity.
+Pushes to `main` and manually requested validation runs each get a unique
+`github.run_id` group so overlapping non-PR runs are never dropped from the
+pending queue and are never automatically cancelled.
 
 **Environment Variables:**
 
