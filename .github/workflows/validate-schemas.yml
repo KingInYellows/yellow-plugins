@@ -80,9 +80,10 @@ on:
   workflow_dispatch:
 
 # Cancel stale pull-request validation runs only. Main-branch and manually
-# requested validation runs remain independent and are never auto-cancelled.
+# requested validation runs use per-run concurrency groups and are never
+# auto-cancelled.
 concurrency:
-  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

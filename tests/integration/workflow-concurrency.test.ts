@@ -155,9 +155,6 @@ describe('GitHub Actions workflow concurrency contracts', () => {
       expect(group as string, `${file} stable PR identity`).toContain(
         'github.event.pull_request.number'
       );
-      expect(group as string, `${file} no per-run identity`).not.toMatch(
-        /github\.(run_id|run_attempt|sha)|github\.event\.pull_request\.head\.sha/
-      );
       expect(
         hasPullRequestTrigger(triggers),
         `${file} pull_request trigger`
@@ -167,10 +164,19 @@ describe('GitHub Actions workflow concurrency contracts', () => {
         expect(group as string, `${file} event isolation`).toContain(
           'github.event_name'
         );
+        expect(group as string, `${file} per-run fallback`).toContain(
+          'github.run_id'
+        );
+        expect(group as string, `${file} no ref fallback`).not.toContain(
+          'github.ref'
+        );
         expect(cancelInProgress, `${file} PR-only cancellation`).toBe(
           "${{ github.event_name == 'pull_request' }}"
         );
       } else {
+        expect(group as string, `${file} no per-run identity`).not.toMatch(
+          /github\.(run_id|run_attempt|sha)|github\.event\.pull_request\.head\.sha/
+        );
         expect(cancelInProgress, `${file} PR cancellation`).toBe(true);
       }
 

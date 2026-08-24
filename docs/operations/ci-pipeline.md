@@ -70,14 +70,15 @@ the following triggers:
 
 ```yaml
 concurrency:
-  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
 
 Only a newer run for the same pull request cancels an older pull-request
 validation run, preventing obsolete PR work from consuming runner capacity.
-Pushes to `main` and manually requested validation runs remain independent and
-are never automatically cancelled.
+Pushes to `main` and manually requested validation runs each get a unique
+`github.run_id` group so overlapping non-PR runs are never dropped from the
+pending queue and are never automatically cancelled.
 
 **Environment Variables:**
 
