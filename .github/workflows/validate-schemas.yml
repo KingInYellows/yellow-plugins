@@ -79,10 +79,11 @@ on:
       - '!.changeset/**'
   workflow_dispatch:
 
-# Cancel stale workflow runs
+# Cancel stale pull-request validation runs only. Main-branch and manually
+# requested validation runs remain independent and are never auto-cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-schemas-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: '22.22.0'
