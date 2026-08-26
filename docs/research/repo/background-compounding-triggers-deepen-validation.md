@@ -38,7 +38,7 @@ No hook anywhere in the codebase contains references to:
 - Any HTTP call to `api.anthropic.com`
 - Any `Task`, `Agent`, or main-loop-primitive invocation
 
-**The claude CLI IS available at `/home/kinginyellow/.local/bin/claude` (v2.1.143).
+**The claude CLI IS available at `~/.local/bin/claude` (v2.1.143).
 It supports non-interactive operation via `claude -p "prompt" --model haiku`
 and `--bare` mode.** However, no existing hook uses it — this is an entirely
 novel pattern in this codebase.

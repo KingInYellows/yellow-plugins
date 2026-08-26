@@ -153,7 +153,7 @@ Capture as a separate follow-up issue. Only implement if a future bug shows the 
 - `CONTRIBUTING.md:157-161` — changeset policy (no changeset needed for `scripts/`-only changes).
 - `.github/workflows/validate-schemas.yml:5-10, 134-136` — CI invocation of `validate-plugin.js`.
 - `code.claude.com/docs/en/hooks` — official Claude Code hooks docs confirming the `{ hooks: { ... } }` wrapper shape.
-- `/home/kinginyellow/.claude/plans/i-think-we-still-cached-dongarra.md` — origin plan for PR #390 (captures the original "optional follow-up" that became this plan).
+- `~/.claude/plans/<origin-plan>.md` — origin plan for PR #390 (captures the original "optional follow-up" that became this plan).
 - `plans/plugin-manifest-userconfig-validator-drift.md` — closely-related precedent (same validator-drift class, schema tightening pattern).
 
 <!-- deepen-plan: external -->

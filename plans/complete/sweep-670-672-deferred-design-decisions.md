@@ -332,7 +332,7 @@ longer share files after the wording-fix move):
 - [x] 4.2: Update the EXISTING memory file
       `~/.claude/projects/<slug>/memory/codacy-md041-changeset-false-positive.md`
       (`<slug>` is the machine-derived encoding of the repo path, e.g.
-      `-home-kinginyellow-projects-yellow-plugins` on this clone; it is
+      `-home-<user>-projects-yellow-plugins` on this clone; it is
       user/machine-specific — do not create a sibling): the repo-file
       exclude is necessary-but-insufficient — `markdownlint` is not in
       `.codacy/codacy.yaml`'s `tools:` list and no workflow invokes

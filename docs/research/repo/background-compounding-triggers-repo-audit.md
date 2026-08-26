@@ -384,10 +384,10 @@ PROJECT_DIR="$HOME/.claude/projects/$ENCODED"
 The system-reminder shows the user's memory path as:
 
 ```text
-/home/kinginyellow/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md
+~/.claude/projects/-home-<user>-projects-yellow-plugins/memory/MEMORY.md
 ```
 
-Applied: `/home/kinginyellow/projects/yellow-plugins` → `tr '/' '-'` → `-home-kinginyellow-projects-yellow-plugins`. Confirmed.
+Applied: `/home/<user>/projects/yellow-plugins` → `tr '/' '-'` → `-home-<user>-projects-yellow-plugins`. Confirmed.
 
 ### Canonical implementation for the stager and reviewer
 
