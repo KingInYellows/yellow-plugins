@@ -381,7 +381,7 @@ PROJECT_DIR="$HOME/.claude/projects/$ENCODED"
 
 ### Confirmed: the user's memory path matches this derivation exactly
 
-The system-reminder shows the user's memory path as:
+The system-reminder shows the user's memory path as (home prefix and username anonymized for publication — the live output shows the literal absolute path):
 
 ```text
 ~/.claude/projects/-home-<user>-projects-yellow-plugins/memory/MEMORY.md

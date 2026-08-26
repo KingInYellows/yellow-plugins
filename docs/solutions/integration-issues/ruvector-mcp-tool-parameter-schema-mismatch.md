@@ -47,7 +47,7 @@ inspected the actual installed ruvector package source:
 
 ```bash
 grep -A 30 'hooks_recall\|hooks_remember' \
-  ~/.nvm/versions/node/v24.12.0/lib/node_modules/ruvector/bin/mcp-server.js
+  $(npm root -g)/ruvector/bin/mcp-server.js
 ```
 
 This revealed the actual `inputSchema` definitions:
