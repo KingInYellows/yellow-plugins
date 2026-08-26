@@ -628,7 +628,7 @@ pnpm validate:plugins
 # Verify MEMORY.md path derivation formula matches actual path
 PROJECT_SLUG="$(pwd | tr '/' '-')"
 echo "$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
-# Should output: ~/.claude/projects/-home-<user>-projects-yellow-plugins/memory/MEMORY.md
+# Should output: /home/kinginyellow/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md
 
 # Check current MEMORY.md line count
 wc -l < "$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
@@ -647,6 +647,6 @@ wc -l < "$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 - Existing compounder: `plugins/yellow-review/agents/workflow/learning-compounder.md`
 - Anti-patterns: `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
 - Parallel agents: `docs/solutions/code-quality/parallel-multi-agent-review-orchestration.md`
-- MEMORY.md format: `~/.claude/projects/-home-<user>-projects-yellow-plugins/memory/MEMORY.md`
+- MEMORY.md format: `~/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md`
 - Prompt injection research: OWASP LLM01:2025; Spotlighting (Hines et al., arXiv:2403.14720)
 - Knowledge routing: Anthropic compound-engineering compound.md + project-specific taxonomy analysis
