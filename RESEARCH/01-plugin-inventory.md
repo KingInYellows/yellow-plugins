@@ -16,7 +16,7 @@ Survey date: 2026-04-26. Repo HEAD: `9ea2a7f` (`main`).
 
 ### Top-level layout
 
-`/bin/ls -la` on the repo root (`/home/kinginyellow/projects/yellow-plugins`)
+`/bin/ls -la` on the repo root (`/home/<user>/projects/yellow-plugins`)
 showed these top-level directories (omitting dotfiles other than the
 plugin-relevant ones):
 

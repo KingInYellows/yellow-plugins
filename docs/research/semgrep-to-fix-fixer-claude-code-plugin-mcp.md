@@ -749,7 +749,7 @@ semgrep scan --config auto --json path/to/file.py > /tmp/full-rescan.json
 
 ### Monorepo Structure
 
-From analysis of the local monorepo at `/home/kinginyellow/projects/yellow-plugins/`:
+From analysis of the local monorepo at `/home/<user>/projects/yellow-plugins/`:
 
 ```
 yellow-plugins/
@@ -855,7 +855,7 @@ Pattern from yellow-devin (HTTP MCP servers):
 
 ### Command Frontmatter Pattern
 
-From `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ci/commands/ci/diagnose.md`:
+From `/home/<user>/projects/yellow-plugins/plugins/yellow-ci/commands/ci/diagnose.md`:
 
 ```markdown
 ---
@@ -883,7 +883,7 @@ Key conventions:
 
 ### Agent Frontmatter Pattern
 
-From `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ci/agents/ci/failure-analyst.md`:
+From `/home/<user>/projects/yellow-plugins/plugins/yellow-ci/agents/ci/failure-analyst.md`:
 
 ```markdown
 ---
@@ -921,7 +921,7 @@ Key conventions:
 
 ### Skill Pattern
 
-From `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ci/skills/ci-conventions/SKILL.md`:
+From `/home/<user>/projects/yellow-plugins/plugins/yellow-ci/skills/ci-conventions/SKILL.md`:
 
 ```markdown
 ---
@@ -949,7 +949,7 @@ Key conventions:
 
 ### Hooks Pattern
 
-From `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ci/hooks/hooks.json`:
+From `/home/<user>/projects/yellow-plugins/plugins/yellow-ci/hooks/hooks.json`:
 
 ```json
 {
