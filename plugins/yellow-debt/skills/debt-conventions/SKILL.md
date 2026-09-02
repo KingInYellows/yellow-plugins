@@ -243,7 +243,8 @@ All scanner agents should follow this minimal structure (~40 lines):
 ---
 name: <category>-scanner
 description: "<category> analysis. Use when auditing code for <specific patterns>."
-model: inherit
+model: sonnet
+effort: low
 skills:
   - debt-conventions
 tools:

@@ -9,7 +9,7 @@ allowed-tools:
   - Glob
   - Edit
   - Write
-  - Task
+  - Agent
   - TaskList
   - TaskOutput
   - AskUserQuestion
@@ -200,10 +200,10 @@ relevant to this PR.
    </work-context>
    ```
 
-2. Spawn `learnings-researcher` via Task tool:
+2. Spawn `learnings-researcher` via Agent tool:
 
    ```
-   Task(
+   Agent(
      subagent_type: "yellow-core:research:learnings-researcher",
      description: "Past learnings pre-pass",
      prompt: "<work-context block from step 1>"
@@ -365,7 +365,7 @@ Spawn unconditionally:
 
 #### Graceful-degradation guard (mandatory)
 
-For each agent above, attempt the Task spawn. If the spawn fails with an
+For each agent above, attempt the Agent spawn. If the spawn fails with an
 "agent not found" / "unknown subagent_type" error (typically because the
 plugin is not installed, or the agent has been renamed and not yet
 propagated), log:
@@ -411,8 +411,8 @@ and continue with the dispatch table above.
 > duplicate the signal and add an empty-glob silent-regression risk
 > if any spawned agent isn't updated to write a result file.
 
-Launch all selected agents EXCEPT `code-simplifier` in parallel via Task
-tool. **Each Task invocation MUST set `run_in_background: true`** — the
+Launch all selected agents EXCEPT `code-simplifier` in parallel via the Agent tool
+tool. **Each Agent invocation MUST set `run_in_background: true`** — the
 review agents declare `background: true` in their frontmatter, but true
 parallelism also requires the spawning call to run in the background.
 Without this, the orchestrator blocks on each agent sequentially even
@@ -778,7 +778,7 @@ Risks section.
 
 ### Step 8: Pass 2 — Code Simplifier
 
-Launch `code-simplifier` via Task
+Launch `code-simplifier` via the Agent tool
 (`subagent_type: "yellow-review:review:code-simplifier"`) on the now-modified
 code to review applied fixes for simplification opportunities. Normalize
 the agent's prose return through Step 6 sub-step 0 first, which assigns

@@ -6,7 +6,7 @@ effort: high
 background: true
 memory: project
 tools:
-  - Task
+  - Agent
   - ToolSearch
   - Write
   - mcp__plugin_yellow-research_ceramic__ceramic_search
@@ -80,7 +80,7 @@ Perplexity/Tavily/EXA which handle natural language. See
 
 **Moderate** — 2-3 aspects or medium depth:
 
-- Dispatch the following three Task calls **in parallel** (do not
+- Dispatch the following three Agent calls **in parallel** (do not
   serialize): `mcp__plugin_yellow-research_ceramic__ceramic_search` (with
   the rewritten keyword query),
   `mcp__plugin_yellow-research_perplexity__perplexity_research` for
@@ -134,7 +134,7 @@ final result when repo-local AST search is unavailable.
 
 ## Step 2: Execute
 
-For moderate/complex, use the Task tool to dispatch concurrent queries:
+For moderate/complex, use the Agent tool to dispatch concurrent queries:
 
 ```text
 Launch in parallel:

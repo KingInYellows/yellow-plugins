@@ -221,6 +221,11 @@ mv plugins/hookify-old plugins/hookify
 > plugin-local hook script paths (existence and basic structure). These checks
 > run automatically but are not documented as separate numbered rules above.
 
+> **Rules 6–11** were folded into the checks `validate-plugin.js` runs without
+> separate numbering (directory-name consistency, `outputStyles` shape, and
+> plugin-local hook script paths). The numbering resumes at 12 so existing
+> error-message references stay stable.
+
 ### Rule 12: Credential-userConfig Env-Var Fallback (warning)
 
 For each `mcpServers.<server>.env.<KEY>: "${user_config.X}"` interpolation,

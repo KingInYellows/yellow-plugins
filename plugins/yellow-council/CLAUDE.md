@@ -32,7 +32,7 @@ and never auto-commits. The user decides what to do with the verdicts.
 ## Conventions
 
 - **Synchronous parallel fan-out.** All four reviewers spawned in a single
-  message via Task tool; Claude Code's harness runs them concurrently.
+  message via Agent tool; Claude Code's harness runs them concurrently.
   council.md collects return values after all four complete.
 - **One in-process slot, three CLI slots.** `claude-reviewer` runs inside
   Claude Code with no `Bash` and no subprocess. Consequences: `COUNCIL_TIMEOUT`
@@ -99,7 +99,7 @@ and never auto-commits. The user decides what to do with the verdicts.
   shares a model family with. Holds `Write` for exactly one file — the
   fenced-output path `council.md` mints with `mktemp -u` — and is allowlisted
   for that in `scripts/validate-agent-authoring.js`. Spawned via
-  `Task(subagent_type="yellow-council:review:claude-reviewer")`.
+  `Agent(subagent_type="yellow-council:review:claude-reviewer")`.
 - `gemini-reviewer` — Antigravity CLI (`agy`) wrapper for the Google lineage
   slot. Invokes
   `cd "$PACK_DIR" && agy --sandbox --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
@@ -107,11 +107,11 @@ and never auto-commits. The user decides what to do with the verdicts.
   capped at ~128KiB; cwd-isolated to the pack dir; pack ingestion verified
   via a final-line INGEST_TOKEN echo — proves the file was read to its end,
   not that instructions were followed). Spawned via
-  `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
+  `Agent(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
   `opencode run --format json --variant high "<prompt>"` plus session cleanup
   via `opencode session delete <id>`. Spawned via
-  `Task(subagent_type="yellow-council:review:opencode-reviewer")`.
+  `Agent(subagent_type="yellow-council:review:opencode-reviewer")`.
 
 (Codex reviewer is reused from yellow-codex when installed:
 `yellow-codex:review:codex-reviewer`. yellow-council does NOT ship its own

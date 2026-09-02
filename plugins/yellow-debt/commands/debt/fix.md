@@ -5,7 +5,7 @@ argument-hint: '<todo-path>'
 allowed-tools:
   - Bash
   - Read
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 
@@ -113,7 +113,7 @@ fi
 
 ## Agent Orchestration
 
-After the bash block succeeds, launch the fixer agent directly via Task with
+After the bash block succeeds, launch the fixer agent directly via the Agent tool with
 the updated todo path, using this literal value:
 
 ```text

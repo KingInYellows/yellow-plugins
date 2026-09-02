@@ -580,7 +580,7 @@ When the failure warrants deeper log analysis or a runner-side investigation
 
 #### On Claude Code
 
-Use the `Task` tool to spawn the specialized CI failure-analyst sub-agent with
+Use the `Agent` tool to spawn the specialized CI failure-analyst sub-agent with
 the run ID, URL, branch, and failed job names; for a suspected runner-side
 issue it in turn delegates to a runner-diagnostics investigation. Synthesize
 its diagnosis into the final report.

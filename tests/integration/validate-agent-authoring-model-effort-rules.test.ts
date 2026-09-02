@@ -3,7 +3,8 @@
  * `scripts/validate-agent-authoring.js`.
  *
  * V1: effort: enum (low|medium|high|xhigh|max) — hard error
- * V2: model: enum (haiku|sonnet|opus|inherit, optionally versioned) — hard error
+ * V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned) or a
+ *     full claude-* model ID — hard error
  * V3: model: inherit on agents/scanners/ or agents/ci/ — non-blocking warning
  * V4: synthesizer/orchestrator name without effort: high — non-blocking warning
  *
@@ -119,6 +120,34 @@ describe('validate-agent-authoring V2: model enum', () => {
     }
     const { status } = runValidator(tmpRoot);
     expect(status).toBe(0);
+  });
+
+  it('passes the fable alias and full claude-* model IDs', () => {
+    const cases: Record<string, string> = {
+      fable: 'fable',
+      'opus-full': 'claude-opus-5',
+      'haiku-dated': 'claude-haiku-4-5-20251001',
+    };
+    for (const [name, model] of Object.entries(cases)) {
+      writeAgent(
+        tmpRoot,
+        `yellow-test/agents/workflow/${name}.md`,
+        agentBody({ name, model })
+      );
+    }
+    const { status } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+  });
+
+  it('errors on model: gemini-2.5-pro (foreign provider, not claude-*)', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/workflow/g.md',
+      agentBody({ name: 'g', model: 'gemini-2.5-pro' })
+    );
+    const { status, stderr } = runValidator(tmpRoot);
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/invalid model: 'gemini-2.5-pro'/);
   });
 
   it('passes a versioned model: sonnet-4-5', () => {

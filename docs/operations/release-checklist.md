@@ -811,7 +811,7 @@ tagging conventions.
   VERSION=$(node -p "require('./package.json').version")
   git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
 
-  Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+  Co-Authored-By: Claude <model that authored the release> <noreply@anthropic.com>
   "
   ```
 

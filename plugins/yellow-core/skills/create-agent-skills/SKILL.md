@@ -83,7 +83,7 @@ Additional details, links.
 | `disable-model-invocation` | No       | If `true`, prints markdown only (no LLM call)                 |
 | `user-invocable`           | No       | If `false`, skill is internal-only (callable by other skills) |
 | `allowed-tools`            | No       | Array of tool names to restrict access                        |
-| `model`                    | No       | Override default model (e.g. `claude-opus-4-6`)               |
+| `model`                    | No       | Override default model (e.g. `fable`, `claude-opus-5`)        |
 | `context`                  | No       | `fork` creates isolated subagent context                      |
 | `agent`                    | No       | Agent name to use instead of default                          |
 
@@ -231,7 +231,7 @@ Use this table when deciding which frontmatter fields a new agent needs.
 | `background: true` (parallel spawn) | Yes | Yes | No | Opt | Opt |
 | `memory: project` (persistent learning) | Opt | No | Yes | Opt | Opt |
 | `skills` (shared conventions) | Opt | Yes (plugin-conventions) | Yes | Opt | Opt |
-| `tools` (whitelist) | Read/Grep/Glob/Bash | Read/Grep/Glob/Bash/Write | Task/AskUserQuestion/... | WebSearch/WebFetch/... | Read/Grep/Glob |
+| `tools` (whitelist) | Read/Grep/Glob/Bash | Read/Grep/Glob/Bash/Write | Agent/AskUserQuestion/... | WebSearch/WebFetch/... | Read/Grep/Glob |
 | Include `security-fencing` block | Yes | Yes | No | Opt (if scraping content) | Opt |
 
 **Archetype quick guide:**
@@ -241,7 +241,7 @@ Use this table when deciding which frontmatter fields a new agent needs.
 - **Scanner** — like Reviewer but more systematic across a whole codebase;
   writes findings to structured output files.
 - **Orchestrator** — multi-step workflow coordinator that spawns other
-  agents via Task. Prompts the user, makes decisions, does not parallelize
+  agents via the Agent tool. Prompts the user, makes decisions, does not parallelize
   with peers.
 - **Research** — investigates an open question by consulting external
   sources (WebSearch, WebFetch, MCP research tools) and/or the codebase.
@@ -254,8 +254,8 @@ Valid values: `memory: user`, `memory: project`, `memory: local`. Writing
 
 ## Subagent Failure Convention (Output-File Pattern)
 
-When an orchestrator spawns prose-emitting subagents via the Task tool,
-the Task return value is not always reliable for distinguishing partial
+When an orchestrator spawns prose-emitting subagents via the Agent tool,
+the Agent tool's return value is not always reliable for distinguishing partial
 success from complete failure. The community-adopted workaround is the
 output-file convention: each agent atomically writes a per-run result
 file with a `status` field, and the orchestrator trusts only those files.

@@ -6,7 +6,7 @@ allowed-tools:
   - Bash
   - Read
   - Write
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 

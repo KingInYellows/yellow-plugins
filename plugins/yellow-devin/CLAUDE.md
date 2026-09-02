@@ -95,7 +95,7 @@ manifest still bundles it.
   every API call. See `devin-workflows` skill for patterns.
 - **Write safety:** C1 (validate before write), M3 (confirm destructive ops like
   cancel via AskUserQuestion).
-- **devin-orchestrator non-interactive contract:** Task-spawned callers that
+- **devin-orchestrator non-interactive contract:** Agent-spawned callers that
   need unattended session creation must include the exact caller-owned marker
   line `non-interactive: declared` in the spawn prompt, outside any fenced
   untrusted-content block (see Step 2 of

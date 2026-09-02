@@ -81,7 +81,7 @@ Selection is based on `git diff --stat` and `git diff` output analysis:
 
 ### Cross-Plugin Agents (from yellow-core)
 
-These are spawned via Task tool when conditions match. The Wave 2
+These are spawned via Agent tool when conditions match. The Wave 2
 pipeline dispatches the calibrated reviewer variants
 (`security-reviewer`, `performance-reviewer`); the legacy fallback
 (`review_pipeline: legacy` in `yellow-plugins.local.md`) keeps the
@@ -343,10 +343,10 @@ call `plugins/github-workflow/lib/github-stack-runtime.js` directly.
 
 ## Cross-Plugin Agent References
 
-To spawn cross-plugin agents from yellow-review commands, use the Task tool:
+To spawn cross-plugin agents from yellow-review commands, use the Agent tool:
 
 ```
-Task(subagent_type="yellow-core:review:security-reviewer",
+Agent(subagent_type="yellow-core:review:security-reviewer",
      prompt="Review these files for security issues: <file-list>")
 ```
 
@@ -361,7 +361,7 @@ legacy` opt-in to dispatch it instead).
 To spawn the optional Codex supplementary reviewer (requires yellow-codex):
 
 ```
-Task(subagent_type="yellow-codex:review:codex-reviewer",
+Agent(subagent_type="yellow-codex:review:codex-reviewer",
      prompt="Review this PR for bugs, security issues, and quality problems.
              Base branch: <base-ref>. PR title: <title>.")
 ```

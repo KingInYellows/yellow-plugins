@@ -8,7 +8,7 @@ skills:
   - brainstorming
 tools:
   - AskUserQuestion
-  - Task
+  - Agent
   - ToolSearch
   - Write
   - Glob
@@ -51,7 +51,7 @@ vector recall), not redundant; keep both.
    `<` → `&lt;`, then `>` → `&gt;`). Activity = one-sentence TOPIC
    summary; Files and Diff empty (an empty Diff field is supported by the
    agent contract); Domains inferred from the topic when there is a signal.
-2. Dispatch `Task` synchronously (blocking — do not use
+2. Dispatch `Agent` synchronously (blocking — do not use
    `run_in_background`) with `subagent_type:
    "yellow-core:research:learnings-researcher"`, description "Past
    learnings pre-pass", prompt = the sanitized `<work-context>` block

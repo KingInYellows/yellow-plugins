@@ -8,7 +8,7 @@ tools:
   - Grep
   - Glob
   - Bash
-  - Task
+  - Agent
   - ToolSearch
 ---
 
@@ -107,7 +107,7 @@ Then stop. Do not invoke any tool.
 ### Step 2: Per-backend discovery (parallel)
 
 Run all three backends in parallel where possible (single-message Bash batch
-+ Task dispatch).
++ Agent dispatch).
 
 #### Claude Code
 
@@ -198,7 +198,7 @@ mcp__plugin_yellow-devin_devin__devin_session_search(
 )
 ```
 
-If only `devin-orchestrator` is available, dispatch via Task with
+If only `devin-orchestrator` is available, dispatch via the Agent tool with
 `subagent_type: "yellow-devin:workflow:devin-orchestrator"` (verify the
 literal subagent type with ToolSearch first; if the agent's exact subagent
 type differs, use the discovered form). Pass the keywords and time window.
@@ -370,7 +370,7 @@ through tiers.
 - Use `Grep` for keyword filtering; never read whole session files.
 - Use `Glob` to enumerate session directories before `find`-style traversal.
 - Use `Bash` for `grep -c`, file timestamps, and CWD-encoding.
-- Use `Task` only for the Devin fallback path (when MCP is unavailable but
+- Use `Agent` only for the Devin fallback path (when MCP is unavailable but
   `devin-orchestrator` agent is present).
 - When in doubt about a backend's availability, the dispatcher already
   detected it — trust `backends_available`.

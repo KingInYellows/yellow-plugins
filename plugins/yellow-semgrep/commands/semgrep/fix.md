@@ -11,7 +11,7 @@ allowed-tools:
   - Glob
   - Skill
   - AskUserQuestion
-  - Task
+  - Agent
   - mcp__plugin_yellow-semgrep_semgrep__semgrep_scan
 ---
 
@@ -162,7 +162,7 @@ If autofix produces a diff:
 - If syntax check fails: discard, fall through to LLM fix
 
 If no autofix available or autofix failed:
-- Spawn `finding-fixer` agent via Task with context:
+- Spawn `finding-fixer` agent via the Agent tool with context:
   `{ check_id, severity, message, cwe, path, line, code_context }`
 - The agent generates a minimal fix and presents it for approval
 
@@ -177,7 +177,7 @@ semgrep scan --config "r/${CHECK_ID}" --autofix --metrics off "${FILE_PATH}"
 
 ### Step 9: Verify Fix
 
-Spawn `scan-verifier` agent via Task:
+Spawn `scan-verifier` agent via the Agent tool:
 
 The agent will:
 1. Re-scan with `--config auto` (covers the target rule + all others in one pass)

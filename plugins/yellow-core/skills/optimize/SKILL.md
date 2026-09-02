@@ -39,7 +39,7 @@ context (no on-disk persistence by default — see "Persistence" below).
 | ----- | ----------------- | ---------------------------------------------------------------------------------- |
 | 0     | Spec resolution   | Read or scaffold the optimization spec; validate against schema.yaml               |
 | 1     | Research pre-pass | Optional best-practices pre-load to seed variant generation with prior art         |
-| 2     | Parallel generate | Spawn `parallel_count` Task agents to produce candidate variants                   |
+| 2     | Parallel generate | Spawn `parallel_count` Agent-tool subagents to produce candidate variants          |
 | 3     | LLM-as-judge      | Two-run order-swap scoring with per-criterion rubric and style-bias self-check     |
 | 4     | Rank & hand-off   | Aggregate scores; surface ranked list via AskUserQuestion; optional compound-write |
 
@@ -130,10 +130,10 @@ Skip this phase when `research_pre_pass: false`.
 Otherwise, dispatch one of:
 
 - `best-practices-researcher` (always available in yellow-core) via
-  `Task(subagent_type: "yellow-core:research:best-practices-researcher", ...)`
+  `Agent(subagent_type: "yellow-core:research:best-practices-researcher", ...)`
 - `research-conductor` (when yellow-research is installed; check via
   `ToolSearch`) via
-  `Task(subagent_type: "yellow-research:research:research-conductor", ...)`
+  `Agent(subagent_type: "yellow-research:research:research-conductor", ...)`
 
 Pass `optimization_target` and the joined `measurement_criteria.name` list
 as the research query. The agent returns a short summary (~300 words). Cache
@@ -146,12 +146,12 @@ to the user and proceed without research. Do not fail the run.
 
 ### Phase 2: Parallel Candidate Generation
 
-Spawn `parallel_count` Task agents in **a single message** (parallel
+Spawn `parallel_count` Agent-tool subagents in **a single message** (parallel
 execution). Each agent receives the same prompt but different
 `candidate_id` (A, B, C, …):
 
 ```text
-Task(
+Agent(
   subagent_type: "general-purpose",
   description: "optimize candidate <ID>",
   prompt: "<candidate_generation_prompt or default>\n\n<external_research>...</external_research>\n\nProduce ONE variant of <optimization_target>. Differ from a baseline; do not micro-tweak. Return the variant in a single fenced code block with no commentary outside the fence."
@@ -259,7 +259,7 @@ Routing on Question 1:
 
 If `knowledge_compound: true` AND the chosen candidate cleared
 `success_threshold`, spawn `knowledge-compounder` via
-`Task(subagent_type: "yellow-core:workflow:knowledge-compounder", ...)`
+`Agent(subagent_type: "yellow-core:workflow:knowledge-compounder", ...)`
 with the winner body, full judge_telemetry, and rationale to write
 `docs/solutions/optimizations/<spec-name>.md`. The `<spec-name>` slug
 must match `^[a-z0-9]+(?:-[a-z0-9]+)*$` (lowercase kebab-case); if the

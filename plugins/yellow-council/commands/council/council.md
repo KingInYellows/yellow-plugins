@@ -7,7 +7,7 @@ allowed-tools:
   - Read
   - Grep
   - Glob
-  - Task
+  - Agent
   - AskUserQuestion
   - Write
 skills:
@@ -214,7 +214,7 @@ Path validation MUST use the skill's `validate_path` function. Reject:
 Per-file content cap: `${COUNCIL_PATH_CHAR_CAP:-8000}` chars.
 Per-invocation file count cap: `${COUNCIL_PATH_MAX_FILES:-3}`.
 
-### Step 4: Parallel reviewer fan-out via Task
+### Step 4: Parallel reviewer fan-out via the Agent tool
 
 Spawn all four reviewers in a SINGLE message (Claude Code runs them
 concurrently). The pack is the SAME for all four; only `{{REVIEWER_NAME}}`
@@ -282,7 +282,7 @@ printf 'CLAUDE_FENCED_FILE=%s\n' "$CLAUDE_FENCED_FILE"
 
 Capture the literal path this prints and substitute it verbatim into
 claude-reviewer's spawn prompt below — Bash variables do NOT survive across
-separate Bash tool calls, and the Task prompt is not shell-expanded, so
+separate Bash tool calls, and the Agent prompt is not shell-expanded, so
 passing the string `$CLAUDE_FENCED_FILE` would hand the agent a useless
 literal.
 
@@ -298,7 +298,7 @@ the NEXT invocation, instead.
 
 In a single tool-call message, invoke:
 
-1. `Task(subagent_type="yellow-council:review:claude-reviewer", prompt=<pack with REVIEWER_NAME=Claude, plus the fenced-output path line>)`
+1. `Agent(subagent_type="yellow-council:review:claude-reviewer", prompt=<pack with REVIEWER_NAME=Claude, plus the fenced-output path line>)`
    - Append one line to this reviewer's prompt only:
      `Write your fenced output to this exact path: <literal CLAUDE_FENCED_FILE value>`
    - This reviewer runs in-process, so there is no not-installed degradation
@@ -309,13 +309,13 @@ In a single tool-call message, invoke:
      external-CLI output. claude-reviewer deliberately emits that shape only
      into its fenced-output file and returns the lowercase Layer-2 6-key
      contract; its agent body states this override explicitly.
-2. `Task(subagent_type="yellow-codex:review:codex-reviewer", prompt=<pack with REVIEWER_NAME=Codex>)`
+2. `Agent(subagent_type="yellow-codex:review:codex-reviewer", prompt=<pack with REVIEWER_NAME=Codex>)`
    - If yellow-codex is not installed, the spawn fails. Catch and mark Codex
      as `UNAVAILABLE (yellow-codex not installed)` in synthesis.
-3. `Task(subagent_type="yellow-council:review:gemini-reviewer", prompt=<pack with REVIEWER_NAME=Gemini>)`
-4. `Task(subagent_type="yellow-council:review:opencode-reviewer", prompt=<pack with REVIEWER_NAME=OpenCode>)`
+3. `Agent(subagent_type="yellow-council:review:gemini-reviewer", prompt=<pack with REVIEWER_NAME=Gemini>)`
+4. `Agent(subagent_type="yellow-council:review:opencode-reviewer", prompt=<pack with REVIEWER_NAME=OpenCode>)`
 
-Wait for all four Tasks to return. Each reviewer returns:
+Wait for all four Agent dispatches to return. Each reviewer returns:
 
 ```text
 verdict=<APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE>
@@ -570,7 +570,7 @@ parse_reviewer_return() {
     # runs in a fresh subprocess, so REVIEWER_SUMMARIES/REVIEWER_FINDINGS die
     # when this one exits — and Step 5 runs later, in a different block. If
     # the only sanitized copy is in memory, Step 5 has nothing to read and
-    # falls back to the raw Task return still sitting in model context,
+    # falls back to the raw Agent return still sitting in model context,
     # which defeats this redaction entirely. Sanitizing the file that
     # $STATE_FILE points at is what actually survives to synthesis.
     # Step 7 redacts this same file again before appending it to the report;
@@ -858,9 +858,9 @@ pass here because they derive from a `REDACTED_FILE` the agent already
 redacted.
 
 **For the claude leg, read its summary and findings from the sanitized file at
-its `$STATE_FILE` path — never from the Task return in context.** The CLI legs
+its `$STATE_FILE` path — never from the Agent return in context.** The CLI legs
 differ and the distinction matters: they redact inside their own agent before
-returning, so their Task return is already sanitized and is a legitimate source.
+returning, so their Agent return is already sanitized and is a legitimate source.
 That is not optional generosity — `yellow-codex`'s reviewer writes only its
 escaped findings plus fence framing to its fenced file, so its overall summary
 exists ONLY in that (already redacted) return. Demanding the file for every leg
@@ -869,7 +869,7 @@ context. The claude leg is the one that cannot sanitize its own return, which is
 why it, and only it, must be read from disk. The
 Bash arrays Step 4 filled do not exist here: each Bash block runs in its own
 subprocess, so `REVIEWER_SUMMARIES`/`REVIEWER_FINDINGS` are gone by the time
-this step runs. The raw Task return IS still in context, and synthesizing
+this step runs. The raw Agent return IS still in context, and synthesizing
 from it silently bypasses Step 4's redaction — the sanitized bytes live only
 in the file on disk. Step 4 redacts that file in place for the claude leg;
 the CLI legs write theirs already redacted.

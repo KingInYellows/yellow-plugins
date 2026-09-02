@@ -4,7 +4,7 @@ description: 'Extract and document recently solved engineering problems using pa
 model: sonnet
 memory: project
 tools:
-  - Task
+  - Agent
   - Bash
   - Read
   - Write
@@ -137,7 +137,7 @@ SKIP exit path; it is distinct from user-initiated Cancel at M3.
 | style, convention, naming, duplication | code-quality |
 | workflow, process, git | workflow |
 
-**Normal path:** Launch all six subagents in parallel via Task. Each receives the
+**Normal path:** Launch all six subagents in parallel via the Agent tool. Each receives the
 conversation context (last 25 turns or the problem-solving session) with
 injection fencing.
 

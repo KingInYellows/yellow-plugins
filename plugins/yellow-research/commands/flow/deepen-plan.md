@@ -8,7 +8,7 @@ allowed-tools:
   - Write
   - Edit
   - Glob
-  - Task
+  - Agent
   - ToolSearch
   - AskUserQuestion
 ---
@@ -124,7 +124,7 @@ again, or run /flow:plan to generate a more detailed plan."
 
 ### Step 4: Codebase Research
 
-Launch via Task tool:
+Launch via Agent tool:
 
 ```text
 subagent_type: yellow-core:research:repo-research-analyst
@@ -179,7 +179,7 @@ OVERVIEW=$(printf '%s' "$PLAN_CONTENT" | sed -n '/^## Overview/,/^## /p' | head 
 
 If no `## Overview` section exists, use the first 500 characters of the plan.
 
-Launch via Task tool:
+Launch via Agent tool:
 
 ```text
 subagent_type: yellow-research:research:research-conductor

@@ -96,7 +96,7 @@ This skill is used identically by both hosts through Phase 1 below; Phase 2
 
 #### On Claude Code
 
-Use the `Task` tool to launch the selected prompts in parallel in a
+Use the `Agent` tool to launch the selected prompts in parallel in a
 **single message**, one general-purpose sub-agent per prompt, passing
 `$DIFF_OUTPUT` as context.
 

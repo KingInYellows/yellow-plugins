@@ -8,7 +8,7 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
-  - Task
+  - Agent
   - Skill
 model: sonnet
 ---

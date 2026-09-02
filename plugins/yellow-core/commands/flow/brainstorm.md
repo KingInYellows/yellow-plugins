@@ -4,7 +4,7 @@ description: Explore a feature or problem through iterative Q&A and optional res
 argument-hint: '[feature description or topic]'
 allowed-tools:
   - Bash
-  - Task
+  - Agent
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities

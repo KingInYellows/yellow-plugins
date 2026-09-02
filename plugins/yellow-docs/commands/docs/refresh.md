@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Edit
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 
@@ -143,7 +143,7 @@ Documentation is up to date."
 
 ### Step 3: Delegate to doc-auditor for Staleness Detection
 
-Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:analysis:doc-auditor") to find stale docs related to the changed files:
+Launch the `doc-auditor` agent via Agent tool (subagent_type: "yellow-docs:analysis:doc-auditor") to find stale docs related to the changed files:
 
 > Analyze these changed source files and find documentation that needs updating:
 >
@@ -178,7 +178,7 @@ Otherwise, present the list of stale docs to the user via AskUserQuestion:
   - "Select which to update" — show the list and let user pick
   - "Cancel" — stop without updating
 
-For each stale doc to update, delegate to the `doc-generator` agent via Task
+For each stale doc to update, delegate to the `doc-generator` agent via the Agent tool
 tool (subagent_type: "yellow-docs:generation:doc-generator"):
 
 > Update this stale documentation file:
