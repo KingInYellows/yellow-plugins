@@ -341,7 +341,7 @@ yellow_plugins_ci_timestamp_seconds{stage="schema_validation",target="marketplac
 
 | Property   | Value                                         |
 | ---------- | --------------------------------------------- |
-| Runs-on    | `[self-hosted, pool:atlas]`                    |
+| Runs-on    | `ubuntu-latest`                               |
 | Timeout    | 3 minutes                                     |
 | Depends-on | None (runs in parallel with validate-schemas) |
 
