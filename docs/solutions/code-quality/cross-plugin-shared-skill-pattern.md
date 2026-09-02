@@ -36,7 +36,7 @@ Is the result consumed inline in the calling agent's context window?
 
 Can the consuming agent simply copy a fixed block of prose/instructions?
   YES → inline replication with canonical SKILL.md source of truth
-  NO (requires dynamic dispatch, user-invokable orchestration) → skill-as-orchestrator
+  NO (requires dynamic dispatch, user-invocable orchestration) → skill-as-orchestrator
        (see session-history pattern: SKILL.md dispatches a Task internally)
 ```
 

@@ -1,7 +1,7 @@
 ---
 name: ci-setup
 description: 'Check CI prerequisites and configure the self-hosted runner SSH config. Use when first installing the plugin, after adding runners, or when CI commands fail with auth or connectivity errors.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

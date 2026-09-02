@@ -1,7 +1,7 @@
 ---
 name: mempalace-conventions
 description: "Canonical reference for how mempalace commands and agents integrate with the MemPalace MCP server. Use when authoring or maintaining a mempalace command or agent — exact tool naming, palace vocabulary, and error-handling rules live here."
-user-invokable: false
+user-invocable: false
 ---
 
 # MemPalace Conventions

@@ -1,7 +1,7 @@
 ---
 name: ci-diagnose
 description: 'Diagnose a CI failure now — fetch the failed run, redact and match its logs against the F01-F12 pattern library, and report root cause with fixes. Use when a GitHub Actions run has failed and you want its root cause and a fix now (for the reference workflow guide, use the diagnose-ci skill).'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

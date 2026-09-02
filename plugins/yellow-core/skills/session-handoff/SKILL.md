@@ -1,7 +1,7 @@
 ---
 name: session-handoff
 description: "Write a session-handoff artifact at plans/handoff/<YYYY-MM-DD>-<slug>.md capturing current task, workflow status, active artifact, open decisions, in-flight changes, and next action so a fresh session can resume without re-deriving context. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off next time\", or a session is approaching a context/compaction boundary mid-task. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
-user-invokable: true
+user-invocable: true
 ---
 
 # Session Handoff

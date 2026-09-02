@@ -1,7 +1,7 @@
 ---
 name: brainstorming
 description: Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation. Use when running /flow:brainstorm or authoring brainstorm-style agents.
-user-invokable: false
+user-invocable: false
 ---
 
 # Brainstorming Reference

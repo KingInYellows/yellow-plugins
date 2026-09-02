@@ -1,7 +1,7 @@
 ---
 name: semgrep-conventions
 description: "Shared conventions for Semgrep integration — triage state mappings, API patterns, fix strategy decision tree, rate limits, and security rules. Use when commands or agents need Semgrep-specific validation, error handling, or API reference."
-user-invokable: false
+user-invocable: false
 ---
 
 # Semgrep Conventions for yellow-semgrep Plugin

@@ -149,7 +149,7 @@ hand-edit `dist/cli.js`.
 ### Skills (1)
 
 - `cursor-delegation` — host-neutral delegation-lifecycle reference,
-  `user-invokable: false`. Not wired into the commands via the `Skill` tool —
+  `user-invocable: false`. Not wired into the commands via the `Skill` tool —
   the commands are full implementations, not thin wrappers around this skill. It
   exists as the twin surface a future Cursor/Codex distribution can expose on
   its own, so it deliberately avoids any Claude-specific mechanism (no

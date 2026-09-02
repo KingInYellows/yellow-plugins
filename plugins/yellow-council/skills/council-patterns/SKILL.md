@@ -1,7 +1,7 @@
 ---
 name: council-patterns
 description: "Canonical reference for yellow-council reviewer contracts, CLI invocation, redaction, and output-parsing conventions. Use when authoring or modifying claude-reviewer, gemini-reviewer, opencode-reviewer, or the /council command."
-user-invokable: false
+user-invocable: false
 ---
 
 # council-patterns Skill

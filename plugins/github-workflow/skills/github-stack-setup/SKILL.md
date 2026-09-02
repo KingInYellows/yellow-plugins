@@ -1,7 +1,7 @@
 ---
 name: github-stack-setup
 description: 'Check GitHub-native stacked-PR prerequisites — gh CLI, authentication, and the official github/gh-stack extension. Use when first installing the plugin, after gh auth changes, or when /stack:status reports PARTIAL_TOOLING for the github provider.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

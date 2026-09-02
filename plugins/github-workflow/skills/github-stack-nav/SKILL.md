@@ -1,7 +1,7 @@
 ---
 name: github-stack-nav
 description: 'Check out a stack target — stack number, PR number, PR URL, or branch. Use when user says "go to PR 42" or "show my stack and let me pick" on the github stacked-PR provider.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

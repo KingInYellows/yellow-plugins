@@ -1,7 +1,7 @@
 ---
 name: ci-status
 description: 'Show recent CI workflow run status. Use when the user asks for CI status, recent builds, what is running, or needs to find a run ID for diagnosis.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

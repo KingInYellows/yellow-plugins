@@ -1,7 +1,7 @@
 ---
 name: local-config
 description: "Defines the yellow-plugins.local.md per-project config file schema. Use when authoring commands that should accept per-project overrides for review pipeline behavior, reviewer set narrowing, depth controls, or focus-area filtering."
-user-invokable: false
+user-invocable: false
 ---
 
 # yellow-plugins.local.md — per-project configuration

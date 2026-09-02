@@ -84,7 +84,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ### Skills (1)
 
 - `codex-patterns` — CLI invocation patterns, output parsing, approval/sandbox
-  modes, error catalog, security conventions (not user-invokable)
+  modes, error catalog, security conventions (not user-invocable)
 
 ### Schemas (1)
 

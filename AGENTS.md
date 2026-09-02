@@ -247,9 +247,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   and directory under `agents/`.
 - Agents that reference a skill by name must either preload it under frontmatter
   `skills:` or include `Skill` in `tools:` for dynamic loading.
-- Skill frontmatter uses `user-invokable` with a `k`, not `user-invocable`.
-  Internal helper skills should set `user-invokable: false`; user-facing skills
-  should set `user-invokable: true`.
+- Skill frontmatter uses `user-invocable` with a `c`, not `user-invokable`
+  (Claude Code reads only the `c` spelling; RULE 20 rejects the other).
+  Internal helper skills should set `user-invocable: false`; user-facing skills
+  should set `user-invocable: true`.
 - Keep all frontmatter `description:` values single-line. Do not use folded or
   literal scalars such as `description: >`, `description: |`, or multi-line
   quoted strings; Claude Code's parser has truncated those in prior audits.

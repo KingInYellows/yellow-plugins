@@ -1,7 +1,7 @@
 ---
 name: test-conventions
 description: "Testing conventions and configuration reference. Use when agents or commands need config schema, severity classification, report templates, or credential rules for browser testing."
-user-invokable: false
+user-invocable: false
 ---
 
 # Test Conventions
@@ -18,7 +18,7 @@ classification, or credential handling rules.
 
 ## Usage
 
-This skill is not user-invokable. It provides shared context for the
+This skill is not user-invocable. It provides shared context for the
 yellow-browser-test plugin.
 
 ## Config Schema

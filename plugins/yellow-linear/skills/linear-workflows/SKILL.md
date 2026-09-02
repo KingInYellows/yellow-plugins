@@ -1,7 +1,7 @@
 ---
 name: linear-workflows
 description: "Linear workflow patterns and conventions reference. Use when commands or agents need Linear workflow context, issue writing guidance, or branch naming conventions."
-user-invokable: false
+user-invocable: false
 ---
 
 # Linear Workflow Patterns
@@ -19,7 +19,7 @@ workflow state definitions.
 
 ## Usage
 
-This skill is not user-invokable. It provides shared context for the
+This skill is not user-invocable. It provides shared context for the
 yellow-linear plugin's commands and agents.
 
 ## Team Context

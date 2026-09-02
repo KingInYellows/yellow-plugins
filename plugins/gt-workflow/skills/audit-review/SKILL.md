@@ -1,7 +1,7 @@
 ---
 name: audit-review
 description: 'Run 1-3 parallel quick-audit passes (code quality, security, error handling) over a diff and gate on findings. Use when smart-submit or gt-amend need to audit uncommitted changes before committing.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

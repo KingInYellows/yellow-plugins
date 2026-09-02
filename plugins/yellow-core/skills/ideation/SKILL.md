@@ -2,7 +2,7 @@
 name: ideation
 description: "Generate 3 grounded approaches to a soft problem, then hand the chosen one off to `brainstorm-orchestrator`. Use when the problem statement is still vague or `/flow:brainstorm` narrows too quickly."
 argument-hint: '[problem statement; append --strict-warrant or --no-strict-warrant to override domain default]'
-user-invokable: true
+user-invocable: true
 ---
 
 # ideation

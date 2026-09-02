@@ -115,10 +115,10 @@ resolution, and sequential stack review. Graphite-native workflow.
 ### Skills (2)
 
 - `pr-review-workflow` — Internal reference for adaptive selection, output
-  format, error handling, and Graphite integration (not user-invokable)
+  format, error handling, and Graphite integration (not user-invocable)
 - `stack-traversal` — Internal reference for the bottom-up Graphite
   stack-traversal procedure shared by `/review:all` and
-  `/review:resolve-stack` (not user-invokable)
+  `/review:resolve-stack` (not user-invocable)
 
 ### Scripts (2)
 

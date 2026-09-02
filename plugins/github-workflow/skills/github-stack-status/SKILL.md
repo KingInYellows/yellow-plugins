@@ -1,7 +1,7 @@
 ---
 name: github-stack-status
 description: 'Report GitHub-native stacked-PR tooling readiness and point to /stack:status (yellow-core) for the authoritative active-provider answer. Use when checking why gh stack tooling is unavailable or which stacked-PR provider is currently active.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

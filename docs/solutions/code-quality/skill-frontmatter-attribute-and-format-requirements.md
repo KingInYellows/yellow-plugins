@@ -17,6 +17,15 @@ pr: '#23, #69'
 
 # Skill and Agent Frontmatter Attribute Name and Format Requirements
 
+> **Status (2026-09-02): the key is `user-invocable` (with c).** The 2026-02
+> diagnostic quoted below came from an older VS Code extension build that listed
+> `user-invokable`. The Claude Code CLI (verified by grepping the 2.1.259 bundle)
+> parses only `user-invocable`, which is also the spelling in the official skills
+> reference. Every SKILL.md was renamed back and RULE 20 in
+> `scripts/validate-agent-authoring.js` now rejects `user-invokable` at error
+> tier. The single-line `description:` rules below are unchanged and still
+> apply. The history is kept verbatim so the reversal is traceable.
+
 ## Problem
 
 VS Code diagnostics on SKILL.md files showed two categories of errors:
@@ -267,7 +276,9 @@ special characters predictably.
 
 ## Prevention
 
-1. **Use the correct attribute name:** Always `user-invokable` (with k)
+1. **Use the correct attribute name:** `user-invocable` (with c) — superseded
+   on 2026-09-02, see the update at the end of this doc; the original text here
+   said `user-invokable`
 2. **Keep frontmatter values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
    `|+`, or multi-line YAML constructs in any `.md` plugin file (skills AND
    agents)
@@ -340,3 +351,46 @@ user invocation, add `user-invokable: true` explicitly for clarity.
 changes), confirm `user-invokable:` is present AND correctly spelled. The
 existing on-touch check for description format now has a sibling check for
 field presence.
+
+---
+
+## Update — 2026-09-02
+
+### Reversal: Claude Code reads `user-invocable`, not `user-invokable`
+
+A best-practices audit grepped the installed Claude Code 2.1.259 bundle for the
+skill frontmatter keys it parses: `user-invocable` / `userInvocable` appear
+110 / 177 times; `invokable` appears zero times. The official skills reference
+(`code.claude.com/docs/en/skills`, "Frontmatter reference") lists
+`user-invocable`. The `k` spelling this repo standardised on in 2026-02 — on the
+strength of a VS Code extension diagnostic — was therefore being silently
+ignored: all 59 skills declared `user-invokable: false` still appeared in the
+`/` menu and were user-invocable.
+
+**Fix (PR: user-invocable key rename):**
+
+1. Renamed the key in every `plugins/*/skills/*/SKILL.md` (70 files) and every
+   prose reference (root `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, plugin
+   `CLAUDE.md` files, `create-agent-skills`, the pattern-recognition-specialist
+   lint row, `emit-codex.js` comment, test fixtures).
+2. Added **RULE 20** (error tier) to `validateSkillFiles()`: a parsed
+   frontmatter mapping containing the key `user-invokable` fails the run.
+   Fenced or prose mentions do not trip it.
+
+**Detection:**
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+grep -rl '^user-invokable:' "$GIT_ROOT/plugins/"*/skills/*/SKILL.md   # must be empty
+```
+
+**Live verification:** in a project with yellow-core enabled, type `/` — the
+internal skills (`yellow-core:security-fencing`, `yellow-core:local-config`, …)
+must no longer be listed, while `yellow-core:ideation` and
+`yellow-core:session-handoff` (declared `user-invocable: true`) remain.
+Orchestrators still load internal skills through the `Skill` tool.
+
+**Lesson:** an IDE diagnostic is not the runtime. When a frontmatter convention
+is load-bearing, verify it against the CLI that consumes it (grep the bundle or
+check the official reference), and back it with a validator rule rather than a
+prose convention.

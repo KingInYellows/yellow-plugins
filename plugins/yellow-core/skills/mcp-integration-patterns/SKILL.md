@@ -1,7 +1,7 @@
 ---
 name: mcp-integration-patterns
 description: "Shared patterns for ruvector recall/remember and morph discovery integration (the ruvector protocol constants are a replica of yellow-ruvector's canonical memory-query skill). Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
-user-invokable: false
+user-invocable: false
 ---
 
 # MCP Integration Patterns
@@ -21,7 +21,7 @@ error-handling and graceful-degradation behavior across the marketplace.
 
 ## Usage
 
-This skill is not user-invokable. It provides shared context for
+This skill is not user-invocable. It provides shared context for
 yellow-plugins commands and agents.
 
 > **Replica of canonical source.** The ruvector protocol constants in the

@@ -1,7 +1,7 @@
 ---
 name: github-stack-merge
 description: 'Merge a stacked PR via gh stack merge. Use when the user says "merge my stack" or "land this PR" on the github stacked-PR provider and the target is fully reviewed and ready.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

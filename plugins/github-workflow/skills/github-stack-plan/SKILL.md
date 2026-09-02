@@ -1,7 +1,7 @@
 ---
 name: github-stack-plan
 description: 'Report the current GitHub-native stack structure (read-only). Use when checking what branches/PRs are in the stack before submitting or merging.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does
