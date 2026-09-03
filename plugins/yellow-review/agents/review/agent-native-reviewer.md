@@ -175,14 +175,16 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   corresponding tool, or a tool embeds clear business logic.
 - **Anchor 50** — the gap is likely but depends on context not fully visible.
   Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — suppress** — the gap requires runtime observation
+- **Anchor 25 or below — report at that anchor; the orchestrator drops it** — the gap requires runtime observation
   you cannot confirm from code.
 
 ## Output Format
 
 Return findings in the standard yellow-review compact-return JSON schema
-shown below. Suppress findings with `confidence < 75` except P0 findings at
-`confidence ≥ 50`.
+shown below. Report every finding you identify, each with a confidence score and
+severity. Do not filter by confidence or cap the count — the orchestrator
+applies the 75 gate after aggregation, and a finding it later drops costs
+less than a real issue silently omitted here.
 
 ```json
 {

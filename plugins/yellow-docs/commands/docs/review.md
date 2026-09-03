@@ -205,6 +205,9 @@ Apply the confidence-rubric gate (matches Wave 2 yellow-review pattern):
   findings (which always emit at confidence 100 by definition) and P1
   findings at `confidence ≥ 50` (P1 is this plugin's highest severity —
   the personas emit only P1|P2|P3).
+- Personas do not pre-filter — they report every finding with a confidence
+  score — so sub-75 findings in the input are expected; count them as
+  suppressed rather than treating them as a persona defect.
 - Group surviving findings by persona for the report.
 
 ### Step 7: Render report
