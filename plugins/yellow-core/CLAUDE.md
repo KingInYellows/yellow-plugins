@@ -429,6 +429,16 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
   rejects it — confirmed via deepen-plan validation). Non-blocking
   behavior comes entirely from the disowned-subshell pattern in
   `hooks/scripts/stop.sh` and `hooks/scripts/session-start.sh`.
+- **PreCompact hook is the odd one out.** `hooks/scripts/pre-compact.sh`
+  prints plain text, not `{"continue": true}`: Claude Code appends a
+  PreCompact hook's stdout to the compaction prompt on exit 0 (exit 2
+  blocks compaction). It carries the Claude 5-generation
+  compaction-preservation instruction (plan path + unchecked tasks,
+  modified files, user decisions verbatim, open questions, last failing
+  command, in-flight branch/PR names). Synchronous, no jq, well under
+  its 3s timeout. Hook events live in `catalog/plugins/yellow-core.json`
+  and are regenerated into `plugin.json` by `pnpm generate:manifests`.
+  Tests: `tests/pre-compact-hook.bats`.
 - **MEMORY.md migration is manual.** Plugin install does not partition
   an existing MEMORY.md into `## CORE_RULES`/`## USER_PREFERENCES`/
   `## KNOWN_PROJECTS`/`## Session Notes` automatically. `staging-promoter`
