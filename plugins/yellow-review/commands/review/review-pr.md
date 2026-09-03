@@ -729,7 +729,10 @@ Apply the aggregation steps from
    the routing is deterministic) or `residual_risks` (otherwise — i.e.,
    purely maintainability). Record the count.
 8. **Confidence gate.** Suppress findings below anchor 75. **Exception:**
-   P0 findings at anchor 50+ survive. Record suppressed counts.
+   P0 findings at anchor 50+ survive. Record suppressed counts. Personas do
+   not pre-filter (they are told to report everything with a confidence
+   score), so sub-75 findings in the input are expected — count them under
+   `suppressed`, do not treat them as a persona defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by

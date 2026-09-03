@@ -84,8 +84,8 @@ Evaluate all 7 principles, but weight findings by command type:
   results by default with no `--limit`, `--filter`, or pagination. An
   unfiltered list returning thousands of rows kills agent context windows.
 
-Cap findings at 5–7 per review. Focus on the highest-severity issues for the
-detected command types.
+Focus on the detected command types, and report every issue you find rather
+than capping the count — ranking happens downstream.
 
 ## Confidence Calibration
 
@@ -99,7 +99,7 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   flag, a list command with no default limit.
 - **Anchor 50** — the pattern is present but context beyond the diff might
   resolve it. Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — suppress** — the issue depends on runtime behavior
+- **Anchor 25 or below — report at that anchor; the orchestrator drops it** — the issue depends on runtime behavior
   or configuration you have no evidence for.
 
 ## What you don't flag
@@ -118,8 +118,10 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 ## Output Format
 
 Return your findings as the standard yellow-review compact-return JSON schema
-shown below. Suppress findings with `confidence < 75` except P0 findings at
-`confidence ≥ 50`.
+shown below. Report every finding you identify, each with a confidence score and
+severity. Do not filter by confidence or cap the count — the orchestrator
+applies the 75 gate after aggregation, and a finding it later drops costs
+less than a real issue silently omitted here.
 
 ```json
 {
