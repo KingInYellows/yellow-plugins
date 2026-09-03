@@ -3,6 +3,8 @@ name: learnings-researcher
 description: "Searches docs/solutions/ for past learnings relevant to a PR diff or planning context, returning a fenced advisory block of distilled findings. Use when running /review:pr, /review:review-all, or /docs:review — surfaces prior bugs, architecture patterns, design decisions, and conventions so institutional knowledge carries forward into the current work."
 model: haiku
 effort: low
+experimental:
+  cacheTtl: 1h
 tools:
   - Read
   - Grep
