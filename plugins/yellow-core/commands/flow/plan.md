@@ -589,7 +589,6 @@ Schema migrations if applicable.
 
 ## Guidelines
 
-- **Be thorough in research:** Better to over-research than under-plan
 - **Ask questions early:** Clarify ambiguities before writing plan
 - **Match detail to complexity:** Don't over-engineer simple changes
 - **Include references:** File paths, similar code, external docs

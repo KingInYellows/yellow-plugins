@@ -95,7 +95,8 @@ Make questions specific and actionable — include recommendations.
 
 ## Guidelines
 
-1. Be exhaustively thorough — consider every permutation
+1. Walk every user journey end to end — happy path, empty state, error, and
+   permission paths — rather than enumerating permutations
 2. Think from the user's perspective, not just the system's
 3. Identify implicit assumptions and make them explicit
 4. Prioritize ruthlessly — not all gaps are equally important

@@ -1079,7 +1079,6 @@ step 5. Phase 4 becomes a summary phase:
 - **Ask when uncertain:** Use AskUserQuestion rather than guess
 - **Document decisions:** Add comments explaining non-obvious choices
 - **Keep PRs focused:** If scope grows, split into multiple PRs
-- **Be thorough:** Quality over speed
 
 ### Stack Execution Guidelines
 
