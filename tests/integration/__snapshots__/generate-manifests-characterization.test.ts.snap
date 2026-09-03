@@ -568,7 +568,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-compact.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-compact.sh\\"",
             "timeout": 3
           }
         ]

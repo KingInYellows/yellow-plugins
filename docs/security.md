@@ -153,7 +153,7 @@ yellow-ci and gt-workflow run a dependency-free Node runtime:
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
-| yellow-core     | SessionStart, Stop                                | Drain the background compounding-pipeline staging queue; capture session transcript tail |
+| yellow-core     | SessionStart, Stop, PreCompact                    | Staging-queue drain; transcript-tail capture; compaction-preservation instruction        |
 | yellow-composio | SessionStart                                      | Warn if `composio_mcp_url` is non-HTTPS (advisory only)                                  |
 | yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
 | yellow-research | SessionStart                                      | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`             |
@@ -169,6 +169,11 @@ read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is carried
 into the generated Codex manifest (`hooks/codex-hooks.json`) but is **inert on
 Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its Codex-side
 behavior is schema/unit/parity-tested, not live-verified.
+
+**yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
+compaction-preservation instruction that Claude Code appends to the compaction
+prompt. It is read-only — no network, no file writes — and always exits 0, so
+it can never block a compaction (exit 2 would).
 
 ### yellow-ruvector Hooks (detailed)
 
