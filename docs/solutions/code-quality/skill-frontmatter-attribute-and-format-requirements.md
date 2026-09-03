@@ -276,9 +276,9 @@ special characters predictably.
 
 ## Prevention
 
-1. **Use the correct attribute name:** `user-invocable` (with c) — superseded
-   on 2026-09-02, see the update at the end of this doc; the original text here
-   said `user-invokable`
+1. **Use the correct attribute name:** `user-invokable` (with k) is superseded
+   as of 2026-09-02 — use `user-invocable` (with c); see "Update — 2026-09-02"
+   at the end of this doc (the original text here said `user-invokable`)
 2. **Keep frontmatter values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
    `|+`, or multi-line YAML constructs in any `.md` plugin file (skills AND
    agents)
@@ -369,20 +369,32 @@ ignored: all 59 skills declared `user-invokable: false` still appeared in the
 
 **Fix (PR: user-invocable key rename):**
 
-1. Renamed the key in every `plugins/*/skills/*/SKILL.md` (70 files) and every
-   prose reference (root `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, plugin
-   `CLAUDE.md` files, `create-agent-skills`, the pattern-recognition-specialist
-   lint row, `emit-codex.js` comment, test fixtures).
+1. Renamed the key in every `plugins/*/skills/*/SKILL.md` (70 files), every
+   live prose reference (root `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+   plugin `CLAUDE.md` files, `create-agent-skills`, the
+   pattern-recognition-specialist lint row, `emit-codex.js` comment, test
+   fixtures), and the not-yet-started plans under `plans/` that teach the key
+   (`plans/yellow-symphony-plugin.md` step 3.1) — following a live plan must
+   not produce a skill that RULE 20 rejects. Historical records
+   (`docs/research`, `docs/brainstorms`, `plans/complete`, and the earlier
+   sections of this doc) keep the old spelling on purpose.
 2. Added **RULE 20** (error tier) to `validateSkillFiles()`: a parsed
    frontmatter mapping containing the key `user-invokable` fails the run.
    Fenced or prose mentions do not trip it.
 
 **Detection:**
 
+RULE 20 inspects the parsed frontmatter only, so scan just the frontmatter
+block — a column-0 `user-invokable:` in a fenced example or body text is fine:
+
 ```bash
 GIT_ROOT="$(git rev-parse --show-toplevel)"
-grep -rl '^user-invokable:' "$GIT_ROOT/plugins/"*/skills/*/SKILL.md   # must be empty
+for f in "$GIT_ROOT/plugins/"*/skills/*/SKILL.md; do
+  sed -n '2,/^---$/p' "$f" | grep -q '^user-invokable:' && echo "$f"
+done   # must print nothing
 ```
+
+Or let the validator decide: `pnpm validate:agents` reports RULE 20 errors.
 
 **Live verification:** in a project with yellow-core enabled, type `/` — the
 internal skills (`yellow-core:security-fencing`, `yellow-core:local-config`, …)
