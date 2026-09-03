@@ -84,7 +84,10 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 - **75** — likely inconsistency; charitable reading could reconcile but
   implementers would diverge
 - **50** — minor asymmetry without downstream consequence; advisory only
-- **Below 50 — report at that anchor; /docs:review drops it** — cannot verify, speculative, or stylistic
+- **Below 50 — report at that anchor; /docs:review drops it** — an in-scope
+  coherence finding you cannot fully verify from the text. Anything under
+  "What you don't flag" — style preferences included — is out of scope at
+  every confidence level; don't report it at all.
 
 ## What you don't flag
 

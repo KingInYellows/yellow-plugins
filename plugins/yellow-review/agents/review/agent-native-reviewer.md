@@ -175,7 +175,9 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   corresponding tool, or a tool embeds clear business logic.
 - **Anchor 50** — the gap is likely but depends on context not fully visible.
   Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — report at that anchor; the orchestrator drops it** — the gap requires runtime observation
+- **Anchor 25 or below — report at that anchor; the orchestrator removes it
+  from the actionable queue (a `pre_existing` finding is still listed in the
+  report's pre-existing section)** — the gap requires runtime observation
   you cannot confirm from code.
 
 ## Output Format
@@ -192,7 +194,7 @@ less than a real issue silently omitted here.
   "findings": [
     {
       "title": "Anti-pattern name — concise one-line title",
-      "severity": "P1|P2|P3",
+      "severity": "P0|P1|P2|P3",
       "category": "agent-native",
       "file": "path/to/file",
       "line": 42,

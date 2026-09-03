@@ -729,10 +729,15 @@ Apply the aggregation steps from
    the routing is deterministic) or `residual_risks` (otherwise — i.e.,
    purely maintainability). Record the count.
 8. **Confidence gate.** Suppress findings below anchor 75. **Exception:**
-   P0 findings at anchor 50+ survive. Record suppressed counts. Personas do
-   not pre-filter (they are told to report everything with a confidence
-   score), so sub-75 findings in the input are expected — count them under
-   `suppressed`, do not treat them as a persona defect.
+   P0 findings at anchor 50+ survive. Record suppressed counts: count only
+   the findings this gate actually removes — a P0 that survives the
+   exception is never counted under `suppressed`, so the report's "Findings
+   suppressed at confidence < 75" line stays accurate.
+   `agent-native-reviewer`, `agent-cli-readiness-reviewer` and
+   `cli-readiness-reviewer` do not pre-filter (they are told to report
+   everything with a confidence score) while the other personas keep their
+   own anchor floors, so sub-75 findings in the input are expected — gate
+   them here, do not treat them as a persona defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by
