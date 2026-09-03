@@ -184,8 +184,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `ideation` — generate 3 grounded approaches to a soft problem using the
   Toulmin warrant contract (evidence + linking principle + idea), filtered
   through MIDAS three-phase generation, then route the chosen approach into
-  `brainstorm-orchestrator` via the Agent tool. Strict-warrant mode auto-engages for
-  security/auth/data-migration domains
+  `brainstorm-orchestrator` via the Agent tool. Strict-warrant mode
+  auto-engages for security/auth/data-migration domains
 - `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-health-probe` — canonical MCP server health classification (OFFLINE /
   DEGRADED / HEALTHY plus PRESENT (untested) refinement) for

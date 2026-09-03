@@ -809,9 +809,10 @@ tagging conventions.
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
+  CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
   git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
 
-  Co-Authored-By: Claude <model that authored the release> <noreply@anthropic.com>
+  Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
   "
   ```
 

@@ -13,6 +13,7 @@ allowed-tools:
   - TaskCreate
   - TaskUpdate
   - TaskList
+  - TaskOutput
   - AskUserQuestion
   - ToolSearch
   - Skill
@@ -723,7 +724,7 @@ it at a Phase 1b checkpoint.
    call is a fresh subprocess. To make `$RUN_DIR` reach the Agent input
    prompts in step 3b, run mktemp and immediately capture the absolute
    path the command printed; substitute that literal path value inline
-   into each Task prompt below. Do not reference the variable name
+   into each Agent prompt below. Do not reference the variable name
    `$RUN_DIR` in the Agent input — the spawned agent receives the value
    you substitute, not a shell-variable expansion.
 
@@ -752,7 +753,7 @@ it at a Phase 1b checkpoint.
    for all agents via TaskOutput before aggregating findings.
 
    ```text
-   Task: code-simplicity-reviewer
+   Agent: code-simplicity-reviewer
    subagent_type: "yellow-core:review:code-simplicity-reviewer"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify overly complex code, suggest simplifications
@@ -760,7 +761,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: security-sentinel
+   Agent: security-sentinel
    subagent_type: "yellow-core:review:security-sentinel"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Find security vulnerabilities, unsafe patterns
@@ -768,7 +769,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: performance-oracle
+   Agent: performance-oracle
    subagent_type: "yellow-core:review:performance-oracle"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify performance issues, optimization opportunities
@@ -776,7 +777,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: polyglot-reviewer
+   Agent: polyglot-reviewer
    subagent_type: "yellow-core:review:polyglot-reviewer"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Check language-specific best practices, idioms

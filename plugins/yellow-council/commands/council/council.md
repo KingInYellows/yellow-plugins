@@ -704,7 +704,7 @@ parse_reviewer_return() {
           ;;
       esac
     fi
-    # Derive the reviewer prose from the SANITIZED FILE, not from the Task
+    # Derive the reviewer prose from the SANITIZED FILE, not from the Agent
     # return. claude-reviewer returns summary= and its findings block empty on
     # purpose: it has no Bash, so anything it put there would reach the
     # orchestrator context raw, and no later pass can retract what has already
@@ -747,7 +747,7 @@ parse_reviewer_return() {
       ' "$fenced_path")
       # A MISSING file verdict is a mismatch too, not an exemption. Skipping the
       # check when the file has no `Verdict:` line would let the independently
-      # generated Task-return vote stand while the persisted appendix shows no
+      # generated Agent-return vote stand while the persisted appendix shows no
       # vote at all.
       if [ -z "$file_verdict" ] || [ "$file_verdict" != "$verdict" ]; then
         # Both values are still REVIEWER-CONTROLLED and unvalidated at this

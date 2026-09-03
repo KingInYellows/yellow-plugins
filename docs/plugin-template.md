@@ -13,9 +13,14 @@ plugins/my-plugin/
 ├── commands/                 ← Slash commands (optional)
 │   └── my-command.md
 ├── skills/                   ← AI skills (optional)
-│   └── my-skill.md
+│   └── my-skill/             ← One directory per skill
+│       └── SKILL.md
 ├── agents/                   ← Custom agents (optional)
-│   └── my-agent.md
+│   └── <subdir>/             ← Namespace segment of subagent_type
+│       └── my-agent.md
+├── hooks/                    ← Hook scripts (optional)
+│   └── scripts/
+│       └── session-start.sh
 ├── scripts/                  ← Lifecycle hooks (optional)
 │   ├── install.sh
 │   └── uninstall.sh
@@ -248,6 +253,29 @@ object form carries a `reason` (a yellow-plugins extension).
 }
 ```
 
+### Hook Script
+
+Every `type: "command"` hook path in the manifest must resolve to a real file
+inside the plugin, so the `SessionStart` entry above needs this companion
+script — `validate-plugin.js` fails with `Hook script not found` without it.
+
+**File**: `hooks/scripts/session-start.sh` (`chmod +x` it)
+
+```bash
+#!/usr/bin/env bash
+# session-start.sh — must always emit a decision object.
+
+# Intentionally omit -e: an unexpected command failure would exit without JSON
+# and block session startup.
+set -uo pipefail
+
+# Drain the hook payload on stdin even when unused.
+cat >/dev/null
+
+printf '{"continue": true}\n'
+exit 0
+```
+
 ---
 
 ## Skill Template
@@ -422,20 +450,22 @@ chmod +x scripts/install.sh scripts/uninstall.sh
 
 ## Common Patterns
 
+Each snippet shows only the keys the pattern adds on top of the four required
+ones. There is no `permissions`, `lifecycle`, or `compatibility` key — the
+schema rejects them. Declare capability and OS requirements in the plugin's
+README, and run setup work from a `SessionStart` hook as shown above.
+
 ### Pattern 1: Configuration File Plugin
 
 ```json
 {
-  "permissions": [
-    {
-      "scope": "filesystem",
-      "reason": "Read and write plugin configuration",
-      "paths": [".config/my-plugin/", "my-plugin.config.json"]
+  "userConfig": {
+    "config_path": {
+      "type": "file",
+      "title": "Config file path",
+      "description": "Read and written by this plugin's commands; created on first run.",
+      "default": "my-plugin.config.json"
     }
-  ],
-  "lifecycle": {
-    "install": "scripts/setup-config.sh",
-    "uninstall": "scripts/remove-config.sh"
   }
 }
 ```
@@ -444,15 +474,18 @@ chmod +x scripts/install.sh scripts/uninstall.sh
 
 ```json
 {
-  "permissions": [
-    {
-      "scope": "network",
-      "reason": "Fetch data from external API",
-      "domains": ["api.example.com"]
+  "mcpServers": {
+    "example-api": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-example-api.sh",
+      "env": { "EXAMPLE_API_TOKEN": "${user_config.example_api_token}" }
     }
-  ],
-  "dependencies": {
-    "axios": "^1.6.0"
+  },
+  "userConfig": {
+    "example_api_token": {
+      "type": "string",
+      "title": "Example API token",
+      "sensitive": true
+    }
   }
 }
 ```
@@ -461,16 +494,14 @@ chmod +x scripts/install.sh scripts/uninstall.sh
 
 ```json
 {
-  "permissions": [
+  "keywords": ["git", "npm"],
+  "dependencies": [
     {
-      "scope": "shell",
-      "reason": "Execute git commands for version control",
-      "commands": ["git", "npm"]
+      "name": "yellow-core",
+      "version": "^1.0.0",
+      "reason": "hooks/scripts/guard-shell.sh sources yellow-core/lib/validate-fs.sh"
     }
-  ],
-  "compatibility": {
-    "os": ["linux", "macos"] // Windows may not have git/npm
-  }
+  ]
 }
 ```
 

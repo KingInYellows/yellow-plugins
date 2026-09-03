@@ -94,10 +94,10 @@ skip directly to Phase 3.
 
 If `RESEARCH_ROUND < 2`: offer via AskUserQuestion: `[Codebase patterns] [External research] [Skip]`
 
-- **Codebase**: `Task: repo-research-analyst` — fenced topic. If empty or fails:
+- **Codebase**: `Agent: repo-research-analyst` — fenced topic. If empty or fails:
   inform user "[brainstorm] Codebase research returned no results. Continuing with
   dialogue only." Do not synthesize. Increment `RESEARCH_ROUND` only on success.
-- **External**: `ToolSearch "research-conductor"` first. If found: `Task: research-conductor`
+- **External**: `ToolSearch "research-conductor"` first. If found: `Agent: research-conductor`
   — fenced topic. If fails: inform user "[brainstorm] External research failed.
   Continuing without it." Do not increment. Do not offer external research again this session. If not found: inform user once —
   "[brainstorm] External research unavailable — yellow-research not installed." —

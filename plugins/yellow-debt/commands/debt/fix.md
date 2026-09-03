@@ -117,9 +117,15 @@ After the bash block succeeds, launch the fixer agent directly via the Agent too
 the updated todo path, using this literal value:
 
 ```text
-Task: debt-fixer
-subagent_type: "yellow-debt:remediation:debt-fixer"
-``` The agent must run in its isolated worktree, read the todo
+Agent(
+  subagent_type="yellow-debt:remediation:debt-fixer",
+  description="Fix debt finding",
+  prompt="Remediate the technical debt finding in <NEW_TODO_PATH printed by the
+bash block above>. Work in an isolated worktree for this todo."
+)
+```
+
+The agent must run in its isolated worktree, read the todo
 file, implement the fix, show the diff, request approval, and either commit or
 restore only the files it changed before resetting the todo to `ready`.
 

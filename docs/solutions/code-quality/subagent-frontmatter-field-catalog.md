@@ -1,6 +1,7 @@
 ---
 title: 'Subagent Frontmatter Field Catalog'
 date: 2026-05-04
+date_verified: 2026-09-02
 category: code-quality
 track: knowledge
 problem: Claude Code subagent .md frontmatter fields — required, optional, version history, scope precedence
@@ -23,6 +24,12 @@ Sources: [docs.anthropic.com/en/docs/claude-code/sub-agents](https://docs.anthro
 [/changelog](https://code.claude.com/docs/en/changelog),
 [/hooks](https://code.claude.com/docs/en/hooks),
 [/permission-modes](https://code.claude.com/docs/en/permission-modes).
+
+The field table above reflects the 2026-05-04 source check. The `effort`
+tier notes were re-verified on 2026-09-02 against the Claude Code sub-agents
+reference and the platform effort documentation — where a claim carries its
+own later date, that date marks the narrower re-check, not a full re-read of
+every field below. See [Version Changelog](#version-changelog).
 
 ---
 
@@ -325,5 +332,6 @@ tools: Read, Bash, Glob
 | v2.1.90+ | 2026-04 | `@mention` typeahead for agents added |
 | v2.1.117+ | 2026-04 | `mcpServers` frontmatter honored in `claude --agent <name>` main-thread mode |
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
+| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.

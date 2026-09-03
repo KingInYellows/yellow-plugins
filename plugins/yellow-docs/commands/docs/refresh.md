@@ -178,7 +178,7 @@ Otherwise, present the list of stale docs to the user via AskUserQuestion:
   - "Select which to update" — show the list and let user pick
   - "Cancel" — stop without updating
 
-For each stale doc to update, delegate to the `doc-generator` agent via the Agent tool
+For each stale doc to update, delegate to the `doc-generator` agent via the Agent
 tool (subagent_type: "yellow-docs:generation:doc-generator"):
 
 > Update this stale documentation file:
