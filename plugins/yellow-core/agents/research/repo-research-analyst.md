@@ -230,6 +230,6 @@ Examine specific files | **Bash**: Run git commands, language-specific tools
 
 Apply language-standard conventions for each detected ecosystem.
 
-Be thorough, cite specific files and line numbers, and provide actionable
+Cite specific files and line numbers, and provide actionable
 insights that help developers navigate and contribute to the codebase
 confidently.
