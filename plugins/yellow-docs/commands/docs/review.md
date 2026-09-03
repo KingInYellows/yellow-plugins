@@ -205,9 +205,12 @@ Apply the confidence-rubric gate (matches Wave 2 yellow-review pattern):
   findings (which always emit at confidence 100 by definition) and P1
   findings at `confidence ≥ 50` (P1 is this plugin's highest severity —
   the personas emit only P1|P2|P3).
-- Personas do not pre-filter — they report every finding with a confidence
-  score — so sub-75 findings in the input are expected; count them as
-  suppressed rather than treating them as a persona defect.
+- `coherence-reviewer` no longer pre-filters — it reports every finding with
+  a confidence score, so sub-75 findings from that persona are expected input,
+  not a persona defect; the other personas still apply their own anchor
+  floors. Count a finding under `suppressed` only when this gate actually
+  removes it — that is, after applying the `safe_auto` and
+  P1-at-`confidence ≥ 50` exceptions above.
 - Group surviving findings by persona for the report.
 
 ### Step 7: Render report
@@ -237,7 +240,11 @@ Output a structured report:
 
 ## Suppressed Findings Summary
 
-[one-line per suppressed finding: persona, confidence, brief reason]
+[suppressed findings at confidence 50–74: one line each — persona,
+confidence, brief reason]
+[suppressed findings below confidence 50: one count line per persona instead
+of per-finding lines — e.g. "coherence-reviewer: 4 findings below 50 (not
+listed)" — so speculative low-anchor items do not flood the report]
 ```
 
 ### Step 8: Optional safe-auto application
