@@ -138,8 +138,8 @@ For moderate/complex, use the Agent tool to dispatch concurrent queries:
 
 ```text
 Launch in parallel:
-- Task: mcp__plugin_yellow-research_perplexity__perplexity_research on <topic>
-- Task: mcp__plugin_yellow-research_tavily__tavily_research on <topic>
+- Agent: mcp__plugin_yellow-research_perplexity__perplexity_research on <topic>
+- Agent: mcp__plugin_yellow-research_tavily__tavily_research on <topic>
 ```
 
 For async tools, start them first:

@@ -81,7 +81,7 @@ mkdir -p docs/research
 Create a per-run artifact directory FIRST (before the Agent spawn). Bash
 variables do not survive across separate Bash tool calls — capture the
 path this command prints and substitute the **literal value** into the
-Task prompt (never the variable name):
+Agent prompt (never the variable name):
 
 ```bash
 RUN_DIR=$(mktemp -d -t research-deep-XXXXXXXX 2>/dev/null); printf '%s\n' "$RUN_DIR"

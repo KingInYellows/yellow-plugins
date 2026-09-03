@@ -118,11 +118,14 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
 // `inherit` is a bare keyword (no version suffix). Aliases (haiku, sonnet,
 // opus, fable — the set Claude Code's sub-agents reference documents) accept
 // an optional one- or two-segment numeric suffix (e.g., `sonnet-4-6`). Full
-// IDs must start with `claude-` (e.g., `claude-opus-5`,
-// `claude-haiku-4-5-20251001`); foreign-provider IDs (gpt-*, gemini-*) stay
-// rejected because Claude Code would silently fall back to the session model.
+// IDs must start with `claude-` and continue as non-empty [a-z0-9] segments
+// joined by single hyphens (e.g., `claude-opus-5`,
+// `claude-haiku-4-5-20251001`) — a leading, trailing, or doubled hyphen
+// (`claude-opus-5-`, `claude-opus--5`) is a typo, not an ID, and must trip
+// the hard error. Foreign-provider IDs (gpt-*, gemini-*) stay rejected too,
+// because Claude Code would silently fall back to the session model.
 const MODEL_VALUE_PATTERN =
-  /^(haiku|sonnet|opus|fable)(-\d+(-\d+)?)?$|^inherit$|^claude-[a-z0-9][a-z0-9-]*$/;
+  /^(haiku|sonnet|opus|fable)(-\d+(-\d+)?)?$|^inherit$|^claude-[a-z0-9]+(-[a-z0-9]+)*$/;
 const EFFORT_VALUES = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 // Effort tiers that satisfy V4's "extended chain-of-thought" requirement.
 // Subset of EFFORT_VALUES — keep in sync if EFFORT_VALUES grows.
@@ -789,7 +792,8 @@ function validateAgentFile(filePath, ctx) {
     errors.push(
       `${relative(filePath)}: invalid model: '${modelVal}' ` +
         `(must be haiku|sonnet|opus|fable with an optional -N[-N] suffix, ` +
-        `inherit, or a full claude-* model ID)`
+        `inherit, or a full claude-* model ID whose segments are ` +
+        `hyphen-separated and non-empty)`
     );
   }
 

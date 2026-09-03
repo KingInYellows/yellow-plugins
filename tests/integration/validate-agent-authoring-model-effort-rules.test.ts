@@ -139,6 +139,27 @@ describe('validate-agent-authoring V2: model enum', () => {
     expect(status).toBe(0);
   });
 
+  it('errors on malformed claude-* IDs (doubled or trailing hyphen)', () => {
+    // The claude-* branch must require non-empty hyphen-separated segments.
+    // A looser tail would let these typos pass V2 and then silently fall
+    // back to the session model at runtime.
+    const cases: Record<string, string> = {
+      'double-hyphen': 'claude-opus--5',
+      'trailing-hyphen': 'claude-opus-5-',
+    };
+    for (const [name, model] of Object.entries(cases)) {
+      writeAgent(
+        tmpRoot,
+        `yellow-test/agents/workflow/${name}.md`,
+        agentBody({ name, model })
+      );
+    }
+    const { status, stderr } = runValidator(tmpRoot);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/invalid model: 'claude-opus--5'/);
+    expect(stderr).toMatch(/invalid model: 'claude-opus-5-'/);
+  });
+
   it('errors on model: gemini-2.5-pro (foreign provider, not claude-*)', () => {
     writeAgent(
       tmpRoot,
