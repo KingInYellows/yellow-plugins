@@ -21,6 +21,8 @@ plugins/my-plugin/
 ├── hooks/                    ← Hook scripts (optional)
 │   └── scripts/
 │       └── session-start.sh
+├── bin/                      ← MCP server wrappers (optional)
+│   └── start-my-server.sh
 ├── scripts/                  ← Lifecycle hooks (optional)
 │   ├── install.sh
 │   └── uninstall.sh
@@ -194,7 +196,10 @@ MIT
 Every key below is accepted by `schemas/plugin.schema.json`. `hooks` is
 inline-only (a `hooks/hooks.json` path is rejected by the local schema by
 policy), `repository` is a string, and `dependencies` is an **array** whose
-object form carries a `reason` (a yellow-plugins extension).
+object form carries a `reason` (a yellow-plugins extension). `outputStyles` is
+left out because it is optional and path-checked — add `"outputStyles":
+"./output-styles"` only once that directory exists and holds at least one
+Markdown output style, or RULES 5b/5c fail the manifest.
 
 ```json
 {
@@ -210,7 +215,6 @@ object form carries a `reason` (a yellow-plugins extension).
   "repository": "https://github.com/username/repo",
   "license": "MIT",
   "keywords": ["development", "productivity"],
-  "outputStyles": "./output-styles",
   "hooks": {
     "SessionStart": [
       {
@@ -274,6 +278,39 @@ cat >/dev/null
 
 printf '{"continue": true}\n'
 exit 0
+```
+
+### MCP Server Wrapper
+
+The `mcpServers.my-server` entry above points at a wrapper rather than at
+`npx` directly, so the credential's dual-source `env` block needs this
+companion script — without it the server has no runnable command. The wrapper
+is where `userConfig` beats the shell env fallback (Rule 12 of
+`plugin-validation-guide.md`; canonical examples in
+`plugins/yellow-research/bin/start-perplexity.sh` and
+`plugins/yellow-semgrep/bin/start-semgrep.sh`).
+
+**File**: `bin/start-my-server.sh` (`chmod +x` it)
+
+```bash
+#!/usr/bin/env bash
+# start-my-server.sh — MCP wrapper: userConfig wins, shell env is the fallback.
+set -euo pipefail
+
+# A non-empty userConfig value overrides the shell env passthrough. An empty
+# one leaves the shell value intact instead of clobbering it with "".
+if [ -n "${MY_API_KEY_USERCONFIG:-}" ]; then
+  export MY_API_KEY="$MY_API_KEY_USERCONFIG"
+fi
+unset MY_API_KEY_USERCONFIG
+
+if [ -z "${MY_API_KEY:-}" ]; then
+  echo "start-my-server.sh: MY_API_KEY is empty. Set it via the plugin's" >&2
+  echo "userConfig prompt or export MY_API_KEY in your shell." >&2
+  exit 1
+fi
+
+exec npx -y "@scope/my-mcp-server@1.4.0" ${1+-- "$@"}
 ```
 
 ---
