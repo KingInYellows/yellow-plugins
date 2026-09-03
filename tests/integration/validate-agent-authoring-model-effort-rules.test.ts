@@ -216,6 +216,28 @@ describe('validate-agent-authoring V2: model enum', () => {
     expect(stderr).toMatch(/invalid model: '\["inherit"\]'/);
   });
 
+  it('passes a nested experimental.cacheTtl map alongside model/effort', () => {
+    const body = [
+      '---',
+      'name: cached',
+      'description: "Test fixture. Use when verifying nested maps do not trip V1/V2."',
+      'model: sonnet',
+      'effort: medium',
+      'experimental:',
+      '  cacheTtl: 1h',
+      'tools:',
+      '  - Read',
+      '---',
+      '',
+      'Body.',
+      '',
+    ].join('\n');
+    writeAgent(tmpRoot, 'yellow-test/agents/workflow/cached.md', body);
+    const { status, stderr } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stderr).not.toMatch(/invalid (model|effort)/);
+  });
+
   it('passes when model: is absent', () => {
     writeAgent(
       tmpRoot,
