@@ -127,6 +127,9 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
   mutation
 
+Both live at `skills/pr-review-workflow/scripts/` and are invoked as
+`${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
+
 ## When to Use What
 
 - **`/review:setup`** — First install, after auth issues, or when review
@@ -204,6 +207,12 @@ degrade — only yellow-review's own agents run.
 - **ast-grep** (yellow-research) — Optional structural code search for
   silent-failure-hunter and type-design-analyzer. Discovered via ToolSearch at
   runtime; falls back to Grep if yellow-research not installed.
+
+## Testing
+
+`bats tests/` from the plugin directory — `get-pr-comments.bats` and
+`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
+`tests/mocks/gh`) plus `skill-content.bats`.
 
 ## Known Limitations
 

@@ -4,7 +4,7 @@ Technical debt audit and remediation with parallel scanner agents.
 
 ## Conventions
 
-- Use Graphite (`gt`) for all branch management — never raw `git push`
+- Use the active stacked-PR provider (see `/stack:status`) — never raw `git push`
 - Scanner agents report findings only — they do NOT edit files
 - Fix agent (debt-fixer) edits files but MUST confirm via AskUserQuestion before
   committing
@@ -95,6 +95,16 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - **yellow-linear** — Required for `/debt:sync` command (pushes debt findings to
   Linear as issues). Without it, `/debt:sync` will report that the yellow-linear
   plugin is not installed.
+
+## Testing
+
+`bats tests/validate.bats` from the plugin directory. Its `setup()` sources
+`../../yellow-core/lib/validate-fs.sh` before `lib/validate.sh` because the
+runtime source is `CLAUDE_PLUGIN_ROOT`-gated. `hooks/hooks.json` is
+reference-only — `plugin.json` is the authoritative hook config; keep timeouts
+in sync. Findings live at `${CLAUDE_PROJECT_DIR}/todos/debt/` named
+`{id}-{status}-{severity}-{slug}-{hash}.md`; the SessionStart hook counts only
+`pending|ready` × `critical|high` filenames.
 
 ## Known Limitations
 

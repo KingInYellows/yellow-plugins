@@ -5,7 +5,7 @@ repository. Detects project structure and adapts analysis accordingly.
 
 ## Conventions
 
-- Use Graphite (`gt`) for all branch management — never raw `git push`
+- Use the active stacked-PR provider (see `/stack:status`) — never raw `git push`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
 - All generated documentation requires human approval via AskUserQuestion
@@ -94,8 +94,17 @@ repository. Detects project structure and adapts analysis accordingly.
 
 ## Cross-Plugin Dependencies
 
-None required. All functionality is self-contained using built-in Claude Code
-tools.
+- **yellow-core (optional)** — `/docs:review` spawns
+  `yellow-core:research:learnings-researcher` as a pre-pass and offers a
+  `/flow:compound` handoff; both are skipped when yellow-core is not installed.
+- The `/docs:review` confidence rubric mirrors
+  `plugins/yellow-review/commands/review/review-pr.md`, which is the source of
+  truth — re-sync when that file changes.
+
+## Testing
+
+No bats suite. Validate with `pnpm validate:agents` (ten agents) and
+`pnpm validate:schemas`.
 
 ## Project Structure Detection
 

@@ -90,7 +90,7 @@ without it:
 
 ### Agents (0)
 
-No agents in v1. Batch orchestration agents deferred until patterns stabilize.
+No agents. Batch orchestration agents deferred until patterns stabilize.
 
 ## Usage Tracking
 
@@ -118,15 +118,20 @@ Composio has no billing API. This is the only way to monitor execution budget.
 
 | Dependency | Purpose | Required? |
 |---|---|---|
-| None | This plugin has no dependencies | N/A |
+| yellow-core | `hooks/check-mcp-url.sh` sources `../yellow-core/lib/credential-status.sh` to publish credential status for `/setup:all`; skipped silently if absent | Optional (not declared in `plugin.json`) |
 
-### Consuming Plugins (v1.1+)
+### Consuming Plugins
 
-| Plugin | Workflow | Composio Use |
-|---|---|---|
-| yellow-review | review:all, review:pr | Cross-PR finding aggregation |
-| yellow-semgrep | semgrep:fix-batch | Batch scan execution |
-| yellow-linear | sync-all, triage, plan-cycle | Issue batch-fetch and classification |
+No other marketplace plugin currently calls Composio tools (only CHANGELOG
+history mentions earlier yellow-review / yellow-semgrep / yellow-linear plans).
+
+## Testing
+
+`bats tests/` from the plugin directory (`start-composio.bats`, wrapper
+precedence). The SessionStart hook `hooks/check-mcp-url.sh` (3s budget) must
+print `{"continue": true}` on every path, so it deliberately omits `set -e`.
+The wrapper `exec`s `node bin/composio-proxy.mjs`, so Node is a hard runtime
+requirement.
 
 ## Known Limitations
 

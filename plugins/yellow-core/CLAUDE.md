@@ -254,7 +254,7 @@ for why that opt-out exists.
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
   Classifies `claude plugin list --json` plus the repository's optional
-  `.yellow-stack.yml` intent into the seven `/stack:status` states, and
+  `.yellow-stack.yml` intent into the eight `/stack:status` states, and
   builds (never executes) the ordered `claude plugin` command plan for a
   provider switch. Dependency-free CJS with a small CLI
   (`node lib/stack-provider-state.js classify|plan`). It ships a replica of
@@ -352,7 +352,7 @@ at session end and asynchronously promotes high-signal entries to
 `docs/solutions/` + the project's auto-memory MEMORY.md. Designed so the
 main session never pays a turn-budget cost for compounding.
 
-**Architecture (see `plans/background-compounding-triggers.md` for full
+**Architecture (see `plans/complete/background-compounding-triggers.md` for full
 detail):**
 
 - Stop hook (pure shell, < 500ms) writes a JSONL pending entry to
@@ -410,6 +410,14 @@ to the marketplace/plugins/contracts/examples/solutions targets), not
 inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 (catalog: `packages/domain/src/validation/errorCatalog.ts`, category
 `ErrorCategory.PLAN_LIFECYCLE`).
+
+## Testing
+
+`bats tests/` from the plugin directory — eight suites
+(`compound-session-start-hook`, `compound-staging`, `compound-stop-hook`,
+`credential-status`, `plan-commands`, `plan-status-parity`, `repo-profile`,
+`validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
+Manifest hook budgets: Stop 5s, SessionStart 3s.
 
 ## Known Limitations
 

@@ -81,8 +81,10 @@ patterns:
 - **`linear-explorer` agent** — Auto-triggers on "search linear", "is this a
   duplicate?" queries. Read-only backlog search.
 
-For advanced workflows, agents can call Linear MCP tools directly (e.g.,
-`get_issue`, `list_issues`) without going through commands.
+For advanced workflows, agents can call Linear MCP tools directly without
+going through commands. Bundled-server tool names carry the plugin prefix:
+`mcp__plugin_yellow-linear_linear__get_issue`,
+`mcp__plugin_yellow-linear_linear__list_issues`, and so on.
 
 ## Cross-Plugin Dependencies
 
@@ -108,6 +110,14 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
   `remote-agent` provider, it invokes the existing `/devin:delegate` command via
   `Skill`, which owns its own credential validation and Devin session creation
   entirely.
+
+## Testing
+
+`bats tests/delegate.bats` from the plugin directory — it content-pins the
+provider-neutral text of `commands/linear/delegate.md`, so edits there must
+update the suite. The delegate tooling probe treats Devin as available only
+when both `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are set; the Cursor
+probe only checks that `yellow-cursor/dist/cli.js` resolves on disk (not auth).
 
 ## Known Limitations
 

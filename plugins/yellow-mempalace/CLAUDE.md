@@ -85,7 +85,7 @@ yellow-ruvector (`docs/memory-routing-protocol.md`).
   data stays readable via explicit `/mempalace:*` commands until the
   removal follow-up handles migration/export. No hook conflicts —
   mempalace ships no hooks.
-- **No hooks in v1.0.0**: Hooks deferred pending upstream security fixes
+- **No hooks (any version)**: Hooks deferred pending upstream security fixes
   (#110, SESSION_ID injection). All integration is MCP-only.
 
 ## Known Limitations
@@ -96,7 +96,9 @@ yellow-ruvector (`docs/memory-routing-protocol.md`).
 - **Python 3.10+ required** — onnxruntime/PyTorch transitive deps
   effectively require 3.10; 3.11+ recommended
 - **stdio stdout risk** — ChromaDB/sentence-transformers may emit log messages
-  to stdout, corrupting JSON-RPC. If MCP fails, check for log contamination
+  to stdout, corrupting JSON-RPC. If MCP fails, check for log contamination.
+  The `PYTHONWARNINGS` / `TRANSFORMERS_VERBOSITY` / `TOKENIZERS_PARALLELISM`
+  env in `plugin.json` is the mitigation — do not remove it
 - **Global palace only** — palace is at `~/.mempalace/`, no per-project support
   (no MEMPALACE_DIR env var documented)
 - **No AAAK compression** — AAAK is the palace's experimental lossy
@@ -107,5 +109,6 @@ yellow-ruvector (`docs/memory-routing-protocol.md`).
 ## Maintenance
 
 - **Install:** `pipx install mempalace` or `/mempalace:setup`
+  (`scripts/install-mempalace.sh` enforces CLI `>= 3.0.0`)
 - **Upgrade:** `pipx upgrade mempalace`
 - **Uninstall:** `pipx uninstall mempalace`, delete `~/.mempalace/` directory
