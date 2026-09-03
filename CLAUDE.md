@@ -44,9 +44,11 @@ pnpm apply:changesets         # version + run scripts/sync-manifests.js
 ```
 
 Run a single Vitest file: `pnpm vitest run path/to/file.test.ts`. Bats shell
-tests live in `plugins/yellow-ci`, `yellow-core`, `yellow-debt`,
-`yellow-review`, `yellow-ruvector`, and `gt-workflow` — run `bats tests/` from
-inside the plugin directory (CI installs `bats@1.11.0` via npm; locally
+tests live under `plugins/<name>/tests/` for `github-workflow`,
+`gt-workflow`, `yellow-ci`, `yellow-composio`, `yellow-core`,
+`yellow-council`, `yellow-debt`, `yellow-linear`, `yellow-research`,
+`yellow-review`, `yellow-ruvector`, and `yellow-semgrep` — run `bats tests/`
+from inside the plugin directory (CI installs `bats@1.11.0` via npm; locally
 `npx -y bats@1.11.0 tests/` works when it is not on PATH).
 
 The CI gate is `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
