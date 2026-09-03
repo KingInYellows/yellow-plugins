@@ -69,8 +69,10 @@ DeepWiki's canonical home moved to the `yellow-research` plugin (bundled, no
 auth, public repos only) — see that plugin's `CLAUDE.md`. `/devin:wiki` still
 works: it discovers the DeepWiki tools via ToolSearch at runtime, preferring
 `mcp__plugin_yellow-research_deepwiki__*` and falling back to
-`mcp__plugin_yellow-devin_deepwiki__*` only on older yellow-devin installs whose
-manifest still bundles it.
+`mcp__plugin_yellow-devin_deepwiki__*` — a name that no longer exists in current
+installs: the manifest's only server is `devin`, which exposes the wiki tools as
+`mcp__plugin_yellow-devin_devin__{ask_question,read_wiki_structure,read_wiki_contents}`.
+The command's fallback list still needs updating to that namespace.
 
 ## Conventions
 
@@ -81,8 +83,8 @@ manifest still bundles it.
 - **JSON construction:** Always use `jq` — never interpolate user input into
   JSON strings.
 - **Shell quoting:** Always quote variables: `"$VAR"` not `$VAR`.
-- **Git workflow:** Use Graphite (`gt`) for all branch management and PR
-  creation — never raw `git push` or `gh pr create`.
+- **Git workflow:** Use the active stacked-PR provider (see `/stack:status`), not raw
+  `git push` or `gh pr create`.
 - **Input validation:**
   - Token format: `^cog_[a-zA-Z0-9_-]{20,128}$`
   - Session ID: `^[a-zA-Z0-9_-]{8,64}$`

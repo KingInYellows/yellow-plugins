@@ -31,8 +31,8 @@ Default-on tools (enabled by EXA by default):
 - `web_search_exa` — General neural web search
 - `get_code_context_exa` — Code examples, GitHub, Stack Overflow, docs
 
-Off-by-default tools (enable by adding them to the `tools=` arg in
-`plugin.json`):
+The `tools=` argument lives in `bin/start-exa.sh` (not `plugin.json`) and
+currently enables all seven exa tools, including these heavier ones:
 
 - `company_research_exa` — Company/org research
 - `web_search_advanced_exa` — Full-control search with date/domain filters
@@ -188,6 +188,19 @@ shell-process leaks.
 
 The **parallel** server uses OAuth — Claude Code handles authentication
 automatically (no API key needed). You'll be prompted to authorize on first use.
+
+## Required Dependencies
+
+- **yellow-core >= 1.17.1** (`dependencies` in `plugin.json`, `optional: false`)
+  — `hooks/write-credential-status.sh` (SessionStart, 3s budget) sources
+  `yellow-core/lib/credential-status.sh` to emit `credential-status.json` for
+  `/setup:all` and pre-warm the Context7 cache; it no-ops without yellow-core.
+
+## Testing
+
+`bats tests/` from the plugin directory — `context7-cache.bats` and
+`resolve-mcp-key.bats` (the shared key resolver `bin/lib/resolve-mcp-key.sh`
+that all three MCP wrappers source).
 
 ## Optional Dependencies
 

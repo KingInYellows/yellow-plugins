@@ -42,6 +42,29 @@ routes, and auth flows. Runs structured and exploratory browser tests.
   exploration
 - **`/browser-test:report`** — Regenerate report from cached test results
 
+## Artifacts and Data Flow
+
+`/browser-test:setup` writes `.claude/yellow-browser-test.local.md` (discovered
+dev-server command, `baseURL`, routes, auth flow), which every other command
+reads. `/browser-test:test` and `/browser-test:explore` write
+`test-reports/results.json`; `/browser-test:report` renders it to
+`test-reports/<timestamp>.md` (plus `issues.md` and `screenshots/`).
+Dev-server lifecycle state lives in `.claude/browser-test-server.pid` and
+`.claude/browser-test-server.log`.
+
+- `scripts/install-agent-browser.sh` (run by `/browser-test:setup`) pins the
+  `agent-browser` version and hard-fails below Node 22.22.0.
+- Dispatch agents by their three-segment runtime names
+  (`yellow-browser-test:testing:app-discoverer`,
+  `yellow-browser-test:testing:test-runner`,
+  `yellow-browser-test:testing:test-reporter`) — bare agent names do not
+  resolve (fixed across all dispatch sites in 1.1.5).
+
+## Testing
+
+No plugin-local suite. Validate with `pnpm validate:plugins` and
+`pnpm validate:agents`.
+
 ## Git Operations
 
 This plugin does not perform git operations. Graphite commands and git workflows

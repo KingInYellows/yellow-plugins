@@ -74,8 +74,8 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
 - **JSON construction:** Always use `jq` — never interpolate user input or
   finding data into JSON strings.
 - **Shell quoting:** Always quote variables: `"$VAR"` not `$VAR`.
-- **Git workflow:** Use Graphite (`gt`) for all branch management and PR
-  creation — never raw `git push` or `gh pr create`.
+- **Git workflow:** Use the active stacked-PR provider (see `/stack:status`), not raw
+  `git push` or `gh pr create`.
 - **Input validation:**
   - Token format: `^sgp_[a-zA-Z0-9]{20,}$`
   - Finding ID: `^[0-9]+$`
@@ -146,8 +146,16 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
 
 | Dependency | Purpose | Required? |
 |---|---|---|
+| yellow-core >= 1.17.1 | `hooks/write-credential-status.sh` (SessionStart, 3s) sources `lib/credential-status.sh` to publish credential status for `/setup:all`; no-ops if absent | **Required** (`optional: false` in `plugin.json`) |
 | yellow-linear | Create Linear issues for unfixable findings | Optional |
 | yellow-ci | Re-run CI after fixes to verify no regressions | Optional |
+
+## Testing
+
+`bats tests/start-semgrep.bats` from the plugin directory — four cases
+covering the userConfig-vs-shell-env token precedence above (advisory-only in
+CI, so a break does not block a PR). The wrapper also unsets an empty
+`SEMGREP_APP_TOKEN` so the MCP process sees "absent", not "explicitly empty".
 
 ## Known Limitations
 

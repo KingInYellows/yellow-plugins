@@ -5,11 +5,12 @@ ruvector.
 
 ## MCP Server
 
-- **ruvector** — Stdio transport via `npx -y ruvector@0.2.34 mcp start`
+- **ruvector** — Stdio transport via `npx -y --ignore-scripts ruvector@0.2.34 mcp start`
   (version-pinned: unpinned npx resolves whatever global is installed —
   a stale 0.2.25 global silently selected the machine-global `~/.ruvector`
   store from worktree sessions. Bump the pin in
-  `catalog/plugins/yellow-ruvector.json` + `scripts/install.sh` together
+  `catalog/plugins/yellow-ruvector.json` + `RUVECTOR_DEFAULT_VERSION` in the
+  plugin-local `scripts/install.sh` together
   and re-verify tool contracts)
 - First MCP start needs network unless the npm exec cache already holds
   `ruvector@0.2.34` from a prior online run — global install alone does
@@ -181,6 +182,15 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
    it is store-wide: report `[ruvector] memory writes refused — run
    /ruvector:status for the reembed + restart steps` and continue. For any
    other failure (timeout, connection refused, unavailable), skip silently.
+
+## Testing
+
+`bats tests/` from the plugin directory — one suite per hook
+(`session-start`, `user-prompt-submit`, `pre-tool-use`, `post-tool-use`,
+`stop`, `repair-cursor-pretooluse`) plus `validate.bats`. Hook config is
+sourced from `catalog/plugins/yellow-ruvector.json` and generated into
+`plugin.json` by `pnpm generate:manifests`; hook scripts emit JSON through
+`hooks/scripts/lib/hook-json.sh`. Do not add `hooks/hooks.json`.
 
 ## Known Limitations
 
