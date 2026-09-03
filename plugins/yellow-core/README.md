@@ -103,6 +103,19 @@ TypeScript, Python, Rust, and Go.
 | `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
 | `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
 
+## Hooks
+
+Three hooks run automatically once the plugin is enabled:
+
+- **SessionStart** — dispatches the background drain of the compound-staging
+  queue.
+- **Stop** — captures the session transcript tail into that queue.
+- **PreCompact** — appends a compaction-preservation instruction to the
+  compaction prompt so summaries keep the active plan, modified files, and
+  your decisions verbatim.
+
+See `plugins/yellow-core/CLAUDE.md` for each hook's contract and time budget.
+
 ## MCP Servers
 
 yellow-core does not bundle any MCP servers. Agents that benefit from

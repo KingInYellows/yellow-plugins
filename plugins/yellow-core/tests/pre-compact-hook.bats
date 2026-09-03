@@ -11,9 +11,19 @@ PC_HOOK="$BATS_TEST_DIRNAME/../hooks/scripts/pre-compact.sh"
 @test "exits 0 and prints the preservation instruction on manual trigger" {
   run bash "$PC_HOOK" <<< '{"session_id":"s1","trigger":"manual","custom_instructions":""}'
   [ "$status" -eq 0 ]
+  # Intro line.
   [[ "$output" == *"preserve the following exactly"* ]]
+  # One distinctive phrase per numbered preservation item (1-6), so dropping
+  # any single safeguard fails here instead of passing silently.
+  [[ "$output" == *"active plan or spec file path"* ]]
   [[ "$output" == *"still unchecked"* ]]
+  [[ "$output" == *"Each file modified this session"* ]]
+  [[ "$output" == *"Decisions the user made"* ]]
+  [[ "$output" == *"Open questions, promises made, and the agreed next action"* ]]
   [[ "$output" == *"last failing command"* ]]
+  [[ "$output" == *"In-flight branch, PR, worktree, and stack names"* ]]
+  # Closing line.
+  [[ "$output" == *"condense everything else"* ]]
 }
 
 @test "prints plain text, never JSON (JSON would be embedded in the prompt)" {
@@ -21,6 +31,13 @@ PC_HOOK="$BATS_TEST_DIRNAME/../hooks/scripts/pre-compact.sh"
   [ "$status" -eq 0 ]
   [[ "$output" != "{"* ]]
   [[ "$output" != *'"continue"'* ]]
+
+  # Stronger form of the same contract: a real JSON parser must reject the
+  # whole payload. Guarded so hosts without jq skip rather than fail.
+  if ! command -v jq >/dev/null 2>&1; then
+    skip "jq not installed; JSON-parse assertion skipped"
+  fi
+  ! printf '%s' "$output" | jq -e . >/dev/null 2>&1
 }
 
 @test "tolerates empty and malformed stdin" {
@@ -33,9 +50,12 @@ PC_HOOK="$BATS_TEST_DIRNAME/../hooks/scripts/pre-compact.sh"
   [[ "$output" == *"preserve the following"* ]]
 }
 
-@test "stays short enough to sit in a compaction prompt" {
+@test "prints exactly eight lines (the eight-line shape is the contract)" {
   run bash "$PC_HOOK" <<< '{}'
   [ "$status" -eq 0 ]
   line_count=$(printf '%s\n' "$output" | wc -l)
-  [ "$line_count" -le 15 ]
+  # Eight lines exactly: one intro line, six numbered preservation items, one
+  # closing line. Both removing a required line and padding the instruction
+  # past its compaction-prompt budget must fail here.
+  [ "$line_count" -eq 8 ]
 }
