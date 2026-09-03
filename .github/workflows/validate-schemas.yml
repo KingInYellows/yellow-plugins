@@ -1,4 +1,15 @@
 # Validate locally: pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck
+#
+# Runner policy: this repository is PUBLIC, so every job runs on GitHub-hosted
+# runners — ubuntu-latest, plus the existing windows-latest leg of the Codex
+# install-verification matrix (free minutes). Non-PR events (push to main,
+# workflow_dispatch) previously routed to self-hosted pool:atlas / pool:ares,
+# which had no registered runners — every main-branch run since 2026-03 queued
+# until it was cancelled (#720), so main had no post-merge validation. Fork PRs
+# were never affected: every job's `if:` already skips them. If this repository
+# ever becomes private, non-PR jobs MUST move back to self-hosted runners and
+# the windows-latest Codex leg MUST be dropped (no self-hosted Windows pool
+# exists) — GitHub-hosted minutes are not to be purchased.
 name: Validate Marketplace and CI Suite
 
 on:
@@ -99,7 +110,7 @@ jobs:
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
     strategy:
@@ -557,7 +568,7 @@ jobs:
   lint-and-typecheck:
     name: Lint & TypeCheck
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
@@ -631,7 +642,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [lint-and-typecheck]
 
@@ -702,7 +713,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:ares"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     needs: [unit-tests]
 
@@ -773,7 +784,7 @@ jobs:
   contract-drift:
     name: Contract Drift Check
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     needs: [validate-schemas]
 
@@ -899,7 +910,7 @@ jobs:
   security-audit:
     name: Security Audit
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:ares","tier:cpu","size:m"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
@@ -1018,7 +1029,7 @@ jobs:
   # ============================================================================
   build:
     name: Build Verification
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:ares"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
@@ -1097,7 +1108,7 @@ jobs:
   validate-versions:
     name: Version Consistency Check
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
@@ -1128,7 +1139,7 @@ jobs:
   # ============================================================================
   changeset-check:
     name: Changeset Required
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
@@ -1178,7 +1189,7 @@ jobs:
   validate-solutions-advisory:
     name: Solution Doc Advisory
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
       contents: read
@@ -1302,7 +1313,7 @@ jobs:
   plugin-shell-tests:
     name: Plugin Shell Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [validate-schemas]
 
@@ -1364,7 +1375,7 @@ jobs:
   # ============================================================================
   report-metrics:
     name: Aggregate CI Metrics
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
@@ -1456,7 +1467,7 @@ jobs:
   # ============================================================================
   ci-status:
     name: CI Status Summary
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
