@@ -14,12 +14,12 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 
 ## Project Structure & Module Organization
 
-- `plugins/`: Installable plugins. Current plugin directories are `gt-workflow`,
-  `yellow-browser-test`, `yellow-chatprd`, `yellow-ci`, `yellow-codex`,
-  `yellow-composio`, `yellow-core`, `yellow-council`, `yellow-cursor`,
-  `yellow-debt`, `yellow-devin`, `yellow-docs`, `yellow-linear`,
-  `yellow-mempalace`, `yellow-morph`, `yellow-research`, `yellow-review`,
-  `yellow-ruvector`, and `yellow-semgrep`.
+- `plugins/`: Installable plugins. Current plugin directories are
+  `github-workflow`, `gt-workflow`, `yellow-browser-test`, `yellow-ci`,
+  `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
+  `yellow-cursor`, `yellow-debt`, `yellow-devin`, `yellow-docs`,
+  `yellow-goal`, `yellow-linear`, `yellow-mempalace`, `yellow-morph`,
+  `yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`.
 - `plugins/<plugin-name>/.claude-plugin/plugin.json`: Required manifest. Most
   plugins rely on Claude Code's default discovery of `commands/`, `agents/`, and
   `skills/`; only add explicit manifest paths when a plugin needs a non-default

@@ -1109,6 +1109,9 @@ jobs:
             # TypeScript version.
             git diff --exit-code -- plugins/yellow-cursor/dist
             echo "::endgroup::"
+            echo "::group::Committed yellow-goal dist drift check"
+            git diff --exit-code -- plugins/yellow-goal/dist
+            echo "::endgroup::"
           } 2>&1 | tee -a "$LOG_PATH"
 
       - name: Capture build duration

@@ -286,7 +286,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-goal yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -688,6 +688,15 @@ and `composio_api_key` `present == true`, OR (status file absent AND both
 - PARTIAL: `python310_check` ok AND `mempalace_mcp_check` ok AND `~/.mempalace/` not initialized
 - NEEDS SETUP: `mempalace_mcp_check` not ok (binary missing or version `< 3.0.0`) OR `python310_check` not ok
 
+**yellow-goal:**
+
+- READY: `/goal:setup` (or `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js setup`)
+  reports `ok:true` with `engineVersion` equal to the pin `0.1.0`
+- PARTIAL: never — missing binary or version mismatch is fail-closed
+- NEEDS SETUP: `goal-gen` missing from PATH OR version probe fails
+  (`GOAL_ENGINE_MISSING` / `GOAL_ENGINE_VERSION_MISMATCH` /
+  `GOAL_ENGINE_UNPARSEABLE`)
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -724,6 +733,7 @@ Marketplace Setup Dashboard
   yellow-codex         PARTIAL         codex v0.140.0 found, OPENAI_API_KEY not set
   yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (codex only)
   yellow-mempalace     NEEDS SETUP     mempalace binary missing from PATH
+  yellow-goal          NEEDS SETUP     goal-gen missing from PATH
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup
@@ -859,7 +869,8 @@ tool in this fixed order:
 16. `codex:setup`
 17. `council:setup`
 18. `mempalace:setup`
-19. `statusline:setup`
+19. `goal:setup`
+20. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 This list is the fixed **order**, not a to-do list. Only invoke setups for
@@ -885,6 +896,7 @@ provider group in one run (see the section below). Use this mapping:
 - `yellow-codex` → `codex:setup`
 - `yellow-council` → `council:setup`
 - `yellow-mempalace` → `mempalace:setup`
+- `yellow-goal` → `goal:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 

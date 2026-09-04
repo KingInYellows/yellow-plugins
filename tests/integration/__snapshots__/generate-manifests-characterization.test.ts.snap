@@ -203,6 +203,16 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
       },
       "source": "./plugins/yellow-mempalace",
       "category": "development"
+    },
+    {
+      "name": "yellow-goal",
+      "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-goal",
+      "category": "development"
     }
   ]
 }
@@ -223,6 +233,7 @@ exports[`manifest byte-identity baseline > plugin inventory (explicit sorted nam
   "yellow-debt",
   "yellow-devin",
   "yellow-docs",
+  "yellow-goal",
   "yellow-linear",
   "yellow-mempalace",
   "yellow-morph",
@@ -720,6 +731,30 @@ exports[`manifest byte-identity baseline > plugins/yellow-docs/.claude-plugin/pl
     "mermaid",
     "audit",
     "generation"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-goal",
+  "version": "0.1.0",
+  "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-goal",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "yellow-goal",
+    "goal-gen",
+    "engine-bridge",
+    "process-contract",
+    "request-packet"
   ]
 }
 "

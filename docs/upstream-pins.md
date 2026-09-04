@@ -55,6 +55,14 @@ or the generated `.cursor-plugin/` shape; see `docs/cursor-distribution.md`
 "Upstream schema provenance" for the three known differences from this
 repo's own (locally-invented, non-upstream) Codex schemas.
 
+**yellow-goal engine tarball** — pinned engine identity `0.1.0`
+(`plugins/yellow-goal/src/pin.ts`). This is **not** an npm registry pin:
+consumers install `goal-gen-0.1.0.tgz` from the yellow-goal GitHub Release
+once tag `v0.1.0` exists. The blocking check is `/goal:setup` /
+`node dist/cli.js setup` (fail-closed on missing binary or
+`engineVersion` mismatch), not `pnpm check:pins`. Do not treat this as
+advisory.
+
 **`@cursor/sdk`** — pinned `1.0.28` **exact** (not `^1.0.28`) in
 `plugins/yellow-cursor/package.json`. The SDK's type surface and error
 classes were verified against that exact installed version during contract

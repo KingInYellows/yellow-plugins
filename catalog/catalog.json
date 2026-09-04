@@ -28,7 +28,8 @@
     "yellow-docs",
     "yellow-codex",
     "yellow-council",
-    "yellow-mempalace"
+    "yellow-mempalace",
+    "yellow-goal"
   ],
   "targets": {
     "claude": {

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Env-driven fake goal-gen for contract tests. Never a real engine.
+# Modes (FAKE_GOAL_GEN_MODE):
+#   ok          — version/create/validate succeed with pin 0.1.0
+#   mismatch    — version reports FAKE_GOAL_GEN_VERSION (default 9.9.9)
+#   unparseable — stdout is not JSON
+#   usage       — exit 2, structured USAGE_ERROR on stderr
+#   fail        — exit 1, structured error on stderr
+#   empty       — exit 0, empty stdout
+set -euo pipefail
+
+mode="${FAKE_GOAL_GEN_MODE:-ok}"
+version="${FAKE_GOAL_GEN_VERSION:-0.1.0}"
+
+case "$mode" in
+  unparseable)
+    printf 'not-json\n'
+    exit 0
+    ;;
+  empty)
+    exit 0
+    ;;
+  usage)
+    printf '{"error":{"code":"USAGE_ERROR","message":"unknown command"}}\n' >&2
+    exit 2
+    ;;
+  fail)
+    printf '{"error":{"code":"INTERNAL","message":"engine boom"}}\n' >&2
+    exit 1
+    ;;
+  mismatch)
+    printf '{"engineVersion":"%s"}\n' "$version"
+    exit 0
+    ;;
+  ok)
+    ;;
+  *)
+    printf '{"error":{"code":"USAGE_ERROR","message":"unknown fake mode"}}\n' >&2
+    exit 2
+    ;;
+esac
+
+has_json=0
+for arg in "$@"; do
+  if [ "$arg" = "--json" ]; then
+    has_json=1
+  fi
+done
+if [ "$has_json" -ne 1 ]; then
+  printf 'pretty non-json output (missing --json)\n'
+  exit 0
+fi
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  version)
+    printf '{"engineVersion":"%s"}\n' "$version"
+    exit 0
+    ;;
+  request)
+    sub="${1:-}"
+    shift || true
+    if [ "$sub" = "create" ]; then
+      output=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --output)
+            output="${2:-}"
+            shift 2
+            ;;
+          --output=*)
+            output="${1#--output=}"
+            shift
+            ;;
+          *)
+            shift
+            ;;
+        esac
+      done
+      if [ -n "$output" ]; then
+        printf '{"goal":"install smoke"}\n' > "$output"
+      fi
+      printf '{"requestId":"req_fake"}\n'
+      exit 0
+    fi
+    if [ "$sub" = "validate" ]; then
+      if [ "${FAKE_GOAL_GEN_VALID:-true}" = "false" ]; then
+        printf '{"valid":false}\n'
+        exit 0
+      fi
+      printf '{"valid":true}\n'
+      exit 0
+    fi
+    printf '{"error":{"code":"USAGE_ERROR","message":"unknown request subcommand"}}\n' >&2
+    exit 2
+    ;;
+  *)
+    printf '{"error":{"code":"USAGE_ERROR","message":"unknown command"}}\n' >&2
+    exit 2
+    ;;
+esac
