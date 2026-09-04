@@ -44,6 +44,9 @@ importers:
       markdownlint-cli:
         specifier: ^0.39.0
         version: 0.39.0
+      only-allow:
+        specifier: 1.2.2
+        version: 1.2.2
       prettier:
         specifier: ^3.2.4
         version: 3.7.4
@@ -4225,6 +4228,13 @@ packages:
       mimic-fn: 4.0.0
     dev: true
 
+  /only-allow@1.2.2:
+    resolution: {integrity: sha512-uxyNYDsCh5YIJ780G7hC5OHjVUr9reHsbZNMM80L9tZlTpb3hUzb36KXgW4ZUGtJKQnGA3xegmWg1BxhWV0jJA==}
+    hasBin: true
+    dependencies:
+      which-pm-runs: 1.1.0
+    dev: true
+
   /openai@4.104.0(zod@3.25.76):
     resolution: {integrity: sha512-p99EFNsA/yX6UhVO93f5kJsDRLAg+CTA2RBqdHK4RtK8u5IJw32Hyb2dTGKbnnFmnuoBv5r7Z2CURI9sGZpSuA==}
     hasBin: true
@@ -5542,6 +5552,11 @@ packages:
       is-set: 2.0.3
       is-weakmap: 2.0.2
       is-weakset: 2.0.4
+    dev: true
+
+  /which-pm-runs@1.1.0:
+    resolution: {integrity: sha512-n1brCuqClxfFfq/Rb0ICg9giSZqCS+pLtccdag6C2HyufBrh3fBOiy9nb6ggRMvWOVH5GrdJskj5iGTZNxd7SA==}
+    engines: {node: '>=4'}
     dev: true
 
   /which-typed-array@1.1.19:
