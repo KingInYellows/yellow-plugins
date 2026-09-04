@@ -82,7 +82,7 @@ describe('validate-agent-authoring RULE 20 (user-invocable key spelling)', () =>
   it('fails hard (exit 1) on the ignored user-invokable key', () => {
     writeAgent(dir, 'plug/skills/old/SKILL.md', OLD_KEY_SKILL);
     const result = runValidator(dir);
-    expect(result.status).not.toBe(0);
+    expect(result.status).toBe(1);
     expect(result.stdout + result.stderr).toContain('RULE 20');
     expect(result.stdout + result.stderr).toContain('user-invocable');
   });

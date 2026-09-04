@@ -46,6 +46,11 @@ Two distinct issues:
 
 ### 1. Wrong attribute name: `user-invocable` vs `user-invokable`
 
+> **Historical (superseded 2026-09-02).** The diagnosis in this subsection is
+> inverted. The current key is `user-invocable` (with **c**). Keep this text as
+> the 2026-02 record; do not copy it into new skills. See
+> "Update — 2026-09-02".
+
 Claude Code's supported attribute is spelled `user-invokable` (with **k**), not
 `user-invocable` (with **c**). The typo propagated across all plugins because
 the first skill was written with `user-invocable` and all subsequent skills
@@ -82,6 +87,10 @@ user-invokable: false
 
 ## Solution
 
+> **Historical (superseded 2026-09-02) for the attribute rename.** Steps 1 and 3
+> below inverted the key. New skills must use `user-invocable`. Step 2 (flatten
+> `description:`) is still current. See "Update — 2026-09-02".
+
 For every SKILL.md file:
 
 1. **Rename attribute:** `user-invocable` → `user-invokable`
@@ -92,12 +101,19 @@ For every SKILL.md file:
 
 ### Supported Frontmatter Attributes (as of 2026-02)
 
+> **Historical snapshot (2026-02).** The live key is `user-invocable`. The list
+> below records what the VS Code extension advertised at the time.
+
 ```
 argument-hint, compatibility, description, disable-model-invocation,
 license, metadata, name, user-invokable
 ```
 
 ### Grep to find violations
+
+> **Historical (superseded 2026-09-02).** This grep treated `user-invocable` as
+> the misspelling. Current detection is RULE 20 / the frontmatter-only scan in
+> "Update — 2026-09-02".
 
 ```bash
 # Wrong attribute name
@@ -310,6 +326,10 @@ special characters predictably.
 ## Update — 2026-05-04
 
 ### `user-invokable: false` Must Be Present, Not Just Correctly Spelled (PRs #328–#330)
+
+> **Historical (superseded 2026-09-02) for the key spelling.** Internal skills
+> still must declare the field; the current name is `user-invocable: false`.
+> Detection greps below use the old key on purpose as the 2026-05 record.
 
 Five reviewers across PRs #328–#330 (yellow-council Wave-2 review) flagged a
 skill missing the `user-invokable: false` field entirely. Prior MEMORY.md and
