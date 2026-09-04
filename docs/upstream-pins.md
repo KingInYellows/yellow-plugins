@@ -66,6 +66,17 @@ bump as a breaking change requiring re-verification of
 the `instanceof` error-branching in `sdk-adapter.ts` before merging, since
 the SDK's error class shapes are not guaranteed stable across versions.
 
+## Yellow Goal Engine Release Pin
+
+Pinned engine artifact identity: `0.1.0`
+(`plugins/yellow-goal/src/pin.ts`). This is **not** an npm registry pin:
+consumers install `goal-gen-0.1.0.tgz` from the yellow-goal GitHub Release
+at annotated tag `v0.1.0`. CI installs the public asset and runs the blocking
+`Released Goal Engine Compatibility` job. Runtime checks use `/goal:setup` /
+`node dist/cli.js setup` (fail-closed on missing binary or
+`engineVersion` mismatch), not `pnpm check:pins`. Do not treat this as
+advisory.
+
 ## Bump Checklist
 
 When bumping a pin:

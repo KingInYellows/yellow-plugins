@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-goal",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["yellow-goal", "goal-gen", "engine-bridge", "process-contract", "request-packet"],
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-goal"
+  },
+  "targets": {
+    "claude": true,
+    "codex": {
+      "enabled": false
+    }
+  }
+}

@@ -54,9 +54,10 @@ yarn.lock
 # Build outputs (Task I1.T1: pnpm workspace)
 dist/
 **/dist/
-# yellow-cursor ships its compiled CLI so installed plugins are runnable
-# without a build step; CI's build job drift-checks it against src/.
+# yellow-cursor / yellow-goal ship compiled CLIs so installed plugins are
+# runnable without a build step; CI's build job drift-checks them against src/.
 !plugins/yellow-cursor/dist/
+!plugins/yellow-goal/dist/
 build/
 **/build/
 *.tsbuildinfo

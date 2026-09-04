@@ -200,6 +200,16 @@
       },
       "source": "./plugins/yellow-mempalace",
       "category": "development"
+    },
+    {
+      "name": "yellow-goal",
+      "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-goal",
+      "category": "development"
     }
   ]
 }
