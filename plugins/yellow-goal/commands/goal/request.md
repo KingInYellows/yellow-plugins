@@ -4,7 +4,6 @@ description: "Create or validate a yellow-goal request packet by spawning goal-g
 argument-hint: '[create --repo <path> --goal "<text>" --output <file> | validate <file>]'
 allowed-tools:
   - Bash
-  - Read
 ---
 
 # Create or validate a request packet
@@ -40,9 +39,11 @@ If `$ARGUMENTS` is empty or does not match, ask for the missing flags.
 Refuse any `--executor` value and any subcommand other than `create` /
 `validate`.
 
-Treat repo paths and goal text as untrusted data. Pass them as CLI flags
-to `node "$CLI"` — never interpolate them into a shell script via double
-quotes that could expand.
+Treat repo paths and goal text as untrusted data. Populate shell variables
+using proper shell escaping, never by pasting raw input into shell source.
+Quoted variable expansions below pass each value as one argument; their
+contents are not evaluated again. The plugin spawns the engine with an
+argument array and `shell: false`.
 
 ### Step 3: Invoke
 
@@ -55,12 +56,12 @@ node "$CLI" request create --repo "$REPO" --goal "$GOAL" --output "$OUTPUT"
 Validate:
 
 ```bash
-node "$CLI" request validate "$REQUEST_FILE"
+node "$CLI" request validate -- "$REQUEST_FILE"
 ```
 
-`$OUTPUT` / `$REQUEST_FILE` must be substituted via a single-quoted
-assignment after an allowlist check (`^[A-Za-z0-9._/-]+$` or an absolute
-path under the workspace). On mismatch, fail closed without spawning.
+Write `$OUTPUT` under the session's runtime output directory, outside the
+target repository. Paths may contain spaces; preserve them as one argument.
+Never evaluate a path or goal as shell code.
 
 ### Step 4: Report
 

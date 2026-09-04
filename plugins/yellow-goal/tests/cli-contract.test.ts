@@ -6,7 +6,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -18,7 +18,12 @@ const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 );
-const fixtureBin = path.join(packageRoot, 'tests', 'fixtures', 'bin');
+const fixturePath = path.join(
+  packageRoot,
+  'tests',
+  'fixtures',
+  'fake-engine.mjs'
+);
 
 let buildDir: string;
 let cliPath: string;
@@ -39,12 +44,11 @@ beforeAll(() => {
     { cwd: packageRoot, stdio: 'inherit' }
   );
   scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'yellow-goal-scratch-'));
-  fs.chmodSync(path.join(fixtureBin, 'goal-gen'), 0o755);
 }, 60_000);
 
 afterAll(() => {
-  fs.rmSync(buildDir, { recursive: true, force: true });
-  fs.rmSync(scratch, { recursive: true, force: true });
+  if (buildDir) fs.rmSync(buildDir, { recursive: true, force: true });
+  if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
 });
 
 interface CliRun {
@@ -64,10 +68,13 @@ async function runCli(
       {
         env: {
           ...process.env,
-          PATH: `${fixtureBin}:${process.env.PATH ?? ''}`,
-          GOAL_GEN_BIN: '',
+          GOAL_GEN_BIN: process.execPath,
+          NODE_OPTIONS: `--import=${pathToFileURL(fixturePath).href}`,
+          FAKE_GOAL_CLI_PATH: cliPath,
           ...extraEnv,
         },
+        timeout: 10_000,
+        killSignal: 'SIGKILL',
       }
     );
     return { stdout, stderr, exitCode: 0 };
@@ -83,7 +90,55 @@ function parseSingleJsonLine(stdout: string): unknown {
   return JSON.parse(lines[0] as string);
 }
 
-describe('PATH fake goal-gen contract', () => {
+describe('portable fake goal-gen contract', () => {
+  it.each(
+    [
+      [],
+      ['setup', '--bogus'],
+      ['request', 'create', '--repo'],
+      ['request', 'create', '--bogus'],
+      ['request', 'validate'],
+      ['request', 'validate', 'one.json', 'two.json'],
+      ['request', 'validate', '--bogus'],
+      ['run'],
+      ['analyze'],
+      ['request', 'validate', '--executor=stub'],
+    ].map((args) => ({ args }))
+  )(
+    'rejects invalid argv $args before invoking an engine',
+    async ({ args }) => {
+      const result = await runCli(args, {
+        GOAL_GEN_BIN: path.join(scratch, 'never-exists'),
+      });
+      expect(result.exitCode).toBe(2);
+      expect(parseSingleJsonLine(result.stdout)).toMatchObject({
+        ok: false,
+        error: { code: 'GOAL_INVALID_INPUT' },
+      });
+    }
+  );
+
+  it('probes the pin before a request and creates no output on mismatch', async () => {
+    const output = path.join(scratch, 'must-not-be-created.json');
+    const result = await runCli(
+      [
+        'request',
+        'create',
+        '--repo',
+        scratch,
+        '--goal',
+        'test',
+        '--output',
+        output,
+      ],
+      { FAKE_GOAL_GEN_MODE: 'mismatch', FAKE_GOAL_GEN_VERSION: '9.9.9' }
+    );
+    expect(result.exitCode).toBe(1);
+    expect(parseSingleJsonLine(result.stdout)).toMatchObject({
+      error: { code: 'GOAL_ENGINE_VERSION_MISMATCH' },
+    });
+    expect(fs.existsSync(output)).toBe(false);
+  });
   it('setup exits 0 when the fake reports the pin', async () => {
     const result = await runCli(['setup']);
     expect(result.exitCode).toBe(0);
@@ -112,7 +167,10 @@ describe('PATH fake goal-gen contract', () => {
   it('setup fail-closes when goal-gen is missing from PATH', async () => {
     const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'yellow-goal-empty-'));
     try {
-      const result = await runCli(['setup'], { PATH: empty });
+      const result = await runCli(['setup'], {
+        PATH: empty,
+        GOAL_GEN_BIN: path.join(empty, 'missing-goal-gen'),
+      });
       expect(result.exitCode).toBe(1);
       const body = parseSingleJsonLine(result.stdout) as {
         ok: boolean;
@@ -179,8 +237,13 @@ describe('PATH fake goal-gen contract', () => {
   });
 
   it('fake goal-gen without --json is not process-contract JSON', () => {
-    const out = execFileSync(path.join(fixtureBin, 'goal-gen'), ['version'], {
+    const out = execFileSync(process.execPath, ['version'], {
       encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_OPTIONS: `--import=${pathToFileURL(fixturePath).href}`,
+        FAKE_GOAL_CLI_PATH: cliPath,
+      },
     });
     expect(() => JSON.parse(out.trim())).toThrow();
   });

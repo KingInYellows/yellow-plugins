@@ -5,10 +5,30 @@ import { requestCreate, requestValidate } from '../src/runtime.js';
 import type { SpawnEngine, SpawnResult } from '../src/spawn.js';
 
 function spawnOf(result: SpawnResult): SpawnEngine {
-  return () => result;
+  return (args) =>
+    args[0] === 'version'
+      ? { exitCode: 0, stdout: '{"engineVersion":"0.1.0"}\n', stderr: '' }
+      : result;
 }
 
 describe('requestCreate', () => {
+  it('rejects the validation-only stdout failure shape', () => {
+    expect(() =>
+      requestCreate(
+        {
+          env: {},
+          spawn: spawnOf({
+            exitCode: 1,
+            stdout: '{"valid":false,"errors":[]}\n',
+            stderr: '',
+          }),
+        },
+        { repo: 'example/repo', goal: 'test', output: 'request.json' }
+      )
+    ).toThrowError(
+      expect.objectContaining({ code: 'GOAL_ENGINE_UNPARSEABLE' })
+    );
+  });
   it('returns requestId from JSON stdout', () => {
     const result = requestCreate(
       {
@@ -46,6 +66,76 @@ describe('requestCreate', () => {
 });
 
 describe('requestValidate', () => {
+  it.each([
+    { valid: false, errors: [{ path: 'goal', message: 'Required' }] },
+    {
+      path: 'other.json',
+      valid: false,
+      errors: [{ path: 'goal', message: 'Required' }],
+    },
+    { path: 'request.json', valid: false, errors: [] },
+    { path: 'request.json', valid: false, errors: [null] },
+    {
+      path: 'request.json',
+      valid: false,
+      errors: [{ path: 1, message: 'Required' }],
+    },
+    { path: 'request.json', valid: false, errors: [{ path: 'goal' }] },
+  ])('rejects malformed validation failure %j', (output) => {
+    expect(() =>
+      requestValidate(
+        {
+          env: {},
+          spawn: spawnOf({
+            exitCode: 1,
+            stdout: JSON.stringify(output) + '\n',
+            stderr: '',
+          }),
+        },
+        { request: 'request.json' }
+      )
+    ).toThrowError(
+      expect.objectContaining({ code: 'GOAL_ENGINE_UNPARSEABLE' })
+    );
+  });
+  it('preserves schema-invalid stdout with exit 1 and no stderr as a domain failure', () => {
+    expect(() =>
+      requestValidate(
+        {
+          env: {},
+          spawn: spawnOf({
+            exitCode: 1,
+            stdout:
+              '{"path":"request.json","valid":false,"errors":[{"path":"goal","message":"Required"}]}\n',
+            stderr: '',
+          }),
+        },
+        { request: 'request.json' }
+      )
+    ).toThrowError(expect.objectContaining({ code: 'GOAL_ENGINE_FAILED' }));
+  });
+
+  it('probes identity first and preserves an option-looking path as one positional', () => {
+    const calls: string[][] = [];
+    requestValidate(
+      {
+        env: {},
+        spawn: (args) => {
+          calls.push([...args]);
+          return spawnOf({
+            exitCode: 0,
+            stdout: '{"valid":true}\n',
+            stderr: '',
+          })(args);
+        },
+      },
+      { request: '--request.json' }
+    );
+    expect(calls).toEqual([
+      ['version', '--json'],
+      ['request', 'validate', '--json', '--', '--request.json'],
+    ]);
+  });
   it('requires valid:true', () => {
     const result = requestValidate(
       {

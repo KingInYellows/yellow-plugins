@@ -21,6 +21,8 @@ function createDefaultSpawn(env, timeoutMs = 30_000) {
         const result = (0, node_child_process_1.spawnSync)(bin, [...args], {
             encoding: 'utf8',
             timeout: timeoutMs,
+            // spawnSync waits for the child after timeout; SIGTERM can be ignored.
+            killSignal: 'SIGKILL',
             env,
             maxBuffer: 10 * 1024 * 1024,
             windowsHide: true,
@@ -28,6 +30,9 @@ function createDefaultSpawn(env, timeoutMs = 30_000) {
         });
         if (result.error) {
             const code = result.error.code;
+            if (code === 'ETIMEDOUT') {
+                throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen timed out after ${timeoutMs}ms`);
+            }
             if (code === 'ENOENT') {
                 throw new errors_js_1.GoalEngineError('GOAL_ENGINE_MISSING', `goal-gen not found on PATH (looked up as ${bin})`);
             }
@@ -36,8 +41,8 @@ function createDefaultSpawn(env, timeoutMs = 30_000) {
             }
             throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', result.error.message);
         }
-        if (result.signal === 'SIGTERM' || result.signal === 'SIGKILL') {
-            throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen timed out after ${timeoutMs}ms`);
+        if (result.signal !== null) {
+            throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen terminated by ${result.signal}`);
         }
         return {
             exitCode: result.status ?? 1,

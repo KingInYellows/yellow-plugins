@@ -31,6 +31,8 @@ export function createDefaultSpawn(
     const result = spawnSync(bin, [...args], {
       encoding: 'utf8',
       timeout: timeoutMs,
+      // spawnSync waits for the child after timeout; SIGTERM can be ignored.
+      killSignal: 'SIGKILL',
       env,
       maxBuffer: 10 * 1024 * 1024,
       windowsHide: true,
@@ -38,6 +40,12 @@ export function createDefaultSpawn(
     });
     if (result.error) {
       const code = (result.error as NodeJS.ErrnoException).code;
+      if (code === 'ETIMEDOUT') {
+        throw new GoalEngineError(
+          'GOAL_ENGINE_FAILED',
+          `goal-gen timed out after ${timeoutMs}ms`
+        );
+      }
       if (code === 'ENOENT') {
         throw new GoalEngineError(
           'GOAL_ENGINE_MISSING',
@@ -52,10 +60,10 @@ export function createDefaultSpawn(
       }
       throw new GoalEngineError('GOAL_ENGINE_FAILED', result.error.message);
     }
-    if (result.signal === 'SIGTERM' || result.signal === 'SIGKILL') {
+    if (result.signal !== null) {
       throw new GoalEngineError(
         'GOAL_ENGINE_FAILED',
-        `goal-gen timed out after ${timeoutMs}ms`
+        `goal-gen terminated by ${result.signal}`
       );
     }
     return {

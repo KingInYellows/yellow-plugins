@@ -663,7 +663,7 @@ jobs:
     name: Unit Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10 # Includes locked dependency installation and its lifecycle scripts.
     needs: [lint-and-typecheck]
 
     steps:
@@ -1110,7 +1110,7 @@ jobs:
             git diff --exit-code -- plugins/yellow-cursor/dist
             echo "::endgroup::"
             echo "::group::Committed yellow-goal dist drift check"
-            git diff --exit-code -- plugins/yellow-goal/dist
+            test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-goal/dist)"
             echo "::endgroup::"
           } 2>&1 | tee -a "$LOG_PATH"
 
@@ -1503,6 +1503,25 @@ jobs:
           PY
           echo "::endgroup::"
 
+  goal-engine-compat:
+    name: Released Goal Engine Compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: [build]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.3'
+      - name: Install public release asset and verify process contract
+        run: |
+          set -euo pipefail
+          export TMPDIR="$RUNNER_TEMP"
+          bash scripts/verify-goal-release.sh
+
   # ============================================================================
   # FINAL STATUS CHECK
   # ============================================================================
@@ -1523,6 +1542,7 @@ jobs:
         build,
         changeset-check,
         plugin-shell-tests,
+        goal-engine-compat,
       ]
 
     steps:
@@ -1537,6 +1557,7 @@ jobs:
              [ "${{ needs.security-audit.result }}" == "success" ] && \
              [ "${{ needs.plugin-shell-tests.result }}" == "success" ] && \
              [ "${{ needs.build.result }}" == "success" ] && \
+             [ "${{ needs.goal-engine-compat.result }}" == "success" ] && \
              { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
@@ -1551,6 +1572,7 @@ jobs:
             echo "Security Audit: ${{ needs.security-audit.result }}"
             echo "Plugin Shell Tests: ${{ needs.plugin-shell-tests.result }}"
             echo "Build Verification: ${{ needs.build.result }}"
+            echo "Released Goal Engine Compatibility: ${{ needs.goal-engine-compat.result }}"
             echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1
           fi

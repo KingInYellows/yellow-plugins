@@ -12,8 +12,12 @@ copy its schemas as a second source of truth.
   (`GOAL_ENGINE_VERSION_MISMATCH`).
 - Consumer CLI: `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js` — one JSON object
   on stdout, diagnostics on stderr, exit 0 / 1 / 2.
-- Engine argv is always an array (`spawnSync`, `shell: false`). Override
-  the binary with `GOAL_GEN_BIN` in tests only.
+- Engine argv is always an array (`spawnSync`, `shell: false`), with a
+  30-second timeout and forced termination. Override the binary with
+  `GOAL_GEN_BIN` in tests only. Create/validate probe the pin before acting.
+- Each successful engine operation emits exactly one JSON line with empty
+  stderr. Usage failures use structured stderr and exit 2. Schema-invalid
+  validation uses `{valid:false,errors}` on stdout, empty stderr, and exit 1.
 - Never `run --executor claude-code`, never `npm run runner`, never live
   `analyze` (it can spawn `claude -p`).
 
@@ -26,9 +30,12 @@ Out of scope this sprint: inspect / analyze / compile / run.
 
 ## Tests
 
-`pnpm --filter yellow-goal test` uses an env-driven fake `goal-gen` on PATH
-(`tests/fixtures/bin/goal-gen`). Do not point tests at a product clone.
+`pnpm --filter yellow-goal test` uses an explicit Node executable with a
+test-only preload (`tests/fixtures/fake-engine.mjs`), so no shell fixture or
+ambient engine is needed. Do not point tests at a product clone.
 
-The live tarball CI job (download GitHub Release `v0.1.0`, install into
-mktemp, create/validate + `run --executor stub`) lands after that tag
-exists. Until then the fake-binary suite is the blocking contract gate.
+The blocking `Released Goal Engine Compatibility` CI job installs the public
+GitHub Release `v0.1.0` tarball into a temporary consumer and verifies version,
+create/validate, usage errors, schema rejection, and incompatible identity.
+It never invokes `run`, including the stub executor. Engine artifact and
+plugin versions are distinct identities even when their numbers coincide.

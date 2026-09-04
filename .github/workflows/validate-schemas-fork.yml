@@ -39,12 +39,15 @@ on:
       - '**/*.txt'
       - '.github/workflows/validate-schemas-fork.yml'
 
+permissions:
+  contents: read
+
 concurrency:
   group: validate-schemas-fork-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '22.22.0'
+  NODE_VERSION: '22.22.3'
   PNPM_VERSION: '8.15.0'
   PNPM_INSTALL_FLAGS: '--frozen-lockfile --prefer-offline'
 
@@ -54,7 +57,7 @@ jobs:
     name: Validate Schemas (${{ matrix.target }})
     if: github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: ${{ matrix.target == 'yellow-goal' && 10 || 5 }}
 
     strategy:
       fail-fast: false
@@ -68,6 +71,7 @@ jobs:
           - authoring
           - codex
           - cursor
+          - yellow-goal
           - generated
 
     steps:
@@ -75,6 +79,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -192,8 +197,12 @@ jobs:
               # stale committed dist/. Local tsc build only — no secrets.
               pnpm --filter yellow-cursor run build
               git diff --exit-code -- plugins/yellow-cursor/dist
+              ;;
+            yellow-goal)
               pnpm --filter yellow-goal run build
-              git diff --exit-code -- plugins/yellow-goal/dist
+              test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-goal/dist)"
+              pnpm --filter yellow-goal test
+              TMPDIR="$RUNNER_TEMP" bash scripts/verify-goal-release.sh
               ;;
             generated)
               # Schema conformance gate (mirror of the main workflow's

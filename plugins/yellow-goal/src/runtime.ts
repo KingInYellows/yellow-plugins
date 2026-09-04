@@ -25,14 +25,15 @@ export interface RequestValidateResult {
 }
 
 function firstJsonLine(text: string): unknown {
-  const line = text
+  const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  if (line === undefined) {
+    .filter((l) => l.length > 0);
+  const line = lines[0];
+  if (lines.length !== 1 || line === undefined) {
     throw new GoalEngineError(
       'GOAL_ENGINE_UNPARSEABLE',
-      'goal-gen produced empty stdout'
+      'goal-gen must produce exactly one JSON line on stdout'
     );
   }
   try {
@@ -45,38 +46,101 @@ function firstJsonLine(text: string): unknown {
   }
 }
 
-function engineErrorMessage(result: SpawnResult): string {
-  const line = result.stderr
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  if (line !== undefined) {
+function engineErrorMessage(
+  result: SpawnResult,
+  validationPath?: string
+): string {
+  if (result.stderr.trim()) {
+    if (result.stdout.trim()) {
+      throw new GoalEngineError(
+        'GOAL_ENGINE_UNPARSEABLE',
+        'engine failure contains both stdout and stderr'
+      );
+    }
     try {
-      const parsed = JSON.parse(line) as {
+      const parsed = JSON.parse(result.stderr.trim()) as {
         error?: { code?: string; message?: string };
       };
-      if (parsed.error?.message) {
-        return `${parsed.error.code ?? 'ENGINE'}: ${parsed.error.message}`;
+      if (
+        result.stderr.trim().split(/\r?\n/).length === 1 &&
+        typeof parsed?.error?.code === 'string' &&
+        typeof parsed.error.message === 'string' &&
+        (result.exitCode === 2) === (parsed.error.code === 'USAGE_ERROR')
+      ) {
+        return `${parsed.error.code}: ${parsed.error.message}`;
       }
     } catch {
-      return line.slice(0, 400);
+      throw new GoalEngineError(
+        'GOAL_ENGINE_UNPARSEABLE',
+        'engine stderr is not a structured error'
+      );
     }
-    return line.slice(0, 400);
+    throw new GoalEngineError(
+      'GOAL_ENGINE_UNPARSEABLE',
+      'engine stderr disagrees with its exit code or error contract'
+    );
   }
-  return result.stdout.trim().slice(0, 400) || `exit ${result.exitCode}`;
+  // request validate reports schema-invalid data on stdout with exit 1.
+  const parsed = firstJsonLine(result.stdout);
+  if (
+    validationPath !== undefined &&
+    result.exitCode === 1 &&
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    'valid' in parsed &&
+    parsed.valid === false &&
+    'path' in parsed &&
+    parsed.path === validationPath &&
+    'errors' in parsed &&
+    Array.isArray(parsed.errors) &&
+    parsed.errors.length > 0 &&
+    parsed.errors.every(
+      (error: unknown) =>
+        error !== null &&
+        typeof error === 'object' &&
+        'path' in error &&
+        typeof error.path === 'string' &&
+        'message' in error &&
+        typeof error.message === 'string'
+    )
+  ) {
+    return `request validation failed: ${JSON.stringify(parsed).slice(0, 400)}`;
+  }
+  throw new GoalEngineError(
+    'GOAL_ENGINE_UNPARSEABLE',
+    'engine failure has no structured error or validation result'
+  );
 }
 
-function throwOnEngineFailure(result: SpawnResult): void {
+function throwOnEngineFailure(
+  result: SpawnResult,
+  validationPath?: string
+): void {
+  if (![0, 1, 2].includes(result.exitCode)) {
+    throw new GoalEngineError(
+      'GOAL_ENGINE_UNPARSEABLE',
+      `engine returned unsupported exit code ${result.exitCode}`
+    );
+  }
   if (result.exitCode === 0) {
+    if (result.stderr.trim()) {
+      throw new GoalEngineError(
+        'GOAL_ENGINE_UNPARSEABLE',
+        'engine success contains stderr diagnostics'
+      );
+    }
     return;
   }
   if (result.exitCode === 2) {
     throw new GoalEngineError(
       'GOAL_ENGINE_USAGE_ERROR',
-      engineErrorMessage(result)
+      engineErrorMessage(result, validationPath)
     );
   }
-  throw new GoalEngineError('GOAL_ENGINE_FAILED', engineErrorMessage(result));
+  throw new GoalEngineError(
+    'GOAL_ENGINE_FAILED',
+    engineErrorMessage(result, validationPath)
+  );
 }
 
 export function setup(deps: RuntimeDeps): SetupResult {
@@ -113,6 +177,7 @@ export function requestCreate(
   deps: RuntimeDeps,
   input: { repo: string; goal: string; output: string }
 ): RequestCreateResult {
+  setup(deps);
   const result = deps.spawn([
     'request',
     'create',
@@ -147,8 +212,15 @@ export function requestValidate(
   deps: RuntimeDeps,
   input: { request: string }
 ): RequestValidateResult {
-  const result = deps.spawn(['request', 'validate', input.request, '--json']);
-  throwOnEngineFailure(result);
+  setup(deps);
+  const result = deps.spawn([
+    'request',
+    'validate',
+    '--json',
+    '--',
+    input.request,
+  ]);
+  throwOnEngineFailure(result, input.request);
   const parsed = firstJsonLine(result.stdout);
   if (
     parsed === null ||

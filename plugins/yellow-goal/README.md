@@ -18,5 +18,8 @@ Put a pinned `goal-gen` binary on PATH (GitHub Release tarball
 - `/goal:setup` — probe `goal-gen version --json` against pin `0.1.0`
 - `/goal:request` — `request create` / `request validate`
 
-This plugin does not run the engine, does not call `claude -p`, and does
-not import yellow-goal source.
+This plugin spawns the engine's version, request-create, and request-validate
+operations. It never invokes `goal-gen run`, `analyze`, or `claude -p`, and
+never imports yellow-goal source. Every request probes the pinned artifact
+version before proceeding. The plugin version and engine version are
+independent release identities.

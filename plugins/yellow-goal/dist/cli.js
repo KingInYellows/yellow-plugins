@@ -99,8 +99,10 @@ function dispatch(operation, rest, deps) {
                     allowPositionals: true,
                 });
                 const request = positionals[0];
-                if (typeof request !== 'string' || request.length === 0) {
-                    throw new UsageError('missing request file argument');
+                if (positionals.length !== 1 ||
+                    typeof request !== 'string' ||
+                    request.length === 0) {
+                    throw new UsageError('request validate requires exactly one request file argument');
                 }
                 return runtime.requestValidate(deps, { request });
             }
@@ -120,21 +122,27 @@ function main() {
             operation: 'unknown',
             error: new errors_js_1.GoalEngineError('GOAL_INVALID_INPUT', `no subcommand given; expected one of: ${KNOWN_OPERATIONS.join(', ')}`).toJson(),
         });
-        process.exit(2);
+        process.exitCode = 2;
+        return;
     }
     try {
         const result = dispatch(operation, rest, buildDeps());
         printJson({ ok: true, operation: resolvedOperation, ...result });
     }
     catch (err) {
-        if (err instanceof UsageError) {
+        if (err instanceof UsageError ||
+            (err instanceof Error &&
+                'code' in err &&
+                typeof err.code === 'string' &&
+                err.code.startsWith('ERR_PARSE_ARGS_'))) {
             process.stderr.write(`${err.message}\n`);
             printJson({
                 ok: false,
                 operation: resolvedOperation,
                 error: new errors_js_1.GoalEngineError('GOAL_INVALID_INPUT', err.message).toJson(),
             });
-            process.exit(2);
+            process.exitCode = 2;
+            return;
         }
         const appError = (0, errors_js_1.toGoalError)(err);
         process.stderr.write(`${appError.code}: ${appError.message}\n`);
@@ -143,7 +151,7 @@ function main() {
             operation: resolvedOperation,
             error: appError,
         });
-        process.exit(1);
+        process.exitCode = 1;
     }
 }
 main();
