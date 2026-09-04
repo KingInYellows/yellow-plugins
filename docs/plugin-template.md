@@ -263,11 +263,18 @@ Every `type: "command"` hook path in the manifest must resolve to a real file
 inside the plugin, so the `SessionStart` entry above needs this companion
 script — `validate-plugin.js` fails with `Hook script not found` without it.
 
+Because this template's `userConfig` includes a sensitive field, the hook
+must also emit `${CLAUDE_PLUGIN_DATA}/credential-status.json` via
+yellow-core's helper so `/setup:all` can classify the plugin. Enumerate
+`my_api_key` without writing its value. Canonical live examples:
+`plugins/yellow-semgrep/hooks/write-credential-status.sh` and
+`docs/plugin-credential-status-protocol.md`.
+
 **File**: `hooks/scripts/session-start.sh` (`chmod +x` it)
 
 ```bash
 #!/usr/bin/env bash
-# session-start.sh — must always emit a decision object.
+# session-start.sh — emit credential-status.json, then a decision object.
 
 # Intentionally omit -e: an unexpected command failure would exit without JSON
 # and block session startup.
@@ -276,8 +283,19 @@ set -uo pipefail
 # Drain the hook payload on stdin even when unused.
 cat >/dev/null
 
-printf '{"continue": true}\n'
-exit 0
+HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/credential-status.sh"
+# yellow-core not installed alongside this plugin — skip silently.
+[ -f "$HELPER" ] || { printf '{"continue": true}\n'; exit 0; }
+# shellcheck source=/dev/null
+. "$HELPER" 2>/dev/null || { printf '{"continue": true}\n'; exit 0; }
+command -v credential_hook_scaffold >/dev/null 2>&1 || { printf '{"continue": true}\n'; exit 0; }
+
+# Enumerate my_api_key without writing its value. userConfig wins, shell
+# env is the fallback; absent otherwise. The scaffold writes
+# ${CLAUDE_PLUGIN_DATA}/credential-status.json, then emits
+# {"continue": true} and exits 0.
+credential_hook_scaffold "my-plugin" "${CLAUDE_PLUGIN_ROOT:-}" \
+  "my_api_key:CLAUDE_PLUGIN_OPTION_MY_API_KEY:MY_API_KEY"
 ```
 
 ### MCP Server Wrapper
