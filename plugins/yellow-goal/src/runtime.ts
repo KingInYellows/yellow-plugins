@@ -46,6 +46,32 @@ function firstJsonLine(text: string): unknown {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function isValidationError(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value['path'] === 'string' &&
+    typeof value['message'] === 'string'
+  );
+}
+
+function isSchemaInvalidValidationResult(
+  value: unknown,
+  validationPath: string
+): boolean {
+  if (!isRecord(value)) return false;
+  if (value['valid'] !== false || value['path'] !== validationPath)
+    return false;
+  return (
+    Array.isArray(value['errors']) &&
+    value['errors'].length > 0 &&
+    value['errors'].every(isValidationError)
+  );
+}
+
 function engineErrorMessage(
   result: SpawnResult,
   validationPath?: string
@@ -85,24 +111,7 @@ function engineErrorMessage(
   if (
     validationPath !== undefined &&
     result.exitCode === 1 &&
-    parsed !== null &&
-    typeof parsed === 'object' &&
-    'valid' in parsed &&
-    parsed.valid === false &&
-    'path' in parsed &&
-    parsed.path === validationPath &&
-    'errors' in parsed &&
-    Array.isArray(parsed.errors) &&
-    parsed.errors.length > 0 &&
-    parsed.errors.every(
-      (error: unknown) =>
-        error !== null &&
-        typeof error === 'object' &&
-        'path' in error &&
-        typeof error.path === 'string' &&
-        'message' in error &&
-        typeof error.message === 'string'
-    )
+    isSchemaInvalidValidationResult(parsed, validationPath)
   ) {
     return `request validation failed: ${JSON.stringify(parsed).slice(0, 400)}`;
   }

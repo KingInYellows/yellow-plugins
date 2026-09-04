@@ -15,6 +15,31 @@ function resolveEngineBin(env) {
     }
     return 'goal-gen';
 }
+function spawnError(error, bin, timeoutMs) {
+    switch (error.code) {
+        case 'ETIMEDOUT':
+            return new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen timed out after ${timeoutMs}ms`);
+        case 'ENOENT':
+            return new errors_js_1.GoalEngineError('GOAL_ENGINE_MISSING', `goal-gen not found on PATH (looked up as ${bin})`);
+        case 'EACCES':
+        case 'EPERM':
+            return new errors_js_1.GoalEngineError('GOAL_ENGINE_UNRUNNABLE', `goal-gen could not be executed (${error.code})`);
+        default:
+            return new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', error.message);
+    }
+}
+function completedSpawn(result, bin, timeoutMs) {
+    if (result.error)
+        throw spawnError(result.error, bin, timeoutMs);
+    if (result.signal !== null) {
+        throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen terminated by ${result.signal}`);
+    }
+    return {
+        exitCode: result.status ?? 1,
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
+    };
+}
 function createDefaultSpawn(env, timeoutMs = 30_000) {
     return (args) => {
         const bin = resolveEngineBin(env);
@@ -28,26 +53,6 @@ function createDefaultSpawn(env, timeoutMs = 30_000) {
             windowsHide: true,
             shell: false,
         });
-        if (result.error) {
-            const code = result.error.code;
-            if (code === 'ETIMEDOUT') {
-                throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen timed out after ${timeoutMs}ms`);
-            }
-            if (code === 'ENOENT') {
-                throw new errors_js_1.GoalEngineError('GOAL_ENGINE_MISSING', `goal-gen not found on PATH (looked up as ${bin})`);
-            }
-            if (code === 'EACCES' || code === 'EPERM') {
-                throw new errors_js_1.GoalEngineError('GOAL_ENGINE_UNRUNNABLE', `goal-gen could not be executed (${code})`);
-            }
-            throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', result.error.message);
-        }
-        if (result.signal !== null) {
-            throw new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', `goal-gen terminated by ${result.signal}`);
-        }
-        return {
-            exitCode: result.status ?? 1,
-            stdout: result.stdout ?? '',
-            stderr: result.stderr ?? '',
-        };
+        return completedSpawn(result, bin, timeoutMs);
     };
 }

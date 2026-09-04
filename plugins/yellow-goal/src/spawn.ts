@@ -2,7 +2,7 @@
  * Process-boundary spawn. The engine is always a child process — never
  * imported. Args are an argv array (`shell` stays false).
  */
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 
 import { GoalEngineError } from './errors.js';
 
@@ -22,6 +22,52 @@ export function resolveEngineBin(env: NodeJS.ProcessEnv): string {
   return 'goal-gen';
 }
 
+function spawnError(
+  error: NodeJS.ErrnoException,
+  bin: string,
+  timeoutMs: number
+): GoalEngineError {
+  switch (error.code) {
+    case 'ETIMEDOUT':
+      return new GoalEngineError(
+        'GOAL_ENGINE_FAILED',
+        `goal-gen timed out after ${timeoutMs}ms`
+      );
+    case 'ENOENT':
+      return new GoalEngineError(
+        'GOAL_ENGINE_MISSING',
+        `goal-gen not found on PATH (looked up as ${bin})`
+      );
+    case 'EACCES':
+    case 'EPERM':
+      return new GoalEngineError(
+        'GOAL_ENGINE_UNRUNNABLE',
+        `goal-gen could not be executed (${error.code})`
+      );
+    default:
+      return new GoalEngineError('GOAL_ENGINE_FAILED', error.message);
+  }
+}
+
+function completedSpawn(
+  result: SpawnSyncReturns<string>,
+  bin: string,
+  timeoutMs: number
+): SpawnResult {
+  if (result.error) throw spawnError(result.error, bin, timeoutMs);
+  if (result.signal !== null) {
+    throw new GoalEngineError(
+      'GOAL_ENGINE_FAILED',
+      `goal-gen terminated by ${result.signal}`
+    );
+  }
+  return {
+    exitCode: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+}
+
 export function createDefaultSpawn(
   env: NodeJS.ProcessEnv,
   timeoutMs = 30_000
@@ -38,38 +84,6 @@ export function createDefaultSpawn(
       windowsHide: true,
       shell: false,
     });
-    if (result.error) {
-      const code = (result.error as NodeJS.ErrnoException).code;
-      if (code === 'ETIMEDOUT') {
-        throw new GoalEngineError(
-          'GOAL_ENGINE_FAILED',
-          `goal-gen timed out after ${timeoutMs}ms`
-        );
-      }
-      if (code === 'ENOENT') {
-        throw new GoalEngineError(
-          'GOAL_ENGINE_MISSING',
-          `goal-gen not found on PATH (looked up as ${bin})`
-        );
-      }
-      if (code === 'EACCES' || code === 'EPERM') {
-        throw new GoalEngineError(
-          'GOAL_ENGINE_UNRUNNABLE',
-          `goal-gen could not be executed (${code})`
-        );
-      }
-      throw new GoalEngineError('GOAL_ENGINE_FAILED', result.error.message);
-    }
-    if (result.signal !== null) {
-      throw new GoalEngineError(
-        'GOAL_ENGINE_FAILED',
-        `goal-gen terminated by ${result.signal}`
-      );
-    }
-    return {
-      exitCode: result.status ?? 1,
-      stdout: result.stdout ?? '',
-      stderr: result.stderr ?? '',
-    };
+    return completedSpawn(result, bin, timeoutMs);
   };
 }
