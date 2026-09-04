@@ -28,6 +28,9 @@ function spawnError(error, bin, timeoutMs) {
             return new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', error.message);
     }
 }
+function outputText(value) {
+    return value ?? '';
+}
 function completedSpawn(result, bin, timeoutMs) {
     if (result.error)
         throw spawnError(result.error, bin, timeoutMs);
@@ -36,8 +39,8 @@ function completedSpawn(result, bin, timeoutMs) {
     }
     return {
         exitCode: result.status ?? 1,
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
+        stdout: outputText(result.stdout),
+        stderr: outputText(result.stderr),
     };
 }
 function createDefaultSpawn(env, timeoutMs = 30_000) {

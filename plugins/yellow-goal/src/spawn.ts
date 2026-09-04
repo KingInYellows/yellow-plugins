@@ -49,6 +49,10 @@ function spawnError(
   }
 }
 
+function outputText(value: string | null | undefined): string {
+  return value ?? '';
+}
+
 function completedSpawn(
   result: SpawnSyncReturns<string>,
   bin: string,
@@ -63,8 +67,8 @@ function completedSpawn(
   }
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
+    stdout: outputText(result.stdout),
+    stderr: outputText(result.stderr),
   };
 }
 
