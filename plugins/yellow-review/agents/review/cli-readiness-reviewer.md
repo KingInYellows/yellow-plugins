@@ -99,9 +99,9 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   flag, a list command with no default limit.
 - **Anchor 50** — the pattern is present but context beyond the diff might
   resolve it. Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — report at that anchor; the orchestrator removes it from the
-  actionable queue (a `pre_existing` finding is still listed in the report's
-  pre-existing section)** — the issue depends on runtime behavior
+- **Anchor 25 or below — report at that anchor; the orchestrator
+  suppresses it from every user-visible section, including
+  Pre-existing** — the issue depends on runtime behavior
   or configuration you have no evidence for.
 
 ## What you don't flag
@@ -131,7 +131,7 @@ less than a real issue silently omitted here.
   "findings": [
     {
       "title": "Concise one-line title",
-      "severity": "P0|P1|P2|P3",
+      "severity": "P1|P2|P3",
       "category": "cli-readiness",
       "file": "path/to/file",
       "line": 42,
