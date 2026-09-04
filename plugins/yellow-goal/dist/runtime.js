@@ -22,6 +22,23 @@ function firstJsonLine(text) {
         throw new errors_js_1.GoalEngineError('GOAL_ENGINE_UNPARSEABLE', `goal-gen stdout was not JSON: ${line.slice(0, 200)}`);
     }
 }
+function isRecord(value) {
+    return value !== null && typeof value === 'object';
+}
+function isValidationError(value) {
+    return (isRecord(value) &&
+        typeof value['path'] === 'string' &&
+        typeof value['message'] === 'string');
+}
+function isSchemaInvalidValidationResult(value, validationPath) {
+    if (!isRecord(value))
+        return false;
+    if (value['valid'] !== false || value['path'] !== validationPath)
+        return false;
+    return (Array.isArray(value['errors']) &&
+        value['errors'].length > 0 &&
+        value['errors'].every(isValidationError));
+}
 function engineErrorMessage(result, validationPath) {
     if (result.stderr.trim()) {
         if (result.stdout.trim()) {
@@ -45,21 +62,7 @@ function engineErrorMessage(result, validationPath) {
     const parsed = firstJsonLine(result.stdout);
     if (validationPath !== undefined &&
         result.exitCode === 1 &&
-        parsed !== null &&
-        typeof parsed === 'object' &&
-        'valid' in parsed &&
-        parsed.valid === false &&
-        'path' in parsed &&
-        parsed.path === validationPath &&
-        'errors' in parsed &&
-        Array.isArray(parsed.errors) &&
-        parsed.errors.length > 0 &&
-        parsed.errors.every((error) => error !== null &&
-            typeof error === 'object' &&
-            'path' in error &&
-            typeof error.path === 'string' &&
-            'message' in error &&
-            typeof error.message === 'string')) {
+        isSchemaInvalidValidationResult(parsed, validationPath)) {
         return `request validation failed: ${JSON.stringify(parsed).slice(0, 400)}`;
     }
     throw new errors_js_1.GoalEngineError('GOAL_ENGINE_UNPARSEABLE', 'engine failure has no structured error or validation result');

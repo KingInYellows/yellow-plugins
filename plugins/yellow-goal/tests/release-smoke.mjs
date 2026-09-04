@@ -124,8 +124,8 @@ try {
     invoke('git', ['-C', target, 'status', '--porcelain']).stdout,
     before
   );
-  console.log(
-    `release process smoke passed: ${checks} invocations; no run or provider operations`
+  process.stdout.write(
+    `release process smoke passed: ${checks} invocations; no run or provider operations\n`
   );
 } finally {
   rmSync(scratch, { recursive: true, force: true });

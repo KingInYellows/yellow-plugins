@@ -1547,32 +1547,44 @@ jobs:
 
     steps:
       - name: Check validation results
+        env:
+          VALIDATE_SCHEMAS_RESULT: ${{ needs.validate-schemas.result }}
+          VALIDATE_VERSIONS_RESULT: ${{ needs.validate-versions.result }}
+          LINT_AND_TYPECHECK_RESULT: ${{ needs.lint-and-typecheck.result }}
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          CONTRACT_DRIFT_RESULT: ${{ needs.contract-drift.result }}
+          SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
+          PLUGIN_SHELL_TESTS_RESULT: ${{ needs.plugin-shell-tests.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          GOAL_ENGINE_COMPAT_RESULT: ${{ needs.goal-engine-compat.result }}
+          CHANGESET_CHECK_RESULT: ${{ needs.changeset-check.result }}
         run: |
-          if [ "${{ needs.validate-schemas.result }}" == "success" ] && \
-             [ "${{ needs.validate-versions.result }}" == "success" ] && \
-             [ "${{ needs.lint-and-typecheck.result }}" == "success" ] && \
-             [ "${{ needs.unit-tests.result }}" == "success" ] && \
-             [ "${{ needs.integration-tests.result }}" == "success" ] && \
-             [ "${{ needs.contract-drift.result }}" == "success" ] && \
-             [ "${{ needs.security-audit.result }}" == "success" ] && \
-             [ "${{ needs.plugin-shell-tests.result }}" == "success" ] && \
-             [ "${{ needs.build.result }}" == "success" ] && \
-             [ "${{ needs.goal-engine-compat.result }}" == "success" ] && \
-             { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
+          if [ "$VALIDATE_SCHEMAS_RESULT" == "success" ] && \
+             [ "$VALIDATE_VERSIONS_RESULT" == "success" ] && \
+             [ "$LINT_AND_TYPECHECK_RESULT" == "success" ] && \
+             [ "$UNIT_TESTS_RESULT" == "success" ] && \
+             [ "$INTEGRATION_TESTS_RESULT" == "success" ] && \
+             [ "$CONTRACT_DRIFT_RESULT" == "success" ] && \
+             [ "$SECURITY_AUDIT_RESULT" == "success" ] && \
+             [ "$PLUGIN_SHELL_TESTS_RESULT" == "success" ] && \
+             [ "$BUILD_RESULT" == "success" ] && \
+             [ "$GOAL_ENGINE_COMPAT_RESULT" == "success" ] && \
+             { [ "$CHANGESET_CHECK_RESULT" == "success" ] || [ "$CHANGESET_CHECK_RESULT" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
           else
             echo "::error::❌ One or more CI checks failed"
-            echo "Schema Validation: ${{ needs.validate-schemas.result }}"
-            echo "Version Consistency: ${{ needs.validate-versions.result }}"
-            echo "Lint & TypeCheck: ${{ needs.lint-and-typecheck.result }}"
-            echo "Unit Tests: ${{ needs.unit-tests.result }}"
-            echo "Integration Tests: ${{ needs.integration-tests.result }}"
-            echo "Contract Drift: ${{ needs.contract-drift.result }}"
-            echo "Security Audit: ${{ needs.security-audit.result }}"
-            echo "Plugin Shell Tests: ${{ needs.plugin-shell-tests.result }}"
-            echo "Build Verification: ${{ needs.build.result }}"
-            echo "Released Goal Engine Compatibility: ${{ needs.goal-engine-compat.result }}"
-            echo "Changeset Required: ${{ needs.changeset-check.result }}"
+            echo "Schema Validation: $VALIDATE_SCHEMAS_RESULT"
+            echo "Version Consistency: $VALIDATE_VERSIONS_RESULT"
+            echo "Lint & TypeCheck: $LINT_AND_TYPECHECK_RESULT"
+            echo "Unit Tests: $UNIT_TESTS_RESULT"
+            echo "Integration Tests: $INTEGRATION_TESTS_RESULT"
+            echo "Contract Drift: $CONTRACT_DRIFT_RESULT"
+            echo "Security Audit: $SECURITY_AUDIT_RESULT"
+            echo "Plugin Shell Tests: $PLUGIN_SHELL_TESTS_RESULT"
+            echo "Build Verification: $BUILD_RESULT"
+            echo "Released Goal Engine Compatibility: $GOAL_ENGINE_COMPAT_RESULT"
+            echo "Changeset Required: $CHANGESET_CHECK_RESULT"
             exit 1
           fi

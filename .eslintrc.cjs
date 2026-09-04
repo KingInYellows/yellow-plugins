@@ -74,6 +74,14 @@ module.exports = {
   },
   overrides: [
     {
+      // Executable ESM test fixtures run directly in Node, so TypeScript
+      // return annotations would be invalid JavaScript syntax.
+      files: ['plugins/yellow-goal/tests/**/*.mjs'],
+      parser: 'espree',
+      parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+      rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+    },
+    {
       // Layered architecture enforcement
       files: ['packages/domain/**/*.ts'],
       rules: {
