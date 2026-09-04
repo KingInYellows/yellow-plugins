@@ -147,7 +147,8 @@ the top level. Claude Code ignores any other value, ignores `1h` while a
 subscription is drawing on usage credits, and reads the field only from
 subagent files. Worth setting on personas that are re-dispatched many times
 per session with a stable system prompt (the `/review:pr` always-on
-reviewers and `learnings-researcher` carry it since 2026-09-02); pointless on
+reviewers, `code-simplifier`, and `learnings-researcher` carry it since
+2026-09-02); pointless on
 one-shot agents. The validator parses the nested map without complaint
 (covered by a fixture in `validate-agent-authoring-model-effort-rules.test.ts`).
 
@@ -345,6 +346,6 @@ tools: Read, Bash, Glob
 | v2.1.90+ | 2026-04 | `@mention` typeahead for agents added |
 | v2.1.117+ | 2026-04 | `mcpServers` frontmatter honored in `claude --agent <name>` main-thread mode |
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
-| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added |
+| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added; `experimental.cacheTtl` (`5m`/`1h` nested under `experimental:`) documented from the 2.1.259 check |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.
