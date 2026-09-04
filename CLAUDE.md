@@ -49,7 +49,7 @@ tests live under `plugins/<name>/tests/` for `github-workflow`,
 `yellow-council`, `yellow-debt`, `yellow-linear`, `yellow-research`,
 `yellow-review`, `yellow-ruvector`, and `yellow-semgrep` — run `bats tests/`
 from inside the plugin directory (CI installs `bats@1.11.0` via npm; locally
-`npx -y bats@1.11.0 tests/` works when it is not on PATH).
+`pnpm dlx bats@1.11.0 tests/` works when it is not on PATH).
 
 The CI gate is `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
 && pnpm lint && pnpm typecheck`.
