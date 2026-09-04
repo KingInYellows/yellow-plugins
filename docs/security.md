@@ -173,7 +173,9 @@ behavior is schema/unit/parity-tested, not live-verified.
 **yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
 compaction-preservation instruction that Claude Code appends to the compaction
 prompt. It is read-only — no network, no file writes — and always exits 0, so
-it can never block a compaction (exit 2 would).
+it can never block a compaction (exit 2 would). The instruction requires
+preserved CLI output to be wrapped in the untrusted-content fence so error
+text cannot re-enter as trusted context after compaction.
 
 ### yellow-ruvector Hooks (detailed)
 
