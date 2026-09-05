@@ -68,7 +68,9 @@ function json(text) {
   return JSON.parse(text);
 }
 function git(target, args) {
-  return invoke('git', ['-C', target, ...args]).stdout;
+  const result = invoke('git', ['-C', target, ...args]);
+  assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
+  return result.stdout;
 }
 function snapshot(target, sentinel) {
   return {

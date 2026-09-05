@@ -69,9 +69,11 @@ case "$REQUEST_FILE" in
   -*) printf 'ERROR: request path may not start with a hyphen\n' >&2; exit 2 ;;
 esac
 # Byte-exact ASCII allowlist: [:alnum:] and bracket ranges are locale
-# dependent, so strip the allowed bytes under LC_ALL=C and require nothing left.
-if [ -n "$(printf '%s' "$REQUEST_FILE" | LC_ALL=C tr -d 'A-Za-z0-9._/-')" ]; then
-  printf 'ERROR: request path contains characters outside [A-Za-z0-9._/-]\n' >&2
+# dependent, so strip the allowed bytes under LC_ALL=C and count what is left
+# (counting bytes, not testing substituted text, so a newline cannot slip past
+# command substitution's trailing-newline stripping). Empty paths are rejected.
+if [ -z "$REQUEST_FILE" ] || [ "$(printf '%s' "$REQUEST_FILE" | LC_ALL=C tr -d 'A-Za-z0-9._/-' | wc -c)" -ne 0 ]; then
+  printf 'ERROR: request path must be non-empty and use only [A-Za-z0-9._/-]\n' >&2
   exit 2
 fi
 if ! validate_file_path "$REQUEST_FILE" "$PWD"; then

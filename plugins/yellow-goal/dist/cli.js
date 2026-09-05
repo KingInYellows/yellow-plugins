@@ -160,8 +160,13 @@ async function dispatch(operation, rest, deps, controller) {
         }
         case 'request':
             return dispatchRequest(rest, deps);
-        case 'run-stub':
-            return dispatchRunStub(rest, { env: deps.env }, controller);
+        case 'run-stub': {
+            // GOAL_GEN_SCRATCH is a test-only seam: production never retains the
+            // per-operation scratch tree, so the variable is stripped here.
+            const { GOAL_GEN_SCRATCH: _testOnlyScratch, ...productionEnv } = deps.env;
+            void _testOnlyScratch;
+            return dispatchRunStub(rest, { env: productionEnv }, controller);
+        }
         default:
             throw new UsageError(`unknown subcommand "${operation}"; expected one of: ${KNOWN_OPERATIONS.join(', ')}`);
     }

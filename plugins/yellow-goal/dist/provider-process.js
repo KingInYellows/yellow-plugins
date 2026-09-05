@@ -213,14 +213,10 @@ function buildChildEnv(input) {
     }
     return env;
 }
-/**
- * One scratch directory per operation (shared HOME/TMPDIR base across every
- * phase of a single `runStub` lifecycle). `GOAL_GEN_SCRATCH` lets tests pin
- * a directory they control instead of a fresh `mkdtemp`.
- */
 function createOperationScratchDir(env) {
     const override = env['GOAL_GEN_SCRATCH'];
-    if (typeof override === 'string' && override.length > 0)
-        return override;
-    return (0, node_fs_1.mkdtempSync)((0, node_path_1.join)((0, node_os_1.tmpdir)(), 'yellow-goal-op-'));
+    if (typeof override === 'string' && override.length > 0) {
+        return { path: override, owned: false };
+    }
+    return { path: (0, node_fs_1.mkdtempSync)((0, node_path_1.join)((0, node_os_1.tmpdir)(), 'yellow-goal-op-')), owned: true };
 }
