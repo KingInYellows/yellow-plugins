@@ -753,12 +753,40 @@ describe('RunStreamValidator', () => {
     ['unparseable', 'not-a-date'],
     ['missing timezone/offset', '2026-01-01T00:00:00'],
     ['space instead of T', '2026-01-01 00:00:00Z'],
+    [
+      'impossible day (Feb 30 normalized by Date.parse)',
+      '2026-02-30T00:00:00Z',
+    ],
+    ['Feb 29 in a non-leap year', '2026-02-29T00:00:00Z'],
+    ['Feb 29 in a century non-leap year', '2100-02-29T00:00:00Z'],
+    ['month 13', '2026-13-01T00:00:00Z'],
+    ['month 0', '2026-00-10T00:00:00Z'],
+    ['day 0', '2026-01-00T00:00:00Z'],
+    ['day 31 in a 30-day month', '2026-04-31T00:00:00Z'],
+    ['hour 24', '2026-01-01T24:00:00Z'],
+    ['minute 60', '2026-01-01T00:60:00Z'],
+    ['second 61', '2026-01-01T00:00:61Z'],
+    ['offset hour 24', '2026-01-01T00:00:00+24:00'],
+    ['offset minute 60', '2026-01-01T00:00:00+00:60'],
   ])('rejects an invalid timestamp: %s', (_label, timestamp) => {
     const v = new RunStreamValidator();
     expectGoalError(
       () => v.accept(start({}, { timestamp })),
       'GOAL_PROTOCOL_INVALID'
     );
+  });
+
+  it.each([
+    ['UTC with fraction', '2026-01-01T00:00:00.123Z'],
+    ['leap day in a leap year', '2024-02-29T23:59:59Z'],
+    ['leap day in a 400-year', '2000-02-29T00:00:00Z'],
+    ['leap second', '2026-06-30T23:59:60Z'],
+    ['negative offset', '2026-01-01T00:00:00-07:00'],
+    ['positive offset', '2026-12-31T23:59:59+13:45'],
+  ])('accepts a strict RFC 3339 timestamp: %s', (_label, timestamp) => {
+    const v = new RunStreamValidator();
+    v.accept(start({}, { timestamp }));
+    expect(v.snapshot.eventCount).toBe(1);
   });
 
   it('rejects an array payload', () => {

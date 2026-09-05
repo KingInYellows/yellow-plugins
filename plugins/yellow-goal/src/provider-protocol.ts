@@ -85,12 +85,38 @@ function isFiniteNonNegativeNumber(value: unknown): value is number {
 }
 
 const RFC3339_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return leap ? 29 : 28;
+  }
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+/** Strict RFC 3339 date-time check on the literal calendar fields. Date.parse
+ *  is deliberately not used: it normalizes impossible dates (Feb 30 -> Mar 2)
+ *  instead of rejecting them. Leap second 60 is accepted per RFC 3339. */
 function isRfc3339Timestamp(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length === 0) return false;
-  if (Number.isNaN(Date.parse(value))) return false;
-  return RFC3339_RE.test(value);
+  if (typeof value !== 'string') return false;
+  const match = RFC3339_RE.exec(value);
+  if (match === null) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > daysInMonth(year, month)) return false;
+  if (hour > 23 || minute > 59 || second > 60) return false;
+  if (match[7] !== undefined) {
+    const offsetHour = Number(match[8]);
+    const offsetMinute = Number(match[9]);
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+  }
+  return true;
 }
 
 function isUniqueNonEmptyStringArray(value: unknown): value is string[] {

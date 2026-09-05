@@ -30,10 +30,12 @@ assert.ok(
 const scratch = mkdtempSync(path.join(tmpdir(), 'goal-release-smoke-'));
 const env = { ...process.env, GOAL_GEN_BIN: bin, NODE_OPTIONS: '' };
 let checks = 0;
-function invoke(executable, args, extraEnv = {}) {
+function invoke(executable, args, extraEnv = {}, { raw = false } = {}) {
   const result = spawnSync(executable, args, {
     env: { ...env, ...extraEnv },
-    encoding: 'utf8',
+    // Protocol probes keep raw bytes so the validators' fatal UTF-8 check is
+    // exercised on the actual artifact output, not on a lossy decode.
+    ...(raw ? {} : { encoding: 'utf8' }),
     timeout: 10_000,
     killSignal: 'SIGKILL',
     shell: false,
@@ -56,14 +58,13 @@ try {
   assert.equal(invoke('git', ['-C', target, 'init', '-q']).status, 0);
   const before = invoke('git', ['-C', target, 'status', '--porcelain']).stdout;
   const request = path.join(scratch, 'request.json');
-  const version = invoke(bin, ['version', '--json']);
+  const version = invoke(bin, ['version', '--json'], {}, { raw: true });
   assert.equal(version.status, 0);
-  assert.equal(version.stderr, '');
-  assert.equal(json(version.stdout).engineVersion, PINNED_ENGINE_VERSION);
+  assert.equal(version.stderr.length, 0);
   assert.equal(
     validateVersionProbe(
       parseSingleJsonObject(
-        Buffer.from(version.stdout, 'utf8'),
+        version.stdout,
         'version stdout',
         CONSUMER_LIMITS.bootstrapMaxStdoutBytes
       ),
@@ -74,12 +75,17 @@ try {
   // Provider Protocol v1 discovery handshake against the public artifact:
   // static, offline, and validated by the consumer's own observable-data
   // guards (never a copied engine schema).
-  const capabilities = invoke(bin, ['capabilities', '--json']);
+  const capabilities = invoke(
+    bin,
+    ['capabilities', '--json'],
+    {},
+    { raw: true }
+  );
   assert.equal(capabilities.status, 0);
-  assert.equal(capabilities.stderr, '');
+  assert.equal(capabilities.stderr.length, 0);
   const validated = validateCapabilities(
     parseSingleJsonObject(
-      Buffer.from(capabilities.stdout, 'utf8'),
+      capabilities.stdout,
       'capabilities stdout',
       CONSUMER_LIMITS.bootstrapMaxStdoutBytes
     ),
