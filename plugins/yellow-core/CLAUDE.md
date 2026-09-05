@@ -434,10 +434,10 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
   prints plain text, not `{"continue": true}`: Claude Code appends a
   PreCompact hook's stdout to the compaction prompt on exit 0 (exit 2
   blocks compaction). It carries the Claude 5-generation
-  compaction-preservation instruction (plan path + unchecked tasks fenced
-  as untrusted-content, modified files, user decisions verbatim, open
-  questions, last failing command redacted then fenced as
-  untrusted-content, in-flight branch/PR names).
+  compaction-preservation instruction (plan path + unchecked tasks,
+  modified files, user decisions verbatim, open questions, last failing
+  command, in-flight branch/PR names — every item secret-redacted then
+  fenced as untrusted-content).
   Synchronous, no jq, well under its 3s timeout. Hook events live in
   `catalog/plugins/yellow-core.json` and are regenerated into
   `plugin.json` by `pnpm generate:manifests`. Tests:
