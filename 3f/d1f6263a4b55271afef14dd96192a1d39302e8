@@ -1,0 +1,20 @@
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_25ce909db53e22::t_16cf562aa15ac2 32-33,38-39
+  s_25ce909db53e22::t_43c62116cf0d95 34-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3fd1f6263a4b55271afef14dd96192a1d39302e8",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
