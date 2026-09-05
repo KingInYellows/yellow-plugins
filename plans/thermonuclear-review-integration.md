@@ -346,7 +346,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 #### Phase 1.4: Orchestrator wiring (minimal)
 
-- [ ] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
+- [x] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
       block, appended only when `thermonuclear-reviewer` is dispatched (B1).
       Before emitting a row, reject paths with newlines, leading hyphens,
       `..`, or other unsafe characters; relative paths must resolve inside
