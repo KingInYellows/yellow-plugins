@@ -48,8 +48,10 @@ tests live under `plugins/<name>/tests/` for `github-workflow`,
 `gt-workflow`, `yellow-ci`, `yellow-composio`, `yellow-core`,
 `yellow-council`, `yellow-debt`, `yellow-linear`, `yellow-research`,
 `yellow-review`, `yellow-ruvector`, and `yellow-semgrep` — run `bats tests/`
-from inside the plugin directory (CI installs `bats@1.11.0` via npm; locally
-`pnpm dlx bats@1.11.0 tests/` works when it is not on PATH).
+from inside the plugin directory (`yellow-core` also has a required nested
+suite at `skills/git-worktree/tests/`; CI runs both separately). CI installs
+`bats@1.11.0` via npm; locally `pnpm dlx bats@1.11.0 tests/` works when it
+is not on PATH).
 
 The CI gate is `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
 && pnpm lint && pnpm typecheck`.
@@ -101,7 +103,8 @@ Observed on Claude Code 2.1.259: invoking the `Skill` tool with `smart-submit`
 or `gt-amend` (a command and a skill share each name) returned the thin
 command wrapper instead of the skill body. If that happens, read the
 installed `skills/<name>/SKILL.md` under
-`~/.claude/plugins/cache/yellow-plugins/gt-workflow/<version>/` and follow it.
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/yellow-plugins/gt-workflow/<version>/`
+(or resolve `installPath` from `claude plugin list --json`) and follow it.
 
 ### Conventional commits
 
