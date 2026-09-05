@@ -87,6 +87,24 @@ at confidence < 75" line counts only what the orchestrator removes.
 Pre-existing findings pass through the same gate (gated-out items count as
 suppressed, not listed under Pre-existing).
 
+## Prompt cache TTL
+
+Five always-run `/review:pr` agents carry `experimental.cacheTtl: 1h` in
+agent frontmatter (nested under `experimental:`):
+
+- `project-compliance-reviewer`
+- `correctness-reviewer`
+- `maintainability-reviewer`
+- `project-standards-reviewer`
+- `code-simplifier`
+
+On Claude Code 2.1.259+, a second review of the same PR within an hour can
+read these stable persona prompts from cache instead of reprocessing them
+full length. Supported values are `5m` and `1h`; the field is read only from
+subagent files. While a subscription is drawing on usage credits, Claude Code
+may ignore the setting — check `cache_read_input_tokens` in the transcript
+(Ctrl-O) to confirm caching on your auth route.
+
 ## Limitations
 
 - Very large PRs (1000+ lines) may cause agent context overflow — consider

@@ -209,6 +209,20 @@ architecture-strategist, performance-reviewer / performance-oracle,
 pattern-recognition-specialist, code-simplicity-reviewer) silently
 degrade — only yellow-review's own agents run.
 
+### Prompt cache TTL
+
+Five always-run `/review:pr` agents set `experimental.cacheTtl: 1h` in
+frontmatter (nested under `experimental:`): the four Wave 2 always-selected
+reviewers (`project-compliance-reviewer`, `correctness-reviewer`,
+`maintainability-reviewer`, `project-standards-reviewer`) and the final-pass
+`code-simplifier`. Conditional personas are intentionally omitted — they
+dispatch too rarely for a longer TTL to matter.
+
+Claude Code 2.1.259+ honors `5m` or `1h` on subagent files only; while a
+subscription is drawing on usage credits the setting may be ignored. Verify
+with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
+`/review:pr` run within the hour.
+
 ### MCP Tool Integration
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at

@@ -341,6 +341,15 @@ yellow-core and yellow-research agents that benefit from it (e.g.,
 `best-practices-researcher`, `code-researcher`) detect availability via
 ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 
+### Prompt cache TTL
+
+`learnings-researcher` sets `experimental.cacheTtl: 1h` in frontmatter
+(nested under `experimental:`). yellow-review's `/review:pr` dispatches it
+as the Step 3d pre-pass before the Wave 2 reviewer personas.
+
+Claude Code 2.1.259+ honors `5m` or `1h` on subagent files only; while a
+subscription is drawing on usage credits the setting may be ignored.
+
 ### MCP Tool Integration
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at
