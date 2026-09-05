@@ -69,19 +69,19 @@ yellow-core integration before reviewing real PRs.
 
 ## Confidence gating
 
-Wave 2 personas report every in-scope finding with a `confidence` anchor
-(`0`, `25`, `50`, `75`, `100`) and severity — they do **not** pre-filter
-below 75 or cap the count. Three conditional personas
-(`agent-native-reviewer`, `agent-cli-readiness-reviewer`,
-`cli-readiness-reviewer`) were updated to stop persona-side suppression so
-recall is not lost before aggregation.
+Three conditional personas (`agent-native-reviewer`,
+`agent-cli-readiness-reviewer`, `cli-readiness-reviewer`) report every
+in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
+and severity — they no longer pre-filter below 75 or cap the count. Other
+Wave 2 personas still apply their own anchor floors (for example,
+`correctness-reviewer` suppresses anchor-25 items before Step 6).
 
 `/review:pr` and `/review:all` apply the **single** confidence gate in
-Step 6/9: suppress findings below anchor 75 except P0 at 50+. Sub-75
-persona output is expected input; the report's "Findings suppressed at
-confidence < 75" line counts only what the orchestrator removes. Pre-existing
-findings pass through the same gate (gated-out items count as suppressed,
-not listed under Pre-existing).
+Step 6/9: suppress findings below anchor 75 except P0 at 50+. Sub-75 input
+from the three recall personas is expected; the report's "Findings suppressed
+at confidence < 75" line counts only what the orchestrator removes.
+Pre-existing findings pass through the same gate (gated-out items count as
+suppressed, not listed under Pre-existing).
 
 ## Limitations
 

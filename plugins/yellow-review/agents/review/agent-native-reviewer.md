@@ -83,8 +83,10 @@ Cross-reference UI actions against agent tools. Build a capability map:
   filtering/sorting
 - **Low priority:** Settings/preferences UI, onboarding wizards, admin panels
 
-Only flag missing parity as Critical or Warning for must-have and
-should-have actions. Low-priority gaps are Observations at most.
+Only flag missing parity as P1 (must-have) or P2 (should-have) for the
+priority tiers above. Low-priority gaps are P3 observations at most. Do not
+use P0 — reserve P0 for critical breakage, exploitable vulnerabilities, or
+data loss per the shared severity contract.
 
 ### 3. Check Context Parity
 
@@ -174,7 +176,7 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 - **Anchor 75** — the gap is directly visible: a UI action exists with no
   corresponding tool, or a tool embeds clear business logic.
 - **Anchor 50** — the gap is likely but depends on context not fully visible.
-  Surfaces only as P0 escape or soft buckets.
+  Surfaces only via the orchestrator's P1-at-50+ escape or soft buckets.
 - **Anchor 25 or below — report at that anchor; the orchestrator
   suppresses it from every user-visible section, including
   Pre-existing** — the gap requires runtime observation
@@ -197,7 +199,7 @@ partial JSON.
   "findings": [
     {
       "title": "Anti-pattern name — concise one-line title",
-      "severity": "P0|P1|P2|P3",
+      "severity": "P1|P2|P3",
       "category": "agent-native",
       "file": "path/to/file",
       "line": 42,

@@ -26,7 +26,9 @@ repository. Detects project structure and adapts analysis accordingly.
   (suppress below 75 except `safe_auto` at 100 and P1 at 50+). Sub-75
   coherence output is expected input; count only what Step 6 removes under
   `suppressed`. The report's Suppressed Findings Summary lists 50–74
-  one-per-line and aggregates sub-50 per persona to avoid noise.
+  one-per-line and aggregates sub-50 per persona for findings the
+  orchestrator received (other personas may still suppress below 50 before
+  dispatch returns).
 
 ## Plugin Components
 
