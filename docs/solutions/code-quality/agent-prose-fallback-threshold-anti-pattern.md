@@ -123,3 +123,44 @@ length of the returned results list) as a fallback proxy.
 - [stale-env-var-docs-and-prose-count-drift.md](./stale-env-var-docs-and-prose-count-drift.md) — Co-occurring count drift findings from PR #265
 - [setup-classification-probe-coupling.md](./setup-classification-probe-coupling.md) — Co-occurring probe/classification coupling failure from PR #265
 - [claude-code-command-authoring-anti-patterns.md](./claude-code-command-authoring-anti-patterns.md) — Broader anti-pattern catalog for command and agent authoring
+
+## Update — 2026-09-05
+
+### The same class of bug shows up in output-budget guards, not just fallback thresholds
+
+PR #743 (removing persona-side confidence filtering and finding caps from four
+review-persona agents so the orchestrator's single 75-point gate is the only
+filter) replaced a countable finding cap with a self-assessment predicate:
+
+```
+plugins/yellow-review/agents/review/agent-native-reviewer.md:192
+"stop before the JSON would truncate / exceed your compact-return output budget"
+```
+
+This is structurally identical to the fallback-threshold anti-pattern above,
+just applied to a different kind of routing decision: instead of "should I
+fall through to a secondary source," it's "should I stop emitting findings."
+Both ask the LLM to judge an unmeasurable internal quantity — here, its own
+eventual serialized output size — before it has produced that output. The
+failure mode is worse than the fixed cap it replaced: a misjudgment doesn't
+just under- or over-include one item, it can drop the *entire* return at
+schema validation once the actual serialization exceeds the budget, which is
+strictly worse for recall than the 5-7 item cap it replaced.
+
+**Fix applied (same shape as the Fix section above):** use a countable,
+mechanically-checkable bound instead of a size/budget judgment call — e.g.
+"return at most N findings, ranked by severity then confidence" — and, if
+truncation is still a real risk at high N, surface it explicitly via an
+`omitted_count` field in the envelope (e.g. under `Coverage`) rather than
+silently dropping items or the whole payload.
+
+### Extended grep for output-budget-style self-assessment predicates
+
+```bash
+rg --glob 'plugins/*/agents/**/*.md' \
+  'output budget|before.*would truncate|exceed.*budget|token budget|context budget'
+```
+
+Any hit that gates whether an item is included/omitted based on this
+self-assessed budget, rather than a fixed count or a schema-enforced size
+limit, is a candidate for the same fix.
