@@ -310,7 +310,8 @@ function summaryPayload(status, extra = {}) {
   return {
     status,
     goalText: extra.goalText ?? 'fake goal',
-    costUsd: 0,
+    // FAKE_PROVIDER_COST_USD models a peer that reports spend on a stub run.
+    costUsd: Number(process.env.FAKE_PROVIDER_COST_USD || '0'),
     replans: 0,
     reextractions: 0,
     actions: [],

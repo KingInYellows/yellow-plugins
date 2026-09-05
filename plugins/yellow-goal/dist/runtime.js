@@ -200,6 +200,12 @@ const BOOTSTRAP_LIMITS = {
     maxStdoutBytes: provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes,
     maxStderrBytes: provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStderrBytes,
 };
+/** A graceful exit, or death by the signal we sent (or a terminal-delivered
+ *  SIGINT to the whole foreground group), is the expected close after a
+ *  recorded local cause; anything else is transport. */
+function isExpectedCancellationClose(signal) {
+    return signal === null || signal === 'SIGTERM' || signal === 'SIGINT';
+}
 /**
  * Probe-phase outcome (reconciliation): a forced kill is transport; a
  * recorded local cause with a graceful close or the expected SIGTERM close
@@ -212,7 +218,7 @@ function probeOutcome(result, label) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', `${label} probe was force-killed`);
     }
     if (result.localCause !== undefined &&
-        (result.signal === null || result.signal === 'SIGTERM')) {
+        isExpectedCancellationClose(result.signal)) {
         throw localCauseError(result.localCause);
     }
     if (result.signal !== null) {
@@ -246,6 +252,18 @@ function assertScenarioBinding(scenario, snapshot) {
     };
     if (!allowed[scenario].includes(summary.status)) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `terminal status ${summary.status} is not a ${scenario} outcome`, {
+            runId: snapshot.runId,
+            eventCount: snapshot.eventCount,
+            terminalStatus: summary.status,
+        });
+    }
+    // Zero-spend contract: stub runs never cost anything. The one exception is
+    // the budget-exhausted scenario, whose summary carries the simulated
+    // accounting that tripped the budget (PP-10), never metered spend.
+    const expectZeroCost = scenario !== 'budget-exhausted';
+    const anyActionCost = summary.actions.some((action) => action.costUsd !== 0);
+    if (expectZeroCost && (summary.costUsd !== 0 || anyActionCost)) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `stub ${scenario} run reported a nonzero cost`, {
             runId: snapshot.runId,
             eventCount: snapshot.eventCount,
             terminalStatus: summary.status,
@@ -396,10 +414,11 @@ async function runStubPhases(deps, input, scratchDir, lifecycle) {
     }
     if (!runResult.forcedKill &&
         runResult.localCause !== undefined &&
-        runResult.signal === 'SIGTERM' &&
+        isExpectedCancellationClose(runResult.signal) &&
         framer.bytesConsumed === 0) {
-        // Our own SIGTERM landed before the engine admitted the run (no event
-        // was ever framed), so there is no stream to be incomplete: this is the
+        // Our cancellation landed before the engine admitted the run (no event
+        // was ever framed), so there is no stream to be incomplete: whether the
+        // child exited cooperatively or died by the expected signal, this is the
         // probe-like local cancellation/deadline, not a transport failure.
         recordLocalCause(runResult.localCause);
         throw localCauseError(runResult.localCause);

@@ -34,7 +34,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
-| `yellow-goal`         | Read-only process bridge to the yellow-goal `goal-gen` engine (setup probe + request create/validate)                                  | 2 commands                                     |
+| `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup probe, request create/validate, zero-spend stub run)                        | 3 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                                                | 2 agents, 6 commands, 2 skills, 1 MCP          |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
@@ -291,7 +291,7 @@ yellow-plugins/
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
-│   ├── yellow-goal/           # yellow-goal engine bridge (2 commands)
+│   ├── yellow-goal/           # yellow-goal engine bridge (3 commands)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-mempalace/      # MemPalace memory (2 agents, 6 commands, 2 skills, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)

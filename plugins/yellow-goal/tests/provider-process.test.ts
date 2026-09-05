@@ -173,6 +173,7 @@ describe('spawnProtocolChild', () => {
   });
 
   it('records deadline as the local cause when the deadline elapses first', async () => {
+    let ready = false;
     const resultPromise = spawnProtocolChild({
       bin: process.execPath,
       argv: [
@@ -180,21 +181,23 @@ describe('spawnProtocolChild', () => {
         "process.on('SIGTERM', () => process.exit(9)); process.stdout.write('ready\\n'); setTimeout(() => {}, 5000)",
       ],
       env: process.env,
-      // The deadline is far enough that the child is ready long before it
-      // elapses, yet short enough to keep the test fast; the readiness
-      // marker below asserts the ordering rather than assuming it.
-      deadlineAt: Date.now() + 1500,
+      // The deadline cannot be gated on readiness (it must fire on its
+      // own), so give the child a generous margin to install its handler
+      // under parallel-worker load; the readiness flag is asserted after the
+      // await so a missed marker is a real test failure.
+      deadlineAt: Date.now() + 4000,
       signal: neverAbortingSignal(),
       limits: GENEROUS_LIMITS,
       onStdout: (chunk) => {
-        expect(chunk.includes('ready')).toBe(true);
+        if (chunk.includes('ready')) ready = true;
       },
     });
     const result = await resultPromise;
+    expect(ready).toBe(true);
     expect(result.exitCode).toBe(9);
     expect(result.signal).toBeNull();
     expect(result.localCause).toBe('deadline');
-  });
+  }, 10_000);
 
   it('escalates to SIGKILL after the grace period when the child ignores SIGTERM', async () => {
     const controller = new AbortController();

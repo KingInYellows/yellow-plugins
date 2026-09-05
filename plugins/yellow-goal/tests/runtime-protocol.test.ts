@@ -657,3 +657,36 @@ describe('runStub scenario binding and pre-admission cancellation', () => {
     expect(err.runId).toBeUndefined();
   });
 });
+
+describe('runStub zero-spend invariant and cooperative pre-admission closes', () => {
+  it('rejects a stub success that reports a nonzero cost', async () => {
+    const err = await expectGoalError(
+      runStub(makeDeps({ FAKE_PROVIDER_COST_USD: '0.25' }), baseInput()),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expect(err.message).toContain('nonzero cost');
+  });
+
+  it('accepts the simulated accounting of a budget-exhausted stub run', async () => {
+    const err = await expectGoalError(
+      runStub(
+        makeDeps({ FAKE_PROVIDER_COST_USD: '20' }),
+        baseInput({ scenario: 'budget-exhausted' })
+      ),
+      'GOAL_RUN_BUDGET_EXHAUSTED'
+    );
+    expect(err.terminalStatus).toBe('budget-exhausted');
+  });
+
+  it('maps a cooperative exit before run.start after a caller abort to the local cause', async () => {
+    const controller = new AbortController();
+    const promise = runStub(
+      makeDeps({ FAKE_PROVIDER_RUN_START_DELAY_MS: '20000' }),
+      baseInput({ signal: controller.signal })
+    );
+    await waitUntilInvoked('run');
+    controller.abort();
+    const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
+    expect(err.localCause).toBe('caller-cancelled');
+  });
+});

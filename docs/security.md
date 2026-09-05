@@ -220,6 +220,39 @@ Before enabling any plugin with hooks:
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
 - yellow-debt reads codebase files but only writes to `todos/` directory
 
+### Engine Process Boundary (yellow-goal)
+
+yellow-goal spawns the pinned `goal-gen` engine (a GitHub Release tarball whose
+version, URL and SHA-256 are recorded in `plugins/yellow-goal/src/pin.ts`) as a
+child process and never imports it. Containment assumptions:
+
+- **Executable**: resolved once per operation from `PATH` (or the test-only
+  `GOAL_GEN_BIN` override); every operation first probes `version --json` and
+  `capabilities --json` and refuses an engine whose identity, version or
+  capabilities disagree with the pin.
+- **Authority**: `/goal:setup` and `/goal:request` are read-only;
+  `/goal:run-stub` spawns exactly
+  `run --executor stub --protocol v1 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
+  No executor, protocol, target, provider or raw-argv selector is exposed; the
+  stub executor is zero-spend and never touches the request's target repository,
+  and the consumer rejects a nonzero reported cost.
+- **Environment**: the child receives only `PATH`, `LANG`/`LC_ALL` and a
+  disposable `HOME`/`TMPDIR`/`XDG_*` under a per-operation scratch directory
+  that is removed afterwards; ambient credentials and `NODE_OPTIONS` are never
+  forwarded; stdin is closed.
+- **Bounds**: stdout/stderr are byte-bounded before buffering, the JSON Lines
+  stream is validated incrementally, one absolute deadline and AbortSignal span
+  all phases, cancellation is SIGTERM then SIGKILL after 5 s, and results carry
+  only the validated terminal summary plus bounded scalar diagnostics — never
+  raw engine output, request contents or environment.
+- **Request path**: `/goal:run-stub` validates the request path with
+  yellow-core's `validate_file_path` (relative, inside the working directory, no
+  symlink escape) before invoking the engine.
+- **CI**: the blocking `Released Goal Engine Compatibility` job verifies the
+  public asset's SHA-256 before installing it with lifecycle scripts ignored and
+  drives every stub scenario with failing `claude`/`codex` traps first on
+  `PATH`.
+
 ### External CLI Reviewers (yellow-council)
 
 `/council`'s Gemini-lineage reviewer shells out to the Antigravity CLI (`agy`)
