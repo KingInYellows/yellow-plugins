@@ -521,7 +521,11 @@ the Step 10 report when present.
 
 When a return fails compact-return validation (missing top-level field,
 malformed value, wrong type), drop the entire return. Record drop count in
-Coverage.
+Coverage. Truncated JSON from an oversized findings list is a malformed
+return — persona prompts for `agent-native-reviewer`,
+`agent-cli-readiness-reviewer`, and `cli-readiness-reviewer` instruct
+those agents to rank by confidence (gate-surviving 75/100 first) then
+severity and stop before output would truncate rather than emit partial JSON.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
 continue to use the legacy prose finding format. This list is exhaustive
@@ -711,7 +715,8 @@ Apply the aggregation steps from
    `50 → 75`, `75 → 100`, `100 → 100`. Note agreement in the Reviewer
    column (e.g., `correctness, reliability`).
 4. **Separate pre-existing.** Pull out `pre_existing: true` into a
-   separate report section.
+   separate report section. Do not render this set yet — Step 8's
+   confidence gate still applies to it.
 5. **Resolve disagreements.** When reviewers flag the same code region
    but disagree on severity, autofix_class, or owner, annotate the
    Reviewer column and keep the more conservative route.
@@ -728,8 +733,18 @@ Apply the aggregation steps from
    ANY contributing reviewer is testing — testing wins on mixed sets so
    the routing is deterministic) or `residual_risks` (otherwise — i.e.,
    purely maintainability). Record the count.
-8. **Confidence gate.** Suppress findings below anchor 75. **Exception:**
-   P0 findings at anchor 50+ survive. Record suppressed counts.
+8. **Confidence gate.** Suppress findings below anchor 75, including the
+   pre-existing set from step 4 (a gated-out pre-existing finding is
+   counted as suppressed, not listed under Pre-existing). **Exception:**
+   P0 findings at anchor 50+ survive. Record suppressed counts: count only
+   the findings this gate actually removes — a P0 that survives the
+   exception is never counted under `suppressed`, so the report's "Findings
+   suppressed at confidence < 75" line stays accurate.
+   `agent-native-reviewer`, `agent-cli-readiness-reviewer` and
+   `cli-readiness-reviewer` do not pre-filter (they are told to report
+   everything with a confidence score) while the other personas keep their
+   own anchor floors, so sub-75 findings in the input are expected — gate
+   them here, do not treat them as a persona defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by
