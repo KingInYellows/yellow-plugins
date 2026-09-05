@@ -332,3 +332,34 @@ copy.
 **Components (this Update):** `plugins/yellow-codex/CLAUDE.md`,
 `plugins/yellow-codex/commands/codex/review.md`,
 `plugins/yellow-codex/skills/codex-patterns/SKILL.md`.
+
+## Update — 2026-09-05: `${CODEX_MODEL:-gpt-5.4}` default is account-type-specific, not universal
+
+A `/review:sweep-all` batch spanning 13 PRs hit `codex exec` auth/model
+rejection on a ChatGPT-subscription Codex account even with the flag-level
+fixes above already in place. The default baked into every invocation site
+above (`-m "${CODEX_MODEL:-gpt-5.4}"`) is correct for API-key-authenticated
+codex-cli accounts but is rejected on ChatGPT-plan accounts, which require
+`export CODEX_MODEL=gpt-5.6-sol` (or whatever model the specific ChatGPT
+plan entitles) set in the environment before invocation. No exit-2
+handler in this doc's flag-drift fix distinguishes "wrong flag syntax"
+from "right flag syntax, wrong model name for this account type" — both
+surface as an argument/config rejection at invocation time, so the
+existing exit-2 stderr-grep guidance above does not by itself tell you
+which case you're in.
+
+**Practical takeaway:** when a Codex invocation site here fails and the
+account is known or suspected to be a ChatGPT-plan login (not a bare API
+key), set `CODEX_MODEL` explicitly in the environment before calling
+`/codex:*` commands or spawning `codex-reviewer`/`codex-analyst`/
+`codex-executor`, rather than trusting the `${CODEX_MODEL:-gpt-5.4}`
+fallback baked into the invocation sites. This is an operator-environment
+concern, not a defect in the flag syntax documented above — no code change
+is implied here, just a documented gotcha for whoever hits the same
+rejection next.
+
+**Components (this Update):** operator environment / invocation
+preconditions for `plugins/yellow-codex/agents/review/codex-reviewer.md`,
+`plugins/yellow-codex/agents/research/codex-analyst.md`,
+`plugins/yellow-codex/agents/workflow/codex-executor.md`,
+`plugins/yellow-codex/commands/codex/*.md`.
