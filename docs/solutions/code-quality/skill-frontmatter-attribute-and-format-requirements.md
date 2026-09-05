@@ -426,3 +426,36 @@ Orchestrators still load internal skills through the `Skill` tool.
 is load-bearing, verify it against the CLI that consumes it (grep the bundle or
 check the official reference), and back it with a validator rule rather than a
 prose convention.
+
+---
+
+## Update — 2026-09-05
+
+### RULE 20 is negative-only: it bans the old key but never requires the new one
+
+Review of the RULE 20 PR (the 70-file rename above) surfaced a validator-design
+gap distinct from the reversal itself: RULE 20 fails a SKILL.md if the
+frontmatter contains `user-invokable`, but it does not check that
+`user-invocable` is present. Nothing requires the *correct* key — only
+absence of the *wrong* one.
+
+**Why this matters:** a negative-only check has a cheaper-than-intended way to
+go green. Deleting the `user-invocable: false` line entirely (not renaming it)
+also satisfies RULE 20, and silently restores the exact bug the rename fixed —
+the skill reappears in the `/` menu because the frontmatter parser sees no
+`user-invocable` key at all and defaults to invokable. CI passes either way;
+only a live `/` check (see "Live verification" above) would catch the
+regression, and that step is manual.
+
+**General lesson:** when a validator's job is "stop people from reverting a
+migration," a check that only rejects the old spelling is half a validator.
+Pair it with a positive-presence check for the new spelling, scoped correctly
+— here, source `plugins/*/skills/*/SKILL.md` only, not generated `codex/` or
+`cursor/` mirrors, which may use a different or absent equivalent key. The
+general shape (ban byte-for-byte error message quoting the exact replacement
+line) also works if a bare presence check is too broad for the surface being
+validated.
+
+**Status:** documented as a follow-up, not yet implemented in
+`scripts/validate-agent-authoring.js` as of this update — RULE 20 still only
+checks for `user-invokable`'s absence.
