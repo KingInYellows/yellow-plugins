@@ -1,0 +1,26 @@
+tests/integration/thermonuclear-reviewer.test.ts
+  s_25ce909db53e22::t_f734a2fcf238dc 283,303-304
+  s_25ce909db53e22::t_c52e84a704e781 171-178,290-302
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_25ce909db53e22::t_9320ed40737a18 81,85,95-99
+plugins/yellow-review/commands/review/review-pr.md
+  s_25ce909db53e22::t_10da7f35a9fca1 520-534,559-560,563,567,570-579
+.changeset/thermonuclear-line-counts.md
+  s_25ce909db53e22::t_5812a3399b08e1 23-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "cd8295b790bae46c1b9e752e1d60981a21b3f105",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
