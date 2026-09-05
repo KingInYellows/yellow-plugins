@@ -239,11 +239,12 @@ true` (`catalog/plugins/yellow-core.json`) — the first non-empty Codex
 marketplace state (`.agents/plugins/marketplace.json`). Its Codex exposure
 is a deliberately narrow, read-only allowlist of exactly three skills:
 `agent-native-architecture`, `agent-native-audit`, and `plan-status`. Every
-other component — all 21 agents, both hooks, background compounding,
-`setup:all`, statusline setup, MCP helpers, `lib/` executables, and the
-remaining skills — is excluded. `targets.codex.includeHooks: false` in the
-catalog source keeps yellow-core's Stop/SessionStart hooks (needed for
-background compounding on the Claude side) out of the generated Codex
+other component — all 21 agents, all three hooks (SessionStart, Stop,
+PreCompact), background compounding, `setup:all`, statusline setup, MCP
+helpers, `lib/` executables, and the remaining skills — is excluded.
+`targets.codex.includeHooks: false` in the catalog source keeps those three
+hooks (Stop and SessionStart are needed for background compounding on the
+Claude side; PreCompact alters compaction prompts) out of the generated Codex
 manifest entirely — see
 `docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md`
 for why that opt-out exists.
@@ -433,9 +434,10 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
   prints plain text, not `{"continue": true}`: Claude Code appends a
   PreCompact hook's stdout to the compaction prompt on exit 0 (exit 2
   blocks compaction). It carries the Claude 5-generation
-  compaction-preservation instruction (plan path + unchecked tasks,
-  modified files, user decisions verbatim, open questions, last failing
-  command fenced as untrusted-content, in-flight branch/PR names).
+  compaction-preservation instruction (plan path + unchecked tasks fenced
+  as untrusted-content, modified files, user decisions verbatim, open
+  questions, last failing command redacted then fenced as
+  untrusted-content, in-flight branch/PR names).
   Synchronous, no jq, well under its 3s timeout. Hook events live in
   `catalog/plugins/yellow-core.json` and are regenerated into
   `plugin.json` by `pnpm generate:manifests`. Tests:
