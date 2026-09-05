@@ -1,0 +1,189 @@
+plugins/yellow-review/references/review-pr/knowledge-compounding.md
+  s_25ce909db53e22::t_04c113588bdf13 12
+tests/integration/validate-agent-authoring-rule21.test.ts
+  s_25ce909db53e22::t_04c113588bdf13 1-75
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_25ce909db53e22::t_04c113588bdf13 50
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_25ce909db53e22::t_04c113588bdf13 11,54
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_25ce909db53e22::t_04c113588bdf13 10,139,157
+plugins/yellow-council/commands/council/council.md
+  s_25ce909db53e22::t_04c113588bdf13 10,217,285,301,312,315-316,318,573,861,863,872
+plugins/yellow-core/commands/flow/compound.md
+  s_25ce909db53e22::t_04c113588bdf13 8,125,167,170
+plugins/yellow-ci/commands/ci/diagnose.md
+  s_25ce909db53e22::t_04c113588bdf13 11
+plugins/yellow-research/commands/flow/deepen-plan.md
+  s_25ce909db53e22::t_04c113588bdf13 11,127,182
+plugins/gt-workflow/commands/smart-submit.md
+  s_25ce909db53e22::t_04c113588bdf13 10
+plugins/yellow-ci/commands/ci/report-linear.md
+  s_25ce909db53e22::t_04c113588bdf13 9,83,86
+plugins/yellow-core/skills/compound-lifecycle/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 36,223,226,287
+plugins/yellow-docs/commands/docs/review.md
+  s_25ce909db53e22::t_04c113588bdf13 10,97,102,118,121
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 761,820,834
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_25ce909db53e22::t_04c113588bdf13 304
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_25ce909db53e22::t_04c113588bdf13 12
+plugins/yellow-research/commands/research/code.md
+  s_25ce909db53e22::t_04c113588bdf13 6
+plugins/yellow-docs/commands/docs/refresh.md
+  s_25ce909db53e22::t_04c113588bdf13 12,146,181
+plugins/yellow-core/skills/optimize/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 42,133,136,149,154,262
+plugins/yellow-core/skills/session-history/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 110,114
+plugins/yellow-devin/CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 98
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 84,346,349,364
+docs/operations/release-checklist.md
+  s_25ce909db53e22::t_04c113588bdf13 814
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 86,234,244,257-258
+tests/integration/validate-agent-authoring-model-effort-rules.test.ts
+  s_25ce909db53e22::t_04c113588bdf13 6-7,125-151
+plugins/yellow-debt/commands/debt/audit.md
+  s_25ce909db53e22::t_04c113588bdf13 9
+plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 116
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 117
+plugins/yellow-codex/CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 77
+plugins/yellow-browser-test/commands/browser-test/report.md
+  s_25ce909db53e22::t_04c113588bdf13 10,31
+plugins/yellow-core/commands/flow/expand-shell.md
+  s_25ce909db53e22::t_04c113588bdf13 12,80
+plugins/yellow-council/CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 35,102,110,114
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_25ce909db53e22::t_04c113588bdf13 3
+plugins/yellow-review/references/review-pr/legacy-fallback.md
+  s_25ce909db53e22::t_04c113588bdf13 16,21
+plugins/yellow-core/commands/flow/brainstorm.md
+  s_25ce909db53e22::t_04c113588bdf13 7
+plugins/yellow-docs/commands/docs/generate.md
+  s_25ce909db53e22::t_04c113588bdf13 10,88
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_25ce909db53e22::t_04c113588bdf13 10,78
+docs/research/all-possible-subagent-frontmatter-config.md
+  s_25ce909db53e22::t_04c113588bdf13 130-133,135
+plugins/yellow-core/agents/workflow/session-historian.md
+  s_25ce909db53e22::t_04c113588bdf13 11,110,201,373
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 230
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_25ce909db53e22::t_04c113588bdf13 12,273,299,310
+plugins/yellow-semgrep/commands/semgrep/fix-batch.md
+  s_25ce909db53e22::t_04c113588bdf13 14
+AGENTS.md
+  s_25ce909db53e22::t_04c113588bdf13 243-244
+plugins/gt-workflow/skills/audit-review/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 99
+docs/plugin-validation-guide.md
+  s_25ce909db53e22::t_04c113588bdf13 224-228
+plugins/yellow-ci/agents/ci/failure-analyst.md
+  s_25ce909db53e22::t_04c113588bdf13 14,160
+plugins/yellow-research/commands/research/deep.md
+  s_25ce909db53e22::t_04c113588bdf13 9,81
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 583
+plugins/yellow-review/commands/review/review-all.md
+  s_25ce909db53e22::t_04c113588bdf13 12,194
+tests/integration/validate-agent-authoring-subagent-refs.test.ts
+  s_25ce909db53e22::t_04c113588bdf13 101-115
+CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 225
+plugins/yellow-core/commands/flow/work.md
+  s_25ce909db53e22::t_04c113588bdf13 12,327,719,721,723,727,743-744
+plugins/yellow-review/CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 168,183
+plugins/yellow-core/commands/flow/plan.md
+  s_25ce909db53e22::t_04c113588bdf13 11,93,98,225,227
+plugins/yellow-review/commands/review/review-pr.md
+  s_25ce909db53e22::t_04c113588bdf13 12,203,206,368,414-415,781
+plugins/gt-workflow/commands/gt-stack-plan.md
+  s_25ce909db53e22::t_04c113588bdf13 12
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_25ce909db53e22::t_04c113588bdf13 7,64,304,353,356,470,516,560
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 584
+plugins/yellow-council/skills/council-patterns/references/cross-references.md
+  s_25ce909db53e22::t_04c113588bdf13 11
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_25ce909db53e22::t_04c113588bdf13 14,165,180
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_25ce909db53e22::t_04c113588bdf13 12
+plugins/gt-workflow/commands/gt-amend.md
+  s_25ce909db53e22::t_04c113588bdf13 7
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_25ce909db53e22::t_04c113588bdf13 7,140
+plugins/yellow-docs/commands/docs/diagram.md
+  s_25ce909db53e22::t_04c113588bdf13 10,91
+docs/plugin-template.md
+  s_25ce909db53e22::t_04c113588bdf13 59-63,189-193,196,204-221,223-229,232-238,240-247,255-263,267-269,274,276-277,279,281-282,284,286-288,295-305,309-316,321,323-325,327,329-331,333,335-336
+plugins/yellow-browser-test/commands/browser-test/test.md
+  s_25ce909db53e22::t_04c113588bdf13 10,150,158
+.changeset/validator-claude5-modernisation.md
+  s_25ce909db53e22::t_04c113588bdf13 1-24
+plugins/yellow-debt/skills/debt-conventions/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 246-247
+plugins/gt-workflow/codex/skills/audit-review/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 98
+plugins/yellow-docs/commands/docs/audit.md
+  s_25ce909db53e22::t_04c113588bdf13 10,70
+plugins/yellow-core/skills/optimize/references/judge-protocol.md
+  s_25ce909db53e22::t_04c113588bdf13 21,24
+plugins/yellow-debt/commands/debt/fix.md
+  s_25ce909db53e22::t_04c113588bdf13 8,116
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_25ce909db53e22::t_04c113588bdf13 3
+scripts/validate-agent-authoring.js
+  s_25ce909db53e22::t_04c113588bdf13 114-115,118-125,249-267,431-435,783-786,791-792,1098-1099,1103,1106,1726-1727,1853-1876,1941
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_25ce909db53e22::t_04c113588bdf13 3
+plugins/yellow-core/skills/ideation/SKILL.md
+  s_25ce909db53e22::t_04c113588bdf13 50,227,231,242
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_25ce909db53e22::t_04c113588bdf13 14
+plugins/yellow-core/CLAUDE.md
+  s_25ce909db53e22::t_04c113588bdf13 187
+plugins/yellow-core/commands/compound/review-staged.md
+  s_25ce909db53e22::t_04c113588bdf13 198,241
+plugins/yellow-core/commands/flow/review.md
+  s_25ce909db53e22::t_04c113588bdf13 12
+plugins/yellow-research/agents/research/research-conductor.md
+  s_25ce909db53e22::t_04c113588bdf13 9,83,137
+plugins/yellow-ci/commands/ci/setup-self-hosted.md
+  s_25ce909db53e22::t_04c113588bdf13 8,303
+plugins/yellow-council/commands/council/setup.md
+  s_25ce909db53e22::t_04c113588bdf13 131
+plugins/yellow-core/README.md
+  s_25ce909db53e22::t_04c113588bdf13 90
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_25ce909db53e22::t_04c113588bdf13 3,128,140-141,152,187
+docs/solutions/code-quality/subagent-frontmatter-field-catalog.md
+  s_25ce909db53e22::t_04c113588bdf13 68-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "061bfa15398a0e45a08b33d15d21c5ec39509b8d",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
