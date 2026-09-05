@@ -441,22 +441,27 @@ Branch `agent/feat/thermonuclear-cross-host`, title
 `feat(distribution): expose thermonuclear review to Cursor and Codex`.
 Kept separate so host compatibility rests on smoke-test evidence, not assertion.
 
-- [ ] 2.1 Edit **only** `catalog/plugins/yellow-review.json`: set
+- [x] 2.1 Edit **only** `catalog/plugins/yellow-review.json`: set
       `targets.codex.enabled: true`, add the `targets.cursor` block, and give each
       an `interface` (`displayName`, `category`), a target-specific `description`,
       `skillAllowlist: ["yellow-thermonuclear-review"]`, and
       `componentPaths.skills`.
-- [ ] 2.2 Run `pnpm generate:manifests`. **Never hand-edit** any generated file
+- [x] 2.2 Run `pnpm generate:manifests`. **Never hand-edit** any generated file
       under `.codex-plugin/`, `.cursor-plugin/`, `codex/skills/`, `cursor/skills/`,
       or the root `.cursor-plugin/marketplace.json`.
-- [ ] 2.3 Confirm the generated trees contain **only** the allowlisted skill — no
+- [x] 2.3 Confirm the generated trees contain **only** the allowlisted skill — no
       agents, no commands, no other skill.
-- [ ] 2.4 Verify the distributed copies still carry the inline MIT notice and the
+- [x] 2.4 Verify the distributed copies still carry the inline MIT notice and the
       safety rails, since frontmatter is normalised to `name` + `description` and
       everything outside `skills/<name>/` is dropped (F9, D2, D4).
-- [ ] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
-- [ ] 2.6 Second changeset — **patch** for `yellow-review` (F12).
+- [x] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
+- [x] 2.6 Second changeset — **patch** for `yellow-review` (F12).
 - [ ] 2.7 Record all three smoke tests in the PR body (see Testing Strategy).
+      **Blocked, 2026-09-05:** the Cursor and Codex legs need those hosts
+      installed against an isolated project / a temporary `CODEX_HOME`,
+      neither of which exists in this environment. Recorded as an open
+      checklist in PR #770's body. Run all three by hand and paste the
+      results there before taking that PR out of draft.
 
 ## Technical Details
 
@@ -688,15 +693,18 @@ blocks merges.
 
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
-<!-- Submission is deferred for this run: `gt submit` is blocked because the
-     ancestor branch `agent/feat/validator-claude5-modernisation` (PR #742) has
-     commits on the remote that are not local. Items below are committed
-     locally on their own branches; the whole stack is submitted in one pass
-     once that drift is resolved. -->
-- [x] 1. agent/chore/thermonuclear-upstream-snapshot (committed 2026-09-05, not yet submitted)
-- [x] 2. agent/feat/thermonuclear-reviewer (committed 2026-09-05, not yet submitted)
-- [ ] 3. agent/feat/thermonuclear-line-counts
-- [ ] 4. agent/feat/thermonuclear-cross-host
+<!-- Submitted 2026-09-05 as a four-PR stack on top of #748. Submission was
+     initially blocked: five ancestor branches (#742, #743, #744, #746, #748)
+     were behind their remotes and `main` had advanced. `gt get` + `gt restack`
+     resolved three conflicts by hand — AGENTS.md (plugin list: kept the
+     20-entry list including yellow-goal), CLAUDE.md (kept #746's trimmed
+     prose, corrected the count 19 -> 20 to match marketplace.json and
+     validate-doc-counts.js), and yellow-review/README.md (both sides added a
+     distinct section; kept both). -->
+- [x] 1. agent/chore/thermonuclear-upstream-snapshot (submitted 2026-09-05, PR #767)
+- [x] 2. agent/feat/thermonuclear-reviewer (submitted 2026-09-05, PR #768)
+- [x] 3. agent/feat/thermonuclear-line-counts (submitted 2026-09-05, PR #769)
+- [x] 4. agent/feat/thermonuclear-cross-host (submitted 2026-09-05, PR #770; task 2.7 host smoke tests still outstanding)
 
 ---
 

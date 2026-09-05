@@ -18,7 +18,7 @@
  * deterministic file content.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, it, expect } from 'vitest';
@@ -366,6 +366,56 @@ describe('opt-in wiring', () => {
     expect(flatten(legacy)).toMatch(
       /`reviewer_set` is not consulted on this path/
     );
+  });
+});
+
+describe('cross-host distribution', () => {
+  const HOSTS = [
+    { name: 'codex', dir: 'codex' },
+    { name: 'cursor', dir: 'cursor' },
+  ] as const;
+
+  it.each(HOSTS)('exposes only the allowlisted skill to $name', ({ dir }) => {
+    const catalog = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'catalog/plugins/yellow-review.json'),
+        'utf8'
+      )
+    ) as { targets: Record<string, { skillAllowlist?: string[] }> };
+    expect(catalog.targets[dir].skillAllowlist).toEqual([
+      'yellow-thermonuclear-review',
+    ]);
+    // No agents, no commands, no second skill. The generator copies only
+    // SKILL.md plus a flat references/*.md from inside skills/<name>/, so
+    // an over-broad allowlist is the only way extra surface leaks out.
+    const tree = readdirSync(
+      resolve(REPO_ROOT, `plugins/yellow-review/${dir}/skills`)
+    );
+    expect(tree).toEqual(['yellow-thermonuclear-review']);
+  });
+
+  it.each(HOSTS)('ships the source body verbatim to $name', ({ dir }) => {
+    // Frontmatter is normalised to name + description, but the BODY must
+    // arrive byte-for-byte: everything the rails, the fail-closed size rule
+    // and the MIT notice depend on lives there, and neither host applies the
+    // agent's `tools:` restriction to make up for a lossy copy.
+    //
+    // Asserting equality rather than re-checking each property individually
+    // is deliberate. The source-side tests above already prove the body
+    // contains the licence, the pinned SHAs and the rails; equality then
+    // carries all of it — including anything added later that nobody
+    // remembers to write a substring check for — and catches any generator
+    // transform, not just the handful of properties we thought to enumerate.
+    const body = (source: string): string =>
+      source.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+    const distributed = readFileSync(
+      resolve(
+        REPO_ROOT,
+        `plugins/yellow-review/${dir}/skills/yellow-thermonuclear-review/SKILL.md`
+      ),
+      'utf8'
+    );
+    expect(body(distributed)).toBe(body(skill));
   });
 });
 
