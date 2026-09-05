@@ -1,7 +1,7 @@
 ---
 name: ci-lint-workflows
 description: 'Lint GitHub Actions workflows for self-hosted runner issues (W01-W14). Use when checking workflows before pushing or finding common CI pitfalls; previews and confirms before applying any fix.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

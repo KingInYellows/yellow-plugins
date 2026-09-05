@@ -60,7 +60,7 @@ Three-layer plugin where each layer is independently useful:
 ### Skills (8)
 
 Six operational skills back the thin `/ci:*` command wrappers (each
-`user-invokable: false`; the command is the Claude-side user surface, Codex
+`user-invocable: false`; the command is the Claude-side user surface, Codex
 reaches the skill directly), plus the two reference skills:
 
 - `ci-setup` — Verify prerequisites and configure the runner SSH config

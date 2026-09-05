@@ -1,7 +1,7 @@
 ---
 name: memory-remember-pattern
 description: "Tiered-Remember-After-Act pattern for ruvector — record learnings via hooks_remember at workflow completion with signal-strength tiers (Auto/Prompted/Skip). Use when authoring commands that should compound institutional memory from workflow outcomes."
-user-invokable: false
+user-invocable: false
 ---
 
 # Pattern: Tiered-Remember-After-Act

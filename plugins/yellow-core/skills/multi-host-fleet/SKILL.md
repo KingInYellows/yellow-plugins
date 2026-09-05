@@ -1,7 +1,7 @@
 ---
 name: multi-host-fleet
 description: Multi-host plugin credential and config reference for yellow-plugins. Use when setting up a new workstation, configuring CI/devcontainer, replicating credentials across a fleet, or wiring a secrets manager. Documents the canonical shell env var names for every credential-bearing plugin.
-user-invokable: true
+user-invocable: true
 ---
 
 # Multi-Host Fleet Reference

@@ -1,6 +1,6 @@
 ---
 name: research-patterns
-user-invokable: false
+user-invocable: false
 description: "Reference conventions for how yellow-research derives slugs, formats reports, and saves output under docs/research/. Use when authoring or modifying yellow-research commands or agents that write research output."
 ---
 

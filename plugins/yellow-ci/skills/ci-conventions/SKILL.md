@@ -1,7 +1,7 @@
 ---
 name: ci-conventions
 description: 'Shared CI conventions reference (not an executable action) — validation rules, failure patterns (F01-F12), error catalog, and security patterns. Consult when agents or commands need CI-specific validation or pattern-matching reference.'
-user-invokable: false
+user-invocable: false
 ---
 
 # CI Conventions for Yellow-CI Plugin

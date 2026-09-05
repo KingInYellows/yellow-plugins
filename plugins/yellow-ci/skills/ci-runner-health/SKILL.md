@@ -1,7 +1,7 @@
 ---
 name: ci-runner-health
 description: 'Check self-hosted runner health via SSH, with deep runner diagnostics folded in. Use when the user asks for runner status, whether a runner is healthy, or wants to verify infrastructure before diagnosing CI failures.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

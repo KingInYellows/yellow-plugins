@@ -1,7 +1,7 @@
 ---
 name: compound-lifecycle
 description: "Audit, refresh, and consolidate `docs/solutions/` to keep the institutional knowledge catalog from rotting. Use when a `docs/solutions/` sweep is needed or after `knowledge-compounder` flags an older entry as superseded."
-user-invokable: true
+user-invocable: true
 ---
 
 # compound-lifecycle

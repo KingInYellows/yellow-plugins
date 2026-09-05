@@ -176,6 +176,6 @@ When creating plugin.json:
 ## Related Documentation
 
 - [AJV CLI v8 strict mode](./ajv-cli-v8-strict-mode-unknown-format.md) — Related schema validation issue with `ajv-formats`
-- [Skill frontmatter requirements](../code-quality/skill-frontmatter-attribute-and-format-requirements.md) — Another Claude Code format strictness issue (`user-invokable` spelling)
+- [Skill frontmatter requirements](../code-quality/skill-frontmatter-attribute-and-format-requirements.md) — Another Claude Code format strictness issue (`user-invocable` spelling)
 - `docs/plugin-validation-guide.md` — Plugin validation reference
 - `schemas/official-marketplace.schema.json` — Local marketplace schema (updated with `additionalProperties: false`)

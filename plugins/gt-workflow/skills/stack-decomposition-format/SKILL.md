@@ -1,7 +1,7 @@
 ---
 name: stack-decomposition-format
 description: 'Structured format contract for "## Stack Decomposition" sections in plan documents, shared by gt-stack-plan (producer) and flow:work (consumer). Use when writing or parsing a Stack Decomposition section.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

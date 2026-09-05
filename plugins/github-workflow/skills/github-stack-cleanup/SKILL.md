@@ -1,7 +1,7 @@
 ---
 name: github-stack-cleanup
 description: 'Remove local stack tracking, and by default also remote-unstack every PR via the GitHub API. Use when user says "clean up my stack" or "untrack this stack" on the github stacked-PR provider.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

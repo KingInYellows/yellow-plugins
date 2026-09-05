@@ -1,7 +1,7 @@
 ---
 name: diagnose-ci
 description: 'Reference guide (not an executable action) for CI debugging workflows and the F01-F12 failure-pattern catalog on self-hosted runners. Consult when you need to understand debugging workflows or failure patterns; to actually run a diagnosis, use the ci-diagnose skill instead.'
-user-invokable: true
+user-invocable: true
 ---
 
 # Diagnosing CI Failures on Self-Hosted Runners

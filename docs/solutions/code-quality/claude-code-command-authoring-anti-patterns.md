@@ -1593,7 +1593,7 @@ it" is not a substitute for doing the check.
 - `docs/solutions/code-quality/parallel-multi-agent-review-orchestration.md` — Workflow for parallel multi-agent review and fix pipeline; batch triage patterns
 - `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md` — Detecting false positives in re-reviews; subprocess optimization patterns
 - `docs/solutions/integration-issues/mcp-bundled-server-tool-naming-and-plugin-authoring-patterns.md` — MCP tool naming formula, Task delegation requires `Task` in allowed-tools, slug sanitization must be Bash
-- `docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md` — Single-line descriptions, `user-invokable` spelling
+- `docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md` — Single-line descriptions, `user-invocable` spelling
 
 **MEMORY.md sections:**
 - "Bash Hook & Validation Patterns" — jq @sh, TOCTOU, prompt injection fencing, error logging

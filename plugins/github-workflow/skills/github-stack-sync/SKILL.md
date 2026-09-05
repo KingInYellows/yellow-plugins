@@ -1,7 +1,7 @@
 ---
 name: github-stack-sync
 description: 'Sync the local stack with trunk via gh stack sync, optionally pruning merged branches. Use when user says "sync with main" or "pull latest" on the github stacked-PR provider.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

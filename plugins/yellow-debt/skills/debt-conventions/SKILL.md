@@ -1,7 +1,7 @@
 ---
 name: debt-conventions
 description: "Technical debt scoring framework and scanner patterns. Use when scanner agents need scoring rubrics, category definitions, safety rules, or output schemas."
-user-invokable: false
+user-invocable: false
 ---
 
 # Technical Debt Conventions
