@@ -63,5 +63,10 @@ Then enable `yellow-docs` from the plugin list.
   state, ER, mindmap) based on code structure analysis
 - **Doc refresh**: Detects stale docs by comparing git history, generates
   per-file update diffs for review
+- **Document review (`/docs:review`)**: Personas report every finding with a
+  confidence score; `coherence-reviewer` no longer pre-filters below 75.
+  Step 6 applies the sole gate (suppress `< 75` except `safe_auto` and P1
+  at 50+). Sub-75 persona output is expected; the Suppressed Findings Summary
+  lists 50–74 individually and rolls sub-50 counts per persona.
 - **General-purpose**: Works in any git repo — TypeScript, Python, Rust, Go,
   and more

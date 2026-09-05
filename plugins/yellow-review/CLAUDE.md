@@ -15,6 +15,16 @@ resolution, and sequential stack review. Graphite-native workflow.
   but the prompt-level "report findings only" rule remains in force; the
   orchestrating command applies all fixes
 - Orchestrating commands apply fixes sequentially to avoid conflicts
+- **Confidence gating is orchestrator-only.** Persona reviewers (especially
+  `agent-native-reviewer`, `agent-cli-readiness-reviewer`, and
+  `cli-readiness-reviewer`) report every in-scope finding with a confidence
+  anchor and severity — no persona-side `< 75` filter and no 5–7 finding
+  cap. `/review:pr` Step 6 and `/review:all` Step 9 are the sole gates
+  (suppress below 75 except P0 at 50+; count sub-75 input as `suppressed`).
+  Pre-existing findings are gated before the Pre-existing section. If a
+  persona risks exceeding compact-return output budget, rank by severity then
+  confidence and stop before JSON would truncate — malformed returns are
+  dropped entirely in Step 5 validation.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command

@@ -67,6 +67,22 @@ yellow-core integration before reviewing real PRs.
 | `pr-review-workflow` | Internal reference for adaptive selection and output format          |
 | `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
 
+## Confidence gating
+
+Wave 2 personas report every in-scope finding with a `confidence` anchor
+(`0`, `25`, `50`, `75`, `100`) and severity — they do **not** pre-filter
+below 75 or cap the count. Three conditional personas
+(`agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+`cli-readiness-reviewer`) were updated to stop persona-side suppression so
+recall is not lost before aggregation.
+
+`/review:pr` and `/review:all` apply the **single** confidence gate in
+Step 6/9: suppress findings below anchor 75 except P0 at 50+. Sub-75
+persona output is expected input; the report's "Findings suppressed at
+confidence < 75" line counts only what the orchestrator removes. Pre-existing
+findings pass through the same gate (gated-out items count as suppressed,
+not listed under Pre-existing).
+
 ## Limitations
 
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
