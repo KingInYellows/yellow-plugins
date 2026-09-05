@@ -5,7 +5,7 @@ import { basename } from 'node:path';
 
 if (process.argv[1] !== process.env.FAKE_GOAL_CLI_PATH) {
   const mode = process.env.FAKE_GOAL_GEN_MODE ?? 'ok';
-  const version = process.env.FAKE_GOAL_GEN_VERSION ?? '0.1.0';
+  const version = process.env.FAKE_GOAL_GEN_VERSION ?? '0.2.0';
   const emit = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
   const fail = (code, message, status) => {
     process.stderr.write(`${JSON.stringify({ error: { code, message } })}\n`);

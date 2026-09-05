@@ -68,11 +68,14 @@ the SDK's error class shapes are not guaranteed stable across versions.
 
 ## Yellow Goal Engine Release Pin
 
-Pinned engine artifact identity: `0.1.0`
-(`plugins/yellow-goal/src/pin.ts`). This is **not** an npm registry pin:
-consumers install `goal-gen-0.1.0.tgz` from the yellow-goal GitHub Release
-at annotated tag `v0.1.0`. CI installs the public asset and runs the blocking
-`Released Goal Engine Compatibility` job. Runtime checks use `/goal:setup` /
+Pinned engine artifact identity: `0.2.0`
+(`plugins/yellow-goal/src/pin.ts`, which also records the annotated tag
+`v0.2.0`, the peeled commit, the public asset URL and its SHA-256). This is
+**not** an npm registry pin: consumers install `goal-gen-0.2.0.tgz` from the
+yellow-goal GitHub Release at annotated tag `v0.2.0`. CI downloads the public
+asset, verifies its SHA-256 before installation, and runs the blocking
+`Released Goal Engine Compatibility` job. The plugin's `release-pin.test.ts`
+fails if `scripts/verify-goal-release.sh` drifts from the pin. Runtime checks use `/goal:setup` /
 `node dist/cli.js setup` (fail-closed on missing binary or
 `engineVersion` mismatch), not `pnpm check:pins`. Do not treat this as
 advisory.

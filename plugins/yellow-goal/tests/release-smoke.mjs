@@ -12,6 +12,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { PINNED_ENGINE_VERSION } from '../dist/pin.js';
+import {
+  CONSUMER_LIMITS,
+  parseSingleJsonObject,
+  validateCapabilities,
+  validateVersionProbe,
+} from '../dist/provider-protocol.js';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'dist', 'cli.js');
 const bin = process.env.GOAL_GEN_BIN;
@@ -22,10 +30,12 @@ assert.ok(
 const scratch = mkdtempSync(path.join(tmpdir(), 'goal-release-smoke-'));
 const env = { ...process.env, GOAL_GEN_BIN: bin, NODE_OPTIONS: '' };
 let checks = 0;
-function invoke(executable, args, extraEnv = {}) {
+function invoke(executable, args, extraEnv = {}, { raw = false } = {}) {
   const result = spawnSync(executable, args, {
     env: { ...env, ...extraEnv },
-    encoding: 'utf8',
+    // Protocol probes keep raw bytes so the validators' fatal UTF-8 check is
+    // exercised on the actual artifact output, not on a lossy decode.
+    ...(raw ? {} : { encoding: 'utf8' }),
     timeout: 10_000,
     killSignal: 'SIGKILL',
     shell: false,
@@ -48,10 +58,45 @@ try {
   assert.equal(invoke('git', ['-C', target, 'init', '-q']).status, 0);
   const before = invoke('git', ['-C', target, 'status', '--porcelain']).stdout;
   const request = path.join(scratch, 'request.json');
-  const version = invoke(bin, ['version', '--json']);
+  const version = invoke(bin, ['version', '--json'], {}, { raw: true });
   assert.equal(version.status, 0);
-  assert.equal(version.stderr, '');
-  assert.equal(json(version.stdout).engineVersion, '0.1.0');
+  assert.equal(version.stderr.length, 0);
+  assert.equal(
+    validateVersionProbe(
+      parseSingleJsonObject(
+        version.stdout,
+        'version stdout',
+        CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+      ),
+      PINNED_ENGINE_VERSION
+    ),
+    PINNED_ENGINE_VERSION
+  );
+  // Provider Protocol v1 discovery handshake against the public artifact:
+  // static, offline, and validated by the consumer's own observable-data
+  // guards (never a copied engine schema).
+  const capabilities = invoke(
+    bin,
+    ['capabilities', '--json'],
+    {},
+    { raw: true }
+  );
+  assert.equal(capabilities.status, 0);
+  assert.equal(capabilities.stderr.length, 0);
+  const validated = validateCapabilities(
+    parseSingleJsonObject(
+      capabilities.stdout,
+      'capabilities stdout',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+  assert.equal(validated.engineVersion, PINNED_ENGINE_VERSION);
+  assert.equal(validated.protocolVersion, 'yellow-goal/provider-protocol/v1');
+  const capabilitiesUsage = invoke(bin, ['capabilities', 'extra']);
+  assert.equal(capabilitiesUsage.status, 2);
+  assert.equal(capabilitiesUsage.stdout, '');
+  assert.equal(json(capabilitiesUsage.stderr).error.code, 'USAGE_ERROR');
   for (const args of [
     ['setup'],
     [
@@ -125,7 +170,7 @@ try {
     before
   );
   process.stdout.write(
-    `release process smoke passed: ${checks} invocations; no run or provider operations\n`
+    `release process smoke passed: ${checks} invocations; version/capabilities/create/validate only, no run or provider operations\n`
   );
 } finally {
   rmSync(scratch, { recursive: true, force: true });
