@@ -377,7 +377,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       `reviewer_set.include`". Without this row, `reviewer_set.include`
       has no subagent_type mapping to dispatch and the opt-in path is
       unreachable.
-- [ ] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
+- [x] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
       `review-all.md`'s own inline pass (it does not inherit Step 5 of
       `review-pr.md` by reference for this concern). Without this, a
       `thermonuclear-reviewer` opted in via `/review:all` never receives the
@@ -483,13 +483,13 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
       safety rails, since frontmatter is normalised to `name` + `description` and
       everything outside `skills/<name>/` is dropped (F9, D2, D4).
 - [x] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
-- [ ] 2.6 Update the canonical target inventories that this PR makes stale:
+- [x] 2.6 Update the canonical target inventories that this PR makes stale:
       `docs/codex-distribution.md` (currently claims exactly three Codex-enabled
       plugins), `docs/cursor-distribution.md` (currently calls `yellow-cursor`
       the sole Cursor-enabled plugin), the root `README.md`, the
       `AGENTS.md` target inventory, and `docs/security.md` (host-specific
       posture: Claude tools-allowlist vs Cursor/Codex prompt-only rails).
-- [ ] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
+- [x] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
       since exposing the skill through Cursor and Codex is an additive
       user-visible capability, not a fix — matching the **minor** bump task
       1.5.4 already uses for PR 1. (PR #770 first shipped it as **patch**;
@@ -751,7 +751,7 @@ blocks merges.
 - [x] 1. agent/chore/thermonuclear-upstream-snapshot (submitted 2026-09-05, PR #767)
 - [x] 2. agent/feat/thermonuclear-reviewer (submitted 2026-09-05, PR #768)
 - [x] 3. agent/feat/thermonuclear-line-counts (submitted 2026-09-05, PR #769)
-- [x] 4. agent/feat/thermonuclear-cross-host (submitted 2026-09-05, PR #770; tasks 2.6-2.8 still outstanding)
+- [x] 4. agent/feat/thermonuclear-cross-host (submitted 2026-09-05, PR #770; task 2.8 host smoke tests still outstanding)
 
 ---
 

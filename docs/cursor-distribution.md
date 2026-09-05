@@ -42,9 +42,10 @@ the same fail-closed convention Codex uses. A plugin only gets a
 (`Boolean(source.targets) && Boolean(source.targets.cursor) && source.targets.cursor.enabled === true`)
 rather than defaulting an absent block to enabled.
 
-**As of this doc, `yellow-cursor` is the sole Cursor-enabled plugin — the
-pilot.** This repository does **not** claim any other plugin, or the marketplace
-as a whole, is Cursor-native. A plugin appears in the Cursor marketplace only
+**Two plugins are Cursor-enabled: `yellow-cursor` (the native pilot) and
+`yellow-review` (a single read-only skill, `yellow-thermonuclear-review`, with
+no commands or agents).** This repository does **not** claim any other plugin,
+or the marketplace as a whole, is Cursor-native. A plugin appears in the Cursor marketplace only
 after its own compatibility work lands (target enabled + generated artifacts +
 passing exposure lint), mirroring Codex's own no-repository-wide-compatibility
 posture (see `codex-distribution.md`'s "No repository-wide compatibility
@@ -204,8 +205,9 @@ plugin is Cursor-enabled.
 
 ## Limitations
 
-- **Native pilot only.** Exactly one plugin (`yellow-cursor`) is Cursor-enabled.
-  No claim is made about any other plugin's Cursor readiness.
+- **Two plugins only.** `yellow-cursor` (native pilot) and `yellow-review`
+  (one skill) are Cursor-enabled. No claim is made about any other plugin's
+  Cursor readiness.
 - **Live editor load test: pending human-approved verification.** The generated
   artifacts pass local schema validation and 57 integration tests (emitter
   characterization, validator, schema examples — see this branch's

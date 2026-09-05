@@ -399,13 +399,39 @@ describe('cross-host distribution', () => {
     expect(catalog.targets[dir].skillAllowlist).toEqual([
       'yellow-thermonuclear-review',
     ]);
-    // No agents, no commands, no second skill. The generator copies only
-    // SKILL.md plus a flat references/*.md from inside skills/<name>/, so
-    // an over-broad allowlist is the only way extra surface leaks out.
-    const tree = readdirSync(
-      resolve(REPO_ROOT, `plugins/yellow-review/${dir}/skills`)
-    );
+    // The generator copies only SKILL.md plus a flat references/*.md from
+    // inside skills/<name>/, so an over-broad allowlist is the only way
+    // extra surface leaks out; assert the host tree holds nothing but the
+    // one skill directory and that the manifest exposes no agents or
+    // commands.
+    const hostRoot = resolve(REPO_ROOT, `plugins/yellow-review/${dir}`);
+    expect(readdirSync(hostRoot).sort()).toEqual(['skills']);
+    const tree = readdirSync(resolve(hostRoot, 'skills')).sort();
     expect(tree).toEqual(['yellow-thermonuclear-review']);
+    const manifest = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, `plugins/yellow-review/.${dir}-plugin/plugin.json`),
+        'utf8'
+      )
+    ) as Record<string, unknown>;
+    expect(manifest.skills).toBe(`./${dir}/skills`);
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('commands');
+    // Frontmatter must be normalised to name + description only: any other
+    // key (user-invocable, tools, model) is a Claude-only contract leaking.
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(
+      readFileSync(
+        resolve(hostRoot, 'skills/yellow-thermonuclear-review/SKILL.md'),
+        'utf8'
+      )
+    );
+    expect(fm).not.toBeNull();
+    const keys = (fm as RegExpExecArray)[1]
+      .split(/\r?\n/)
+      .filter((l) => /^[a-z-]+:/.test(l))
+      .map((l) => l.replace(/:.*$/, ''))
+      .sort();
+    expect(keys).toEqual(['description', 'name']);
   });
 
   it.each(HOSTS)('ships the source body verbatim to $name', ({ dir }) => {

@@ -293,8 +293,9 @@ rule id in parentheses is what the failure message cites.
   `references/` whose filenames match `[a-zA-Z0-9_][a-zA-Z0-9_-]*.md`
   (nested dirs, symlinks, or other names hard-error in `emit-codex.js`).
   Codex-enabled plugins: `gt-workflow`, `yellow-core`,
-  `yellow-ci` (`docs/codex-distribution.md`); the Cursor pilot mirrors the
-  same discipline (`docs/cursor-distribution.md`).
+  `yellow-ci`, `yellow-review` (`docs/codex-distribution.md`); Cursor-enabled
+  plugins (`yellow-cursor`, `yellow-review`) mirror the same discipline
+  (`docs/cursor-distribution.md`).
 - A thin-wrapper command whose `## Usage` says "Invoke the `Skill` tool with
   `skill: "<name>"`" keeps `Skill` in `allowed-tools:` alongside its other
   tools (RULE 17 checks presence and that the same-plugin skill exists; the
