@@ -16,8 +16,10 @@ second source of truth.
 - Consumer CLI: `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js` — one JSON object on
   stdout, diagnostics on stderr, exit 0 / 1 / 2.
 - Engine argv is always an array (`spawnSync`, `shell: false`), with a 30-second
-  timeout and forced termination. Override the binary with `GOAL_GEN_BIN` in
-  tests only. Create/validate probe the pin before acting.
+  timeout and forced termination. Override the binary with `GOAL_GEN_BIN` (and
+  pin the run-stub scratch directory with `GOAL_GEN_SCRATCH`) in tests only.
+  Create/validate probe the pin before acting. `run-stub` uses the async
+  transport with a consumer deadline of 120 s plus the engine timeout.
 - Each successful engine operation emits exactly one JSON line with empty
   stderr. Usage failures use structured stderr and exit 2. Schema-invalid
   validation uses `{valid:false,errors}` on stdout, empty stderr, and exit 1.

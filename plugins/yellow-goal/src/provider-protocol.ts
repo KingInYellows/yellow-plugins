@@ -780,9 +780,10 @@ type EngineTerminalCode = Extract<
   { kind: 'engine-terminal' }
 >['code'];
 
-/** Best-effort detection of the engine's transport-failure envelope. Parse
+/** Best-effort detection of the engine's RUN_STDOUT_TRANSPORT_FAILED
+ *  envelope (PP-09: it takes precedence over any summary status). Parse
  *  failures are swallowed here; the regular agreement path re-raises them. */
-function isStdoutTransportFailure(stderr: Buffer): boolean {
+export function isEngineStdoutTransportFailure(stderr: Buffer): boolean {
   try {
     const parsed = parseSingleJsonObject(
       stderr,
@@ -810,7 +811,11 @@ export function validateTerminalAgreement(input: {
   if (signal !== null) {
     invalid('process terminated by a signal, not a protocol terminal');
   }
-  if (exitCode === 1 && stderr.length > 0 && isStdoutTransportFailure(stderr)) {
+  if (
+    exitCode === 1 &&
+    stderr.length > 0 &&
+    isEngineStdoutTransportFailure(stderr)
+  ) {
     throw new GoalEngineError(
       'GOAL_PROTOCOL_TRANSPORT',
       'engine reported stdout transport failure after the summary'

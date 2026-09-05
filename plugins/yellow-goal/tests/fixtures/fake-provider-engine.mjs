@@ -86,7 +86,12 @@ function installIgnoreSigterm() {
  *  the full delay). Mirrors how a well-behaved protocol child is expected
  *  to exit gracefully in response to cancellation. */
 async function raceSignalOrTimeout(ms) {
-  const ignoreSigterm = process.env.FAKE_PROVIDER_IGNORE_SIGTERM === '1';
+  // FAKE_PROVIDER_DEFAULT_SIGNAL=1 installs no SIGTERM listener at all, so
+  // the OS default disposition terminates the child by signal (the real
+  // engine behaves this way outside an admitted run).
+  const ignoreSigterm =
+    process.env.FAKE_PROVIDER_IGNORE_SIGTERM === '1' ||
+    process.env.FAKE_PROVIDER_DEFAULT_SIGNAL === '1';
   return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
@@ -155,6 +160,17 @@ async function handleVersion() {
   }
   if (mode === 'malformed') {
     await writeAndWait(process.stdout, 'not-json\n');
+    process.exit(0);
+    return;
+  }
+  if (mode === 'valid-then-exit-1') {
+    await emit({ engineVersion: version });
+    process.exit(1);
+    return;
+  }
+  if (mode === 'valid-with-stderr') {
+    await emit({ engineVersion: version });
+    await writeAndWait(process.stderr, 'warning: noise\n');
     process.exit(0);
     return;
   }

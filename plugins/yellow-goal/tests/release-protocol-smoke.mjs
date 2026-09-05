@@ -226,7 +226,7 @@ try {
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
     });
-    setTimeout(() => child.kill('SIGTERM'), 1500);
+    setTimeout(() => child.kill('SIGTERM'), 3000);
     const exit = await new Promise((resolve) =>
       child.once('close', (code, signal) => resolve({ code, signal }))
     );

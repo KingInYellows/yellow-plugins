@@ -15,6 +15,7 @@ import {
   STUB_SCENARIOS,
   RunStreamValidator,
   classifyPreflightFailure,
+  isEngineStdoutTransportFailure,
   parseSingleJsonObject,
   validateCapabilities,
   validateTerminalAgreement,
@@ -377,16 +378,38 @@ const BOOTSTRAP_LIMITS: ProtocolChildLimits = {
   maxStderrBytes: CONSUMER_LIMITS.bootstrapMaxStderrBytes,
 };
 
+/**
+ * Probe-phase outcome (reconciliation): a forced kill is transport; a
+ * recorded local cause with a graceful close or the expected SIGTERM close
+ * maps to the local cancellation/deadline code and discards partial output;
+ * any other signal exit is transport. A probe that produced stdout must also
+ * have exited 0 with empty stderr, otherwise its output is not trusted.
+ */
 function probeOutcome(result: ProtocolChildResult, label: string): void {
-  if (result.forcedKill || result.signal !== null) {
+  if (result.forcedKill) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_TRANSPORT',
+      `${label} probe was force-killed`
+    );
+  }
+  if (
+    result.localCause !== undefined &&
+    (result.signal === null || result.signal === 'SIGTERM')
+  ) {
+    throw localCauseError(result.localCause);
+  }
+  if (result.signal !== null) {
     throw new GoalEngineError(
       'GOAL_PROTOCOL_TRANSPORT',
       `${label} probe did not close cleanly`
     );
   }
-  if (result.localCause !== undefined) {
-    // Probe-phase local cancellation/deadline: discard partial output.
-    throw localCauseError(result.localCause);
+  if (result.stdout.length === 0) return;
+  if (result.exitCode !== 0 || result.stderr.length !== 0) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INVALID',
+      `${label} probe output contradicts its exit code or stderr`
+    );
   }
 }
 
@@ -422,24 +445,44 @@ async function runStubInScratch(
     if (localCause === undefined) localCause = cause;
   };
 
+  const onCallerAbort = (): void => {
+    recordLocalCause('caller-cancelled');
+    controller.abort();
+  };
   if (input.signal !== undefined) {
-    if (input.signal.aborted) {
-      recordLocalCause('caller-cancelled');
-      controller.abort();
-    } else {
-      input.signal.addEventListener(
-        'abort',
-        () => {
-          recordLocalCause('caller-cancelled');
-          controller.abort();
-        },
-        { once: true }
-      );
-    }
+    if (input.signal.aborted) onCallerAbort();
+    else input.signal.addEventListener('abort', onCallerAbort, { once: true });
   }
+  try {
+    return await runStubPhases(deps, input, scratchDir, {
+      controller,
+      deadlineAt,
+      localCause: () => localCause,
+      recordLocalCause,
+    });
+  } finally {
+    input.signal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
+interface RunStubLifecycle {
+  readonly controller: AbortController;
+  readonly deadlineAt: number;
+  readonly localCause: () => GoalErrorLocalCause | undefined;
+  readonly recordLocalCause: (cause: GoalErrorLocalCause) => void;
+}
+
+async function runStubPhases(
+  deps: ProtocolRuntimeDeps,
+  input: RunStubInput,
+  scratchDir: string,
+  lifecycle: RunStubLifecycle
+): Promise<RunStubResult> {
+  const { controller, deadlineAt, recordLocalCause } = lifecycle;
 
   function checkNotCancelled(): void {
-    if (localCause !== undefined) throw localCauseError(localCause);
+    const cause = lifecycle.localCause();
+    if (cause !== undefined) throw localCauseError(cause);
     if (Date.now() >= deadlineAt) {
       recordLocalCause('deadline');
       controller.abort();
@@ -583,6 +626,7 @@ async function runStubInScratch(
       {
         runId: validator.snapshot.runId,
         eventCount: validator.snapshot.eventCount,
+        localCause: runResult.localCause,
       }
     );
   }
@@ -590,7 +634,17 @@ async function runStubInScratch(
   function finalizeRunStream(): ReturnType<typeof validateTerminalAgreement> {
     framer.finish();
     const snapshot = validator.snapshot;
-    if (framer.bytesConsumed === 0 && snapshot.summary === undefined) {
+    if (framer.bytesConsumed === 0) {
+      if (
+        runResult.exitCode === 1 &&
+        isEngineStdoutTransportFailure(runResult.stderr)
+      ) {
+        throw new GoalEngineError(
+          'GOAL_PROTOCOL_TRANSPORT',
+          'engine reported stdout transport failure before any event',
+          { runId: snapshot.runId, eventCount: snapshot.eventCount }
+        );
+      }
       throw classifyPreflightFailure({
         exitCode: runResult.exitCode,
         signal: runResult.signal,
@@ -645,10 +699,22 @@ async function runStubInScratch(
     // The stream fully and validly agreed (success or an engine terminal),
     // but a local cause still wins: it was observed before this close.
     recordLocalCause(runResult.localCause);
-    throw localCauseError(runResult.localCause, {
-      runId: snapshot.runId,
-      eventCount: snapshot.eventCount,
-    });
+    throw new GoalEngineError(
+      runResult.localCause === 'caller-cancelled'
+        ? 'GOAL_RUN_CANCELLED'
+        : 'GOAL_RUN_DEADLINE_EXCEEDED',
+      runResult.localCause === 'caller-cancelled'
+        ? 'run cancelled by the caller before completion'
+        : 'the consumer deadline elapsed before completion',
+      {
+        runId: snapshot.runId,
+        eventCount: snapshot.eventCount,
+        terminalStatus: snapshot.summary?.status,
+        terminationReason: snapshot.summary?.terminationReason,
+        gateKind: snapshot.gateKind,
+        localCause: runResult.localCause,
+      }
+    );
   }
 
   if (outcome.kind === 'succeeded') {

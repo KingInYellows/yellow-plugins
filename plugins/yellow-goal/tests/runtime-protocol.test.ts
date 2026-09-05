@@ -467,7 +467,7 @@ describe('runStub — cancellation and deadlines', () => {
         baseInput({
           scenario: 'await-cancel',
           timeoutMs: 60_000,
-          deadlineMs: 1000,
+          deadlineMs: 3000,
         })
       ),
       'GOAL_RUN_DEADLINE_EXCEEDED'
@@ -566,4 +566,65 @@ describe('runStub — argument validation before any spawn', () => {
       expect(verbsInvoked()).toEqual([]);
     }
   );
+});
+
+describe('runStub probe outcome hardening (review dispositions)', () => {
+  it.each(['valid-then-exit-1', 'valid-with-stderr'])(
+    'rejects a version probe whose stdout contradicts its exit/stderr (%s) and never runs',
+    async (mode) => {
+      await expectGoalError(
+        runStub(makeDeps({ FAKE_PROVIDER_VERSION_MODE: mode }), baseInput()),
+        'GOAL_PROTOCOL_INVALID'
+      );
+      expect(verbsInvoked()).toEqual(['version']);
+    }
+  );
+
+  it('maps an expected SIGTERM close of a default-disposition probe to the local cause', async () => {
+    const controller = new AbortController();
+    const promise = runStub(
+      makeDeps({
+        FAKE_PROVIDER_DEFAULT_SIGNAL: '1',
+        FAKE_PROVIDER_VERSION_DELAY_MS: '20000',
+      }),
+      baseInput({ signal: controller.signal })
+    );
+    await waitUntilInvoked('version');
+    controller.abort();
+    const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
+    expect(err.localCause).toBe('caller-cancelled');
+    expect(verbsInvoked()).toEqual(['version']);
+  });
+
+  it('maps a deadline that kills a default-disposition capabilities probe to GOAL_RUN_DEADLINE_EXCEEDED', async () => {
+    const err = await expectGoalError(
+      runStub(
+        makeDeps({
+          FAKE_PROVIDER_DEFAULT_SIGNAL: '1',
+          FAKE_PROVIDER_CAPABILITIES_DELAY_MS: '20000',
+        }),
+        baseInput({ deadlineMs: 1500 })
+      ),
+      'GOAL_RUN_DEADLINE_EXCEEDED'
+    );
+    expect(err.localCause).toBe('deadline');
+    expect(verbsInvoked()).toEqual(['version', 'capabilities']);
+  });
+
+  it('classifies RUN_STDOUT_TRANSPORT_FAILED with no events as transport', async () => {
+    const err = await expectGoalError(
+      runStub(
+        makeDeps({
+          FAKE_PROVIDER_RUN_MODE: 'no-output',
+          FAKE_PROVIDER_EXIT_CODE: '1',
+          FAKE_PROVIDER_PREFLIGHT_STDERR: JSON.stringify({
+            error: { code: 'RUN_STDOUT_TRANSPORT_FAILED', message: 'drain' },
+          }),
+        }),
+        baseInput()
+      ),
+      'GOAL_PROTOCOL_TRANSPORT'
+    );
+    expect(err.retryable).toBe(true);
+  });
 });

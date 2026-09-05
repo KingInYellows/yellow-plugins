@@ -324,6 +324,18 @@ describe('run-stub against the portable fake provider engine', () => {
     expect(body.error.code).toBe('GOAL_RUN_FAILED');
   });
 
+  it('accepts a leading-dash request path after -- on run-stub', async () => {
+    const result = await runCli(
+      ['run-stub', '--scenario', 'success', '--yes', '--', '-odd-request.json'],
+      { GOAL_GEN_BIN: providerFixturePath }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(parseSingleJsonLine(result.stdout)).toMatchObject({
+      ok: true,
+      operation: 'run-stub',
+    });
+  });
+
   it('forwards a SIGTERM into the run-stub operation and reports GOAL_RUN_CANCELLED', async () => {
     const resultPromise = new Promise<CliRun>((resolve) => {
       const child = execFile(
@@ -352,7 +364,7 @@ describe('run-stub against the portable fake provider engine', () => {
       // await-cancel wait before signalling.
       setTimeout(() => {
         if (child.pid !== undefined) process.kill(child.pid, 'SIGTERM');
-      }, 600);
+      }, 3000);
     });
     const result = await resultPromise;
     expect(result.exitCode).toBe(1);

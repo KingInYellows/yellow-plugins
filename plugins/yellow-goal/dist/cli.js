@@ -208,7 +208,10 @@ async function main() {
         process.off('SIGTERM', forwardSignal);
     }
     try {
-        installSignalForwarding();
+        // Only the async run-stub lifecycle listens to the controller; the
+        // synchronous setup/request paths keep Node's default signal behavior.
+        if (operation === 'run-stub')
+            installSignalForwarding();
         const result = await dispatch(operation, rest, buildDeps(), controller);
         printJson({ ok: true, operation: resolvedOperation, ...result });
     }

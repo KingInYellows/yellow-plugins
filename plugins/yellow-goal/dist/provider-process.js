@@ -62,10 +62,20 @@ function spawnProtocolChild(opts) {
             sigkillTimer = undefined;
             deadlineTimer = undefined;
         };
+        const swallow = () => {
+            // Late errors after settlement (a pipe closing under SIGKILL, or a
+            // kill() failure event) must never surface as an unhandled 'error'.
+        };
         const removeListeners = () => {
-            child.stdout?.removeAllListeners();
-            child.stderr?.removeAllListeners();
-            child.removeAllListeners();
+            child.stdout?.off('data', onStdoutData);
+            child.stderr?.off('data', onStderrData);
+            child.stdout?.off('error', onStdoutError);
+            child.stderr?.off('error', onStderrError);
+            child.off('error', onChildError);
+            child.off('close', onClose);
+            child.stdout?.on('error', swallow);
+            child.stderr?.on('error', swallow);
+            child.on('error', swallow);
             opts.signal.removeEventListener('abort', onAbort);
         };
         const finish = (action) => {
@@ -111,10 +121,10 @@ function spawnProtocolChild(opts) {
                 ? err
                 : new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', String(err))));
         }
-        child.once('error', (error) => {
+        const onChildError = (error) => {
             finish(() => reject(mapSpawnError(error)));
-        });
-        child.stdout?.on('data', (chunk) => {
+        };
+        const onStdoutData = (chunk) => {
             if (settled)
                 return;
             stdoutBytes += chunk.length;
@@ -133,8 +143,8 @@ function spawnProtocolChild(opts) {
             else {
                 stdoutChunks.push(chunk);
             }
-        });
-        child.stderr?.on('data', (chunk) => {
+        };
+        const onStderrData = (chunk) => {
             if (settled)
                 return;
             stderrBytes += chunk.length;
@@ -143,14 +153,14 @@ function spawnProtocolChild(opts) {
                 return;
             }
             stderrChunks.push(chunk);
-        });
-        child.stdout?.once('error', (error) => {
+        };
+        const onStdoutError = (error) => {
             hardFail(new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', `stdout stream error: ${error.message}`));
-        });
-        child.stderr?.once('error', (error) => {
+        };
+        const onStderrError = (error) => {
             hardFail(new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', `stderr stream error: ${error.message}`));
-        });
-        child.once('close', (code, signal) => {
+        };
+        const onClose = (code, signal) => {
             finish(() => resolve({
                 exitCode: code,
                 signal,
@@ -159,7 +169,13 @@ function spawnProtocolChild(opts) {
                 ...(localCause !== undefined ? { localCause } : {}),
                 forcedKill,
             }));
-        });
+        };
+        child.on('error', onChildError);
+        child.stdout?.on('data', onStdoutData);
+        child.stderr?.on('data', onStderrData);
+        child.stdout?.on('error', onStdoutError);
+        child.stderr?.on('error', onStderrError);
+        child.on('close', onClose);
     });
 }
 /**

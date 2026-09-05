@@ -200,13 +200,28 @@ const BOOTSTRAP_LIMITS = {
     maxStdoutBytes: provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes,
     maxStderrBytes: provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStderrBytes,
 };
+/**
+ * Probe-phase outcome (reconciliation): a forced kill is transport; a
+ * recorded local cause with a graceful close or the expected SIGTERM close
+ * maps to the local cancellation/deadline code and discards partial output;
+ * any other signal exit is transport. A probe that produced stdout must also
+ * have exited 0 with empty stderr, otherwise its output is not trusted.
+ */
 function probeOutcome(result, label) {
-    if (result.forcedKill || result.signal !== null) {
+    if (result.forcedKill) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', `${label} probe was force-killed`);
+    }
+    if (result.localCause !== undefined &&
+        (result.signal === null || result.signal === 'SIGTERM')) {
+        throw localCauseError(result.localCause);
+    }
+    if (result.signal !== null) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', `${label} probe did not close cleanly`);
     }
-    if (result.localCause !== undefined) {
-        // Probe-phase local cancellation/deadline: discard partial output.
-        throw localCauseError(result.localCause);
+    if (result.stdout.length === 0)
+        return;
+    if (result.exitCode !== 0 || result.stderr.length !== 0) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `${label} probe output contradicts its exit code or stderr`);
     }
 }
 async function runStub(deps, input) {
@@ -232,21 +247,34 @@ async function runStubInScratch(deps, input, scratchDir) {
         if (localCause === undefined)
             localCause = cause;
     };
+    const onCallerAbort = () => {
+        recordLocalCause('caller-cancelled');
+        controller.abort();
+    };
     if (input.signal !== undefined) {
-        if (input.signal.aborted) {
-            recordLocalCause('caller-cancelled');
-            controller.abort();
-        }
-        else {
-            input.signal.addEventListener('abort', () => {
-                recordLocalCause('caller-cancelled');
-                controller.abort();
-            }, { once: true });
-        }
+        if (input.signal.aborted)
+            onCallerAbort();
+        else
+            input.signal.addEventListener('abort', onCallerAbort, { once: true });
     }
+    try {
+        return await runStubPhases(deps, input, scratchDir, {
+            controller,
+            deadlineAt,
+            localCause: () => localCause,
+            recordLocalCause,
+        });
+    }
+    finally {
+        input.signal?.removeEventListener('abort', onCallerAbort);
+    }
+}
+async function runStubPhases(deps, input, scratchDir, lifecycle) {
+    const { controller, deadlineAt, recordLocalCause } = lifecycle;
     function checkNotCancelled() {
-        if (localCause !== undefined)
-            throw localCauseError(localCause);
+        const cause = lifecycle.localCause();
+        if (cause !== undefined)
+            throw localCauseError(cause);
         if (Date.now() >= deadlineAt) {
             recordLocalCause('deadline');
             controller.abort();
@@ -342,12 +370,17 @@ async function runStubInScratch(deps, input, scratchDir) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'run did not close cleanly', {
             runId: validator.snapshot.runId,
             eventCount: validator.snapshot.eventCount,
+            localCause: runResult.localCause,
         });
     }
     function finalizeRunStream() {
         framer.finish();
         const snapshot = validator.snapshot;
-        if (framer.bytesConsumed === 0 && snapshot.summary === undefined) {
+        if (framer.bytesConsumed === 0) {
+            if (runResult.exitCode === 1 &&
+                (0, provider_protocol_js_1.isEngineStdoutTransportFailure)(runResult.stderr)) {
+                throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'engine reported stdout transport failure before any event', { runId: snapshot.runId, eventCount: snapshot.eventCount });
+            }
             throw (0, provider_protocol_js_1.classifyPreflightFailure)({
                 exitCode: runResult.exitCode,
                 signal: runResult.signal,
@@ -390,9 +423,17 @@ async function runStubInScratch(deps, input, scratchDir) {
         // The stream fully and validly agreed (success or an engine terminal),
         // but a local cause still wins: it was observed before this close.
         recordLocalCause(runResult.localCause);
-        throw localCauseError(runResult.localCause, {
+        throw new errors_js_1.GoalEngineError(runResult.localCause === 'caller-cancelled'
+            ? 'GOAL_RUN_CANCELLED'
+            : 'GOAL_RUN_DEADLINE_EXCEEDED', runResult.localCause === 'caller-cancelled'
+            ? 'run cancelled by the caller before completion'
+            : 'the consumer deadline elapsed before completion', {
             runId: snapshot.runId,
             eventCount: snapshot.eventCount,
+            terminalStatus: snapshot.summary?.status,
+            terminationReason: snapshot.summary?.terminationReason,
+            gateKind: snapshot.gateKind,
+            localCause: runResult.localCause,
         });
     }
     if (outcome.kind === 'succeeded') {
