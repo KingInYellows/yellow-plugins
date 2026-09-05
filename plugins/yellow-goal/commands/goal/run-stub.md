@@ -54,8 +54,9 @@ Bash before any invocation using yellow-core's canonical validator
 (`validate_file_path` rejects empty paths, `..`, absolute and `~` paths,
 embedded newlines, symlinks whose target escapes the root, and broken
 intermediate symlinks). The request path must therefore be **relative to the
-current working directory** and resolve inside it; a leading hyphen is rejected
-separately. yellow-core is a required dependency of this plugin.
+current working directory** and resolve inside it; a leading hyphen and any
+character outside `[A-Za-z0-9._/-]` are rejected separately, before the
+canonical check. yellow-core is a required dependency of this plugin.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
@@ -66,6 +67,7 @@ fi
 . "$HELPER"
 case "$REQUEST_FILE" in
   -*) printf 'ERROR: request path may not start with a hyphen\n' >&2; exit 2 ;;
+  *[![:alnum:]._/-]*) printf 'ERROR: request path contains unsafe characters\n' >&2; exit 2 ;;
 esac
 if ! validate_file_path "$REQUEST_FILE" "$PWD"; then
   printf 'ERROR: request path must be a relative path inside %s\n' "$PWD" >&2

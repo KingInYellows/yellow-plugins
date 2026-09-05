@@ -258,9 +258,10 @@ function assertScenarioBinding(scenario, snapshot) {
         });
     }
     // Zero-spend contract: stub runs never cost anything. The one exception is
-    // the budget-exhausted scenario, whose summary carries the simulated
-    // accounting that tripped the budget (PP-10), never metered spend.
-    const expectZeroCost = scenario !== 'budget-exhausted';
+    // an actual budget-exhausted terminal, whose summary carries the simulated
+    // accounting that tripped the budget (PP-10), never metered spend. A
+    // budget-exhausted request that ended cancelled must still report zero.
+    const expectZeroCost = summary.status !== 'budget-exhausted';
     const anyActionCost = summary.actions.some((action) => action.costUsd !== 0);
     if (expectZeroCost && (summary.costUsd !== 0 || anyActionCost)) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `stub ${scenario} run reported a nonzero cost`, {
