@@ -377,3 +377,21 @@ describe('run-stub against the portable fake provider engine', () => {
     expect(body.error.localCause).toBe('caller-cancelled');
   }, 20_000);
 });
+
+describe('run-stub scratch hygiene', () => {
+  const fixture = path.join(
+    packageRoot,
+    'tests',
+    'fixtures',
+    'fake-provider-engine.mjs'
+  );
+  it('ignores GOAL_GEN_SCRATCH from the ambient environment and retains nothing', async () => {
+    const pinned = path.join(scratch, 'ambient-scratch-must-not-be-used');
+    const result = await runCli(
+      ['run-stub', 'req.json', '--scenario', 'success', '--yes'],
+      { GOAL_GEN_BIN: fixture, GOAL_GEN_SCRATCH: pinned }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pinned)).toBe(false);
+  });
+});

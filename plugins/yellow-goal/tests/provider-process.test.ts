@@ -259,6 +259,7 @@ describe('buildChildEnv', () => {
           ANTHROPIC_API_KEY: 'sk-secret',
           CLAUDE_CODE_OAUTH_TOKEN: 'oauth-secret',
           OPENAI_API_KEY: 'openai-secret',
+          CODEX_API_KEY: 'codex-secret',
           GH_TOKEN: 'gh-secret',
           GITHUB_TOKEN: 'gh-secret-2',
           NPM_TOKEN: 'npm-secret',
@@ -341,9 +342,10 @@ describe('createOperationScratchDir', () => {
       path.join(os.tmpdir(), 'yellow-goal-pinned-scratch-')
     );
     try {
-      expect(createOperationScratchDir({ GOAL_GEN_SCRATCH: pinned })).toBe(
-        pinned
-      );
+      expect(createOperationScratchDir({ GOAL_GEN_SCRATCH: pinned })).toEqual({
+        path: pinned,
+        owned: false,
+      });
     } finally {
       fs.rmSync(pinned, { recursive: true, force: true });
     }
@@ -353,12 +355,14 @@ describe('createOperationScratchDir', () => {
     const a = createOperationScratchDir({});
     const b = createOperationScratchDir({});
     try {
-      expect(a).not.toBe(b);
-      expect(fs.existsSync(a)).toBe(true);
-      expect(fs.existsSync(b)).toBe(true);
+      expect(a.owned).toBe(true);
+      expect(b.owned).toBe(true);
+      expect(a.path).not.toBe(b.path);
+      expect(fs.existsSync(a.path)).toBe(true);
+      expect(fs.existsSync(b.path)).toBe(true);
     } finally {
-      fs.rmSync(a, { recursive: true, force: true });
-      fs.rmSync(b, { recursive: true, force: true });
+      fs.rmSync(a.path, { recursive: true, force: true });
+      fs.rmSync(b.path, { recursive: true, force: true });
     }
   });
 });

@@ -274,14 +274,18 @@ function assertScenarioBinding(scenario, snapshot) {
 async function runStub(deps, input) {
     validateScenario(input.scenario);
     validateTimeoutMs(input.timeoutMs, input.scenario);
-    const pinnedScratch = deps.env['GOAL_GEN_SCRATCH'];
-    const scratchDir = (0, provider_process_js_1.createOperationScratchDir)(deps.env);
+    const scratch = (0, provider_process_js_1.createOperationScratchDir)(deps.env);
     try {
-        return await runStubInScratch(deps, input, scratchDir);
+        return await runStubInScratch(deps, input, scratch.path);
     }
     finally {
-        if (typeof pinnedScratch !== 'string' || pinnedScratch.length === 0) {
-            (0, node_fs_1.rmSync)(scratchDir, { recursive: true, force: true });
+        if (scratch.owned) {
+            try {
+                (0, node_fs_1.rmSync)(scratch.path, { recursive: true, force: true });
+            }
+            catch {
+                // Cleanup must never mask the run outcome (EBUSY/EPERM etc.).
+            }
         }
     }
 }

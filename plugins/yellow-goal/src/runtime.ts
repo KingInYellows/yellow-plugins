@@ -487,13 +487,16 @@ export async function runStub(
 ): Promise<RunStubResult> {
   validateScenario(input.scenario);
   validateTimeoutMs(input.timeoutMs, input.scenario);
-  const pinnedScratch = deps.env['GOAL_GEN_SCRATCH'];
-  const scratchDir = createOperationScratchDir(deps.env);
+  const scratch = createOperationScratchDir(deps.env);
   try {
-    return await runStubInScratch(deps, input, scratchDir);
+    return await runStubInScratch(deps, input, scratch.path);
   } finally {
-    if (typeof pinnedScratch !== 'string' || pinnedScratch.length === 0) {
-      rmSync(scratchDir, { recursive: true, force: true });
+    if (scratch.owned) {
+      try {
+        rmSync(scratch.path, { recursive: true, force: true });
+      } catch {
+        // Cleanup must never mask the run outcome (EBUSY/EPERM etc.).
+      }
     }
   }
 }

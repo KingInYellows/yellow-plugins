@@ -229,7 +229,12 @@ child process and never imports it. Containment assumptions:
 - **Executable**: resolved once per operation from `PATH` (or the test-only
   `GOAL_GEN_BIN` override); every operation first probes `version --json` and
   `capabilities --json` and refuses an engine whose identity, version or
-  capabilities disagree with the pin.
+  capabilities disagree with the pin. **The locally installed executable is a
+  trusted boundary**: the operator installs the verified release asset and
+  controls `PATH`; the runtime probes validate an already trusted binary and do
+  not claim to authenticate an arbitrary replacement (Provider Protocol v1,
+  PP-11). Release-asset provenance is enforced by the SHA-256 check in the
+  blocking CI gate, not at every spawn.
 - **Authority**: `/goal:setup` and `/goal:request` are read-only;
   `/goal:run-stub` spawns exactly
   `run --executor stub --protocol v1 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.

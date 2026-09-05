@@ -295,10 +295,21 @@ export function buildChildEnv(input: ChildEnvInput): NodeJS.ProcessEnv {
 /**
  * One scratch directory per operation (shared HOME/TMPDIR base across every
  * phase of a single `runStub` lifecycle). `GOAL_GEN_SCRATCH` lets tests pin
- * a directory they control instead of a fresh `mkdtemp`.
+ * a directory they control instead of a fresh `mkdtemp`; the returned
+ * `owned` flag is the single source of truth for whether the caller may
+ * delete it afterwards.
  */
-export function createOperationScratchDir(env: NodeJS.ProcessEnv): string {
+export interface OperationScratch {
+  readonly path: string;
+  readonly owned: boolean;
+}
+
+export function createOperationScratchDir(
+  env: NodeJS.ProcessEnv
+): OperationScratch {
   const override = env['GOAL_GEN_SCRATCH'];
-  if (typeof override === 'string' && override.length > 0) return override;
-  return mkdtempSync(join(tmpdir(), 'yellow-goal-op-'));
+  if (typeof override === 'string' && override.length > 0) {
+    return { path: override, owned: false };
+  }
+  return { path: mkdtempSync(join(tmpdir(), 'yellow-goal-op-')), owned: true };
 }
