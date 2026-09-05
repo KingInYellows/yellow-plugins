@@ -8,6 +8,11 @@
       "name": "yellow-cursor",
       "source": "plugins/yellow-cursor",
       "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs"
+    },
+    {
+      "name": "yellow-review",
+      "source": "plugins/yellow-review",
+      "description": "One read-only skill: the thermonuclear structural-quality review rubric — code-judo restructurings, spaghetti-condition growth, weak type and module boundaries, misplaced ownership, and evidence-gated file-size threshold crossings. Reports findings only; never edits the repository. Excludes all of yellow-review's commands, agents, and other skills."
     }
   ]
 }
