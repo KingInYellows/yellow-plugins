@@ -5,6 +5,6 @@
     "displayName": "Yellow Review",
     "category": "Developer Tools"
   },
-  "description": "One read-only skill: the thermonuclear structural-quality review rubric — code-judo restructurings, spaghetti-condition growth, weak type and module boundaries, misplaced ownership, and evidence-gated file-size threshold crossings. Reports findings only; never edits the repository. Excludes all of yellow-review's commands, agents, and other skills.",
+  "description": "One read-only skill: the thermonuclear structural-quality review rubric — code-judo restructurings, spaghetti-condition growth, weak type and module boundaries, misplaced ownership, and evidence-gated file-size threshold crossings (when the requester supplies before/after line counts). Invoke it explicitly by name; it is not applied to ordinary reviews automatically. Reports findings only; never edits the repository. Excludes all of yellow-review's commands, agents, and other skills.",
   "skills": "./codex/skills"
 }

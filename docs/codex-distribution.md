@@ -35,8 +35,7 @@ runs the **exposure lint** (below).
 
 ## Codex-enabled plugins
 
-As of the yellow-ci pilot close-out, **three** plugins enable Codex, in canonical
-order:
+**Four** plugins enable Codex, in canonical order:
 
 1. `gt-workflow` — entire skill surface (thin command wrappers, no Claude-only
    logic).
@@ -44,9 +43,12 @@ order:
    agents, and both hooks).
 3. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
    reference), hooks carried (`includeHooks` default `true`).
+4. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
+   every command, agent, and other skill of the plugin stays Claude-only, and
+   the plugin has no hooks to carry.
 
 Filtering `pluginOrder` by `targets.codex.enabled` yields
-`[gt-workflow, yellow-core, yellow-ci]` automatically.
+`[gt-workflow, yellow-core, yellow-ci, yellow-review]` automatically.
 
 ## Host-neutral skill bodies + the exposure lint (R15)
 
