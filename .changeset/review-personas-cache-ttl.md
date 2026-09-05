@@ -3,11 +3,12 @@
 'yellow-core': patch
 ---
 
-Set `experimental.cacheTtl: 1h` on the four always-on `/review:pr` personas
+Set `experimental.cacheTtl: 1h` on the five always-run `/review:pr` agents
 (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`,
-`project-standards-reviewer`), on `code-simplifier` (the unconditional Step 8
-final pass), and on `learnings-researcher` (the Step 3d pre-pass) — the agents
-that run with a stable system prompt on every review. The one-hour prompt
-cache lifetime means a second review within the hour reads those prompts from
-cache instead of re-processing them. Verified against Claude Code 2.1.259;
-ignored while a subscription is drawing on usage credits.
+`project-standards-reviewer`, and the Step 8 `code-simplifier`) — the agents
+whose stable system prompt is re-sent on every review. A second review within
+the hour reads those prompts from cache. `learnings-researcher` (yellow-core)
+stays at the default because it is one-shot on every caller; a `1h` write bills
+about 2x base input versus 1.25x for `5m`. A `subagentPromptCacheTtl` setting
+or env var overrides the frontmatter for all subagents. Verified against
+Claude Code 2.1.259; ignored while a subscription is drawing on usage credits.

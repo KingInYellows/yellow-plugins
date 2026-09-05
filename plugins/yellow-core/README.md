@@ -105,14 +105,11 @@ TypeScript, Python, Rust, and Go.
 
 ## Prompt cache TTL
 
-`learnings-researcher` carries `experimental.cacheTtl: 1h` in agent
-frontmatter (nested under `experimental:`). yellow-review's `/review:pr`
-dispatches it as the Step 3d pre-pass before the Wave 2 reviewer personas.
-
-On Claude Code 2.1.259+, a second review of the same PR within an hour can
-read this stable persona prompt from cache. Supported values are `5m` and
-`1h`; the field is read only from subagent files. While a subscription is
-drawing on usage credits, Claude Code may ignore the setting.
+No yellow-core agent sets `experimental.cacheTtl`. `learnings-researcher` was
+considered and left at the default: every caller (`/review:pr`, `/flow:plan`,
+`/flow:brainstorm`, `/docs:review`) dispatches it once, and a `1h` cache write
+costs more than the default `5m` write unless the prompt is re-sent within the
+hour. See yellow-review's README for the personas that do carry the field.
 
 ## Hooks
 

@@ -218,7 +218,11 @@ reviewers (`project-compliance-reviewer`, `correctness-reviewer`,
 `code-simplifier`. Conditional personas are intentionally omitted — they
 dispatch too rarely for a longer TTL to matter.
 
-Claude Code 2.1.259+ honors `5m` or `1h` on subagent files only; while a
+Claude Code 2.1.259+ honors `5m` or `1h` on subagent files only, and only
+when no `subagentPromptCacheTtl` setting or environment variable is set (that
+setting overrides the frontmatter for every subagent — the opt-out). A `1h`
+cache write bills at about 2x base input versus 1.25x for `5m`, so the
+setting pays off only when a second review runs within the hour. While a
 subscription is drawing on usage credits the setting may be ignored. Verify
 with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 `/review:pr` run within the hour.
