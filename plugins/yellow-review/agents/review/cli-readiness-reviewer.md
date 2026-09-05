@@ -124,9 +124,10 @@ shown below. Report every finding you identify, each with a confidence score and
 severity. Do not filter by confidence — the orchestrator applies the 75 gate
 after aggregation, and a finding it later drops costs less than a real issue
 silently omitted here. If the list would exceed your compact-return output
-budget, rank by severity then confidence and stop before the JSON would
-truncate — Step 5 validation drops an entire malformed return, so never emit
-partial JSON.
+budget, rank by confidence (gate-surviving 75/100 first, then 50, then
+25/0) then severity and stop before the JSON would truncate — the
+orchestrator's compact-return validation drops an entire malformed return,
+so never emit partial JSON.
 
 ```json
 {

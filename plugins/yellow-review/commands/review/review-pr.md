@@ -524,8 +524,8 @@ malformed value, wrong type), drop the entire return. Record drop count in
 Coverage. Truncated JSON from an oversized findings list is a malformed
 return — persona prompts for `agent-native-reviewer`,
 `agent-cli-readiness-reviewer`, and `cli-readiness-reviewer` instruct
-those agents to rank by severity then confidence and stop before output
-would truncate rather than emit partial JSON.
+those agents to rank by confidence (gate-surviving 75/100 first) then
+severity and stop before output would truncate rather than emit partial JSON.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
 continue to use the legacy prose finding format. This list is exhaustive
