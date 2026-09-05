@@ -103,6 +103,17 @@ describe('portable fake goal-gen contract', () => {
       ['run'],
       ['analyze'],
       ['request', 'validate', '--executor=stub'],
+      ['run-stub'],
+      ['run-stub', 'req.json', '--executor', 'claude-code'],
+      ['run-stub', 'req.json', '--executor=stub'],
+      ['run-stub', 'req.json', '--protocol', 'v1'],
+      ['run-stub', 'req.json', '--protocol=v1'],
+      ['run-stub', 'req.json', '--bogus'],
+      ['run-stub', 'req.json', 'extra-positional'],
+      ['run-stub', 'req.json', '--scenario', 'not-a-real-scenario'],
+      ['run-stub', 'req.json', '--timeout-ms', 'abc'],
+      ['run-stub', 'req.json', '--timeout-ms', '-5'],
+      ['run-stub', 'req.json', '--timeout-ms', '0'],
     ].map((args) => ({ args }))
   )(
     'rejects invalid argv $args before invoking an engine',
@@ -272,4 +283,85 @@ describe('portable fake goal-gen contract', () => {
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe('GOAL_INVALID_INPUT');
   });
+});
+
+describe('run-stub against the portable fake provider engine', () => {
+  const providerFixturePath = path.join(
+    packageRoot,
+    'tests',
+    'fixtures',
+    'fake-provider-engine.mjs'
+  );
+
+  it('runs the success scenario end to end and exits 0', async () => {
+    const result = await runCli(['run-stub', 'req.json', '--yes'], {
+      GOAL_GEN_BIN: providerFixturePath,
+    });
+    expect(result.exitCode).toBe(0);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      operation: string;
+      engineVersion: string;
+      summary: { status: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.operation).toBe('run-stub');
+    expect(body.engineVersion).toBe(PINNED_ENGINE_VERSION);
+    expect(body.summary.status).toBe('succeeded');
+  });
+
+  it('maps a failed scenario to exit 1 with GOAL_RUN_FAILED', async () => {
+    const result = await runCli(
+      ['run-stub', 'req.json', '--scenario', 'failed', '--yes'],
+      { GOAL_GEN_BIN: providerFixturePath }
+    );
+    expect(result.exitCode).toBe(1);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      error: { code: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe('GOAL_RUN_FAILED');
+  });
+
+  it('forwards a SIGTERM into the run-stub operation and reports GOAL_RUN_CANCELLED', async () => {
+    const resultPromise = new Promise<CliRun>((resolve) => {
+      const child = execFile(
+        process.execPath,
+        [
+          cliPath,
+          'run-stub',
+          'req.json',
+          '--scenario',
+          'await-cancel',
+          '--timeout-ms',
+          '60000',
+        ],
+        {
+          env: { ...process.env, GOAL_GEN_BIN: providerFixturePath },
+          timeout: 15_000,
+          killSignal: 'SIGKILL',
+        },
+        (err, stdout, stderr) => {
+          const exitCode = (err as { code?: number } | null)?.code ?? 0;
+          resolve({ stdout, stderr, exitCode });
+        }
+      );
+      // Give the CLI time to spawn the engine child, complete the fast
+      // version/capabilities probes, and reach the run phase's
+      // await-cancel wait before signalling.
+      setTimeout(() => {
+        if (child.pid !== undefined) process.kill(child.pid, 'SIGTERM');
+      }, 600);
+    });
+    const result = await resultPromise;
+    expect(result.exitCode).toBe(1);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      error: { code: string; localCause?: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe('GOAL_RUN_CANCELLED');
+    expect(body.error.localCause).toBe('caller-cancelled');
+  }, 20_000);
 });

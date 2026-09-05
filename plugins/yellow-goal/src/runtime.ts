@@ -1,5 +1,25 @@
-import { GoalEngineError } from './errors.js';
+import { GoalEngineError, type GoalErrorLocalCause } from './errors.js';
 import { PINNED_ENGINE_VERSION } from './pin.js';
+import {
+  buildChildEnv,
+  createOperationScratchDir,
+  spawnProtocolChild,
+  type ProtocolChildLimits,
+  type ProtocolChildResult,
+} from './provider-process.js';
+import {
+  CONSUMER_LIMITS,
+  JsonLinesFramer,
+  STUB_SCENARIOS,
+  RunStreamValidator,
+  classifyPreflightFailure,
+  parseSingleJsonObject,
+  validateCapabilities,
+  validateTerminalAgreement,
+  validateVersionProbe,
+  type StubScenario,
+  type ValidatedSummary,
+} from './provider-protocol.js';
 import type { SpawnEngine, SpawnResult } from './spawn.js';
 import { resolveEngineBin } from './spawn.js';
 
@@ -242,4 +262,400 @@ export function requestValidate(
     );
   }
   return { valid: true, request: input.request };
+}
+
+// ---------------------------------------------------------------------------
+// runStub — async fixed-authority Provider Protocol v1 lifecycle
+// ---------------------------------------------------------------------------
+
+export interface ProtocolRuntimeDeps {
+  readonly env: NodeJS.ProcessEnv;
+  /** Test-only seam (e.g. a NODE_OPTIONS preload); production never sets
+   *  this. Forwarded verbatim into every child's allowlisted environment. */
+  readonly childEnvOverride?: NodeJS.ProcessEnv;
+}
+
+export interface RunStubInput {
+  readonly request: string;
+  readonly scenario: StubScenario;
+  readonly timeoutMs?: number;
+  readonly yes?: boolean;
+  /** Consumer absolute deadline in ms from now; default 120_000 plus the
+   *  engine timeout when one is given. */
+  readonly deadlineMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface RunStubResult {
+  readonly engineVersion: string;
+  readonly protocolVersion: string;
+  readonly runId: string;
+  readonly eventCount: number;
+  readonly summary: ValidatedSummary;
+}
+
+const DEFAULT_DEADLINE_BASE_MS = 120_000;
+const MIN_TIMEOUT_MS = 1;
+const MAX_TIMEOUT_MS = 3_600_000;
+
+function runStubUsageError(message: string): never {
+  throw new GoalEngineError('GOAL_INVALID_INPUT', message);
+}
+
+function validateScenario(scenario: StubScenario): void {
+  if (!STUB_SCENARIOS.includes(scenario)) {
+    runStubUsageError(
+      `unknown stub scenario "${scenario}"; expected one of: ${STUB_SCENARIOS.join(', ')}`
+    );
+  }
+}
+
+function validateTimeoutMs(
+  timeoutMs: number | undefined,
+  scenario: StubScenario
+): void {
+  if (timeoutMs === undefined) {
+    if (scenario === 'await-cancel') {
+      runStubUsageError('the await-cancel scenario requires --timeout-ms');
+    }
+    return;
+  }
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < MIN_TIMEOUT_MS ||
+    timeoutMs > MAX_TIMEOUT_MS
+  ) {
+    runStubUsageError(
+      `--timeout-ms must be a safe integer between ${MIN_TIMEOUT_MS} and ${MAX_TIMEOUT_MS}`
+    );
+  }
+}
+
+function localCauseError(
+  cause: GoalErrorLocalCause,
+  extras: { runId?: string; eventCount?: number } = {}
+): GoalEngineError {
+  if (cause === 'caller-cancelled') {
+    return new GoalEngineError(
+      'GOAL_RUN_CANCELLED',
+      'run cancelled by the caller before completion',
+      { ...extras, localCause: cause }
+    );
+  }
+  return new GoalEngineError(
+    'GOAL_RUN_DEADLINE_EXCEEDED',
+    'the consumer deadline elapsed before completion',
+    { ...extras, localCause: cause }
+  );
+}
+
+/** Rethrow a caught failure with runId/eventCount filled in when absent. */
+function attachRunDiagnostics(
+  err: unknown,
+  runId: string | undefined,
+  eventCount: number
+): never {
+  if (err instanceof GoalEngineError) {
+    throw new GoalEngineError(err.code, err.message, {
+      engineVersion: err.engineVersion,
+      pinnedVersion: err.pinnedVersion,
+      runId: err.runId ?? runId,
+      eventCount: err.eventCount ?? eventCount,
+      terminalStatus: err.terminalStatus,
+      terminationReason: err.terminationReason,
+      gateKind: err.gateKind,
+      localCause: err.localCause,
+    });
+  }
+  throw err;
+}
+
+const BOOTSTRAP_LIMITS: ProtocolChildLimits = {
+  maxStdoutBytes: CONSUMER_LIMITS.bootstrapMaxStdoutBytes,
+  maxStderrBytes: CONSUMER_LIMITS.bootstrapMaxStderrBytes,
+};
+
+function probeOutcome(result: ProtocolChildResult, label: string): void {
+  if (result.forcedKill || result.signal !== null) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_TRANSPORT',
+      `${label} probe did not close cleanly`
+    );
+  }
+  if (result.localCause !== undefined) {
+    // Probe-phase local cancellation/deadline: discard partial output.
+    throw localCauseError(result.localCause);
+  }
+}
+
+export async function runStub(
+  deps: ProtocolRuntimeDeps,
+  input: RunStubInput
+): Promise<RunStubResult> {
+  validateScenario(input.scenario);
+  validateTimeoutMs(input.timeoutMs, input.scenario);
+
+  const controller = new AbortController();
+  let localCause: GoalErrorLocalCause | undefined;
+  const deadlineAt =
+    Date.now() +
+    (input.deadlineMs ?? DEFAULT_DEADLINE_BASE_MS + (input.timeoutMs ?? 0));
+
+  const recordLocalCause = (cause: GoalErrorLocalCause): void => {
+    if (localCause === undefined) localCause = cause;
+  };
+
+  if (input.signal !== undefined) {
+    if (input.signal.aborted) {
+      recordLocalCause('caller-cancelled');
+      controller.abort();
+    } else {
+      input.signal.addEventListener(
+        'abort',
+        () => {
+          recordLocalCause('caller-cancelled');
+          controller.abort();
+        },
+        { once: true }
+      );
+    }
+  }
+
+  function checkNotCancelled(): void {
+    if (localCause !== undefined) throw localCauseError(localCause);
+    if (Date.now() >= deadlineAt) {
+      recordLocalCause('deadline');
+      controller.abort();
+      throw localCauseError('deadline');
+    }
+  }
+
+  checkNotCancelled();
+
+  const bin = resolveEngineBin(deps.env);
+  const scratchDir = createOperationScratchDir(deps.env);
+  const env = buildChildEnv({
+    sourceEnv: deps.env,
+    scratchDir,
+    childEnvOverride: deps.childEnvOverride,
+  });
+
+  function runChild(
+    argv: readonly string[],
+    limits: ProtocolChildLimits,
+    onStdout?: (chunk: Buffer) => void
+  ): Promise<ProtocolChildResult> {
+    return spawnProtocolChild({
+      bin,
+      argv,
+      env,
+      deadlineAt,
+      signal: controller.signal,
+      limits,
+      ...(onStdout !== undefined ? { onStdout } : {}),
+    });
+  }
+
+  // Phase 1: version.
+  const versionResult = await runChild(['version', '--json'], BOOTSTRAP_LIMITS);
+  probeOutcome(versionResult, 'version');
+  if (versionResult.stdout.length === 0) {
+    throw classifyPreflightFailure({
+      exitCode: versionResult.exitCode,
+      signal: versionResult.signal,
+      stdout: versionResult.stdout,
+      stderr: versionResult.stderr,
+    });
+  }
+  const engineVersion = validateVersionProbe(
+    parseSingleJsonObject(
+      versionResult.stdout,
+      'version probe',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+
+  checkNotCancelled();
+
+  // Phase 2: capabilities.
+  const capabilitiesResult = await runChild(
+    ['capabilities', '--json'],
+    BOOTSTRAP_LIMITS
+  );
+  probeOutcome(capabilitiesResult, 'capabilities');
+  if (capabilitiesResult.stdout.length === 0) {
+    throw classifyPreflightFailure({
+      exitCode: capabilitiesResult.exitCode,
+      signal: capabilitiesResult.signal,
+      stdout: capabilitiesResult.stdout,
+      stderr: capabilitiesResult.stderr,
+    });
+  }
+  const capabilities = validateCapabilities(
+    parseSingleJsonObject(
+      capabilitiesResult.stdout,
+      'capabilities probe',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+  if (!capabilities.stubScenarios.includes(input.scenario)) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INCOMPATIBLE',
+      `engine did not advertise the ${input.scenario} stub scenario`,
+      {
+        engineVersion: capabilities.engineVersion,
+        pinnedVersion: PINNED_ENGINE_VERSION,
+      }
+    );
+  }
+
+  checkNotCancelled();
+
+  // Phase 3: run.
+  const runArgv = [
+    'run',
+    '--executor',
+    'stub',
+    '--protocol',
+    'v1',
+    '--stub-scenario',
+    input.scenario,
+    ...(input.timeoutMs !== undefined
+      ? ['--timeout-ms', String(input.timeoutMs)]
+      : []),
+    ...(input.yes === true ? ['--yes'] : []),
+    '--',
+    input.request,
+  ];
+
+  const framer = new JsonLinesFramer({
+    maxRecordBytes: Math.min(
+      CONSUMER_LIMITS.maxEventBytes,
+      capabilities.limits.maxEventBytes
+    ),
+    maxTotalBytes: CONSUMER_LIMITS.maxStdoutBytes,
+  });
+  const validator = new RunStreamValidator();
+  const onStdout = (chunk: Buffer): void => {
+    for (const record of framer.push(chunk)) validator.accept(record);
+  };
+
+  let runResult: ProtocolChildResult;
+  try {
+    runResult = await runChild(
+      runArgv,
+      {
+        maxStdoutBytes: CONSUMER_LIMITS.maxStdoutBytes,
+        maxStderrBytes: CONSUMER_LIMITS.maxStderrBytes,
+      },
+      onStdout
+    );
+  } catch (err) {
+    attachRunDiagnostics(
+      err,
+      validator.snapshot.runId,
+      validator.snapshot.eventCount
+    );
+  }
+
+  if (runResult.forcedKill || runResult.signal !== null) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_TRANSPORT',
+      'run did not close cleanly',
+      {
+        runId: validator.snapshot.runId,
+        eventCount: validator.snapshot.eventCount,
+      }
+    );
+  }
+
+  function finalizeRunStream(): ReturnType<typeof validateTerminalAgreement> {
+    framer.finish();
+    const snapshot = validator.snapshot;
+    if (framer.bytesConsumed === 0 && snapshot.summary === undefined) {
+      throw classifyPreflightFailure({
+        exitCode: runResult.exitCode,
+        signal: runResult.signal,
+        stdout: Buffer.alloc(0),
+        stderr: runResult.stderr,
+      });
+    }
+    validator.finish();
+    const finished = validator.snapshot;
+    if (finished.summary === undefined) {
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_INVALID',
+        'run stream ended without a validated summary'
+      );
+    }
+    return validateTerminalAgreement({
+      exitCode: runResult.exitCode,
+      signal: runResult.signal,
+      stderr: runResult.stderr,
+      summary: finished.summary,
+      gateKind: finished.gateKind,
+    });
+  }
+
+  let outcome: ReturnType<typeof validateTerminalAgreement>;
+  try {
+    outcome = finalizeRunStream();
+  } catch (err) {
+    if (runResult.localCause !== undefined) {
+      // A cancellation interrupted the stream before it could fully agree;
+      // that is a transport artifact of our own signal, never a protocol
+      // violation by the engine.
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_TRANSPORT',
+        'run stream was incomplete after cancellation',
+        {
+          runId: validator.snapshot.runId,
+          eventCount: validator.snapshot.eventCount,
+          localCause: runResult.localCause,
+        }
+      );
+    }
+    attachRunDiagnostics(
+      err,
+      validator.snapshot.runId,
+      validator.snapshot.eventCount
+    );
+  }
+
+  const snapshot = validator.snapshot;
+  if (runResult.localCause !== undefined) {
+    // The stream fully and validly agreed (success or an engine terminal),
+    // but a local cause still wins: it was observed before this close.
+    recordLocalCause(runResult.localCause);
+    throw localCauseError(runResult.localCause, {
+      runId: snapshot.runId,
+      eventCount: snapshot.eventCount,
+    });
+  }
+
+  if (outcome.kind === 'succeeded') {
+    if (snapshot.runId === undefined) {
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_INVALID',
+        'succeeded run stream is missing its run identity'
+      );
+    }
+    return {
+      engineVersion,
+      protocolVersion: capabilities.protocolVersion,
+      runId: snapshot.runId,
+      eventCount: snapshot.eventCount,
+      summary: snapshot.summary as ValidatedSummary,
+    };
+  }
+
+  throw new GoalEngineError(outcome.code, outcome.message, {
+    runId: snapshot.runId,
+    eventCount: snapshot.eventCount,
+    terminalStatus: snapshot.summary?.status,
+    terminationReason: snapshot.summary?.terminationReason,
+    gateKind: snapshot.gateKind,
+  });
 }

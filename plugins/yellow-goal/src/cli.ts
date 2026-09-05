@@ -10,15 +10,17 @@
 import { parseArgs } from 'node:util';
 
 import { GoalEngineError, toGoalError } from './errors.js';
+import { STUB_SCENARIOS, type StubScenario } from './provider-protocol.js';
 import * as runtime from './runtime.js';
 import { createDefaultSpawn } from './spawn.js';
 
-const KNOWN_OPERATIONS = ['setup', 'request'] as const;
+const KNOWN_OPERATIONS = ['setup', 'request', 'run-stub'] as const;
 
 type DispatchResult =
   | runtime.SetupResult
   | runtime.RequestCreateResult
-  | runtime.RequestValidateResult;
+  | runtime.RequestValidateResult
+  | runtime.RunStubResult;
 
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -106,11 +108,70 @@ function dispatchRequest(
   }
 }
 
-function dispatch(
+function dispatchRunStub(
+  rest: readonly string[],
+  deps: runtime.ProtocolRuntimeDeps,
+  controller: AbortController
+): Promise<runtime.RunStubResult> {
+  if (
+    rest.some((arg) => arg === '--executor' || arg.startsWith('--executor='))
+  ) {
+    throw new UsageError(
+      'refusing --executor; run-stub always uses the stub executor'
+    );
+  }
+  if (
+    rest.some((arg) => arg === '--protocol' || arg.startsWith('--protocol='))
+  ) {
+    throw new UsageError('refusing --protocol; run-stub always uses v1');
+  }
+  const { values, positionals } = parseArgs({
+    args: rest,
+    options: {
+      scenario: { type: 'string' },
+      'timeout-ms': { type: 'string' },
+      yes: { type: 'boolean', default: false },
+    },
+    strict: true,
+    allowPositionals: true,
+  });
+  const request = positionals[0];
+  if (
+    positionals.length !== 1 ||
+    typeof request !== 'string' ||
+    request.length === 0
+  ) {
+    throw new UsageError('run-stub requires exactly one <request> argument');
+  }
+  const scenarioRaw = values.scenario ?? 'success';
+  if (!STUB_SCENARIOS.includes(scenarioRaw as StubScenario)) {
+    throw new UsageError(
+      `unknown --scenario "${scenarioRaw}"; expected one of: ${STUB_SCENARIOS.join(', ')}`
+    );
+  }
+  let timeoutMs: number | undefined;
+  const timeoutRaw = values['timeout-ms'];
+  if (timeoutRaw !== undefined) {
+    if (!/^[1-9][0-9]*$/.test(timeoutRaw)) {
+      throw new UsageError('--timeout-ms must be a positive decimal integer');
+    }
+    timeoutMs = Number(timeoutRaw);
+  }
+  return runtime.runStub(deps, {
+    request,
+    scenario: scenarioRaw as StubScenario,
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    yes: values.yes === true,
+    signal: controller.signal,
+  });
+}
+
+async function dispatch(
   operation: string,
   rest: readonly string[],
-  deps: runtime.RuntimeDeps
-): DispatchResult {
+  deps: runtime.RuntimeDeps,
+  controller: AbortController
+): Promise<DispatchResult> {
   switch (operation) {
     case 'setup': {
       parseArgs({ args: rest, strict: true, allowPositionals: false });
@@ -118,6 +179,8 @@ function dispatch(
     }
     case 'request':
       return dispatchRequest(rest, deps);
+    case 'run-stub':
+      return dispatchRunStub(rest, { env: deps.env }, controller);
     default:
       throw new UsageError(
         `unknown subcommand "${operation}"; expected one of: ${KNOWN_OPERATIONS.join(', ')}`
@@ -135,7 +198,7 @@ function isUsageError(err: unknown): err is Error {
   return err instanceof UsageError || isParseArgsError(err);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const [operation, ...rest] = process.argv.slice(2);
   const resolvedOperation = operation ?? 'unknown';
 
@@ -155,8 +218,25 @@ function main(): void {
     return;
   }
 
+  const controller = new AbortController();
+  const forwardSignal = (): void => controller.abort();
+  let signalsInstalled = false;
+  function installSignalForwarding(): void {
+    if (signalsInstalled) return;
+    signalsInstalled = true;
+    process.on('SIGINT', forwardSignal);
+    process.on('SIGTERM', forwardSignal);
+  }
+  function removeSignalForwarding(): void {
+    if (!signalsInstalled) return;
+    signalsInstalled = false;
+    process.off('SIGINT', forwardSignal);
+    process.off('SIGTERM', forwardSignal);
+  }
+
   try {
-    const result = dispatch(operation, rest, buildDeps());
+    installSignalForwarding();
+    const result = await dispatch(operation, rest, buildDeps(), controller);
     printJson({ ok: true, operation: resolvedOperation, ...result });
   } catch (err) {
     if (isUsageError(err)) {
@@ -177,7 +257,9 @@ function main(): void {
       error: appError,
     });
     process.exitCode = 1;
+  } finally {
+    removeSignalForwarding();
   }
 }
 
-main();
+void main();
