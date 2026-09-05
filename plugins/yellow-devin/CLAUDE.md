@@ -65,14 +65,15 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
   - Auth mechanism with `cog_` tokens unverified — may need separate
     configuration
 
-DeepWiki's canonical home moved to the `yellow-research` plugin (bundled, no
-auth, public repos only) — see that plugin's `CLAUDE.md`. `/devin:wiki` still
-works: it discovers the DeepWiki tools via ToolSearch at runtime, preferring
-`mcp__plugin_yellow-research_deepwiki__*` and falling back to
-`mcp__plugin_yellow-devin_deepwiki__*` — a name that no longer exists in current
-installs: the manifest's only server is `devin`, which exposes the wiki tools as
+`/devin:wiki` queries this plugin's `devin` server first — the manifest's only
+server — via the pinned
 `mcp__plugin_yellow-devin_devin__{ask_question,read_wiki_structure,read_wiki_contents}`.
-The command's fallback list still needs updating to that namespace.
+DeepWiki is the fallback when that fails, and its canonical home is now the
+`yellow-research` plugin (bundled, no auth, public repos only) — see that
+plugin's `CLAUDE.md`. The command discovers the fallback tools via ToolSearch at
+runtime, preferring `mcp__plugin_yellow-research_deepwiki__*` and then
+`mcp__plugin_yellow-devin_deepwiki__*`, which is retained deliberately for older
+installs that still bundle DeepWiki here.
 
 ## Conventions
 
