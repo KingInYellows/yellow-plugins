@@ -338,7 +338,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 #### Phase 1.4: Orchestrator wiring (minimal)
 
-- [ ] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
+- [x] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
       block, appended only when `thermonuclear-reviewer` is dispatched (B1).
 
 <!-- deepen-plan: codebase -->
@@ -694,7 +694,7 @@ blocks merges.
      locally on their own branches; the whole stack is submitted in one pass
      once that drift is resolved. -->
 - [x] 1. agent/chore/thermonuclear-upstream-snapshot (committed 2026-09-05, not yet submitted)
-- [ ] 2. agent/feat/thermonuclear-reviewer
+- [x] 2. agent/feat/thermonuclear-reviewer (committed 2026-09-05, not yet submitted)
 - [ ] 3. agent/feat/thermonuclear-line-counts
 - [ ] 4. agent/feat/thermonuclear-cross-host
 
