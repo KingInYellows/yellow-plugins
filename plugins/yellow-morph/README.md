@@ -45,7 +45,8 @@ with ruvector, cost/credit details, and privacy notes.
 ## Prerequisites
 
 - **ripgrep** (`rg`) — required by WarpGrep for local search
-- **Node.js 22.22.0 or later** — required for MCP server via npx
+- **Node.js 22.22.0 or later** — the wrapper runs `npm ci` and then
+  `exec node …/@morphllm/morphmcp/dist/index.js` (no npx)
 - **Morph API key** — obtain from https://morphllm.com (free tier: 250K
   credits/month). Answer the `userConfig` prompt at plugin-enable time; a
   shell `MORPH_API_KEY` export is accepted as a fallback.
