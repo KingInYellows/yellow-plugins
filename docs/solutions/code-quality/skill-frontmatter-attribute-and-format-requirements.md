@@ -104,7 +104,7 @@ For every SKILL.md file:
 > **Historical snapshot (2026-02).** The live key is `user-invocable`. The list
 > below records what the VS Code extension advertised at the time.
 
-```
+```text
 argument-hint, compatibility, description, disable-model-invocation,
 license, metadata, name, user-invokable
 ```
