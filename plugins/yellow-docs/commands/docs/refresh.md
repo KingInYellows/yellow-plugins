@@ -143,7 +143,9 @@ Documentation is up to date."
 
 ### Step 3: Delegate to doc-auditor for Staleness Detection
 
-Launch the `doc-auditor` agent via Agent tool (subagent_type: "yellow-docs:analysis:doc-auditor") to find stale docs related to the changed files:
+Launch the `doc-auditor` agent via Agent tool
+(subagent_type: "yellow-docs:analysis:doc-auditor") to find stale docs
+related to the changed files:
 
 > Analyze these changed source files and find documentation that needs updating:
 >

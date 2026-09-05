@@ -298,7 +298,8 @@ the NEXT invocation, instead.
 
 In a single tool-call message, invoke:
 
-1. `Agent(subagent_type="yellow-council:review:claude-reviewer", prompt=<pack with REVIEWER_NAME=Claude, plus the fenced-output path line>)`
+1. `Agent(subagent_type="yellow-council:review:claude-reviewer",
+   prompt=<pack with REVIEWER_NAME=Claude, plus the fenced-output path line>)`
    - Append one line to this reviewer's prompt only:
      `Write your fenced output to this exact path: <literal CLAUDE_FENCED_FILE value>`
    - This reviewer runs in-process, so there is no not-installed degradation

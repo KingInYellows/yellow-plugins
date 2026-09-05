@@ -106,8 +106,8 @@ Then stop. Do not invoke any tool.
 
 ### Step 2: Per-backend discovery (parallel)
 
-Run all three backends in parallel where possible (single-message Bash batch
-+ Agent dispatch).
+Run all three backends in parallel where possible — a single-message Bash
+batch plus an Agent dispatch.
 
 #### Claude Code
 

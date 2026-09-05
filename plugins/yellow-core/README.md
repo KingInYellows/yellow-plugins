@@ -87,7 +87,7 @@ TypeScript, Python, Rust, and Go.
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
-| `ideation`            | Generate 3 grounded approaches with the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into `brainstorm-orchestrator` via the Agent tool |
+| `ideation`            | Generate 3 grounded approaches via the Toulmin warrant contract and MIDAS filtering, then route the winner into `brainstorm-orchestrator` via the Agent tool      |
 | `local-config`        | Defines the `yellow-plugins.local.md` per-project config file schema — per-project overrides for review pipeline behavior, reviewer set narrowing, depth controls, and focus-area filtering |
 | `mcp-health-probe`    | Canonical MCP server health classification (OFFLINE / DEGRADED / HEALTHY plus PRESENT (untested) refinement) for `/<plugin>:status` commands                      |
 | `mcp-integration-patterns` | Shared patterns for ruvector recall/remember and morph discovery integration — its protocol constants are a RULE 16-linted replica of yellow-ruvector's canonical `memory-query` skill |

@@ -532,18 +532,26 @@ README, and run setup work from a `SessionStart` hook as shown above.
   "mcpServers": {
     "example-api": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-example-api.sh",
-      "env": { "EXAMPLE_API_TOKEN": "${user_config.example_api_token}" }
+      "env": {
+        "EXAMPLE_API_TOKEN_USERCONFIG": "${user_config.example_api_token}",
+        "EXAMPLE_API_TOKEN": "${EXAMPLE_API_TOKEN:-}"
+      }
     }
   },
   "userConfig": {
     "example_api_token": {
       "type": "string",
       "title": "Example API token",
+      "description": "Stored in the keychain; EXAMPLE_API_TOKEN in the shell environment is the fallback.",
       "sensitive": true
     }
   }
 }
 ```
+
+The `start-example-api.sh` wrapper (same three-element pattern as the
+full-featured template above) resolves `userConfig` before the shell env
+fallback and rejects an empty credential at MCP startup.
 
 ### Pattern 3: Shell Command Plugin
 

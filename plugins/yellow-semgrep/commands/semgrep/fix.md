@@ -162,6 +162,7 @@ If autofix produces a diff:
 - If syntax check fails: discard, fall through to LLM fix
 
 If no autofix available or autofix failed:
+
 - Spawn `finding-fixer` agent via the Agent tool with context:
   `{ check_id, severity, message, cwe, path, line, code_context }`
 - The agent generates a minimal fix and presents it for approval
