@@ -103,6 +103,17 @@ TypeScript, Python, Rust, and Go.
 | `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
 | `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
 
+## Prompt cache TTL
+
+`learnings-researcher` carries `experimental.cacheTtl: 1h` in agent
+frontmatter (nested under `experimental:`). yellow-review's `/review:pr`
+dispatches it as the Step 3d pre-pass before the Wave 2 reviewer personas.
+
+On Claude Code 2.1.259+, a second review of the same PR within an hour can
+read this stable persona prompt from cache. Supported values are `5m` and
+`1h`; the field is read only from subagent files. While a subscription is
+drawing on usage credits, Claude Code may ignore the setting.
+
 ## Hooks
 
 Three hooks run automatically once the plugin is enabled:
