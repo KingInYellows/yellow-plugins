@@ -5,6 +5,7 @@ exports.boundedString = boundedString;
 exports.parseSingleJsonObject = parseSingleJsonObject;
 exports.validateVersionProbe = validateVersionProbe;
 exports.validateCapabilities = validateCapabilities;
+exports.isEngineStdoutTransportFailure = isEngineStdoutTransportFailure;
 exports.validateTerminalAgreement = validateTerminalAgreement;
 exports.classifyPreflightFailure = classifyPreflightFailure;
 /**
@@ -599,9 +600,10 @@ class RunStreamValidator {
     }
 }
 exports.RunStreamValidator = RunStreamValidator;
-/** Best-effort detection of the engine's transport-failure envelope. Parse
+/** Best-effort detection of the engine's RUN_STDOUT_TRANSPORT_FAILED
+ *  envelope (PP-09: it takes precedence over any summary status). Parse
  *  failures are swallowed here; the regular agreement path re-raises them. */
-function isStdoutTransportFailure(stderr) {
+function isEngineStdoutTransportFailure(stderr) {
     try {
         const parsed = parseSingleJsonObject(stderr, 'stderr', exports.CONSUMER_LIMITS.maxStderrBytes);
         const errorField = parsed['error'];
@@ -617,7 +619,9 @@ function validateTerminalAgreement(input) {
     if (signal !== null) {
         invalid('process terminated by a signal, not a protocol terminal');
     }
-    if (exitCode === 1 && stderr.length > 0 && isStdoutTransportFailure(stderr)) {
+    if (exitCode === 1 &&
+        stderr.length > 0 &&
+        isEngineStdoutTransportFailure(stderr)) {
         throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'engine reported stdout transport failure after the summary');
     }
     if (summary.status === 'succeeded') {

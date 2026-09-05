@@ -44,9 +44,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 const node_util_1 = require("node:util");
 const errors_js_1 = require("./errors.js");
+const provider_protocol_js_1 = require("./provider-protocol.js");
 const runtime = __importStar(require("./runtime.js"));
 const spawn_js_1 = require("./spawn.js");
-const KNOWN_OPERATIONS = ['setup', 'request'];
+const KNOWN_OPERATIONS = ['setup', 'request', 'run-stub'];
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value)}\n`);
 }
@@ -108,7 +109,50 @@ function dispatchRequest(rest, deps) {
             throw new UsageError(`unknown request subcommand "${rest[0] ?? ''}"; expected create or validate`);
     }
 }
-function dispatch(operation, rest, deps) {
+function dispatchRunStub(rest, deps, controller) {
+    if (rest.some((arg) => arg === '--executor' || arg.startsWith('--executor='))) {
+        throw new UsageError('refusing --executor; run-stub always uses the stub executor');
+    }
+    if (rest.some((arg) => arg === '--protocol' || arg.startsWith('--protocol='))) {
+        throw new UsageError('refusing --protocol; run-stub always uses v1');
+    }
+    const { values, positionals } = (0, node_util_1.parseArgs)({
+        args: rest,
+        options: {
+            scenario: { type: 'string' },
+            'timeout-ms': { type: 'string' },
+            yes: { type: 'boolean', default: false },
+        },
+        strict: true,
+        allowPositionals: true,
+    });
+    const request = positionals[0];
+    if (positionals.length !== 1 ||
+        typeof request !== 'string' ||
+        request.length === 0) {
+        throw new UsageError('run-stub requires exactly one <request> argument');
+    }
+    const scenarioRaw = values.scenario ?? 'success';
+    if (!provider_protocol_js_1.STUB_SCENARIOS.includes(scenarioRaw)) {
+        throw new UsageError(`unknown --scenario "${scenarioRaw}"; expected one of: ${provider_protocol_js_1.STUB_SCENARIOS.join(', ')}`);
+    }
+    let timeoutMs;
+    const timeoutRaw = values['timeout-ms'];
+    if (timeoutRaw !== undefined) {
+        if (!/^[1-9][0-9]*$/.test(timeoutRaw)) {
+            throw new UsageError('--timeout-ms must be a positive decimal integer');
+        }
+        timeoutMs = Number(timeoutRaw);
+    }
+    return runtime.runStub(deps, {
+        request,
+        scenario: scenarioRaw,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        yes: values.yes === true,
+        signal: controller.signal,
+    });
+}
+async function dispatch(operation, rest, deps, controller) {
     switch (operation) {
         case 'setup': {
             (0, node_util_1.parseArgs)({ args: rest, strict: true, allowPositionals: false });
@@ -116,6 +160,8 @@ function dispatch(operation, rest, deps) {
         }
         case 'request':
             return dispatchRequest(rest, deps);
+        case 'run-stub':
+            return dispatchRunStub(rest, { env: deps.env }, controller);
         default:
             throw new UsageError(`unknown subcommand "${operation}"; expected one of: ${KNOWN_OPERATIONS.join(', ')}`);
     }
@@ -127,9 +173,11 @@ function isParseArgsError(err) {
     return typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_');
 }
 function isUsageError(err) {
-    return err instanceof UsageError || isParseArgsError(err);
+    return (err instanceof UsageError ||
+        isParseArgsError(err) ||
+        (err instanceof errors_js_1.GoalEngineError && err.code === 'GOAL_INVALID_INPUT'));
 }
-function main() {
+async function main() {
     const [operation, ...rest] = process.argv.slice(2);
     const resolvedOperation = operation ?? 'unknown';
     if (operation === undefined) {
@@ -142,8 +190,29 @@ function main() {
         process.exitCode = 2;
         return;
     }
+    const controller = new AbortController();
+    const forwardSignal = () => controller.abort();
+    let signalsInstalled = false;
+    function installSignalForwarding() {
+        if (signalsInstalled)
+            return;
+        signalsInstalled = true;
+        process.on('SIGINT', forwardSignal);
+        process.on('SIGTERM', forwardSignal);
+    }
+    function removeSignalForwarding() {
+        if (!signalsInstalled)
+            return;
+        signalsInstalled = false;
+        process.off('SIGINT', forwardSignal);
+        process.off('SIGTERM', forwardSignal);
+    }
     try {
-        const result = dispatch(operation, rest, buildDeps());
+        // Only the async run-stub lifecycle listens to the controller; the
+        // synchronous setup/request paths keep Node's default signal behavior.
+        if (operation === 'run-stub')
+            installSignalForwarding();
+        const result = await dispatch(operation, rest, buildDeps(), controller);
         printJson({ ok: true, operation: resolvedOperation, ...result });
     }
     catch (err) {
@@ -166,5 +235,8 @@ function main() {
         });
         process.exitCode = 1;
     }
+    finally {
+        removeSignalForwarding();
+    }
 }
-main();
+void main();

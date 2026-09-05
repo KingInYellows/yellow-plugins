@@ -206,7 +206,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "yellow-goal",
-      "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+      "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
       "version": "0.1.0",
       "author": {
         "name": "KingInYellows"
@@ -741,7 +741,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/pl
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-goal",
   "version": "0.1.0",
-  "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+  "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -755,6 +755,14 @@ exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/pl
     "engine-bridge",
     "process-contract",
     "request-packet"
+  ],
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "goal:run-stub sources validate_file_path() from yellow-core/lib/validate-fs.sh to contain the request path; the command fails closed without it"
+    }
   ]
 }
 "

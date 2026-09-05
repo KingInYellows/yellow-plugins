@@ -203,7 +203,7 @@
     },
     {
       "name": "yellow-goal",
-      "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+      "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
       "version": "0.1.0",
       "author": {
         "name": "KingInYellows"
