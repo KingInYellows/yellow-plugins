@@ -1,0 +1,45 @@
+diff --git a/src/checkout/session-manager.ts b/src/checkout/session-manager.ts
+--- a/src/checkout/session-manager.ts
++++ b/src/checkout/session-manager.ts
+@@ -980,3 +980,51 @@ export class SessionManager {
+     return this.store.get(id);
+   }
++
++  // Coupon evaluation: a self-contained subsystem with no dependency on
++  // SessionManager's fields beyond the cart total.
++  private couponRules: CouponRule[] = [];
++
++  registerCoupon(rule: CouponRule): void {
++    this.couponRules.push(rule);
++  }
++
++  private couponApplies(rule: CouponRule, cart: Cart): boolean {
++    if (rule.minimum && cart.total < rule.minimum) return false;
++    if (rule.expires && rule.expires < Date.now()) return false;
++    if (rule.skus && !cart.items.some((i) => rule.skus.includes(i.sku))) {
++      return false;
++    }
++    return true;
++  }
++
++  private couponDiscount(rule: CouponRule, cart: Cart): number {
++    if (rule.kind === 'percent') return cart.total * (rule.value / 100);
++    if (rule.kind === 'flat') return Math.min(rule.value, cart.total);
++    if (rule.kind === 'shipping') return cart.shipping;
++    return 0;
++  }
++
++  private stackCoupons(applied: CouponRule[], cart: Cart): number {
++    let total = 0;
++    for (const rule of applied) {
++      if (rule.exclusive && applied.length > 1) continue;
++      total += this.couponDiscount(rule, cart);
++    }
++    return Math.min(total, cart.total);
++  }
++
++  applyCoupons(cart: Cart): number {
++    const applied = this.couponRules.filter((r) => this.couponApplies(r, cart));
++    return this.stackCoupons(applied, cart);
++  }
+ }

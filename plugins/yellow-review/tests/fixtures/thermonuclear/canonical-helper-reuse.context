@@ -1,0 +1,11 @@
+Existing canonical helper the reviewer must find and cite before
+recommending reuse (present in the repository, unchanged by the diff):
+
+src/lib/strings.ts:14
+  export function slugify(input: string): string {
+    return input
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
