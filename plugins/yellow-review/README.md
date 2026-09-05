@@ -34,7 +34,7 @@ yellow-core integration before reviewing real PRs.
 
 ## Agents
 
-### Review (15)
+### Review (16)
 
 | Agent                          | Description                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -53,6 +53,7 @@ yellow-core integration before reviewing real PRs.
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |
 | `type-design-analyzer`         | Type design, encapsulation, invariants                                                                       |
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
+| `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
 ### Workflow (1)
 
@@ -66,6 +67,34 @@ yellow-core integration before reviewing real PRs.
 | -------------------- | -------------------------------------------------------------------- |
 | `pr-review-workflow` | Internal reference for adaptive selection and output format          |
 | `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
+| `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
+
+## Opt-in: thermonuclear structural review
+
+`thermonuclear-reviewer` is the one persona `/review:pr` never selects on
+its own. It applies a deliberately aggressive structural rubric at
+opus/xhigh, which is not worth paying on every PR — so a repository enables
+it explicitly in `yellow-plugins.local.md`:
+
+```yaml
+---
+reviewer_set:
+  include:
+    - thermonuclear-reviewer
+---
+```
+
+Then run `/review:pr` as usual. All default personas still run; this adds a
+high-pressure structural lane on top of them. Remove the entry to turn it
+off again.
+
+Two caveats worth knowing before enabling it:
+
+- Its findings are advisory and owned by a human. No automatic-fix lane
+  will ever apply a restructuring it proposes.
+- It is unreachable under `review_pipeline: legacy`. The legacy escape
+  hatch carries its own fixed persona list and never reads `reviewer_set`,
+  so `include` has no effect there.
 
 ## Confidence gating
 

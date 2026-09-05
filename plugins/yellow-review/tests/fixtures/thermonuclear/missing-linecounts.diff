@@ -1,0 +1,25 @@
+diff --git a/src/checkout/session-manager.ts b/src/checkout/session-manager.ts
+--- a/src/checkout/session-manager.ts
++++ b/src/checkout/session-manager.ts
+@@ -980,2 +980,42 @@ export class SessionManager {
+     return this.store.get(id);
++  }
++
++  private couponRules: CouponRule[] = [];
++
++  registerCoupon(rule: CouponRule): void {
++    this.couponRules.push(rule);
++  }
++
++  applyCoupons(cart: Cart): number {
++    let total = 0;
++    for (const rule of this.couponRules) {
++      if (rule.minimum && cart.total < rule.minimum) continue;
++      if (rule.expires && rule.expires < Date.now()) continue;
++      if (rule.kind === 'percent') total += cart.total * (rule.value / 100);
++      if (rule.kind === 'flat') total += Math.min(rule.value, cart.total);
++      if (rule.kind === 'shipping') total += cart.shipping;
++    }
++    return Math.min(total, cart.total);
+   }
+ }

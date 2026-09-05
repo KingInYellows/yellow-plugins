@@ -1,0 +1,14 @@
+diff --git a/src/checkout/session-manager.ts b/src/checkout/session-manager.ts
+--- a/src/checkout/session-manager.ts
++++ b/src/checkout/session-manager.ts
+@@ -1290,6 +1290,12 @@ export class SessionManager {
+   expire(id: string): void {
+-    this.store.delete(id);
++    const session = this.store.get(id);
++    if (!session) return;
++    // Release the reservation before dropping the session, or inventory
++    // stays held until the nightly sweep.
++    this.inventory.release(session.reservationId);
++    this.store.delete(id);
+   }
+ }
