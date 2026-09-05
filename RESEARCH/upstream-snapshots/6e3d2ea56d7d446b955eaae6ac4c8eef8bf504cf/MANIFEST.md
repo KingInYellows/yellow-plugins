@@ -45,8 +45,15 @@ user with both marketplaces installed sees no third ambiguous copy.
 
 To verify snapshot integrity against upstream at the locked SHA:
 
+Run from the repository root. The path list below mirrors the three rows of
+the Snapshotted-files table above — deliberately not `find`, so the check
+can't sweep in unrelated repo paths (e.g. `AGENTS.md`, `plugins/...`) if run
+from somewhere other than the snapshot directory.
+
 ```bash
+set -euo pipefail
 SHA=6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf
+SNAP=RESEARCH/upstream-snapshots/$SHA
 # Portable SHA-256: prefer sha256sum (Linux), fall back to shasum -a 256 (macOS).
 if command -v sha256sum >/dev/null 2>&1; then
   sha256() { sha256sum | cut -d' ' -f1; }
@@ -56,21 +63,30 @@ else
   echo "ERROR: neither sha256sum nor shasum is available" >&2
   exit 1
 fi
-# Every file except this MANIFEST is a verbatim upstream copy. $rel already
-# matches the GitHub Contents API path (e.g.
-# `cursor-team-kit/agents/thermo-nuclear-code-quality-review.md`) — cursor/plugins
-# is a monorepo with each plugin at a top-level directory, so do NOT strip the
-# `cursor-team-kit/` prefix.
+paths=(
+  cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md
+  cursor-team-kit/agents/thermo-nuclear-code-quality-review.md
+  cursor-team-kit/LICENSE
+)
 drift=0
-while IFS= read -r f; do
-  rel=${f#./}
-  remote=$(gh api "repos/cursor/plugins/contents/${rel}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256)
-  local=$(sha256 < "$f")
+checked=0
+for rel in "${paths[@]}"; do
+  if ! remote=$(gh api "repos/cursor/plugins/contents/${rel}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256); then
+    echo "FETCH ERROR: $rel" >&2
+    drift=1
+    continue
+  fi
+  local=$(sha256 < "$SNAP/$rel")
   if [ "$remote" != "$local" ]; then
     echo "DRIFT: $rel"
     drift=1
   fi
-done < <(find . -type f ! -name MANIFEST.md)
+  checked=$((checked + 1))
+done
+if [ "$checked" -ne "${#paths[@]}" ]; then
+  echo "ERROR: checked $checked of ${#paths[@]} expected files" >&2
+  drift=1
+fi
 [ "$drift" -eq 0 ] && echo "OK: snapshot matches upstream at $SHA"
 exit "$drift"
 ```
@@ -79,11 +95,21 @@ To re-check for upstream movement **past** the locked SHA (the drift audit
 proper, required if implementation slips more than a week past 2026-09-05):
 
 ```bash
+set -euo pipefail
+SHA=6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf
+moved=0
 for p in \
   cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md \
-  cursor-team-kit/agents/thermo-nuclear-code-quality-review.md
+  cursor-team-kit/agents/thermo-nuclear-code-quality-review.md \
+  cursor-team-kit/LICENSE
 do
-  n=$(gh api "repos/cursor/plugins/commits?path=$p&since=2026-05-28T16:19:24Z" --jq 'length')
+  if ! n=$(gh api "repos/cursor/plugins/commits?path=$p&since=2026-05-28T16:19:24Z" --jq 'length'); then
+    echo "FETCH ERROR: $p" >&2
+    moved=1
+    continue
+  fi
   printf '%s\t%s commit(s) since pin\n' "$p" "$n"
+  [ "$n" -eq 0 ] || moved=1
 done
+exit "$moved"
 ```

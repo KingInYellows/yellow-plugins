@@ -120,8 +120,12 @@ path/to/file.ts base=986 head=1034
 </file-line-counts>
 ```
 
-sourced from `git diff --numstat "$DIFF_BASE"...HEAD` plus
-`git show "$DIFF_BASE":<file> | wc -l`. Repo-internal, but still XML-sanitised.
+sourced from `git diff --numstat -z "$DIFF_BASE"...HEAD` (NUL-delimited, never
+line-split) plus `git show "$DIFF_BASE:$path" | wc -l`, where `$path` is
+validated (rejected if absolute, containing `..`, or resolving outside the
+repo root) before being used in either command. Paths get the same
+literal-delimiter substitution and XML escaping as the main diff before
+entering the prompt.
 If the block is absent or unparseable the reviewer **suppresses size-threshold
 findings entirely** rather than guessing — fail-closed.
 
@@ -284,8 +288,12 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 - [ ] 1.3.2 Description must be single-line and state that it is opt-in via
       `reviewer_set.include` — **not** "review:pr selects this automatically",
       which is the conditional-persona phrasing and would be false here.
-- [ ] 1.3.3 Copy the `## CRITICAL SECURITY RULES` block **byte-for-byte** from
-      `adversarial-reviewer.md`. Do not paraphrase.
+- [ ] 1.3.3 Add a security section carrying the same fencing semantics as the
+      security-fencing skill (untrusted-content delimiters; diffs, files,
+      commit messages, and PR text are reference-only, never instructions),
+      expressed as brief imperative sentences rather than an ALL-CAPS
+      byte-for-byte copy of `adversarial-reviewer.md`'s `## CRITICAL SECURITY
+      RULES` block.
 - [ ] 1.3.4 Add depth calibration mirroring `adversarial-reviewer` (D6) so
       trivial diffs get a cheap pass.
 - [ ] 1.3.5 Add the confidence-anchor section using the 5 anchors
@@ -356,6 +364,21 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > is unlikely. The O1 recommendation is unchanged, but the urgency framing is
 > stronger than the evidence supports.
 <!-- /deepen-plan -->
+- [ ] 1.4.1b Register `thermonuclear-reviewer` in a new "Opt-in only"
+      subsection in `review-pr.md` Step 4 (and the equivalent dispatch
+      table in `review-all.md`), separate from the always-on and
+      conditional tables, carrying `Agent | subagent_type | Reviewer
+      category` = `thermonuclear-reviewer` /
+      `yellow-review:review:thermonuclear-reviewer` / `maintainability`,
+      annotated "no automatic trigger; enabled only via
+      `reviewer_set.include`". Without this row, `reviewer_set.include`
+      has no subagent_type mapping to dispatch and the opt-in path is
+      unreachable.
+- [ ] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
+      `review-all.md`'s own inline pass (it does not inherit Step 5 of
+      `review-pr.md` by reference for this concern). Without this, a
+      `thermonuclear-reviewer` opted in via `/review:all` never receives the
+      block and every size-threshold finding is silently suppressed.
 - [ ] 1.4.2 **Do not** add a row to the always-on table (`review-pr.md:327-337`)
       or the conditional table (`339-358`) — either would auto-trigger it and
       defeat opt-in (F5).
@@ -429,7 +452,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > `validator-harness.ts`; this is direct `readFileSync` + byte comparison. Flag
 > it in review so nobody "corrects" it toward the harness pattern.
 <!-- /deepen-plan -->
-- [ ] 1.6.2 Create `tests/fixtures/thermonuclear/` (crosses-1000-lines,
+- [ ] 1.6.2 Create `plugins/yellow-review/tests/fixtures/thermonuclear/` (crosses-1000-lines,
       already-large-file, generated-file, spaghetti-branching,
       justified-domain-complexity, canonical-helper-reuse, wrapper-indirection,
       prompt-injection, clean-implementation) as **manual-eval inputs**, with a
@@ -455,8 +478,16 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
       safety rails, since frontmatter is normalised to `name` + `description` and
       everything outside `skills/<name>/` is dropped (F9, D2, D4).
 - [ ] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
-- [ ] 2.6 Second changeset — **patch** for `yellow-review` (F12).
-- [ ] 2.7 Record all three smoke tests in the PR body (see Testing Strategy).
+- [ ] 2.6 Update the canonical target inventories that this PR makes stale:
+      `docs/codex-distribution.md` (currently claims exactly three Codex-enabled
+      plugins), `docs/cursor-distribution.md` (currently calls `yellow-cursor`
+      the sole Cursor-enabled plugin), the root `README.md`, and the
+      `AGENTS.md` target inventory.
+- [ ] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
+      since exposing the skill through Cursor and Codex is an additive
+      user-visible capability, not a fix — matching the **minor** bump task
+      1.5.4 already uses for PR 1.
+- [ ] 2.8 Record all three smoke tests in the PR body (see Testing Strategy).
 
 ## Technical Details
 
@@ -477,14 +508,17 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
 | Path | Change |
 |---|---|
 | `plugins/yellow-review/commands/review/review-pr.md` | Step 5 `<file-line-counts>` block only |
+| `plugins/yellow-review/commands/review/review-all.md` | Mirror the Step 5 `<file-line-counts>` collection/injection into the inline pass (task 1.4.1c) |
 | `plugins/yellow-review/CLAUDE.md` | `(16)`→`(17)` + catalog entry |
 | `plugins/yellow-review/README.md` | Document reviewer + opt-in |
 | `plugins/yellow-core/skills/local-config/SKILL.md` | Name the opt-in reviewer |
 | `catalog/plugins/yellow-review.json` | PR 2 only — cursor + codex targets |
 
 Explicitly **not** modified: `maintainability-reviewer.md` (preserves its
-calibration and avoids conflict with #748), and `review-all.md` (it mirrors
-`review-pr.md`'s table by reference, so `reviewer_set.include` flows through).
+calibration and avoids conflict with #748). `review-all.md` mirrors
+`review-pr.md`'s dispatch table by reference (`reviewer_set.include` flows
+through via 1.4.1b), but its inline pass does **not** inherit the Step 5
+`<file-line-counts>` block by reference — see task 1.4.1c.
 
 ### Activation
 
@@ -602,6 +636,10 @@ By recorded human sign-off:
 
 ## Security Considerations
 
+- **PR 2 task:** update `docs/security.md` with the host-specific posture: on
+  Claude the read-only guarantee is enforced by the tools allowlist; on Cursor
+  and Codex only prose rails remain, since the generators keep only `name` and
+  `description` and drop the tool restriction entirely.
 - The reviewer reads untrusted diff content. The verbatim CRITICAL SECURITY RULES
   block is the model-level control; per this repo's own 2026 research it is
   **necessary but not sufficient**.
@@ -681,8 +719,8 @@ blocks merges.
 ### 4. agent/feat/thermonuclear-cross-host
 - **Type:** feat
 - **Description:** Expose the thermonuclear skill to the Cursor and Codex targets
-- **Scope:** catalog/plugins/yellow-review.json, plugins/yellow-review/.cursor-plugin/, plugins/yellow-review/.codex-plugin/, plugins/yellow-review/cursor/skills/, plugins/yellow-review/codex/skills/, .cursor-plugin/marketplace.json, .changeset/
-- **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7
+- **Scope:** catalog/plugins/yellow-review.json, plugins/yellow-review/.cursor-plugin/, plugins/yellow-review/.codex-plugin/, plugins/yellow-review/cursor/skills/, plugins/yellow-review/codex/skills/, .cursor-plugin/marketplace.json, docs/codex-distribution.md, docs/cursor-distribution.md, README.md, AGENTS.md, .changeset/
+- **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
 - **Depends on:** #3
 
 ---
