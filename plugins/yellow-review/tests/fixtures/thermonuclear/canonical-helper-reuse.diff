@@ -1,0 +1,17 @@
+diff --git a/src/reports/export.ts b/src/reports/export.ts
+--- a/src/reports/export.ts
++++ b/src/reports/export.ts
+@@ -3,6 +3,18 @@ import { Report } from './types';
++// Local slug helper for report filenames.
++function toSlug(input: string): string {
++  return input
++    .toLowerCase()
++    .normalize('NFKD')
++    .replace(/[^a-z0-9]+/g, '-')
++    .replace(/^-+|-+$/g, '');
++}
++
+ export function filename(report: Report): string {
+-  return `${report.id}.csv`;
++  return `${toSlug(report.title)}-${report.id}.csv`;
+ }

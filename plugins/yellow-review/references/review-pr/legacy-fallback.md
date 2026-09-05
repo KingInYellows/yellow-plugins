@@ -26,6 +26,17 @@ persona dispatch table and use the pre-Wave-2 adaptive selection:
   `Finding:` findings (no `Fix:` line — Codex's schema has no fix field)
   are nested inside the findings block, not returned as bare prose.
 
+**`reviewer_set` is not consulted on this path.** The membership above is
+fixed. `reviewer_set.include` / `.exclude` in `yellow-plugins.local.md`
+have no effect under `review_pipeline: legacy`, which means the opt-in
+`thermonuclear-reviewer` is unreachable here by design — it is reachable
+only through `include` on the persona path. This is deliberate: legacy is a
+rollback escape hatch whose whole value is that its reviewer set is
+pinned, so a config key that could grow it would defeat the point. A user
+who sets both `review_pipeline: legacy` and
+`reviewer_set.include: [thermonuclear-reviewer]` gets the legacy set with
+no thermonuclear lane and no error.
+
 Same graceful-degradation guard applies. The legacy path is a rollback
 escape hatch only — it skips the dedup / cross-reviewer-promotion /
 confidence-gate sub-steps of Step 6 (sub-steps 2, 3, 8 below), not Step 6

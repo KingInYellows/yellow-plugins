@@ -1,0 +1,43 @@
+diff --git a/src/handlers/order.ts b/src/handlers/order.ts
+--- a/src/handlers/order.ts
++++ b/src/handlers/order.ts
+@@ -12,7 +12,11 @@ export async function handleOrder(req: Request): Promise<Response> {
+   const order = await load(req.params.id);
+-  if (order.state === 'paid') {
++  if (req.query.dryRun) {
++    return preview(order);
++  }
++  if (order.state === 'paid' && !req.query.skipFulfilment) {
+     await fulfil(order);
+   }
+   return ok(order);
+ }
+diff --git a/src/handlers/refund.ts b/src/handlers/refund.ts
+--- a/src/handlers/refund.ts
++++ b/src/handlers/refund.ts
+@@ -8,6 +8,10 @@ export async function handleRefund(req: Request): Promise<Response> {
+   const order = await load(req.params.id);
++  if (req.query.dryRun) {
++    return preview(order);
++  }
++  if (req.query.skipFulfilment) {
++    return ok(order);
++  }
+   await refund(order);
+   return ok(order);
+ }
+diff --git a/src/handlers/cancel.ts b/src/handlers/cancel.ts
+--- a/src/handlers/cancel.ts
++++ b/src/handlers/cancel.ts
+@@ -9,6 +9,12 @@ export async function handleCancel(req: Request): Promise<Response> {
+   const order = await load(req.params.id);
++  if (req.query.dryRun) {
++    return preview(order);
++  }
++  // skipFulfilment means "do not touch the warehouse" here, unlike in
++  // refund.ts where it means "return early".
++  const touchWarehouse = !req.query.skipFulfilment;
++  if (touchWarehouse) await releaseStock(order);
+   await cancel(order);
+   return ok(order);
+ }
