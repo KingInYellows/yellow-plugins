@@ -53,7 +53,9 @@ Dev-server lifecycle state lives in `.claude/browser-test-server.pid` and
 `.claude/browser-test-server.log`.
 
 - `scripts/install-agent-browser.sh` (run by `/browser-test:setup`) pins the
-  `agent-browser` version and hard-fails below Node 22.22.0.
+  `agent-browser` version. It skips the Node check entirely if `agent-browser`
+  is already on `PATH`; otherwise it hard-fails below Node 22.22.0, or warns
+  and continues if Node itself can't be found or its version can't be parsed.
 - Dispatch agents by their three-segment runtime names
   (`yellow-browser-test:testing:app-discoverer`,
   `yellow-browser-test:testing:test-runner`,

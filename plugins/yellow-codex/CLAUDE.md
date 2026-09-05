@@ -99,7 +99,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 No bats suite. Validate with `pnpm validate:codex` (artifact + exposure lint)
 and `pnpm validate:schemas`. The review schema resolves through
-`${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json`; `codex exec review`
+`${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json`; plain `codex exec`
 runs under a 300-second `timeout` (`commands/codex/review.md`).
 
 ## Model Selection
