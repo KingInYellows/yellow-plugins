@@ -200,7 +200,9 @@ tools:
 
 <!-- If this agent reads untrusted input (diffs, PR comments, documents, API
 responses), paste the canonical `## CRITICAL SECURITY RULES` block from
-plugins/yellow-core/skills/security-fencing/SKILL.md here, verbatim. -->
+`${CLAUDE_PLUGIN_ROOT}/skills/security-fencing/SKILL.md`
+(repo-relative: plugins/yellow-core/skills/security-fencing/SKILL.md) here,
+verbatim. -->
 
 ## Task
 

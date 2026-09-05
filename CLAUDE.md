@@ -53,8 +53,11 @@ suite at `skills/git-worktree/tests/`; CI runs both separately). CI installs
 `bats@1.11.0` via npm; locally `pnpm dlx bats@1.11.0 tests/` works when it
 is not on PATH).
 
-The CI gate is `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
-&& pnpm lint && pnpm typecheck`.
+`pnpm validate:schemas && pnpm test:unit && pnpm test:integration && pnpm lint
+&& pnpm typecheck` is a local baseline, not the full CI gate — the
+`ci-status` job in `.github/workflows/validate-schemas.yml` additionally
+requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
+`changeset-check`, `plugin-shell-tests`, and `goal-engine-compat`.
 
 ## Architecture in Four Facts
 
@@ -63,10 +66,13 @@ The CI gate is `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
    (`packages/`, `schemas/`, `scripts/`) gate what can land. `packages/` is
    layered one way — `cli → infrastructure → domain`, `domain` imports nothing —
    and ESLint enforces the direction.
-2. **Manifests are generated.** `.claude-plugin/`, `.agents/`, and each
-   plugin's `.claude-plugin/plugin.json` (including its `hooks` block) are
-   emitted from `catalog/` by `pnpm generate:manifests`; edit the catalog
-   source, regenerate, and expect
+2. **Manifests are generated.** `pnpm generate:manifests` emits the root
+   `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`,
+   and each plugin's `.claude-plugin/plugin.json` (including its `hooks`
+   block) from `catalog/` sources — other root `.claude-plugin/` files
+   (`config.json`, `flags.json`, `registry.schema.json`, `audit/`) have no
+   catalog source and are hand-maintained. Edit the catalog source,
+   regenerate, and expect
    `tests/integration/generate-manifests-characterization.test.ts` to need a
    snapshot refresh (`vitest -u`) when the output legitimately changes.
 3. **Versions sync three ways.** `plugins/<name>/package.json` →
@@ -116,6 +122,11 @@ the colon.
 ### When you change a plugin
 
 1. Run `pnpm validate:schemas` (or the focused validator for your change).
+   Plugin Markdown (agent/command/skill) changes need both
+   `pnpm validate:agents` and `pnpm lint:plugins` — neither
+   `validate:schemas` nor `validate:agents` alone runs the
+   `lint-plugins.yml` convention lint. See AGENTS.md's Targeted
+   Validation Matrix for the rest.
 2. Run `pnpm changeset` and commit the file — CI blocks the PR without it.
 3. Adding or removing a plugin: update `.claude-plugin/marketplace.json` AND
    `plugins/yellow-core/commands/setup/all.md` together, or
