@@ -1,5 +1,6 @@
 ---
 'yellow-review': minor
+'yellow-ci': patch
 ---
 
 Expose `yellow-thermonuclear-review` — and only that skill — to the Cursor
