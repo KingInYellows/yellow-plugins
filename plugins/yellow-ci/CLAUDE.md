@@ -210,6 +210,16 @@ bodies.
 - **morph** — Preferred for applying code fixes to large files (>200 lines).
   Discovered via ToolSearch at runtime; falls back to built-in Edit silently.
 
+## Testing
+
+`bats tests/` from the plugin directory — six suites: `fake-exec`,
+`hook-parity`, `redaction` (gates `redact_secrets()` in
+`hooks/scripts/lib/redact.sh`), `resolve-runner-targets`, `ssh-safety`, and
+`validate` (input validators in `hooks/scripts/lib/validate.sh`). Shared
+harnesses: `tests/lib/redaction-fuzz.bash`, `tests/lib/hook-scenario.bash`.
+`schemas/runner-targets.schema.json` is the validation contract for the
+runner-targets YAML.
+
 ## Codex Distribution
 
 `targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — the **third**

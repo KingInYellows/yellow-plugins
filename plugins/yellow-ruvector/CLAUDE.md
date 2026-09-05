@@ -5,11 +5,12 @@ ruvector.
 
 ## MCP Server
 
-- **ruvector** — Stdio transport via `npx -y ruvector@0.2.34 mcp start`
+- **ruvector** — Stdio transport via `npx -y --ignore-scripts ruvector@0.2.34 mcp start`
   (version-pinned: unpinned npx resolves whatever global is installed —
   a stale 0.2.25 global silently selected the machine-global `~/.ruvector`
   store from worktree sessions. Bump the pin in
-  `catalog/plugins/yellow-ruvector.json` + `scripts/install.sh` together
+  `catalog/plugins/yellow-ruvector.json` + `RUVECTOR_DEFAULT_VERSION` in the
+  plugin-local `scripts/install.sh` together
   and re-verify tool contracts)
 - First MCP start needs network unless the npm exec cache already holds
   `ruvector@0.2.34` from a prior online run — global install alone does
@@ -157,6 +158,15 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
      and fixes, and `type=project` for session summaries
 
 5. If `hooks_remember` fails or is unavailable, skip silently.
+
+## Testing
+
+`bats tests/` from the plugin directory — one suite per hook
+(`session-start`, `user-prompt-submit`, `pre-tool-use`, `post-tool-use`,
+`stop`, `repair-cursor-pretooluse`) plus `validate.bats`. Hook JSON is emitted
+through `hooks/scripts/lib/hook-json.sh`. `hooks/hooks.json` is reference-only
+— Claude Code reads the inline hooks in `plugin.json`; keep the two in sync by
+hand.
 
 ## Known Limitations
 

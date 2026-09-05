@@ -59,7 +59,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   the format `--- redacted credential at line N ---`. See codex-patterns skill
   for the full redaction block (the per-file `gsub` lists are the source of
   truth for which credential shapes are covered).
-- **Git workflow:** Use Graphite (`gt`) for all branch management — never raw
+- **Git workflow:** Use the active stacked-PR provider (see `/stack:status`), not raw
   `git push` or `gh pr create`.
 
 ## Plugin Components
@@ -90,6 +90,17 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 - `review-findings.json` — JSON Schema for structured review output via
   `--output-schema`
+
+### Scripts (1)
+
+- `scripts/install-codex.sh` — invoked by `/codex:setup`
+
+## Testing
+
+No bats suite. Validate with `pnpm validate:codex` (artifact + exposure lint)
+and `pnpm validate:schemas`. The review schema resolves through
+`${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json`; `codex exec review`
+runs under a 300-second `timeout` (`commands/codex/review.md`).
 
 ## Model Selection
 

@@ -151,6 +151,14 @@ Codex agent.)
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
 
+## Testing
+
+`bats tests/redaction.bats` from the plugin directory (the one bats suite CI
+runs as a blocking gate). The awk redaction block under test is extracted from
+`skills/council-patterns/SKILL.md` by `tests/lib/extract-redaction-awk.bash`,
+so edit the patterns in the SKILL — never a copy. There is no fresh-machine
+install CI (see Known Limitations).
+
 ## Known Limitations
 
 - **OpenCode persistent sessions.** Every `opencode run` creates a SQLite
