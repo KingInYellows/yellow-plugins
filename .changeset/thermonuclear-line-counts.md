@@ -9,16 +9,25 @@ the authoritative before/after line totals its size-threshold rule needs.
 A unified diff cannot supply them: hunk headers describe changed regions, not
 file totals, and summing `+`/`-` lines is arithmetic a reviewer gets wrong
 silently. The orchestrator already resolves `DIFF_BASE` in Step 3a, so it
-computes the counts with `git diff -z --numstat` plus `git cat-file -e` /
-`git show`, handling adds (base 0), deletes and binaries (skipped), and
+computes the counts with `git diff -z --numstat --find-renames` plus
+`git cat-file -t` / `git show`, handling adds (base 0), deletes and binaries (skipped), and
 renames (base measured on the old path, so a rename does not read as a
 crossing). Base content is read at `git merge-base "$DIFF_BASE" HEAD`, not at
 `DIFF_BASE`'s tip, so the counts span exactly what the three-dot diff spans —
 reading the tip instead reports a phantom shrink or a phantom crossing on any
 branch whose base has advanced since it was cut, which is the normal state of
 a branch in a stack. Paths are read NUL-delimited so a filename containing a
-space or quote stays intact, and the values go through the same
-literal-delimiter-then-XML sanitization as the pr-context fence.
+quote, backslash, non-ASCII byte, or newline stays intact; a path containing
+a control character, whitespace, or `=` is dropped with a warning because
+it could forge the `base=`/`head=` fields that follow it in a row. The
+values go through the same literal-delimiter-then-XML sanitization as the
+pr-context fence, and the pr-context sanitizer now scrubs the
+file-line-counts delimiters too. The numstat output, file contents, and
+rows are staged in temp files rather than piped, so a failed `git` command
+or a truncated rename record exits the snippet instead of leaving a
+partial block, an unresolved merge-base omits the block, more than 500
+measurable files omits it, and a `file-line-counts rows=N dropped=M`
+header line marks a complete result.
 
 The loop variable is `new_path`, never `path`: in zsh `path` is a special
 array tied to `$PATH`, so naming it `path` replaces the command search path

@@ -294,15 +294,23 @@ describe('opt-in wiring', () => {
     // Partial output would look authoritative; the reviewer only fails
     // closed on a block that is absent outright.
     expect(flat).toContain('do not emit a partial');
-    // -z is what makes a path containing a space or quote safe to read.
-    expect(command).toContain('git diff -z --numstat');
+    // -z is what lets a path containing a quote, backslash, non-ASCII byte,
+    // or newline reach the loop intact; --find-renames pins the rename record
+    // shape regardless of the host's diff.renames setting.
+    expect(command).toContain('git diff -z --numstat --find-renames');
+    // The header is the completeness signal the orchestrator keys on, and an
+    // unresolved merge-base must stop the block rather than read the index.
+    expect(command).toContain("printf 'file-line-counts rows=%s dropped=%s\\n'");
+    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
+    expect(command).toContain('IFS= read -r -d \'\' base_path || exit 1');
+    expect(command).not.toContain('base_path || break');
     // ...and is exactly why a control character has to be dropped: `-z`
     // yields the path RAW, so a PR author who names a file with an embedded
     // newline emits a second, fully-forged `<path> base=N head=M` row —
     // fabricating a threshold crossing on a file the PR never touched, or
     // stating a benign base for one it did. Neither sanitization step
     // touches control characters.
-    expect(command).toContain('*[[:cntrl:]]*)');
+    expect(command).toContain('*[[:cntrl:]]*|*[[:space:]]*|*=*)');
     // `path` is a special array in zsh, tied to $PATH. Naming the loop
     // variable `path` replaces the command search path, after which `git`
     // and `awk` vanish and every row degrades to `base=0 head=` while the
@@ -335,6 +343,13 @@ describe('opt-in wiring', () => {
       '--- begin file-line-counts (reference only) ---'
     );
     expect(command).toContain('--- end file-line-counts ---');
+    // The pr-context sanitizer (item 2) must scrub the new pair too, since the
+    // diff is interpolated before this block in the same prompt.
+    const item2 = command.slice(
+      command.indexOf('Literal-delimiter substitution (REQUIRED'),
+      command.indexOf('6. A `<file-line-counts>` block')
+    );
+    expect(item2).toContain('[ESCAPED] end file-line-counts');
     expect(flat).toContain('must include this block');
     expect(flat).toContain('own two delimiters');
     // `A...HEAD` diffs from the merge-base, so base content must be read
