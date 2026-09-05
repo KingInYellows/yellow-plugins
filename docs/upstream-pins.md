@@ -74,9 +74,8 @@ Pinned engine artifact identity: `0.2.0`
 **not** an npm registry pin: consumers install `goal-gen-0.2.0.tgz` from the
 yellow-goal GitHub Release at annotated tag `v0.2.0`. CI downloads the public
 asset, verifies its SHA-256 before installation, and runs the blocking
-`Released Goal Engine Compatibility` job; `plugins/yellow-goal/tests/
-release-pin.test.ts` fails if `scripts/verify-goal-release.sh` drifts from
-the pin. Runtime checks use `/goal:setup` /
+`Released Goal Engine Compatibility` job. The plugin's `release-pin.test.ts`
+fails if `scripts/verify-goal-release.sh` drifts from the pin. Runtime checks use `/goal:setup` /
 `node dist/cli.js setup` (fail-closed on missing binary or
 `engineVersion` mismatch), not `pnpm check:pins`. Do not treat this as
 advisory.

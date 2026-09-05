@@ -25,7 +25,9 @@ import {
   type ValidatedSummary,
 } from '../src/provider-protocol.js';
 
-const PIN = '0.1.0';
+// Deliberately synthetic: proves the validators are parameterized by the
+// caller rather than reading the module pin.
+const PIN = '9.9.9-test';
 
 function expectGoalError(fn: () => unknown, code: GoalErrorCode): void {
   try {
@@ -625,6 +627,22 @@ describe('RunStreamValidator', () => {
     expect(v.snapshot.summary?.terminationReason).toBe('gate-required');
   });
 
+  it.each([
+    {
+      label: 'wrong schemaVersion',
+      overrides: { schemaVersion: 'yellow-goal/run-event/v2' },
+    },
+    { label: 'missing schemaVersion', overrides: { schemaVersion: undefined } },
+    { label: 'empty type', overrides: { type: '' } },
+    { label: 'missing type', overrides: { type: undefined } },
+  ])('rejects an envelope with $label', ({ overrides }) => {
+    const validator = new RunStreamValidator();
+    expectGoalError(
+      () => validator.accept(start({}, overrides)),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
   it('rejects a runId change mid-stream', () => {
     const v = new RunStreamValidator();
     v.accept(start());
@@ -911,6 +929,56 @@ describe('validateTerminalAgreement', () => {
       terminationReason,
     };
   }
+
+  it('classifies RUN_STDOUT_TRANSPORT_FAILED as transport ahead of any summary', () => {
+    for (const summary of [
+      succeededSummary(),
+      failedSummary(),
+      cancelledSummary('signal'),
+    ]) {
+      expectGoalError(
+        () =>
+          validateTerminalAgreement({
+            exitCode: 1,
+            signal: null,
+            stderr: stderrOf('RUN_STDOUT_TRANSPORT_FAILED', 'drain timeout'),
+            summary,
+          }),
+        'GOAL_PROTOCOL_TRANSPORT'
+      );
+    }
+  });
+
+  it('rejects exit 0 with a failed summary', () => {
+    expectGoalError(
+      () =>
+        validateTerminalAgreement({
+          exitCode: 0,
+          signal: null,
+          stderr: Buffer.alloc(0),
+          summary: failedSummary(),
+        }),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('rejects stderr over the consumer stderr bound as transport', () => {
+    const oversized = Buffer.concat([
+      Buffer.from('{"error":{"code":"RUN_FAILED","message":"'),
+      Buffer.alloc(CONSUMER_LIMITS.maxStderrBytes, 0x61),
+      Buffer.from('"}}\n'),
+    ]);
+    expectGoalError(
+      () =>
+        validateTerminalAgreement({
+          exitCode: 1,
+          signal: null,
+          stderr: oversized,
+          summary: failedSummary(),
+        }),
+      'GOAL_PROTOCOL_TRANSPORT'
+    );
+  });
 
   it('succeeded: exit 0, empty stderr, no signal', () => {
     const outcome = validateTerminalAgreement({

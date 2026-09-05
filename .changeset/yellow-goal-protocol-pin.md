@@ -10,4 +10,6 @@ summary/stderr/exit agreement, and additive protocol error codes with bounded
 diagnostics. The blocking public-artifact job now verifies the asset hash before
 installing it and performs the `capabilities --json` handshake. Existing
 `/goal:setup` and `/goal:request` behavior is unchanged; no run surface is
-exposed yet.
+exposed yet. Operators holding `goal-gen` 0.1.0 must reinstall the
+`goal-gen-0.2.0.tgz` release asset, because `/goal:setup` now fail-closes on the
+old version.

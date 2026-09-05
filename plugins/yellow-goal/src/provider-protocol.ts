@@ -45,8 +45,16 @@ export const CONSUMER_LIMITS = Object.freeze({
   bootstrapMaxStderrBytes: 65_536,
 });
 
-/** A peer may only tighten this bound, never loosen it. */
+/**
+ * Ceiling for the peer's declared writer-finalization budget (the engine
+ * declares 5_000). The consumer owns its own SIGTERM/SIGKILL deadline, so this
+ * declared value is advisory; the ceiling only rejects absurd declarations.
+ */
 const MAX_WRITER_FINALIZATION_TIMEOUT_MS = 60_000;
+
+/** Engine stderr code for stdout transport loss (PP-06/PP-09); it takes
+ *  precedence over any summary status or cancellation cause. */
+const ENGINE_STDOUT_TRANSPORT_CODE = 'RUN_STDOUT_TRANSPORT_FAILED';
 
 // ---------------------------------------------------------------------------
 // Small shared predicates
@@ -746,6 +754,25 @@ type EngineTerminalCode = Extract<
   { kind: 'engine-terminal' }
 >['code'];
 
+/** Best-effort detection of the engine's transport-failure envelope. Parse
+ *  failures are swallowed here; the regular agreement path re-raises them. */
+function isStdoutTransportFailure(stderr: Buffer): boolean {
+  try {
+    const parsed = parseSingleJsonObject(
+      stderr,
+      'stderr',
+      CONSUMER_LIMITS.maxStderrBytes
+    );
+    const errorField = parsed['error'];
+    return (
+      isPlainObject(errorField) &&
+      errorField['code'] === ENGINE_STDOUT_TRANSPORT_CODE
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function validateTerminalAgreement(input: {
   readonly exitCode: number | null;
   readonly signal: string | null;
@@ -756,6 +783,12 @@ export function validateTerminalAgreement(input: {
   const { exitCode, signal, stderr, summary, gateKind } = input;
   if (signal !== null) {
     invalid('process terminated by a signal, not a protocol terminal');
+  }
+  if (exitCode === 1 && stderr.length > 0 && isStdoutTransportFailure(stderr)) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_TRANSPORT',
+      'engine reported stdout transport failure after the summary'
+    );
   }
 
   if (summary.status === 'succeeded') {
@@ -870,7 +903,10 @@ export function classifyPreflightFailure(input: {
   }
 
   if (exitCode === 2 && code === 'USAGE_ERROR') {
-    return new GoalEngineError('GOAL_ENGINE_USAGE_ERROR', message);
+    return new GoalEngineError(
+      'GOAL_ENGINE_USAGE_ERROR',
+      boundedString(message, 400) ?? message
+    );
   }
   if (exitCode === 2 || code === 'USAGE_ERROR') {
     return new GoalEngineError(

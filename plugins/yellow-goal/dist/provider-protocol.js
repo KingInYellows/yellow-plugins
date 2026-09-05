@@ -46,8 +46,15 @@ exports.CONSUMER_LIMITS = Object.freeze({
     bootstrapMaxStdoutBytes: 65_536,
     bootstrapMaxStderrBytes: 65_536,
 });
-/** A peer may only tighten this bound, never loosen it. */
+/**
+ * Ceiling for the peer's declared writer-finalization budget (the engine
+ * declares 5_000). The consumer owns its own SIGTERM/SIGKILL deadline, so this
+ * declared value is advisory; the ceiling only rejects absurd declarations.
+ */
 const MAX_WRITER_FINALIZATION_TIMEOUT_MS = 60_000;
+/** Engine stderr code for stdout transport loss (PP-06/PP-09); it takes
+ *  precedence over any summary status or cancellation cause. */
+const ENGINE_STDOUT_TRANSPORT_CODE = 'RUN_STDOUT_TRANSPORT_FAILED';
 // ---------------------------------------------------------------------------
 // Small shared predicates
 // ---------------------------------------------------------------------------
@@ -563,10 +570,26 @@ class RunStreamValidator {
     }
 }
 exports.RunStreamValidator = RunStreamValidator;
+/** Best-effort detection of the engine's transport-failure envelope. Parse
+ *  failures are swallowed here; the regular agreement path re-raises them. */
+function isStdoutTransportFailure(stderr) {
+    try {
+        const parsed = parseSingleJsonObject(stderr, 'stderr', exports.CONSUMER_LIMITS.maxStderrBytes);
+        const errorField = parsed['error'];
+        return (isPlainObject(errorField) &&
+            errorField['code'] === ENGINE_STDOUT_TRANSPORT_CODE);
+    }
+    catch {
+        return false;
+    }
+}
 function validateTerminalAgreement(input) {
     const { exitCode, signal, stderr, summary, gateKind } = input;
     if (signal !== null) {
         invalid('process terminated by a signal, not a protocol terminal');
+    }
+    if (exitCode === 1 && stderr.length > 0 && isStdoutTransportFailure(stderr)) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'engine reported stdout transport failure after the summary');
     }
     if (summary.status === 'succeeded') {
         if (exitCode !== 0)
@@ -656,7 +679,7 @@ function classifyPreflightFailure(input) {
         return new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', 'preflight stderr error has an invalid code/message shape');
     }
     if (exitCode === 2 && code === 'USAGE_ERROR') {
-        return new errors_js_1.GoalEngineError('GOAL_ENGINE_USAGE_ERROR', message);
+        return new errors_js_1.GoalEngineError('GOAL_ENGINE_USAGE_ERROR', boundedString(message, 400) ?? message);
     }
     if (exitCode === 2 || code === 'USAGE_ERROR') {
         return new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', 'preflight exit code and USAGE_ERROR disagree');

@@ -66,9 +66,15 @@ describe('released engine pin provenance', () => {
 
   it('verifies the asset hash before installing it', () => {
     const hashIndex = verifier.indexOf('sha256sum "$asset"');
+    const compareIndex = verifier.indexOf(
+      '"$actual_sha" != "$PINNED_ENGINE_ASSET_SHA256"'
+    );
+    const exitIndex = verifier.indexOf('exit 1', compareIndex);
     const installIndex = verifier.indexOf('npm install');
     expect(hashIndex).toBeGreaterThan(-1);
-    expect(installIndex).toBeGreaterThan(hashIndex);
+    expect(compareIndex).toBeGreaterThan(hashIndex);
+    expect(exitIndex).toBeGreaterThan(compareIndex);
+    expect(installIndex).toBeGreaterThan(exitIndex);
     expect(verifier).toContain('--ignore-scripts');
   });
 });
