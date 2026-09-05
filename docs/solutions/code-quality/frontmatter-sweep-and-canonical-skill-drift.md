@@ -94,3 +94,58 @@ exact terms must appear consistently in all prose, headings, and examples.
 - `docs/solutions/code-quality/stale-env-var-docs-and-prose-count-drift.md`
 - `docs/solutions/code-quality/cross-plugin-documentation-correctness.md`
 - `docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md`
+
+---
+
+## Update — 2026-09-05
+
+### Sweeps That Fix a Convention Everywhere Except in the Two Plugins That Define It (PR #750)
+
+A currency sweep across `docs/CLAUDE.md` and all 19 plugin `CLAUDE.md` files
+replaced hardcoded "use Graphite" prose with the provider-neutral
+`/stack:status` rule in five plugins — but left the old hardcoded language in
+`plugins/yellow-core/CLAUDE.md` and `plugins/yellow-review/CLAUDE.md`, the two
+plugins that respectively *own* the provider-neutral abstraction
+(`stack-operation-registry.js`) and *consume* it most heavily in review
+orchestration. `validate-provider-neutral-commands.js` did not catch the gap
+because it only lints mutating subcommands (`gt submit`, `gt merge`, etc.),
+not bare prose statements like "Use Graphite for this."
+
+This is the same failure mode as pattern #1 above (frontmatter sweep misses
+structurally-equivalent files) with a sharper edge: the two files missed
+were not random stragglers, they were the plugins with the *strongest* claim
+to being updated first, because they define and consume the very thing the
+sweep was standardizing on. A sweep's mental model of "which files use this
+convention" can silently exclude the convention's own source and heaviest
+consumer, precisely because their role in the system makes an author assume
+they're already correct.
+
+#### Rule: Grep the Full Convention Surface, Including the Owner and Heaviest Consumer
+
+Before closing a cross-plugin prose sweep, explicitly check the plugin(s)
+that own or most heavily consume the convention being swept, even (especially)
+if they seem obviously already-compliant:
+
+```bash
+rg -n 'Graphite|gt-workflow' plugins/*/CLAUDE.md
+```
+
+Any hit that isn't the resolved-provider pattern (`/stack:status`, resolved
+provider commands) after the sweep is a miss — regardless of whether that
+plugin owns the abstraction being standardized on.
+
+#### Validator Scope Gap Is a Separate, Explicit Finding
+
+`validate-provider-neutral-commands.js` catching only mutating subcommands
+and not prose is a real scope gap, not just "the sweep missed a file." When a
+sweep's target pattern (hardcoded provider names in prose) has no
+corresponding CI gate, either extend the validator in the same PR or call out
+the gap explicitly in the PR description so it isn't silently assumed to be
+covered.
+
+## Related Documentation (2026-09-05 addendum)
+
+- `docs/solutions/workflow/skill-split-caveat-and-claude-md-drift.md` — the
+  sibling pattern for structural splits leaving satellite files stale; this
+  update is the prose-sweep analogue where the "satellite" is the
+  abstraction's own owner/consumer plugin
