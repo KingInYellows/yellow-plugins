@@ -12,6 +12,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { PINNED_ENGINE_VERSION } from '../dist/pin.js';
+import {
+  CONSUMER_LIMITS,
+  parseSingleJsonObject,
+  validateCapabilities,
+  validateVersionProbe,
+} from '../dist/provider-protocol.js';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'dist', 'cli.js');
 const bin = process.env.GOAL_GEN_BIN;
@@ -51,7 +59,38 @@ try {
   const version = invoke(bin, ['version', '--json']);
   assert.equal(version.status, 0);
   assert.equal(version.stderr, '');
-  assert.equal(json(version.stdout).engineVersion, '0.1.0');
+  assert.equal(json(version.stdout).engineVersion, PINNED_ENGINE_VERSION);
+  assert.equal(
+    validateVersionProbe(
+      parseSingleJsonObject(
+        Buffer.from(version.stdout, 'utf8'),
+        'version stdout',
+        CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+      ),
+      PINNED_ENGINE_VERSION
+    ),
+    PINNED_ENGINE_VERSION
+  );
+  // Provider Protocol v1 discovery handshake against the public artifact:
+  // static, offline, and validated by the consumer's own observable-data
+  // guards (never a copied engine schema).
+  const capabilities = invoke(bin, ['capabilities', '--json']);
+  assert.equal(capabilities.status, 0);
+  assert.equal(capabilities.stderr, '');
+  const validated = validateCapabilities(
+    parseSingleJsonObject(
+      Buffer.from(capabilities.stdout, 'utf8'),
+      'capabilities stdout',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+  assert.equal(validated.engineVersion, PINNED_ENGINE_VERSION);
+  assert.equal(validated.protocolVersion, 'yellow-goal/provider-protocol/v1');
+  const capabilitiesUsage = invoke(bin, ['capabilities', 'extra']);
+  assert.equal(capabilitiesUsage.status, 2);
+  assert.equal(capabilitiesUsage.stdout, '');
+  assert.equal(json(capabilitiesUsage.stderr).error.code, 'USAGE_ERROR');
   for (const args of [
     ['setup'],
     [
@@ -125,7 +164,7 @@ try {
     before
   );
   process.stdout.write(
-    `release process smoke passed: ${checks} invocations; no run or provider operations\n`
+    `release process smoke passed: ${checks} invocations; version/capabilities/create/validate only, no run or provider operations\n`
   );
 } finally {
   rmSync(scratch, { recursive: true, force: true });

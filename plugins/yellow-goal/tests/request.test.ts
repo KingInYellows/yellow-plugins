@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import { GoalEngineError } from '../src/errors.js';
+import { PINNED_ENGINE_VERSION } from '../src/pin.js';
 import { requestCreate, requestValidate } from '../src/runtime.js';
 import type { SpawnEngine, SpawnResult } from '../src/spawn.js';
 
 function spawnOf(result: SpawnResult): SpawnEngine {
   return (args) =>
     args[0] === 'version'
-      ? { exitCode: 0, stdout: '{"engineVersion":"0.1.0"}\n', stderr: '' }
+      ? {
+          exitCode: 0,
+          stdout: `{"engineVersion":"${PINNED_ENGINE_VERSION}"}\n`,
+          stderr: '',
+        }
       : result;
 }
 

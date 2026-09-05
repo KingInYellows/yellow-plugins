@@ -12,7 +12,7 @@ allowed-tools:
 # Set Up yellow-goal
 
 Probe the yellow-goal engine as a **process**. Never import its TypeScript. The
-pin is `0.1.0` (`plugins/yellow-goal/src/pin.ts`). Mismatch or a missing binary
+pin is `0.2.0` (`plugins/yellow-goal/src/pin.ts`). Mismatch or a missing binary
 is fail-closed.
 
 ## Workflow
