@@ -690,3 +690,19 @@ describe('runStub zero-spend invariant and cooperative pre-admission closes', ()
     expect(err.localCause).toBe('caller-cancelled');
   });
 });
+
+describe('runStub cost exception is keyed to the actual terminal', () => {
+  it('rejects a nonzero cost on a budget-exhausted request that ended cancelled', async () => {
+    const err = await expectGoalError(
+      runStub(
+        makeDeps({
+          FAKE_PROVIDER_RUN_MODE: 'gate-required',
+          FAKE_PROVIDER_COST_USD: '20',
+        }),
+        baseInput({ scenario: 'budget-exhausted', yes: false })
+      ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expect(err.message).toContain('nonzero cost');
+  });
+});
