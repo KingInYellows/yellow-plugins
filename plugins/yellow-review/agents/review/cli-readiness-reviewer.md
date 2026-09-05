@@ -121,9 +121,12 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 
 Return your findings as the standard yellow-review compact-return JSON schema
 shown below. Report every finding you identify, each with a confidence score and
-severity. Do not filter by confidence or cap the count — the orchestrator
-applies the 75 gate after aggregation, and a finding it later drops costs
-less than a real issue silently omitted here.
+severity. Do not filter by confidence — the orchestrator applies the 75 gate
+after aggregation, and a finding it later drops costs less than a real issue
+silently omitted here. If the list would exceed your compact-return output
+budget, rank by severity then confidence and stop before the JSON would
+truncate — Step 5 validation drops an entire malformed return, so never emit
+partial JSON.
 
 ```json
 {
