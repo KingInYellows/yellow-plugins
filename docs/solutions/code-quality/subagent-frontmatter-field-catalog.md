@@ -60,6 +60,7 @@ every field below. See [Version Changelog](#version-changelog).
 | `hooks` | event → handler mapping | none | v2.0.42 |
 | `initialPrompt` | string | none | SDK-level |
 | `color` | `red`/`blue`/`green`/`yellow`/`purple`/`orange`/`pink`/`cyan` | none | undocumented until GH #19292 |
+| `experimental.cacheTtl` | `5m` or `1h` (nested under `experimental:`) | provider default | documented in the sub-agents reference; verified on 2.1.259 |
 
 ### `effort` tier-selection rule (high vs xhigh vs max)
 
@@ -137,6 +138,19 @@ frontmatter shape and `subagent_type` references; nothing cross-checks a
 prose-mandated tool name against the `tools:` allowlist. Check manually:
 after wording a Step as "must call X" or "X exclusively," grep the same
 file's frontmatter `tools:` list for the exact tool name as written there.
+
+### `experimental.cacheTtl`
+
+Chooses the prompt-cache lifetime for the subagent's own requests: `5m` or
+`1h`, written as a nested map (`experimental:` → `cacheTtl: 1h`), never at
+the top level. Claude Code ignores any other value, ignores `1h` while a
+subscription is drawing on usage credits, and reads the field only from
+subagent files. Worth setting on personas that are re-dispatched many times
+per session with a stable system prompt (the `/review:pr` always-on
+reviewers, `code-simplifier`, and `learnings-researcher` carry it since
+2026-09-02); pointless on
+one-shot agents. The validator parses the nested map without complaint
+(covered by a fixture in `validate-agent-authoring-model-effort-rules.test.ts`).
 
 ### `isolation: worktree`
 
@@ -332,6 +346,6 @@ tools: Read, Bash, Glob
 | v2.1.90+ | 2026-04 | `@mention` typeahead for agents added |
 | v2.1.117+ | 2026-04 | `mcpServers` frontmatter honored in `claude --agent <name>` main-thread mode |
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
-| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added |
+| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added; `experimental.cacheTtl` (`5m`/`1h` nested under `experimental:`) documented from the 2.1.259 check |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.
