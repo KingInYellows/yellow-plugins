@@ -324,3 +324,45 @@ console.log('[check-readme-count] ok');
 ```
 
 Add to `package.json` scripts: `"check:readme": "node scripts/check-readme-count.js"` and invoke in CI alongside `validate:schemas`.
+
+---
+
+## Update — 2026-09-05
+
+### Plugin CLAUDE.md Testing Sections: A Validator That Explicitly Skips the File Class (PR #750)
+
+A currency sweep across all 19 plugin `CLAUDE.md` files added new Testing
+sections that hand-write derivable counts — "eleven skills", "eight suites" —
+directly into prose (e.g. `plugins/gt-workflow/CLAUDE.md:271`). This is the
+same recurring failure as the README/MCP-count drift above, but in a fifth
+location this doc hadn't previously enumerated: **per-plugin `CLAUDE.md`
+Testing sections**, and with a twist — `validate-doc-counts.js` already
+exists in this repo and explicitly skips `plugins/*/CLAUDE.md` in its glob.
+So this isn't merely "no CI check enforces it" (the general case above); it's
+"a CI check for exactly this exists, and was deliberately scoped to exclude
+the file class the sweep just wrote fresh counts into."
+
+#### Why This Is Worse Than a Missing Check
+
+An absent validator is a known gap anyone can rediscover by asking "what
+checks this?" A validator that exists but silently excludes a file class
+looks, from the outside, like the problem is covered — until someone counts
+by hand and finds it stale. Before adding a new prose count to any file,
+check whether an existing count-drift validator's glob covers that file
+before assuming either "there's no check for this" or "the existing check
+has me covered."
+
+#### Rule: Extend the Validator or Don't Write the Count
+
+When adding a new Testing/coverage section to a plugin `CLAUDE.md` that
+would state a count of skills, suites, agents, or commands:
+
+1. Check `validate-doc-counts.js`'s glob first — if `plugins/*/CLAUDE.md` is
+   excluded, either extend the glob in the same PR or drop the bare count
+   and keep only the non-derivable content (what a suite covers, known
+   gotchas) instead of a number that will silently drift.
+2. If extending the validator's scope is out of scope for the current PR,
+   say so explicitly in the PR description rather than leaving the gap
+   implicit — matching the "call out the validator gap" rule in
+   `docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md`'s
+   2026-09-05 update.
