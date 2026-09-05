@@ -10,7 +10,7 @@ source of truth.
 
 Plugins are authored once under `catalog/` and `plugins/<name>/`, then **per-host
 artifacts are generated** — never hand-edited. Three distribution targets exist
-today: Claude, Codex, and Cursor (the last is a single-plugin pilot; see
+today: Claude, Codex, and Cursor (the last is a two-plugin pilot; see
 [cursor-distribution.md](cursor-distribution.md) for its own canonical doc).
 This doc covers the Codex target only:
 
