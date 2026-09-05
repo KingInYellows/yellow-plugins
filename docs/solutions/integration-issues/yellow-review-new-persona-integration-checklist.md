@@ -1,6 +1,8 @@
 ---
 title: 'Opt-in review personas need an identity row, not just a trigger row'
 category: integration-issues
+track: knowledge
+problem: Opt-in review personas registered only by absence from the trigger tables leave the orchestrator with no subagent_type or category mapping, and agent+skill contracts copied by hand drift silently without a sync test.
 tags: [reviewer-registration, dispatch-table, opt-in-config, agent-skill-drift, schema-duplication, byte-identity-test]
 module: yellow-review
 date: 2026-09-05

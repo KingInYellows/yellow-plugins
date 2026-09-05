@@ -41,10 +41,7 @@ const SNAPSHOT_DIR = resolve(
   REPO_ROOT,
   'RESEARCH/upstream-snapshots/6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf'
 );
-const UPSTREAM_LICENSE_PATH = resolve(
-  SNAPSHOT_DIR,
-  'cursor-team-kit/LICENSE'
-);
+const UPSTREAM_LICENSE_PATH = resolve(SNAPSHOT_DIR, 'cursor-team-kit/LICENSE');
 
 const PINNED_COMMIT = '6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf';
 const SKILL_BLOB_SHA = 'ac76a2bc88bb2d895e83ab1788aa584a82346cfc';
@@ -122,7 +119,9 @@ describe('thermonuclear-reviewer agent', () => {
     expect(frontmatter(agent)).toMatch(
       /^\s*-\s*yellow-thermonuclear-review\s*$/m
     );
-    expect(frontmatter(skill)).toMatch(/^name:\s*yellow-thermonuclear-review\s*$/m);
+    expect(frontmatter(skill)).toMatch(
+      /^name:\s*yellow-thermonuclear-review\s*$/m
+    );
   });
 
   it('describes itself as opt-in, not as auto-selected', () => {
@@ -172,8 +171,12 @@ describe('thermonuclear-reviewer agent', () => {
   it('states no persona-side confidence cutoff', () => {
     // Step 6 gates once. A second cutoff here would silently drop findings
     // the aggregator was built to weigh.
-    expect(flatten(agent)).toContain('There is no persona-side confidence cutoff');
-    expect(flatten(agent)).toContain('Report every finding at or above anchor 50');
+    expect(flatten(agent)).toContain(
+      'There is no persona-side confidence cutoff'
+    );
+    expect(flatten(agent)).toContain(
+      'Report every finding you identify, with its calibrated confidence anchor'
+    );
   });
 
   it('fails closed when file line counts are unavailable', () => {
@@ -212,7 +215,9 @@ describe('yellow-thermonuclear-review skill', () => {
     // Only SKILL.md and a flat references/*.md reach the Cursor and Codex
     // targets, and neither host applies the agent's `tools:` restriction.
     // The rails have no textual basis on those hosts unless they live here.
-    expect(flatten(skill)).toMatch(/Report only\. Never mutate the repository\./);
+    expect(flatten(skill)).toMatch(
+      /Report only\. Never mutate the repository\./
+    );
     expect(flatten(skill)).toMatch(/never instruction/i);
     expect(skill).toContain('--- code begin (reference only) ---');
   });
@@ -249,19 +254,39 @@ describe('yellow-thermonuclear-review skill', () => {
 describe('opt-in wiring', () => {
   it('appears in neither dispatch table', () => {
     const command = readFileSync(
-      resolve(
-        REPO_ROOT,
-        'plugins/yellow-review/commands/review/review-pr.md'
-      ),
+      resolve(REPO_ROOT, 'plugins/yellow-review/commands/review/review-pr.md'),
       'utf8'
     );
-    // A row in either table would make it auto-select and defeat opt-in.
-    expect(command).not.toContain(
+    // A row in either auto-dispatch table would make it auto-select and
+    // defeat opt-in. The "Opt-in only" table (checked below) is allowed to
+    // carry the subagent_type — it never triggers automatic dispatch.
+    const alwaysOnStart = command.indexOf('#### Always-on personas');
+    const optInStart = command.indexOf('#### Opt-in only');
+    expect(alwaysOnStart).toBeGreaterThan(-1);
+    expect(optInStart).toBeGreaterThan(alwaysOnStart);
+    const autoDispatchTables = command.slice(alwaysOnStart, optInStart);
+    expect(autoDispatchTables).not.toContain(
       'yellow-review:review:thermonuclear-reviewer'
     );
     // It emits compact-return JSON directly, so listing it among the
     // legacy-prose reviewers would corrupt every return it makes.
     expect(command).not.toMatch(/`thermonuclear-reviewer`[^\n]*legacy/);
+  });
+
+  it('registers a non-triggering opt-in mapping to its subagent_type', () => {
+    const command = readFileSync(
+      resolve(REPO_ROOT, 'plugins/yellow-review/commands/review/review-pr.md'),
+      'utf8'
+    );
+    const optInStart = command.indexOf('#### Opt-in only');
+    const guardStart = command.indexOf('#### Graceful-degradation guard');
+    expect(optInStart).toBeGreaterThan(-1);
+    expect(guardStart).toBeGreaterThan(optInStart);
+    const optInSection = command.slice(optInStart, guardStart);
+    expect(optInSection).toContain(
+      '`thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability'
+    );
+    expect(flatten(optInSection)).toMatch(/never auto-select/);
   });
 
   it('is documented as the reachable-only-via-include reviewer', () => {
@@ -289,10 +314,7 @@ describe('opt-in wiring', () => {
 
 describe('upstream snapshot', () => {
   it('has a MANIFEST with a runnable drift-verification script', () => {
-    const manifest = readFileSync(
-      resolve(SNAPSHOT_DIR, 'MANIFEST.md'),
-      'utf8'
-    );
+    const manifest = readFileSync(resolve(SNAPSHOT_DIR, 'MANIFEST.md'), 'utf8');
     expect(manifest).toContain('cursor/plugins');
     expect(manifest).toContain(PINNED_COMMIT);
     expect(manifest).toContain(SKILL_BLOB_SHA);

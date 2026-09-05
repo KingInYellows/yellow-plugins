@@ -363,6 +363,22 @@ Spawn unconditionally:
 |-------|---------------|---------|
 | `codex-reviewer` | `yellow-codex:review:codex-reviewer` | yellow-codex installed AND gross line count > 100 |
 
+#### Opt-in only (never auto-selected)
+
+Not spawned by any trigger above. Dispatched only when named in
+`reviewer_set.include`:
+
+| Agent | subagent_type | Reviewer category |
+|-------|---------------|-------------------|
+| `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
+
+A row in this table never auto-selects the agent — the always-on and
+conditional tables above are exhaustive for automatic dispatch. This is
+the only registry entry that maps the bare `thermonuclear-reviewer` name
+from `reviewer_set.include` to a spawnable `subagent_type`; without it the
+opt-in path has no mapping to dispatch. The graceful-degradation guard
+below covers this table too.
+
 #### Graceful-degradation guard (mandatory)
 
 For each agent above, attempt the Agent spawn. If the spawn fails with an

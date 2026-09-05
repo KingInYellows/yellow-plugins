@@ -153,9 +153,24 @@ not a local sibling of this SKILL.md):
 
 - `plugins/yellow-browser-test/agents/testing/` (1) — app-discoverer
 
+**Document variant** (untrusted document content, not source code):
+
+- `plugins/yellow-docs/agents/review/` (7) —
+  adversarial-document-reviewer, coherence-reviewer, design-lens-reviewer,
+  feasibility-reviewer, product-lens-reviewer, scope-guardian-reviewer,
+  security-lens-reviewer
+
+**Session-transcript variant** (untrusted `transcript_tail` fields, not
+source code):
+
+- `plugins/yellow-core/agents/workflow/` (3) — staging-promoter,
+  staging-reviewer, staging-scorer
+
 The list above is hand-maintained and may drift; rerun the
 machine-verifiable one-liner above before relying on counts. Sum of
-per-directory counts here = **34**, matching the one-liner output.
+per-directory counts here = **48**, plus the 2 non-agent files noted above
+(`yellow-core/README.md` and `create-agent-skills/SKILL.md`, both outside
+`agents/`) = **50**, matching the one-liner output.
 
 ### Why this is a documentation skill, not an agent-injection skill
 
