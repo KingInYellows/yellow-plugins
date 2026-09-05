@@ -1373,9 +1373,9 @@ describe('GoalEngineError diagnostics extras (errors.ts additive)', () => {
     ['GOAL_RUN_ENGINE_TIMEOUT', false],
     ['GOAL_RUN_CANCELLED', false],
     ['GOAL_RUN_DEADLINE_EXCEEDED', true],
-  ])('sets retryable=%s for %s correctly', (code, expectedFirst) => {
+  ])('%s sets retryable=%s', (code, expectedRetryable) => {
     const err = new GoalEngineError(code, 'x');
-    expect(err.retryable).toBe(expectedFirst);
+    expect(err.retryable).toBe(expectedRetryable);
     expect(typeof err.recoveryAction).toBe('string');
     expect(err.recoveryAction.length).toBeGreaterThan(0);
   });

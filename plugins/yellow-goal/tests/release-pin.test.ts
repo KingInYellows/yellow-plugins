@@ -65,7 +65,9 @@ describe('released engine pin provenance', () => {
   });
 
   it('verifies the asset hash before installing it', () => {
-    const hashIndex = verifier.indexOf('sha256sum "$asset"');
+    const hashIndex = verifier.indexOf('actual_sha="$(sha256_of "$asset")"');
+    expect(verifier).toContain('sha256sum "$1"');
+    expect(verifier).toContain('shasum -a 256 "$1"');
     const compareIndex = verifier.indexOf(
       '"$actual_sha" != "$PINNED_ENGINE_ASSET_SHA256"'
     );

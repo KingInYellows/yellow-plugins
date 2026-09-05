@@ -18,7 +18,18 @@ curl --fail --silent --show-error --location --retry 3 --output "$asset" \
   "$PINNED_ENGINE_ASSET_URL"
 
 # Verify the public asset hash BEFORE anything from it is installed.
-actual_sha="$(sha256sum "$asset" | awk '{print $1}')"
+# GitHub-hosted Linux runners ship sha256sum; macOS developers have shasum.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    echo "neither sha256sum nor shasum is available to verify the release asset" >&2
+    return 1
+  fi
+}
+actual_sha="$(sha256_of "$asset")"
 if [ "$actual_sha" != "$PINNED_ENGINE_ASSET_SHA256" ]; then
   echo "released goal-gen asset SHA-256 mismatch: expected $PINNED_ENGINE_ASSET_SHA256, got $actual_sha" >&2
   exit 1
