@@ -174,8 +174,11 @@ behavior is schema/unit/parity-tested, not live-verified.
 compaction-preservation instruction that Claude Code appends to the compaction
 prompt. It is read-only — no network, no file writes — and always exits 0, so
 it can never block a compaction (exit 2 would). The instruction requires
-preserved CLI output to be wrapped in the untrusted-content fence so error
-text cannot re-enter as trusted context after compaction.
+unchecked plan tasks and preserved CLI output to be wrapped in the
+untrusted-content fence so instruction-like text cannot re-enter as trusted
+context after compaction, and requires detected secrets in failing-command
+output to be replaced with `--- redacted credential at line N ---` before
+preservation.
 
 ### yellow-ruvector Hooks (detailed)
 
