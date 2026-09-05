@@ -249,7 +249,7 @@ Markdown output style, or RULES 5b/5c fail the manifest.
   "dependencies": [
     {
       "name": "yellow-core",
-      "version": "^1.17.1",
+      "version": ">=1.17.1",
       "optional": false,
       "reason": "credential_hook_scaffold in lib/credential-status.sh (SessionStart hook) and validate_file_path() in lib/validate-fs.sh"
     }
@@ -424,7 +424,13 @@ files unless `Write`/`Edit` are in `tools:` and the task asks for it.
 
 ---
 
-## Lifecycle Script Templates
+## Manually-Invoked Setup Script Templates
+
+Claude Code does not run these automatically — there is no `lifecycle` key in
+the schema. Wire the setup/teardown steps you need into a `SessionStart` hook
+(see the full-featured example above) if they must run without user action,
+or document these as scripts the user runs by hand (e.g. `npm run install`,
+`./scripts/uninstall.sh`).
 
 ### Install Script
 
@@ -556,6 +562,12 @@ The `start-example-api.sh` wrapper (same three-element pattern as the
 full-featured template above) resolves `userConfig` before the shell env
 fallback and rejects an empty credential at MCP startup.
 
+A `sensitive: true` field like `example_api_token` also requires the
+`SessionStart` credential-status hook and `yellow-core` dependency shown in
+the full-featured example above, or `/setup:all` reports its credential
+state as unknown even after configuration — see
+[docs/plugin-credential-status-protocol.md](plugin-credential-status-protocol.md).
+
 ### Pattern 3: Shell Command Plugin
 
 ```json
@@ -565,7 +577,7 @@ fallback and rejects an empty credential at MCP startup.
     {
       "name": "yellow-core",
       "version": "^1.0.0",
-      "reason": "hooks/scripts/guard-shell.sh sources yellow-core/lib/validate-fs.sh"
+      "reason": "hooks/scripts/lib/validate.sh sources yellow-core/lib/validate-fs.sh for validate_file_path"
     }
   ]
 }

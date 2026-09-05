@@ -591,14 +591,16 @@ flag's value.
 
 ---
 
-### 17. Task Tool Over Agent Tool in Commands
+### 17. Bareword Agent Dispatch Without subagent_type
 
-Commands must use `Task` (with `subagent_type`) to spawn agents, not the `Agent`
-tool directly. Every established plugin in this repository follows the `Task`
-convention. The `Agent` tool works at runtime, but using it bypasses
-cross-reference validation -- when commands use `Task` with an explicit
-`subagent_type`, the validator and review agents can verify the agent name
-exists and matches a registered agent file.
+Commands must use the `Agent` tool (renamed from `Task` in Claude Code
+2.1.63; `Task` remains a backward-compatible alias) with an explicit
+`subagent_type` to spawn agents -- never a bareword instruction that leaves
+the agent identity implicit. Every established plugin in this repository
+follows the `Agent(subagent_type=...)` convention. Dispatching without a
+literal `subagent_type` bypasses cross-reference validation -- when commands
+supply an explicit `subagent_type`, the validator and review agents can
+verify the agent name exists and matches a registered agent file.
 
 **WRONG:**
 ```markdown
@@ -606,27 +608,25 @@ Step 3: Use the Agent tool to spawn the doc-auditor agent.
 Provide the file list as context.
 ```
 
-The `Agent` tool does not take `subagent_type`, so the agent identity is
-implicit and unverifiable. There is no way to statically check which agent
-was invoked, and the LLM may spawn a generic agent instead of the intended
-specialist.
+Without a literal `subagent_type`, the agent identity is implicit and
+unverifiable. There is no way to statically check which agent was invoked,
+and the LLM may spawn a generic agent instead of the intended specialist.
 
 **RIGHT:**
 ```markdown
-Step 3: Use the Task tool to spawn the doc-auditor agent:
+Step 3: Use the Agent tool to spawn the doc-auditor agent:
   subagent_type: "yellow-docs:doc-auditor"
   description: "Audit staleness of documentation files"
   (exact name: field from plugins/yellow-docs/agents/doc-auditor.md)
 ```
 
-**Rule:** Commands always delegate to agents via `Task` with a literal
-`subagent_type`. Reserve the `Agent` tool for ad-hoc user-initiated work
-where a specific agent identity is not needed. If a command uses `Agent`,
-treat it as a review finding.
+**Rule:** Commands always delegate to agents via `Agent` (or its `Task`
+alias) with a literal `subagent_type`. If a command dispatches an agent
+without a literal `subagent_type`, treat it as a review finding.
 
 **Note:** This extends anti-pattern #4 (subagent_type naming). Pattern #4
-covers getting the name right; this pattern covers using the right tool
-in the first place.
+covers getting the name right; this pattern covers requiring an explicit
+`subagent_type` at all.
 
 ---
 
