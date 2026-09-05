@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Read-only yellow-goal engine bridge — probe a pinned goal-gen process and create/validate request packets. Never imports the engine.",
+  "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

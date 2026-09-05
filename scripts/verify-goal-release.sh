@@ -38,3 +38,5 @@ fi
 npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund "$asset"
 GOAL_GEN_BIN="$consumer/node_modules/.bin/goal-gen" \
   node plugins/yellow-goal/tests/release-smoke.mjs
+GOAL_GEN_BIN="$consumer/node_modules/.bin/goal-gen" \
+  node plugins/yellow-goal/tests/release-protocol-smoke.mjs

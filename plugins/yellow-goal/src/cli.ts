@@ -195,7 +195,11 @@ function isParseArgsError(err: unknown): err is Error {
 }
 
 function isUsageError(err: unknown): err is Error {
-  return err instanceof UsageError || isParseArgsError(err);
+  return (
+    err instanceof UsageError ||
+    isParseArgsError(err) ||
+    (err instanceof GoalEngineError && err.code === 'GOAL_INVALID_INPUT')
+  );
 }
 
 async function main(): Promise<void> {

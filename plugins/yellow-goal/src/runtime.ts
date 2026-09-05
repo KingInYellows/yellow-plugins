@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+
 import { GoalEngineError, type GoalErrorLocalCause } from './errors.js';
 import { PINNED_ENGINE_VERSION } from './pin.js';
 import {
@@ -394,7 +396,22 @@ export async function runStub(
 ): Promise<RunStubResult> {
   validateScenario(input.scenario);
   validateTimeoutMs(input.timeoutMs, input.scenario);
+  const pinnedScratch = deps.env['GOAL_GEN_SCRATCH'];
+  const scratchDir = createOperationScratchDir(deps.env);
+  try {
+    return await runStubInScratch(deps, input, scratchDir);
+  } finally {
+    if (typeof pinnedScratch !== 'string' || pinnedScratch.length === 0) {
+      rmSync(scratchDir, { recursive: true, force: true });
+    }
+  }
+}
 
+async function runStubInScratch(
+  deps: ProtocolRuntimeDeps,
+  input: RunStubInput,
+  scratchDir: string
+): Promise<RunStubResult> {
   const controller = new AbortController();
   let localCause: GoalErrorLocalCause | undefined;
   const deadlineAt =
@@ -433,7 +450,6 @@ export async function runStub(
   checkNotCancelled();
 
   const bin = resolveEngineBin(deps.env);
-  const scratchDir = createOperationScratchDir(deps.env);
   const env = buildChildEnv({
     sourceEnv: deps.env,
     scratchDir,
