@@ -213,6 +213,56 @@ executable code), AI agents copy these patterns directly. Stale references in
 secondary documentation paths are functionally equivalent to bugs in code
 because they cause agents to use incorrect patterns.
 
+## Update — 2026-09-05
+
+### Same cascade pattern for prose fixes across near-identical sibling agent files, not just API migrations
+
+PR #743 (removing persona-side confidence filtering and finding caps from
+four reviewer agents so the orchestrator's single 75-point gate is the only
+filter) fixed a stale sentence in one persona file but left the identical
+stale sentence in its near-duplicate siblings:
+
+- `plugins/yellow-review/agents/review/agent-native-reviewer.md` had its
+  "surfaces only as P0 escape" bullet corrected to match the persona's
+  schema (which forbids emitting P0 directly).
+- `plugins/yellow-review/agents/review/cli-readiness-reviewer.md:101` and
+  `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md:223`
+  — near-identical "Anchor-50" bullets in sibling personas — still said the
+  old, now-incorrect thing.
+
+Separately in the same PR, `plugins/yellow-review/CLAUDE.md:24` and
+`README.md:81` were both updated to point at "`/review:all` Step 9" for the
+confidence gate, but the gate actually lives at a nested sub-step (Step 8,
+sub-step 9) — top-level Step 9 is "Apply fixes." Both files got the same
+wrong reference in the same edit, which is the inverse failure of the first
+example (one wrong value copied to N places instead of one fix not
+propagated to N places) but comes from the same root cause: no single
+canonical location for step numbers / persona-schema invariants, so every
+site that repeats them can independently drift.
+
+This generalizes the original finding beyond "API migration": **any prose
+fix applied to one of several near-duplicate files (sibling reviewer
+personas, parallel setup docs, repeated cross-references to a numbered
+step) needs an explicit sibling-file sweep**, not just a sweep for stale
+references to a changed API. Detection Step 2's grep approach still applies
+— grep for the exact old sentence/phrase across the sibling file set, not
+just across "documentation" broadly:
+
+```bash
+# Find sibling persona files still carrying the pre-fix sentence
+rg -n --include='*.md' 'surfaces only as P0 escape' plugins/yellow-review/agents/
+
+# Find all cross-references to a specific step number that may be stale
+# after a step is renumbered or nested
+rg -n --include='*.md' '/review:all Step 9\b' plugins/yellow-review/
+```
+
+The Prevention section's "documentation consistency checklist" should add a
+line item specifically for **sibling files with near-identical prose**
+(personas cloned from a common template, parallel setup docs for the same
+provider): when fixing a bug in one, grep the sibling set for the same
+literal phrase before considering the fix complete.
+
 ## Related Documentation
 
 - `docs/solutions/code-quality/cross-plugin-documentation-correctness.md` --
