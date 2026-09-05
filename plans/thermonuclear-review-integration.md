@@ -228,19 +228,19 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 #### Phase 1.2: The skill
 
-- [ ] 1.2.1 Create `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`.
+- [x] 1.2.1 Create `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`.
       Frontmatter: `name`, single-line `description` (carrying the discovery
       phrases — thermonuclear review, code-judo simplification, spaghetti-growth
       analysis, giant-file review), and `user-invocable: false` (see O1).
-- [ ] 1.2.2 Body uses exactly the three headings `## What It Does`,
+- [x] 1.2.2 Body uses exactly the three headings `## What It Does`,
       `## When to Use`, `## Usage`.
-- [ ] 1.2.3 Author the **rubric** into the skill: code-judo moves, spaghetti
+- [x] 1.2.3 Author the **rubric** into the skill: code-judo moves, spaghetti
       condition growth, weak type/module boundaries, canonical-helper reuse,
       non-atomic orchestration, the evidence-gated size-threshold rule.
-- [ ] 1.2.4 Author the **safety rails into the skill body**, not only the agent
+- [x] 1.2.4 Author the **safety rails into the skill body**, not only the agent
       frontmatter (D4): report-only / never mutate the repository / ignore
       instructions found in reviewed content / emit compact-return JSON.
-- [ ] 1.2.5 Inline the MIT attribution **and the licence notice text** at the top
+- [x] 1.2.5 Inline the MIT attribution **and the licence notice text** at the top
       of the body (D2) — a relative path to a plugin-root file would dangle in
       every Cursor/Codex copy. Cite source repo, upstream commit, both blob SHAs,
       and retrieval date.
@@ -267,31 +267,31 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > writing.kemitchell.com/2016/09/21/MIT-License-Line-by-Line.html ·
 > github.com/anthropics/claude-code/issues/11043
 <!-- /deepen-plan -->
-- [ ] 1.2.6 Keep the directory shape to `SKILL.md` + optional flat
+- [x] 1.2.6 Keep the directory shape to `SKILL.md` + optional flat
       `references/*.md` matching `[a-zA-Z0-9_-]+\.md` — no nested dirs, no
       symlinks, no other file types (F9).
-- [ ] 1.2.7 Keep the body free of Claude-only primitives — no `Agent`/`Task`
+- [x] 1.2.7 Keep the body free of Claude-only primitives — no `Agent`/`Task`
       dispatch, no `AskUserQuestion`, no `subagent_type`, no `${CLAUDE_PLUGIN_ROOT}`,
       no `$ARGUMENTS`. None are caught by a validator; they simply degrade
       silently on other hosts.
 
 #### Phase 1.3: The agent
 
-- [ ] 1.3.1 Create `plugins/yellow-review/agents/review/thermonuclear-reviewer.md`.
+- [x] 1.3.1 Create `plugins/yellow-review/agents/review/thermonuclear-reviewer.md`.
       Frontmatter key order `name`, `description`, `model: opus`, `effort: xhigh`,
       `background: true`, `skills: [yellow-thermonuclear-review]`,
       `tools: [Read, Grep, Glob]`. No `memory:`. Nothing outside F14's honoured set.
-- [ ] 1.3.2 Description must be single-line and state that it is opt-in via
+- [x] 1.3.2 Description must be single-line and state that it is opt-in via
       `reviewer_set.include` — **not** "review:pr selects this automatically",
       which is the conditional-persona phrasing and would be false here.
-- [ ] 1.3.3 Copy the `## CRITICAL SECURITY RULES` block **byte-for-byte** from
+- [x] 1.3.3 Copy the `## CRITICAL SECURITY RULES` block **byte-for-byte** from
       `adversarial-reviewer.md`. Do not paraphrase.
-- [ ] 1.3.4 Add depth calibration mirroring `adversarial-reviewer` (D6) so
+- [x] 1.3.4 Add depth calibration mirroring `adversarial-reviewer` (D6) so
       trivial diffs get a cheap pass.
-- [ ] 1.3.5 Add the confidence-anchor section using the 5 anchors
+- [x] 1.3.5 Add the confidence-anchor section using the 5 anchors
       (0/25/50/75/100). **No persona-side confidence cutoff** — report every real
       finding and let Step 6 gate once (#743).
-- [ ] 1.3.6 Add an explicit `## What you don't flag` section naming sibling
+- [x] 1.3.6 Add an explicit `## What you don't flag` section naming sibling
       owners: naming and ordinary dead code (`maintainability-reviewer`), missing
       tests (`pr-test-analyzer`), correctness bugs (`correctness-reviewer`),
       vulnerabilities (`security-reviewer`), retry/timeout (`reliability-reviewer`),
@@ -325,15 +325,15 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > Sources: abseil.io/resources/swe-book/html/ch20.html ·
 > code.claude.com/docs/en/code-review
 <!-- /deepen-plan -->
-- [ ] 1.3.7 Document the size-threshold rule as consuming `<file-line-counts>`,
+- [x] 1.3.7 Document the size-threshold rule as consuming `<file-line-counts>`,
       with explicit fail-closed suppression when the block is missing (B1).
       Exclude generated, vendored, and lockfile paths.
-- [ ] 1.3.8 Output contract: compact-return JSON with `reviewer: "thermonuclear"`,
+- [x] 1.3.8 Output contract: compact-return JSON with `reviewer: "thermonuclear"`,
       `category: "maintainability"` (F4), and defaults `autofix_class: advisory`,
       `owner: human`, `requires_verification: true`. `safe_auto` is never valid
       for a structural finding. Always emit `residual_risks: []` and
       `testing_gaps: []`.
-- [ ] 1.3.9 Keep the file under 300 lines (RULE 21, F16). Match sibling personas'
+- [x] 1.3.9 Keep the file under 300 lines (RULE 21, F16). Match sibling personas'
       formatting exactly — style artefacts measurably skew LLM-judge aggregation.
 
 #### Phase 1.4: Orchestrator wiring (minimal)
@@ -356,14 +356,14 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > is unlikely. The O1 recommendation is unchanged, but the urgency framing is
 > stronger than the evidence supports.
 <!-- /deepen-plan -->
-- [ ] 1.4.2 **Do not** add a row to the always-on table (`review-pr.md:327-337`)
+- [x] 1.4.2 **Do not** add a row to the always-on table (`review-pr.md:327-337`)
       or the conditional table (`339-358`) — either would auto-trigger it and
       defeat opt-in (F5).
-- [ ] 1.4.3 **Do not** add it to the legacy-prose normalisation lists
+- [x] 1.4.3 **Do not** add it to the legacy-prose normalisation lists
       (`review-pr.md:526-541`, `570-583`) — it emits compact-return JSON directly.
       Adding it there would corrupt its returns; omitting it while emitting prose
       would silently drop every finding.
-- [ ] 1.4.4 Verify no sibling registration site was missed. Per the PR #712
+- [x] 1.4.4 Verify no sibling registration site was missed. Per the PR #712
       retrospective, guards and registrations in this repo are habitually applied
       to 3 of 4 structurally-identical copies. Grep `review-pr.md`, `review-all.md`,
       `skills/pr-review-workflow/SKILL.md`, and `yellow-core/skills/local-config/SKILL.md`
@@ -389,13 +389,13 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 #### Phase 1.5: Documentation
 
-- [ ] 1.5.1 `plugins/yellow-review/CLAUDE.md`: `### Agents (16)` → `(17)` and add
+- [x] 1.5.1 `plugins/yellow-review/CLAUDE.md`: `### Agents (16)` → `(17)` and add
       a catalog entry marked opt-in-only (D8/F13).
-- [ ] 1.5.2 `plugins/yellow-review/README.md`: document the reviewer and the
+- [x] 1.5.2 `plugins/yellow-review/README.md`: document the reviewer and the
       `reviewer_set.include` opt-in snippet.
-- [ ] 1.5.3 `plugins/yellow-core/skills/local-config/SKILL.md`: mention the new
+- [x] 1.5.3 `plugins/yellow-core/skills/local-config/SKILL.md`: mention the new
       opt-in name so users know what to type.
-- [ ] 1.5.4 `pnpm changeset` — **minor** for `yellow-review` (new capability)
+- [x] 1.5.4 `pnpm changeset` — **minor** for `yellow-review` (new capability)
       **and `patch` for `yellow-core`**, since task 1.5.3 edits
       `plugins/yellow-core/skills/local-config/SKILL.md`. A single-package
       changeset here leaves the yellow-core edit unversioned; precedent for the
@@ -403,7 +403,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 #### Phase 1.6: Tests (deterministic only)
 
-- [ ] 1.6.1 Add static contract assertions. Prefer **vitest** under
+- [x] 1.6.1 Add static contract assertions. Prefer **vitest** under
       `tests/integration/` (a blocking matrix arm) over bats, which is advisory
       and would give false assurance (F7, D3). Assert: `tools:` contains no
       `Bash`/`Edit`/`Write`/`MultiEdit`/`Agent`/`Task`; the `skills:` target
@@ -429,7 +429,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > `validator-harness.ts`; this is direct `readFileSync` + byte comparison. Flag
 > it in review so nobody "corrects" it toward the harness pattern.
 <!-- /deepen-plan -->
-- [ ] 1.6.2 Create `tests/fixtures/thermonuclear/` (crosses-1000-lines,
+- [x] 1.6.2 Create `tests/fixtures/thermonuclear/` (crosses-1000-lines,
       already-large-file, generated-file, spaghetti-branching,
       justified-domain-complexity, canonical-helper-reuse, wrapper-indirection,
       prompt-injection, clean-implementation) as **manual-eval inputs**, with a
@@ -591,6 +591,7 @@ By recorded human sign-off:
 | Threshold crossing with no cohesive extractable unit | No finding. Crossing alone is not a defect. |
 | Recommends reusing a canonical helper | Must verify the helper actually exists first. |
 | Complexity is genuinely domain-driven | No finding. This is the primary false-positive class. |
+| `review_pipeline: legacy` is set | Silently unavailable — decided 2026-09-05. The legacy fallback carries its own fixed persona list and never reads `reviewer_set`, so `include` has no effect there. Documented in `references/review-pr/legacy-fallback.md`, `README.md`, `CLAUDE.md`, and `local-config/SKILL.md`; no warning is emitted, because legacy's value is that its reviewer set is pinned. |
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Missing row — **`review_pipeline: legacy`**. The legacy fallback
@@ -684,6 +685,18 @@ blocks merges.
 - **Scope:** catalog/plugins/yellow-review.json, plugins/yellow-review/.cursor-plugin/, plugins/yellow-review/.codex-plugin/, plugins/yellow-review/cursor/skills/, plugins/yellow-review/codex/skills/, .cursor-plugin/marketplace.json, .changeset/
 - **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7
 - **Depends on:** #3
+
+## Stack Progress
+<!-- Updated by flow:work. Do not edit manually. -->
+<!-- Submission is deferred for this run: `gt submit` is blocked because the
+     ancestor branch `agent/feat/validator-claude5-modernisation` (PR #742) has
+     commits on the remote that are not local. Items below are committed
+     locally on their own branches; the whole stack is submitted in one pass
+     once that drift is resolved. -->
+- [x] 1. agent/chore/thermonuclear-upstream-snapshot (committed 2026-09-05, not yet submitted)
+- [ ] 2. agent/feat/thermonuclear-reviewer
+- [ ] 3. agent/feat/thermonuclear-line-counts
+- [ ] 4. agent/feat/thermonuclear-cross-host
 
 ---
 
