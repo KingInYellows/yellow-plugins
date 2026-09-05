@@ -204,7 +204,7 @@ describe('runStub — happy paths', () => {
     ]);
   });
 
-  it('sanitizes the child environment and closes stdin', async () => {
+  it('sanitizes the child environment (stdin is ignored by the transport)', async () => {
     await runStub(makeDeps({}), baseInput());
     const invocations = readCapture();
     expect(invocations.length).toBeGreaterThan(0);
@@ -626,5 +626,34 @@ describe('runStub probe outcome hardening (review dispositions)', () => {
       'GOAL_PROTOCOL_TRANSPORT'
     );
     expect(err.retryable).toBe(true);
+  });
+});
+
+describe('runStub scenario binding and pre-admission cancellation', () => {
+  it('rejects a peer that reports a different scenario than requested', async () => {
+    const err = await expectGoalError(
+      runStub(
+        makeDeps({ FAKE_PROVIDER_REPORT_SCENARIO: 'success' }),
+        baseInput({ scenario: 'failed' })
+      ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expect(err.message).toContain('instead of failed');
+  });
+
+  it('maps a SIGTERM that lands before run.start on a default-disposition engine to the local cause', async () => {
+    const controller = new AbortController();
+    const promise = runStub(
+      makeDeps({
+        FAKE_PROVIDER_DEFAULT_SIGNAL: '1',
+        FAKE_PROVIDER_RUN_START_DELAY_MS: '20000',
+      }),
+      baseInput({ signal: controller.signal })
+    );
+    await waitUntilInvoked('run');
+    controller.abort();
+    const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
+    expect(err.localCause).toBe('caller-cancelled');
+    expect(err.runId).toBeUndefined();
   });
 });

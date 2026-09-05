@@ -755,6 +755,14 @@ exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/pl
     "engine-bridge",
     "process-contract",
     "request-packet"
+  ],
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "goal:run-stub sources validate_file_path() from yellow-core/lib/validate-fs.sh to contain the request path; the command fails closed without it"
+    }
   ]
 }
 "

@@ -49,23 +49,28 @@ Refuse any `--executor`, `--protocol`, or unknown flag.
 
 ### Step 3: Validate the request path in code
 
-Treat the request path as untrusted data. Enforce the allowlist in Bash before
-any invocation: a relative path, or an absolute path under the current working
-directory; no `..` segments, no leading hyphen, no control or
-shell-metacharacters; the file must exist and be a regular file.
+Treat the request path as untrusted data. Enforce the allowlist in executable
+Bash before any invocation using yellow-core's canonical validator
+(`validate_file_path` rejects empty paths, `..`, absolute and `~` paths,
+embedded newlines, symlinks whose target escapes the root, and broken
+intermediate symlinks). The request path must therefore be **relative to the
+current working directory** and resolve inside it; a leading hyphen is rejected
+separately. yellow-core is a required dependency of this plugin.
 
 ```bash
+HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
+if [ ! -f "$HELPER" ]; then
+  printf 'ERROR: yellow-core validate-fs.sh not found; install yellow-core\n' >&2
+  exit 1
+fi
+. "$HELPER"
 case "$REQUEST_FILE" in
   -*) printf 'ERROR: request path may not start with a hyphen\n' >&2; exit 2 ;;
-  *[![:alnum:]._/-]*) printf 'ERROR: request path contains unsafe characters\n' >&2; exit 2 ;;
-  */../*|../*|*/..|..) printf 'ERROR: request path may not traverse upward\n' >&2; exit 2 ;;
 esac
-case "$REQUEST_FILE" in
-  /*) case "$REQUEST_FILE" in
-        "$PWD"/*) ;;
-        *) printf 'ERROR: absolute request path must be under %s\n' "$PWD" >&2; exit 2 ;;
-      esac ;;
-esac
+if ! validate_file_path "$REQUEST_FILE" "$PWD"; then
+  printf 'ERROR: request path must be a relative path inside %s\n' "$PWD" >&2
+  exit 2
+fi
 if [ ! -f "$REQUEST_FILE" ]; then
   printf 'ERROR: request file not found\n' >&2
   exit 2

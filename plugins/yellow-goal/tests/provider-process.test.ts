@@ -154,17 +154,17 @@ describe('spawnProtocolChild', () => {
       bin: process.execPath,
       argv: [
         '-e',
-        "process.on('SIGTERM', () => process.exit(7)); setTimeout(() => {}, 5000)",
+        "process.on('SIGTERM', () => process.exit(7)); process.stdout.write('ready\\n'); setTimeout(() => {}, 5000)",
       ],
       env: process.env,
       deadlineAt: farFutureDeadline(),
       signal: controller.signal,
       limits: GENEROUS_LIMITS,
+      // Abort only once the child has proven its SIGTERM handler is installed.
+      onStdout: (chunk) => {
+        if (chunk.includes('ready')) controller.abort();
+      },
     });
-    // Generous margin: under parallel test-worker load, the child needs
-    // real time to start up and register its SIGTERM handler before a
-    // signal sent too early would fall back to the OS default action.
-    setTimeout(() => controller.abort(), 300);
     const result = await resultPromise;
     expect(result.exitCode).toBe(7);
     expect(result.signal).toBeNull();
@@ -177,13 +177,18 @@ describe('spawnProtocolChild', () => {
       bin: process.execPath,
       argv: [
         '-e',
-        "process.on('SIGTERM', () => process.exit(9)); setTimeout(() => {}, 5000)",
+        "process.on('SIGTERM', () => process.exit(9)); process.stdout.write('ready\\n'); setTimeout(() => {}, 5000)",
       ],
       env: process.env,
-      // Generous margin: see the sibling caller-cancelled test above.
-      deadlineAt: Date.now() + 300,
+      // The deadline is far enough that the child is ready long before it
+      // elapses, yet short enough to keep the test fast; the readiness
+      // marker below asserts the ordering rather than assuming it.
+      deadlineAt: Date.now() + 1500,
       signal: neverAbortingSignal(),
       limits: GENEROUS_LIMITS,
+      onStdout: (chunk) => {
+        expect(chunk.includes('ready')).toBe(true);
+      },
     });
     const result = await resultPromise;
     expect(result.exitCode).toBe(9);
@@ -198,19 +203,21 @@ describe('spawnProtocolChild', () => {
       bin: process.execPath,
       argv: [
         '-e',
-        "process.on('SIGTERM', () => {}); setTimeout(() => {}, 20000)",
+        "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setTimeout(() => {}, 20000)",
       ],
       env: process.env,
       deadlineAt: farFutureDeadline(),
       signal: controller.signal,
       limits: GENEROUS_LIMITS,
+      // Abort only once the child has proven its ignore-SIGTERM handler is
+      // installed; a signal sent earlier would hit the OS default action.
+      onStdout: (chunk) => {
+        if (chunk.includes('ready') && abortedAt === 0) {
+          abortedAt = Date.now();
+          controller.abort();
+        }
+      },
     });
-    // Give the child a moment to install its ignore-SIGTERM handler before
-    // signalling, otherwise the OS default action would terminate it first.
-    setTimeout(() => {
-      abortedAt = Date.now();
-      controller.abort();
-    }, 200);
     const result = await resultPromise;
     expect(Date.now() - abortedAt).toBeGreaterThanOrEqual(4900);
     expect(result.forcedKill).toBe(true);

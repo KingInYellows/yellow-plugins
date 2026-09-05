@@ -20,6 +20,7 @@ import {
   validateCapabilities,
   validateTerminalAgreement,
   validateVersionProbe,
+  type RunStreamSnapshot,
   type StubScenario,
   type ValidatedSummary,
 } from './provider-protocol.js';
@@ -413,6 +414,49 @@ function probeOutcome(result: ProtocolChildResult, label: string): void {
   }
 }
 
+/**
+ * A compatible engine must honor the requested scenario: run.start must echo
+ * it and the terminal status must be one the scenario can produce. Otherwise
+ * a requested deterministic failure could be reported as a success.
+ */
+function assertScenarioBinding(
+  scenario: StubScenario,
+  snapshot: RunStreamSnapshot
+): void {
+  const start = snapshot.start;
+  const summary = snapshot.summary;
+  if (start === undefined || summary === undefined) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INVALID',
+      'run stream is missing its start or summary'
+    );
+  }
+  if (start.stubScenario !== scenario) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INVALID',
+      `engine ran scenario ${start.stubScenario} instead of ${scenario}`,
+      { runId: snapshot.runId, eventCount: snapshot.eventCount }
+    );
+  }
+  const allowed: Record<StubScenario, readonly string[]> = {
+    success: ['succeeded', 'cancelled'],
+    failed: ['failed', 'cancelled'],
+    'budget-exhausted': ['budget-exhausted', 'cancelled'],
+    'await-cancel': ['cancelled'],
+  };
+  if (!allowed[scenario].includes(summary.status)) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INVALID',
+      `terminal status ${summary.status} is not a ${scenario} outcome`,
+      {
+        runId: snapshot.runId,
+        eventCount: snapshot.eventCount,
+        terminalStatus: summary.status,
+      }
+    );
+  }
+}
+
 export async function runStub(
   deps: ProtocolRuntimeDeps,
   input: RunStubInput
@@ -619,6 +663,18 @@ async function runStubPhases(
     );
   }
 
+  if (
+    !runResult.forcedKill &&
+    runResult.localCause !== undefined &&
+    runResult.signal === 'SIGTERM' &&
+    framer.bytesConsumed === 0
+  ) {
+    // Our own SIGTERM landed before the engine admitted the run (no event
+    // was ever framed), so there is no stream to be incomplete: this is the
+    // probe-like local cancellation/deadline, not a transport failure.
+    recordLocalCause(runResult.localCause);
+    throw localCauseError(runResult.localCause);
+  }
   if (runResult.forcedKill || runResult.signal !== null) {
     throw new GoalEngineError(
       'GOAL_PROTOCOL_TRANSPORT',
@@ -695,6 +751,7 @@ async function runStubPhases(
   }
 
   const snapshot = validator.snapshot;
+  assertScenarioBinding(input.scenario, snapshot);
   if (runResult.localCause !== undefined) {
     // The stream fully and validly agreed (success or an engine terminal),
     // but a local cause still wins: it was observed before this close.

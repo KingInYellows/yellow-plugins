@@ -227,9 +227,18 @@ try {
       stderr += chunk;
     });
     setTimeout(() => child.kill('SIGTERM'), 3000);
-    const exit = await new Promise((resolve) =>
-      child.once('close', (code, signal) => resolve({ code, signal }))
-    );
+    const exit = await new Promise((resolve, reject) => {
+      // Bounded like every invoke(): a stalled consumer or engine must fail
+      // the gate, never hang it.
+      const watchdog = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(new Error('forwarded-SIGTERM smoke did not close within 60s'));
+      }, 60_000);
+      child.once('close', (code, signal) => {
+        clearTimeout(watchdog);
+        resolve({ code, signal });
+      });
+    });
     checks++;
     assert.equal(
       exit.signal,

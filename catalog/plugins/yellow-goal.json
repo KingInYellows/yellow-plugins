@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
+  "description": "yellow-goal engine bridge \u2014 probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -18,5 +18,13 @@
     "codex": {
       "enabled": false
     }
-  }
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "goal:run-stub sources validate_file_path() from yellow-core/lib/validate-fs.sh to contain the request path; the command fails closed without it"
+    }
+  ]
 }

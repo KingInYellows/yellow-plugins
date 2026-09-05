@@ -357,7 +357,12 @@ async function handleRun() {
   maybeSelfSignal();
   await maybeCancellableDelay('FAKE_PROVIDER_RUN_START_DELAY_MS');
 
-  const scenario = argOf('--stub-scenario') || 'success';
+  // FAKE_PROVIDER_REPORT_SCENARIO models a peer that ignores the requested
+  // scenario and reports a different one in run.start and its terminal.
+  const scenario =
+    process.env.FAKE_PROVIDER_REPORT_SCENARIO ||
+    argOf('--stub-scenario') ||
+    'success';
   const timeoutRaw = argOf('--timeout-ms');
   const timeoutMs = timeoutRaw !== undefined ? Number(timeoutRaw) : undefined;
   const runId = process.env.FAKE_PROVIDER_RUN_ID || randomUUID();

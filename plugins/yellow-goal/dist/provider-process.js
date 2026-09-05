@@ -34,7 +34,9 @@ function mapSpawnError(error) {
  * ignores SIGTERM for {@link SIGKILL_GRACE_MS} is escalated to SIGKILL.
  * The promise settles exactly once, on `close`, except for spawn/stream
  * errors and byte-bound overflow, which reject immediately after best-effort
- * SIGKILL. Every timer and listener is released at settlement.
+ * SIGKILL. Every timer and every active listener is released at settlement;
+ * only inert no-op `error` guards stay attached so a late pipe or kill()
+ * error after settlement can never surface as an unhandled event.
  */
 function spawnProtocolChild(opts) {
     return new Promise((resolve, reject) => {
