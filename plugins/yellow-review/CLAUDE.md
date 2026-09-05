@@ -25,8 +25,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   those three (suppress below 75 except P0 at 50+; count sub-75 input as
   `suppressed`). Pre-existing findings are gated before the Pre-existing
   section. If a recall persona risks exceeding compact-return output budget,
-  rank by severity then confidence and stop before JSON would truncate —
-  malformed returns are dropped entirely in Step 5 validation.
+  rank by confidence (gate-surviving 75/100 first) then severity and stop
+  before JSON would truncate — the orchestrator's compact-return validation
+  drops malformed returns entirely.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command
