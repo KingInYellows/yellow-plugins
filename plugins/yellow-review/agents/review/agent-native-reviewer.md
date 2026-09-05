@@ -176,7 +176,8 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 - **Anchor 75** — the gap is directly visible: a UI action exists with no
   corresponding tool, or a tool embeds clear business logic.
 - **Anchor 50** — the gap is likely but depends on context not fully visible.
-  Surfaces only via the orchestrator's P1-at-50+ escape or soft buckets.
+  Suppressed by the orchestrator's sub-75 gate (this persona does not emit
+  P0, so no P0-at-50+ escape applies).
 - **Anchor 25 or below — report at that anchor; the orchestrator
   suppresses it from every user-visible section, including
   Pre-existing** — the gap requires runtime observation

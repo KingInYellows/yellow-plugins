@@ -73,8 +73,9 @@ Three conditional personas (`agent-native-reviewer`,
 `agent-cli-readiness-reviewer`, `cli-readiness-reviewer`) report every
 in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
 and severity — they no longer pre-filter below 75 or cap the count. Other
-Wave 2 personas still apply their own anchor floors (for example,
-`correctness-reviewer` suppresses anchor-25 items before Step 6).
+persona reviewers still apply their own anchor floors (for example,
+`correctness-reviewer` suppresses anchor-25 items and
+`plugin-contract-reviewer` suppresses anchor-25 items before Step 6).
 
 `/review:pr` and `/review:all` apply the **single** confidence gate in
 Step 6/9: suppress findings below anchor 75 except P0 at 50+. Sub-75 input

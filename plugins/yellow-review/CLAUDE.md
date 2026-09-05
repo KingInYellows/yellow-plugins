@@ -19,8 +19,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   `agent-native-reviewer`, `agent-cli-readiness-reviewer`, and
   `cli-readiness-reviewer` report every in-scope finding with a confidence
   anchor and severity — no persona-side `< 75` filter and no 5–7 finding
-  cap. Other Wave 2 personas still apply their own anchor floors before Step
-  6. `/review:pr` Step 6 and `/review:all` Step 9 are the sole gates for
+  cap. Other persona reviewers still apply their own anchor floors before
+  Step 6 (including Wave 3 reviewers such as `plugin-contract-reviewer`).
+  `/review:pr` Step 6 and `/review:all` Step 9 are the sole gates for
   those three (suppress below 75 except P0 at 50+; count sub-75 input as
   `suppressed`). Pre-existing findings are gated before the Pre-existing
   section. If a recall persona risks exceeding compact-return output budget,
