@@ -235,101 +235,64 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 
 ## Command, Agent, And Skill Authoring
 
-- Agent files use `tools:` in frontmatter. Do not use `allowed-tools:` in agent
-  files.
-- Command files use Claude Code command `allowed-tools:` frontmatter. Keep
-  command tool lists to tools the command body calls directly; delegated agents
-  own their own tool lists.
-- Any command that delegates to an agent must include `Agent` in `allowed-tools:`
-  (`Task` is the pre-2.1.63 name of the same tool and still works as an alias)
-  and spell out the exact literal `subagent_type` value.
-- Cross-plugin agent references must use the three-segment runtime form
-  `plugin-name:subdir:agent-name`, matching the agent file's `name:` frontmatter
-  and directory under `agents/`.
-- Agents that reference a skill by name must either preload it under frontmatter
-  `skills:` or include `Skill` in `tools:` for dynamic loading.
-- Skill frontmatter uses `user-invocable` with a `c`, not `user-invokable`
-  (Claude Code reads only the `c` spelling; RULE 20 rejects the other).
-  Internal helper skills should set `user-invocable: false`; user-facing skills
-  should set `user-invocable: true`.
-- Keep all frontmatter `description:` values single-line. Do not use folded or
-  literal scalars such as `description: >`, `description: |`, or multi-line
-  quoted strings; Claude Code's parser has truncated those in prior audits.
-- Preferred `SKILL.md` body shape is `## What It Does`, `## When to Use`, and
-  `## Usage`; use lower-level headings inside `## Usage`.
-- Review agents under `plugins/<name>/agents/review/` must be read-only: no
-  `Bash`, `Write`, `Edit`, or `MultiEdit` in `tools:` (W1.5) unless the file is
-  explicitly allowlisted in `scripts/validate-agent-authoring.js` and includes a
-  "Tool Surface - Documented Exception" section. A review agent that sets
-  `memory:` (which auto-enables Read/Write/Edit) MUST also carry
-  `disallowedTools: [Write, Edit, MultiEdit]` to restore the read-only contract
-  (W1.5b).
-- Use `memory: project`, `memory: user`, or another supported scope. Do not use
-  `memory: true`.
-- `tools:`, `disallowedTools:`, and `skills:` accept a YAML list (block or
-  `[A, B]` flow form) or a comma-separated string (`A, B`) — the validator
-  parses all three. Inline `#` comments are stripped (the validator parses real
-  YAML), so a trailing comment cannot bypass these checks.
-- If a command or agent uses deferred MCP tools, include `ToolSearch` and verify
-  the real tool names after plugin installation.
-- For bundled MCP servers, derive tool names from the manifest:
-  `mcp__plugin_{pluginName}_{serverName}__{toolName}`. Do not copy names from a
-  standalone/global MCP plugin unless that global plugin is the intended
-  dependency.
-- Markdown commands must use `${CLAUDE_PLUGIN_ROOT}` or a concrete script path
-  for plugin-local file access. Do not source plugin files through `BASH_SOURCE`
-  in command markdown.
-- Command-level progressive disclosure: when a command file's conditional or
-  late-sequence detail moves out of the file, it lives at the plugin root as
-  `references/<slug>/<file>.md`, where `<slug>` is the command's frontmatter
-  `name:` with `:` replaced by `-` (e.g. `setup:all` → `references/setup-all/`).
-  Load it via an imperative `Read ${CLAUDE_PLUGIN_ROOT}/references/<slug>/...`
-  stub at the branch point, and add `Read` to the command's `allowed-tools:`.
-  Skills instead use skill-relative `references/` paths (sibling to SKILL.md) —
-  a **Codex-exposed** skill's directory may contain `SKILL.md` plus a flat
-  `references/` subdirectory of `[a-zA-Z0-9_-]+.md` files: the generator
-  (`emit-codex.js`) copies `SKILL.md` and any such reference files verbatim,
-  but hard-errors on nested directories, symlinks, or any other sidecar shape
-  (e.g. a top-level `schema.yaml`, `agents/`). Relocate anything outside that
-  supported shape out of such a skill's directory (e.g.
-  `plugins/yellow-ci/references/`, loaded by Claude-only agents via
-  `${CLAUDE_PLUGIN_ROOT}`). Three plugins enable Codex today, in canonical order:
-  `gt-workflow`, `yellow-core`, `yellow-ci`; see `docs/codex-distribution.md`.
-  The Cursor target (`emit-cursor.js` / `validate-cursor.js`) mirrors the same
-  allowlist, containment, and exposure-lint discipline for its own
-  single-plugin pilot (`yellow-cursor`); see `docs/cursor-distribution.md`
-  rather than duplicating the rules here.
-- A thin-wrapper command whose `## Usage` section reads "Invoke the `Skill`
-  tool with `skill: "<name>"`." (the cross-host pattern: the command is a
-  Claude-only entrypoint, the skill is what both Claude and Codex actually
-  execute) must include `Skill` in `allowed-tools:` alongside its other
-  tools — never as a replacement for them (command-authoring anti-pattern
-  #28). `scripts/validate-agent-authoring.js` RULE 17 enforces two of these
-  checks automatically: that `Skill` is present in `allowed-tools:`, and
-  that a same-plugin `skills/<name>/SKILL.md` exists. It does NOT verify
-  that the wrapper's original tools were preserved alongside `Skill` (the
-  "never as a replacement" half above) — that remains a manual-review
-  concern per the validator's own inline comment. RULE 17 is scoped to
-  `## Usage` section content only so unrelated cross-plugin `skill: "..."`
-  references elsewhere in a larger document (e.g. a multi-phase workflow command citing
-  another plugin's skill as one step) are not flagged by RULE 17.
-- A **namespaced** `skill: "<namespace>:<name>"` dispatch must resolve to
-  something that actually exists: either a command declaring
-  `name: <namespace>:<name>` in its frontmatter, or a plugin skill at
-  `plugins/<namespace>/**/skills/<name>/SKILL.md`. `RULE 18`
-  (`validateSkillDispatchResolution`) enforces this across every markdown
-  file under `plugins/`, resolving against **all** plugins because
-  cross-plugin dispatch is the normal case. It is the complement to RULE 17,
-  not a replacement: RULE 17's `SKILL_REF_RE` character class excludes `:`,
-  so it has never matched a namespaced value, and before RULE 18 nothing
-  verified that a namespaced dispatch target existed at all — a renamed
-  command silently broke every caller. RULE 18 scans whole bodies (namespaced
-  dispatch lives mid-document in multi-phase orchestrators), skips bare names
-  so the two rules never double-report, and ignores fenced syntax examples.
-  It also exempts two literal prose placeholders — `plugin:skill-name` and
-  `yellow-X:skill-name` — by exact string match (`SKILL_DISPATCH_PLACEHOLDERS`),
-  not heuristic pattern matching, so these generic teaching examples don't need
-  a real backing command or skill.
+Most of these are CI-enforced by `scripts/validate-agent-authoring.js`; the
+rule id in parentheses is what the failure message cites.
+
+- Agents use `tools:` in frontmatter, never `allowed-tools:`; commands use
+  `allowed-tools:` and list only the tools the command body calls directly.
+- A command that delegates to an agent lists `Agent` in `allowed-tools:`
+  (`Task` is the pre-2.1.63 alias) and spells out the literal
+  `subagent_type`, always in the three-segment form
+  `plugin-name:subdir:agent-name` (colon-less/bareword forms and
+  `Agent(name):` shorthand are errors; a 2-segment form is only logged today
+  and will become an error).
+- An agent that names a skill either preloads it under `skills:` or lists
+  `Skill` in `tools:` (RULE 19 also requires `Skill` wherever a body invokes
+  the Skill tool).
+- Skill frontmatter key is `user-invocable` (RULE 20 rejects `user-invokable`,
+  which Claude Code ignores). Internal skills set it `false`; user-facing
+  skills `true`.
+- Every `description:` is single-line — no `>`, `|`, or wrapped strings (RULE
+  15d, warning tier; Claude Code truncates them silently).
+- SKILL.md body headings are `## What It Does`, `## When to Use`, `## Usage`
+  (RULE 15b); keep SKILL.md under 500 lines (RULE 15a), commands under 500
+  and agents under 300 (RULE 21) — all warning tier.
+- Review agents under `agents/review/` are read-only: no `Bash`, `Write`,
+  `Edit`, `MultiEdit` in `tools:` unless allowlisted in the validator with a
+  "Tool Surface - Documented Exception" section (W1.5); a review agent with
+  `memory:` also carries `disallowedTools: [Write, Edit, MultiEdit]` (W1.5b).
+- `memory:` takes a scope (`project`, `user`, `local`), never `true`.
+- `model:` accepts `haiku`, `sonnet`, `opus`, `fable`, `inherit`, a
+  versioned alias, or a full `claude-*` ID (V2); `effort:` is
+  `low|medium|high|xhigh|max` (V1). Haiku 4.5 ignores `effort:`.
+- `tools:`, `disallowedTools:`, `skills:` accept block list, flow list, or
+  comma-separated string; inline `#` comments are stripped.
+- Deferred MCP tools need `ToolSearch` in the tool list. Bundled MCP tool
+  names are `mcp__plugin_{pluginName}_{serverName}__{toolName}`.
+- Commands reach plugin files through `${CLAUDE_PLUGIN_ROOT}` or a concrete
+  script path, never `BASH_SOURCE`.
+- Progressive disclosure: a command's offloaded detail lives at
+  `references/<slug>/<file>.md` (slug = command `name:` with `:` → `-`),
+  loaded by an imperative `Read ${CLAUDE_PLUGIN_ROOT}/references/<slug>/...`
+  stub with `Read` in `allowed-tools:`. Skills use a skill-relative
+  `references/`; a Codex-exposed skill may hold only `SKILL.md` plus a flat
+  `references/*.md` (nested dirs, symlinks, or other sidecars hard-error in
+  `emit-codex.js`). Codex-enabled plugins: `gt-workflow`, `yellow-core`,
+  `yellow-ci` (`docs/codex-distribution.md`); the Cursor pilot mirrors the
+  same discipline (`docs/cursor-distribution.md`).
+- A thin-wrapper command whose `## Usage` says "Invoke the `Skill` tool with
+  `skill: "<name>"`" keeps `Skill` in `allowed-tools:` alongside its other
+  tools (RULE 17 checks presence and that the same-plugin skill exists; the
+  "alongside, not instead" half is manual review).
+- A namespaced `skill: "<namespace>:<name>"` dispatch must resolve to a real
+  command `name:` or `plugins/<namespace>/**/skills/<name>/SKILL.md` (RULE
+  18); the prose placeholders `plugin:skill-name` and `yellow-X:skill-name`
+  are exempt by exact match.
+- Write agent and skill bodies for the Claude 5 generation: task, inputs,
+  output contract, and the project-specific facts Claude cannot infer, in
+  brief imperative sentences. Omit ALL-CAPS rule lists, "be thorough"
+  exhortations, self-verification loops, and finding-stage confidence
+  filters (orchestrators gate once, after aggregation).
 
 ## Security & Prompt-Injection Rules
 
