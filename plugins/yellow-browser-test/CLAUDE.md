@@ -44,16 +44,19 @@ routes, and auth flows. Runs structured and exploratory browser tests.
 
 ## Artifacts and Data Flow
 
-`/browser-test:setup` writes `.claude/yellow-browser-test.local.md` (discovered
-dev-server command, `baseURL`, routes, auth flow), which every other command
-reads. `/browser-test:test` and `/browser-test:explore` write
-`test-reports/results.json`; `/browser-test:report` renders it to
-`test-reports/<timestamp>.md` (plus `issues.md` and `screenshots/`).
-Dev-server lifecycle state lives in `.claude/browser-test-server.pid` and
-`.claude/browser-test-server.log`.
+`/browser-test:setup` writes `.claude/yellow-browser-test.local.md`
+(discovered dev-server command, `baseURL`, routes, auth flow), which
+`/browser-test:test` and `/browser-test:explore` read. Both write
+`test-reports/results.json` and create/prune `test-reports/screenshots/`;
+`/browser-test:report` renders the results file to
+`test-reports/<timestamp>.md` (plus `issues.md`) and needs neither the config
+file nor a dev server. Dev-server lifecycle state lives in
+`.claude/browser-test-server.pid` and `.claude/browser-test-server.log`.
 
 - `scripts/install-agent-browser.sh` (run by `/browser-test:setup`) pins the
-  `agent-browser` version and hard-fails below Node 22.22.0.
+  `agent-browser` version. It skips the Node check entirely if `agent-browser`
+  is already on `PATH`; otherwise it hard-fails below Node 22.22.0, or warns
+  and continues if Node itself can't be found or its version can't be parsed.
 - Dispatch agents by their three-segment runtime names
   (`yellow-browser-test:testing:app-discoverer`,
   `yellow-browser-test:testing:test-runner`,

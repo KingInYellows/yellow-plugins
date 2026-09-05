@@ -29,8 +29,15 @@ can be installed via `/plugin marketplace add KingInYellows/yellow-plugins`.
    `.claude-plugin/marketplace.json` entry. Never hand-edit those.
 3. Add commands in `plugins/<name>/commands/*.md` and/or other entrypoints,
    plus `CLAUDE.md` and `README.md` in the plugin root.
-4. Add a row to `plugins/yellow-core/commands/setup/all.md`
-   (`validate-setup-all.js` fails otherwise) and a `.changeset/*.md` entry.
+4. Update `plugins/yellow-core/commands/setup/all.md` — the new plugin must
+   appear, in matching order, in every marker-delimited section of that file
+   that `validate-setup-all.js` cross-checks; see the script's header comment
+   for the authoritative section list and error codes. The Step 1.6
+   credential-status list is the one section that lives elsewhere: if the
+   plugin's hooks emit credential status, add it there too, between the
+   `# setup-all-credential-status-plugins:start/end` markers in
+   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`.
+   Add a `.changeset/*.md` entry.
 5. Run `pnpm validate:schemas` (includes `validate:generated` and
    `validate:setup-all`).
 

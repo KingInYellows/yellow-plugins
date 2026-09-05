@@ -6,8 +6,9 @@ ruvector.
 ## MCP Server
 
 - **ruvector** — Stdio transport via `npx -y --ignore-scripts ruvector@0.2.34 mcp start`
-  (version-pinned: unpinned npx resolves whatever global is installed —
-  a stale 0.2.25 global silently selected the machine-global `~/.ruvector`
+  (version-pinned: an unpinned npx invocation resolves whatever global is
+  installed — under the previous unpinned command, a stale 0.2.25 global
+  silently selected the machine-global `~/.ruvector`
   store from worktree sessions. Bump the pin in
   `catalog/plugins/yellow-ruvector.json` + `RUVECTOR_DEFAULT_VERSION` in the
   plugin-local `scripts/install.sh` together

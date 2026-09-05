@@ -154,10 +154,14 @@ Codex agent.)
 ## Testing
 
 `bats tests/redaction.bats` from the plugin directory (the one bats suite CI
-runs as a blocking gate). The awk redaction block under test is extracted from
-`skills/council-patterns/SKILL.md` by `tests/lib/extract-redaction-awk.bash`,
-so edit the patterns in the SKILL — never a copy. There is no fresh-machine
-install CI (see Known Limitations).
+runs as a blocking gate). The awk redaction program is shipped as three
+synchronized copies (`REDACTION_SOURCES` in
+`tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
+`agents/review/opencode-reviewer.md`, and `skills/council-patterns/SKILL.md`.
+The bats suite extracts and runs the first entry, `gemini-reviewer.md`, and
+also asserts byte-identity across all three — edit the patterns in all three
+files together, never just one. There is no fresh-machine install CI (see
+Known Limitations).
 
 ## Known Limitations
 

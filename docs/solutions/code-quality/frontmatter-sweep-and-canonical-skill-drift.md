@@ -130,9 +130,32 @@ if they seem obviously already-compliant:
 rg -n 'Graphite|gt-workflow' plugins/*/CLAUDE.md
 ```
 
-Any hit that isn't the resolved-provider pattern (`/stack:status`, resolved
-provider commands) after the sweep is a miss — regardless of whether that
-plugin owns the abstraction being standardized on.
+That grep is a discovery step, not a verdict: most of its hits are correct
+prose that must stay. A hit is a defect only when it is an action-oriented
+instruction ("Use Graphite for all branch management", "always use `gt`") or a
+direct mutating command (`gt submit`, `gt merge`, `gh pr create`) in a plugin
+that should route through the resolved provider instead. Provider-identity
+text, comparison and boundary text, integration notes and historical
+references are allowed — for example `plugins/github-workflow/CLAUDE.md`
+names `gt-workflow` as the other `stacked-pr` provider and documents why it
+must never be disabled, which is required, not stale.
+
+Two exemptions are structural: `gt-workflow` and `github-workflow` are the
+provider plugins themselves, so naming their own provider and its commands is
+their job.
+
+To go straight to the candidates instead of reading every hit:
+
+```bash
+rg -n -i '(use|run|execute|always|never).{0,40}(Graphite|gt-workflow)|\bgt (submit|merge|sync|create|track)\b' plugins/*/CLAUDE.md
+```
+
+In PR #750 the broad grep hit 9 plugins and the narrow one 4; after the two
+provider plugins were set aside, the real misses were the single "Use Graphite
+(`gt`) for all branch management and PR creation" line in each of
+`plugins/yellow-core/CLAUDE.md` and `plugins/yellow-review/CLAUDE.md` —
+regardless of the fact that those two plugins own and most heavily consume the
+abstraction being standardized on.
 
 #### Validator Scope Gap Is a Separate, Explicit Finding
 
