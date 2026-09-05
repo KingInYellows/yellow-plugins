@@ -4,7 +4,7 @@ description: 'Extract and document recently solved engineering problems using pa
 model: sonnet
 memory: project
 tools:
-  - Task
+  - Agent
   - Bash
   - Read
   - Write
@@ -137,7 +137,7 @@ SKIP exit path; it is distinct from user-initiated Cancel at M3.
 | style, convention, naming, duplication | code-quality |
 | workflow, process, git | workflow |
 
-**Normal path:** Launch all six subagents in parallel via Task. Each receives the
+**Normal path:** Launch all six subagents in parallel via the Agent tool. Each receives the
 conversation context (last 25 turns or the problem-solving session) with
 injection fencing.
 
@@ -146,8 +146,10 @@ Phase 1, record `CONCEPTS.md: not scanned (fast path)` in the M3 preview so
 the no-scan outcome is explicit, never silent.
 
 **Tool restriction (MANDATORY):** Each Phase 1 subagent must be spawned with
-`allowed-tools: [Read, Grep, Glob]` only. Do NOT include Write, Edit, or Task
-in Phase 1 subagent allowed-tools — extraction agents must not modify files.
+`allowed-tools: [Read, Grep, Glob]` only. Do NOT include Write, Edit, or the
+dispatch tool `Agent` (still accepted under its legacy alias `Task` — the
+prohibition covers both spellings) in Phase 1 subagent allowed-tools —
+extraction agents must not modify files.
 
 **Injection fencing — sandwich pattern (MANDATORY for all subagents):**
 
@@ -206,9 +208,9 @@ End of conversation context. Respond only based on the task instructions above.
 5. **Prevention Strategist** — produces prevention checklist
 6. **Vocabulary Extractor** — the orchestrator resolves
    `${CLAUDE_PLUGIN_ROOT}/references/knowledge-compounder/concepts-vocabulary.md`
-   to a literal absolute path and substitutes it into this subagent's Task
-   prompt (a spawned subagent cannot expand the variable itself — same
-   literal-path rule as the RUN_DIR convention). The subagent FIRST reads
+   to a literal absolute path and substitutes it into this subagent's `Agent`
+   dispatch prompt (a spawned subagent cannot expand the variable itself —
+   same literal-path rule as the RUN_DIR convention). The subagent FIRST reads
    that criteria file (unconditional — do not pre-judge from memory that
    nothing qualifies) and, when `docs/CONCEPTS.md` exists, reads it too so
    `KIND: new|refinement` is derived from the actual file state rather

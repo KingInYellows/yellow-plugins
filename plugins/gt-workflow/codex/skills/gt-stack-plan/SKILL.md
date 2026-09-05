@@ -113,7 +113,7 @@ Use Glob and Grep to understand the project structure:
 - Identify existing patterns for similar features
 - Note the testing strategy in use
 
-On Claude Code, use the Task tool with the Explore agent type if the scope
+On Claude Code, use the Agent tool with the Explore agent type if the scope
 is large and requires deep exploration. On Codex, delegate the same
 exploration to the built-in `explorer` agent instead.
 

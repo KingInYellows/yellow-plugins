@@ -11,7 +11,7 @@ tools:
   - Grep
   - Glob
   - AskUserQuestion
-  - Task
+  - Agent
 ---
 
 <examples>

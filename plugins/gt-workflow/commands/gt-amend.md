@@ -4,7 +4,7 @@ description: 'Fold working-tree changes into the current branch commit, audit th
 argument-hint: '[--no-verify] [--no-submit] [--publish]'
 allowed-tools:
   - Bash
-  - Task
+  - Agent
   - AskUserQuestion
   - Skill
 ---

@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - AskUserQuestion
-  - Task
+  - Agent
   - TaskOutput
 ---
 
@@ -77,7 +77,7 @@ On any failure, gate with AskUserQuestion — do not proceed silently:
 
 ## Step 4: Pattern Survey
 
-Delegate a scoped survey via Task with `subagent_type:
+Delegate a scoped survey via the Agent tool with `subagent_type:
 "yellow-core:research:repo-research-analyst"`, focused on the shell's `Produces`
 and high-level steps — analogous features, reusable utilities, convention
 anchors, concrete file paths and named symbols. For shells that introduce novel

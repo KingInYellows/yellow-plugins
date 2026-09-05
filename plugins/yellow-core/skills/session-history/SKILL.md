@@ -107,11 +107,11 @@ Before dispatch, apply any vendor restriction parsed in Phase 0: set the
 availability-map entry of every restricted-out backend to `false` so the
 agent skips it (e.g., "Claude Code only" forces Devin and Codex to `false`).
 
-Spawn `session-historian` via Task with the parsed query, backend availability
+Spawn `session-historian` via the Agent tool with the parsed query, backend availability
 map, and time range. Use the **literal** 3-segment subagent type:
 
 ```text
-Task(
+Agent(
   subagent_type: "yellow-core:workflow:session-historian",
   description: "Cross-vendor session search: <topic>",
   prompt: "<parsed query block — see agent input contract>"

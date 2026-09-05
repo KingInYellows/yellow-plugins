@@ -6,7 +6,7 @@ allowed-tools:
   - Bash
   - Read
   - Write
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 
@@ -141,10 +141,10 @@ printf '[audit] Run the listed scanner agents in parallel, then run yellow-debt:
 After the bash block succeeds:
 
 1. Read `.debt/scanners-to-run.txt`.
-2. Launch one Task per scanner in parallel using subagent type
+2. Launch one Agent per scanner in parallel using subagent type
    `yellow-debt:scanners:<scanner>-scanner` (the agents live at
    `plugins/yellow-debt/agents/scanners/<scanner>-scanner.md`; the runtime
-   resolves only the three-segment `plugin:dir:name` form). **Each Task
+   resolves only the three-segment `plugin:dir:name` form). **Each Agent
    invocation MUST set `run_in_background: true`** — scanner agents declare
    `background: true` in their frontmatter, but true parallelism also
    requires the spawning call to run in the background.

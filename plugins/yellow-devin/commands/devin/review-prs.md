@@ -9,7 +9,7 @@ allowed-tools:
   - Glob
   - Edit
   - Write
-  - Task
+  - Agent
   - Skill
   - AskUserQuestion
   - ToolSearch

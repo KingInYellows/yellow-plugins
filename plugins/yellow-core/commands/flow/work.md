@@ -9,10 +9,11 @@ allowed-tools:
   - Edit
   - Glob
   - Grep
-  - Task
+  - Agent
   - TaskCreate
   - TaskUpdate
   - TaskList
+  - TaskOutput
   - AskUserQuestion
   - ToolSearch
   - Skill
@@ -324,7 +325,7 @@ in order from bottom (item 1) to top:
    - **Optional Codex rescue:** If yellow-codex is installed, offer an
      additional option: "Delegate to Codex for investigation". If chosen,
      spawn `codex-executor` via
-     `Task(subagent_type="yellow-codex:workflow:codex-executor")` with the error
+     `Agent(subagent_type="yellow-codex:workflow:codex-executor")` with the error
      context and task description. Present Codex's proposed fixes. Ask:
      "Apply Codex's fixes?" If yes, apply via Edit tool and re-run tests.
      **Graceful degradation:** If the agent spawn fails (yellow-codex not
@@ -716,15 +717,15 @@ it at a Phase 1b checkpoint.
 
 3. **If the change is trivial (single-file documentation edit, comment-only
    tweak, rename only), skip this step and proceed to Step 4.** For complex
-   changes, run reviewer agents in parallel using Task tool.
+   changes, run reviewer agents in parallel using Agent tool.
 
-   **3a. Create the per-run directory FIRST (before any Task spawn).**
+   **3a. Create the per-run directory FIRST (before any Agent spawn).**
    Bash variables do NOT survive across separate Bash tool calls — each
-   call is a fresh subprocess. To make `$RUN_DIR` reach the Task input
+   call is a fresh subprocess. To make `$RUN_DIR` reach the Agent input
    prompts in step 3b, run mktemp and immediately capture the absolute
    path the command printed; substitute that literal path value inline
-   into each Task prompt below. Do not reference the variable name
-   `$RUN_DIR` in the Task input — the spawned agent receives the value
+   into each Agent prompt below. Do not reference the variable name
+   `$RUN_DIR` in the Agent input — the spawned agent receives the value
    you substitute, not a shell-variable expansion.
 
    ```bash
@@ -740,8 +741,8 @@ it at a Phase 1b checkpoint.
    coverage". Continuing with empty `$RUN_DIR` would cause every agent
    to write to a non-existent path and silently appear "failed".
 
-   **3b. Spawn agents in parallel.** **Issue all four Task invocations in
-   a single response** so they execute concurrently. **Each Task invocation
+   **3b. Spawn agents in parallel.** **Issue all four Agent invocations in
+   a single response** so they execute concurrently. **Each Agent invocation
    MUST set `run_in_background: true`** — the review agents declare
    `background: true` in their frontmatter, but true parallelism also
    requires the spawning call to run in the background. Pass the
@@ -752,7 +753,7 @@ it at a Phase 1b checkpoint.
    for all agents via TaskOutput before aggregating findings.
 
    ```text
-   Task: code-simplicity-reviewer
+   Agent: code-simplicity-reviewer
    subagent_type: "yellow-core:review:code-simplicity-reviewer"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify overly complex code, suggest simplifications
@@ -760,7 +761,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: security-sentinel
+   Agent: security-sentinel
    subagent_type: "yellow-core:review:security-sentinel"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Find security vulnerabilities, unsafe patterns
@@ -768,7 +769,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: performance-oracle
+   Agent: performance-oracle
    subagent_type: "yellow-core:review:performance-oracle"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify performance issues, optimization opportunities
@@ -776,7 +777,7 @@ it at a Phase 1b checkpoint.
    ```
 
    ```text
-   Task: polyglot-reviewer
+   Agent: polyglot-reviewer
    subagent_type: "yellow-core:review:polyglot-reviewer"
    Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Check language-specific best practices, idioms

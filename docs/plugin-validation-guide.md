@@ -221,6 +221,19 @@ mv plugins/hookify-old plugins/hookify
 > plugin-local hook script paths (existence and basic structure). These checks
 > run automatically but are not documented as separate numbered rules above.
 
+> **Rules 6–11** run inside `validate-plugin.js` but have no numbered heading
+> here. They cover plugin-local inline hook script paths and content sanity —
+> shebang, `set -e`, decision output (RULES 6 + 8); `hooks.json` drift against
+> the manifest's inline hook config (RULE 7); `userConfig` entry shape — a
+> required `type` from the supported set, a required `title`, and the
+> allowlist of fields Claude Code's remote validator accepts, applied to both
+> the top-level object and each `channels[].userConfig` (RULE 9); and
+> cross-plugin `dependencies` declarations, where a hard dep missing from the
+> marketplace catalog warns (RULE 11). There is no RULE 10 — it was a reverted
+> `userConfig` `pattern` rule. `outputStyles` is checked alongside the other
+> path fields in the same pass (RULES 5b/5c), directory-only. Numbering
+> resumes at 12 so existing error-message references stay stable.
+
 ### Rule 12: Credential-userConfig Env-Var Fallback (warning)
 
 For each `mcpServers.<server>.env.<KEY>: "${user_config.X}"` interpolation,

@@ -9,7 +9,7 @@ allowed-tools:
   - Glob
   - Edit
   - Write
-  - Task
+  - Agent
   - AskUserQuestion
   - ToolSearch
   - Skill
@@ -191,7 +191,7 @@ aggregation rules change there, propagate the same change here.
 
 5. **Learnings pre-pass** (mirrors review-pr.md Step 3d): always spawn
    `learnings-researcher` (via
-   `Task(subagent_type: "yellow-core:research:learnings-researcher", ...)`) with a
+   `Agent(subagent_type: "yellow-core:research:learnings-researcher", ...)`) with a
    `<work-context>` block built from PR title, files, body, and inferred
    domains. Apply the two-condition detection from review-pr.md Step 3d.4:
    **(a)** response contains `NO_PRIOR_LEARNINGS` as a complete line

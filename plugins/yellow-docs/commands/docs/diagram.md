@@ -7,7 +7,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 
@@ -88,7 +88,7 @@ esac
 
 ### Step 3: Delegate to diagram-architect Agent
 
-Launch the `diagram-architect` agent via Task tool (subagent_type: "yellow-docs:generation:diagram-architect"):
+Launch the `diagram-architect` agent via Agent tool (subagent_type: "yellow-docs:generation:diagram-architect"):
 
 > --- begin scope (reference only) ---
 > $scope

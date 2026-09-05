@@ -47,7 +47,7 @@ plausible-sounding prose.
 | 2     | Warrant filter   | Apply Toulmin contract; reject unjustified ideas; keep 3 survivors       |
 | 3     | Extension        | Add a "next step / open question" to each survivor                       |
 | 4     | Ranked selection | User picks one approach via AskUserQuestion (or cancels)                 |
-| 5     | Hand-off         | Spawn brainstorm-orchestrator via Task with the chosen approach          |
+| 5     | Hand-off         | Spawn brainstorm-orchestrator (Agent tool) with the chosen approach      |
 
 ## When to Use
 
@@ -224,11 +224,11 @@ the brainstorm spawn happens.
 
 ### Phase 5: Hand-off to Brainstorm
 
-Spawn the brainstorm-orchestrator using the `Task` tool. Use the **literal**
+Spawn the brainstorm-orchestrator using the `Agent` tool. Use the **literal**
 3-segment subagent type — the LLM will guess wrong with 2-segment forms:
 
 ```text
-Task(
+Agent(
   subagent_type: "yellow-core:workflow:brainstorm-orchestrator",
   description: "Brainstorm: <chosen title>",
   prompt: "<chosen approach summary>\n\n[EVIDENCE: ...]\n[WARRANT: ...]\n[IDEA: ...]\n\n**Next step:** <next step>\n**Open question:** <open question>"
@@ -239,7 +239,7 @@ The brainstorm-orchestrator will run its own iterative dialogue from there.
 This skill's job is done after the spawn — do not continue to ask requirements
 questions yourself.
 
-**Graceful degradation:** if the Task tool spawn fails (subagent not
+**Graceful degradation:** if the Agent tool spawn fails (subagent not
 registered, plugin not installed), surface the chosen approach and its
 warrant + next step + open question in plain markdown so the user can copy
 it into `/flow:brainstorm` manually.

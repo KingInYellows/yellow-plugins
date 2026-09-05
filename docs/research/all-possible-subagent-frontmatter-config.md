@@ -3,6 +3,8 @@
 **Date:** 2026-05-04
 **Sources:** Official Anthropic docs (code.claude.com, docs.anthropic.com), Claude Code TypeScript SDK reference, official changelog, GitHub issues on anthropics/claude-code, real-world plugin repos
 
+**Addendum (2026-09-02):** The alias-to-model-ID rows in the `model` section were re-verified on 2026-09-02 against the Claude Code sub-agents reference and the 2.1.259 CLI, and carry their own `as of 2026-09` dates. Every other section still reflects the 2026-05-04 snapshot and has not been re-verified since.
+
 ## Summary
 
 Subagent `.md` files in Claude Code use a YAML frontmatter block (delimited by `---`) to declare identity, capabilities, model selection, permissions, and runtime behavior. The Markdown body below the frontmatter becomes the subagent's system prompt verbatim. The frontmatter parser is strict about field names: only recognized keys are acted upon; unknown keys are silently ignored unless they conflict with YAML parsing itself. Only `name` and `description` are required; all other fields are optional. Invalid YAML (malformed scalars, bad indentation) prevents the file from loading; invalid field _values_ typically cause the field to be ignored or the agent to fail to spawn.
@@ -127,11 +129,12 @@ When both `tools` and `disallowedTools` are specified, `tools` sets the allowlis
 
 | Value | Meaning |
 |-------|---------|
-| `sonnet` | Latest Claude Sonnet model (currently maps to `claude-sonnet-4-6`) |
-| `opus` | Latest Claude Opus model (currently maps to `claude-opus-4-7` or similar) |
-| `haiku` | Latest Claude Haiku model (currently maps to `claude-haiku-4-5-20251001` or similar) |
+| `sonnet` | Latest Claude Sonnet model (as of 2026-09: `claude-sonnet-5`) |
+| `opus` | Latest Claude Opus model (as of 2026-09: `claude-opus-5`) |
+| `haiku` | Latest Claude Haiku model (as of 2026-09: `claude-haiku-4-5`; Haiku 4.5 ignores `effort:`) |
+| `fable` | Latest Claude Fable model (as of 2026-09: `claude-fable-5-1`) — added to the sub-agents reference with the Claude 5 generation |
 | `inherit` | Use the same model as the parent conversation (default behavior; explicit `inherit` and omitting the field are equivalent) |
-| Full model ID | Any concrete Anthropic API model ID, e.g., `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
+| Full model ID | Any concrete Anthropic API model ID, e.g., `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5-20251001` |
 
 **Override precedence:** The `model` field in frontmatter can be overridden by:
 1. The environment variable `CLAUDE_CODE_SUBAGENT_MODEL` (takes precedence over frontmatter)

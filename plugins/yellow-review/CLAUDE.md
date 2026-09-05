@@ -165,7 +165,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Cross-Plugin Agent References
 
-When conditions warrant, commands spawn these agents via Task tool (using
+When conditions warrant, commands spawn these agents via Agent tool (using
 the three-segment `yellow-core:<dir>:<name>` subagent_type — e.g.
 `yellow-core:review:security-reviewer`). The Wave 2 pipeline dispatches the
 calibrated reviewer variants; the legacy fallback (`review_pipeline:
@@ -180,7 +180,7 @@ legacy` in `yellow-plugins.local.md`) keeps the deeper-audit variants.
   plugin authoring convention checks
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
-Optional supplementary agent via Task tool (using the three-segment
+Optional supplementary agent via Agent tool (using the three-segment
 `yellow-codex:review:codex-reviewer` subagent_type):
 
 - `codex-reviewer` — parallel review when yellow-codex is installed AND

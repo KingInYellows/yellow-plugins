@@ -33,7 +33,7 @@ Three operations:
    entry, present the user with a one-question `AskUserQuestion` choice
    (Keep / Update / Consolidate / Replace / Delete-and-archive). On
    Consolidate or Replace approval, dispatch `knowledge-compounder` via
-   `Task` to write the merged entry, then archive the superseded
+   `Agent` to write the merged entry, then archive the superseded
    originals to `docs/solutions/archived/<original-category>/`.
 
 The skill **never deletes**. Per yellow-plugins convention, superseded
@@ -220,10 +220,10 @@ under "Applied".
      `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`)
    - the user's stated rationale (if provided via the "Other" option)
    - target category and tags (union of the originals)
-2. Dispatch `knowledge-compounder` via `Task`:
+2. Dispatch `knowledge-compounder` via `Agent`:
 
    ```text
-   Task(
+   Agent(
      subagent_type: "yellow-core:workflow:knowledge-compounder",
      description: "Consolidate <N> entries into one canonical doc",
      prompt: "<consolidation-context block>"
@@ -284,7 +284,7 @@ brings them into context.
   `archived/` and `README.md`)
 - **Writes** `docs/solutions/<category>/<slug>.md` (in-place Updates) and
   `docs/solutions/archived/<category>/<slug>.md` (archive moves)
-- **Dispatches** `knowledge-compounder` via `Task` for Consolidate and
+- **Dispatches** `knowledge-compounder` via `Agent` for Consolidate and
   Replace classifications
 
 ## Why "archive, don't delete"

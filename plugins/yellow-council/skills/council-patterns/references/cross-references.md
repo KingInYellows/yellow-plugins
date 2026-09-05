@@ -8,7 +8,7 @@ CLI Flag Pattern" section, which stays preloaded).
 
 - `yellow-codex:codex-patterns` — Codex CLI invocation conventions, exit
   code catalog, sandbox/approval modes. yellow-council reuses these for the
-  Codex reviewer leg via Task spawn — do not duplicate the codex-patterns
+  Codex reviewer leg via the Agent tool spawn — do not duplicate the codex-patterns
   content here.
 - `docs/spikes/antigravity-cli-headless-2026-08.md` — verified Antigravity
   CLI (agy 1.0.2) invocation for the Gemini slot: `cd <pack-dir> && agy

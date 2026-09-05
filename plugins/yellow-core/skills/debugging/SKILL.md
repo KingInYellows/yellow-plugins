@@ -227,7 +227,7 @@ If 2–3 hypotheses are exhausted without confirmation, diagnose **why** they fa
 | Works locally, fails in CI/prod             | Environment problem                                | Focus on env differences, config, dependencies, timing         |
 | Fix works but prediction was wrong          | Symptom fix, not root cause                        | The real cause is still active — keep investigating            |
 
-**Parallel investigation option:** when hypotheses are evidence-bottlenecked across clearly independent subsystems, dispatch read-only sub-agents in parallel via `Task` (one per hypothesis) with structured evidence-return format. No code edits by sub-agents. Skip this when hypotheses depend on each other's outcomes — sequential ranked-likelihood probing is correct in that case.
+**Parallel investigation option:** when hypotheses are evidence-bottlenecked across clearly independent subsystems, dispatch read-only sub-agents in parallel via `Agent` (one per hypothesis) with structured evidence-return format. No code edits by sub-agents. Skip this when hypotheses depend on each other's outcomes — sequential ranked-likelihood probing is correct in that case.
 
 Present the diagnosis to the user before proceeding.
 

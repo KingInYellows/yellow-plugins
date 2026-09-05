@@ -8,7 +8,7 @@ allowed-tools:
   - Glob
   - Grep
   - Write
-  - Task
+  - Agent
   - AskUserQuestion
   - ToolSearch
   - Skill
@@ -90,12 +90,12 @@ research, analysis, and structured documentation.
       </work-context>
       ```
 
-   2. Spawn `learnings-researcher` via Task tool **in the background** so
+   2. Spawn `learnings-researcher` via Agent tool **in the background** so
       the pre-pass overlaps with the remaining Phase 1 steps instead of
       serializing in front of Phase 2's parallel dispatch:
 
       ```
-      Task(
+      Agent(
         subagent_type: "yellow-core:research:learnings-researcher",
         description: "Past learnings pre-pass",
         prompt: "<work-context block from step 1>",
@@ -222,15 +222,15 @@ research, analysis, and structured documentation.
    - Any helper failure (non-zero exit, empty output) → treat exactly as
      NO-CACHE. The cache is an optimization and must never block planning.
 
-1. Launch research agents in parallel using Task tool. **Issue both Task
+1. Launch research agents in parallel using Agent tool. **Issue both Agent
    invocations in a single response** so they execute concurrently. **Each
-   Task invocation MUST set `run_in_background: true`** — both research
+   Agent invocation MUST set `run_in_background: true`** — both research
    agents declare `background: true` in their frontmatter, but the spawning
    call must also run in the background so the two agents execute concurrently
    rather than serially:
 
    ```text
-   Task: repo-research-analyst
+   Agent: repo-research-analyst
    subagent_type: "yellow-core:research:repo-research-analyst"
    Input: {feature_description}
    Goal: Find relevant files, existing patterns, similar implementations
@@ -238,7 +238,7 @@ research, analysis, and structured documentation.
    ```
 
    ```text
-   Task: best-practices-researcher
+   Agent: best-practices-researcher
    subagent_type: "yellow-core:research:best-practices-researcher"
    Input: {feature_description}
    Goal: Identify project conventions, architectural patterns, testing approaches
@@ -272,7 +272,7 @@ research, analysis, and structured documentation.
 1. Run specification flow analyzer:
 
    ```text
-   Task: spec-flow-analyzer
+   Agent: spec-flow-analyzer
    subagent_type: "yellow-core:workflow:spec-flow-analyzer"
    Input: {feature_description, research_findings}
    Goal: Validate completeness, identify edge cases, find missing requirements

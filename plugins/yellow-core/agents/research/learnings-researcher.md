@@ -301,7 +301,7 @@ Invoked by:
   (empty Diff field)
 - `/flow:brainstorm` (`brainstorm-orchestrator` Phase 0b) — pre-pass
   after TOPIC confirmation, before the first question round
-- Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
+- Standalone via `Agent` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses
 specific field labels — so prioritize distilled, actionable takeaways over

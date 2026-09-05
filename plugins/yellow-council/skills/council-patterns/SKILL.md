@@ -758,7 +758,7 @@ in-process Claude slot can accept the full diff anyway — uniformity > capacity
 for synthesis comparability.
 
 The 100K cap is per reviewer, but the fan-out cost is not. `council.md` Step 4
-spawns all four in a SINGLE message, each `Task` call carrying the pack
+spawns all four in a SINGLE message, each `Agent` call carrying the pack
 verbatim in its prompt — so a pack at the cap means the orchestrator emits
 ~400K chars of tool-call arguments in one turn, up from ~300K at three
 reviewers. Subagents get isolated context windows, so this is a cost the
@@ -817,7 +817,7 @@ background, deliberately kept out of the preload budget.
 ### Reviewer-Specific CLI Flag Pattern
 
 **Claude slot — in-process, no CLI** (via
-`Task(subagent_type="yellow-council:review:claude-reviewer")`):
+`Agent(subagent_type="yellow-council:review:claude-reviewer")`):
 - No binary, no subprocess, no `Bash`: `tools:` is `[Read, Grep, Glob, Write]`.
   Every CLI-specific convention in this skill — the `timeout` pattern, exit-code
   classification, `--sandbox`/`--variant` flags, session cleanup, the `awk`
@@ -831,7 +831,7 @@ background, deliberately kept out of the preload budget.
 - Redaction and delimiter escaping are prose rules, not executed code — see
   the fence-label note above.
 
-**Codex** (via `Task(subagent_type="yellow-codex:review:codex-reviewer")`):
+**Codex** (via `Agent(subagent_type="yellow-codex:review:codex-reviewer")`):
 - 300s timeout (yellow-codex's own cap; council's 600s does NOT propagate)
 - Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-a` does not parse on either subcommand; `-c` also outranks `~/.codex/config.toml`)
 - Invokes plain `codex exec` with `--output-schema` against a pre-written diff file — **not** `codex exec review`, which silently ignores `--output-schema` and returns unparsable prose

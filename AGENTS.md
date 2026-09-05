@@ -240,7 +240,8 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - Command files use Claude Code command `allowed-tools:` frontmatter. Keep
   command tool lists to tools the command body calls directly; delegated agents
   own their own tool lists.
-- Any command that delegates to an agent must include `Task` in `allowed-tools:`
+- Any command that delegates to an agent must include `Agent` in `allowed-tools:`
+  (`Task` is the pre-2.1.63 name of the same tool and still works as an alias)
   and spell out the exact literal `subagent_type` value.
 - Cross-plugin agent references must use the three-segment runtime form
   `plugin-name:subdir:agent-name`, matching the agent file's `name:` frontmatter
