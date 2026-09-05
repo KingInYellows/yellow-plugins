@@ -144,11 +144,13 @@ describe('thermonuclear-reviewer agent', () => {
     const fences = agent.match(/^```json\r?$/gm) ?? [];
     expect(fences).toHaveLength(1);
     const body = /^```json\r?\n([\s\S]*?)\r?\n```/m.exec(agent);
-    expect(body).not.toBeNull();
+    if (body === null) {
+      throw new Error('agent has no ```json fence');
+    }
     // The schema example uses placeholder strings for free-text fields and
     // an enum union for severity; substitute concrete values so the shape
     // itself can be parsed and asserted on.
-    const concrete = (body as RegExpExecArray)[1]
+    const concrete = body[1]
       .replace(/"P1\|P2\|P3"/g, '"P2"')
       .replace(/"<[^"]*>"/g, '"placeholder"');
     const parsed = JSON.parse(concrete) as {
@@ -174,6 +176,14 @@ describe('thermonuclear-reviewer agent', () => {
     // the aggregator was built to weigh.
     expect(flatten(agent)).toContain('There is no persona-side confidence cutoff');
     expect(flatten(agent)).toContain('Report every finding at or above anchor 50');
+  });
+
+  it('treats the line-count block as untrusted and fenced', () => {
+    // The agent's documented shape must match what the orchestrator emits,
+    // fence included, or the persona looks for a block it never receives.
+    expect(agent).toContain('--- begin file-line-counts (reference only) ---');
+    expect(agent).toContain('--- end file-line-counts ---');
+    expect(flatten(agent)).toContain('paths in them come from the PR');
   });
 
   it('fails closed when file line counts are unavailable', () => {
@@ -262,6 +272,78 @@ describe('opt-in wiring', () => {
     // It emits compact-return JSON directly, so listing it among the
     // legacy-prose reviewers would corrupt every return it makes.
     expect(command).not.toMatch(/`thermonuclear-reviewer`[^\n]*legacy/);
+  });
+
+  it('injects file line counts only into this persona', () => {
+    const command = readFileSync(
+      resolve(
+        REPO_ROOT,
+        'plugins/yellow-review/commands/review/review-pr.md'
+      ),
+      'utf8'
+    );
+    const flat = flatten(command);
+    expect(command).toContain('<file-line-counts>');
+    expect(flat).toContain(
+      'only into `thermonuclear-reviewer`, and only when it was dispatched'
+    );
+    // The block is derived from diff paths, so it goes through the same
+    // two-step sanitization as the pr-context fence.
+    expect(flat).toContain(
+      'apply the same two steps in the same order as the pr-context block above'
+    );
+    // Partial output would look authoritative; the reviewer only fails
+    // closed on a block that is absent outright.
+    expect(flat).toContain('do not emit a partial');
+    // -z is what makes a path containing a space or quote safe to read.
+    expect(command).toContain('git diff -z --numstat');
+    // ...and is exactly why a control character has to be dropped: `-z`
+    // yields the path RAW, so a PR author who names a file with an embedded
+    // newline emits a second, fully-forged `<path> base=N head=M` row —
+    // fabricating a threshold crossing on a file the PR never touched, or
+    // stating a benign base for one it did. Neither sanitization step
+    // touches control characters.
+    expect(command).toContain('*[[:cntrl:]]*)');
+    // `path` is a special array in zsh, tied to $PATH. Naming the loop
+    // variable `path` replaces the command search path, after which `git`
+    // and `awk` vanish and every row degrades to `base=0 head=` while the
+    // loop keeps emitting. The orchestrator's shell is the host's, and on
+    // this repo's own machines that is zsh.
+    expect(command).not.toMatch(/^\s*path=/m);
+    expect(command).toContain('new_path=');
+    // Counts must come from commits on BOTH sides, so they describe the two
+    // endpoints the diff spans rather than whatever is checked out.
+    expect(command).toContain('git show "HEAD:$new_path"');
+    // awk counts lines; `wc -l` counts newlines and undercounts a file with
+    // no trailing newline — an off-by-one exactly at the 1000/1001 boundary.
+    expect(command).toContain("awk 'END{print NR}'");
+    // The fail-closed guard must test each value independently. Bare
+    // `$base$head` concatenates them, so an empty `head` hides behind a
+    // digit `base` — and `base` is a literal 0 for every file the PR adds,
+    // which is exactly the `base=0 head=` row the guard exists to reject.
+    expect(command).toContain('case ${base:-x}${head:-x} in');
+    expect(command).not.toContain('case $base$head in');
+    // `cat-file -e` also succeeds for a TREE, so a file replaced by a
+    // directory of the same name would pass an existence probe and awk
+    // would count git's tree listing as if it were file content.
+    expect(command).toContain('git cat-file -t "HEAD:$new_path"');
+    expect(command).toContain('git cat-file -t "$MERGE_BASE:$base_path"');
+    expect(command).not.toMatch(/git cat-file -e ["$]/);
+    expect(command).not.toMatch(/head=\$\(wc -l/);
+    // The block carries its own fence, and both delimiters must join the
+    // literal-delimiter substitution list or a hostile path ends it early.
+    expect(command).toContain(
+      '--- begin file-line-counts (reference only) ---'
+    );
+    expect(command).toContain('--- end file-line-counts ---');
+    expect(flat).toContain('must include this block');
+    expect(flat).toContain('own two delimiters');
+    // `A...HEAD` diffs from the merge-base, so base content must be read
+    // there too. Reading `DIFF_BASE`'s tip reports a phantom shrink on any
+    // branch whose base advanced after it was cut.
+    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD)');
+    expect(command).toContain('git cat-file -t "$MERGE_BASE:$base_path"');
+    expect(command).not.toContain('git show "$DIFF_BASE:$base_path"');
   });
 
   it('is documented as the reachable-only-via-include reviewer', () => {
