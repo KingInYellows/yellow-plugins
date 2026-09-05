@@ -1,9 +1,9 @@
 diff --git a/src/checkout/session-manager.ts b/src/checkout/session-manager.ts
 --- a/src/checkout/session-manager.ts
 +++ b/src/checkout/session-manager.ts
-@@ -980,2 +980,42 @@ export class SessionManager {
+@@ -980,4 +980,21 @@ export class SessionManager {
      return this.store.get(id);
-+  }
+   }
 +
 +  private couponRules: CouponRule[] = [];
 +

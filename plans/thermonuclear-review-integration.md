@@ -367,7 +367,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 > is unlikely. The O1 recommendation is unchanged, but the urgency framing is
 > stronger than the evidence supports.
 <!-- /deepen-plan -->
-- [ ] 1.4.1b Register `thermonuclear-reviewer` in a new "Opt-in only"
+- [x] 1.4.1b Register `thermonuclear-reviewer` in a new "Opt-in only"
       subsection in `review-pr.md` Step 4 (and the equivalent dispatch
       table in `review-all.md`), separate from the always-on and
       conditional tables, carrying `Agent | subagent_type | Reviewer
@@ -740,7 +740,7 @@ blocks merges.
      locally on their own branches; the whole stack is submitted in one pass
      once that drift is resolved. -->
 - [x] 1. agent/chore/thermonuclear-upstream-snapshot (committed 2026-09-05, not yet submitted)
-- [ ] 2. agent/feat/thermonuclear-reviewer
+- [x] 2. agent/feat/thermonuclear-reviewer (implementation tasks 1.2.1-1.6.2 complete)
 - [ ] 3. agent/feat/thermonuclear-line-counts
 - [ ] 4. agent/feat/thermonuclear-cross-host
 

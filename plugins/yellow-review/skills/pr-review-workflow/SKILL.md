@@ -132,7 +132,9 @@ Binary files show `-` in numstat and are excluded.
   diff content triggers it. A repository reaches it only by naming it in
   `reviewer_set.include` in `yellow-plugins.local.md`. Under
   `review_pipeline: legacy` it is unreachable by design — the legacy
-  persona list is fixed and never reads `reviewer_set`.
+  persona list is fixed and never reads `reviewer_set`. Its
+  `subagent_type` mapping lives in `review-pr.md` Step 4's "Opt-in only"
+  table, not here.
 
 ### Size Tiers
 

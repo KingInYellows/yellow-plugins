@@ -74,8 +74,8 @@ Select your depth:
 ## File line counts
 
 The size-threshold rule needs authoritative before/after line counts, which
-a unified diff does not carry. When the orchestrator dispatches this
-persona it appends a `<file-line-counts>` block:
+a unified diff does not carry. When the host supplies them, the orchestrator
+appends a `<file-line-counts>` block when it dispatches this persona:
 
 ```text
 <file-line-counts>
@@ -112,9 +112,10 @@ Persona-specific guidance:
 - **Anchor 25 or below** — you have an impression that the code "feels
   complicated" without a concrete alternative. Do not report it.
 
-**Report every finding at or above anchor 50.** There is no persona-side
-confidence cutoff: Step 6 applies the gate once, and a second cutoff here
-would suppress findings the aggregator was built to weigh.
+**Report every finding you identify, with its calibrated confidence anchor.**
+There is no persona-side confidence cutoff: Step 6 applies the 75 gate once
+after aggregation, and a second cutoff here would suppress findings the
+aggregator was built to weigh.
 
 ## What you don't flag
 

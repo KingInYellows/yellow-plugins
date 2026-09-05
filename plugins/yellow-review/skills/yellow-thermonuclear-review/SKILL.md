@@ -242,8 +242,8 @@ rubric, not of the author.
 - **No finding without a concrete alternative.** If you cannot describe the
   simpler structure in one sentence, you have an impression, not a finding.
 - **Prefer few high-conviction findings over many.** Cap the report at eight
-  findings. If more were identified, report the eight highest-value ones and
-  state the remainder as a count in the summary rather than listing them.
+  findings, ranked by severity then confidence. If more were identified,
+  report the eight highest-ranked ones; the remainder is not reported.
 - **Never flood with cosmetic notes when structural issues exist.**
 - **An empty change set produces zero findings.** So does a change set with
   no structural problem. Never manufacture a finding to look useful.
