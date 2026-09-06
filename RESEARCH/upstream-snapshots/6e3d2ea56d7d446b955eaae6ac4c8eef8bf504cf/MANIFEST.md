@@ -32,7 +32,7 @@ Note: `cursor/plugins` ships the same skill blob from two plugins — `cursor-te
 
 | Snapshot file | yellow-plugins task(s) | Use |
 |---|---|---|
-| `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md` | 1.2.1-1.2.7 | Rubric source for `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`. Adapted, not copied: the yellow skill adds report-only safety rails, a compact-return JSON contract, evidence-gated size thresholds (the upstream absolute 1,000-line rule is replaced per plan blocker B1 and its research annotation), and inline MIT attribution. |
+| `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md` | 1.2.1-1.2.7 | Rubric source for `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`. Adapted, not copied: the yellow skill adds report-only safety rails, a compact-return JSON contract, evidence-gated size thresholds (the upstream absolute 1,000-line crossing is **retained**; B1 only moves the count into an orchestrator-injected `<file-line-counts>` block so the reviewer does not guess), and inline MIT attribution. |
 | `cursor-team-kit/agents/thermo-nuclear-code-quality-review.md` | 1.3.1-1.3.9 | Frontmatter and skill-preload reference for `plugins/yellow-review/agents/review/thermonuclear-reviewer.md`. Upstream's parent-orchestration section does not port: yellow's `/review:pr` already supplies the diff and dispatch context, and the yellow persona spawns nothing. |
 | `cursor-team-kit/LICENSE` | 1.2.5 | Exact MIT notice text reproduced inline in the yellow `SKILL.md` body. Inline rather than a plugin-root path because the Cursor/Codex generator copies only `SKILL.md` + flat `references/*.md` from inside `skills/<name>/`, so any relative path out of that directory would dangle in every distributed copy. |
 
@@ -54,6 +54,7 @@ from somewhere other than the snapshot directory.
 set -euo pipefail
 SHA=6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf
 SNAP=RESEARCH/upstream-snapshots/$SHA
+MANIFEST="$SNAP/MANIFEST.md"
 # Portable SHA-256: prefer sha256sum (Linux), fall back to shasum -a 256 (macOS).
 if command -v sha256sum >/dev/null 2>&1; then
   sha256() { sha256sum | cut -d' ' -f1; }
@@ -63,28 +64,61 @@ else
   echo "ERROR: neither sha256sum nor shasum is available" >&2
   exit 1
 fi
-paths=(
-  cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md
-  cursor-team-kit/agents/thermo-nuclear-code-quality-review.md
-  cursor-team-kit/LICENSE
-)
+# Single source: the Snapshotted-files table in this MANIFEST (path, blob, bytes).
+# Both integrity and movement loops iterate this list; do not duplicate it.
+mapfile -t rows < <(awk -F'|' '
+  /^\| `/ {
+    path=$2; blob=$3; bytes=$4
+    gsub(/^ +| +$/, "", path); gsub(/`/, "", path)
+    gsub(/^ +| +$/, "", blob); gsub(/`/, "", blob)
+    gsub(/^ +| +$/, "", bytes)
+    if (path ~ /\// && blob ~ /^[0-9a-f]{40}$/)
+      print path "|" blob "|" bytes
+  }
+' "$MANIFEST")
+if [ "${#rows[@]}" -eq 0 ]; then
+  echo "ERROR: failed to parse Snapshotted-files table in $MANIFEST" >&2
+  exit 1
+fi
 drift=0
 checked=0
-for rel in "${paths[@]}"; do
-  if ! remote=$(gh api "repos/cursor/plugins/contents/${rel}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256); then
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+for row in "${rows[@]}"; do
+  rel=${row%%|*}
+  rest=${row#*|}
+  expect_blob=${rest%%|*}
+  expect_bytes=${rest#*|}
+  if ! gh api "repos/cursor/plugins/contents/${rel}?ref=$SHA" \
+      -H "Accept: application/vnd.github.raw" >"$tmp"; then
     echo "FETCH ERROR: $rel" >&2
     drift=1
     continue
   fi
-  local=$(sha256 < "$SNAP/$rel")
+  remote=$(sha256 < "$tmp")
+  if ! local=$(sha256 < "$SNAP/$rel"); then
+    echo "LOCAL READ ERROR: $SNAP/$rel" >&2
+    drift=1
+    continue
+  fi
   if [ "$remote" != "$local" ]; then
     echo "DRIFT: $rel"
     drift=1
   fi
+  got_blob=$(git hash-object "$SNAP/$rel")
+  if [ "$got_blob" != "$expect_blob" ]; then
+    echo "BLOB SHA DRIFT: $rel got $got_blob expected $expect_blob" >&2
+    drift=1
+  fi
+  got_bytes=$(wc -c < "$SNAP/$rel" | tr -d ' ')
+  if [ "$got_bytes" != "$expect_bytes" ]; then
+    echo "BYTE COUNT DRIFT: $rel got $got_bytes expected $expect_bytes" >&2
+    drift=1
+  fi
   checked=$((checked + 1))
 done
-if [ "$checked" -ne "${#paths[@]}" ]; then
-  echo "ERROR: checked $checked of ${#paths[@]} expected files" >&2
+if [ "$checked" -ne "${#rows[@]}" ]; then
+  echo "ERROR: checked $checked of ${#rows[@]} expected files" >&2
   drift=1
 fi
 [ "$drift" -eq 0 ] && echo "OK: snapshot matches upstream at $SHA"
@@ -97,12 +131,22 @@ proper, required if implementation slips more than a week past 2026-09-05):
 ```bash
 set -euo pipefail
 SHA=6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf
+SNAP=RESEARCH/upstream-snapshots/$SHA
+MANIFEST="$SNAP/MANIFEST.md"
+mapfile -t rows < <(awk -F'|' '
+  /^\| `/ {
+    path=$2; blob=$3
+    gsub(/^ +| +$/, "", path); gsub(/`/, "", path)
+    gsub(/^ +| +$/, "", blob); gsub(/`/, "", blob)
+    if (path ~ /\// && blob ~ /^[0-9a-f]{40}$/) print path
+  }
+' "$MANIFEST")
+if [ "${#rows[@]}" -eq 0 ]; then
+  echo "ERROR: failed to parse Snapshotted-files table in $MANIFEST" >&2
+  exit 1
+fi
 moved=0
-for p in \
-  cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md \
-  cursor-team-kit/agents/thermo-nuclear-code-quality-review.md \
-  cursor-team-kit/LICENSE
-do
+for p in "${rows[@]}"; do
   if ! n=$(gh api "repos/cursor/plugins/commits?path=$p&since=2026-05-28T16:19:24Z" --jq 'length'); then
     echo "FETCH ERROR: $p" >&2
     moved=1

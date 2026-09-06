@@ -133,10 +133,14 @@ Observed failure modes, all in a ~15-line bash block:
    fails (auth expired, rate-limited, network down), `sha256sum` happily
    hashes empty input, the local file hashes to something else, and the
    script reports `DRIFT: <file>` — a false positive that looks like an
-   upstream change but is actually a fetch error. Fix: capture `gh`'s exit
-   status separately (`PIPESTATUS`, or split the pipe into `remote=$(gh api
-   ...)` then check `$?` before hashing) and fail loudly on a fetch error
-   rather than reporting it as drift.
+   upstream change but is actually a fetch error. Fix: write the raw `gh api`
+   body to a temp file, check `gh`'s exit status, then hash that file.
+   Do **not** capture into `remote=$(gh api ...)` before hashing — command
+   substitution strips trailing newlines, so a byte-identical snapshot that
+   ends in a newline is reported as drift. `PIPESTATUS` on a pipe into the hasher
+   is acceptable only when the producer-to-hasher pipeline stays under
+   `pipefail` and never passes through `$(...)`. Fail loudly on a fetch
+   error rather than reporting it as drift.
 3. **The drift re-check enumerates files independently of the integrity
    check, so the two lists diverge.** The integrity script derives its file
    set from `find`; the re-check script hardcodes a `for p in ...` list that
@@ -170,7 +174,8 @@ Observed failure modes, all in a ~15-line bash block:
 - [ ] Any command piped into a hash or comparison (`gh api ... | sha256sum`,
       `curl ... | jq`) has its own exit status checked before the piped
       output is trusted — a fallible producer feeding a hasher becomes
-      untraceable once piped.
+      untraceable once piped. Prefer `gh api ... >"$tmp" && sha256 < "$tmp"`
+      over `remote=$(gh api ...)` so trailing newline bytes survive.
 - [ ] A "0 drift" / "0 commits since pin" result is only valid when paired
       with an assertion that the check actually ran against a nonzero,
       expected file/commit set — an empty result and a verified-clean
