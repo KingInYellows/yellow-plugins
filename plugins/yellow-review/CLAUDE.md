@@ -253,6 +253,27 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
   silent-failure-hunter and type-design-analyzer. Discovered via ToolSearch at
   runtime; falls back to Grep if yellow-research not installed.
 
+## Codex and Cursor Distribution
+
+`targets.codex.enabled: true` and `targets.cursor.enabled: true` in
+`catalog/plugins/yellow-review.json`, each with a `skillAllowlist` of exactly
+one entry: `yellow-thermonuclear-review`. Every command, agent, and other skill
+in this plugin stays Claude-only, and the plugin ships no hooks. See
+[`docs/codex-distribution.md`](../../docs/codex-distribution.md) and
+[`docs/cursor-distribution.md`](../../docs/cursor-distribution.md).
+
+Generated artifacts (`pnpm generate:manifests`; checked by
+`pnpm validate:generated`): `.codex-plugin/plugin.json`,
+`.cursor-plugin/plugin.json`, `codex/skills/yellow-thermonuclear-review/SKILL.md`,
+`cursor/skills/yellow-thermonuclear-review/SKILL.md`, plus the root
+`.agents/plugins/marketplace.json` and `.cursor-plugin/marketplace.json`
+entries. The host copies carry the canonical skill body byte-for-byte with
+frontmatter normalised to `name` + `description`; edit
+`skills/yellow-thermonuclear-review/SKILL.md` and regenerate, never the
+copies. Because neither host applies the agent's `tools:` restriction or
+`user-invocable: false`, the rails, the input contract, and the
+explicit-invocation wording live in the skill body and description.
+
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed

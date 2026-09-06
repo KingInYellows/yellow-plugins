@@ -377,7 +377,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       `reviewer_set.include`". Without this row, `reviewer_set.include`
       has no subagent_type mapping to dispatch and the opt-in path is
       unreachable.
-- [ ] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
+- [x] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
       `review-all.md`'s own inline pass (it does not inherit Step 5 of
       `review-pr.md` by reference for this concern). Without this, a
       `thermonuclear-reviewer` opted in via `/review:all` never receives the
@@ -469,31 +469,38 @@ Branch `agent/feat/thermonuclear-cross-host`, title
 `feat(distribution): expose thermonuclear review to Cursor and Codex`.
 Kept separate so host compatibility rests on smoke-test evidence, not assertion.
 
-- [ ] 2.1 Edit **only** `catalog/plugins/yellow-review.json`: set
+- [x] 2.1 Edit **only** `catalog/plugins/yellow-review.json`: set
       `targets.codex.enabled: true`, add the `targets.cursor` block, and give each
       an `interface` (`displayName`, `category`), a target-specific `description`,
       `skillAllowlist: ["yellow-thermonuclear-review"]`, and
       `componentPaths.skills`.
-- [ ] 2.2 Run `pnpm generate:manifests`. **Never hand-edit** any generated file
+- [x] 2.2 Run `pnpm generate:manifests`. **Never hand-edit** any generated file
       under `.codex-plugin/`, `.cursor-plugin/`, `codex/skills/`, `cursor/skills/`,
       or the root `.cursor-plugin/marketplace.json`.
-- [ ] 2.3 Confirm the generated trees contain **only** the allowlisted skill — no
+- [x] 2.3 Confirm the generated trees contain **only** the allowlisted skill — no
       agents, no commands, no other skill.
-- [ ] 2.4 Verify the distributed copies still carry the inline MIT notice and the
+- [x] 2.4 Verify the distributed copies still carry the inline MIT notice and the
       safety rails, since frontmatter is normalised to `name` + `description` and
       everything outside `skills/<name>/` is dropped (F9, D2, D4).
-- [ ] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
-- [ ] 2.6 Update the canonical target inventories that this PR makes stale:
+- [x] 2.5 `pnpm validate:generated && pnpm validate:cursor && pnpm validate:codex`.
+- [x] 2.6 Update the canonical target inventories that this PR makes stale:
       `docs/codex-distribution.md` (currently claims exactly three Codex-enabled
       plugins), `docs/cursor-distribution.md` (currently calls `yellow-cursor`
       the sole Cursor-enabled plugin), the root `README.md`, the
       `AGENTS.md` target inventory, and `docs/security.md` (host-specific
       posture: Claude tools-allowlist vs Cursor/Codex prompt-only rails).
-- [ ] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
+- [x] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
       since exposing the skill through Cursor and Codex is an additive
       user-visible capability, not a fix — matching the **minor** bump task
-      1.5.4 already uses for PR 1.
+      1.5.4 already uses for PR 1. (PR #770 first shipped it as **patch**;
+      re-bump before merge.)
 - [ ] 2.8 Record all three smoke tests in the PR body (see Testing Strategy).
+      **Deferred, 2026-09-06 → issue #774.** Not run. The Cursor and Codex
+      legs need those hosts installed against an isolated project / a
+      temporary `CODEX_HOME`, neither of which exists in this environment.
+      Non-blocking by the Testing Strategy table above ("No — release gate
+      by review"), so #770 merges with this box open rather than ticked;
+      it stays unchecked because the tests were never run.
 
 ## Technical Details
 
@@ -546,7 +553,7 @@ Three tiers, deliberately separated so nothing masquerades as a gate it isn't.
 | Tier | Mechanism | Blocks merge? |
 |---|---|---|
 | Static contract | vitest under `tests/integration/` + `pnpm validate:agents` | **Yes** |
-| Model quality | 9 fixtures, run by hand, recorded in the PR body | No — recorded evidence |
+| Model quality | 10 fixtures, run by hand, recorded in the PR body | No — recorded evidence |
 | Cross-host | 3 smoke tests, recorded in PR 2's body | No — release gate by review |
 
 **Do not** wire the fixture matrix into bats. Per F7 it is advisory-only, so an
@@ -555,7 +562,7 @@ LLM-output assertion there would appear green while never blocking a regression.
 <!-- deepen-plan: external -->
 > **Research:** The three-tier split is well supported, and the real risk is
 > **false assurance rather than flakiness**. Miller (Anthropic), "Adding Error
-> Bars to Evals" (arXiv:2411.00640) implies a nine-fixture suite is
+> Bars to Evals" (arXiv:2411.00640) implies a ten-fixture suite is
 > statistically incapable of detecting small regressions: it recommends ~**1,000
 > questions** for good power, and warns that **clustered standard errors can
 > exceed naive ones by >3×** when items share structure — which fixtures drawn
@@ -614,7 +621,10 @@ Mechanically verifiable:
 
 By recorded human sign-off:
 
-10. All 9 fixtures behave as tabulated, recorded in PR 1's body with date and reviewer.
+10. All 10 fixtures behave as tabulated, recorded with date and reviewer.
+    **Deferred, 2026-09-06 → issue #774.** Not run. Non-blocking by the
+    Testing Strategy table above ("No — recorded evidence"); the merge gate
+    is the static contract tier, which is green.
 11. All 3 host smoke tests pass, recorded in PR 2's body.
 12. The rubric is adapted and attributed, not anonymously copied.
 
@@ -734,15 +744,18 @@ blocks merges.
 
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
-<!-- Submission is deferred for this run: `gt submit` is blocked because the
-     ancestor branch `agent/feat/validator-claude5-modernisation` (PR #742) has
-     commits on the remote that are not local. Items below are committed
-     locally on their own branches; the whole stack is submitted in one pass
-     once that drift is resolved. -->
-- [x] 1. agent/chore/thermonuclear-upstream-snapshot (committed 2026-09-05, not yet submitted)
-- [x] 2. agent/feat/thermonuclear-reviewer (implementation tasks 1.2.1-1.6.2 complete)
-- [ ] 3. agent/feat/thermonuclear-line-counts
-- [ ] 4. agent/feat/thermonuclear-cross-host
+<!-- Submitted 2026-09-05 as a four-PR stack on top of #748. Submission was
+     initially blocked: five ancestor branches (#742, #743, #744, #746, #748)
+     were behind their remotes and `main` had advanced. `gt get` + `gt restack`
+     resolved three conflicts by hand — AGENTS.md (plugin list: kept the
+     20-entry list including yellow-goal), CLAUDE.md (kept #746's trimmed
+     prose, corrected the count 19 -> 20 to match marketplace.json and
+     validate-doc-counts.js), and yellow-review/README.md (both sides added a
+     distinct section; kept both). -->
+- [x] 1. agent/chore/thermonuclear-upstream-snapshot (submitted 2026-09-05, PR #767)
+- [x] 2. agent/feat/thermonuclear-reviewer (submitted 2026-09-05, PR #768)
+- [x] 3. agent/feat/thermonuclear-line-counts (submitted 2026-09-05, PR #769)
+- [x] 4. agent/feat/thermonuclear-cross-host (submitted 2026-09-05, PR #770; task 2.8 host smoke tests still outstanding)
 
 ---
 

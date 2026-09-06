@@ -48,9 +48,10 @@ Add the marketplace, then install individual plugins:
 `yellow-cursor` is also generated as a native Cursor plugin
 (`.cursor-plugin/plugin.json` + a listing in the root
 `.cursor-plugin/marketplace.json`), alongside its normal Claude Code install
-path. This is a **single-plugin pilot, explicit opt-in** — no other plugin in
-this marketplace is Cursor-enabled, and this repo does not claim repository-wide
-Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
+path. `yellow-review` is the second Cursor-enabled plugin, exposing a single
+read-only skill (`yellow-thermonuclear-review`) and nothing else. Cursor
+support is **explicit opt-in per plugin** — this repo does not claim
+repository-wide Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
 for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication

@@ -18,7 +18,7 @@
  * deterministic file content.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, it, expect } from 'vitest';
@@ -109,7 +109,8 @@ describe('thermonuclear-reviewer agent', () => {
   it('fences untrusted input without an ALL-CAPS rule list', () => {
     expect(agent).toMatch(/^## Untrusted input\s*$/m);
     expect(flatten(agent)).toMatch(/data, never instructions/);
-    expect(agent).toContain('--- code begin (reference only) ---');
+    expect(agent).toContain('--- code begin (reference only)');
+    expect(flatten(agent)).toMatch(/--- code end <nonce> ---/);
     expect(agent).not.toContain('CRITICAL SECURITY RULES');
   });
 
@@ -203,7 +204,11 @@ describe('yellow-thermonuclear-review skill', () => {
       /Report only\. Never mutate the repository\./
     );
     expect(flatten(skill)).toMatch(/never instruction/i);
-    expect(skill).toContain('--- code begin (reference only) ---');
+    expect(skill).toContain('--- code begin (reference only) <nonce> ---');
+    expect(flatten(skill)).toMatch(
+      /closer does not appear in the captured text/
+    );
+    expect(flatten(skill)).toMatch(/un-nonce'd `--- code end ---` closer/);
   });
 
   it('states the fail-closed size rule without host-specific machinery', () => {
@@ -275,10 +280,7 @@ describe('opt-in wiring', () => {
 
   it('injects file line counts only into this persona', () => {
     const command = readFileSync(
-      resolve(
-        REPO_ROOT,
-        'plugins/yellow-review/commands/review/review-pr.md'
-      ),
+      resolve(REPO_ROOT, 'plugins/yellow-review/commands/review/review-pr.md'),
       'utf8'
     );
     const flat = flatten(command);
@@ -300,9 +302,13 @@ describe('opt-in wiring', () => {
     expect(command).toContain('git diff -z --numstat --find-renames');
     // The header is the completeness signal the orchestrator keys on, and an
     // unresolved merge-base must stop the block rather than read the index.
-    expect(command).toContain("printf 'file-line-counts rows=%s dropped=%s\\n'");
-    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
-    expect(command).toContain('IFS= read -r -d \'\' base_path || exit 1');
+    expect(command).toContain(
+      "printf 'file-line-counts rows=%s dropped=%s\\n'"
+    );
+    expect(command).toContain(
+      'MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1'
+    );
+    expect(command).toContain("IFS= read -r -d '' base_path || exit 1");
     expect(command).not.toContain('base_path || break');
     // ...and is exactly why a control character has to be dropped: `-z`
     // yields the path RAW, so a PR author who names a file with an embedded
@@ -380,6 +386,82 @@ describe('opt-in wiring', () => {
     expect(flatten(legacy)).toMatch(
       /`reviewer_set` is not consulted on this path/
     );
+  });
+});
+
+describe('cross-host distribution', () => {
+  const HOSTS = [
+    { name: 'codex', dir: 'codex' },
+    { name: 'cursor', dir: 'cursor' },
+  ] as const;
+
+  it.each(HOSTS)('exposes only the allowlisted skill to $name', ({ dir }) => {
+    const catalog = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'catalog/plugins/yellow-review.json'),
+        'utf8'
+      )
+    ) as { targets: Record<string, { skillAllowlist?: string[] }> };
+    expect(catalog.targets[dir].skillAllowlist).toEqual([
+      'yellow-thermonuclear-review',
+    ]);
+    // The generator copies only SKILL.md plus a flat references/*.md from
+    // inside skills/<name>/, so an over-broad allowlist is the only way
+    // extra surface leaks out; assert the host tree holds nothing but the
+    // one skill directory and that the manifest exposes no agents or
+    // commands.
+    const hostRoot = resolve(REPO_ROOT, `plugins/yellow-review/${dir}`);
+    expect(readdirSync(hostRoot).sort()).toEqual(['skills']);
+    const tree = readdirSync(resolve(hostRoot, 'skills')).sort();
+    expect(tree).toEqual(['yellow-thermonuclear-review']);
+    const manifest = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, `plugins/yellow-review/.${dir}-plugin/plugin.json`),
+        'utf8'
+      )
+    ) as Record<string, unknown>;
+    expect(manifest.skills).toBe(`./${dir}/skills`);
+    expect(manifest).not.toHaveProperty('agents');
+    expect(manifest).not.toHaveProperty('commands');
+    // Frontmatter must be normalised to name + description only: any other
+    // key (user-invocable, tools, model) is a Claude-only contract leaking.
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(
+      readFileSync(
+        resolve(hostRoot, 'skills/yellow-thermonuclear-review/SKILL.md'),
+        'utf8'
+      )
+    );
+    expect(fm).not.toBeNull();
+    const keys = (fm as RegExpExecArray)[1]
+      .split(/\r?\n/)
+      .filter((l) => /^[a-z-]+:/.test(l))
+      .map((l) => l.replace(/:.*$/, ''))
+      .sort();
+    expect(keys).toEqual(['description', 'name']);
+  });
+
+  it.each(HOSTS)('ships the source body verbatim to $name', ({ dir }) => {
+    // Frontmatter is normalised to name + description, but the BODY must
+    // arrive byte-for-byte: everything the rails, the fail-closed size rule
+    // and the MIT notice depend on lives there, and neither host applies the
+    // agent's `tools:` restriction to make up for a lossy copy.
+    //
+    // Asserting equality rather than re-checking each property individually
+    // is deliberate. The source-side tests above already prove the body
+    // contains the licence, the pinned SHAs and the rails; equality then
+    // carries all of it — including anything added later that nobody
+    // remembers to write a substring check for — and catches any generator
+    // transform, not just the handful of properties we thought to enumerate.
+    const body = (source: string): string =>
+      source.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+    const distributed = readFileSync(
+      resolve(
+        REPO_ROOT,
+        `plugins/yellow-review/${dir}/skills/yellow-thermonuclear-review/SKILL.md`
+      ),
+      'utf8'
+    );
+    expect(body(distributed)).toBe(body(skill));
   });
 });
 
