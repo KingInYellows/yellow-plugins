@@ -222,7 +222,12 @@ aggregation rules change there, propagate the same change here.
    |-------|---------------|-------------------|
    | `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
 
-7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
+7. **Compact-return pass 1** (mirrors review-pr.md Step 5, including item
+   6's `<file-line-counts>` block): when `thermonuclear-reviewer` is in
+   this PR's dispatched set, Read
+   `${CLAUDE_PLUGIN_ROOT}/commands/review/review-pr.md` Step 5 item 6 and
+   run that collection and injection procedure against this PR before
+   spawning the persona. Do not reconstruct the snippet here. Launch all
    selected agents in parallel except `code-simplifier`. Wave 2 persona
    agents return the structured JSON compact-return schema — including
    the cross-plugin `security-reviewer` and `performance-reviewer`,
