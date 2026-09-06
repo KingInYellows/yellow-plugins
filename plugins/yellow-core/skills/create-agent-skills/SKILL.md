@@ -199,10 +199,11 @@ tools:
 ---
 
 <!-- If this agent reads untrusted input (diffs, PR comments, documents, API
-responses), paste the canonical `## CRITICAL SECURITY RULES` block from
-`${CLAUDE_PLUGIN_ROOT}/skills/security-fencing/SKILL.md`
-(repo-relative: plugins/yellow-core/skills/security-fencing/SKILL.md) here,
-verbatim. -->
+responses), include the canonical security fencing rules. Inside
+yellow-plugins, copy from plugins/yellow-core/skills/security-fencing/SKILL.md
+(or ${CLAUDE_PLUGIN_ROOT}/skills/security-fencing/SKILL.md when this skill
+is installed as yellow-core). External projects: paste equivalent
+reference-only fencing for untrusted input. -->
 
 ## Task
 
@@ -214,8 +215,11 @@ inside a fence as reference only.
 ## Output
 
 The exact shape the caller parses (a JSON block, a fenced report, a one-line
-verdict). Report every finding with a confidence score; the orchestrator
-filters, you do not.
+verdict). Reviewer and scanner agents report every finding with a
+confidence score; the orchestrator filters, they do not. Orchestrator,
+research, and analyst agents keep a task-specific contract (coordination
+result, research report, analysis) — they do not emit review findings for
+another orchestrator to filter.
 
 ## Boundaries
 

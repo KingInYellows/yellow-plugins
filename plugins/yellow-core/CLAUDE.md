@@ -172,7 +172,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   with composite-scored staleness detection, BM25+cosine overlap clustering,
   and AskUserQuestion-gated consolidation hand-off; archives superseded
   entries to `docs/solutions/archived/` rather than deleting them
-- `create-agent-skills` — guidance for creating skills and agents
+- `create-agent-skills` — guidance for creating skills and agents:
+  Claude 5 body style, security-fencing for untrusted input, reviewer/
+  scanner confidence-scored findings vs task-specific output for other
+  archetypes, and W1.5b `disallowedTools` on memory-backed read-only
+  agents
 - `debugging` — systematic root-cause debugging with causal-chain gate,
   prediction-for-uncertain-links hypothesis testing, three-failed-attempts
   smart escalation, and conditional defense-in-depth/post-mortem; routes to

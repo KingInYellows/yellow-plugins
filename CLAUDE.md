@@ -35,7 +35,7 @@ pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
 pnpm validate:versions        # cross-manifest version drift check
 pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
-pnpm generate:manifests       # regenerate .claude-plugin/ + .agents/ from catalog/ sources
+pnpm generate:manifests       # manifests from catalog/; Codex/Cursor skill copies from plugins/<name>/skills/
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 
 pnpm release:check            # validate:schemas + validate:versions + typecheck
@@ -77,9 +77,12 @@ requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
    snapshot refresh (`vitest -u`) when the output legitimately changes.
 3. **Versions sync three ways.** `plugins/<name>/package.json` →
    `plugin.json` → `marketplace.json`; `package.json` is the source of truth
-   and `validate-versions.js` blocks drift. Releases are Changesets-driven
-   (`docs/CLAUDE.md`); the bot-created "chore: version packages" PR does not
-   run `validate-schemas.yml`, so review it by hand.
+   and `validate-versions.js` blocks drift. Codex-enabled plugins also
+   two-way-check `package.json` against `.codex-plugin/plugin.json`;
+   Cursor-enabled plugins against `.cursor-plugin/plugin.json`. Releases
+   are Changesets-driven (`docs/CLAUDE.md`); the bot-created "chore:
+   version packages" PR does not run `validate-schemas.yml`, so review
+   those three-way and two-way version files by hand.
 4. **Local schema ≠ remote validator.** `schemas/plugin.schema.json` is
    stricter than Claude Code's remote validator in places and looser in
    others (`CONTRIBUTING.md` "Local vs Remote Validator Divergence"). Test on
