@@ -382,16 +382,20 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       `reviewer_set.include`". Without this row, `reviewer_set.include`
       has no subagent_type mapping to dispatch and the opt-in path is
       unreachable.
-- [ ] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
-      `review-all.md`'s own inline pass (it does not inherit Step 5 of
-      `review-pr.md` by reference for this concern). Without this, a
+- [x] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
+      `review-all.md`'s own inline pass (it inherits Step 5 of `review-pr.md`
+      by reference for this concern: Step 7 of `review-all.md`'s Step 4 loop
+      reads review-pr.md Step 5 items 2 and 6 and runs that procedure
+      in-place, rebinding `DIFF_BASE` to review-all's own per-PR base ref
+      rather than duplicating the snippet). Without this, a
       `thermonuclear-reviewer` opted in via `/review:all` never receives the
       block and every size-threshold finding is silently suppressed.
-- [ ] 1.4.1d `pnpm changeset` — **patch** for `yellow-review`. Stack item 3
+- [x] 1.4.1d `pnpm changeset` — **patch** for `yellow-review`. Stack item 3
       edits files under `plugins/yellow-review/` and the changeset gate diffs
       `origin/main...HEAD`, so listing `.changeset/` in scope is not enough;
       this PR needs its own changeset (F12). Planned changeset count is
-      **three** (1.5.4, 1.4.1d, 2.7).
+      **three** (1.5.4, 1.4.1d, 2.7). Changeset:
+      `.changeset/thermonuclear-line-counts.md`.
 - [ ] 1.4.1e Record the size-threshold fixture sign-off (986→1,034 P2;
       already-large no-finding; generated no-finding) on this PR, after the
       count wiring lands. Do not record those three rows against the
@@ -558,8 +562,10 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
 Explicitly **not** modified: `maintainability-reviewer.md` (preserves its
 calibration and avoids conflict with #748). `review-all.md` mirrors
 `review-pr.md`'s dispatch table by reference (`reviewer_set.include` flows
-through via 1.4.1b), but its inline pass does **not** inherit the Step 5
-`<file-line-counts>` block by reference — see task 1.4.1c.
+through via 1.4.1b), and its inline pass now also inherits the Step 5
+`<file-line-counts>` block by reference — reading review-pr.md's items 2
+and 6 and running that procedure in place rather than duplicating the
+snippet — see task 1.4.1c.
 
 ### Activation
 

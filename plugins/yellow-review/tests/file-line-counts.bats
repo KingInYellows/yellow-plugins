@@ -96,8 +96,15 @@ setup() {
   [[ "$output" != *"del.txt"* ]]
   [[ "$output" != *"bin.bin"* ]]
   [[ "$output" != *$'\ncfg base='* ]]
-  [[ "$output" == *"Warning: skipping line-count row for path with space.txt"* ]]
-  [[ "$output" == *"Warning: skipping line-count row for file=weird.txt"* ]]
+  # Rejected paths are PR-controlled text landing outside every reference
+  # fence, so the warning names the row by ordinal and withholds the path.
+  [[ "$output" == *"dropping line-count row #1; path rejected by the safe-path allowlist (path withheld: PR-controlled)"* ]]
+  [[ "$output" == *"dropping line-count row #2;"* ]]
+  [[ "$output" != *"path with space.txt"* ]]
+  [[ "$output" != *"file=weird.txt"* ]]
+  # Header and footer bracket the payload, so a truncated output is detectable.
+  [[ "$output" == *"file-line-counts end rows=5 dropped=2"* ]]
+  [[ "${lines[${#lines[@]}-1]}" == "file-line-counts end rows=5 dropped=2" ]]
 }
 
 @test "zsh: same measurement as bash" {
@@ -139,10 +146,66 @@ setup() {
   printf '3\t4\t\0' >>"$TRUNC"
 
   TRUNC_LC="$BATS_TEST_TMPDIR/lc-truncated.sh"
-  sed "s#^git diff -z --numstat --find-renames \"\$DIFF_BASE\"\\.\\.\\.HEAD >|\"\$LC_NUMSTAT\" || exit 1#cat \"$TRUNC\" >|\"\$LC_NUMSTAT\" || exit 1#" "$LC" >"$TRUNC_LC"
+  sed "s#^git -c diff.renameLimit=0 --attr-source=\"\$LC_EMPTY_TREE\" diff -z --numstat --find-renames --no-relative \"\$DIFF_BASE\"\\.\\.\\.HEAD >|\"\$LC_NUMSTAT\" || exit 1#cat \"$TRUNC\" >|\"\$LC_NUMSTAT\" || exit 1#" "$LC" >"$TRUNC_LC"
+  # A no-op sed leaves the real git call in place and the test would pass
+  # vacuously; pin that the substitution actually fired.
+  ! cmp -s "$LC" "$TRUNC_LC"
 
   run env DIFF_BASE=main bash "$TRUNC_LC"
   [ "$status" -ne 0 ]
   [[ "$output" != *"file-line-counts rows="* ]]
   [[ "$output" != *"base="* ]]
+}
+
+@test "the pinned rename limit survives a hostile diff.renameLimit" {
+  # Without `-c diff.renameLimit=0`, a low ambient limit makes git skip
+  # exhaustive rename detection and emit delete/add records, landing the
+  # renamed file at base=0 — a fabricated threshold crossing.
+  git config diff.renameLimit 1
+  run env DIFF_BASE=main bash "$LC"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"new_name.txt base=3 head=4"* ]]
+  [[ "$output" != *"old_name.txt"* ]]
+}
+
+@test "a PR-added .gitattributes cannot suppress a real text file's row" {
+  printf '*.txt binary\n' >|.gitattributes
+  printf 'a\nb\nc\nd\ne\nf\ng\nh\n' >|mod.txt
+  git add -A
+  git commit -q -m attrs
+  run env DIFF_BASE=main bash "$LC"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"mod.txt base=5 head=8"* ]]
+}
+
+@test "a leading-hyphen path is rejected before any git probe" {
+  printf 'x\n' >|./-payload.ts
+  git add -A
+  git commit -q -m hyphen
+  run env DIFF_BASE=main bash "$LC"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"payload.ts"* ]]
+  [[ "$output" == *"path rejected by the safe-path allowlist"* ]]
+}
+
+@test "a failed HEAD object probe omits the block instead of dropping the row" {
+  # A probe that FAILS and a path that is absent must not look alike: the
+  # failure has to stop the block, not silently shorten it.
+  SHIM="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$SHIM"
+  REAL_GIT="$(command -v git)"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'if [ "$1" = "ls-tree" ] && [ "$2" = "HEAD" ]; then\n'
+    printf '  echo "fatal: simulated object read failure" >&2\n'
+    printf '  exit 128\n'
+    printf 'fi\n'
+    printf 'exec %s "$@"\n' "$REAL_GIT"
+  } >"$SHIM/git"
+  chmod +x "$SHIM/git"
+
+  run env PATH="$SHIM:$PATH" DIFF_BASE=main bash "$LC"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HEAD object probe failed"* ]]
+  [[ "$output" != *"file-line-counts rows="* ]]
 }

@@ -297,10 +297,28 @@ describe('opt-in wiring', () => {
     // -z is what lets a path containing a quote, backslash, non-ASCII byte,
     // or newline reach the loop intact; --find-renames pins the rename record
     // shape regardless of the host's diff.renames setting.
-    expect(command).toContain('git diff -z --numstat --find-renames');
-    // The header is the completeness signal the orchestrator keys on, and an
-    // unresolved merge-base must stop the block rather than read the index.
+    expect(command).toContain('diff -z --numstat --find-renames --no-relative');
+    // --find-renames alone is not enough: a low ambient diff.renameLimit, or a
+    // PR with more rename candidates than git's default, skips the exhaustive
+    // pass and re-emits the rename as delete/add, landing the added path at
+    // base=0. And in-tree .gitattributes is PR-controlled, so `*.ts binary`
+    // would make numstat report `-`/`-` for a text blob and silently drop a
+    // real crossing; an empty attr-source neutralizes it.
+    expect(command).toContain('-c diff.renameLimit=0');
+    expect(command).toContain('--attr-source="$LC_EMPTY_TREE"');
+    expect(command).toContain(
+      'LC_EMPTY_TREE=$(git hash-object -t tree /dev/null) || exit 1'
+    );
+    // Header AND footer bracket the payload. The header alone is printed
+    // before the rows, so a truncated tool output still carries it and a
+    // partial row set would read as complete.
     expect(command).toContain("printf 'file-line-counts rows=%s dropped=%s\\n'");
+    expect(command).toContain(
+      "printf 'file-line-counts end rows=%s dropped=%s\\n'"
+    );
+    expect(flat).toContain(
+      'the rows between them must number exactly `N`'
+    );
     expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
     expect(command).toContain('IFS= read -r -d \'\' base_path || exit 1');
     expect(command).not.toContain('base_path || break');
@@ -310,7 +328,22 @@ describe('opt-in wiring', () => {
     // fabricating a threshold crossing on a file the PR never touched, or
     // stating a benign base for one it did. Neither sanitization step
     // touches control characters.
-    expect(command).toContain('*[[:cntrl:]]*|*[[:space:]]*|*=*)');
+    // The same allowlist also rejects a leading hyphen (the value would be an
+    // OPTION to the git probes, not a path), `..`, and an absolute path, and
+    // it runs over `base_path` too — on a rename that is a second PR-chosen
+    // path reaching the same probes.
+    expect(command).toContain(
+      "''|*[[:cntrl:]]*|*[[:space:]]*|*=*|-*|/*|..|../*|*/../*|*/..)"
+    );
+    expect(command).toContain('for lc_probe in "$new_path" "$base_path"; do');
+    // The rejected path is PR-controlled text landing outside every reference
+    // fence, in output the orchestrator reads while holding mutation tools.
+    // Name the row by ordinal; never echo the path, masked or otherwise.
+    expect(command).toContain('path withheld: PR-controlled');
+    expect(command).not.toContain(
+      '"$(printf \'%s\' "$new_path" | tr -c'
+    );
+    expect(command).not.toMatch(/Warning:[^\n]*%s[^\n]*"\$new_path" >&2/);
     // `path` is a special array in zsh, tied to $PATH. Naming the loop
     // variable `path` replaces the command search path, after which `git`
     // and `awk` vanish and every row degrades to `base=0 head=` while the
@@ -330,12 +363,21 @@ describe('opt-in wiring', () => {
     // which is exactly the `base=0 head=` row the guard exists to reject.
     expect(command).toContain('case ${base:-x}${head:-x} in');
     expect(command).not.toContain('case $base$head in');
-    // `cat-file -e` also succeeds for a TREE, so a file replaced by a
-    // directory of the same name would pass an existence probe and awk
-    // would count git's tree listing as if it were file content.
-    expect(command).toContain('git cat-file -t "HEAD:$new_path"');
-    expect(command).toContain('git cat-file -t "$MERGE_BASE:$base_path"');
-    expect(command).not.toMatch(/git cat-file -e ["$]/);
+    // `cat-file` exits 128 with empty stdout both for an absent path and for
+    // a failed probe, so a failure reads as "the PR added this file" and
+    // leaves base=0 inside a block still claiming completeness. `ls-tree`
+    // exits 0 with empty output for absence and non-zero only on failure.
+    // Reading its TYPE field also rejects a tree, whose listing awk would
+    // otherwise count as file content.
+    expect(command).toContain(
+      'git ls-tree HEAD -- ":(literal)$new_path"'
+    );
+    expect(command).toContain(
+      'git ls-tree "$MERGE_BASE" -- ":(literal)$base_path"'
+    );
+    expect(command).toContain('HEAD object probe failed');
+    expect(command).toContain('base object probe failed');
+    expect(command).not.toMatch(/git cat-file -[et] ["$]/);
     expect(command).not.toMatch(/head=\$\(wc -l/);
     // The block carries its own fence, and both delimiters must join the
     // literal-delimiter substitution list or a hostile path ends it early.
@@ -356,7 +398,7 @@ describe('opt-in wiring', () => {
     // there too. Reading `DIFF_BASE`'s tip reports a phantom shrink on any
     // branch whose base advanced after it was cut.
     expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD)');
-    expect(command).toContain('git cat-file -t "$MERGE_BASE:$base_path"');
+    expect(command).toContain('git show "$MERGE_BASE:$base_path"');
     expect(command).not.toContain('git show "$DIFF_BASE:$base_path"');
   });
 
