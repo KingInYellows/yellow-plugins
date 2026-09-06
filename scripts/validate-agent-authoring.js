@@ -233,6 +233,13 @@ const MEMORY_PROTOCOL_SENTINEL_FILES = [
 //        multi-line quoted strings, and wrapped plain scalars are ALL
 //        silently truncated by Claude Code's frontmatter parser (see
 //        docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md).
+//
+// RULE 20 — ERROR tier, same walk. `user-invokable` (k) is not a Claude
+// Code frontmatter key: the CLI (verified against 2.1.259) parses only
+// `user-invocable`, so the k spelling is silently ignored and a skill meant
+// to be internal-only still appears in the `/` menu. The repo carried the
+// wrong key in every SKILL.md for months precisely because nothing checked
+// it; a hard error keeps it from creeping back via old templates.
 const SKILL_MAX_LINES = 500;
 const SKILL_REQUIRED_HEADINGS = [
   '## What It Does',
@@ -1738,6 +1745,23 @@ function validateSkillFiles(skillFiles, ctx) {
           `${relative(filePath)}: malformed YAML frontmatter — ${String(e.message).split('\n')[0]}`
         );
         continue;
+      }
+    }
+
+    // RULE 20 — the ignored `user-invokable` key (see the catalog comment).
+    // Key presence is checked on the parsed mapping, not by regex, so a
+    // commented-out or fenced mention elsewhere in the file cannot trip it.
+    if (frontmatter) {
+      const data = parseFrontmatter(frontmatter);
+      if (
+        data &&
+        Object.prototype.hasOwnProperty.call(data, 'user-invokable')
+      ) {
+        errors.push(
+          `${relative(filePath)}: RULE 20 — frontmatter key ` +
+            '`user-invokable` is not recognised by Claude Code (it reads ' +
+            '`user-invocable`); rename the key.'
+        );
       }
     }
 

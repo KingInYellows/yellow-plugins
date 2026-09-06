@@ -1,7 +1,7 @@
 ---
 name: test-skill
 description: Skill fixture used to validate the skill-reference resolver in lint-plugins.sh.
-user-invokable: false
+user-invocable: false
 ---
 
 # Test Skill

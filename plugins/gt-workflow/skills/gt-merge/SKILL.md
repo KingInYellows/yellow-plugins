@@ -1,7 +1,7 @@
 ---
 name: gt-merge
 description: 'Merge the current stack''s pull requests, from trunk up to the current branch, via Graphite. Use when the user says "merge my stack" or "land these PRs" and the stack is fully reviewed and ready.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

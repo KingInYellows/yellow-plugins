@@ -305,7 +305,7 @@ function checkDirSymlinkContainment(dir, expectedRealPath) {
  * `plugins/<name>/codex/skills/` when unset — the same source and default
  * buildCodexPluginManifest uses for the manifest's "skills" field, so the
  * two always agree), normalizing each SKILL.md's frontmatter to `name` +
- * single-line `description` only (Claude-only fields like `user-invokable`
+ * single-line `description` only (Claude-only fields like `user-invocable`
  * stripped). Rejects symlinked skill directories — both skillDir itself
  * (via `lstat`, including an in-plugin symlink like an allowlisted
  * `skills/allowed` pointing at a non-allowlisted `skills/private`) and

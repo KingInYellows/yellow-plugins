@@ -1,7 +1,7 @@
 ---
 name: stack-provider-router
 description: 'Resolve which stacked-PR provider is active and route provider-specific work to it, or refuse when the state is ambiguous. Use when a workflow needs to know whether Graphite or GitHub native stacks is in effect before running a stack operation.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

@@ -1,7 +1,7 @@
 ---
 name: github-stack-submit
 description: 'Stage, commit, and submit uncommitted changes as a GitHub-native stacked PR. Use when user says "submit this" or "ship it" on the github stacked-PR provider and has uncommitted work to turn into a PR.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

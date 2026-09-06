@@ -89,7 +89,8 @@ See `docs/plugin-validation-guide.md` for detailed validation rules.
 ### Plugin Conventions
 
 - SKILL.md `description:` must be single-line (no YAML folded scalars)
-- SKILL.md frontmatter uses `user-invokable` (with k)
+- SKILL.md frontmatter uses `user-invocable` (with c — the older `user-invokable`
+  spelling is ignored by Claude Code and rejected by RULE 20)
 - Agent `.md` files should focus on project-specific rules, not generic LLM
   knowledge
 - Commands must list all tools used in `allowed-tools`
@@ -553,7 +554,7 @@ time. The implication is positional, not a budget to cut toward: keep
 the differentiating clause and "Use when..." trigger inside the first
 ~200 chars regardless of total description length.
 
-This guidance does NOT apply to `user-invokable: false` skills — those
+This guidance does NOT apply to `user-invocable: false` skills — those
 descriptions are loaded only by agents that preload them via `skills:`
 frontmatter, never rendered in the listing budget. The positional
 ~250-char threshold above does not apply. Trim them only when the

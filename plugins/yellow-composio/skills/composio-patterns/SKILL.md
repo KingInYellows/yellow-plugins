@@ -1,7 +1,7 @@
 ---
 name: composio-patterns
 description: "Canonical conventions for running batch workflows through the Composio MCP server. Use when authoring or modifying commands or agents that call Composio tools — the Workbench sandbox, Multi-Execute batching, and the local usage counter."
-user-invokable: false
+user-invocable: false
 ---
 
 # Composio Integration Patterns

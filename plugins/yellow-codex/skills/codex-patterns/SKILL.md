@@ -1,7 +1,7 @@
 ---
 name: codex-patterns
 description: "Canonical conventions for shelling out to the OpenAI Codex CLI. Use when authoring or modifying commands or agents that invoke codex exec — choosing flags, sandbox and approval modes, and parsing its output."
-user-invokable: false
+user-invocable: false
 ---
 
 # Codex CLI Patterns

@@ -1,7 +1,7 @@
 ---
 name: stack-traversal
 description: "Internal reference for the bottom-up Graphite stack-traversal procedure shared by /review:all and /review:resolve-stack. Use when a yellow-review command needs to walk a Graphite stack PR by PR in dependency order."
-user-invokable: false
+user-invocable: false
 ---
 
 # Graphite Stack Traversal
@@ -23,7 +23,7 @@ resolve, etc.); this skill supplies only the walk around it.
 
 ## Usage
 
-This skill is not user-invokable. It is a shared prose reference — consuming
+This skill is not user-invocable. It is a shared prose reference — consuming
 commands **inline** the steps below and cite this skill as the source of
 truth; they do NOT load it via the `Skill` tool. When the traversal logic
 changes, update this skill and every command that mirrors it (currently

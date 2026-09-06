@@ -257,7 +257,7 @@ yellow-ci's runner-health command. Config stored in
 ### Phase 3: Skill and Template
 
 - [ ] 3.1: Write `skills/symphony-conventions/SKILL.md`
-  - `user-invokable: false` (internal reference for commands)
+  - `user-invocable: false` (internal reference for commands)
   - SYMPHONY.md schema documentation (all fields, types, defaults, constraints)
   - SSH connection conventions (BatchMode, ConnectTimeout, fencing)
   - Daemon control protocol expectations (what the OpenClaw plugin should

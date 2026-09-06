@@ -1,7 +1,7 @@
 ---
 name: memory-query
 description: Standard pattern for querying ruvector institutional memory before acting. Use when authoring new agents or commands that should query past patterns, findings, or solutions before executing.
-user-invokable: false
+user-invocable: false
 ---
 
 # Memory Query Pattern

@@ -108,7 +108,7 @@ reviewer/executor, not authoring plugins Codex itself loads.
 
 - SKILL.md frontmatter in the primary spec is `name` + `description` only;
   Claude-only fields (`allowed-tools`, `context`, `hooks`,
-  `user-invokable`) must be stripped when generating Codex-side copies.
+  `user-invocable`) must be stripped when generating Codex-side copies.
 - Discovery locations: repo `.agents/skills` (walked up to repo root), user
   `$HOME/.agents/skills`, admin `/etc/codex/skills`, plus plugin-bundled
   trees at whatever path the manifest's `skills` field references

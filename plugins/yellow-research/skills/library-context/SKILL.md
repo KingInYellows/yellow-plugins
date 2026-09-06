@@ -1,7 +1,7 @@
 ---
 name: library-context
 description: "Use when an agent needs official library docs, API examples, or migration guides. Canonical fallback chain: context7 → EXA → WebSearch. Preloaded by within-plugin agents; inlined verbatim by cross-plugin consumers."
-user-invokable: true
+user-invocable: true
 ---
 
 # library-context — Library Documentation Lookup with Graceful Fallback

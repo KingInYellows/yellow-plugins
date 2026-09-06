@@ -1,7 +1,7 @@
 ---
 name: cursor-delegation
 description: "Host-neutral reference for the Cursor Cloud Agent delegation lifecycle, the yellow-cursor CLI's JSON contract, and its safety/idempotency rules. Use when building or reasoning about a surface that delegates work to a Cursor Cloud Agent through the CLI."
-user-invokable: false
+user-invocable: false
 ---
 
 # Cursor Cloud Agent Delegation

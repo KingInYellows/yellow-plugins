@@ -17,6 +17,15 @@ pr: '#23, #69'
 
 # Skill and Agent Frontmatter Attribute Name and Format Requirements
 
+> **Status (2026-09-02): the key is `user-invocable` (with c).** The 2026-02
+> diagnostic quoted below came from an older VS Code extension build that listed
+> `user-invokable`. The Claude Code CLI (verified by grepping the 2.1.259 bundle)
+> parses only `user-invocable`, which is also the spelling in the official skills
+> reference. Every SKILL.md was renamed back and RULE 20 in
+> `scripts/validate-agent-authoring.js` now rejects `user-invokable` at error
+> tier. The single-line `description:` rules below are unchanged and still
+> apply. The history is kept verbatim so the reversal is traceable.
+
 ## Problem
 
 VS Code diagnostics on SKILL.md files showed two categories of errors:
@@ -36,6 +45,11 @@ All 13 SKILL.md files across all 10 plugins were affected.
 Two distinct issues:
 
 ### 1. Wrong attribute name: `user-invocable` vs `user-invokable`
+
+> **Historical (superseded 2026-09-02).** The diagnosis in this subsection is
+> inverted. The current key is `user-invocable` (with **c**). Keep this text as
+> the 2026-02 record; do not copy it into new skills. See
+> "Update — 2026-09-02".
 
 Claude Code's supported attribute is spelled `user-invokable` (with **k**), not
 `user-invocable` (with **c**). The typo propagated across all plugins because
@@ -73,6 +87,10 @@ user-invokable: false
 
 ## Solution
 
+> **Historical (superseded 2026-09-02) for the attribute rename.** Steps 1 and 3
+> below inverted the key. New skills must use `user-invocable`. Step 2 (flatten
+> `description:`) is still current. See "Update — 2026-09-02".
+
 For every SKILL.md file:
 
 1. **Rename attribute:** `user-invocable` → `user-invokable`
@@ -83,12 +101,19 @@ For every SKILL.md file:
 
 ### Supported Frontmatter Attributes (as of 2026-02)
 
-```
+> **Historical snapshot (2026-02).** The live key is `user-invocable`. The list
+> below records what the VS Code extension advertised at the time.
+
+```text
 argument-hint, compatibility, description, disable-model-invocation,
 license, metadata, name, user-invokable
 ```
 
 ### Grep to find violations
+
+> **Historical (superseded 2026-09-02).** This grep treated `user-invocable` as
+> the misspelling. Current detection is RULE 20 / the frontmatter-only scan in
+> "Update — 2026-09-02".
 
 ```bash
 # Wrong attribute name
@@ -267,7 +292,9 @@ special characters predictably.
 
 ## Prevention
 
-1. **Use the correct attribute name:** Always `user-invokable` (with k)
+1. **Use the correct attribute name:** `user-invokable` (with k) is superseded
+   as of 2026-09-02 — use `user-invocable` (with c); see "Update — 2026-09-02"
+   at the end of this doc (the original text here said `user-invokable`)
 2. **Keep frontmatter values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
    `|+`, or multi-line YAML constructs in any `.md` plugin file (skills AND
    agents)
@@ -299,6 +326,10 @@ special characters predictably.
 ## Update — 2026-05-04
 
 ### `user-invokable: false` Must Be Present, Not Just Correctly Spelled (PRs #328–#330)
+
+> **Historical (superseded 2026-09-02) for the key spelling.** Internal skills
+> still must declare the field; the current name is `user-invocable: false`.
+> Detection greps below use the old key on purpose as the 2026-05 record.
 
 Five reviewers across PRs #328–#330 (yellow-council Wave-2 review) flagged a
 skill missing the `user-invokable: false` field entirely. Prior MEMORY.md and
@@ -340,3 +371,91 @@ user invocation, add `user-invokable: true` explicitly for clarity.
 changes), confirm `user-invokable:` is present AND correctly spelled. The
 existing on-touch check for description format now has a sibling check for
 field presence.
+
+---
+
+## Update — 2026-09-02
+
+### Reversal: Claude Code reads `user-invocable`, not `user-invokable`
+
+A best-practices audit grepped the installed Claude Code 2.1.259 bundle for the
+skill frontmatter keys it parses: `user-invocable` / `userInvocable` appear
+110 / 177 times; `invokable` appears zero times. The official skills reference
+(`code.claude.com/docs/en/skills`, "Frontmatter reference") lists
+`user-invocable`. The `k` spelling this repo standardised on in 2026-02 — on the
+strength of a VS Code extension diagnostic — was therefore being silently
+ignored: all 59 skills declared `user-invokable: false` still appeared in the
+`/` menu and were user-invocable.
+
+**Fix (PR: user-invocable key rename):**
+
+1. Renamed the key in every `plugins/*/skills/*/SKILL.md` (70 files), every
+   live prose reference (root `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+   plugin `CLAUDE.md` files, `create-agent-skills`, the
+   pattern-recognition-specialist lint row, `emit-codex.js` comment, test
+   fixtures), and the not-yet-started plans under `plans/` that teach the key
+   (`plans/yellow-symphony-plugin.md` step 3.1) — following a live plan must
+   not produce a skill that RULE 20 rejects. Historical records
+   (`docs/research`, `docs/brainstorms`, `plans/complete`, and the earlier
+   sections of this doc) keep the old spelling on purpose.
+2. Added **RULE 20** (error tier) to `validateSkillFiles()`: a parsed
+   frontmatter mapping containing the key `user-invokable` fails the run.
+   Fenced or prose mentions do not trip it.
+
+**Detection:**
+
+RULE 20 inspects the parsed frontmatter only, so scan just the frontmatter
+block — a column-0 `user-invokable:` in a fenced example or body text is fine:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+for f in "$GIT_ROOT/plugins/"*/skills/*/SKILL.md; do
+  sed -n '2,/^---$/p' "$f" | grep -q '^user-invokable:' && echo "$f"
+done   # must print nothing
+```
+
+Or let the validator decide: `pnpm validate:agents` reports RULE 20 errors.
+
+**Live verification:** in a project with yellow-core enabled, type `/` — the
+internal skills (`yellow-core:security-fencing`, `yellow-core:local-config`, …)
+must no longer be listed, while `yellow-core:ideation` and
+`yellow-core:session-handoff` (declared `user-invocable: true`) remain.
+Orchestrators still load internal skills through the `Skill` tool.
+
+**Lesson:** an IDE diagnostic is not the runtime. When a frontmatter convention
+is load-bearing, verify it against the CLI that consumes it (grep the bundle or
+check the official reference), and back it with a validator rule rather than a
+prose convention.
+
+---
+
+## Update — 2026-09-05
+
+### RULE 20 is negative-only: it bans the old key but never requires the new one
+
+Review of the RULE 20 PR (the 70-file rename above) surfaced a validator-design
+gap distinct from the reversal itself: RULE 20 fails a SKILL.md if the
+frontmatter contains `user-invokable`, but it does not check that
+`user-invocable` is present. Nothing requires the *correct* key — only
+absence of the *wrong* one.
+
+**Why this matters:** a negative-only check has a cheaper-than-intended way to
+go green. Deleting the `user-invocable: false` line entirely (not renaming it)
+also satisfies RULE 20, and silently restores the exact bug the rename fixed —
+the skill reappears in the `/` menu because the frontmatter parser sees no
+`user-invocable` key at all and defaults to invokable. CI passes either way;
+only a live `/` check (see "Live verification" above) would catch the
+regression, and that step is manual.
+
+**General lesson:** when a validator's job is "stop people from reverting a
+migration," a check that only rejects the old spelling is half a validator.
+Pair it with a positive-presence check for the new spelling, scoped correctly
+— here, source `plugins/*/skills/*/SKILL.md` only, not generated `codex/` or
+`cursor/` mirrors, which may use a different or absent equivalent key. The
+general shape (ban byte-for-byte error message quoting the exact replacement
+line) also works if a bare presence check is too broad for the surface being
+validated.
+
+**Status:** documented as a follow-up, not yet implemented in
+`scripts/validate-agent-authoring.js` as of this update — RULE 20 still only
+checks for `user-invokable`'s absence.

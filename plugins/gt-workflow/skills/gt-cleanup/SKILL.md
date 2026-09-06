@@ -1,7 +1,7 @@
 ---
 name: gt-cleanup
 description: 'Scan local branches for staleness and divergence, then delete or reconcile them with safeguards. Use when user says "clean up my branches" or "which branches are stale". For deleting branches whose PRs merged — and for pulling trunk or restacking — use the gt-sync skill.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

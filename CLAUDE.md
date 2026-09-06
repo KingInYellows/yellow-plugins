@@ -219,15 +219,16 @@ Enforcement differs by surface:
   single-line `description:` rule are checked on SKILL.md files by
   `validate-agent-authoring.js` (RULE 15b/15d) at warning tier only —
   warnings never fail CI, so review remains the enforcement gate. The
-  `user-invokable` spelling is convention only; the validator does not
-  check it.
+  `user-invocable` key spelling is error-tier (RULE 20): the old
+  `user-invokable` spelling is silently ignored by Claude Code.
 
 The full list is in `AGENTS.md` ("Critical Agent Authoring Rules"); the
 most-frequently-tripped items:
 
 - Agent frontmatter uses `tools:`, NOT `allowed-tools:`
-- Skill frontmatter attribute is `user-invokable` (with k), NOT
-  `user-invocable`
+- Skill frontmatter attribute is `user-invocable` (with c), NOT
+  `user-invokable` — Claude Code ignores the k spelling, so an internal
+  skill written that way still appears in the `/` menu
 - Skill/agent `description:` must be single-line — folded scalars
   (`description: >`) and multi-line single-quoted strings are silently
   truncated by Claude Code's frontmatter parser

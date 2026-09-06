@@ -1,7 +1,7 @@
 ---
 name: security-fencing
 description: "Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files). Use when authoring an agent that reads untrusted input — copy the appropriate variant verbatim into the agent body; only pure output-only agents (no file reading, no untrusted input) are exempt."
-user-invokable: false
+user-invocable: false
 ---
 
 # Security Fencing — Canonical Block for Untrusted-Content Agents

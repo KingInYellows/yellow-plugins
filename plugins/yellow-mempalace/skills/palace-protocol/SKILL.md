@@ -1,7 +1,7 @@
 ---
 name: palace-protocol
 description: "The Palace Protocol for interacting with MemPalace — wake-up sequence, query-before-assert pattern, memory stack usage, and when to use search vs KG vs navigation. Use when agents need guidance on how to interact with the palace correctly."
-user-invokable: false
+user-invocable: false
 ---
 
 # Palace Protocol

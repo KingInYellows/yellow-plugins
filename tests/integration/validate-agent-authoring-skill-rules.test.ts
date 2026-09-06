@@ -37,7 +37,7 @@ import { runValidator, writeAgent } from './helpers/validator-harness';
 const COMPLIANT_SKILL = `---
 name: compliant-skill
 description: Compliant fixture. Use when verifying RULE 15 stays silent on a conforming skill.
-user-invokable: true
+user-invocable: true
 ---
 
 # Compliant Skill
@@ -141,7 +141,7 @@ In RULE 15b indented-fence-stripping tests.
 const MALFORMED_YAML_SKILL = `---
 name: malformed-skill
 description: "unclosed quote
-user-invokable: true
+user-invocable: true
 ---
 
 # Malformed Skill

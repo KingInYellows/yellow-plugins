@@ -1,7 +1,7 @@
 ---
 name: ci-setup-runner-targets
 description: 'Configure runner pool targets, routing rules, and semantic metadata for CI workflow optimization (wizard, YAML import, or GitHub API discovery). Use when setting up runner-aware CI optimization or after changing your runner fleet.'
-user-invokable: false
+user-invocable: false
 ---
 
 ## What It Does

@@ -1,7 +1,7 @@
 ---
 name: docs-conventions
 description: "Shared documentation conventions — templates, diagram type selection, staleness detection, severity classification. Use when agents need doc generation or audit context."
-user-invokable: false
+user-invocable: false
 ---
 
 # Documentation Conventions
