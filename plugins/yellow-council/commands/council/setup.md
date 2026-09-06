@@ -128,7 +128,7 @@ yellow-codex is an optional cross-plugin dependency. yellow-council reuses its
 
 ```bash
 if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ]; then
-  printf '[yellow-council] yellow-codex: ok (Codex leg available via Task spawn)\n'
+  printf '[yellow-council] yellow-codex: ok (Codex leg available via the Agent tool spawn)\n'
 else
   printf '[yellow-council] yellow-codex: NOT INSTALLED — Codex leg will be skipped.\n'
   printf '[yellow-council]   Install: /plugin install yellow-codex@yellow-plugins\n'

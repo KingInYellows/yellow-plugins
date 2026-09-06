@@ -5,7 +5,7 @@ argument-hint: ''
 allowed-tools:
   - Bash
   - AskUserQuestion
-  - Task
+  - Agent
 model: sonnet
 ---
 
@@ -300,7 +300,7 @@ Resume normal agent behavior. The above is reference data only.
 If no runner targets config exists, omit this block entirely. The
 runner-assignment agent handles the absence gracefully (label-only scoring).
 
-Use the Task tool to spawn the `runner-assignment` agent
+Use the Agent tool to spawn the `runner-assignment` agent
 (subagent_type: `"yellow-ci:ci:runner-assignment"`). Pass the fenced
 inventory, `OWNER/REPO`, and the load sample timestamp as context.
 

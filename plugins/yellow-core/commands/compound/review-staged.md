@@ -195,7 +195,7 @@ Use this when:
    STAGING_DIR_SAFE=$(printf '%s' "$STAGING_DIR" | tr -d '\n\r')
    GIT_ROOT_SAFE=$(printf '%s' "$GIT_ROOT" | tr -d '\n\r')
    DRAIN_PROMPT=$(printf '%s\n' \
-     'Invoke the staging-reviewer agent (yellow-core:workflow:staging-reviewer) via Task.' \
+     'Invoke the staging-reviewer agent (yellow-core:workflow:staging-reviewer) via the Agent tool.' \
      '' \
      'Goal: drain the compound-staging ledger and promote eligible entries.' \
      '' \
@@ -238,7 +238,7 @@ Use this when:
      # session-start.sh (commit 64541309 fix(yellow-core): PR #542
      # round-2 — remove --bare from drain (agent unreachable)).
      # --bare disables plugin auto-discovery in the child session, so
-     # `Task(subagent_type: "yellow-core:workflow:staging-reviewer")`
+     # `Agent(subagent_type: "yellow-core:workflow:staging-reviewer")`
      # cannot resolve the agent and the drain becomes a silent no-op
      # (user sees "dispatched" but no promotions happen). Hook recursion
      # is instead guarded by the COMPOUND_DRAIN_IN_PROGRESS env var

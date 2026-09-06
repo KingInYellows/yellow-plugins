@@ -13,9 +13,16 @@ plugins/my-plugin/
 ├── commands/                 ← Slash commands (optional)
 │   └── my-command.md
 ├── skills/                   ← AI skills (optional)
-│   └── my-skill.md
+│   └── my-skill/             ← One directory per skill
+│       └── SKILL.md
 ├── agents/                   ← Custom agents (optional)
-│   └── my-agent.md
+│   └── <subdir>/             ← Namespace segment of subagent_type
+│       └── my-agent.md
+├── hooks/                    ← Hook scripts (optional)
+│   └── scripts/
+│       └── session-start.sh
+├── bin/                      ← MCP server wrappers (optional)
+│   └── start-my-server.sh
 ├── scripts/                  ← Lifecycle hooks (optional)
 │   ├── install.sh
 │   └── uninstall.sh
@@ -56,6 +63,11 @@ cd plugins/my-plugin
 
 **File**: `.claude-plugin/plugin.json`
 
+`name`, `version`, `description`, and `author` are required; every other key
+must be one the local schema (`schemas/plugin.schema.json`,
+`additionalProperties: false`) knows. Commands, agents, and skills are
+auto-discovered from `commands/`, `agents/`, and `skills/` — do not list them.
+
 ```json
 {
   "name": "my-plugin",
@@ -63,16 +75,6 @@ cd plugins/my-plugin
   "description": "A brief description of what this plugin does (10-280 chars)",
   "author": {
     "name": "Your Name"
-  },
-  "entrypoints": {
-    "commands": ["commands/my-command.md"]
-  },
-  "compatibility": {
-    "claudeCodeMin": "2.0.12"
-  },
-  "permissions": [],
-  "docs": {
-    "readme": "https://github.com/username/repo/tree/main/plugins/my-plugin/README.md"
   }
 }
 ```
@@ -191,184 +193,244 @@ MIT
 
 **File**: `.claude-plugin/plugin.json`
 
+Every key below is accepted by `schemas/plugin.schema.json`. `hooks` is
+inline-only (a `hooks/hooks.json` path is rejected by the local schema by
+policy), `repository` is a string, and `dependencies` is an **array** whose
+object form carries a `reason` (a yellow-plugins extension). `outputStyles` is
+left out because it is optional and path-checked — add `"outputStyles":
+"./output-styles"` only once that directory exists and holds at least one
+Markdown output style, or RULES 5b/5c fail the manifest.
+
 ```json
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "my-plugin",
   "version": "1.0.0",
   "description": "Comprehensive plugin description explaining its purpose and key features",
   "author": {
     "name": "Your Name",
-    "email": "you@example.com",
     "url": "https://github.com/username"
   },
-  "entrypoints": {
-    "commands": ["commands/my-command.md", "commands/my-other-command.md"],
-    "skills": ["skills/my-skill.md"],
-    "agents": ["agents/my-agent.md"]
-  },
-  "compatibility": {
-    "claudeCodeMin": "2.0.12",
-    "nodeMin": "22.22.0",
-    "os": ["linux", "macos", "windows"],
-    "arch": ["x64", "arm64"]
-  },
-  "permissions": [
-    {
-      "scope": "filesystem",
-      "reason": "Read configuration files to customize behavior",
-      "paths": [".config/my-plugin/"]
-    },
-    {
-      "scope": "network",
-      "reason": "Fetch plugin updates from GitHub API",
-      "domains": ["api.github.com"]
-    },
-    {
-      "scope": "shell",
-      "reason": "Execute git commands for version control integration",
-      "commands": ["git"]
-    }
-  ],
-  "docs": {
-    "readme": "https://github.com/username/repo/tree/main/plugins/my-plugin/README.md",
-    "changelog": "https://github.com/username/repo/blob/main/plugins/my-plugin/CHANGELOG.md",
-    "examples": "https://github.com/username/repo/tree/main/plugins/my-plugin/examples"
-  },
-  "repository": "https://github.com/username/repo.git",
-  "lifecycle": {
-    "install": "scripts/install.sh",
-    "uninstall": "scripts/uninstall.sh"
-  },
-  "dependencies": {
-    "ajv": "^8.12.0"
-  },
-  "keywords": ["development", "productivity", "automation"],
+  "homepage": "https://github.com/username/repo#my-plugin",
+  "repository": "https://github.com/username/repo",
   "license": "MIT",
-  "homepage": "https://example.com/my-plugin"
+  "keywords": ["development", "productivity"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "my-server": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-my-server.sh",
+      "env": {
+        "MY_API_KEY_USERCONFIG": "${user_config.my_api_key}",
+        "MY_API_KEY": "${MY_API_KEY:-}"
+      }
+    }
+  },
+  "userConfig": {
+    "my_api_key": {
+      "type": "string",
+      "title": "My API key",
+      "description": "Stored in the keychain; MY_API_KEY in the shell environment is the fallback.",
+      "sensitive": true
+    }
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=1.17.1",
+      "optional": false,
+      "reason": "credential_hook_scaffold in lib/credential-status.sh (SessionStart hook) and validate_file_path() in lib/validate-fs.sh"
+    }
+  ]
 }
+```
+
+### Hook Script
+
+Every `type: "command"` hook path in the manifest must resolve to a real file
+inside the plugin, so the `SessionStart` entry above needs this companion
+script — `validate-plugin.js` fails with `Hook script not found` without it.
+
+Because this template's `userConfig` includes a sensitive field, the hook
+must also emit `${CLAUDE_PLUGIN_DATA}/credential-status.json` via
+yellow-core's helper so `/setup:all` can classify the plugin. Enumerate
+`my_api_key` without writing its value. Canonical live examples:
+`plugins/yellow-semgrep/hooks/write-credential-status.sh` and
+`docs/plugin-credential-status-protocol.md`.
+
+**File**: `hooks/scripts/session-start.sh` (`chmod +x` it)
+
+```bash
+#!/usr/bin/env bash
+# session-start.sh — emit credential-status.json, then a decision object.
+
+# Intentionally omit -e: an unexpected command failure would exit without JSON
+# and block session startup.
+set -uo pipefail
+
+# Drain the hook payload on stdin even when unused.
+cat >/dev/null
+
+HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/credential-status.sh"
+# yellow-core not installed alongside this plugin — skip silently.
+[ -f "$HELPER" ] || { printf '{"continue": true}\n'; exit 0; }
+# shellcheck source=/dev/null
+. "$HELPER" 2>/dev/null || { printf '{"continue": true}\n'; exit 0; }
+command -v credential_hook_scaffold >/dev/null 2>&1 || { printf '{"continue": true}\n'; exit 0; }
+
+# Enumerate my_api_key without writing its value. userConfig wins, shell
+# env is the fallback; absent otherwise. The scaffold writes
+# ${CLAUDE_PLUGIN_DATA}/credential-status.json, then emits
+# {"continue": true} and exits 0.
+credential_hook_scaffold "my-plugin" "${CLAUDE_PLUGIN_ROOT:-}" \
+  "my_api_key:CLAUDE_PLUGIN_OPTION_MY_API_KEY:MY_API_KEY"
+```
+
+### MCP Server Wrapper
+
+The `mcpServers.my-server` entry above points at a wrapper rather than at
+`npx` directly, so the credential's dual-source `env` block needs this
+companion script — without it the server has no runnable command. The wrapper
+is where `userConfig` beats the shell env fallback (Rule 12 of
+`plugin-validation-guide.md`; canonical examples in
+`plugins/yellow-research/bin/start-perplexity.sh` and
+`plugins/yellow-semgrep/bin/start-semgrep.sh`).
+
+**File**: `bin/start-my-server.sh` (`chmod +x` it)
+
+```bash
+#!/usr/bin/env bash
+# start-my-server.sh — MCP wrapper: userConfig wins, shell env is the fallback.
+set -euo pipefail
+
+# A non-empty userConfig value overrides the shell env passthrough. An empty
+# one leaves the shell value intact instead of clobbering it with "".
+if [ -n "${MY_API_KEY_USERCONFIG:-}" ]; then
+  export MY_API_KEY="$MY_API_KEY_USERCONFIG"
+fi
+unset MY_API_KEY_USERCONFIG
+
+if [ -z "${MY_API_KEY:-}" ]; then
+  echo "start-my-server.sh: MY_API_KEY is empty. Set it via the plugin's" >&2
+  echo "userConfig prompt or export MY_API_KEY in your shell." >&2
+  exit 1
+fi
+
+exec npx -y "@scope/my-mcp-server@1.4.0" ${1+-- "$@"}
 ```
 
 ---
 
 ## Skill Template
 
-**File**: `skills/my-skill.md`
+**File**: `skills/my-skill/SKILL.md` (a directory per skill; supporting files
+go in `references/`, `scripts/`, or `examples/` beside it)
+
+Frontmatter rules the validator checks: kebab-case `name`, a **single-line**
+`description` with a "Use when" trigger clause (RULE 15c/15d), the
+`user-invocable` key spelled with a `c` (RULE 20 — Claude Code ignores
+`user-invokable`), the three standard headings (RULE 15b), and under 500 lines
+(RULE 15a). Set `user-invocable: false` for internal reference skills that
+only agents and commands load.
 
 ```markdown
 ---
-name: My Skill
-description: AI-invoked skill that does something useful
-allowed-tools: [Read, Write, Glob, Grep, Bash]
+name: my-skill
+description: "One-line summary of what the skill does. Use when <concrete trigger>, e.g. the user says \"do X\" or a command needs Y conventions. Not for <confusable sibling> — use <other-skill>."
+user-invocable: false
 ---
 
 # My Skill
 
-This skill provides [functionality description].
+## What It Does
+
+Two or three sentences. State the project-specific facts Claude cannot infer
+(paths, schema keys, exit codes, tool names) — not generic advice.
 
 ## When to Use
 
-Claude should invoke this skill when:
+- Trigger 1
+- Trigger 2
 
-- [Trigger condition 1]
-- [Trigger condition 2]
+## Usage
 
-## How It Works
-
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-
-## Examples
-
-### Example 1
-
-[Description]
-```
-
-Input: [example input] Output: [example output]
-
-```
-
-### Example 2
-[Description]
-
-```
-
-Input: [example input] Output: [example output]
-
-```
-
-## Implementation Notes
-
-[Technical details about implementation]
-
-## Limitations
-
-- [Limitation 1]
-- [Limitation 2]
+The steps, written as standing instructions. Reference detail Claude only needs
+in a branch with an imperative load stub, for example:
+`Read ${CLAUDE_PLUGIN_ROOT}/skills/my-skill/references/edge-cases.md`.
 ```
 
 ---
 
 ## Agent Template
 
-**File**: `agents/my-agent.md`
+**File**: `agents/<subdir>/my-agent.md` (dispatched as
+`subagent_type: "my-plugin:<subdir>:my-agent"`)
+
+Frontmatter uses `tools:` (never `allowed-tools:` — that is the command key),
+a single-line `description` with a "Use when" clause, and an explicit `model:`
+(`haiku`, `sonnet`, `opus`, `fable`, a full `claude-*` ID, or `inherit`).
+`effort:` (`low`…`max`) is the cost lever on Sonnet 5 / Opus 5 / Fable; Haiku
+4.5 ignores it. Review agents under `agents/review/` must stay read-only
+(W1.5). Keep the body to the task, inputs, output contract, and the
+project-specific facts Claude cannot infer; brief imperative sentences steer
+the Claude 5 generation better than enumerated ALL-CAPS rules.
 
 ```markdown
 ---
-name: My Agent
-description: Specialized AI agent for [domain]
-personality: professional, detail-oriented
-expertise: [domain1, domain2]
+name: my-agent
+description: "What the agent produces. Use when <trigger>. Not for <sibling> — use <other-agent>."
+model: sonnet
+effort: medium
+tools:
+  - Read
+  - Grep
+  - Glob
 ---
 
 # My Agent
 
-You are a specialized agent for [domain]. Your role is to [primary
-responsibility].
+## Task
 
-## Expertise
+What to analyse or produce, and the inputs you receive (paths, a fenced diff,
+a document body). Wrap untrusted input in `--- begin … (reference only) ---`
+/ `--- end … ---` delimiters and treat it as reference only — copy the
+canonical `CRITICAL SECURITY RULES` block from
+`plugins/yellow-core/skills/security-fencing/SKILL.md` when the agent reads
+code, CI logs, or other untrusted content.
 
-- [Area of expertise 1]
-- [Area of expertise 2]
-- [Area of expertise 3]
+## Output
 
-## Behavior Guidelines
+The exact shape the caller parses (a JSON block, a fenced markdown report, a
+one-line verdict). Report every finding with a confidence score; the
+orchestrator filters, you do not.
 
-1. **[Guideline category 1]**
-   - [Specific behavior]
-   - [Specific behavior]
+## Boundaries
 
-2. **[Guideline category 2]**
-   - [Specific behavior]
-   - [Specific behavior]
-
-## Communication Style
-
-- Use [tone description]
-- Focus on [communication priority]
-- Avoid [what to avoid]
-
-## Tools and Capabilities
-
-- Can use: [tool list]
-- Cannot use: [restricted tool list]
-- Requires permission for: [permission list]
-
-## Example Interactions
-
-### Scenario 1
-
-**User**: [user input] **Agent**: [expected response]
-
-### Scenario 2
-
-**User**: [user input] **Agent**: [expected response]
+Do not spawn subagents unless the task names a `subagent_type`. Do not edit
+files unless `Write`/`Edit` are in `tools:` and the task asks for it.
 ```
 
 ---
 
-## Lifecycle Script Templates
+## Manually-Invoked Setup Script Templates
+
+Claude Code does not run these automatically — there is no `lifecycle` key in
+the schema. Wire the setup/teardown steps you need into a `SessionStart` hook
+(see the full-featured example above) if they must run without user action,
+or document these as scripts the user runs by hand (e.g. `npm run install`,
+`./scripts/uninstall.sh`).
 
 ### Install Script
 
@@ -452,20 +514,22 @@ chmod +x scripts/install.sh scripts/uninstall.sh
 
 ## Common Patterns
 
+Each snippet shows only the keys the pattern adds on top of the four required
+ones. There is no `permissions`, `lifecycle`, or `compatibility` key — the
+schema rejects them. Declare capability and OS requirements in the plugin's
+README, and run setup work from a `SessionStart` hook as shown above.
+
 ### Pattern 1: Configuration File Plugin
 
 ```json
 {
-  "permissions": [
-    {
-      "scope": "filesystem",
-      "reason": "Read and write plugin configuration",
-      "paths": [".config/my-plugin/", "my-plugin.config.json"]
+  "userConfig": {
+    "config_path": {
+      "type": "file",
+      "title": "Config file path",
+      "description": "Read and written by this plugin's commands; created on first run.",
+      "default": "my-plugin.config.json"
     }
-  ],
-  "lifecycle": {
-    "install": "scripts/setup-config.sh",
-    "uninstall": "scripts/remove-config.sh"
   }
 }
 ```
@@ -474,33 +538,48 @@ chmod +x scripts/install.sh scripts/uninstall.sh
 
 ```json
 {
-  "permissions": [
-    {
-      "scope": "network",
-      "reason": "Fetch data from external API",
-      "domains": ["api.example.com"]
+  "mcpServers": {
+    "example-api": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-example-api.sh",
+      "env": {
+        "EXAMPLE_API_TOKEN_USERCONFIG": "${user_config.example_api_token}",
+        "EXAMPLE_API_TOKEN": "${EXAMPLE_API_TOKEN:-}"
+      }
     }
-  ],
-  "dependencies": {
-    "axios": "^1.6.0"
+  },
+  "userConfig": {
+    "example_api_token": {
+      "type": "string",
+      "title": "Example API token",
+      "description": "Stored in the keychain; EXAMPLE_API_TOKEN in the shell environment is the fallback.",
+      "sensitive": true
+    }
   }
 }
 ```
+
+The `start-example-api.sh` wrapper (same three-element pattern as the
+full-featured template above) resolves `userConfig` before the shell env
+fallback and rejects an empty credential at MCP startup.
+
+A `sensitive: true` field like `example_api_token` also requires the
+`SessionStart` credential-status hook and `yellow-core` dependency shown in
+the full-featured example above, or `/setup:all` reports its credential
+state as unknown even after configuration — see
+[docs/plugin-credential-status-protocol.md](plugin-credential-status-protocol.md).
 
 ### Pattern 3: Shell Command Plugin
 
 ```json
 {
-  "permissions": [
+  "keywords": ["git", "npm"],
+  "dependencies": [
     {
-      "scope": "shell",
-      "reason": "Execute git commands for version control",
-      "commands": ["git", "npm"]
+      "name": "yellow-core",
+      "version": "^1.0.0",
+      "reason": "hooks/scripts/lib/validate.sh sources yellow-core/lib/validate-fs.sh for validate_file_path"
     }
-  ],
-  "compatibility": {
-    "os": ["linux", "macos"] // Windows may not have git/npm
-  }
+  ]
 }
 ```
 

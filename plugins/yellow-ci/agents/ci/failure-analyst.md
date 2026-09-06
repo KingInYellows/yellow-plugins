@@ -11,7 +11,7 @@ tools:
   - Grep
   - Glob
   - AskUserQuestion
-  - Task
+  - Agent
 ---
 
 <examples>
@@ -157,7 +157,7 @@ excerpt]
 If failure pattern suggests runner-side issue (F02 disk full, F04 Docker, F09
 runner agent):
 
-1. Use Task tool to spawn `runner-diagnostics` agent
+1. Use Agent tool to spawn `runner-diagnostics` agent
 2. Pass context: runner name, failure pattern, relevant log excerpt
 3. Synthesize both diagnoses in final report
 

@@ -111,13 +111,21 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
 
 // V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
 // V1: effort: enum (low|medium|high|xhigh|max) — hard error
-// V2: model: enum (haiku|sonnet|opus|inherit, optionally versioned) — hard error
+// V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned)
+//     or a full `claude-*` model ID — hard error
 // V3: model: inherit on a scanner/CI agent — non-blocking warning
 // V4: synthesizer/orchestrator name without effort: high — non-blocking warning
-// `inherit` is a bare keyword (no version suffix). Real model IDs (haiku,
-// sonnet, opus) accept an optional one- or two-segment numeric suffix
-// (e.g., `sonnet-4-6`).
-const MODEL_VALUE_PATTERN = /^(haiku|sonnet|opus)(-\d+(-\d+)?)?$|^inherit$/;
+// `inherit` is a bare keyword (no version suffix). Aliases (haiku, sonnet,
+// opus, fable — the set Claude Code's sub-agents reference documents) accept
+// an optional one- or two-segment numeric suffix (e.g., `sonnet-4-6`). Full
+// IDs must start with `claude-` and continue as non-empty [a-z0-9] segments
+// joined by single hyphens (e.g., `claude-opus-5`,
+// `claude-haiku-4-5-20251001`) — a leading, trailing, or doubled hyphen
+// (`claude-opus-5-`, `claude-opus--5`) is a typo, not an ID, and must trip
+// the hard error. Foreign-provider IDs (gpt-*, gemini-*) stay rejected too,
+// because Claude Code would silently fall back to the session model.
+const MODEL_VALUE_PATTERN =
+  /^(haiku|sonnet|opus|fable)(-\d+(-\d+)?)?$|^inherit$|^claude-[a-z0-9]+(-[a-z0-9]+)*$/;
 const EFFORT_VALUES = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 // Effort tiers that satisfy V4's "extended chain-of-thought" requirement.
 // Subset of EFFORT_VALUES — keep in sync if EFFORT_VALUES grows.
@@ -241,6 +249,25 @@ const MEMORY_PROTOCOL_SENTINEL_FILES = [
 // wrong key in every SKILL.md for months precisely because nothing checked
 // it; a hard error keeps it from creeping back via old templates.
 const SKILL_MAX_LINES = 500;
+
+// RULE 21 — WARNING tier, command/agent line ceilings. RULE 15a covers only
+// SKILL.md; a command's full text loads on every invocation and an agent's on
+// every dispatch, and the 2026-07 progressive-disclosure wave regrew without
+// a ceiling (flow/work.md went 796 → 1116 lines). Warning tier like 15a:
+// ~25 shipped files exceed these today, so the advisory count is the trim
+// scoreboard rather than a CI gate. Agents get the lower ceiling because the
+// body is a system prompt — docs/research/do-we-actually-need-a-120-line-
+// maximum-o.md puts the split-unconditionally threshold at 300.
+const COMMAND_MAX_LINES = 500;
+const AGENT_MAX_LINES = 300;
+
+// Logical line count shared by RULE 15a and RULE 21: newline-separated
+// segments, including a final unterminated line. Equals `wc -l` for files
+// that end with a newline (the common case); a file lacking one reports one
+// more than `wc -l` so the ceiling still sees the unterminated last line.
+function countLines(content) {
+  return content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+}
 const SKILL_REQUIRED_HEADINGS = [
   '## What It Does',
   '## When to Use',
@@ -404,9 +431,11 @@ const pluginSubagentPattern =
 // segment of a fully-qualified colon-ful reference.
 const colonlessSubagentPattern =
   /subagent_type\s*(?:=|:)\s*[`"']*([a-z0-9-]+)(?![a-z0-9:-])/g;
-// Task(bareword): shorthand (e.g. `Task(test-runner): "..."`) — not a real
-// dispatch form; the canonical form is Task(subagent_type="plugin:dir:name").
-const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
+// Agent(bareword): shorthand (e.g. `Agent(test-runner): "..."`) — not a real
+// dispatch form; the canonical form is Agent(subagent_type="plugin:dir:name").
+// `Task` is the pre-2.1.63 name of the same tool and still works as an alias,
+// so both spellings are matched; group 1 is the tool word, group 2 the bare name.
+const taskBarewordPattern = /\b(Task|Agent)\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 
 // Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b, RULE 18,
 // and the colon-less/bareword subagent reference checks (fence-aware:
@@ -754,14 +783,17 @@ function validateAgentFile(filePath, ctx) {
     );
   }
 
-  // V2: model: enum (haiku | sonnet | opus | inherit, optionally with a
-  // version suffix like sonnet-4-5). Hard error. Catches typos and invalid
-  // model IDs that would otherwise fall back to the session default.
+  // V2: model: alias (haiku | sonnet | opus | fable | inherit, optionally
+  // with a version suffix like sonnet-4-5) or a full claude-* model ID. Hard
+  // error. Catches typos and foreign-provider IDs that would otherwise fall
+  // back to the session default.
   const modelVal = parseScalar(frontmatter, 'model');
   if (modelVal !== null && !MODEL_VALUE_PATTERN.test(modelVal)) {
     errors.push(
       `${relative(filePath)}: invalid model: '${modelVal}' ` +
-        `(must match ^(haiku|sonnet|opus)(-\\d+(-\\d+)?)?$|^inherit$)`
+        `(must be haiku|sonnet|opus|fable with an optional -N[-N] suffix, ` +
+        `inherit, or a full claude-* model ID whose segments are ` +
+        `hyphen-separated and non-empty)`
     );
   }
 
@@ -1067,14 +1099,15 @@ function validateSubagentReferences(markdownFiles, ctx) {
       );
     }
     for (const match of prose.matchAll(taskBarewordPattern)) {
-      const bare = match[1];
+      const toolWord = match[1];
+      const bare = match[2];
       const candidates = lastSegmentIndex.get(bare);
       if (!candidates) continue;
       const suggestion = [...candidates]
-        .map((r) => `Task(subagent_type="${r}")`)
+        .map((r) => `Agent(subagent_type="${r}")`)
         .join(' or ');
       errors.push(
-        `${relative(filePath)}: Task(${bare}): shorthand is not a real dispatch form — use the canonical ${suggestion} form`
+        `${relative(filePath)}: ${toolWord}(${bare}): shorthand is not a real dispatch form — use the canonical ${suggestion} form`
       );
     }
   }
@@ -1694,14 +1727,8 @@ function validateSkillFiles(skillFiles, ctx) {
   for (const filePath of skillFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
 
-    // 15a — line ceiling. Counts logical lines: newline-separated segments,
-    // including a final unterminated line (a file with no trailing newline
-    // still counts its last line). For files that end with a trailing
-    // newline — the common case for markdown here — this equals `wc -l`; a
-    // file lacking one deliberately reports one more line than `wc -l`
-    // would, so the ceiling still sees the unterminated last line.
-    const lineCount =
-      content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    // 15a — line ceiling (see countLines for the counting contract).
+    const lineCount = countLines(content);
     if (lineCount > SKILL_MAX_LINES) {
       warnings.push(
         `[RULE 15a advisory] ${relative(filePath)}: ${lineCount} lines ` +
@@ -1827,6 +1854,30 @@ function validateSkillFiles(skillFiles, ctx) {
   }
 }
 
+// RULE 21 — command/agent line ceilings (see the constant block above for the
+// rationale). Warning tier; the message names the remedy the repo already
+// uses (references/ offload behind an imperative load stub) plus the
+// deletion test from the Claude 5 alignment plan.
+function validateSizeCeilings(commandFiles, agentFiles, warnings) {
+  const groups = [
+    { files: commandFiles, ceiling: COMMAND_MAX_LINES, kind: 'command' },
+    { files: agentFiles, ceiling: AGENT_MAX_LINES, kind: 'agent' },
+  ];
+  for (const { files, ceiling, kind } of groups) {
+    for (const filePath of files) {
+      const lineCount = countLines(fs.readFileSync(filePath, 'utf8'));
+      if (lineCount > ceiling) {
+        warnings.push(
+          `[RULE 21 advisory] ${relative(filePath)}: ${lineCount} lines ` +
+            `(${kind} ceiling ${ceiling}) — delete prose that does not change ` +
+            `behaviour, then move late-sequence detail into references/ ` +
+            `behind an imperative load stub.`
+        );
+      }
+    }
+  }
+}
+
 function main() {
   const pluginNames = new Set(
     fs
@@ -1891,6 +1942,7 @@ function main() {
   validateSkillToolGrant(commandFiles, errors, { toolsKey: 'allowed-tools' });
   validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
+  validateSizeCeilings(commandFiles, agentFiles, warnings);
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);

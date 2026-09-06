@@ -6,7 +6,7 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
-  - Task
+  - Agent
   - ToolSearch
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
@@ -80,10 +80,10 @@ Use the `list_teams` response from Step 1. Auto-detect from git remote repo name
 
 ### Step 5: Diagnose via failure-analyst Agent
 
-Delegate to the `failure-analyst` agent via Task:
+Delegate to the `failure-analyst` agent via the Agent tool:
 
 ```
-Task subagent_type: "yellow-ci:ci:failure-analyst"
+Agent subagent_type: "yellow-ci:ci:failure-analyst"
 Pass: run ID, repo, branch (from git branch --show-current)
 Receive: structured failure report including:
   - F-code (F01–F12)

@@ -18,10 +18,10 @@ Branch by `judge_runs`:
   third distinct ordering."
 
 **Independence note.** Where the harness supports it, dispatch each judge
-run as a separate `Task(subagent_type: "general-purpose")` call so the
+run as a separate `Agent(subagent_type: "general-purpose")` call so the
 runs are context-isolated. Sequential same-LLM runs without context
 boundaries produce correlated scores and weaken the order-swap bias
-correction. If parallel-Task dispatch is unavailable, run sequentially
+correction. If parallel-Agent dispatch is unavailable, run sequentially
 and accept the degraded independence — note this in the Phase 4 report.
 
 **Judge prompt template:**

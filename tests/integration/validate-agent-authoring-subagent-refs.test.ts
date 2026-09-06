@@ -98,7 +98,21 @@ describe('subagent reference hardening — colon-less + Task(bareword):', () => 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Task(fixture-agent): shorthand');
     expect(result.stderr).toContain(
-      'Task(subagent_type="demo:testing:fixture-agent")'
+      'Agent(subagent_type="demo:testing:fixture-agent")'
+    );
+  });
+
+  it('errors on Agent(bareword): shorthand (post-2.1.63 tool name) (red)', () => {
+    writeAgent(
+      dir,
+      REFERENCE_PATH,
+      commandBody('Agent(fixture-agent): "Do the fixture work."')
+    );
+    const result = runValidator(dir);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Agent(fixture-agent): shorthand');
+    expect(result.stderr).toContain(
+      'Agent(subagent_type="demo:testing:fixture-agent")'
     );
   });
 

@@ -1,6 +1,7 @@
 ---
 title: 'Subagent Frontmatter Field Catalog'
 date: 2026-05-04
+date_verified: 2026-09-02
 category: code-quality
 track: knowledge
 problem: Claude Code subagent .md frontmatter fields — required, optional, version history, scope precedence
@@ -23,6 +24,12 @@ Sources: [docs.anthropic.com/en/docs/claude-code/sub-agents](https://docs.anthro
 [/changelog](https://code.claude.com/docs/en/changelog),
 [/hooks](https://code.claude.com/docs/en/hooks),
 [/permission-modes](https://code.claude.com/docs/en/permission-modes).
+
+The field table above reflects the 2026-05-04 source check. The `effort`
+tier notes were re-verified on 2026-09-02 against the Claude Code sub-agents
+reference and the platform effort documentation — where a claim carries its
+own later date, that date marks the narrower re-check, not a full re-read of
+every field below. See [Version Changelog](#version-changelog).
 
 ---
 
@@ -65,8 +72,8 @@ precedent and yellow-plugins convention (established M-A-05, 2026-05-08):
 | `low` | CLI relay agents, narrow taxonomy scanners, deterministic agents that follow a fixed procedural script | The agent does any synthesis or scoring across candidates |
 | `medium` | Default for caller-flexible agents — let the calling session's context decide depth | The agent has compound reasoning that should override caller defaults |
 | `high` | Agent applies a **bounded structured rubric** (n principles, n axes, n criteria) where each axis is itself bounded; multi-axis but bounded analysis | The agent is open-ended and additional CoT mostly redoes the same axes |
-| `xhigh` | Open-ended reasoning with **no rubric ceiling** — adversarial scenario construction, novel-pattern detection, agents that *generate* failure modes rather than check against them. Effective ceiling on Opus 4.7+ | Agent is sonnet/haiku-tier (xhigh on lower models is pointless — model ceiling already constrains output before effort would) |
-| `max` | Deepest single-pass synthesis on the largest documents, when wall-clock cost is acceptable | The deployed model is not pinned to a specific Opus version that supports `max` — community sources indicate `max` may be Opus 4.6-exclusive and returns API errors on other models. Avoid in plugin agents that ship across Opus versions |
+| `xhigh` | Open-ended reasoning with **no rubric ceiling** — adversarial scenario construction, novel-pattern detection, agents that _generate_ failure modes rather than check against them. Documented as the setting for the hardest coding and agentic work on Sonnet 5 / Opus 5 / Fable 5.x | Agent is sonnet/haiku-tier (xhigh on lower models is pointless — model ceiling already constrains output before effort would) |
+| `max` | Deepest single-pass synthesis on the largest documents, when wall-clock cost is acceptable | The agent runs on `haiku` (Haiku 4.5 has no effort control) or the extra wall-clock is not justified. `max` is accepted on Sonnet 5, Opus 5 and Fable 5.x (verified 2026-09-02); the earlier "Opus 4.6-exclusive" caveat no longer applies |
 
 **Pairing with `model:`:** `xhigh`/`max` are most impactful with `model: opus`.
 On `sonnet` or `haiku`, the model's ceiling constrains output quality before
@@ -325,5 +332,6 @@ tools: Read, Bash, Glob
 | v2.1.90+ | 2026-04 | `@mention` typeahead for agents added |
 | v2.1.117+ | 2026-04 | `mcpServers` frontmatter honored in `claude --agent <name>` main-thread mode |
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
+| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.

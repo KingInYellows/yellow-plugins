@@ -9,7 +9,7 @@ threshold below are load-bearing — execute them exactly as written.
 
 If no P0, P1, or P2 findings were reported, skip this step.
 
-Otherwise, spawn the `knowledge-compounder` agent via Task
+Otherwise, spawn the `knowledge-compounder` agent via the Agent tool
 (`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all P0/P1/P2
 findings from this review wrapped in injection fencing. Format findings as
 a markdown table (Severity | Reviewer | File | Title | Suggested fix):

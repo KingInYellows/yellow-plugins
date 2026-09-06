@@ -74,7 +74,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ### Agents (3)
 
 - `codex-reviewer` — Supplementary reviewer spawned by `review:pr` and
-  `/council` via Task tool. Returns the structured 6-key contract
+  `/council` via Agent tool. Returns the structured 6-key contract
   (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
   `findings_block_begin`...`findings_block_end`) shared with yellow-council's
   Gemini and OpenCode reviewers

@@ -148,6 +148,8 @@ When `yq` is absent, commands fall back to defaults.
 
 ## Requirements
 
+- Claude Code 2.1.63 or later — commands list the `Agent` tool; on older
+  versions the same tool was named `Task`.
 - [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) v1.6.7+
   installed and authenticated
 - Git repository initialized with Graphite (`gt init`)

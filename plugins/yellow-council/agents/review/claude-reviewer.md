@@ -1,6 +1,6 @@
 ---
 name: claude-reviewer
-description: "In-process council reviewer that analyzes the council pack with pure reasoning — no CLI subprocess. Spawned by /council via Task. Returns the shared 6-key contract (verdict / confidence / summary / fenced_output_path / findings block)."
+description: "In-process council reviewer that analyzes the council pack with pure reasoning — no CLI subprocess. Spawned by /council via the Agent tool. Returns the shared 6-key contract (verdict / confidence / summary / fenced_output_path / findings block)."
 model: inherit
 tools:
   - Read

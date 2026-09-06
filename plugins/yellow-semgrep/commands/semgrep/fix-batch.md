@@ -11,7 +11,7 @@ allowed-tools:
   - Glob
   - Skill
   - AskUserQuestion
-  - Task
+  - Agent
   - mcp__plugin_yellow-semgrep_semgrep__semgrep_scan
 ---
 

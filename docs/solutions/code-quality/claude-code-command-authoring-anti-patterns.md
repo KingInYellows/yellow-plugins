@@ -591,14 +591,16 @@ flag's value.
 
 ---
 
-### 17. Task Tool Over Agent Tool in Commands
+### 17. Bareword Agent Dispatch Without subagent_type
 
-Commands must use `Task` (with `subagent_type`) to spawn agents, not the `Agent`
-tool directly. Every established plugin in this repository follows the `Task`
-convention. The `Agent` tool works at runtime, but using it bypasses
-cross-reference validation -- when commands use `Task` with an explicit
-`subagent_type`, the validator and review agents can verify the agent name
-exists and matches a registered agent file.
+Commands must use the `Agent` tool (renamed from `Task` in Claude Code
+2.1.63; `Task` remains a backward-compatible alias) with an explicit
+`subagent_type` to spawn agents -- never a bareword instruction that leaves
+the agent identity implicit. Every established plugin in this repository
+follows the `Agent(subagent_type=...)` convention. Dispatching without a
+literal `subagent_type` bypasses cross-reference validation -- when commands
+supply an explicit `subagent_type`, the validator and review agents can
+verify the agent name exists and matches a registered agent file.
 
 **WRONG:**
 ```markdown
@@ -606,27 +608,25 @@ Step 3: Use the Agent tool to spawn the doc-auditor agent.
 Provide the file list as context.
 ```
 
-The `Agent` tool does not take `subagent_type`, so the agent identity is
-implicit and unverifiable. There is no way to statically check which agent
-was invoked, and the LLM may spawn a generic agent instead of the intended
-specialist.
+Without a literal `subagent_type`, the agent identity is implicit and
+unverifiable. There is no way to statically check which agent was invoked,
+and the LLM may spawn a generic agent instead of the intended specialist.
 
 **RIGHT:**
 ```markdown
-Step 3: Use the Task tool to spawn the doc-auditor agent:
+Step 3: Use the Agent tool to spawn the doc-auditor agent:
   subagent_type: "yellow-docs:doc-auditor"
   description: "Audit staleness of documentation files"
   (exact name: field from plugins/yellow-docs/agents/doc-auditor.md)
 ```
 
-**Rule:** Commands always delegate to agents via `Task` with a literal
-`subagent_type`. Reserve the `Agent` tool for ad-hoc user-initiated work
-where a specific agent identity is not needed. If a command uses `Agent`,
-treat it as a review finding.
+**Rule:** Commands always delegate to agents via `Agent` (or its `Task`
+alias) with a literal `subagent_type`. If a command dispatches an agent
+without a literal `subagent_type`, treat it as a review finding.
 
 **Note:** This extends anti-pattern #4 (subagent_type naming). Pattern #4
-covers getting the name right; this pattern covers using the right tool
-in the first place.
+covers getting the name right; this pattern covers requiring an explicit
+`subagent_type` at all.
 
 ---
 
@@ -754,7 +754,8 @@ executes.
 - [ ] `subagent_type` matches the exact `name:` field in the agent's frontmatter
 - [ ] Verified by checking `plugins/<plugin>/agents/<file>.md`, not inferred
 - [ ] The literal `subagent_type: "..."` string is spelled out in the command prose — not left for the LLM to guess from a description like "spawn the X agent"
-- [ ] Commands use `Task` tool (not `Agent`) for all agent delegation
+- [ ] Commands use `Agent` (or its `Task` alias) with a literal
+      `subagent_type` for all agent delegation
 
 **Prompt Injection**
 - [ ] Linear issue bodies, PR comments, CI logs wrapped in `--- begin/end ---` delimiters
@@ -819,7 +820,8 @@ When reviewing command markdown files, scan for:
 12. `yq '.field'` — is `-r` flag present for all string fields used in comparisons or case statements?
 13. `AskUserQuestion` free-text buttons — do they use "Other" as the label (not a custom label)?
 14. Conditional steps — does each optional step start with "If [condition not met], skip this step."?
-15. `Agent` tool in commands — should be `Task` with `subagent_type` instead?
+15. Command agent dispatch — missing a literal `subagent_type` on
+    `Agent` (or its `Task` alias)?
 16. Per-item agent loops — is there a threshold gate with user confirmation before spawning N agents?
 17. Prose-based branching — does an `if` condition in prose gate control flow that should be a bash `case`/`if` instead?
 

@@ -13,12 +13,12 @@ persona dispatch table and use the pre-Wave-2 adaptive selection:
   `maintainability-reviewer`.
 - Conditionally include: `pr-test-analyzer`, `comment-analyzer`,
   `type-design-analyzer`, `silent-failure-hunter`
-- Cross-plugin via Task: `security-sentinel` (yellow-core),
+- Cross-plugin via the Agent tool: `security-sentinel` (yellow-core),
   `architecture-strategist`, `performance-oracle`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
 - Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
   is installed AND diff > 100 lines. Spawn via
-  `Task(subagent_type="yellow-codex:review:codex-reviewer", run_in_background=true)`.
+  `Agent(subagent_type="yellow-codex:review:codex-reviewer", run_in_background=true)`.
   If the agent is not found (yellow-codex not installed), skip silently.
   `codex-reviewer` returns the structured 6-key council contract
   (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/

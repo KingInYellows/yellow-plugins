@@ -6,7 +6,6 @@ effort: high
 background: true
 memory: project
 tools:
-  - Task
   - ToolSearch
   - Write
   - mcp__plugin_yellow-research_ceramic__ceramic_search
@@ -80,9 +79,11 @@ Perplexity/Tavily/EXA which handle natural language. See
 
 **Moderate** — 2-3 aspects or medium depth:
 
-- Dispatch the following three Task calls **in parallel** (do not
-  serialize): `mcp__plugin_yellow-research_ceramic__ceramic_search` (with
-  the rewritten keyword query),
+- Issue the following three MCP tool calls **in parallel** (do not
+  serialize, and do not wrap them in Agent — these names are bundled MCP
+  tools, not subagents):
+  `mcp__plugin_yellow-research_ceramic__ceramic_search` (with the
+  rewritten keyword query),
   `mcp__plugin_yellow-research_perplexity__perplexity_research` for
   synthesis, and `mcp__plugin_yellow-research_tavily__tavily_search` for
   recent web. Union the result sets and synthesize.
@@ -134,12 +135,14 @@ final result when repo-local AST search is unavailable.
 
 ## Step 2: Execute
 
-For moderate/complex, use the Task tool to dispatch concurrent queries:
+For moderate/complex, issue the MCP tool calls directly in one parallel
+response. These `mcp__plugin_*` identifiers are bundled MCP tools, not
+registered subagents — do not pass them to Agent.
 
 ```text
 Launch in parallel:
-- Task: mcp__plugin_yellow-research_perplexity__perplexity_research on <topic>
-- Task: mcp__plugin_yellow-research_tavily__tavily_research on <topic>
+- mcp__plugin_yellow-research_perplexity__perplexity_research on <topic>
+- mcp__plugin_yellow-research_tavily__tavily_research on <topic>
 ```
 
 For async tools, start them first:

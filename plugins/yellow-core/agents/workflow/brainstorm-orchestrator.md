@@ -8,7 +8,7 @@ skills:
   - brainstorming
 tools:
   - AskUserQuestion
-  - Task
+  - Agent
   - ToolSearch
   - Write
   - Glob
@@ -51,7 +51,7 @@ vector recall), not redundant; keep both.
    `<` → `&lt;`, then `>` → `&gt;`). Activity = one-sentence TOPIC
    summary; Files and Diff empty (an empty Diff field is supported by the
    agent contract); Domains inferred from the topic when there is a signal.
-2. Dispatch `Task` synchronously (blocking — do not use
+2. Dispatch `Agent` synchronously (blocking — do not use
    `run_in_background`) with `subagent_type:
    "yellow-core:research:learnings-researcher"`, description "Past
    learnings pre-pass", prompt = the sanitized `<work-context>` block
@@ -94,10 +94,10 @@ skip directly to Phase 3.
 
 If `RESEARCH_ROUND < 2`: offer via AskUserQuestion: `[Codebase patterns] [External research] [Skip]`
 
-- **Codebase**: `Task: repo-research-analyst` — fenced topic. If empty or fails:
+- **Codebase**: `Agent: repo-research-analyst` — fenced topic. If empty or fails:
   inform user "[brainstorm] Codebase research returned no results. Continuing with
   dialogue only." Do not synthesize. Increment `RESEARCH_ROUND` only on success.
-- **External**: `ToolSearch "research-conductor"` first. If found: `Task: research-conductor`
+- **External**: `ToolSearch "research-conductor"` first. If found: `Agent: research-conductor`
   — fenced topic. If fails: inform user "[brainstorm] External research failed.
   Continuing without it." Do not increment. Do not offer external research again this session. If not found: inform user once —
   "[brainstorm] External research unavailable — yellow-research not installed." —

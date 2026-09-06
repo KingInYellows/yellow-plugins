@@ -3,7 +3,7 @@ name: research:code
 description: Inline code research for active development. Use when user asks how a library works, needs code examples, API patterns, or framework documentation. Returns synthesized answer in-context — no file saved.
 argument-hint: '<topic or question>'
 allowed-tools:
-  - Task
+  - Agent
   - Read
   - Grep
   - Glob

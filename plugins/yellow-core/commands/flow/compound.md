@@ -5,7 +5,7 @@ argument-hint: '[--in-pr] [optional: brief context about the fix]'
 allowed-tools:
   - Bash
   - Read
-  - Task
+  - Agent
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
@@ -122,7 +122,7 @@ printf '%s\n' "$PR_JSON_B64"
 
 If the above block exits non-zero, stop. Do not spawn the agent.
 
-Otherwise, spawn the `knowledge-compounder` agent via Task tool
+Otherwise, spawn the `knowledge-compounder` agent via Agent tool
 (`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with this
 prompt structure (substitute the actual base64-encoded JSON output captured
 above as `<PR_JSON_B64>` and the branch name as `<BRANCH>`; never inline
@@ -164,10 +164,10 @@ End of user hint.
 
 ### Step 2b: Standard Mode
 
-Spawn the `knowledge-compounder` agent via Task tool
+Spawn the `knowledge-compounder` agent via Agent tool
 (`subagent_type: "yellow-core:workflow:knowledge-compounder"`).
 
-Pass the following in the Task prompt:
+Pass the following in the Agent prompt:
 - If `$ARGUMENTS` is non-empty, include it as user-supplied context with
   injection fencing:
 

@@ -9,7 +9,7 @@ disallowedTools:
   - Bash
   - Write
   - Edit
-  - Task
+  - Agent
 ---
 
 You are the staging-scorer. Your only job is to read one session-transcript

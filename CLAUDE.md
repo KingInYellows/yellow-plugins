@@ -222,7 +222,7 @@ Enforcement differs by surface:
   `user-invocable` key spelling is error-tier (RULE 20): the old
   `user-invokable` spelling is silently ignored by Claude Code.
 
-The full list is in `AGENTS.md` ("Critical Agent Authoring Rules"); the
+The full list is in `AGENTS.md` ("Command, Agent, And Skill Authoring"); the
 most-frequently-tripped items:
 
 - Agent frontmatter uses `tools:`, NOT `allowed-tools:`

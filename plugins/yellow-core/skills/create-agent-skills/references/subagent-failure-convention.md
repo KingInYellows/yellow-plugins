@@ -1,6 +1,6 @@
 # Subagent Failure Convention (Output-File Pattern)
 
-When an orchestrator spawns a subagent via the Task tool, the Task tool's
+When an orchestrator spawns a subagent via the Agent tool, the Agent tool's
 return value is not always reliable for distinguishing partial success
 from complete failure (see
 [GitHub Issue #24181](https://github.com/anthropics/claude-code/issues/24181)).
@@ -125,7 +125,7 @@ filename.
    Capture the printed path. Bash variables do NOT survive across
    separate Bash tool calls in command files (each call is a fresh
    subprocess), so the orchestrator must substitute the literal path
-   value into subsequent Task input prompts rather than referencing
+   value into subsequent Agent input prompts rather than referencing
    `$RUN_DIR` by name. If `mktemp` fails (disk full, permission
    denied) the captured path is empty — error out before spawning
    agents; an empty `run_dir` causes every agent to write to a
@@ -137,8 +137,8 @@ filename.
    to `<run_dir>/agent-result-<agent-name>.json`. The agent owns the
    `.tmp` → `.json` rename; the orchestrator only reads `.json`.
 
-3. After the Task call returns, read the result file rather than relying on
-   the Task return value. Treat `status: "success"` as the only signal that
+3. After the Agent call returns, read the result file rather than relying on
+   the Agent return value. Treat `status: "success"` as the only signal that
    the agent completed its work — `status: "failed"`, missing file, or
    invalid JSON all indicate incomplete work that the orchestrator should
    surface.
@@ -149,7 +149,7 @@ filename.
    so `$RUN_DIR` from Step 1 is NOT in scope here. The block below is
    illustrative shell logic — in a command file, either re-derive the path
    in the same fence, or pass the **literal path captured from `mktemp -d`**
-   to the agent's Task input instead of the variable name.
+   to the agent's Agent input instead of the variable name.
 
 ```bash
 RESULT="$RUN_DIR/agent-result-${AGENT_NAME}.json"
@@ -184,7 +184,7 @@ file parses correctly but `.status` is null or absent.
 
 ## Why files and not stdout
 
-Stdout parsing is unreliable — the Task tool may suppress trailing output,
+Stdout parsing is unreliable — the Agent tool may suppress trailing output,
 agents may emit unstructured prose alongside the JSON, and context
 truncation can drop the final line. Files are durable and can be read
 even if the agent crashes mid-execution.

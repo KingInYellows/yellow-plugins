@@ -6,7 +6,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
-  - Task
+  - Agent
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_yellow-research_ceramic__ceramic_search
@@ -78,10 +78,10 @@ mkdir -p docs/research
 
 ### Step 4: Research
 
-Create a per-run artifact directory FIRST (before the Task spawn). Bash
+Create a per-run artifact directory FIRST (before the Agent spawn). Bash
 variables do not survive across separate Bash tool calls — capture the
 path this command prints and substitute the **literal value** into the
-Task prompt (never the variable name):
+Agent prompt (never the variable name):
 
 ```bash
 RUN_DIR=$(mktemp -d -t research-deep-XXXXXXXX 2>/dev/null); printf '%s\n' "$RUN_DIR"
