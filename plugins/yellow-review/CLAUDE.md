@@ -21,13 +21,14 @@ resolution, and sequential stack review. Graphite-native workflow.
   anchor and severity — no persona-side `< 75` filter and no 5–7 finding
   cap. Other persona reviewers still apply their own anchor floors before
   Step 6 (including Wave 3 reviewers such as `plugin-contract-reviewer`).
-  `/review:pr` Step 6 and `/review:all` Step 9 are the sole gates for
-  those three (suppress below 75 except P0 at 50+; count sub-75 input as
+  `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the
+  Aggregate-findings confidence gate) are the sole gates for those three
+  (suppress below 75 except P0 at 50+; count sub-75 input as
   `suppressed`). Pre-existing findings are gated before the Pre-existing
-  section. If a recall persona risks exceeding compact-return output budget,
-  rank by confidence (gate-surviving 75/100 first) then severity and stop
-  before JSON would truncate — the orchestrator's compact-return validation
-  drops malformed returns entirely.
+  section. If a recall persona would exceed 40 findings, rank
+  gate-surviving items first (anchors 75/100, and P0 at 50+) by severity
+  then confidence, then remaining findings, and drop the lowest-ranked
+  overflow — never emit partial JSON.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command

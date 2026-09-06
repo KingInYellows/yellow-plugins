@@ -106,8 +106,9 @@ Report every finding with a confidence score; do not filter by confidence —
 `/docs:review` applies the 75 gate after aggregation. Safe-auto patterns
 above always emit at confidence 100.
 
-Bound output at 40 findings: if a document surfaces more, rank by confidence
-(gate-surviving 75/100 first) then severity, and drop the lowest-ranked
+Bound output at 40 findings: if a document surfaces more, rank
+gate-surviving findings first (anchors 75/100, and P1 at 50+) by severity
+then confidence, then remaining findings, and drop the lowest-ranked
 overflow rather than truncate. Never emit partial JSON — a malformed return
 is dropped by the orchestrator, including any confidence-100 findings it
 contained.

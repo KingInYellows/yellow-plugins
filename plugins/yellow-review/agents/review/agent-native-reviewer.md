@@ -189,11 +189,11 @@ Return findings in the standard yellow-review compact-return JSON schema
 shown below. Report every finding you identify, each with a confidence score and
 severity. Do not filter by confidence — the orchestrator applies the 75 gate
 after aggregation, and a finding it later drops costs less than a real issue
-silently omitted here. If the list would exceed your compact-return output
-budget, rank by confidence (gate-surviving 75/100 first, then 50, then
-25/0) then severity and stop before the JSON would truncate — the
-orchestrator's compact-return validation drops an entire malformed return,
-so never emit partial JSON.
+silently omitted here. Bound output at 40 findings. Rank gate-surviving
+findings first (anchors 75/100, and P0 at 50+) by severity (P0 first)
+then confidence descending; then remaining findings by confidence then
+severity. Drop the lowest-ranked overflow. Never emit partial JSON — the
+orchestrator's compact-return validation drops an entire malformed return.
 
 ```json
 {

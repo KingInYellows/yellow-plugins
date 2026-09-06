@@ -77,8 +77,9 @@ persona reviewers still apply their own anchor floors (for example,
 `correctness-reviewer` suppresses anchor-25 items and
 `plugin-contract-reviewer` suppresses anchor-25 items before Step 6).
 
-`/review:pr` and `/review:all` apply the **single** confidence gate in
-Step 6/9: suppress findings below anchor 75 except P0 at 50+. Sub-75 input
+`/review:pr` Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings
+confidence gate) apply the **single** confidence gate: suppress findings
+below anchor 75 except P0 at 50+. Sub-75 input
 from the three recall personas is expected; the report's "Findings suppressed
 at confidence < 75" line counts only what the orchestrator removes.
 Pre-existing findings pass through the same gate (gated-out items count as

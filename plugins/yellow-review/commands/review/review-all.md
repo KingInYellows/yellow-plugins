@@ -263,7 +263,7 @@ aggregation rules change there, propagate the same change here.
       separator.
    4. **Cross-reviewer agreement promotion** (50→75, 75→100).
    5. **Separate pre-existing** into a separate report section. Do not
-      render this set yet — step 9's confidence gate still applies to it.
+      render this set yet — sub-step 9's confidence gate still applies to it.
    6. **Resolve disagreements** (annotate Reviewer column, keep most
       conservative severity / autofix_class / owner).
    7. **Normalize routing** (most conservative `autofix_class` and

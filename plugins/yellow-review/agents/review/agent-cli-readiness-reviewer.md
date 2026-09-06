@@ -220,7 +220,7 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   literally has no `--json` definition and prints free-form text.
 - **Anchor 75** — the issue is directly visible in the diff.
 - **Anchor 50** — the pattern is present but context beyond the diff might
-  resolve it. Surfaces only as P0 escape or soft buckets.
+  resolve it. Suppressed by the orchestrator's sub-75 gate (except P0 at 50+).
 - **Anchor 25 or below — report at that anchor; the orchestrator
   suppresses it from every user-visible section, including
   Pre-existing** — the issue depends on runtime behavior
@@ -242,11 +242,11 @@ Return findings in the standard yellow-review compact-return JSON schema
 shown below. Report every finding you identify, each with a confidence score and
 severity. Do not filter by confidence — the orchestrator applies the 75 gate
 after aggregation, and a finding it later drops costs less than a real issue
-silently omitted here. If the list would exceed your compact-return output
-budget, rank by confidence (gate-surviving 75/100 first, then 50, then
-25/0) then severity and stop before the JSON would truncate — the
-orchestrator's compact-return validation drops an entire malformed return,
-so never emit partial JSON.
+silently omitted here. Bound output at 40 findings. Rank gate-surviving
+findings first (anchors 75/100, and P0 at 50+) by severity (P0 first)
+then confidence descending; then remaining findings by confidence then
+severity. Drop the lowest-ranked overflow. Never emit partial JSON — the
+orchestrator's compact-return validation drops an entire malformed return.
 
 ```json
 {
