@@ -103,8 +103,9 @@ read these stable persona prompts from cache instead of reprocessing them
 full length. Supported values are `5m` and `1h`; the field is read only from
 subagent files. Trade-off: on usage-billed routes a `1h` cache write bills at
 about 2x base input versus 1.25x for the default `5m`, so the setting pays off
-only when a second review runs within the hour (a re-review, or
-`/review:sweep-all` across several PRs). A `subagentPromptCacheTtl` setting or
+only when a second review runs within the hour (a re-review,
+`/review:all` across several PRs, or `/review:sweep-all`). A
+`subagentPromptCacheTtl` setting or
 environment variable overrides the frontmatter value for every subagent, which
 is the opt-out. While a subscription is drawing on usage credits, Claude Code
 may ignore the setting — check `cache_read_input_tokens` in the transcript

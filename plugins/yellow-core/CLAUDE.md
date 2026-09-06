@@ -344,9 +344,13 @@ ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 ### Prompt cache TTL
 
 No yellow-core agent sets `experimental.cacheTtl`. `learnings-researcher` is
-one-shot on every caller, so a `1h` cache write (about 2x base input versus
-1.25x for the default `5m`) would not pay back; the field stays on the
-yellow-review personas that are re-dispatched across reviews.
+one-shot on `/review:pr`, `/flow:plan`, `/flow:brainstorm`, and
+`/docs:review`, so a `1h` cache write (about 2x base input versus 1.25x for
+the default `5m`) would not pay back there. `/review:all` dispatches it
+once per PR in the batch, which can pay back when those reviews are more
+than five minutes apart; the field still stays off because the common path
+is a single `/review:pr`. The 1h field stays on the yellow-review personas
+that are re-dispatched across reviews.
 
 ### MCP Tool Integration
 

@@ -147,8 +147,8 @@ the top level. Claude Code ignores any other value, ignores `1h` while a
 subscription is drawing on usage credits, and reads the field only from
 subagent files. Worth setting on personas that are re-dispatched many times
 per session with a stable system prompt (the `/review:pr` always-on
-reviewers, `code-simplifier`, and `learnings-researcher` carry it since
-2026-09-02); pointless on
+reviewers and `code-simplifier` carry it since 2026-09-02;
+`learnings-researcher` stays at the default); pointless on
 one-shot agents. The validator parses the nested map without complaint
 (covered by a fixture in `validate-agent-authoring-model-effort-rules.test.ts`).
 
