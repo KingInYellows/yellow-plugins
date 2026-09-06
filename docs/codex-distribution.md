@@ -41,14 +41,15 @@ runs the **exposure lint** (below).
    logic).
 2. `yellow-core` — a narrow read-only skill allowlist (excludes most skills, all
    agents, and both hooks).
-3. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
-   reference), hooks carried (`includeHooks` default `true`).
-4. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
+3. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
    every command, agent, and other skill of the plugin stays Claude-only, and
    the plugin has no hooks to carry.
+4. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
+   reference), hooks carried (`includeHooks` default `true`).
 
 Filtering `pluginOrder` by `targets.codex.enabled` yields
-`[gt-workflow, yellow-core, yellow-ci, yellow-review]` automatically.
+`[gt-workflow, yellow-core, yellow-review, yellow-ci]` automatically
+(generated `.agents/plugins/marketplace.json` order).
 
 ## Host-neutral skill bodies + the exposure lint (R15)
 

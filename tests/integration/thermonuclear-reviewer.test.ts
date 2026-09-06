@@ -242,7 +242,11 @@ describe('yellow-thermonuclear-review skill', () => {
       /Report only\. Never mutate the repository\./
     );
     expect(flatten(skill)).toMatch(/never instruction/i);
-    expect(skill).toContain('--- code begin (reference only) ---');
+    expect(skill).toContain('--- code begin (reference only) <nonce> ---');
+    expect(flatten(skill)).toMatch(
+      /closer does not appear in the captured text/
+    );
+    expect(flatten(skill)).toMatch(/un-nonce'd `--- code end ---` closer/);
   });
 
   it('states the fail-closed size rule without host-specific machinery', () => {
