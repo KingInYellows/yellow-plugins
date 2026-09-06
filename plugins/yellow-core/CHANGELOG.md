@@ -1,5 +1,78 @@
 # Changelog
 
+## 2.4.0
+
+### Minor Changes
+
+- [`6f7d93f`](https://github.com/KingInYellows/yellow-plugins/commit/6f7d93ffd4ef9dc3ba0171cec9c93db8d0976f14)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `PreCompact` hook. `hooks/scripts/pre-compact.sh` prints the Claude
+  5-generation compaction-preservation instruction (active plan path and
+  unchecked tasks, files modified with reasons, the user's decisions and
+  constraints verbatim, open questions, the last failing command, in-flight
+  branch/PR/worktree names); Claude Code appends it to the main-session
+  compaction prompt (subagent compactons discard hook stdout). Synchronous,
+  dependency-free, always exits 0 so it can never block compaction.
+
+### Patch Changes
+
+- [`2d749fb`](https://github.com/KingInYellows/yellow-plugins/commit/2d749fb508e4e7a6a886db09368510a2cd4f27e8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  agent template in `create-agent-skills`: the body now opens with the task,
+  inputs, output contract, and delegation boundary instead of a "You are an
+  expert in [domain]" persona and enumerated behaviour lists, and the
+  frontmatter example shows explicit `model:`/`effort:`/`tools:`. Matches
+  Anthropic's Claude 5-generation guidance that prior-model scaffolding is too
+  prescriptive. The output-contract example is reviewer/scanner-only
+  (confidence-scored findings); other archetypes keep a task-specific contract.
+  Plugin README and CLAUDE.md catalog entries now describe that behavior.
+
+- [`dc407e7`](https://github.com/KingInYellows/yellow-plugins/commit/dc407e7857ed50ecaf2bfa69e2815bbdc51d8ec2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove four "be
+  thorough" exhortations from `/flow:plan`, `/flow:work`,
+  `repo-research-analyst`, and `spec-flow-analyzer`. Anthropic's Claude
+  5-generation prompting guidance says blanket thoroughness instructions that
+  earlier models needed now cause over-exploration; the concrete halves of each
+  line (cite files and line numbers; walk each user journey's happy, empty,
+  error, and permission paths) are kept.
+
+- [`c8f41b7`](https://github.com/KingInYellows/yellow-plugins/commit/c8f41b7afc3ea98653b321eb1416a70d0683a00b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Set
+  `experimental.cacheTtl: 1h` on the five always-run `/review:pr` agents
+  (`project-compliance-reviewer`, `correctness-reviewer`,
+  `maintainability-reviewer`, `project-standards-reviewer`, and the Step 8
+  `code-simplifier`) — the agents whose stable system prompt is re-sent on every
+  review. A second review within the hour reads those prompts from cache.
+  `learnings-researcher` (yellow-core) stays at the default: `/review:pr` and
+  the flow/docs callers dispatch it once, and a `1h` write bills about 2x base
+  input versus 1.25x for `5m`. `/review:all` dispatches it once per PR and can
+  pay back on a slow batch, but the common path is a single `/review:pr`. A
+  `subagentPromptCacheTtl` setting or env var overrides the frontmatter for all
+  subagents. Verified against Claude Code 2.1.259; ignored while a subscription
+  is drawing on usage credits.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 2.3.1
 
 ### Patch Changes
