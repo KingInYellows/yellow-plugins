@@ -84,7 +84,10 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 - **75** — likely inconsistency; charitable reading could reconcile but
   implementers would diverge
 - **50** — minor asymmetry without downstream consequence; advisory only
-- **Below 50 — suppress** — cannot verify, speculative, or stylistic
+- **Below 50 — report at that anchor; /docs:review drops it** — an in-scope
+  coherence finding you cannot fully verify from the text. Anything under
+  "What you don't flag" — style preferences included — is out of scope at
+  every confidence level; don't report it at all.
 
 ## What you don't flag
 
@@ -99,8 +102,16 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 ## Output Format
 
 Return findings as the standard yellow-docs compact-return JSON schema.
-Suppress findings with `confidence < 75` except for safe-auto patterns
-above (which always emit at confidence 100).
+Report every finding with a confidence score; do not filter by confidence —
+`/docs:review` applies the 75 gate after aggregation. Safe-auto patterns
+above always emit at confidence 100.
+
+Bound output at 40 findings: if a document surfaces more, rank
+gate-surviving findings first (anchors 75/100, and P1 at 50+) by severity
+then confidence, then remaining findings, and drop the lowest-ranked
+overflow rather than truncate. Never emit partial JSON — a malformed return
+is dropped by the orchestrator, including any confidence-100 findings it
+contained.
 
 ```json
 {

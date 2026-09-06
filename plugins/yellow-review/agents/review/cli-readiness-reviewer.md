@@ -84,8 +84,10 @@ Evaluate all 7 principles, but weight findings by command type:
   results by default with no `--limit`, `--filter`, or pagination. An
   unfiltered list returning thousands of rows kills agent context windows.
 
-Cap findings at 5–7 per review. Focus on the highest-severity issues for the
-detected command types.
+Focus on the detected command types. Report every in-scope finding up to
+the 40-item cap in Output Format — if you would exceed 40, rank and drop
+overflow there. Do not emit an uncapped set; truncated JSON is dropped
+entirely.
 
 ## Confidence Calibration
 
@@ -98,8 +100,11 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   command with no `--json` flag definition, a prompt call with no bypass
   flag, a list command with no default limit.
 - **Anchor 50** — the pattern is present but context beyond the diff might
-  resolve it. Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — suppress** — the issue depends on runtime behavior
+  resolve it. Suppressed by the orchestrator's sub-75 gate (this persona
+  does not emit P0, so no P0-at-50+ escape applies).
+- **Anchor 25 or below — report at that anchor; the orchestrator
+  suppresses it from every user-visible section, including
+  Pre-existing** — the issue depends on runtime behavior
   or configuration you have no evidence for.
 
 ## What you don't flag
@@ -118,8 +123,15 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 ## Output Format
 
 Return your findings as the standard yellow-review compact-return JSON schema
-shown below. Suppress findings with `confidence < 75` except P0 findings at
-`confidence ≥ 50`.
+shown below. Report every in-scope finding you identify, each with a
+confidence score and severity, up to 40. Do not filter by confidence — the
+orchestrator applies the 75 gate after aggregation, and a finding it later
+drops costs less than a real issue silently omitted here. Bound output at
+40 findings. Rank gate-surviving findings first (anchors 75/100) by
+severity (P1 first) then confidence descending; then remaining findings by
+confidence then severity. Drop the lowest-ranked overflow. Never emit
+partial JSON — the orchestrator's compact-return validation drops an
+entire malformed return.
 
 ```json
 {

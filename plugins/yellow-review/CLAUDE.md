@@ -15,6 +15,22 @@ resolution, and sequential stack review. Graphite-native workflow.
   but the prompt-level "report findings only" rule remains in force; the
   orchestrating command applies all fixes
 - Orchestrating commands apply fixes sequentially to avoid conflicts
+- **Confidence gating is orchestrator-only for the three recall personas.**
+  `agent-native-reviewer`, `agent-cli-readiness-reviewer`, and
+  `cli-readiness-reviewer` report every in-scope finding with a confidence
+  anchor and severity — no persona-side `< 75` filter. They cap at 40
+  findings; overflow is dropped silently and is not orchestrator-suppressed.
+  Other persona reviewers still apply their own anchor floors before
+  Step 6 (including Wave 3 reviewers such as `plugin-contract-reviewer`).
+  `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the
+  Aggregate-findings confidence gate) are the sole gates for those three
+  (suppress below 75 except P0 at 50+; count only findings the gate
+  actually removes as `suppressed` — surviving P0-at-50+ exceptions are
+  not suppressed). Pre-existing findings are gated before the Pre-existing
+  section. If a recall persona would exceed 40 findings, rank
+  gate-surviving items first (anchors 75/100) by severity then
+  confidence, then remaining findings, and drop the lowest-ranked
+  overflow — never emit partial JSON.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command

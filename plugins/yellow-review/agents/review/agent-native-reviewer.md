@@ -83,8 +83,10 @@ Cross-reference UI actions against agent tools. Build a capability map:
   filtering/sorting
 - **Low priority:** Settings/preferences UI, onboarding wizards, admin panels
 
-Only flag missing parity as Critical or Warning for must-have and
-should-have actions. Low-priority gaps are Observations at most.
+Only flag missing parity as P1 (must-have) or P2 (should-have) for the
+priority tiers above. Low-priority gaps are P3 observations at most. Do not
+use P0 — reserve P0 for critical breakage, exploitable vulnerabilities, or
+data loss per the shared severity contract.
 
 ### 3. Check Context Parity
 
@@ -174,15 +176,25 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 - **Anchor 75** — the gap is directly visible: a UI action exists with no
   corresponding tool, or a tool embeds clear business logic.
 - **Anchor 50** — the gap is likely but depends on context not fully visible.
-  Surfaces only as P0 escape or soft buckets.
-- **Anchor 25 or below — suppress** — the gap requires runtime observation
+  Suppressed by the orchestrator's sub-75 gate (this persona does not emit
+  P0, so no P0-at-50+ escape applies).
+- **Anchor 25 or below — report at that anchor; the orchestrator
+  suppresses it from every user-visible section, including
+  Pre-existing** — the gap requires runtime observation
   you cannot confirm from code.
 
 ## Output Format
 
 Return findings in the standard yellow-review compact-return JSON schema
-shown below. Suppress findings with `confidence < 75` except P0 findings at
-`confidence ≥ 50`.
+shown below. Report every in-scope finding you identify, each with a
+confidence score and severity, up to 40. Do not filter by confidence — the
+orchestrator applies the 75 gate after aggregation, and a finding it later
+drops costs less than a real issue silently omitted here. Bound output at
+40 findings. Rank gate-surviving findings first (anchors 75/100) by
+severity then confidence descending; then remaining findings by
+confidence then severity. Drop the lowest-ranked overflow. Never emit
+partial JSON — the orchestrator's compact-return validation drops an
+entire malformed return.
 
 ```json
 {

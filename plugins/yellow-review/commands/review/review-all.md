@@ -262,14 +262,17 @@ aggregation rules change there, propagate the same change here.
       finding matches across both pipelines regardless of OS path
       separator.
    4. **Cross-reviewer agreement promotion** (50→75, 75→100).
-   5. **Separate pre-existing** into a separate report section.
+   5. **Separate pre-existing** into a separate report section. Do not
+      render this set yet — sub-step 9's confidence gate still applies to it.
    6. **Resolve disagreements** (annotate Reviewer column, keep most
       conservative severity / autofix_class / owner).
    7. **Normalize routing** (most conservative `autofix_class` and
       `owner` wins).
    8. **Mode-aware demotion** of testing/maintainability advisory P2/P3
       into `testing_gaps` / `residual_risks`.
-   9. **Confidence gate** — suppress below 75 except P0 ≥ 50.
+   9. **Confidence gate** — suppress below 75 except P0 ≥ 50, including
+      the pre-existing set from step 5 (gated-out pre-existing findings
+      count as suppressed, not listed under Pre-existing).
    10. **Partition** into safe_auto / residual / advisory queues.
    11. **Sort** (severity → anchor desc → file path → line).
 

@@ -20,6 +20,15 @@ repository. Detects project structure and adapts analysis accordingly.
 - Never include sensitive content (API keys, credentials, database URLs) in
   generated markdown documentation
 - Respect `.gitignore` — never scan ignored paths
+- **Confidence gating is orchestrator-only for `/docs:review`.**
+  `coherence-reviewer` reports every finding with a confidence anchor — no
+  persona-side `< 75` filter. Step 6 of `/docs:review` is the sole gate
+  (suppress below 75 except `safe_auto` at 100 and P1 at 50+). Sub-75
+  coherence output is expected input; count only what Step 6 removes under
+  `suppressed`. The report's Suppressed Findings Summary lists 50–74
+  one-per-line and aggregates sub-50 per persona for findings the
+  orchestrator received (other personas may still suppress below 50 before
+  dispatch returns).
 
 ## Plugin Components
 
