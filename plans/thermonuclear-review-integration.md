@@ -348,6 +348,9 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 - [ ] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
       block, appended only when `thermonuclear-reviewer` is dispatched (B1).
+      Before emitting a row, reject paths with newlines, leading hyphens,
+      `..`, or other unsafe characters; relative paths must resolve inside
+      the repository.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** A **closer precedent than `<standards-paths>`** exists and should
@@ -433,8 +436,10 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       resolves to a real `SKILL.md`; the output example parses as JSON;
       `autofix_class: advisory` and `owner: human` are the documented defaults;
       no persona-side confidence cutoff appears; attribution + licence text are
-      present in the skill body; the CRITICAL SECURITY RULES block matches
-      `adversarial-reviewer`'s byte-for-byte.
+      present in the skill body; the security rails carry the same fencing
+      semantics as the security-fencing skill (untrusted-content delimiters;
+      reviewed content is reference-only) without requiring an ALL-CAPS
+      byte-for-byte copy of `adversarial-reviewer.md`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `tests/integration/` **is** a genuine blocking CI arm — the
@@ -481,8 +486,9 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
 - [ ] 2.6 Update the canonical target inventories that this PR makes stale:
       `docs/codex-distribution.md` (currently claims exactly three Codex-enabled
       plugins), `docs/cursor-distribution.md` (currently calls `yellow-cursor`
-      the sole Cursor-enabled plugin), the root `README.md`, and the
-      `AGENTS.md` target inventory.
+      the sole Cursor-enabled plugin), the root `README.md`, the
+      `AGENTS.md` target inventory, and `docs/security.md` (host-specific
+      posture: Claude tools-allowlist vs Cursor/Codex prompt-only rails).
 - [ ] 2.7 Second changeset (its own, per F12) — **minor** for `yellow-review`,
       since exposing the skill through Cursor and Codex is an additive
       user-visible capability, not a fix — matching the **minor** bump task
@@ -640,9 +646,11 @@ By recorded human sign-off:
   Claude the read-only guarantee is enforced by the tools allowlist; on Cursor
   and Codex only prose rails remain, since the generators keep only `name` and
   `description` and drop the tool restriction entirely.
-- The reviewer reads untrusted diff content. The verbatim CRITICAL SECURITY RULES
-  block is the model-level control; per this repo's own 2026 research it is
-  **necessary but not sufficient**.
+- The reviewer reads untrusted diff content. Brief imperative security
+  rails with the same fencing semantics as the security-fencing skill are
+  the model-level control; per this repo's own 2026 research they are
+  **necessary but not sufficient**. Do not copy `adversarial-reviewer`'s
+  ALL-CAPS block byte-for-byte.
 - The load-bearing control is orchestrator-side: `review-pr.md` Step 5 already
   performs literal-delimiter substitution before XML escaping, in that order. The
   new `<file-line-counts>` block must be sanitised the same way even though it is
@@ -712,14 +720,14 @@ blocks merges.
 ### 3. agent/feat/thermonuclear-line-counts
 - **Type:** feat
 - **Description:** Inject base/head line counts so the size-threshold rule is computable
-- **Scope:** plugins/yellow-review/commands/review/review-pr.md, .changeset/
-- **Tasks:** 1.4.1
+- **Scope:** plugins/yellow-review/commands/review/review-pr.md, plugins/yellow-review/commands/review/review-all.md, .changeset/
+- **Tasks:** 1.4.1, 1.4.1c
 - **Depends on:** #2
 
 ### 4. agent/feat/thermonuclear-cross-host
 - **Type:** feat
 - **Description:** Expose the thermonuclear skill to the Cursor and Codex targets
-- **Scope:** catalog/plugins/yellow-review.json, plugins/yellow-review/.cursor-plugin/, plugins/yellow-review/.codex-plugin/, plugins/yellow-review/cursor/skills/, plugins/yellow-review/codex/skills/, .cursor-plugin/marketplace.json, docs/codex-distribution.md, docs/cursor-distribution.md, README.md, AGENTS.md, .changeset/
+- **Scope:** catalog/plugins/yellow-review.json, plugins/yellow-review/.cursor-plugin/, plugins/yellow-review/.codex-plugin/, plugins/yellow-review/cursor/skills/, plugins/yellow-review/codex/skills/, .cursor-plugin/marketplace.json, docs/codex-distribution.md, docs/cursor-distribution.md, docs/security.md, README.md, AGENTS.md, .changeset/
 - **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
 - **Depends on:** #3
 
