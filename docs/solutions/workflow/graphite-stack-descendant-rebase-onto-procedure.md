@@ -44,39 +44,72 @@ approved.
 
 ## Solution
 
-For each descendant branch, in stack order (parent before child):
+Snapshot every current descendant tip **before** rewriting anyone. After a
+parent is rebased and force-submitted, neither the local parent ref nor
+`origin/<parent>` still names the child's old exclusion boundary.
 
 ```bash
-# 1. Rebase the descendant onto the new tip of its parent, replaying only
-#    the commits that are unique to the descendant (everything after the
-#    OLD parent tip).
-git rebase --onto <new-parent-sha-or-branch> <old-base-sha-or-branch> <descendant-branch>
+# 0. Capture old tips first (parent, child, grandchild, …).
+old_parent=$(git rev-parse <parent-branch>)
+old_child=$(git rev-parse <child-branch>)
+old_grandchild=$(git rev-parse <grandchild-branch>)
+```
 
-# 2. Re-link Graphite's own stack metadata to the (possibly new) parent —
-#    gt's tracked-parent pointer does not follow a raw git rebase
-#    automatically.
-gt track --parent
+Then, for each descendant, in stack order (parent before child), rebasing
+onto **that descendant's own immediate parent** — reusing the top-level
+`$old_parent` for every descendant replays the wrong patch once you're two
+levels down:
+
+```bash
+# 1. Rebase the descendant onto the new tip of its immediate parent,
+#    replaying only the commits unique to the descendant (everything
+#    after that parent's OWN captured old tip). <upstream> per
+#    `git rebase -h` is the SECOND positional after --onto, and it must be
+#    the descendant's own immediate-parent tip — for the child that's
+#    $old_parent, but for the grandchild it's $old_child, not $old_parent.
+#    Passing $old_parent for the grandchild replays the child's already-
+#    rebased patch a second time and corrupts the diff.
+git rebase --onto <new-immediate-parent-branch> "$old_immediate_parent" <descendant-branch>
+
+# 2. Re-link Graphite's own stack metadata to the new parent — gt's
+#    tracked-parent pointer does not follow a raw git rebase
+#    automatically. `gt track --parent` takes `-p, --parent <parent>` as a
+#    required string value (per `gt track --help`); calling it bare fails
+#    option parsing, so pass the new immediate-parent branch explicitly.
+gt track --parent <new-immediate-parent-branch>
 
 # 3. Before force-pushing, verify the local branch's commits are genuinely
 #    rebased versions of what's already on the remote, not divergent work.
-#    Syntax is `git cherry [<upstream> [<head>]]`: upstream first, then
-#    head. That lists commits reachable from local HEAD that are not
-#    ancestors of the remote, compared by patch-id. Equivalent-content
-#    commits with new SHAs from the rebase show as "-" (already
-#    upstream-equivalent); any truly new/divergent local commit shows as
-#    "+". Reversing the arguments (`git cherry HEAD origin/<branch>`)
-#    lists the remote relative to local and hides local-only commits.
-git cherry origin/<descendant-branch> HEAD
+#    Syntax per `git cherry -h` is `git cherry [<upstream> [<head>
+#    [<limit>]]]`. Pass the new immediate-parent tip as <limit> too —
+#    without it, an amended parent's rewritten commit is also walked and
+#    reported as "+" alongside genuinely new descendant work, since it's
+#    patch-different from the remote parent. With <limit> set, only
+#    commits unique to the descendant are classified: commits reachable
+#    from local HEAD that are not ancestors of the remote, compared by
+#    patch-id. Equivalent-content commits with new SHAs from the rebase
+#    show as "-" (already upstream-equivalent); any truly new/divergent
+#    local commit shows as "+". Reversing the first two arguments
+#    (`git cherry HEAD origin/<branch>`) lists the remote relative to
+#    local and hides local-only commits.
+git cherry origin/<descendant-branch> HEAD <new-immediate-parent-branch>
 
 # 4. Only after confirming the "+"/"-" output matches expectations
 #    (rebased versions of prior commits are the "-" set):
 gt submit --no-interactive --force
 ```
 
+Concretely, for a parent → child → grandchild stack: the child's rebase
+uses `"$old_parent"` as `<upstream>` and the parent branch as
+`<new-immediate-parent-branch>`/`<limit>`; the grandchild's rebase then
+uses `"$old_child"` (the child's pre-rebase tip captured in step 0) as
+`<upstream>` and the newly-rebased child branch as
+`<new-immediate-parent-branch>`/`<limit>` — never `"$old_parent"` again.
+
 Repeat for each descendant in dependency order — a grandchild branch must
 wait for its immediate parent to be re-rebased and re-tracked first, since
-`gt track --parent` needs the parent's ref to already reflect the new
-history.
+`gt track --parent <branch>` needs the parent's ref to already reflect the
+new history.
 
 ## Related gotchas hit in the same operation
 

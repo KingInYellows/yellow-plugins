@@ -300,7 +300,7 @@ rule id in parentheses is what the failure message cites.
   `references/` whose filenames match `[a-zA-Z0-9_][a-zA-Z0-9_-]*.md`
   (nested dirs, symlinks, or other names hard-error in `emit-codex.js`).
   Codex-enabled plugins: `gt-workflow`, `yellow-core`,
-  `yellow-ci`, `yellow-review` (`docs/codex-distribution.md`); Cursor-enabled
+  `yellow-review`, `yellow-ci` (`docs/codex-distribution.md`); Cursor-enabled
   plugins (`yellow-cursor`, `yellow-review`) mirror the same discipline
   (`docs/cursor-distribution.md`).
 - A thin-wrapper command whose `## Usage` says "Invoke the `Skill` tool with
