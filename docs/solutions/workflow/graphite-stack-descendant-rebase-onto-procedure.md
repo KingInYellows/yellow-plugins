@@ -44,13 +44,24 @@ approved.
 
 ## Solution
 
-For each descendant branch, in stack order (parent before child):
+Snapshot every current descendant tip **before** rewriting anyone. After a
+parent is rebased and force-submitted, neither the local parent ref nor
+`origin/<parent>` still names the child's old exclusion boundary.
+
+```bash
+# 0. Capture old tips first (parent, child, grandchild, …).
+old_parent=$(git rev-parse <parent-branch>)
+old_child=$(git rev-parse <child-branch>)
+old_grandchild=$(git rev-parse <grandchild-branch>)
+```
+
+Then, for each descendant, in stack order (parent before child):
 
 ```bash
 # 1. Rebase the descendant onto the new tip of its parent, replaying only
 #    the commits that are unique to the descendant (everything after the
-#    OLD parent tip).
-git rebase --onto <new-parent-sha-or-branch> <old-base-sha-or-branch> <descendant-branch>
+#    captured OLD parent tip — never the rewritten parent ref).
+git rebase --onto <new-parent-sha-or-branch> "$old_parent" <descendant-branch>
 
 # 2. Re-link Graphite's own stack metadata to the (possibly new) parent —
 #    gt's tracked-parent pointer does not follow a raw git rebase

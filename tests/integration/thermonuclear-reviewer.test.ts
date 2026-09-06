@@ -109,7 +109,8 @@ describe('thermonuclear-reviewer agent', () => {
   it('fences untrusted input without an ALL-CAPS rule list', () => {
     expect(agent).toMatch(/^## Untrusted input\s*$/m);
     expect(flatten(agent)).toMatch(/data, never instructions/);
-    expect(agent).toContain('--- code begin (reference only) ---');
+    expect(agent).toContain('--- code begin (reference only)');
+    expect(flatten(agent)).toMatch(/--- code end <nonce> ---/);
     expect(agent).not.toContain('CRITICAL SECURITY RULES');
   });
 
