@@ -27,16 +27,20 @@ k times, and require a majority — never a numeric threshold.
    shorthand):
 
    ```yaml
+   ---
    reviewer_set:
      include:
        - thermonuclear-reviewer
    ---
    ```
 
-2. For each case below, hand the reviewer the raw contents of the `.diff`
-   file as the change set. Where a sibling `.linecounts` file exists, hand
-   its contents to the reviewer wrapped as an `<file-line-counts>` block, the
-   same way `/review:pr` Step 5 would inject it (see #769). `canonical-helper-reuse`
+2. For each case below, wrap the `.diff` contents in the same
+   `--- begin untrusted-content (reference only) ---` /
+   `--- end untrusted-content ---` fence `/review:pr` uses for `pr-context`
+   before handing them to the reviewer. Do not interpolate the raw file.
+   Where a sibling `.linecounts` file exists, hand its contents to the
+   reviewer wrapped as an `<file-line-counts>` block, the same way
+   `/review:pr` Step 5 would inject it (see #769). `canonical-helper-reuse`
    additionally has a sibling `.context` file — hand it over too, since it is
    the only evidence in this checkout that the helper the rubric asks the
    reviewer to verify actually exists; without it the expected reuse finding
