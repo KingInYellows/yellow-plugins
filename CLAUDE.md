@@ -140,8 +140,9 @@ Authoring" lists them with their rule numbers). These are the ones that
 still rely on review:
 
 - Skill and agent `description:` must be single-line — folded scalars and
-  multi-line quoted strings are silently truncated by Claude Code's parser
-  (warning tier only, RULE 15d).
+  multi-line quoted strings are silently truncated by Claude Code's parser.
+  RULE 15d's advisory only runs on `SKILL.md`; agent and command
+  descriptions are the same convention with no validator warning.
 - Wrap untrusted input (PR comments, commit messages, API responses,
   document bodies) in `--- begin/end ---` delimiters with a
   "(reference only)" annotation; the `security-fencing` skill has the block.

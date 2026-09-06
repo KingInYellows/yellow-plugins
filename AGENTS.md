@@ -252,8 +252,10 @@ rule id in parentheses is what the failure message cites.
 - Skill frontmatter key is `user-invocable` (RULE 20 rejects `user-invokable`,
   which Claude Code ignores). Internal skills set it `false`; user-facing
   skills `true`.
-- Every `description:` is single-line — no `>`, `|`, or wrapped strings (RULE
-  15d, warning tier; Claude Code truncates them silently).
+- Every `description:` is single-line — no `>`, `|`, or wrapped strings
+  (Claude Code truncates them silently). RULE 15d's advisory only runs on
+  `SKILL.md`; agent and command descriptions follow the same convention
+  with no validator warning.
 - SKILL.md body headings are `## What It Does`, `## When to Use`, `## Usage`
   (RULE 15b); keep SKILL.md under 500 lines (RULE 15a), commands under 500
   and agents under 300 (RULE 21) — all warning tier.
