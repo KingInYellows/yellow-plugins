@@ -607,7 +607,7 @@ Mechanically verifiable:
 3. The output example parses as JSON; defaults are `advisory` + `human`; no persona-side confidence cutoff.
 4. Upstream commit SHA, both blob SHAs, retrieval date, and MIT notice text appear in the skill body.
 5. `RESEARCH/upstream-snapshots/6e3d2ea…/MANIFEST.md` exists with a runnable drift script.
-6. The reviewer appears in neither dispatch table; `/review:pr` without `reviewer_set.include` does not spawn it.
+6. The reviewer appears in neither the always-on nor the conditional dispatch table; it is registered only in the Opt-in table of `/review:pr` and `/review:all`. `/review:pr` without `reviewer_set.include` does not spawn it.
 7. Generated Cursor and Codex trees contain only `yellow-thermonuclear-review`.
 8. `CLAUDE.md` agent count reads 17 and matches `ls`.
 9. Full validation gate passes (below).
@@ -713,8 +713,8 @@ blocks merges.
 ### 2. agent/feat/thermonuclear-reviewer
 - **Type:** feat
 - **Description:** Add opt-in thermonuclear structural reviewer and its preloaded skill
-- **Scope:** plugins/yellow-review/skills/yellow-thermonuclear-review/, plugins/yellow-review/agents/review/thermonuclear-reviewer.md, plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md, plugins/yellow-core/skills/local-config/SKILL.md, tests/integration/thermonuclear-reviewer.test.ts, plugins/yellow-review/tests/fixtures/thermonuclear/, .changeset/
-- **Tasks:** 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.2.5, 1.2.6, 1.2.7, 1.3.1, 1.3.2, 1.3.3, 1.3.4, 1.3.5, 1.3.6, 1.3.7, 1.3.8, 1.3.9, 1.4.2, 1.4.3, 1.4.4, 1.5.1, 1.5.2, 1.5.3, 1.5.4, 1.6.1, 1.6.2
+- **Scope:** plugins/yellow-review/skills/yellow-thermonuclear-review/, plugins/yellow-review/agents/review/thermonuclear-reviewer.md, plugins/yellow-review/commands/review/review-pr.md, plugins/yellow-review/commands/review/review-all.md, plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md, plugins/yellow-core/skills/local-config/SKILL.md, tests/integration/thermonuclear-reviewer.test.ts, plugins/yellow-review/tests/fixtures/thermonuclear/, .changeset/
+- **Tasks:** 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.2.5, 1.2.6, 1.2.7, 1.3.1, 1.3.2, 1.3.3, 1.3.4, 1.3.5, 1.3.6, 1.3.7, 1.3.8, 1.3.9, 1.4.1b, 1.4.2, 1.4.3, 1.4.4, 1.5.1, 1.5.2, 1.5.3, 1.5.4, 1.6.1, 1.6.2
 - **Depends on:** #1
 
 ### 3. agent/feat/thermonuclear-line-counts
