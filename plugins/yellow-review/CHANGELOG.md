@@ -1,5 +1,61 @@
 # Changelog
 
+## 3.3.2
+
+### Patch Changes
+
+- [`c8f41b7`](https://github.com/KingInYellows/yellow-plugins/commit/c8f41b7afc3ea98653b321eb1416a70d0683a00b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Set
+  `experimental.cacheTtl: 1h` on the five always-run `/review:pr` agents
+  (`project-compliance-reviewer`, `correctness-reviewer`,
+  `maintainability-reviewer`, `project-standards-reviewer`, and the Step 8
+  `code-simplifier`) — the agents whose stable system prompt is re-sent on every
+  review. A second review within the hour reads those prompts from cache.
+  `learnings-researcher` (yellow-core) stays at the default: `/review:pr` and
+  the flow/docs callers dispatch it once, and a `1h` write bills about 2x base
+  input versus 1.25x for `5m`. `/review:all` dispatches it once per PR and can
+  pay back on a slow batch, but the common path is a single `/review:pr`. A
+  `subagentPromptCacheTtl` setting or env var overrides the frontmatter for all
+  subagents. Verified against Claude Code 2.1.259; ignored while a subscription
+  is drawing on usage credits.
+
+- [`1717627`](https://github.com/KingInYellows/yellow-plugins/commit/17176277de077334ac76d289491ca9d7fe0439b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop filtering
+  review findings at the persona stage. Four reviewer agents
+  (`agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+  `cli-readiness-reviewer`, `coherence-reviewer`) suppressed findings below
+  confidence 75 and two capped the count at 5–7, while `/review:pr` and
+  `/docs:review` already apply the same 75 gate after aggregation. Anthropic's
+  Sonnet 5 / Opus 5 prompting guides show the Claude 5 generation follows such
+  instructions literally, so the redundant persona-side gate lowered measured
+  recall. Personas now report findings with a confidence score and severity,
+  capped at 40 (lowest-ranked overflow dropped, not counted as
+  orchestrator-suppressed); the aggregators keep the single gate and count only
+  findings the gate actually removes as suppressed (`/review:pr` P0 at 50+ and
+  `/docs:review` P1 at 50+ survive and are excluded from that count).
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 3.3.1
 
 ### Patch Changes
