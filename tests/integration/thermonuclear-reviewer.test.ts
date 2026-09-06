@@ -8,8 +8,8 @@
  * file instead reads the two REAL committed files and asserts on their
  * content, because the properties under test are properties of those
  * specific files — the tool surface that keeps a reviewer read-only, the
- * byte-identity of a security block copied from a sibling, and the presence
- * of upstream attribution and licence text. A synthetic fixture cannot
+ * fencing semantics of the untrusted-input rails, and the presence of
+ * upstream attribution and licence text. A synthetic fixture cannot
  * assert any of that. Do not "correct" this toward the harness pattern.
  *
  * The model-quality side of this persona is evaluated by hand from
@@ -29,10 +29,6 @@ const AGENT_PATH = resolve(
   REPO_ROOT,
   'plugins/yellow-review/agents/review/thermonuclear-reviewer.md'
 );
-const SIBLING_AGENT_PATH = resolve(
-  REPO_ROOT,
-  'plugins/yellow-review/agents/review/adversarial-reviewer.md'
-);
 const SKILL_PATH = resolve(
   REPO_ROOT,
   'plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md'
@@ -48,7 +44,6 @@ const SKILL_BLOB_SHA = 'ac76a2bc88bb2d895e83ab1788aa584a82346cfc';
 const AGENT_BLOB_SHA = 'dc83d959306c41bb9a4b504608d9607be34e4297';
 
 const agent = readFileSync(AGENT_PATH, 'utf8');
-const sibling = readFileSync(SIBLING_AGENT_PATH, 'utf8');
 const skill = readFileSync(SKILL_PATH, 'utf8');
 
 /** Frontmatter block between the opening and closing `---` fences. */
@@ -58,28 +53,6 @@ function frontmatter(source: string): string {
     throw new Error('file has no YAML frontmatter block');
   }
   return match[1] ?? '';
-}
-
-/**
- * Text of one `## <heading>` section, from the heading line up to (but not
- * including) the next `## ` heading at column 0. Used for the byte-identity
- * comparison, so the slice must be taken the same way from both files.
- */
-function section(source: string, heading: string): string {
-  // Anchor to line start. A plain indexOf would also match inside a deeper
-  // heading (`### CRITICAL SECURITY RULES` contains `## CRITICAL SECURITY
-  // RULES` at offset 1) or an inline mention, slicing the wrong region — and
-  // a byte-identity comparison of two wrong regions can still pass, which is
-  // the failure mode this helper exists to rule out.
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const start = source.search(new RegExp(`^## ${escaped}\\s*$`, 'm'));
-  if (start === -1) {
-    throw new Error(`missing section: ## ${heading}`);
-  }
-  const rest = source.slice(start);
-  // Offset past this heading's own line before hunting the next one.
-  const nextRel = rest.slice(1).search(/^## /m);
-  return nextRel === -1 ? rest : rest.slice(0, nextRel + 1);
 }
 
 /**
@@ -133,10 +106,11 @@ describe('thermonuclear-reviewer agent', () => {
     expect(fm).not.toContain('selected automatically by review:pr');
   });
 
-  it('copies the CRITICAL SECURITY RULES block byte-for-byte', () => {
-    expect(section(agent, 'CRITICAL SECURITY RULES')).toBe(
-      section(sibling, 'CRITICAL SECURITY RULES')
-    );
+  it('fences untrusted input without an ALL-CAPS rule list', () => {
+    expect(agent).toMatch(/^## Untrusted input\s*$/m);
+    expect(flatten(agent)).toMatch(/data, never instructions/);
+    expect(agent).toContain('--- code begin (reference only) ---');
+    expect(agent).not.toContain('CRITICAL SECURITY RULES');
   });
 
   it('carries exactly one JSON example and it parses', () => {
