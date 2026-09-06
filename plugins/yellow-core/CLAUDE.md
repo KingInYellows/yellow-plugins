@@ -432,8 +432,9 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
   `hooks/scripts/stop.sh` and `hooks/scripts/session-start.sh`.
 - **PreCompact hook is the odd one out.** `hooks/scripts/pre-compact.sh`
   prints plain text, not `{"continue": true}`: Claude Code appends a
-  PreCompact hook's stdout to the compaction prompt on exit 0 (exit 2
-  blocks compaction). It carries the Claude 5-generation
+  PreCompact hook's stdout to the **main-session** compaction prompt on
+  exit 0 (exit 2 blocks compaction). Subagent compactons (`agentContext`
+  set) discard that stdout. It carries the Claude 5-generation
   compaction-preservation instruction (plan path + unchecked tasks,
   modified files, user decisions verbatim, open questions, last failing
   command, in-flight branch/PR names — every item secret-redacted then

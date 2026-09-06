@@ -111,8 +111,9 @@ Three hooks run automatically once the plugin is enabled:
   queue.
 - **Stop** — captures the session transcript tail into that queue.
 - **PreCompact** — appends a compaction-preservation instruction to the
-  compaction prompt so summaries keep the active plan, modified files, and
-  your decisions verbatim.
+  **main-session** compaction prompt so summaries keep the active plan,
+  modified files, and your decisions verbatim. Subagent compactons discard
+  hook stdout (`agentContext` is set) and are not covered.
 
 See `plugins/yellow-core/CLAUDE.md` for each hook's contract and time budget.
 
