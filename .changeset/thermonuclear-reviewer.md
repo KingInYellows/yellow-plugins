@@ -31,9 +31,11 @@ rather than estimating base counts from a diff.
 
 yellow-core changes are documentation only: `local-config` names the opt-in
 reviewer as the sole way to reach it, and the `security-fencing` consumer
-inventory is refreshed to the 16 `yellow-review/agents/review/` agents that
+inventory is refreshed to the 15 `yellow-review/agents/review/` agents that
 carry the `## CRITICAL SECURITY RULES` block (the inventory's grep-based
-definition; it claimed 12 and omitted four). Three of the sixteen
-(`agent-cli-readiness-reviewer`, `agent-native-reviewer`,
-`cli-readiness-reviewer`) state the untrusted-input rule in prose without the
-`--- begin ... (reference only) ---` delimiter template.
+definition; it claimed 12 and omitted three — `thermonuclear-reviewer` is
+deliberately not among them, carrying prose rails in its skill body instead
+of the heading). Three of the fifteen (`agent-cli-readiness-reviewer`,
+`agent-native-reviewer`, `cli-readiness-reviewer`) state the untrusted-input
+rule in prose without the `--- begin ... (reference only) ---` delimiter
+template.

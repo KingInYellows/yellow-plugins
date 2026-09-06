@@ -539,10 +539,11 @@ When a return fails compact-return validation (missing top-level field,
 malformed value, wrong type), drop the entire return. Record drop count in
 Coverage. Truncated JSON from an oversized findings list is a malformed
 return — persona prompts for `agent-native-reviewer`,
-`agent-cli-readiness-reviewer`, and `cli-readiness-reviewer` instruct
-those agents to emit at most 40 findings, ranking gate-surviving items
-first (anchors 75/100) by severity then confidence, then remaining
-findings, and dropping overflow rather than emitting partial JSON.
+`agent-cli-readiness-reviewer`, and `cli-readiness-reviewer`, plus the
+preloaded skill body for `thermonuclear-reviewer`, instruct those agents
+to emit at most 40 findings, ranking gate-surviving items first (anchors
+75/100) by severity then confidence, then remaining findings, and
+dropping overflow rather than emitting partial JSON.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
 continue to use the legacy prose finding format. This list is exhaustive
@@ -757,11 +758,12 @@ Apply the aggregation steps from
    the findings this gate actually removes — a P0 that survives the
    exception is never counted under `suppressed`, so the report's "Findings
    suppressed at confidence < 75" line stays accurate.
-   `agent-native-reviewer`, `agent-cli-readiness-reviewer` and
-   `cli-readiness-reviewer` do not pre-filter (they are told to report
-   everything with a confidence score) while the other personas keep their
-   own anchor floors, so sub-75 findings in the input are expected — gate
-   them here, do not treat them as a persona defect.
+   `agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+   `cli-readiness-reviewer` and `thermonuclear-reviewer` do not pre-filter
+   (they are told to report everything with a confidence score) while the
+   other personas keep their own anchor floors, so sub-75 findings in the
+   input are expected — gate them here, do not treat them as a persona
+   defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by

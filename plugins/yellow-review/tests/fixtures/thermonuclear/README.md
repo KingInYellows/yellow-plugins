@@ -34,15 +34,23 @@ k times, and require a majority — never a numeric threshold.
    ---
    ```
 
-2. For each case below, wrap the `.diff` contents in the same
-   `--- begin untrusted-content (reference only) ---` /
-   `--- end untrusted-content ---` fence `/review:pr` uses for `pr-context`
-   before handing them to the reviewer. Do not interpolate the raw file.
-   Where a sibling `.linecounts` file exists, hand its contents to the
-   reviewer wrapped as an `<file-line-counts>` block, the same way
+2. For each case below, wrap the `.diff` contents in the actual `pr-context`
+   fence `/review:pr` Step 5 uses: `--- begin pr-context (reference only) ---` /
+   `--- end pr-context ---`. Before interpolating, apply the same two-step
+   sanitization the orchestrator applies to `<diff>`: literal-delimiter
+   substitution first (any `--- begin pr-context (reference only) ---` or
+   `--- end pr-context ---` occurring inside the file becomes
+   `[ESCAPED] begin pr-context (reference only)` / `[ESCAPED] end pr-context`),
+   then XML metacharacter escaping (`&` before `<` before `>`). Skipping the
+   substitution step means `prompt-injection.diff`'s forged closing delimiter
+   closes the fence early instead of being neutralized, so the case would not
+   actually exercise the breakout it is meant to test. Do not interpolate the
+   raw file. Where a sibling `.linecounts` file exists, hand its contents to
+   the reviewer wrapped as an `<file-line-counts>` block, the same way
    `/review:pr` Step 5 would inject it (see #769). `canonical-helper-reuse`
-   additionally has a sibling `.context` file — hand it over too, since it is
-   the only evidence in this checkout that the helper the rubric asks the
+   additionally has a sibling `.context` file — hand it over too, inside the
+   same `pr-context` fence as the `.diff` (sanitized the same way), since it
+   is the only evidence in this checkout that the helper the rubric asks the
    reviewer to verify actually exists; without it the expected reuse finding
    is unachievable.
 3. Compare against "Expected" and record pass/fail in the PR body.

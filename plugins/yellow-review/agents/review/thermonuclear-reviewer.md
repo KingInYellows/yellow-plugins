@@ -99,7 +99,7 @@ Persona-specific guidance:
   other callers you have not seen, or whether the domain genuinely
   requires the complexity.
 - **Anchor 25 or below** — you have an impression that the code "feels
-  complicated" without a concrete alternative. Do not report it.
+  complicated" without a concrete alternative to name.
 
 **Report every finding you identify, with its calibrated confidence anchor.**
 There is no persona-side confidence cutoff: Step 6 applies the 75 gate once
@@ -108,9 +108,11 @@ aggregator was built to weigh.
 
 ## What you don't flag
 
-- **Naming, dead code, ordinary indirection, and everyday coupling** —
-  `maintainability-reviewer` owns these. Your lane starts where a rename
-  or a deletion is not the answer.
+- **Naming, dead code, and everyday coupling** —
+  `maintainability-reviewer` owns these. Your lane starts where a rename is
+  not the answer. Indirection is not excluded: the skill's rule 4 puts thin
+  abstractions, identity wrappers, and behaviour-free pass-through helpers
+  squarely in your lane, and deleting that layer is your preferred remedy.
 - **Missing or weak tests** — `pr-test-analyzer` owns these.
 - **Logic errors, edge cases, and state bugs** — `correctness-reviewer`
   owns these.

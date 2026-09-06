@@ -95,11 +95,17 @@ Two caveats worth knowing before enabling it:
 - It is unreachable under `review_pipeline: legacy`. The legacy escape
   hatch carries its own fixed persona list and never reads `reviewer_set`,
   so `include` has no effect there.
+- Its category is `maintainability`. If the repository already sets
+  `focus_areas` without `maintainability` in it, the mapping filters this
+  persona back out after `reviewer_set.include` adds it — add
+  `maintainability` to `focus_areas` too, or the opt-in snippet above has
+  no effect.
 
 ## Confidence gating
 
-Three conditional personas (`agent-native-reviewer`,
-`agent-cli-readiness-reviewer`, `cli-readiness-reviewer`) report every
+Four conditional personas (`agent-native-reviewer`,
+`agent-cli-readiness-reviewer`, `cli-readiness-reviewer`,
+`thermonuclear-reviewer`) report every
 in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
 and severity — they no longer pre-filter below 75. They do cap at 40
 findings: overflow is dropped at the persona and is not counted in the
@@ -111,7 +117,7 @@ persona reviewers still apply their own anchor floors (for example,
 `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings
 confidence gate) apply the **single** confidence gate: suppress findings
 below anchor 75 except P0 at 50+. Sub-75 input
-from the three recall personas is expected; the report's "Findings suppressed
+from the four recall personas is expected; the report's "Findings suppressed
 at confidence < 75" line counts only what the orchestrator removes.
 Pre-existing findings pass through the same gate (gated-out items count as
 suppressed, not listed under Pre-existing).
