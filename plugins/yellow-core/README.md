@@ -84,7 +84,7 @@ TypeScript, Python, Rust, and Go.
 | `agent-native-audit`        | Step-by-step audit checklist for evaluating an existing codebase against agent-native principles — capability mapping, noun test, anti-pattern catalog                                                                                                              |
 | `brainstorming`       | Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation                                    |
 | `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
-| `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
+| `create-agent-skills` | Guidance for creating skills and agents: Claude 5 body style, security-fencing for untrusted input, reviewer/scanner confidence-scored findings vs task-specific output for other archetypes, W1.5b `disallowedTools` on memory-backed read-only agents |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
 | `ideation`            | Generate 3 grounded approaches via the Toulmin warrant contract and MIDAS filtering, then route the winner into `brainstorm-orchestrator` via the Agent tool      |

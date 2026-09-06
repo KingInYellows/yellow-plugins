@@ -111,7 +111,77 @@ disagrees with the file tree.
       here (a reference file and a `CLAUDE.md`) is what elevated it above
       the "P2, don't bother" bar.
 
+## Update — 2026-09-05
+
+### Same cascade, but from trimming a root doc rather than splitting a skill
+
+PR #746 (trim root `CLAUDE.md` to a "gotchas" format; rewrite `AGENTS.md`
+authoring rules as bare facts) reproduced this pattern's failure mode
+without touching a skill file at all — cutting an always-loaded doc down
+for concision dropped the qualifying context that made several of its
+claims true, and multi-agent review caught 8 resulting defects across
+`CLAUDE.md`, `AGENTS.md`, and one `SKILL.md` in a single pass:
+
+1. **Overclaimed validator coverage (P1).** The trim compressed "RULE 15d
+   applies to SKILL.md `description:` fields, warning-tier only" down to
+   an unqualified "RULE 15d governs agent descriptions" — but
+   `scripts/validate-agent-authoring.js`'s RULE 15d check lives only
+   inside `validateSkillFiles` (confirmed: `grep -n "RULE 15d"
+   scripts/validate-agent-authoring.js` returns hits only in that
+   function, invoked only for `SKILL.md`). The trimmed sentence now
+   claims CI coverage for agent/command descriptions that does not exist
+   — the single most dangerous class of drift from this pattern, because
+   an agent trusting the doc has no way to know the enforcement claim is
+   false without reading the validator source itself.
+2. **Internal self-contradiction from clause compression (P2).** "Branch
+   counts are floors, not ceilings" and "do not spawn agents a skill does
+   not specify" were merged into one sentence, but the merge makes them
+   read as mutually exclusive rather than as two independent rules
+   (floors → never fewer; the second rule → never *extra*, unspecified
+   agents). Trimming for word count merged clauses that needed to stay
+   separately scoped.
+3. **A step whose target was itself trimmed into non-existence (P2).**
+   "Run the focused validator for your change" pointed at a discoverable
+   list of focused validators that the same trim removed, and a
+   "hand-edit `.claude-plugin/marketplace.json`" instruction survived the
+   trim after a separate change made that file fully generated from
+   `catalog/` — the trimmed doc now instructs the reader to violate the
+   generation pipeline it documents elsewhere in the same file.
+4. **Dropped non-derivable gotchas (P2).** The Codex two-way version
+   check and the WSL2 CRLF solution-doc pointer are exactly the kind of
+   fact this doc's own Prevention section (below) says can't be
+   recovered by reading the code — they were cut anyway because the trim
+   pass optimized for line count, not for which sentences were load-bearing
+   vs. restatable.
+5. **A hardcoded path that only resolves inside this repo, shipped in a
+   template meant for consumer projects** (`plugins/yellow-core/skills/
+   create-agent-skills/SKILL.md:201`) — the same class of defect as this
+   doc's original finding #1 (a caveat that doesn't travel with the
+   context it depends on), but here the failure is a repository-relative
+   path baked into template prose instead of a caveat left off a sibling
+   file.
+
+## Prevention (addendum)
+
+- [ ] Before trimming an always-loaded doc (`CLAUDE.md`, `AGENTS.md`) for
+      concision, classify every sentence being cut or compressed as
+      derivable-from-code (safe to cut) vs. non-derivable gotcha (must
+      survive, even if reworded) — see the original Prevention checklist
+      below for the split-file version of this same triage.
+- [ ] Any claim of the form "rule X is enforced by validator Y" must be
+      checked against the validator's actual call graph
+      (`grep -n '<rule tag>' <validator file>`) before or immediately
+      after a trim — trims compress qualifying scope words ("only for
+      SKILL.md", "warning-tier only") first, because they're the words
+      that look most cuttable.
+- [ ] When two independent rules get merged into one sentence during a
+      trim, re-read the merged sentence in isolation and ask whether it
+      still permits both rules' original edge cases — clause compression
+      is a distinct failure mode from clause deletion and needs its own
+      check.
+
 ## Related Documentation
 
 - `docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md` — adjacent but distinct: sweeps missing *sibling copies across plugins*, not a single-plugin split leaving satellites stale
 - `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — anti-pattern #30 (same PR #667): a JSON-example authoring defect found and fixed in the same review pass
+- `docs/solutions/code-quality/api-migration-stale-documentation-cascade.md` — sibling pattern: a primary-pattern change leaves secondary docs stale, generalized in its own 2026-09-05 update to any near-duplicate prose sweep; this doc's 2026-09-05 update covers the inverse trigger (cutting for concision, not migrating a pattern)
