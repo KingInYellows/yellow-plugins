@@ -203,7 +203,11 @@ describe('yellow-thermonuclear-review skill', () => {
       /Report only\. Never mutate the repository\./
     );
     expect(flatten(skill)).toMatch(/never instruction/i);
-    expect(skill).toContain('--- code begin (reference only) ---');
+    expect(skill).toContain('--- code begin (reference only) <nonce> ---');
+    expect(flatten(skill)).toMatch(
+      /closer does not appear in the captured text/
+    );
+    expect(flatten(skill)).toMatch(/un-nonce'd `--- code end ---` closer/);
   });
 
   it('states the fail-closed size rule without host-specific machinery', () => {
@@ -275,10 +279,7 @@ describe('opt-in wiring', () => {
 
   it('injects file line counts only into this persona', () => {
     const command = readFileSync(
-      resolve(
-        REPO_ROOT,
-        'plugins/yellow-review/commands/review/review-pr.md'
-      ),
+      resolve(REPO_ROOT, 'plugins/yellow-review/commands/review/review-pr.md'),
       'utf8'
     );
     const flat = flatten(command);
@@ -300,9 +301,13 @@ describe('opt-in wiring', () => {
     expect(command).toContain('git diff -z --numstat --find-renames');
     // The header is the completeness signal the orchestrator keys on, and an
     // unresolved merge-base must stop the block rather than read the index.
-    expect(command).toContain("printf 'file-line-counts rows=%s dropped=%s\\n'");
-    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
-    expect(command).toContain('IFS= read -r -d \'\' base_path || exit 1');
+    expect(command).toContain(
+      "printf 'file-line-counts rows=%s dropped=%s\\n'"
+    );
+    expect(command).toContain(
+      'MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1'
+    );
+    expect(command).toContain("IFS= read -r -d '' base_path || exit 1");
     expect(command).not.toContain('base_path || break');
     // ...and is exactly why a control character has to be dropped: `-z`
     // yields the path RAW, so a PR author who names a file with an embedded

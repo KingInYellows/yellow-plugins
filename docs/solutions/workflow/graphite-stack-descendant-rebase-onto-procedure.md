@@ -58,11 +58,15 @@ git rebase --onto <new-parent-sha-or-branch> <old-base-sha-or-branch> <descendan
 gt track --parent
 
 # 3. Before force-pushing, verify the local branch's commits are genuinely
-#    rebased versions of what's already on the remote, not divergent work —
-#    git cherry compares patch-ids, so equivalent-content commits with new
-#    SHAs from the rebase show as "-" (already upstream-equivalent) and any
-#    truly new/divergent commit shows as "+".
-git cherry HEAD origin/<descendant-branch>
+#    rebased versions of what's already on the remote, not divergent work.
+#    Syntax is `git cherry [<upstream> [<head>]]`: upstream first, then
+#    head. That lists commits reachable from local HEAD that are not
+#    ancestors of the remote, compared by patch-id. Equivalent-content
+#    commits with new SHAs from the rebase show as "-" (already
+#    upstream-equivalent); any truly new/divergent local commit shows as
+#    "+". Reversing the arguments (`git cherry HEAD origin/<branch>`)
+#    lists the remote relative to local and hides local-only commits.
+git cherry origin/<descendant-branch> HEAD
 
 # 4. Only after confirming the "+"/"-" output matches expectations
 #    (rebased versions of prior commits are the "-" set):

@@ -88,6 +88,27 @@ Then run `/review:pr` as usual. All default personas still run; this adds a
 high-pressure structural lane on top of them. Remove the entry to turn it
 off again.
 
+### Cursor and Codex
+
+Those hosts do not ship `/review:pr`, the persona, or the
+`reviewer_set.include` opt-in. Each generated target exposes **only** the
+`yellow-thermonuclear-review` skill, and it is explicit-invocation-only:
+ask for a thermonuclear review (or one of the skill description's other
+trigger phrases) after installing the plugin. It will not load on an
+ordinary review.
+
+- **Cursor** — install the generated `yellow-review` plugin (see
+  [cursor-distribution.md](../../docs/cursor-distribution.md)) and invoke
+  `yellow-thermonuclear-review` directly.
+- **Codex** — install from the generated `.agents/plugins/` marketplace
+  (see [codex-distribution.md](../../docs/codex-distribution.md)), confirm
+  it with `codex plugin list`, then invoke the same skill.
+
+Neither host enforces the Claude agent's read-only tool allowlist. The
+skill's report-only rails are prompt-level, not runtime-enforced. Live
+host smoke tests are tracked in
+[#774](https://github.com/KingInYellows/yellow-plugins/issues/774).
+
 Two caveats worth knowing before enabling it:
 
 - Its findings are advisory and owned by a human. No automatic-fix lane

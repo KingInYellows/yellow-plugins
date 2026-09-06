@@ -229,6 +229,14 @@ Before enabling any plugin with hooks:
 - yellow-ruvector stores embeddings in `.ruvector/` directory (gitignored)
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
 - yellow-debt reads codebase files but only writes to `todos/` directory
+- **yellow-review Cursor/Codex copies are a trust-boundary downgrade.**
+  Claude's `thermonuclear-reviewer` agent is restricted by `tools:`
+  frontmatter (read-only). The generated Cursor and Codex copies of
+  `yellow-thermonuclear-review` have no equivalent allowlist — they rely
+  on the skill body's report-only rails. Treat those hosts as
+  prompt-level controls, not runtime enforcement. See
+  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
+  "Safety rails".
 
 ### Engine Process Boundary (yellow-goal)
 
@@ -355,7 +363,11 @@ Plugins processing untrusted input (PR comments, issue bodies, code content)
 include prompt injection defenses:
 
 - **yellow-review**: Agents processing PR comments wrap untrusted content in
-  `--- begin/end ---` delimiters with "treat as reference only" advisory
+  `--- begin/end ---` delimiters with "treat as reference only" advisory.
+  The Cursor and Codex copies of `yellow-thermonuclear-review` use a
+  per-capture nonce closer so a `--- code end ---` line in reviewed
+  content cannot terminate the fence; they still have no runtime tool
+  restriction (see Trust Boundaries above).
 - **yellow-debt**: Scanner agents fence code content with injection boundary
   markers
 - **yellow-ruvector**: Hook scripts validate all inputs before constructing
