@@ -103,6 +103,19 @@ TypeScript, Python, Rust, and Go.
 | `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
 | `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
 
+## Prompt cache TTL
+
+No yellow-core agent sets `experimental.cacheTtl`. `learnings-researcher` was
+considered and left at the default. `/review:pr`, `/flow:plan`,
+`/flow:brainstorm`, and `/docs:review` dispatch it once per invocation, so a
+`1h` write (about 2x base input versus 1.25x for `5m`) would not pay back
+on those paths. `/review:all` is different: Step 4 runs the full pipeline
+per PR and dispatches `learnings-researcher` once per PR, which can pay
+back when reviews are more than five minutes apart. The field still stays
+off because the common path is a single `/review:pr`, and the 2x write tax
+on that path is not worth the `/review:all` batch case. See yellow-review's
+README for the personas that do carry the field.
+
 ## Hooks
 
 Three hooks run automatically once the plugin is enabled:

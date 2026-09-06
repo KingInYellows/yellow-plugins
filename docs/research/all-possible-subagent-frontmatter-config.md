@@ -3,7 +3,7 @@
 **Date:** 2026-05-04
 **Sources:** Official Anthropic docs (code.claude.com, docs.anthropic.com), Claude Code TypeScript SDK reference, official changelog, GitHub issues on anthropics/claude-code, real-world plugin repos
 
-**Addendum (2026-09-02):** The alias-to-model-ID rows in the `model` section were re-verified on 2026-09-02 against the Claude Code sub-agents reference and the 2.1.259 CLI, and carry their own `as of 2026-09` dates. Every other section still reflects the 2026-05-04 snapshot and has not been re-verified since.
+**Addendum (2026-09-02):** The alias-to-model-ID rows in the `model` section were re-verified on 2026-09-02 against the Claude Code sub-agents reference and the 2.1.259 CLI, and carry their own `as of 2026-09` dates. The `experimental.cacheTtl` field was added from that same 2.1.259 check. Every other section still reflects the 2026-05-04 snapshot and has not been re-verified since.
 
 ## Summary
 
@@ -365,6 +365,23 @@ Use cases: safe parallel code changes, prototype work that may be discarded, pre
 
 ---
 
+### `experimental.cacheTtl`
+
+| Attribute | Value |
+|-----------|-------|
+| Type | Nested map: `experimental:` → `cacheTtl:` (`5m` or `1h`) |
+| Default | Provider default |
+| Added | Documented in the sub-agents reference; verified on Claude Code 2.1.259 |
+
+**Semantics:** Chooses the prompt-cache lifetime for the subagent's own requests. Must be written as a nested map (`experimental:` then `cacheTtl: 1h`), never as a top-level `cacheTtl:` key. Claude Code ignores any other value, ignores `1h` while a subscription is drawing on usage credits, and reads the field only from subagent files. Worth setting on personas that are re-dispatched many times per session with a stable system prompt; pointless on one-shot agents.
+
+```yaml
+experimental:
+  cacheTtl: 1h
+```
+
+---
+
 ## Fields Documented Only in the TypeScript SDK (`AgentDefinition`)
 
 These fields appear in the official TypeScript SDK `AgentDefinition` type and/or the `--agents` JSON flag documentation. They are supported in programmatic/SDK agent definitions and via the `--agents` CLI flag. Their behavior in file-based YAML frontmatter is either confirmed or likely — the `--agents` flag docs explicitly state it "accepts JSON with the same frontmatter fields."
@@ -678,6 +695,7 @@ Return a summary of critical and high-severity findings only.
 | `isolation` | No | `worktree` (only valid value) | none | Official |
 | `color` | No | `red`/`blue`/`green`/`yellow`/`purple`/`orange`/`pink`/`cyan` | none | Official |
 | `initialPrompt` | No | `string` | none | Official |
+| `experimental.cacheTtl` | No | nested `5m`/`1h` | provider default | Official (experimental) |
 | `criticalSystemReminder_EXPERIMENTAL` | No | `string` | none | Official (experimental) |
 | `priority` | No | integer | — | Observed, unofficial |
 | `version`, `author`, `license` | No | string | — | Ignored (plugin manifest fields) |
@@ -694,6 +712,7 @@ Return a summary of critical and high-severity findings only.
 | v2.0.x  | Late 2025 | `effort`, `maxTurns`, `disallowedTools` frontmatter support added for plugin-shipped agents |
 | v2.1.49 | Early 2026 | `isolation: worktree` added |
 | v2.1.90+ | April 2026 | `@mention` typeahead for agents; `mcpServers` in frontmatter honored when using `claude --agent <name>` (v2.1.117+); `permissionMode` honored for built-in agents via `--agent <name>` (v2.1.119+) |
+| — (doc re-check) | 2026-09-02 | `experimental.cacheTtl` (`5m`/`1h` nested under `experimental:`) verified against the sub-agents reference and Claude Code 2.1.259 |
 
 **Fields with no deprecation history found** as of May 4, 2026 in official sources. The EXA report mentions `deny-tools` (deprecated v2.1.110), `auto-invoke` (deprecated v2.1.112, replaced by `proactive`), and `extends` (removed v2.1.115) — these could not be confirmed against the official changelog and should be treated as unverified. The official docs do not mention any deprecated frontmatter fields.
 

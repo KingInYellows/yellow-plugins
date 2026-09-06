@@ -341,6 +341,17 @@ yellow-core and yellow-research agents that benefit from it (e.g.,
 `best-practices-researcher`, `code-researcher`) detect availability via
 ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 
+### Prompt cache TTL
+
+No yellow-core agent sets `experimental.cacheTtl`. `learnings-researcher` is
+one-shot on `/review:pr`, `/flow:plan`, `/flow:brainstorm`, and
+`/docs:review`, so a `1h` cache write (about 2x base input versus 1.25x for
+the default `5m`) would not pay back there. `/review:all` dispatches it
+once per PR in the batch, which can pay back when those reviews are more
+than five minutes apart; the field still stays off because the common path
+is a single `/review:pr`. The 1h field stays on the yellow-review personas
+that are re-dispatched across reviews.
+
 ### MCP Tool Integration
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at

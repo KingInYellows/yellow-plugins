@@ -1,7 +1,7 @@
 ---
 title: 'Subagent Frontmatter Field Catalog'
 date: 2026-05-04
-date_verified: 2026-09-02
+date_verified: 2026-09-05
 category: code-quality
 track: knowledge
 problem: Claude Code subagent .md frontmatter fields — required, optional, version history, scope precedence
@@ -60,6 +60,7 @@ every field below. See [Version Changelog](#version-changelog).
 | `hooks` | event → handler mapping | none | v2.0.42 |
 | `initialPrompt` | string | none | SDK-level |
 | `color` | `red`/`blue`/`green`/`yellow`/`purple`/`orange`/`pink`/`cyan` | none | undocumented until GH #19292 |
+| `experimental.cacheTtl` | `5m` or `1h` (nested under `experimental:`) | provider default | documented in the sub-agents reference; verified on 2.1.259 |
 
 ### `effort` tier-selection rule (high vs xhigh vs max)
 
@@ -137,6 +138,35 @@ frontmatter shape and `subagent_type` references; nothing cross-checks a
 prose-mandated tool name against the `tools:` allowlist. Check manually:
 after wording a Step as "must call X" or "X exclusively," grep the same
 file's frontmatter `tools:` list for the exact tool name as written there.
+
+### `experimental.cacheTtl`
+
+Chooses the prompt-cache lifetime for the subagent's own requests: `5m` or
+`1h`, written as a nested map (`experimental:` → `cacheTtl: 1h`), never at
+the top level. Claude Code ignores any other value, ignores `1h` while a
+subscription is drawing on usage credits, and reads the field only from
+subagent files. Worth setting on personas that are re-dispatched many times
+per session with a stable system prompt (the `/review:pr` always-on
+reviewers and `code-simplifier` carry it since 2026-09-02;
+`learnings-researcher` stays at the default); pointless on
+one-shot agents. The validator parses the nested map without complaint
+(covered by a fixture in `validate-agent-authoring-model-effort-rules.test.ts`).
+
+**Precedence — a session-level setting silently beats the frontmatter field.**
+Verified against the installed Claude Code 2.1.261 binary's agent frontmatter
+schema, which describes `experimental.cacheTtl` as: 'Prompt cache TTL for this
+agent's requests ("5m" or "1h") when no `subagentPromptCacheTtl` setting or
+env var is set. "1h" is ignored...' (during the usage-credits condition
+above). In other words the frontmatter field is a *fallback*, not an
+override: if the operator (or their environment) has a
+`subagentPromptCacheTtl` setting or env var configured, that value wins and
+the per-agent `experimental.cacheTtl` is never consulted. The loader passes
+the resolved value through internally as `agentCacheTtlOverride`. Reviewing
+or authoring `experimental.cacheTtl:` without checking for a
+`subagentPromptCacheTtl` override elsewhere in the operator's config will
+misdiagnose "caching isn't working" — the frontmatter is correct, but a
+higher-precedence setting is silently shadowing it, and nothing in the field
+table above or the sub-agents reference states this until now.
 
 ### `isolation: worktree`
 
@@ -251,6 +281,7 @@ The `plugin-directory-name` is the directory name (e.g., `yellow-research`), NOT
 - **`disallowedTools` composability:** Prefer `disallowedTools` to restrict a single tool rather than enumerating an entire `tools` allowlist when the goal is "everything except Write/Edit."
 - **`isolation: worktree` cleanup:** Worktrees with no changes are cleaned up automatically. Worktrees with changes are left for review — callers must account for this in their orchestration.
 - **Scope precedence affects plugin QA:** A project-level `.claude/agents/same-name.md` silently overrides a plugin agent with the same name. Always use qualified `subagent_type` in plugin command files.
+- **`experimental.cacheTtl` is a fallback, not an override:** a `subagentPromptCacheTtl` setting or env var at the operator/session level always wins over the per-agent frontmatter value. Docs that explain the "1h ignored under usage credits" caveat but omit this precedence rule leave operators with no explanation when a correctly-set `experimental.cacheTtl: 1h` produces no visible caching effect.
 
 ---
 
@@ -332,6 +363,7 @@ tools: Read, Bash, Glob
 | v2.1.90+ | 2026-04 | `@mention` typeahead for agents added |
 | v2.1.117+ | 2026-04 | `mcpServers` frontmatter honored in `claude --agent <name>` main-thread mode |
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
-| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added |
+| — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added; `experimental.cacheTtl` (`5m`/`1h` nested under `experimental:`) documented from the 2.1.259 check |
+| — (doc re-check) | 2026-09-05 | `experimental.cacheTtl` precedence rule added: a `subagentPromptCacheTtl` setting or env var overrides the frontmatter field entirely (frontmatter is the fallback, not a peer or override). Verified against the installed 2.1.261 binary's agent frontmatter schema text; found during PR #748 review after six doc surfaces stated the usage-credits caveat but omitted this precedence rule. |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.
