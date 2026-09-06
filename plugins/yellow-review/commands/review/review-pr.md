@@ -628,10 +628,11 @@ Each agent receives:
        printf '[review:pr] Warning: more than 500 measurable files; omitting file-line-counts\n' >&2
        exit 1
      fi
-     printf '%s base=%s head=%s\n' "$new_path" "$base" "$head" >>"$LC_ROWS"
+     printf '%s base=%s head=%s\n' "$new_path" "$base" "$head" >>"$LC_ROWS" || exit 1
    done <"$LC_NUMSTAT"
    # The header line is the completeness signal. It is printed only after the
-   # whole loop succeeded, so its absence means the block must be omitted.
+   # whole loop succeeded (row-write failures `exit 1` before this), so its
+   # absence means the block must be omitted.
    printf 'file-line-counts rows=%s dropped=%s\n' "$rows" "$dropped"
    cat "$LC_ROWS"
    ```
