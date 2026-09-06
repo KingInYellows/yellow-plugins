@@ -215,6 +215,13 @@ aggregation rules change there, propagate the same change here.
    `focus_areas`, `reviewer_set.{include,exclude}` overrides. Never abort
    on a missing persona — log to stderr and continue.
 
+   Opt-in only (never auto-selected). Dispatched only when named in
+   `reviewer_set.include`:
+
+   | Agent | subagent_type | Reviewer category |
+   |-------|---------------|-------------------|
+   | `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
+
 7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
    selected agents in parallel except `code-simplifier`. Wave 2 persona
    agents return the structured JSON compact-return schema — including

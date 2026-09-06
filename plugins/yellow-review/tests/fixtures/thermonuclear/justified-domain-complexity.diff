@@ -1,0 +1,31 @@
+diff --git a/src/tax/vat.ts b/src/tax/vat.ts
+--- a/src/tax/vat.ts
++++ b/src/tax/vat.ts
+@@ -40,3 +40,27 @@ export function vatRate(sale: Sale): Rate {
+   }
++  // EU distance-selling: below the EUR 10,000 pan-EU threshold the seller
++  // charges its own country's rate; above it, the buyer's country rate.
++  // The threshold is measured across all member states combined, not per
++  // country, and resets on 1 January. (Council Directive 2006/112/EC,
++  // art. 59c, as amended by (EU) 2017/2455.)
++  if (isEu(sale.sellerCountry) && isEu(sale.buyerCountry)) {
++    if (sale.sellerYtdCrossBorder < EU_DISTANCE_SELLING_THRESHOLD) {
++      return rateFor(sale.sellerCountry, sale.category);
++    }
++    return rateFor(sale.buyerCountry, sale.category);
++  }
++  // Northern Ireland stays in the EU VAT area for goods under the Windsor
++  // Framework (Protocol on Ireland/Northern Ireland, as amended), so goods
++  // sales apply the same distance-selling threshold with IE standing in for
++  // the EU side; services follow UK rules instead.
++  if (sale.buyerCountry === 'XI') {
++    if (sale.category !== 'goods') {
++      return rateFor('GB', sale.category);
++    }
++    if (isEu(sale.sellerCountry) && sale.sellerYtdCrossBorder < EU_DISTANCE_SELLING_THRESHOLD) {
++      return rateFor(sale.sellerCountry, sale.category);
++    }
++    return rateFor('IE', sale.category);
++  }
+   return rateFor(sale.buyerCountry, sale.category);
+ }

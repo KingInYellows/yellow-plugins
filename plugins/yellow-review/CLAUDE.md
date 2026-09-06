@@ -15,22 +15,22 @@ resolution, and sequential stack review. Graphite-native workflow.
   but the prompt-level "report findings only" rule remains in force; the
   orchestrating command applies all fixes
 - Orchestrating commands apply fixes sequentially to avoid conflicts
-- **Confidence gating is orchestrator-only for the three recall personas.**
-  `agent-native-reviewer`, `agent-cli-readiness-reviewer`, and
-  `cli-readiness-reviewer` report every in-scope finding with a confidence
-  anchor and severity — no persona-side `< 75` filter. They cap at 40
-  findings; overflow is dropped silently and is not orchestrator-suppressed.
-  Other persona reviewers still apply their own anchor floors before
-  Step 6 (including Wave 3 reviewers such as `plugin-contract-reviewer`).
-  `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the
-  Aggregate-findings confidence gate) are the sole gates for those three
-  (suppress below 75 except P0 at 50+; count only findings the gate
-  actually removes as `suppressed` — surviving P0-at-50+ exceptions are
-  not suppressed). Pre-existing findings are gated before the Pre-existing
-  section. If a recall persona would exceed 40 findings, rank
-  gate-surviving items first (anchors 75/100) by severity then
-  confidence, then remaining findings, and drop the lowest-ranked
-  overflow — never emit partial JSON.
+- **Confidence gating is orchestrator-only for the four recall personas.**
+  `agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+  `cli-readiness-reviewer`, and `thermonuclear-reviewer` report every
+  in-scope finding with a confidence anchor and severity — no persona-side
+  `< 75` filter. They cap at 40 findings; overflow is dropped silently and
+  is not orchestrator-suppressed. Other persona reviewers still apply their
+  own anchor floors before Step 6 (including Wave 3 reviewers such as
+  `plugin-contract-reviewer`). `/review:pr` Step 6 and `/review:all`
+  Step 8 item 9 (the Aggregate-findings confidence gate) are the sole
+  gates for those four (suppress below 75 except P0 at 50+; count only
+  findings the gate actually removes as `suppressed` — surviving
+  P0-at-50+ exceptions are not suppressed). Pre-existing findings are
+  gated before the Pre-existing section. If a recall persona would
+  exceed 40 findings, rank gate-surviving items first (anchors 75/100)
+  by severity then confidence, then remaining findings, and drop the
+  lowest-ranked overflow — never emit partial JSON.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command
@@ -75,7 +75,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary, and a single `/flow:compound` pass at the end
 
-### Agents (16)
+### Agents (17)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -116,6 +116,16 @@ resolution, and sequential stack review. Graphite-native workflow.
   parity: every UI action has an agent tool equivalent, agents see the
   same data users see, shared workspace, primitives over workflows,
   dynamic context injection. Adapted from upstream CE v3.3.2. New in Wave 3.
+- `thermonuclear-reviewer` — **Opt-in only, never auto-selected.** Strict
+  structural-quality lane: code-judo restructurings, spaghetti-condition
+  growth, weak type/module boundaries, misplaced ownership, evidence-gated
+  file-size threshold crossings. Enable by naming it in
+  `reviewer_set.include` in `yellow-plugins.local.md`; it appears in neither
+  dispatch table. Runs opus/xhigh, so it is not free. Preloads the
+  `yellow-thermonuclear-review` skill, adapted from Cursor's MIT-licensed
+  `thermo-nuclear-code-quality-review`. Unreachable under
+  `review_pipeline: legacy`, which has its own fixed persona list and never
+  reads `reviewer_set`.
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final
@@ -128,13 +138,17 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `pr-comment-resolver` — Implements fix for a single review comment (spawned in
   parallel)
 
-### Skills (2)
+### Skills (3)
 
 - `pr-review-workflow` — Internal reference for adaptive selection, output
   format, error handling, and Graphite integration (not user-invocable)
 - `stack-traversal` — Internal reference for the bottom-up Graphite
   stack-traversal procedure shared by `/review:all` and
   `/review:resolve-stack` (not user-invocable)
+- `yellow-thermonuclear-review` — Portable structural-quality rubric
+  preloaded by `thermonuclear-reviewer`; carries its own report-only safety
+  rails and inline MIT attribution so the rules survive on hosts with no
+  tool restriction (not user-invocable)
 
 ### Scripts (2)
 

@@ -1,0 +1,24 @@
+diff --git a/src/users/service.ts b/src/users/service.ts
+--- a/src/users/service.ts
++++ b/src/users/service.ts
+@@ -1,6 +1,18 @@
+ import { repo } from './repo';
+ 
++class UserFetcher {
++  constructor(private readonly source = repo) {}
++  fetch(id: string) {
++    return this.source.findById(id);
++  }
++}
++
++class UserAccessor {
++  private fetcher = new UserFetcher();
++  get(id: string) {
++    return this.fetcher.fetch(id);
++  }
++}
++
+ export function getUser(id: string) {
+-  return repo.findById(id);
++  return new UserAccessor().get(id);
+ }
