@@ -72,7 +72,9 @@ yellow-core integration before reviewing real PRs.
 Three conditional personas (`agent-native-reviewer`,
 `agent-cli-readiness-reviewer`, `cli-readiness-reviewer`) report every
 in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
-and severity — they no longer pre-filter below 75 or cap the count. Other
+and severity — they no longer pre-filter below 75. They do cap at 40
+findings: overflow is dropped at the persona and is not counted in the
+orchestrator's suppressed total. Other
 persona reviewers still apply their own anchor floors (for example,
 `correctness-reviewer` suppresses anchor-25 items and
 `plugin-contract-reviewer` suppresses anchor-25 items before Step 6).

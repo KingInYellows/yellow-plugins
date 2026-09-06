@@ -10,5 +10,9 @@ confidence 75 and two capped the count at 5–7, while `/review:pr` and
 `/docs:review` already apply the same 75 gate after aggregation. Anthropic's
 Sonnet 5 / Opus 5 prompting guides show the Claude 5 generation follows such
 instructions literally, so the redundant persona-side gate lowered measured
-recall. Personas now report every finding with a confidence score and severity;
-the aggregators keep the single gate and count sub-75 findings as suppressed.
+recall. Personas now report findings with a confidence score and severity,
+capped at 40 (lowest-ranked overflow dropped, not counted as
+orchestrator-suppressed); the aggregators keep the single gate and count
+only findings the gate actually removes as suppressed (`/review:pr` P0 at
+50+ and `/docs:review` P1 at 50+ survive and are excluded from that
+count).

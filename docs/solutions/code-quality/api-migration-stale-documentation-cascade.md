@@ -254,7 +254,7 @@ rg -n --include='*.md' 'surfaces only as P0 escape' plugins/yellow-review/agents
 
 # Find all cross-references to a specific step number that may be stale
 # after a step is renumbered or nested
-rg -n --include='*.md' '/review:all Step 9\b' plugins/yellow-review/
+rg -n --include='*.md' '/review:all`?[[:space:]]+Step 9\b' plugins/yellow-review/
 ```
 
 The Prevention section's "documentation consistency checklist" should add a

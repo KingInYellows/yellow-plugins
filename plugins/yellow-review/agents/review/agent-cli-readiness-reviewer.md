@@ -220,7 +220,8 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
   literally has no `--json` definition and prints free-form text.
 - **Anchor 75** — the issue is directly visible in the diff.
 - **Anchor 50** — the pattern is present but context beyond the diff might
-  resolve it. Suppressed by the orchestrator's sub-75 gate (except P0 at 50+).
+  resolve it. Suppressed by the orchestrator's sub-75 gate (this persona
+  does not emit P0, so no P0-at-50+ escape applies).
 - **Anchor 25 or below — report at that anchor; the orchestrator
   suppresses it from every user-visible section, including
   Pre-existing** — the issue depends on runtime behavior
@@ -239,14 +240,15 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 ## Output Format
 
 Return findings in the standard yellow-review compact-return JSON schema
-shown below. Report every finding you identify, each with a confidence score and
-severity. Do not filter by confidence — the orchestrator applies the 75 gate
-after aggregation, and a finding it later drops costs less than a real issue
-silently omitted here. Bound output at 40 findings. Rank gate-surviving
-findings first (anchors 75/100, and P0 at 50+) by severity (P0 first)
-then confidence descending; then remaining findings by confidence then
-severity. Drop the lowest-ranked overflow. Never emit partial JSON — the
-orchestrator's compact-return validation drops an entire malformed return.
+shown below. Report every in-scope finding you identify, each with a
+confidence score and severity, up to 40. Do not filter by confidence — the
+orchestrator applies the 75 gate after aggregation, and a finding it later
+drops costs less than a real issue silently omitted here. Bound output at
+40 findings. Rank gate-surviving findings first (anchors 75/100) by
+severity (P1 first) then confidence descending; then remaining findings by
+confidence then severity. Drop the lowest-ranked overflow. Never emit
+partial JSON — the orchestrator's compact-return validation drops an
+entire malformed return.
 
 ```json
 {

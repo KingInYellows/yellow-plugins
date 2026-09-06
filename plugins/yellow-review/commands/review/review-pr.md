@@ -525,8 +525,8 @@ Coverage. Truncated JSON from an oversized findings list is a malformed
 return — persona prompts for `agent-native-reviewer`,
 `agent-cli-readiness-reviewer`, and `cli-readiness-reviewer` instruct
 those agents to emit at most 40 findings, ranking gate-surviving items
-first (anchors 75/100, and P0 at 50+) by severity then confidence, then
-remaining findings, and dropping overflow rather than emitting partial JSON.
+first (anchors 75/100) by severity then confidence, then remaining
+findings, and dropping overflow rather than emitting partial JSON.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
 continue to use the legacy prose finding format. This list is exhaustive

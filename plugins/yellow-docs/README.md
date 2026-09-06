@@ -64,7 +64,8 @@ Then enable `yellow-docs` from the plugin list.
 - **Doc refresh**: Detects stale docs by comparing git history, generates
   per-file update diffs for review
 - **Document review (`/docs:review`)**: `coherence-reviewer` reports every
-  finding with a confidence score and no longer pre-filters below 75; the
+  finding with a confidence score, no longer pre-filters below 75, and
+  caps at 40 findings (overflow dropped, not listed as suppressed); the
   other personas still suppress below anchor 50 in their own prompts. Step 6
   applies the sole gate (suppress `< 75` except `safe_auto` and P1 at 50+).
   Sub-75 coherence output is expected orchestrator input; the Suppressed

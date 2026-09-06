@@ -132,7 +132,7 @@ PR #743 (removing persona-side confidence filtering and finding caps from four
 review-persona agents so the orchestrator's single 75-point gate is the only
 filter) replaced a countable finding cap with a self-assessment predicate:
 
-```
+```text
 plugins/yellow-review/agents/review/agent-native-reviewer.md:192
 "stop before the JSON would truncate / exceed your compact-return output budget"
 ```

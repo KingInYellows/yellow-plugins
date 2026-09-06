@@ -186,14 +186,15 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 ## Output Format
 
 Return findings in the standard yellow-review compact-return JSON schema
-shown below. Report every finding you identify, each with a confidence score and
-severity. Do not filter by confidence — the orchestrator applies the 75 gate
-after aggregation, and a finding it later drops costs less than a real issue
-silently omitted here. Bound output at 40 findings. Rank gate-surviving
-findings first (anchors 75/100, and P0 at 50+) by severity (P0 first)
-then confidence descending; then remaining findings by confidence then
-severity. Drop the lowest-ranked overflow. Never emit partial JSON — the
-orchestrator's compact-return validation drops an entire malformed return.
+shown below. Report every in-scope finding you identify, each with a
+confidence score and severity, up to 40. Do not filter by confidence — the
+orchestrator applies the 75 gate after aggregation, and a finding it later
+drops costs less than a real issue silently omitted here. Bound output at
+40 findings. Rank gate-surviving findings first (anchors 75/100) by
+severity then confidence descending; then remaining findings by
+confidence then severity. Drop the lowest-ranked overflow. Never emit
+partial JSON — the orchestrator's compact-return validation drops an
+entire malformed return.
 
 ```json
 {
