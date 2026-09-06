@@ -546,11 +546,12 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
       1.5.4 already uses for PR 1. (PR #770 first shipped it as **patch**;
       re-bump before merge.)
 - [ ] 2.8 Record all three smoke tests in the PR body (see Testing Strategy).
-      **Blocked, 2026-09-05:** the Cursor and Codex legs need those hosts
-      installed against an isolated project / a temporary `CODEX_HOME`,
-      neither of which exists in this environment. Recorded as an open
-      checklist in PR #770's body. Run all three by hand and paste the
-      results there before taking that PR out of draft.
+      **Deferred, 2026-09-06 → issue #774.** Not run. The Cursor and Codex
+      legs need those hosts installed against an isolated project / a
+      temporary `CODEX_HOME`, neither of which exists in this environment.
+      Non-blocking by the Testing Strategy table above ("No — release gate
+      by review"), so #770 merges with this box open rather than ticked;
+      it stays unchecked because the tests were never run.
 
 ## Technical Details
 
@@ -609,7 +610,7 @@ Three tiers, deliberately separated so nothing masquerades as a gate it isn't.
 | Tier | Mechanism | Blocks merge? |
 |---|---|---|
 | Static contract | vitest under `tests/integration/` + `pnpm validate:agents` | **Yes** |
-| Model quality | 9 fixtures, run by hand, recorded in the PR body | No — recorded evidence |
+| Model quality | 10 fixtures, run by hand, recorded in the PR body | No — recorded evidence |
 | Cross-host | 3 smoke tests, recorded in PR 2's body | No — release gate by review |
 
 **Do not** wire the fixture matrix into bats. Per F7 it is advisory-only, so an
@@ -618,7 +619,7 @@ LLM-output assertion there would appear green while never blocking a regression.
 <!-- deepen-plan: external -->
 > **Research:** The three-tier split is well supported, and the real risk is
 > **false assurance rather than flakiness**. Miller (Anthropic), "Adding Error
-> Bars to Evals" (arXiv:2411.00640) implies a nine-fixture suite is
+> Bars to Evals" (arXiv:2411.00640) implies a ten-fixture suite is
 > statistically incapable of detecting small regressions: it recommends ~**1,000
 > questions** for good power, and warns that **clustered standard errors can
 > exceed naive ones by >3×** when items share structure — which fixtures drawn
@@ -682,6 +683,9 @@ By recorded human sign-off:
     tabulated, recorded in the reviewer PR body with date and reviewer.
     Size-threshold fixtures (986→1,034, already-large, generated) are
     recorded on the line-count PR after 1.4.1e.
+    **Deferred, 2026-09-06 → issue #774.** Not run. Non-blocking by the
+    Testing Strategy table above ("No — recorded evidence"); the merge gate
+    is the static contract tier, which is green.
 11. All 3 host smoke tests pass, recorded in PR 2's body.
 12. The rubric is adapted and attributed, not anonymously copied.
 
