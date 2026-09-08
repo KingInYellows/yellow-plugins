@@ -29,7 +29,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration (validator tests live here)
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex + cursor + flow-namespace
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + flow-namespace + provider-neutral-commands + council-roster + doc-counts
 pnpm validate:agents          # agent-authoring rules only (fast; run after any plugin markdown edit)
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace

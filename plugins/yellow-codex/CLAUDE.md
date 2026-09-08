@@ -77,7 +77,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   `/council` via Agent tool. Returns the structured 6-key contract
   (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
   `findings_block_begin`...`findings_block_end`) shared with yellow-council's
-  Gemini and OpenCode reviewers
+  Claude, Gemini, and OpenCode reviewers
 - `codex-executor` — Rescue/debug agent spawned by `flow:work` on task failure
 - `codex-analyst` — Codebase research and analysis agent
 

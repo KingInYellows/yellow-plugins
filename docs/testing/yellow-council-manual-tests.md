@@ -3,7 +3,7 @@
 **Status:** Manual test checklist — no automated CI for these (no fresh-machine
 plugin install job exists in `.github/workflows/`).
 **Required environment:** working `agy` (Antigravity CLI), `opencode` CLIs (auth configured);
-optional `yellow-codex` plugin installed for full 3-reviewer coverage.
+optional `yellow-codex` plugin installed for full 4-reviewer coverage.
 **Run before:** declaring yellow-council PRs mergeable.
 
 ## Phase 1: Fresh-Machine Install Test (BLOCKING)
@@ -59,7 +59,7 @@ verbatim outputs in your test log.
 ```
 
 **Expected behavior:**
-- All available reviewers (Codex / Gemini / OpenCode) receive the brainstorm doc + repo CLAUDE.md
+- All available reviewers (Claude / Codex / Gemini / OpenCode) receive the brainstorm doc + repo CLAUDE.md
 - Synthesis Headline reflects verdict counts
 - File written to `docs/council/<YYYY-MM-DD>-plan-2026-05-03-godmodeskill-integration-brainstorm.md` (or with `-2`/`-3` suffix on collision)
 - Inline output: synthesis only (no raw outputs pasted)

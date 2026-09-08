@@ -1,0 +1,76 @@
+{
+  "$comment": "Canonical /council reviewer roster. Build-time artifact only — nothing reads this at runtime, and council.md must not be changed to do so (a missing or corrupt roster would abort a review mid-fan-out to buy nothing). Consumed by scripts/validate-council-roster.js. Deliberately stores no count field: a stored count would itself be a drift site. Totals are derived.",
+  "reviewers": [
+    {
+      "name": "claude",
+      "display": "Claude",
+      "kind": "in-process",
+      "agent": "yellow-council:review:claude-reviewer",
+      "agent_path": "plugins/yellow-council/agents/review/claude-reviewer.md",
+      "ships_redaction_awk": false
+    },
+    {
+      "name": "codex",
+      "display": "Codex",
+      "kind": "cli",
+      "agent": "yellow-codex:review:codex-reviewer",
+      "agent_path": "plugins/yellow-codex/agents/review/codex-reviewer.md",
+      "ships_redaction_awk": false
+    },
+    {
+      "name": "gemini",
+      "display": "Gemini",
+      "kind": "cli",
+      "agent": "yellow-council:review:gemini-reviewer",
+      "agent_path": "plugins/yellow-council/agents/review/gemini-reviewer.md",
+      "ships_redaction_awk": true
+    },
+    {
+      "name": "opencode",
+      "display": "OpenCode",
+      "kind": "cli",
+      "agent": "yellow-council:review:opencode-reviewer",
+      "agent_path": "plugins/yellow-council/agents/review/opencode-reviewer.md",
+      "ships_redaction_awk": true
+    }
+  ],
+  "redaction_extra_sources": ["plugins/yellow-council/skills/council-patterns/SKILL.md"],
+  "redaction_known_untested": [
+    {
+      "file": "plugins/yellow-council/commands/council/council.md",
+      "reason": "Carries two copies of the canonical program: the Step 4 claude-leg redaction behind `local redact_awk='` and the Step 7 report-build pass behind `section_body=$(awk '`. Both are indented, so extract-redaction-awk.bash's bare `^awk '$` opener never matches, and its case statement returns one body per file so it cannot represent two. Wiring this file needs an extractor that returns multiple bodies — tracked as a follow-up, not silently ignored."
+    }
+  ],
+  "prose_sites": {
+    "README.md": "1efa59b3",
+    "catalog/plugins/yellow-council.json": "1efa59b3",
+    "docs/CONCEPTS.md": "1efa59b3",
+    "docs/review-surface-routing-protocol.md": "1efa59b3",
+    "docs/security.md": "1efa59b3",
+    "docs/testing/yellow-council-manual-tests.md": "1efa59b3",
+    "plugins/yellow-codex/CLAUDE.md": "1efa59b3",
+    "plugins/yellow-codex/agents/review/codex-reviewer.md": "1efa59b3",
+    "plugins/yellow-codex/commands/codex/rescue.md": "1efa59b3",
+    "plugins/yellow-codex/commands/codex/review.md": "1efa59b3",
+    "plugins/yellow-core/commands/setup/all.md": "1efa59b3",
+    "plugins/yellow-council/CLAUDE.md": "1efa59b3",
+    "plugins/yellow-council/README.md": "1efa59b3",
+    "plugins/yellow-council/agents/review/claude-reviewer.md": "1efa59b3",
+    "plugins/yellow-council/agents/review/gemini-reviewer.md": "1efa59b3",
+    "plugins/yellow-council/agents/review/opencode-reviewer.md": "1efa59b3",
+    "plugins/yellow-council/commands/council/council.md": "1efa59b3",
+    "plugins/yellow-council/commands/council/setup.md": "1efa59b3",
+    "plugins/yellow-council/package.json": "1efa59b3",
+    "plugins/yellow-council/skills/council-patterns/SKILL.md": "1efa59b3",
+    "plugins/yellow-council/skills/council-patterns/references/cross-references.md": "1efa59b3",
+    "plugins/yellow-council/tests/lib/extract-redaction-awk.bash": "1efa59b3",
+    "scripts/validate-agent-authoring.js": "1efa59b3"
+  },
+  "exceptions": [
+    {
+      "file": "plugins/yellow-council/CLAUDE.md",
+      "contains": "3-reviewer V1",
+      "reason": "Historical comparison to the pre-claude-reviewer V1 council. Deliberately frozen at 3; not a claim about the current roster."
+    }
+  ]
+}
