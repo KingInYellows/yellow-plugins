@@ -20,7 +20,7 @@ Graphite-native workflow commands for stacked PR development.
 `dependencies: ["yellow-core"]` was added to `catalog/plugins/gt-workflow.json`
 once the neutral `stacked-pr` operation surface (`/stack:*` commands,
 `lib/stack-operation-registry.js`) became load-bearing for this plugin —
-per `plans/stacked-pr-provider-abstraction.md`'s "Documented adjustments"
+per `plans/complete/stacked-pr-provider-abstraction.md`'s "Documented adjustments"
 section, this was deliberately deferred until that surface existed and was
 validated, unlike `github-workflow`, which declared the dependency from
 day one because it is new. Claude Code auto-enables a declared dependency
@@ -111,8 +111,8 @@ invoked directly, no command layer) execute.
   `plugins/yellow-core/lib/stack-operation-registry.js`
 
 Three additional skills exist with no command wrapper (Claude Code reaches
-them only via cross-references from the seven skills above, or the `Skill`
-tool directly; Codex reaches all ten identically since it has no command
+them only via cross-references from the eight skills above, or the `Skill`
+tool directly; Codex reaches all eleven identically since it has no command
 layer):
 
 - `audit-review` — the `quick-code-review`/`quick-security-scan`/
@@ -268,14 +268,14 @@ skill surface: all eleven skills are allowlisted —
 `gt-setup`, `gt-nav`, `gt-stack-plan`, `gt-sync`, `smart-submit`, `gt-amend`,
 `gt-cleanup`, `gt-merge`, `audit-review`, `stack-decomposition-format`,
 `stack-plan-style` — since gt-workflow's commands are thin wrappers with no
-Claude-only logic of their own (contrast yellow-core, which excludes 17 of
-its 20 skills along with all 21 agents and both hooks). `includeHooks` is
+Claude-only logic of their own (contrast yellow-core, which excludes 19 of
+its 22 skills along with all 21 agents and both hooks). `includeHooks` is
 left at its default (`true`, not `false` like yellow-core) — see "Hooks"
 above for why they're carried but currently inert.
 
 Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `.codex-plugin/plugin.json`, `hooks/codex-hooks.json`,
-`codex/skills/<name>/SKILL.md` (ten directories, frontmatter normalized to
+`codex/skills/<name>/SKILL.md` (eleven directories, frontmatter normalized to
 `name` + single-line `description` only), and
 `codex/skills/<name>/references/*.md` (flat reference sidecars copied
 verbatim alongside an allowlisted SKILL.md — currently gt-cleanup's three).
@@ -290,7 +290,7 @@ directory" Read stub and quoted content that exists only in
 
 A live `codex plugin add` install/inspect/uninstall round-trip (codex-cli
 0.144.6, isolated `CODEX_HOME`) confirmed: the plugin installs cleanly from
-a local marketplace; all ten `codex/skills/*/SKILL.md` files, the
+a local marketplace; all eleven `codex/skills/*/SKILL.md` files, the
 `.codex-plugin/plugin.json` manifest, and `.mcp.json` are byte-identical to
 the committed generated artifacts at the installed path;
 `hooks/codex-hooks.json` correctly references `entrypoint-codex.js`; and

@@ -122,7 +122,13 @@ building on it — see
 Claude Code auto-enables declared dependencies at the same scope, and
 `claude plugin enable` fails if the dependency is not installed. That is
 what guarantees `/stack:select` and `/stack:status` exist whenever this
-provider is enabled. `gt-workflow` deliberately does **not** carry this
-dependency yet — adding it would break existing standalone installs; see
-the "Documented adjustments" section of
-`plans/stacked-pr-provider-abstraction.md`.
+provider is enabled. `gt-workflow` now carries the same dependency (see its
+`CLAUDE.md`, "Dependency on yellow-core"); the history of the earlier
+deferral is in the "Documented adjustments" section of
+`plans/complete/stacked-pr-provider-abstraction.md`.
+
+## Testing
+
+`bats tests/` from the plugin directory — `hooks.bats` (hook behavior) and
+`skill-content.bats` (skill text pins), with fake `gh` / `git` executables in
+`tests/fixtures/bin/`. Both manifest hooks run under a 1-second `timeout`.

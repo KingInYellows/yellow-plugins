@@ -102,10 +102,29 @@ Routing rules:
 This plugin does not perform git operations. Graphite commands and git workflows
 do not apply.
 
+## Install Architecture
+
+- `lib/install-morphmcp.sh` is the shared primitive library sourced by the MCP
+  wrapper (`bin/start-morph.sh`), the SessionStart prewarm hook
+  (`hooks/scripts/prewarm-morph.sh`), and `/morph:setup`.
+- Install lock: `${CLAUDE_PLUGIN_DATA}/.install.lock` (atomic `mkdir`,
+  stale-PID recovery). The wrapper waits 20s, then fails and tells the user to
+  `rmdir` it — the most likely cause of "morph MCP won't start". The lock is
+  released explicitly before `exec` because bash EXIT traps do not survive exec.
+- SessionStart contract: manifest `timeout: 5`; every code path must print
+  `{"continue": true}` or session startup blocks. `hooks/hooks.json` is a
+  reference-only mirror of the inline `plugin.json` hook — keep them in sync.
+- `plugin.json` MCP env sets `DISABLED_TOOLS=github_codebase_search` and
+  `WORKSPACE_MODE=true`; `npm ci` runs under `env -i` so postinstall scripts
+  inherit no secrets.
+- No automated tests exist for the wrapper/lock logic.
+
 ## Prerequisites
 
 - ripgrep (`rg`) installed — required by WarpGrep for local search
-- Node.js 22.22.0 or later — required for MCP server via npx
+- Node.js 22.22.0 or later — the wrapper runs `npm ci` into
+  `${CLAUDE_PLUGIN_DATA}` and then `exec node …/@morphllm/morphmcp/dist/index.js`
+  (no npx)
 - Morph API key — answer the `userConfig` prompt at plugin-enable time
   (obtain a key from https://morphllm.com). A shell `MORPH_API_KEY` export
   remains supported as a fallback for power users.
