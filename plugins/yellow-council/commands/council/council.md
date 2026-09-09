@@ -369,9 +369,8 @@ parse_reviewer_return() {
   # mechanically re-run the same 11-pattern block here for the claude leg —
   # a bypassed prose rule must not carry credential material into synthesis.
   # Canonical program: council-patterns SKILL.md "11-Pattern Credential
-  # Redaction" — byte-identical to it after dedent. Not yet covered by
-  # tests/redaction.bats (this file is absent from REDACTION_SOURCES
-  # until the multi-body extractor follow-up lands).
+  # Redaction" — byte-identical to it after dedent; tests/redaction.bats
+  # fails the whole suite if any copy drifts.
   # Defined unconditionally (not just under the claude branch below): the
   # non-enum verdict warning further down also reuses this helper, and that
   # warning fires for ANY reviewer, not only claude.
@@ -1306,9 +1305,8 @@ for reviewer in claude codex gemini opencode; do
       # invariant would silently lose a member and unredacted key material
       # could land in docs/council/<report>.md — a file committed to the repo.
       # Canonical program: council-patterns SKILL.md "11-Pattern Credential
-      # Redaction" — byte-identical to it after dedent. Not yet covered by
-      # tests/redaction.bats (this file is absent from REDACTION_SOURCES
-      # until the multi-body extractor follow-up lands).
+      # Redaction" — byte-identical to it after dedent; tests/redaction.bats
+      # fails the whole suite if any copy drifts.
       section_body=$(awk '
       function strip_deco(s,   prev, guard, limit) {
         # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in

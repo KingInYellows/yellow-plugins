@@ -56,6 +56,12 @@ and never auto-commits. The user decides what to do with the verdicts.
   before appending it to the report. The invariant is that no reviewer's
   content reaches `docs/council/<report>.md` unredacted — the enforcement
   point, not the guarantee, is what varies.
+  council.md runs the program at two independent sites, Step 4 (`local
+  redact_awk=`, applied to summary/findings, the persisted fenced file, and
+  rejected verdict values) and Step 7 (`section_body=$(awk '`), not one. Every
+  copy in this plugin (SKILL.md, gemini-reviewer.md, opencode-reviewer.md, and
+  both council.md bodies) is byte-identical to SKILL.md after dedent, and
+  `tests/redaction.bats` fails the whole file if any copy drifts.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
   `--- end council-output:<reviewer> ---` fences.

@@ -343,6 +343,9 @@ TEXT_FILE=$(mktemp /tmp/council-opencode-text-XXXXXX.txt)
 printf '%s' "$ASSISTANT_TEXT" > "$TEXT_FILE"
 
 REDACTED_FILE=$(mktemp /tmp/council-opencode-redacted-XXXXXX.txt)
+# Canonical program: council-patterns SKILL.md "11-Pattern Credential
+# Redaction" — byte-identical to it after dedent; tests/redaction.bats
+# fails the whole suite if any copy drifts.
 awk '
 function strip_deco(s,   prev, guard, limit) {
   # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in

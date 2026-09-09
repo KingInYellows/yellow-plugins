@@ -231,8 +231,6 @@ const LEDGER_EXCLUDED_DIRS = [
  * Individual files the ledger never registers, by exact repo-relative path or
  * by rule. Split from the directory list because these are scattered.
  */
-const CANONICAL_AWK_MARKERS = ['function cred_hit(', 'function strip_deco('];
-
 const LEDGER_EXCLUDED_FILES = new Set([
   'AUDIT_REPORT.md', // dated 2026-05-07 audit record
   'scripts/council-roster.json', // the roster itself
@@ -605,6 +603,132 @@ function stripBashLineComment(line) {
   return line;
 }
 
+/**
+ * Matches a bash array literal declared at the START of a line. The anchor is
+ * load-bearing: an unanchored match lets a commented-out `# NAME=(...)`
+ * example above the live array win the first-match race and repoint every
+ * consumer. Returns the entry count plus, for exactly one declaration, the
+ * text between the parens — so callers can word "absent" and "declared twice"
+ * differently.
+ */
+function matchArrayLiteral(body, name) {
+  const matches = Array.from(
+    body.matchAll(new RegExp(`^${name}=\\(([\\s\\S]*?)\\)`, 'gm'))
+  );
+  return {
+    count: matches.length,
+    inner: matches.length === 1 ? matches[0][1] : null,
+  };
+}
+
+/**
+ * The canonical anchor markers used to detect a carrier by content are no
+ * longer hardcoded here — they are authored once, in the same lib that owns
+ * REDACTION_SOURCES, and parsed the same way. A hardcoded copy would drift
+ * silently the moment the awk program's function names changed.
+ *
+ * Takes the lib body checkRedactionSources already read, and the file cache,
+ * rather than re-reading from disk: a second read can observe a different
+ * file, and the caller has already reported an unreadable lib.
+ *
+ * Returns null (after pushing a clear error) when the array is absent,
+ * declared more than once, holds anything but exactly two entries, or names a
+ * marker that no longer appears in CANONICAL_SOURCE. Callers MUST treat null
+ * as "carrier detection is unavailable", never as "zero carriers" — the
+ * latter would silently green-light Rule R's carrier-dependent checks.
+ */
+function readAnchorMarkers(body, fileCache, errors) {
+  const arr = matchArrayLiteral(body, 'REDACTION_ANCHOR_MARKERS');
+  if (arr.count === 0) {
+    errors.push(
+      'extract-redaction-awk.bash: REDACTION_ANCHOR_MARKERS array not found ' +
+        'or has fewer than 2 entries'
+    );
+    return null;
+  }
+  if (arr.count > 1) {
+    errors.push(
+      `extract-redaction-awk.bash: REDACTION_ANCHOR_MARKERS is declared ${arr.count} ` +
+        'times — keep exactly one live declaration, or a first-match race ' +
+        'decides which one drives carrier detection'
+    );
+    return null;
+  }
+  const markers = Array.from(arr.inner.matchAll(/"([^"]+)"/g)).map((m) => m[1]);
+  // extract-redaction-bodies.awk consumes exactly two markers: one that must
+  // appear inside a walked body, one that anchors the walk. A third would be
+  // parsed here and silently ignored there.
+  if (markers.length !== 2) {
+    errors.push(
+      `extract-redaction-awk.bash: REDACTION_ANCHOR_MARKERS has ${markers.length} ` +
+        'entries, expected exactly 2 (the body walker takes exactly two — one ' +
+        'inside the body, one to anchor the walk)'
+    );
+    return null;
+  }
+  // Two IDENTICAL entries pass the arity check and then reduce carrier
+  // detection to a single-marker test: `markers.every(m => text.includes(m))`
+  // asks the same question twice, so any file quoting that one string reads as
+  // a carrier. The walker is worse off still — it would receive the same string
+  // as both ANCHOR and INNER, and every anchor line would satisfy its own
+  // interior requirement.
+  if (new Set(markers).size !== markers.length) {
+    errors.push(
+      'extract-redaction-awk.bash: REDACTION_ANCHOR_MARKERS entries #1 and #2 are ' +
+        'identical — the two entries must be different strings (one that appears inside ' +
+        'the body, one that anchors the walk), or carrier detection collapses ' +
+        'to a single-marker test'
+    );
+    return null;
+  }
+
+  // Liveness. A marker that no longer appears in the program it identifies
+  // matches nothing, so every carrier-dependent check would pass by finding
+  // zero carriers — the exact silent green Rule R exists to prevent.
+  const declarations = Array.from(
+    body.matchAll(/^CANONICAL_SOURCE="([^"]+)"/gm)
+  );
+  if (declarations.length !== 1) {
+    errors.push(
+      'extract-redaction-awk.bash: expected exactly one CANONICAL_SOURCE="..." ' +
+        `declaration, found ${declarations.length} — without it the marker set ` +
+        'cannot be checked against the program it identifies'
+    );
+    return null;
+  }
+  const canonical = declarations[0][1];
+  const canonicalBody = fileCache.get(canonical);
+  if (canonicalBody === undefined) {
+    // Report the declaration's LINE, never its value: CANONICAL_SOURCE is
+    // repository controlled and a pasted credential standing in for it would
+    // otherwise print into CI logs through this diagnostic (same reasoning
+    // as the stale-marker-index diagnostic below).
+    const declLine = body.slice(0, declarations[0].index).split('\n').length;
+    errors.push(
+      `extract-redaction-awk.bash:${declLine}: CANONICAL_SOURCE names a file ` +
+        'that was not scanned (missing, or outside the redaction walk), so ' +
+        'REDACTION_ANCHOR_MARKERS cannot be checked for staleness'
+    );
+    return null;
+  }
+  // Report the entry INDEX, never the value: the array is repository
+  // controlled and a pasted credential in it would otherwise print into CI
+  // logs through this diagnostic.
+  const staleIdx = markers
+    .map((m, i) => (canonicalBody.includes(m) ? -1 : i + 1))
+    .filter((i) => i > 0);
+  if (staleIdx.length > 0) {
+    for (const i of staleIdx) {
+      errors.push(
+        `REDACTION_ANCHOR_MARKERS entry #${i} does not appear in ${canonical}; ` +
+          'the marker set is stale'
+      );
+    }
+    return null;
+  }
+  return markers;
+}
+
 /** Rule R — REDACTION_SOURCES must cover every agent shipping the awk program. */
 function checkRedactionSources(roster, fileCache, errors) {
   if (!fs.existsSync(REDACTION_LIB)) {
@@ -616,15 +740,23 @@ function checkRedactionSources(roster, fileCache, errors) {
     errors
   );
   if (body === null) return;
-  const block = /REDACTION_SOURCES=\(([\s\S]*?)\)/.exec(body);
-  if (!block) {
+  const sources = matchArrayLiteral(body, 'REDACTION_SOURCES');
+  if (sources.count === 0) {
     errors.push(
       'extract-redaction-awk.bash: REDACTION_SOURCES array not found'
     );
     return;
   }
+  if (sources.count > 1) {
+    errors.push(
+      `extract-redaction-awk.bash: REDACTION_SOURCES is declared ${sources.count} ` +
+        'times — keep exactly one live declaration, or a first-match race ' +
+        'decides which one Rule R checks'
+    );
+    return;
+  }
   const listed = new Set(
-    block[1]
+    sources.inner
       .split('\n')
       .map(stripBashLineComment)
       .flatMap((line) =>
@@ -633,34 +765,57 @@ function checkRedactionSources(roster, fileCache, errors) {
   );
   const known = new Set(roster.redaction_known_untested.map((k) => k.file));
 
+  const anchorMarkers = readAnchorMarkers(body, fileCache, errors);
+
   // Derived from file CONTENT, not from the roster's boolean. Trusting the
   // flag relocated the silent failure one level up: a copy pasted into an
   // agent whose flag says false would go untested and still pass.
-  const carriers = Array.from(fileCache.entries())
-    .filter(([, body]) => CANONICAL_AWK_MARKERS.every((m) => body.includes(m)))
-    .map(([rel]) => rel);
+  //
+  // null (not []) when the marker list itself could not be trusted —
+  // readAnchorMarkers already reported why. Carrier-dependent checks below
+  // are skipped entirely rather than run against an empty/unreliable set,
+  // so an absent marker list cannot turn Rule R green.
+  const libRel = toPosix(path.relative(ROOT, REDACTION_LIB));
+  const carriers = anchorMarkers
+    ? Array.from(fileCache.entries())
+        .filter(([rel, fileBody]) => {
+          // The lib authors REDACTION_ANCHOR_MARKERS, so its own body always
+          // contains both marker strings as array literals. Scrub that one
+          // span rather than excluding the file from the walk: exclusion also
+          // drops it from the Rule S ledger, and a real program pasted into
+          // the lib must still register as a carrier.
+          const text =
+            rel === libRel
+              ? fileBody.replace(/^REDACTION_ANCHOR_MARKERS=\([\s\S]*?\)/gm, '')
+              : fileBody;
+          return anchorMarkers.every((m) => text.includes(m));
+        })
+        .map(([rel]) => rel)
+    : null;
 
-  for (const rel of carriers) {
-    if (!listed.has(rel) && !known.has(rel)) {
-      errors.push(
-        `${rel} carries the canonical redaction program but is in neither ` +
-          'extract-redaction-awk.bash REDACTION_SOURCES nor council-roster.json ' +
-          'redaction_known_untested — its copy would never be drift-tested, and ' +
-          'that failure is silent'
-      );
+  if (carriers) {
+    for (const rel of carriers) {
+      if (!listed.has(rel) && !known.has(rel)) {
+        errors.push(
+          `${rel} carries the canonical redaction program but is in neither ` +
+            'extract-redaction-awk.bash REDACTION_SOURCES nor council-roster.json ' +
+            'redaction_known_untested — its copy would never be drift-tested, and ' +
+            'that failure is silent'
+        );
+      }
     }
-  }
 
-  // The declared flag must agree with what is on disk, so the roster cannot
-  // drift away from reality even though the flag no longer gates the rule.
-  for (const r of roster.reviewers) {
-    const carries = carriers.includes(r.agent_path);
-    if (Boolean(r.ships_redaction_awk) !== carries) {
-      errors.push(
-        `council-roster.json: "${r.name}" declares ships_redaction_awk=` +
-          `${Boolean(r.ships_redaction_awk)} but ${r.agent_path} ` +
-          `${carries ? 'does' : 'does not'} carry the canonical program`
-      );
+    // The declared flag must agree with what is on disk, so the roster cannot
+    // drift away from reality even though the flag no longer gates the rule.
+    for (const r of roster.reviewers) {
+      const carries = carriers.includes(r.agent_path);
+      if (Boolean(r.ships_redaction_awk) !== carries) {
+        errors.push(
+          `council-roster.json: "${r.name}" declares ships_redaction_awk=` +
+            `${Boolean(r.ships_redaction_awk)} but ${r.agent_path} ` +
+            `${carries ? 'does' : 'does not'} carry the canonical program`
+        );
+      }
     }
   }
 
@@ -673,12 +828,15 @@ function checkRedactionSources(roster, fileCache, errors) {
   }
 
   // A known-untested entry that no longer carries the program is dead weight.
-  for (const k of roster.redaction_known_untested) {
-    if (!carriers.includes(k.file)) {
-      errors.push(
-        `council-roster.json redaction_known_untested lists "${k.file}", which no ` +
-          'longer carries the canonical program — remove the entry'
-      );
+  // Skipped when carriers is unavailable — see the comment above.
+  if (carriers) {
+    for (const k of roster.redaction_known_untested) {
+      if (!carriers.includes(k.file)) {
+        errors.push(
+          `council-roster.json redaction_known_untested lists "${k.file}", which no ` +
+            'longer carries the canonical program — remove the entry'
+        );
+      }
     }
   }
 }
@@ -771,6 +929,13 @@ function redactionExcluded(rel) {
   return SELF_FILES.has(rel);
 }
 
+/**
+ * Membership here removes a file from the redaction walk — and the ledger
+ * cache is a filtered view of that same walk, so it removes the file from the
+ * Rule S ledger too. That second effect is why the lib declaring
+ * REDACTION_ANCHOR_MARKERS is NOT listed: it restates the roster and must stay
+ * stamped. checkRedactionSources scrubs its marker array instead.
+ */
 const SELF_FILES = new Set([
   'scripts/validate-council-roster.js',
   'tests/integration/validate-council-roster.test.ts',

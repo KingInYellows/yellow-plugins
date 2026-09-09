@@ -197,7 +197,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 
 #### 2A. Extractor library
 
-- [ ] 2.1 Create `plugins/yellow-council/tests/lib/extract-redaction-bodies.awk`
+- [x] 2.1 Create `plugins/yellow-council/tests/lib/extract-redaction-bodies.awk`
       (passed with `-f`, no shell-quoting layer). Behaviour:
       buffer all lines; for each anchor line matching `function strip_deco\(`,
       walk backward to the nearest opener of three shapes and forward to the
@@ -215,7 +215,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 
       No interval expressions, no `gensub`, `[ \t]` rather than `[[:space:]]`
       where older awks might differ. Prototype validated under mawk, gawk, awk.
-- [ ] 2.2 Rewrite `extract-redaction-awk.bash`:
+- [x] 2.2 Rewrite `extract-redaction-awk.bash`:
       - `CANONICAL_SOURCE` constant; `REDACTION_SOURCES` gains
         `"plugins/yellow-council/commands/council/council.md"`. Keep entries
         as plain double-quoted strings, and keep every explanatory comment
@@ -239,7 +239,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > `redaction.bats` (lines 37, 164, 184, 197), so deleting it breaks nothing
 > else.
 <!-- /deepen-plan -->
-- [ ] 2.3 Write `plugins/yellow-council/tests/extract.bats` covering the
+- [x] 2.3 Write `plugins/yellow-council/tests/extract.bats` covering the
       walker itself with synthetic fixtures in `BATS_TEST_TMPDIR` (markers
       assembled at runtime, no literal PEM strings): one body per shape; two
       bodies in one file; zero anchors yields zero files and exit 0; anchor
@@ -252,9 +252,9 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 
 #### 2B. redaction.bats restructure
 
-- [ ] 2.4 Add `bats_require_minimum_version 1.7.0` at the top (the floor for
+- [x] 2.4 Add `bats_require_minimum_version 1.7.0` at the top (the floor for
       `setup_file` + `BATS_FILE_TMPDIR` + the guard function itself).
-- [ ] 2.5 Add `setup_file()`: load the lib; extract every source into
+- [x] 2.5 Add `setup_file()`: load the lib; extract every source into
       `BATS_FILE_TMPDIR/bodies/`; assert no `\` at end of line in any raw
       body (dedent precondition); dedent each; extract and dedent the
       canonical from `CANONICAL_SOURCE` and assert exactly one body; `cmp -s`
@@ -277,7 +277,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > https://github.com/bazel-contrib/bazel-lib/blob/main/docs/write_source_files.md
 > and https://github.com/kubernetes/kubernetes/blob/master/hack/lib/verify-generated.sh
 <!-- /deepen-plan -->
-- [ ] 2.6 Rewrite `setup()`: `AWK_PROG` is the dedented canonical body from
+- [x] 2.6 Rewrite `setup()`: `AWK_PROG` is the dedented canonical body from
       `BATS_FILE_TMPDIR` (no re-extraction), with the existing `[ -s ]` guard.
 
 <!-- deepen-plan: codebase -->
@@ -285,21 +285,21 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > `redaction.bats` itself (lines 74-89), not in the lib. They stay where they
 > are and are out of scope for this rewrite; O3's prompt should say so.
 <!-- /deepen-plan -->
-- [ ] 2.7 Rewrite the three existing loops (byte-identical drift guard,
+- [x] 2.7 Rewrite the three existing loops (byte-identical drift guard,
       single-quote, syntax-valid) to iterate over every `.body` file. The
       drift-guard test becomes a thin assertion that `setup_file` ran (the
       gate itself is fatal) so the suite still lists identity as a named test.
-- [ ] 2.8 Update the header comment ("authored in three files" at line 154
+- [x] 2.8 Update the header comment ("authored in three files" at line 154
       and the top block) to say four files, five bodies.
-- [ ] 2.9 Behavioral tests are untouched.
+- [x] 2.9 Behavioral tests are untouched.
 
 #### 2C. Roster, validator parity, docs
 
-- [ ] 2.10 `scripts/council-roster.json`: add council.md to
+- [x] 2.10 `scripts/council-roster.json`: add council.md to
       `redaction_extra_sources`; delete its `redaction_known_untested` entry
       (leave the array present and empty so the schema and validator
       default still hold).
-- [ ] 2.11 In `scripts/validate-council-roster.js`, replace the hardcoded
+- [x] 2.11 In `scripts/validate-council-roster.js`, replace the hardcoded
       `CANONICAL_AWK_MARKERS` constant with a parse of
       `REDACTION_ANCHOR_MARKERS=(...)` from `extract-redaction-awk.bash`
       (same regex shape as the `REDACTION_SOURCES` parse; error if absent or
@@ -315,19 +315,19 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > `vitest run --dir tests/integration --passWithNoTests`, so the new file is
 > auto-discovered with no config change.
 <!-- /deepen-plan -->
-- [ ] 2.12 `plugins/yellow-council/CLAUDE.md`: extend the "Output redaction is
+- [x] 2.12 `plugins/yellow-council/CLAUDE.md`: extend the "Output redaction is
       mandatory" bullet with one sentence naming the identity gate and the
       rule that SKILL.md is the source of truth for all five bodies.
-- [ ] 2.12b Flip the two "Not yet covered by tests/redaction.bats" comments in
+- [x] 2.12b Flip the two "Not yet covered by tests/redaction.bats" comments in
       council.md (Step 4 site near line 371, Step 7 site near line 1308) to
       state the identity gate now covers this file; carry the SKILL.md and
       plugin CLAUDE.md context findings from the PR 1 review (a carrier list
       after the SKILL.md fence, outside the ```awk block; the CLAUDE.md
       redaction bullet naming both council.md sites).
-- [ ] 2.13 `pnpm changeset` with `'yellow-council': patch`.
-- [ ] 2.14 Submit via `/smart-submit`; PR description states the dependency on
+- [x] 2.13 `pnpm changeset` with `'yellow-council': patch`.
+- [x] 2.14 Submit via `/smart-submit`; PR description states the dependency on
       PR 1 and that landing out of order fails the gate by design.
-- [ ] 2.15 Add `sudo apt-get install -y gawk` to the `plugin-shell-tests` job
+- [x] 2.15 Add `sudo apt-get install -y gawk` to the `plugin-shell-tests` job
       in `.github/workflows/validate-schemas.yml` (next to the bats install at
       line 1385) so the gawk path is CI-verified, not local-only. No changeset
       needed for `.github/` changes.
@@ -354,7 +354,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 
 ### Phase 3: Quality gates (orchestrator-owned, every one run locally before submit)
 
-- [ ] 3.1 `bats plugins/yellow-council/tests/` green under mawk and gawk.
+- [x] 3.1 `bats plugins/yellow-council/tests/` green under mawk and gawk.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The `plugin-shell-tests` job runs on `ubuntu-latest` only
@@ -362,15 +362,15 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > so until task 2.15 lands this gawk check exists only on the orchestrator's
 > machine. Keep it as a recurring local step, not a one-time check.
 <!-- /deepen-plan -->
-- [ ] 3.2 `pnpm validate:schemas` (includes validate-council-roster.js against
+- [x] 3.2 `pnpm validate:schemas` (includes validate-council-roster.js against
       the real tree), `pnpm validate:agents`, `pnpm lint:plugins`,
       `pnpm test:integration`, `pnpm lint`, `pnpm typecheck`.
-- [ ] 3.3 Negative test of the gate: temporarily corrupt one byte in
+- [x] 3.3 Negative test of the gate: temporarily corrupt one byte in
       council.md body 2, confirm `setup_file` fails with the right file, body
       index, and line; revert.
-- [ ] 3.4 Negative test of Rule R: temporarily delete council.md from
+- [x] 3.4 Negative test of Rule R: temporarily delete council.md from
       `REDACTION_SOURCES`, confirm the validator errors; revert.
-- [ ] 3.5 `git diff --check` and LF-only line endings on every new file
+- [x] 3.5 `git diff --check` and LF-only line endings on every new file
       (`.awk`, `.bash`, `.bats`).
 
 <!-- deepen-plan: codebase -->
@@ -381,7 +381,7 @@ Branch: `agent/feat/council-redaction-multi-body-extractor` stacked on PR 1 (#78
 > touches `plugins/*/tests/**`, and `pnpm lint` is eslint on `.js`/`.ts`
 > only, so the new test files trip no lint.
 <!-- /deepen-plan -->
-- [ ] 3.6 `/review:pr` on each PR; resolve findings before requesting merge.
+- [x] 3.6 `/review:pr` on each PR; resolve findings before requesting merge.
 
 ## Agent Orchestration
 
@@ -519,13 +519,79 @@ None added. bats 1.11.0 (CI pin), mawk/gawk, POSIX `cmp` and `diff`.
 - No runtime reads any test file or the roster, so neither PR changes
   `/council` behavior except through the program text itself.
 
+## Follow-ups surfaced during PR 2 review (out of scope here)
+
+Applied in PR 2 after review: walker takes the markers from the lib array
+via `-v` (four reviewers), inner-marker count cross-checked against anchor
+count so a corrupted anchor line fails loudly, anchors inside an
+already-walked body are skipped, basename uniqueness asserted before
+extraction, `close()` and `dedent_file` statuses checked, `LC_ALL=C` on the
+parsed `cmp`, the identity gate extracted into a lib function with its own
+drift test, shared awk helpers moved into the lib, the validator scrubs
+the array span instead of excluding the whole lib from the walk (which had
+silently dropped it from the Rule S ledger), marker liveness checked
+against the canonical, array regexes anchored with multi-match errors, CI
+runs `apt-get update` first, provenance comments added above both reviewer
+agents' `awk '`, AGENTS.md routes carrier edits to the bats gate, and the
+count numerals were removed from prose.
+
+Not applied, tracked here:
+
+- **A deleted redaction site is not drift.** The gate proves every body
+  present matches the canonical; it cannot see that council.md lost its
+  Step 4 site outright, because anchors and bodies derive from the same
+  scan. Storing a per-carrier count in the roster was declined (a stored
+  count is a drift site; roster `$comment`). A derived alternative worth
+  building: assert that every `awk "$redact_awk"` consumer in council.md
+  sits after a `local redact_awk='` opener in the same function, i.e. tie
+  site presence to consumer presence rather than to a number.
+- **Exit codes.** The walker uses exit 2 for every failure, the same code
+  awk itself uses for a missing `-f` file or unwritable output. Split into
+  usage/environment vs carrier-shape codes, or prefix stderr lines with a
+  stable token, so an agent can branch without grepping prose.
+- **Accumulate the earlier fail-fast loops in `setup_file`** (extraction
+  failure, zero bodies, line continuation) the way the identity gate does.
+- **Path-keyed body names.** Bodies are keyed by carrier basename; the
+  uniqueness assertion makes a collision loud, but keying on the
+  repo-relative path (or a per-carrier subdirectory) removes the
+  constraint entirely.
+- **Rule R's two-marker AND** makes a copy that renamed or dropped one
+  function invisible to both the validator and the walker. Flag files with
+  either marker and require classification.
+- **Single source of truth could be the roster JSON.** The release gate now
+  regex-parses two constants out of a plugin's test-scope bash file. Moving
+  `canonical_source`, `sources`, and `anchor_markers` into a `redaction`
+  object in `scripts/council-roster.json`, with the bash lib reading it via
+  `jq` (already a plugin prerequisite), inverts the dependency the right
+  way and collapses `redaction_extra_sources` into the same list.
+- **File-local opt-out for marker mentions** instead of the validator's
+  central `SELF_FILES` set, so a doc or fixture that must name both
+  functions does not require a validator edit.
+- **A sync writer.** The DRIFT message tells the reader to re-extract and
+  re-indent by hand. A `--write` mode on the walker, or a small script that
+  re-indents the canonical into each recorded opener/closer span, would
+  pair the check with a fix the way `validate:generated` pairs with
+  `generate:manifests`. Including the opener line number in the DRIFT line
+  is a cheap first step.
+- **BSD awk is asserted, never exercised.** `available_awks` probes
+  `mawk`, `gawk`, `awk` only; a macOS runner or an `original-awk` probe
+  would close that.
+- **The gate's own extraction runs under one awk in CI.** `setup_file`
+  calls plain `awk` (gawk after the install step); `extract.bats` shims both
+  implementations for the walker, but an `AWK` override in the lib would let
+  the gate itself run under each.
+
 ## Follow-ups surfaced during PR 1 review (out of scope here)
 
 These target the canonical program in SKILL.md, so they cannot be applied
 in PR 1 (bodies must stay byte-identical) and are not part of PR 2 either.
 
 - **Leak on a prose-prefixed BEGIN with a narrow-wrapped body (highest
-  priority, canonical-wide).** Measured 2026-09-09 with mawk: input
+  priority, canonical-wide).** Already recorded as an accepted Known
+  Limitation in `plugins/yellow-council/CLAUDE.md` ("A key that shares its
+  BEGIN line with prose, or is wrapped by a serializer, leaks its tail"),
+  which also explains why the naive fix was reverted: keying "real key" off
+  length or wrappers swallowed the report. Measured 2026-09-09 with mawk: input
   `leaked key: <BEGIN marker>` followed by four body lines under the
   20-character base64 floor and an END marker. The pre-sync council.md body
   (tail-anchored classifier) leaked 0 lines; the canonical (fully anchored

@@ -1,5 +1,5 @@
 {
-  "$comment": "Canonical /council reviewer roster. Build-time artifact only — nothing reads this at runtime, and council.md must not be changed to do so (a missing or corrupt roster would abort a review mid-fan-out to buy nothing). Consumed by scripts/validate-council-roster.js. Deliberately stores no count field: a stored count would itself be a drift site. Totals are derived.",
+  "$comment": "Canonical /council reviewer roster. Build-time artifact only \u2014 nothing reads this at runtime, and council.md must not be changed to do so (a missing or corrupt roster would abort a review mid-fan-out to buy nothing). Consumed by scripts/validate-council-roster.js. Deliberately stores no count field: a stored count would itself be a drift site. Totals are derived.",
   "reviewers": [
     {
       "name": "claude",
@@ -34,14 +34,13 @@
       "ships_redaction_awk": true
     }
   ],
-  "redaction_extra_sources": ["plugins/yellow-council/skills/council-patterns/SKILL.md"],
-  "redaction_known_untested": [
-    {
-      "file": "plugins/yellow-council/commands/council/council.md",
-      "reason": "Carries two copies of the canonical program: the Step 4 claude-leg redaction behind `local redact_awk='` and the Step 7 report-build pass behind `section_body=$(awk '`. Both are indented, so extract-redaction-awk.bash's bare `^awk '$` opener never matches, and its case statement returns one body per file so it cannot represent two. Wiring this file needs an extractor that returns multiple bodies — tracked as a follow-up, not silently ignored."
-    }
+  "redaction_extra_sources": [
+    "plugins/yellow-council/skills/council-patterns/SKILL.md",
+    "plugins/yellow-council/commands/council/council.md"
   ],
+  "redaction_known_untested": [],
   "prose_sites": {
+    "AGENTS.md": "1efa59b3",
     "README.md": "1efa59b3",
     "catalog/plugins/yellow-council.json": "1efa59b3",
     "docs/CONCEPTS.md": "1efa59b3",
