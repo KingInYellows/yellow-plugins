@@ -371,15 +371,14 @@ function strip_deco(s,   prev, guard, limit) {
   # caller fail CLOSED (treat the line as a real key) instead of falling
   # through to the bounded path. No test exercises this arm today -- it exists
   # so a future edit degrades safely rather than silently leaking.
-  # A "+" run is consumed whole below, so the common flood case is linear. A
-  # long "-" run still costs one pass per character (the delimiter guard has to
-  # re-test after each removal), which is quadratic in the run length. An
-  # earlier revision bounded that with a flat length cap that failed CLOSED,
-  # but keying "this is a real key" off LENGTH ALONE meant any long line that
-  # merely MENTIONED a marker was promoted to a real key and swallowed the
-  # report through EOF. Cost is bounded here only for the "+" case; a hostile
-  # "-" flood is a known open issue, tracked rather than papered over with a
-  # guard that misclassifies.
+  # A "+" run is consumed whole below, and a "-" run longer than a delimiter
+  # collapses to five in one pass, so both flood cases are linear (a 100,000
+  # dash prefix went from 19 seconds under gawk to 20 milliseconds). An
+  # earlier revision bounded the dash case with a flat length cap that failed
+  # CLOSED, but keying "this is a real key" off LENGTH ALONE meant any long
+  # line that merely MENTIONED a marker was promoted to a real key and
+  # swallowed the report through EOF; collapsing the run keeps the per-line
+  # classification exactly as it was.
   guard = 0
   limit = length(s) + 2
   do {
@@ -393,6 +392,12 @@ function strip_deco(s,   prev, guard, limit) {
     # Never strip a leading dash off a line that is ALREADY a valid PEM
     # delimiter: that corrupts "-----BEGIN" into "----BEGIN" and breaks every
     # anchored test downstream.
+    # A dash run longer than a delimiter can never BE one, so collapse it
+    # to five in one pass: a flood of 100,000 dashes cost one pass per
+    # character (quadratic, about nine seconds) and could stall the
+    # council. Five is exactly what the per-character step below would
+    # leave before reaching a marker, so classification is unchanged.
+    if (s ~ /^------/) sub(/^--*/, "-----", s)
     if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
     sub(/^[[:space:]]+/, "", s)
   } while (s != prev && ++guard < limit)
@@ -428,6 +433,43 @@ function cred_hit(re, minlen,   s) {
 function is_base64_line(s, minlen) {
   if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
   return length(s) >= minlen
+}
+# Narrow-wrapped key body. A real key whose BEGIN shared its line with prose
+# runs under the bounded stray window, and a decoy END inside a real key
+# hands the rest of the body to the re-arm window; both used the 20-char
+# floor below, so a body wrapped narrower than that released redaction and
+# printed the tail. A body line of 12 to 19 characters counts as key-shaped
+# only when it carries BOTH a digit, "+", "/" or "=" AND a character outside
+# the hex alphabet, the same exclusion the 20-char branch applies: base64
+# key material has both in nearly every slice that wide, an English word or
+# identifier has no digit, and a short git SHA or hash fragment has no
+# non-hex letter. So a short list after a quoted marker still counts as
+# stray and cannot swallow the report. Bodies wrapped under 12 characters,
+# and the rare slice with no digit or with hex characters only, remain a
+# documented residual.
+function is_narrow_key_line(s) {
+  if (!is_base64_line(s, 12) || length(s) >= 20) return 0
+  return s ~ /[0-9+\/=]/ && s ~ /[G-Zg-z+\/=]/
+}
+# The narrow rule plus the width chain, shared by the two sites that decide
+# whether a line inside a bounded window is key material: the re-arm test
+# after a decoy END and the stray-counter test. One helper so a future
+# tweak cannot land at one site and not its sibling, which is how the
+# 20-char floor survived at the re-arm test after it was fixed below.
+# pem_key_len is the width of the last key-shaped line in the current
+# block; a pure base64 line of exactly that width is body even when the
+# slice carries no digit (the fixed PKCS#8 DER prefix yields such slices).
+function is_narrow_key_run(s) {
+  if (is_narrow_key_line(s)) return 1
+  # A digit-free slice continues the body only at the established width and
+  # only when it does not read as a plain word: one optional capital then
+  # lowercase ("Recommendation", "consideration"). Base64 of random bytes
+  # mixes case on nearly every line (about 1 slice in 4000 at width 12 reads
+  # as a word, and one such line only counts as stray, it does not release
+  # the window), while a run of equal-length words after a quoted marker or
+  # a genuine END no longer extends the window toward the verdict.
+  return pem_key_len > 0 && is_base64_line(s, 12) &&
+    length(s) == pem_key_len && s !~ /^[A-Z]?[a-z]+$/
 }
 {
   line = $0
@@ -484,7 +526,8 @@ function is_base64_line(s, minlen) {
   # cap — fail closed. If the BEGIN marker instead shares the line with
   # other prose (a report merely MENTIONING "-----BEGIN ... KEY-----"),
   # this is a stray mention: fall back to a bounded window (20-char body
-  # floor, hex-SHA exclusion, 3-line stray counter, 200-line span cap) so
+  # floor or 12 with a digit, hex-SHA exclusion on both, 3-line stray
+  # counter, 400-line span cap) so
   # the report is not swallowed and Verdict:/Confidence: survive. Without
   # this split, either every stray mention risks eating the whole report,
   # or every real key gets a floor/cap that lets it leak (a narrow-wrapped
@@ -504,6 +547,8 @@ function is_base64_line(s, minlen) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
+      pem_key_len = 0
+      pem_chain = 0
       # Retire any re-arm window left over from an EARLIER block. pem_watch is
       # only decremented while !in_pem, so a countdown still running when this
       # BEGIN opens is frozen for the whole of this block and resumes after it
@@ -556,8 +601,20 @@ function is_base64_line(s, minlen) {
     # reviewer is scored UNKNOWN. Real key material is base64 of random
     # bytes and effectively always carries digits or +//=; English
     # identifiers do not.
-    if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
-        pem_check ~ /[0-9+\/=]/) {
+    # The wide clause here also requires a digit or +/= while the stray
+    # branch below does not: re-arming is the higher-stakes decision (it can
+    # inherit UNBOUNDED mode), so a camelCase identifier must not qualify.
+    # The width continuation is only honoured while the chain is unbroken:
+    # pem_chain is set by the last body line and cleared by the first line
+    # in this window that is not key material. A genuine END followed by
+    # prose therefore closes the chain, and an equal-width token further
+    # down the window cannot re-open the block on width alone; a decoy END
+    # injected mid-body is followed directly by the next slice, so the
+    # chain survives it.
+    if ((is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
+         pem_check ~ /[0-9+\/=]/) ||
+        is_narrow_key_line(pem_check) ||
+        (pem_chain && is_narrow_key_run(pem_check))) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
@@ -576,8 +633,10 @@ function is_base64_line(s, minlen) {
       # whole report.
       pem_real = (pem_prev_real && pem_check ~ /[+\/=]/) ? 1 : 0
       pem_watch = 0
+      pem_chain = 1
     } else {
       pem_watch--
+      pem_chain = 0
     }
   }
   # Decide the state transition BEFORE deciding whether to redact this line.
@@ -597,7 +656,12 @@ function is_base64_line(s, minlen) {
     } else if (pem_real) {
       # Real block: unbounded, fail closed. No floor, no releasing cap —
       # every line stays redacted until a genuine END or EOF, however
-      # narrow the wrapping or long the block.
+      # narrow the wrapping or long the block. Remember the body width all
+      # the same: a decoy END injected mid-body hands the rest of the key to
+      # the re-arm window, whose continuation test needs the width to
+      # recognise a narrow, digit-free resumed line.
+      pem_body = strip_deco($0)
+      if (is_base64_line(pem_body, 12)) { pem_key_len = length(pem_body); pem_chain = 1 }
     } else {
       # Stray prose mention: bounded window so an ordinary report does not
       # get swallowed by a BEGIN marker quoted in passing. PEM armor is
@@ -607,19 +671,50 @@ function is_base64_line(s, minlen) {
       # the 0-9/a-f range: a bare 40- or 64-char hex token (git SHA, hash)
       # is common in ordinary reviewer prose and would otherwise satisfy a
       # length-only base64 check on every such line, resetting the stray
-      # counter forever. A hard span cap (200 lines) backstops the stray
+      # counter forever. A hard span cap (400 lines) backstops the stray
       # counter so this branch terminates even if some future input keeps
-      # fooling the body classifier.
-      if (++pem_span > 200) {
+      # fooling the body classifier. 400, not 200: a 4096-bit key wrapped at
+      # 12 characters is about 275 lines, and the cap releasing mid-key
+      # printed its tail. Larger keys wrapped that narrowly remain a
+      # documented residual.
+      if (++pem_span > 400) {
         in_pem = 0
         pem_release = 1
       } else {
         pem_body = strip_deco($0)
         if (pem_body != "") {
+          # The width chain (is_narrow_key_run) closes the digit-free-slice
+          # gap: without it roughly one real key in six released the window
+          # on its fifth line at width 12. The width survives a stray line (a
+          # body line whose leading "+" strip_deco ate as decoration is one
+          # character short) and survives a decoy END, and is cleared only by
+          # a new BEGIN. Prose never earns it: the chain starts only from a
+          # line that passed one of the strict tests, so equal-length words
+          # after a mention stay stray.
           if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
-              pem_body ~ /^(Proc-Type|DEK-Info):/ ||
-              $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-          else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
+              is_narrow_key_run(pem_body)) {
+            pem_stray = 0
+            # Only a base64 body line establishes the width: a Proc-Type or
+            # DEK-Info header, or a repeated BEGIN, resets the stray counter
+            # but must not feed its own length into the chain.
+            pem_key_len = length(pem_body)
+            pem_chain = 1
+          } else if (pem_body ~ /^(Proc-Type|DEK-Info):/) {
+            pem_stray = 0
+          } else if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+            # A bare BEGIN reopening inside this window is a NEW block, not
+            # more of the mention that opened it: a prose mention opened a
+            # BOUNDED window, and a genuine key starting inside it stayed on
+            # the floor path, so a body wrapped under 12 chars released the
+            # stray counter and printed the rest of the key plus its END.
+            # Reuse the real-vs-prose test the entry branch applies and promote
+            # only if it passes; an embedded mention keeps the stray reset.
+            pem_check = strip_deco($0)
+            if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+              pem_real = 1; pem_span = 0; pem_key_len = 0; pem_chain = 0
+            }
+            pem_stray = 0
+          } else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
         }
       }
     }

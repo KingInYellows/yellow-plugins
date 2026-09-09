@@ -586,10 +586,28 @@ Not applied, tracked here:
 These target the canonical program in SKILL.md, so they cannot be applied
 in PR 1 (bodies must stay byte-identical) and are not part of PR 2 either.
 
-- **Leak on a prose-prefixed BEGIN with a narrow-wrapped body (highest
-  priority, canonical-wide).** Already recorded as an accepted Known
-  Limitation in `plugins/yellow-council/CLAUDE.md` ("A key that shares its
-  BEGIN line with prose, or is wrapped by a serializer, leaks its tail"),
+- **Leak on a prose-prefixed BEGIN with a narrow-wrapped body: SHIPPED as
+  PR 3 (#783, `agent/fix/council-redaction-narrow-body-leak`, stacked on
+  PR 2; listed here for history, not as open work).** `is_narrow_key_line()`
+  counts a 12-to-19 character body line as key material when it carries a
+  digit, `+`, `/` or `=` and a non-hex character, and a pure base64 line of
+  the width the last key-shaped line established continues the body unless
+  it reads as a plain word; the same rules re-arm after a decoy END while
+  the chain is unbroken (review round 2 on #783: equal-length words after a
+  strict line or a genuine END no longer extend or re-open the window), and
+  the span cap is 400. Measured
+  over 25 real 2048-bit keys at every width from 12 to 19 under mawk and
+  gawk: 0 leaked lines on both shapes (at width 12 the pre-fix program
+  leaked 134 of 136), verdict intact throughout, and counterweight fixtures
+  pin the over-redaction direction (long words, short SHAs, digit-bearing
+  identifiers). Residuals: bodies wrapped under 12 characters, a first slice
+  after a mention with no digit or hex only before the chain starts,
+  serializer-wrapped shapes (JSON string, table cell) whose lines carry
+  quotes or pipes, and keys longer than 400 lines. Original analysis
+  follows. The shape was recorded as an accepted Known
+  Limitation in `plugins/yellow-council/CLAUDE.md` (now "A key wrapped by a
+  serializer leaks its tail; a key that merely shares its BEGIN line with
+  prose no longer does"),
   which also explains why the naive fix was reverted: keying "real key" off
   length or wrappers swallowed the report. Measured 2026-09-09 with mawk: input
   `leaked key: <BEGIN marker>` followed by four body lines under the
