@@ -18,7 +18,7 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
   `github-workflow`, `gt-workflow`, `yellow-browser-test`, `yellow-ci`,
   `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
   `yellow-cursor`, `yellow-debt`, `yellow-devin`, `yellow-docs`,
-  `yellow-goal`, `yellow-linear`, `yellow-mempalace`, `yellow-morph`,
+  `yellow-goal`, `yellow-linear`, `yellow-morph`,
   `yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`.
 - `plugins/<plugin-name>/.claude-plugin/plugin.json`: Required manifest. Most
   plugins rely on Claude Code's default discovery of `commands/`, `agents/`, and

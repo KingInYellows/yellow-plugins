@@ -47,13 +47,6 @@ const CHECK_MODE = process.argv.slice(2).includes('--check');
 // review #534, threadId PRRT_kwDOQ3SUys6CmtOZ):
 //   - plugins/yellow-research/scripts/install-ast-grep.sh — embeds the
 //     install-helpers block byte-for-byte; onboarded as a TARGETS entry.
-//   - plugins/yellow-mempalace/scripts/install-mempalace.sh — defines a
-//     version_gte that differs ONLY in heredoc-delimiter style
-//     (__EOF_VERSION_LEFT__ / __EOF_VERSION_RIGHT__) to avoid
-//     heredoc-delimiter collision with user input. That safety property
-//     is documented in MEMORY.md "Heredoc delimiter collision". Do NOT
-//     migrate mempalace to install-version-gte without first porting the
-//     unique-delimiter pattern into the canonical snippet.
 const TARGETS = {
   'plugins/yellow-codex/scripts/install-codex.sh': [
     'install-helpers',

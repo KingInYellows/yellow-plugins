@@ -49,14 +49,11 @@ Disjoint with a single primary: memories land in ruvector. No dual-write.
 Palace data existing today stays readable via explicit `/mempalace:*`
 commands until the removal plan handles migration/export.
 
-## Follow-up (out of scope here)
+## Follow-up (done)
 
-A separate plan item covers: deprecation notice in the marketplace
-listing and `plugins/yellow-mempalace/.claude-plugin/plugin.json`
-description, palace-data export path, removal from
-`.claude-plugin/marketplace.json` +
-`plugins/yellow-core/commands/setup/all.md` (both must change together
-— `scripts/validate-setup-all.js`), deletion of
-`plugins/yellow-mempalace/`, and cleanup of the remaining explicit
-cross-references (e.g. `/ruvector:memory`'s palace pointer, the
-`/mempalace:mine` vs `/ruvector:index` "indexing" trigger overlap).
+The removal plan referenced above has landed: `plugins/yellow-mempalace/`
+is deleted, its catalog source and marketplace listing are gone, `setup/all.md`
+no longer references it, and the `/ruvector:memory` cross-reference to
+`/mempalace:search` was removed. The trigger-routing table above and the
+rationale are kept as the historical record of the decision; rows
+mentioning `/mempalace:*` now describe a plugin that no longer exists.

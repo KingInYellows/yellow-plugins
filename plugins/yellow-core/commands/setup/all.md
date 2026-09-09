@@ -64,20 +64,6 @@ command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || prin
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
-if command -v mempalace >/dev/null 2>&1; then
-  mp_version_raw=$(mempalace --version 2>/dev/null | head -n1)
-  mp_version=$(printf '%s' "$mp_version_raw" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1)
-  printf 'mempalace:          OK (%s)\n' "${mp_version_raw:-unknown}"
-  mp_major=${mp_version%%.*}
-  if [ -n "$mp_major" ] && [ "$mp_major" -ge 3 ] 2>/dev/null; then
-    printf 'mempalace_mcp_check: ok\n'
-  else
-    printf 'mempalace_mcp_check: too_old\n'
-  fi
-else
-  printf 'mempalace:          NOT FOUND\n'
-  printf 'mempalace_mcp_check: missing\n'
-fi
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -169,7 +155,6 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.codex/auth.json ] && printf '~/.codex/auth.json:                 exists\n' || printf '~/.codex/auth.json:                 missing\n'
-[ -d "$HOME/.mempalace" ] && printf '~/.mempalace/:                      exists\n' || printf '~/.mempalace/:                      missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -286,7 +271,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-goal yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -681,13 +666,6 @@ and `composio_api_key` `present == true`, OR (status file absent AND both
 - NEEDS SETUP: required system tools missing (`bash`, `timeout`, `jq`) OR
   system tools present but 0 of 3 reviewer CLIs installed
 
-**yellow-mempalace:**
-
-- READY: `python310_check` ok AND `mempalace_mcp_check` ok AND
-  `~/.mempalace/` directory exists
-- PARTIAL: `python310_check` ok AND `mempalace_mcp_check` ok AND `~/.mempalace/` not initialized
-- NEEDS SETUP: `mempalace_mcp_check` not ok (binary missing or version `< 3.0.0`) OR `python310_check` not ok
-
 **yellow-goal:**
 
 - READY: `/goal:setup` (or `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js setup`)
@@ -732,7 +710,6 @@ Marketplace Setup Dashboard
   yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-codex         PARTIAL         codex v0.140.0 found, OPENAI_API_KEY not set
   yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (codex only)
-  yellow-mempalace     NEEDS SETUP     mempalace binary missing from PATH
   yellow-goal          NEEDS SETUP     goal-gen missing from PATH
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
@@ -868,9 +845,8 @@ tool in this fixed order:
 15. `composio:setup`
 16. `codex:setup`
 17. `council:setup`
-18. `mempalace:setup`
-19. `goal:setup`
-20. `statusline:setup`
+18. `goal:setup`
+19. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 This list is the fixed **order**, not a to-do list. Only invoke setups for
@@ -895,7 +871,6 @@ provider group in one run (see the section below). Use this mapping:
 - `yellow-composio` → `composio:setup`
 - `yellow-codex` → `codex:setup`
 - `yellow-council` → `council:setup`
-- `yellow-mempalace` → `mempalace:setup`
 - `yellow-goal` → `goal:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
