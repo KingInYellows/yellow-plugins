@@ -368,23 +368,64 @@ parse_reviewer_return() {
   # pass ever runs (that pass only covers the fenced-file appendix), so
   # mechanically re-run the same 11-pattern block here for the claude leg —
   # a bypassed prose rule must not carry credential material into synthesis.
-  # Canonical list: council-patterns SKILL.md "11-Pattern Credential
-  # Redaction" — keep this copy in sync with Step 7's.
+  # Canonical program: council-patterns SKILL.md "11-Pattern Credential
+  # Redaction" — byte-identical to it after dedent. Not yet covered by
+  # tests/redaction.bats (this file is absent from REDACTION_SOURCES
+  # until the multi-body extractor follow-up lands).
   # Defined unconditionally (not just under the claude branch below): the
   # non-enum verdict warning further down also reuses this helper, and that
   # warning fires for ANY reviewer, not only claude.
   local redact_awk='
-    function strip_deco(s) {
-      sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
-      sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
-      sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
-      # Diff "-"/"+" prefix (no space) — but never strip a leading dash off a
-      # real PEM delimiter run ("-----BEGIN"/"-----END"): that would corrupt
-      # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
-      # test below, since this helper also classifies the BEGIN line itself
-      # now, not just body lines.
-      if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
-      sub(/^[[:space:]]+/, "", s)
+    function strip_deco(s,   prev, guard, limit) {
+      # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in
+      # arbitrary order and depth: a blockquote inside a list item
+      # ("- > <header>"), a combined diff with one prefix character per parent
+      # ("++"/"--"), a numbered excerpt wrapping either. A single ordered pass
+      # removes whichever layer it happens to reach first and leaves the rest, so
+      # the marker never normalises, the anchored classifier fails, and the block
+      # drops to the bounded path where a narrowly wrapped body leaks.
+      #
+      # Repeating until nothing changes removes every layer regardless of order
+      # or count. The bound is derived from the INPUT LENGTH, not a constant: an
+      # iteration only continues after removing at least one character, so
+      # length(s)+2 iterations always reach the fixpoint. A CONSTANT ceiling (the
+      # original 8, then 64) is a real limit on a nesting depth the attacker
+      # chooses -- 100 leading "+" exhausted the 64-ceiling with prefixes still
+      # attached, the anchored classifier below then failed, and the block leaked
+      # on the bounded path.
+      #
+      # Reaching `limit` is therefore impossible while every substitution above
+      # shrinks s; it can only mean a later edit added one that rewrites without
+      # shrinking. That is a bug, not deep nesting, so record it and let the
+      # caller fail CLOSED (treat the line as a real key) instead of falling
+      # through to the bounded path. No test exercises this arm today -- it exists
+      # so a future edit degrades safely rather than silently leaking.
+      # A "+" run is consumed whole below, so the common flood case is linear. A
+      # long "-" run still costs one pass per character (the delimiter guard has to
+      # re-test after each removal), which is quadratic in the run length. An
+      # earlier revision bounded that with a flat length cap that failed CLOSED,
+      # but keying "this is a real key" off LENGTH ALONE meant any long line that
+      # merely MENTIONED a marker was promoted to a real key and swallowed the
+      # report through EOF. Cost is bounded here only for the "+" case; a hostile
+      # "-" flood is a known open issue, tracked rather than papered over with a
+      # guard that misclassifies.
+      guard = 0
+      limit = length(s) + 2
+      do {
+        prev = s
+        sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
+        sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
+        sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
+        # A "+" run can never be part of a PEM delimiter, so take the whole run in
+        # one pass. Only the dash case below needs character-at-a-time care.
+        sub(/^\+\+*/, "", s)
+        # Never strip a leading dash off a line that is ALREADY a valid PEM
+        # delimiter: that corrupts "-----BEGIN" into "----BEGIN" and breaks every
+        # anchored test downstream.
+        if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
+        sub(/^[[:space:]]+/, "", s)
+      } while (s != prev && ++guard < limit)
+      deco_exhausted = (s != prev)
       sub(/[[:space:]]+$/, "", s)
       return s
     }
@@ -398,11 +439,14 @@ parse_reviewer_return() {
       # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
       # purposes (we only ever discard the matched text, never reuse it, so
       # {N} exact and {N,} at-least are interchangeable here).
-      # match() returns only the LEFTMOST occurrence. A short placeholder
-      # sharing the same literal prefix would shadow a real credential
-      # later on the same line, emitting the whole line unredacted. Walk
-      # every start position, advancing ONE character rather than past the
-      # whole match: a longer occurrence can begin inside a shorter one.
+      # match() returns only the LEFTMOST occurrence. When a short placeholder
+      # sharing the same literal prefix appears before a real token on the same
+      # line ("example sk-ant-xxx ... sk-ant-<real>"), the leftmost RLENGTH falls
+      # under minlen and the line — real token included — is emitted unredacted.
+      # Walk every start position instead of testing only the first, advancing by
+      # ONE character rather than past the whole match: a longer occurrence can
+      # begin inside a shorter one ("sk-sk-ant-<real>"), and skipping RLENGTH
+      # would step over it.
       s = $0
       while (match(s, re)) {
         if (RLENGTH >= minlen) return 1
@@ -443,7 +487,19 @@ parse_reviewer_return() {
       # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
       # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
       # because there is no ^ anchor; only trailing content after the marker is
-      # rejected. A hostile producer can embed a decoy END mid-body with garbage
+      # rejected.
+      #
+      # SCOPE: everything above is about ENTERING and LEAVING pem mode, which is
+      # deliberately unanchored so no marker shape can dodge redaction. It is NOT
+      # about the real-vs-prose classifier further below, which anchors
+      # `pem_check` with `^...$` on purpose. The two are separate decisions and
+      # must not be "made consistent": unanchoring entry keeps keys from escaping,
+      # while anchoring the classifier keeps ordinary prose that merely ends by
+      # quoting a header from being read as a real key and redacting the report to
+      # EOF. Decoration is stripped before the classifier runs, so a diff- or
+      # blockquote-prefixed real marker still reaches it anchored.
+      #
+      # A hostile producer can embed a decoy END mid-body with garbage
       # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
       # redaction early — the tail anchor makes that decoy fail the
       # immediate-terminate path and fall through to the re-arm/stray logic
@@ -477,7 +533,18 @@ parse_reviewer_return() {
           in_pem = 1
           pem_stray = 0
           pem_span = 0
-          if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+          # Retire any re-arm window left over from an EARLIER block. pem_watch is
+          # only decremented while !in_pem, so a countdown still running when this
+          # BEGIN opens is frozen for the whole of this block and resumes after it
+          # with a stale count -- and the re-arm path restores pem_real from
+          # pem_prev_real, which belongs to that older block. A prose mention could
+          # then re-enter UNBOUNDED real mode on the strength of a key that ended
+          # long before. The window belongs to the block that closed, so close it.
+          pem_watch = 0
+          # deco_exhausted: strip_deco could not reach its fixpoint, so pem_check
+          # may still carry decoration and cannot be trusted to fail the anchor
+          # honestly. Fail closed -- treat the block as a real key.
+          if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
           else pem_real = 0
         }
       }
@@ -510,18 +577,47 @@ parse_reviewer_return() {
       # failure the window exists to prevent.
       if (!in_pem && pem_watch > 0) {
         pem_check = strip_deco($0)
+        # The re-arm additionally requires a digit or a base64-only punctuation
+        # character. Without it an ordinary camelCase identifier
+        # ("additionalRecommendationsForReviewers") satisfies the shape test and
+        # re-enters UNBOUNDED real mode on a single word, redacting the report
+        # through EOF so Verdict:/Confidence:/Summary: never survive and the
+        # reviewer is scored UNKNOWN. Real key material is base64 of random
+        # bytes and effectively always carries digits or +//=; English
+        # identifiers do not.
         if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
             pem_check ~ /[0-9+\/=]/) {
           in_pem = 1
           pem_stray = 0
           pem_span = 0
-          pem_real = pem_prev_real
+          # Inherit UNBOUNDED mode only with real base64-armor evidence. The
+          # shape test above accepts any alphanumeric run with a digit and a
+          # non-hex letter, which ordinary prose satisfies
+          # ("HereIsSomeBase64LookingData12345AndMore7"): inheriting real mode
+          # on that re-entered unbounded redaction and swallowed every
+          # remaining line including Verdict:/Confidence:/Summary:, scoring the
+          # reviewer UNKNOWN off one benign sentence. "+", "/" and "=" cannot
+          # appear in an identifier, so requiring one gates the unbounded path
+          # on evidence prose cannot forge. Without that evidence the block
+          # still re-enters PEM mode, just BOUNDED -- key-shaped lines keep
+          # resetting the stray counter, so a genuinely resumed body stays
+          # redacted, and a false re-arm costs three lines instead of the
+          # whole report.
+          pem_real = (pem_prev_real && pem_check ~ /[+\/=]/) ? 1 : 0
           pem_watch = 0
         } else {
           pem_watch--
         }
       }
-      if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
+      # Decide the state transition BEFORE deciding whether to redact this line.
+      # The stray cutoff fires ON the line that proves the window is over, and
+      # that line is ordinary prose. Overwriting `line` first meant the cutoff
+      # line was redacted anyway, so one quoted marker cost the mention plus
+      # three following lines -- and with Verdict:/Confidence:/Summary: right
+      # after it, all three were swallowed and the reviewer scored UNKNOWN, the
+      # exact outcome this bounded window exists to prevent.
+      pem_was_in = in_pem
+      pem_release = 0
       if (in_pem) {
         if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
           pem_prev_real = pem_real
@@ -545,17 +641,24 @@ parse_reviewer_return() {
           # fooling the body classifier.
           if (++pem_span > 200) {
             in_pem = 0
+            pem_release = 1
           } else {
             pem_body = strip_deco($0)
             if (pem_body != "") {
               if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
                   pem_body ~ /^(Proc-Type|DEK-Info):/ ||
                   $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-              else if (++pem_stray >= 3) in_pem = 0
+              else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
             }
           }
         }
       }
+      # Redact when the line was ENTERED in PEM mode, unless the machine released
+      # on THIS line via the stray cutoff or the span backstop -- in both cases
+      # the line is the non-key prose that ended the window. The END branch
+      # deliberately does not set pem_release: an END marker belongs to the key
+      # block and must stay redacted.
+      if (pem_was_in && !pem_release) line = "--- redacted PEM key block at line " NR " ---"
       # Blank lines are NEUTRAL — they neither reset nor increment pem_stray
       # (is_base64_line("") is false and pem_body == "" short-circuits above).
       # Counting them as valid body would reset pem_stray on every paragraph
@@ -1202,20 +1305,61 @@ for reviewer in claude codex gemini opencode; do
       # a prose rule with nothing executing it. Without this pass the
       # invariant would silently lose a member and unredacted key material
       # could land in docs/council/<report>.md — a file committed to the repo.
-      # Canonical block: council-patterns SKILL.md "11-Pattern Credential
-      # Redaction" — keep byte-identical with it.
+      # Canonical program: council-patterns SKILL.md "11-Pattern Credential
+      # Redaction" — byte-identical to it after dedent. Not yet covered by
+      # tests/redaction.bats (this file is absent from REDACTION_SOURCES
+      # until the multi-body extractor follow-up lands).
       section_body=$(awk '
-      function strip_deco(s) {
-        sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
-        sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
-        sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
-        # Diff "-"/"+" prefix (no space) — but never strip a leading dash off a
-        # real PEM delimiter run ("-----BEGIN"/"-----END"): that would corrupt
-        # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
-        # test below, since this helper also classifies the BEGIN line itself
-        # now, not just body lines.
-        if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
-        sub(/^[[:space:]]+/, "", s)
+      function strip_deco(s,   prev, guard, limit) {
+        # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in
+        # arbitrary order and depth: a blockquote inside a list item
+        # ("- > <header>"), a combined diff with one prefix character per parent
+        # ("++"/"--"), a numbered excerpt wrapping either. A single ordered pass
+        # removes whichever layer it happens to reach first and leaves the rest, so
+        # the marker never normalises, the anchored classifier fails, and the block
+        # drops to the bounded path where a narrowly wrapped body leaks.
+        #
+        # Repeating until nothing changes removes every layer regardless of order
+        # or count. The bound is derived from the INPUT LENGTH, not a constant: an
+        # iteration only continues after removing at least one character, so
+        # length(s)+2 iterations always reach the fixpoint. A CONSTANT ceiling (the
+        # original 8, then 64) is a real limit on a nesting depth the attacker
+        # chooses -- 100 leading "+" exhausted the 64-ceiling with prefixes still
+        # attached, the anchored classifier below then failed, and the block leaked
+        # on the bounded path.
+        #
+        # Reaching `limit` is therefore impossible while every substitution above
+        # shrinks s; it can only mean a later edit added one that rewrites without
+        # shrinking. That is a bug, not deep nesting, so record it and let the
+        # caller fail CLOSED (treat the line as a real key) instead of falling
+        # through to the bounded path. No test exercises this arm today -- it exists
+        # so a future edit degrades safely rather than silently leaking.
+        # A "+" run is consumed whole below, so the common flood case is linear. A
+        # long "-" run still costs one pass per character (the delimiter guard has to
+        # re-test after each removal), which is quadratic in the run length. An
+        # earlier revision bounded that with a flat length cap that failed CLOSED,
+        # but keying "this is a real key" off LENGTH ALONE meant any long line that
+        # merely MENTIONED a marker was promoted to a real key and swallowed the
+        # report through EOF. Cost is bounded here only for the "+" case; a hostile
+        # "-" flood is a known open issue, tracked rather than papered over with a
+        # guard that misclassifies.
+        guard = 0
+        limit = length(s) + 2
+        do {
+          prev = s
+          sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
+          sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
+          sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
+          # A "+" run can never be part of a PEM delimiter, so take the whole run in
+          # one pass. Only the dash case below needs character-at-a-time care.
+          sub(/^\+\+*/, "", s)
+          # Never strip a leading dash off a line that is ALREADY a valid PEM
+          # delimiter: that corrupts "-----BEGIN" into "----BEGIN" and breaks every
+          # anchored test downstream.
+          if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
+          sub(/^[[:space:]]+/, "", s)
+        } while (s != prev && ++guard < limit)
+        deco_exhausted = (s != prev)
         sub(/[[:space:]]+$/, "", s)
         return s
       }
@@ -1229,11 +1373,14 @@ for reviewer in claude codex gemini opencode; do
         # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
         # purposes (we only ever discard the matched text, never reuse it, so
         # {N} exact and {N,} at-least are interchangeable here).
-        # match() returns only the LEFTMOST occurrence. A short placeholder
-        # sharing the same literal prefix would shadow a real credential
-        # later on the same line, emitting the whole line unredacted. Walk
-        # every start position, advancing ONE character rather than past the
-        # whole match: a longer occurrence can begin inside a shorter one.
+        # match() returns only the LEFTMOST occurrence. When a short placeholder
+        # sharing the same literal prefix appears before a real token on the same
+        # line ("example sk-ant-xxx ... sk-ant-<real>"), the leftmost RLENGTH falls
+        # under minlen and the line — real token included — is emitted unredacted.
+        # Walk every start position instead of testing only the first, advancing by
+        # ONE character rather than past the whole match: a longer occurrence can
+        # begin inside a shorter one ("sk-sk-ant-<real>"), and skipping RLENGTH
+        # would step over it.
         s = $0
         while (match(s, re)) {
           if (RLENGTH >= minlen) return 1
@@ -1274,7 +1421,19 @@ for reviewer in claude codex gemini opencode; do
         # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
         # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
         # because there is no ^ anchor; only trailing content after the marker is
-        # rejected. A hostile producer can embed a decoy END mid-body with garbage
+        # rejected.
+        #
+        # SCOPE: everything above is about ENTERING and LEAVING pem mode, which is
+        # deliberately unanchored so no marker shape can dodge redaction. It is NOT
+        # about the real-vs-prose classifier further below, which anchors
+        # `pem_check` with `^...$` on purpose. The two are separate decisions and
+        # must not be "made consistent": unanchoring entry keeps keys from escaping,
+        # while anchoring the classifier keeps ordinary prose that merely ends by
+        # quoting a header from being read as a real key and redacting the report to
+        # EOF. Decoration is stripped before the classifier runs, so a diff- or
+        # blockquote-prefixed real marker still reaches it anchored.
+        #
+        # A hostile producer can embed a decoy END mid-body with garbage
         # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
         # redaction early — the tail anchor makes that decoy fail the
         # immediate-terminate path and fall through to the re-arm/stray logic
@@ -1308,7 +1467,18 @@ for reviewer in claude codex gemini opencode; do
             in_pem = 1
             pem_stray = 0
             pem_span = 0
-            if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+            # Retire any re-arm window left over from an EARLIER block. pem_watch is
+            # only decremented while !in_pem, so a countdown still running when this
+            # BEGIN opens is frozen for the whole of this block and resumes after it
+            # with a stale count -- and the re-arm path restores pem_real from
+            # pem_prev_real, which belongs to that older block. A prose mention could
+            # then re-enter UNBOUNDED real mode on the strength of a key that ended
+            # long before. The window belongs to the block that closed, so close it.
+            pem_watch = 0
+            # deco_exhausted: strip_deco could not reach its fixpoint, so pem_check
+            # may still carry decoration and cannot be trusted to fail the anchor
+            # honestly. Fail closed -- treat the block as a real key.
+            if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
             else pem_real = 0
           }
         }
@@ -1341,18 +1511,47 @@ for reviewer in claude codex gemini opencode; do
         # failure the window exists to prevent.
         if (!in_pem && pem_watch > 0) {
           pem_check = strip_deco($0)
+          # The re-arm additionally requires a digit or a base64-only punctuation
+          # character. Without it an ordinary camelCase identifier
+          # ("additionalRecommendationsForReviewers") satisfies the shape test and
+          # re-enters UNBOUNDED real mode on a single word, redacting the report
+          # through EOF so Verdict:/Confidence:/Summary: never survive and the
+          # reviewer is scored UNKNOWN. Real key material is base64 of random
+          # bytes and effectively always carries digits or +//=; English
+          # identifiers do not.
           if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
               pem_check ~ /[0-9+\/=]/) {
             in_pem = 1
             pem_stray = 0
             pem_span = 0
-            pem_real = pem_prev_real
+            # Inherit UNBOUNDED mode only with real base64-armor evidence. The
+            # shape test above accepts any alphanumeric run with a digit and a
+            # non-hex letter, which ordinary prose satisfies
+            # ("HereIsSomeBase64LookingData12345AndMore7"): inheriting real mode
+            # on that re-entered unbounded redaction and swallowed every
+            # remaining line including Verdict:/Confidence:/Summary:, scoring the
+            # reviewer UNKNOWN off one benign sentence. "+", "/" and "=" cannot
+            # appear in an identifier, so requiring one gates the unbounded path
+            # on evidence prose cannot forge. Without that evidence the block
+            # still re-enters PEM mode, just BOUNDED -- key-shaped lines keep
+            # resetting the stray counter, so a genuinely resumed body stays
+            # redacted, and a false re-arm costs three lines instead of the
+            # whole report.
+            pem_real = (pem_prev_real && pem_check ~ /[+\/=]/) ? 1 : 0
             pem_watch = 0
           } else {
             pem_watch--
           }
         }
-        if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
+        # Decide the state transition BEFORE deciding whether to redact this line.
+        # The stray cutoff fires ON the line that proves the window is over, and
+        # that line is ordinary prose. Overwriting `line` first meant the cutoff
+        # line was redacted anyway, so one quoted marker cost the mention plus
+        # three following lines -- and with Verdict:/Confidence:/Summary: right
+        # after it, all three were swallowed and the reviewer scored UNKNOWN, the
+        # exact outcome this bounded window exists to prevent.
+        pem_was_in = in_pem
+        pem_release = 0
         if (in_pem) {
           if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
             pem_prev_real = pem_real
@@ -1376,17 +1575,24 @@ for reviewer in claude codex gemini opencode; do
             # fooling the body classifier.
             if (++pem_span > 200) {
               in_pem = 0
+              pem_release = 1
             } else {
               pem_body = strip_deco($0)
               if (pem_body != "") {
                 if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
                     pem_body ~ /^(Proc-Type|DEK-Info):/ ||
                     $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-                else if (++pem_stray >= 3) in_pem = 0
+                else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
               }
             }
           }
         }
+        # Redact when the line was ENTERED in PEM mode, unless the machine released
+        # on THIS line via the stray cutoff or the span backstop -- in both cases
+        # the line is the non-key prose that ended the window. The END branch
+        # deliberately does not set pem_release: an END marker belongs to the key
+        # block and must stay redacted.
+        if (pem_was_in && !pem_release) line = "--- redacted PEM key block at line " NR " ---"
         # Blank lines are NEUTRAL — they neither reset nor increment pem_stray
         # (is_base64_line("") is false and pem_body == "" short-circuits above).
         # Counting them as valid body would reset pem_stray on every paragraph

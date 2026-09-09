@@ -94,3 +94,27 @@ exact terms must appear consistently in all prose, headings, and examples.
 - `docs/solutions/code-quality/stale-env-var-docs-and-prose-count-drift.md`
 - `docs/solutions/code-quality/cross-plugin-documentation-correctness.md`
 - `docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md`
+
+## Update — 2026-09-09: fifth instance — canonical skill lists no carrier roster (PR #781)
+
+A concrete case of Root Cause #1 (mental-model mismatch in sweeps) turned
+up in the security-sensitive PEM/credential-redaction awk lineage:
+`plugins/yellow-council/skills/council-patterns/SKILL.md` is the canonical
+source for a redaction program copied into two internal `council.md`
+sites and two CLI reviewer agent files, but the canonical file's own prose
+never lists where its copies live. A prior hardening pass fixed every copy
+its test extractor could find and silently missed council.md, because
+neither the extractor nor the canonical skill doc named it as a carrier —
+only an external JSON roster (`scripts/council-roster.json`) tracked the
+gap, and only because someone had thought to add an explicit entry for it.
+
+**Prevention addition:** when a file is designated canonical
+source-of-truth for a block that gets copied elsewhere — not just
+frontmatter, as in the original four patterns above, but any
+verbatim-copied code block — require the canonical file itself to
+enumerate its known copy sites in adjacent prose, not only in an external
+roster or extractor list. A roster file can itself drift or have blind
+spots, as it did here; a carrier list next to the source is one read away
+from the code someone is actually editing.
+
+Full incident: `docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md`'s 2026-09-09 Update.

@@ -223,3 +223,77 @@ these two sites is tracked as follow-up work, not covered by this PR.
 `plugins/yellow-council/skills/council-patterns/SKILL.md`,
 `plugins/yellow-codex/agents/review/codex-reviewer.md`,
 `plugins/yellow-codex/commands/codex/review.md`.
+
+## Update — 2026-09-09: canonical-vs-copy drift hid a third trade-off — anchored classifier narrow-wrap leak (PR #781)
+
+**Context:** `council.md` carried two 189-line copies of this exact awk
+program (the Step 4 claude-leg pass and the Step 7 report-build pass) —
+both roughly 101 lines behind the 290-line canonical body in
+`council-patterns/SKILL.md`, still running the single-pass decoration
+stripper the 2026-08-06 Update above already showed leaks, and missing the
+stray-window release fix. This was a tracked gap, not a silent one:
+`tests/lib/extract-redaction-awk.bash` only recognizes a bare, column-zero
+`awk '` opener and returns one body per file, so it cannot see council.md's
+two bodies, each indented inside a shell variable assignment.
+`scripts/council-roster.json` carried council.md in an explicit
+`redaction_known_untested` entry rather than letting it silently drop out
+of coverage — but "tracked" is not "tested."
+
+**Behavioral suite against the pre-sync body:** run once before the sync
+landed, it produced 4 failures, all over-redaction. None of the suite's
+leak checks failed — the stale body's known weakness was redacting too
+much, not leaking.
+
+**The trade-off found on re-review:** the canonical classifier decides
+real-block vs. stray-mention once, at BEGIN time, by anchoring the
+decoration-stripped BEGIN line full-line: a marker that is essentially the
+whole line is a genuine key (unbounded, fail-closed); a marker sharing its
+line with other text (a report merely quoting it) falls to a bounded
+window with a body-width floor, so an ordinary report is not swallowed
+whole. On a case built to probe exactly that boundary — a sentence that
+ends by quoting the BEGIN marker, immediately followed by a real key body
+wrapped narrower than the bounded path's floor (under 20 characters wide)
+— the _old_, pre-sync, tail-anchored-only classifier happened to leak 0
+lines of that body. The _new_, canonical, full-line-anchored classifier
+leaks 2, because the real block is classified as a stray mention and only
+escapes redaction once its width floor is satisfied.
+
+**This is not a regression to revert.** The full-line anchor exists
+specifically to close the under-redaction bypass this file's 2026-08-06
+Update documents — a single-line or inline key sharing a line with a BEGIN
+marker used to pass through completely unredacted. Leaking 2 lines of a
+narrow body is strictly better than that. But it is a real, measured
+regression against the specific stale behavior it replaces, on this one
+shape, and the General Rule above applies: don't fix this by loosening the
+anchor in isolation, that reopens the worse bug.
+
+**Fix direction (tracked, not yet landed):** add a fixture for the
+prose-prefixed, narrow-wrapped-body shape to the behavioral suite before
+any width/anchor tuning, so the specific trade-off is measured against a
+regression test rather than re-derived from memory next time someone
+touches this classifier.
+
+**Root-cause echo:** the same review round flagged that the canonical
+SKILL.md names none of its own copy sites in prose — an editor changing
+the canonical block has no way to discover council.md carries two of them
+short of reading `scripts/council-roster.json`. That is the concrete
+mechanism behind the #703 hardening pass missing this file in the first
+place. See the companion Update in
+`docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md`.
+
+**Documentation gotcha:** `scripts/validate-council-roster.js`'s Rule R
+walks the entire repository — including `plans/`, `docs/brainstorms/`, and
+gitignored paths like `.claude/agent-memory/`; only `.git/`,
+`node_modules/`, and the validator's own files are excluded — looking for
+two literal function-definition strings that identify a copy of this awk
+program. A prose file that quotes both together, anywhere, is treated as
+an undeclared carrier and fails `pnpm validate:schemas`. When writing
+about this code outside the canonical source and its registered carriers,
+refer to the two functions separately rather than pairing their exact
+definitions in one place.
+
+**Components (this Update):**
+`plugins/yellow-council/commands/council/council.md`,
+`plugins/yellow-council/skills/council-patterns/SKILL.md`,
+`scripts/council-roster.json`,
+`plugins/yellow-council/tests/lib/extract-redaction-awk.bash`.
