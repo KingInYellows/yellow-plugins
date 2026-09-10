@@ -7,7 +7,7 @@ rationale lives in the linked docs.
 ## Repository Purpose
 
 `yellow-plugins` is a pnpm monorepo that ships a Claude Code plugin
-marketplace (20 plugins under `plugins/`) plus the TypeScript validation and
+marketplace (19 plugins under `plugins/`) plus the TypeScript validation and
 release tooling that gates it. There is no published runtime — the TypeScript
 packages exist solely to validate manifests, schemas, and authoring rules.
 Plugin install/uninstall/rollback is handled natively by Claude Code.
