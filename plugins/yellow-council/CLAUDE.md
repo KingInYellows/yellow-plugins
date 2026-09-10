@@ -225,24 +225,43 @@ Codex agent.)
   enforceable read-only tool policy flag, adopt it here and retire this
   limitation. Treat any unexpected file mutation after a council run as a
   bug report for this plugin.
-- **A key that shares its BEGIN line with prose, or is wrapped by a
-  serializer, leaks its tail.** Redaction classifies once, at BEGIN time: a
-  marker that is the whole line (after decoration stripping) is a real key and
-  is redacted unbounded; anything else is treated as a mention and runs under
-  the bounded window, which releases after three non-key-shaped lines. Three
-  shapes therefore land on the bounded path even though they carry a genuine
-  key — `leaked key: -----BEGIN PRIVATE KEY-----`, a JSON string
-  (`"-----BEGIN PRIVATE KEY-----",`, which OpenCode's `--format json` can
-  produce), and a markdown table cell. With a narrowly wrapped body the tail
-  of the key and its END marker survive into the report.
-  A revision that normalized those shapes was reverted: keying "real key" off
-  line length or off matched quote/table wrappers promoted ordinary MENTIONS
-  to real keys, and real mode never resets until END or EOF, so one long
-  paragraph or one `- "<marker>"` bullet swallowed `Verdict:`/`Confidence:`/
-  `Summary:` and scored the reviewer UNKNOWN. Both directions are
-  attacker-reachable. Closing the leak safely requires reworking the bounded
-  window's width floor at the same time, which is deliberately left to its own
-  change rather than patched shape-by-shape here.
+- **A key wrapped by a serializer leaks its tail; a key that merely shares
+  its BEGIN line with prose no longer does.** Redaction classifies once, at
+  BEGIN time: a marker that is the whole line (after decoration stripping)
+  is a real key and is redacted unbounded; anything else is treated as a
+  mention and runs under the bounded window, which releases after three
+  non-key-shaped lines. `leaked key: -----BEGIN PRIVATE KEY-----` lands on
+  that bounded path, and until 2026-09-09 a body wrapped narrower than the
+  20-character base64 floor released the window and printed the rest of the
+  key and its END marker (a real 2048-bit key wrapped at 12 characters leaked
+  134 of 136 body lines). The bounded path now counts a 12-to-19 character
+  line as key material when it carries a digit, `+`, `/` or `=` AND a
+  character outside the hex alphabet (`is_narrow_key_line()` in
+  `skills/council-patterns/SKILL.md`, the canonical), and a pure base64 line
+  of the width the last key-shaped line established continues the body
+  unless it reads as a plain word (one optional capital, then lowercase);
+  the same rules re-arm the window after a decoy END, but only while the
+  chain is unbroken, so prose after a genuine END closes it; the span cap
+  is 400 lines. Measured over 25 real 2048-bit keys at every width from 12
+  to 19: 0 leaked lines. What remains open: bodies wrapped under 12
+  characters whose BEGIN shares its line with prose (a bare BEGIN inside a
+  prose-opened window now re-runs the entry test and starts a real block,
+  so that shape is redacted at any width); a run of equal-width mixed-case tokens (camelCase
+  identifiers, not words) directly after a key-shaped line, which keeps the
+  bounded window open until three plain lines follow; the
+  first slice after a mention when it carries no digit or hex characters
+  only, since the width chain has not started yet; keys longer than 400
+  lines; and serializer-wrapped shapes whose body lines carry quotes or
+  pipes — a JSON string (`"-----BEGIN PRIVATE KEY-----",`, which OpenCode's
+  `--format json` can produce) and a markdown table cell — because those
+  lines fail the base64 test at any width. A revision that normalized those
+  shapes was reverted: keying "real key" off matched quote/table wrappers
+  promoted ordinary MENTIONS to real keys, and real mode never resets until
+  END or EOF, so one `- "<marker>"` bullet swallowed `Verdict:`/
+  `Confidence:`/`Summary:` and scored the reviewer UNKNOWN. Both directions
+  are attacker-reachable. Any change to the rule is made in SKILL.md, is
+  re-extracted into the four carriers (see Conventions), and needs a
+  fixture for each direction in `tests/redaction.bats` first.
 - **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
   tool permission request, including writes (same class as the retired
   gemini `--yolo`). yellow-council MUST NOT use it.

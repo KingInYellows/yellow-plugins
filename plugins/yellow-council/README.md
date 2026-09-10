@@ -84,10 +84,16 @@ The user is asked for confirmation before the report file is written.
 > API keys, tokens and cleanly-formatted PEM private key blocks. It classifies
 > a key block once, when it sees the `BEGIN` marker, and only treats the block
 > as a real key when that marker is the whole line. A genuine key whose marker
-> shares its line with prose (`leaked key: -----BEGIN PRIVATE KEY-----`), or
-> one wrapped by a serializer (a JSON string, a markdown table cell), is read
-> as a passing mention instead and runs under a bounded window — with a
-> narrowly wrapped body, the tail of that key and its `END` marker can survive
+> shares its line with prose (`leaked key: -----BEGIN PRIVATE KEY-----`) runs
+> under a bounded window instead; since 2026-09-09 that window recognises a
+> narrowly wrapped body by its key-shaped lines and their width, so that
+> shape is redacted in full for wrappings of 12 characters or more once a
+> key-shaped line starts the width chain and while the block stays within
+> the 400-line cap (residuals: narrower wraps, a first slice with no digit
+> or hex only, keys over 400 lines). A key wrapped
+> by a serializer (a JSON string, a markdown table cell) still reads as a
+> passing mention because its body lines carry quotes or pipes, and with a
+> narrowly wrapped body the tail of that key and its `END` marker can survive
 > into the report. The alternative was measured and is worse: treating those
 > shapes as real keys lets any line ending in a `BEGIN` marker redact a whole
 > reviewer verdict, which a hostile diff can trigger deliberately.

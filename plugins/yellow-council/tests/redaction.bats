@@ -193,6 +193,10 @@ setup() {
   # required_conversation_resolution. The awk program sees identical bytes.
   NARROW_BODY="MIIEvQIBADANBg"
   WIDE_BODY="${NARROW_BODY}kqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCxYz"
+  # A narrow body line that satisfies is_narrow_key_line(): 12 to 19 chars,
+  # base64 charset, a digit AND a non-hex letter. Built from NARROW_BODY the
+  # same way WIDE_BODY is, for the same scanner reason.
+  NARROW_DIGIT_BODY="${NARROW_BODY}9g"
 }
 
 # run_redaction <awk-implementation> — filter stdin through the program.
@@ -605,6 +609,65 @@ body_files() {
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 
+@test "a prose-prefixed key with a narrowly wrapped body is fully redacted" {
+  # THE BOUNDED-PATH LEAK. A BEGIN that shares its line with prose is
+  # classified as a mention (see the anchored test above), so the block runs
+  # under the stray window. Before is_narrow_key_line(), body lines under
+  # the 20-char floor counted as stray, the window released after three of
+  # them, and the rest of the key plus its END marker printed into the
+  # committed report. Measured against a real 2048-bit key wrapped at 12
+  # characters: 134 of 136 body lines leaked; every width from 12 to 19
+  # leaked all but the first two. Pinned at the 12-char floor, at 14, and at
+  # the 19-char ceiling of the narrow band; a line ending in "=" exercises
+  # the "+", "/", "=" alternative of the digit test.
+  local w body input
+  for w in 12 14 19; do
+    body="${WIDE_BODY:0:$((w - 1))}9"
+    input="$(printf 'leaked key: %s\n%s\n%s\n%s\n%s\n%s\nVerdict: APPROVE' \
+      "$BEGIN_PK" "$body" "$body" "$body" "$body" "$END_PK")"
+    assert_redacted_under_all "$input" "$body" || { echo "width ${w}" >&2; return 1; }
+    assert_redacted_under_all "$input" "$END_PK" || { echo "width ${w}" >&2; return 1; }
+    assert_survives_under_all "$input" "Verdict: APPROVE" || { echo "width ${w}" >&2; return 1; }
+  done
+  body="${WIDE_BODY:0:13}="
+  input="$(printf 'leaked key: %s\n%s\n%s\n%s\n%s\n%s\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$body" "$body" "$body" "$body" "$END_PK")"
+  assert_redacted_under_all "$input" "$body"
+}
+
+@test "a prose-prefixed key whose header slices carry no digit is fully redacted" {
+  # THE WIDTH CHAIN. The fixed PKCS#8 DER prefix, wrapped at 12, yields
+  # slices with no digit, "+", "/" or "=" in known positions, so the digit
+  # test alone let roughly one real key in six release the window on its
+  # fifth line. A pure base64 line of the same width as the last key-shaped
+  # line now counts as key material. WIDE_BODY is that prefix; fold it at 12
+  # and every slice must stay redacted, digit or not.
+  local input slices
+  slices="$(printf '%s' "$WIDE_BODY" | fold -w 12)"
+  input="$(printf 'leaked key: %s\n%s\n%s\nVerdict: APPROVE' "$BEGIN_PK" "$slices" "$END_PK")"
+  assert_redacted_under_all "$input" "${WIDE_BODY:0:12}"
+  assert_redacted_under_all "$input" "${WIDE_BODY:24:12}"
+  assert_redacted_under_all "$input" "${WIDE_BODY:36:12}"
+  assert_redacted_under_all "$input" "$END_PK"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
+@test "a decoy END inside a narrowly wrapped real key does not expose the rest" {
+  # The re-arm window is the sibling of the bounded path and used the same
+  # 20-char floor: a decoy END inside a real key handed the resumed narrow
+  # body to a window that never re-armed, and every remaining line printed
+  # in clear. The re-arm now accepts a narrow key-shaped line or a line of
+  # the width the real block already established. Measured against real
+  # 2048-bit keys wrapped at 12 to 19: 113 of 116 lines leaked before at
+  # width 14, 0 after.
+  local input
+  input="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$END_PK" \
+    "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_DIGIT_BODY"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
 @test "a decoy END does not expose the remaining key body" {
   # A hostile producer injects a bare END mid-body to terminate redaction
   # early. The bounded re-arm window exists to catch the resumed body.
@@ -615,6 +678,88 @@ body_files() {
 }
 
 # --- Over-redaction direction ----------------------------------------------
+
+@test "a quoted marker followed by a list of long words still releases the report" {
+  # THE COUNTERWEIGHT to the narrow-body tests above. is_narrow_key_line()
+  # must not promote ordinary single-word lines to key body: capitalised or
+  # camelCase words of 12+ letters on their own lines, right after a
+  # mention, carry no digit and must count as stray so the window releases
+  # before the verdict. Equal-length words must not start the width chain
+  # either: the chain only starts from a line that passed a strict test.
+  local input
+  input="$(printf 'note: the header is %s\nRecommendation\nDocumentation\ngetUserNameFast\nmore prose here\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+  input="$(printf 'note: the header is %s\nDocumentation\nInvestigation\nRecommendatio\nmore prose here\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
+@test "a quoted marker followed by abbreviated commit SHAs still releases the report" {
+  # A 12-char git SHA is base64-charset with digits. Without the hex-SHA
+  # exclusion the 20-char branch already applies, three of them after a
+  # mention held the window open and swallowed Verdict: and Summary:.
+  local input
+  input="$(printf 'commits mentioning %s:\n766268d1a2b3\n13c99c56f49b\n6a0bcc87e1d2\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+}
+
+@test "digit-bearing identifiers after a quoted marker delay release but stay bounded" {
+  # The accepted trade, same class the 20-char branch already accepts (see
+  # the coincidental base64-shaped word test below): a list of identifiers
+  # that carry digits and non-hex letters is key-shaped, so the window stays
+  # open across them, but it still releases after three plain lines and the
+  # verdict survives when it sits past that point.
+  local input
+  input="$(printf 'note: %s\nbuild2024final\nrelease2025rc\nversion3beta\nshort prose\nmore prose\nthird prose\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+}
+
+@test "equal-length plain words after a narrow key line still release the report" {
+  # THE COUNTERWEIGHT to the width chain. Once a strict narrow line has set
+  # the width, a digit-free line of that exact width continues the body --
+  # but not when it reads as a plain word (one optional capital, then
+  # lowercase). Three 16-letter words after a 16-char key-shaped line must
+  # count as stray so the window releases before the verdict.
+  local input
+  input="$(printf 'note: %s\n%s\nresponsibilities\ncharacterisation\nacknowledgements\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK" "$NARROW_DIGIT_BODY")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+}
+
+@test "equal-length words after a genuine END cannot re-open the block" {
+  # The re-arm window honours the width continuation only while the chain
+  # is unbroken. A genuine END followed by prose closes the chain, so a run
+  # of words matching the body width -- or a single width-matched token a
+  # few lines later -- cannot re-enter PEM mode and swallow the verdict.
+  local input
+  input="$(printf 'key: %s\n%s\n%s\n%s\n%s\nresponsibilities\ncharacterisation\nacknowledgements\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$END_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+  input="$(printf 'key: %s\n%s\n%s\n%s\n%s\nsee the notes\nrecommended.\n%s\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$END_PK" "$NARROW_BODY")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
+}
+
+@test "a word-shaped slice inside a narrow key body does not release it" {
+  # The other direction of the plain-word exclusion. Roughly one slice in
+  # four thousand of a real key at width 12 happens to read as a word; it
+  # counts as one stray line, the next key-shaped line resets the counter,
+  # and nothing leaks.
+  local input
+  input="$(printf 'leaked key: %s\n%s\nresponsibilities\n%s\n%s\n%s\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$NARROW_DIGIT_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_DIGIT_BODY"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
 
 @test "the report tail survives a coincidental base64-shaped word after a key" {
   # THE COUNTERWEIGHT to the re-arm tests above. After a genuine END, an
@@ -741,6 +886,26 @@ body_files() {
     "$BEGIN_RSA" "$WIDE_BODY" \
     "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_RSA")"
   assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "a bare BEGIN inside a prose-opened window starts a real block" {
+  # A prose mention of a marker opens a BOUNDED window. When a genuine key
+  # begins on its own line inside that window, the entry branch cannot see
+  # it (it requires !in_pem), so the block stayed on the floor path and a
+  # body wrapped under 12 characters released the stray counter after three
+  # lines, printing the rest of the key and its END marker. The in-window
+  # branch now re-runs the entry test on a bare BEGIN and promotes the block
+  # to real mode, so the body is redacted at any width.
+  local under12="MIIEvQIB"
+  local input
+  input="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s' \
+    "note: a mention of ${BEGIN_PK} in prose" \
+    "$BEGIN_RSA" \
+    "$under12" "$under12" "$under12" "$under12" "$under12" "$under12" \
+    "$END_RSA" "Verdict: APPROVE")"
+  assert_redacted_under_all "$input" "$under12"
+  assert_redacted_under_all "$input" "$END_RSA"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
 }
 
 @test "an inline single-line key is redacted without entering PEM mode" {
