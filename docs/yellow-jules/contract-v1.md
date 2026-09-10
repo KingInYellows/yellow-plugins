@@ -14,6 +14,18 @@ the shapes in
 Evidence labels use the vocabulary defined once in
 [capability-matrix.md](capability-matrix.md).
 
+**Provenance.** Statements that trace to a spec requirement (cited as `R<n>`)
+are normative. The mechanism-level rules and every numeric default in this
+document that carry no `R<n>` citation and no evidence label were added in PR1
+to close review findings, not taken from the spec or from vendor evidence: the
+60 s / 30 s timeouts, the 120 s / 180 s deadlines, the 20-page and `pageSize`
+bounds, the 5-minute overlap, the 1000-id ring, the 5-page reconcile bound, the
+10-minute token TTL and 50-entry cap, the 25 MiB / 200 artifact / 100 MiB caps,
+the 30-day archive, the 60-character title default, the `[yellow:<local-id>]`
+tag, the `sdk-scratch` tripwire, the fetch guard, the pending-confirmations
+file, and the watermark and resume-token rules. PR2 may revise any of them with
+a note in this contract; they bound the design, they do not certify it.
+
 ## Motivation
 
 The motivating value of yellow-jules is asynchronous, unattended execution:
