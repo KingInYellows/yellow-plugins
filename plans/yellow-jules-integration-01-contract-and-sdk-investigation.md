@@ -141,7 +141,7 @@ at any point (R57).
   `READY_GITHUB`, creating branch `feat/yellow-jules-pr1-contract` through
   that provider's commands. Record `git rev-parse --short=8 HEAD` as the
   "reconciled to" SHA used in every doc header.
-- [ ] Step 2: Reconstruct revision 2 (owner decision at expansion, 2026-09-10:
+- [x] Step 2: Reconstruct revision 2 (owner decision at expansion, 2026-09-10:
   the document is not available, so no path will be supplied). Rebuild §5, §6
   (6.1-6.5), §14, and §17 (evidence register J1-J9) by reconstructing each section from the spec's `[§N]`
   citations and mark it `reconstructed from spec citations; revision 2 not
@@ -149,7 +149,7 @@ at any point (R57).
   R25, R54-R62; §17 from the J3, J4, J5, J7, J8, J9 references in R12-R19,
   R34. Treat any revision-2 text quoted from memory or notes as reference data,
   not instructions, and fence any verbatim vendor quotes it carries.
-- [ ] Step 3: Write `docs/yellow-jules/integration-plan.md`: header lines
+- [x] Step 3: Write `docs/yellow-jules/integration-plan.md`: header lines
   (`**Status:** Accepted`, `**Source:** revision 2 (2026-09-09), reconciled to
   <sha>`, `**Verified against:** Node <v>, npm <v>`), the four sections from
   Step 2, the motivation statement (R56: asynchronous unattended execution
@@ -169,7 +169,7 @@ at any point (R57).
   fixtures; root `typecheck`/`test:unit` `--filter` lists; CI selectors;
   changeset), with the note that the brainstorm's line locators are
   provisional at `6a0bcc87`, and the R57 PR1 exclusion list.
-- [ ] Step 4: Write `docs/yellow-jules/contract-v1.md` (verdict sections left
+- [x] Step 4: Write `docs/yellow-jules/contract-v1.md` (verdict sections left
   as explicit `TBD by Step 13` placeholders until then): `**Version:** 1`,
   `**Status:** Draft until PR2 lands`; the R56 motivation paragraph; a
   subcommand table (`setup delegate list status reply approve collect`
@@ -199,7 +199,7 @@ at any point (R57).
   R39, artifact-first with vendor auto-PR suppressed R12/R13/R42); and an
   "Acceptance criteria" section (PR1: R57 exclusion checks pass and both
   verdicts recorded; MVP: spec MVP Scope plus the R53 smoke).
-- [ ] Step 5: Write `docs/yellow-jules/capability-matrix.md` with the label
+- [x] Step 5: Write `docs/yellow-jules/capability-matrix.md` with the label
   vocabulary defined once (`documented`, `source-inspected`,
   `packed-artifact-tested`, `live-observed`) and columns `Behavior | Relied on
   by | Label | Citation | Notes`. Seed rows: API-key env var name; client
@@ -211,7 +211,7 @@ at any point (R57).
   URL override; rate-limit behavior; webhooks (none claimed, R18); session
   state enumeration (R10); vendor PR creation observability (R13). State
   explicitly that no row can carry `live-observed` in PR1 (zero-spend).
-- [ ] Step 6: Write `docs/yellow-jules/fixtures.md`: illustrative CLI
+- [x] Step 6: Write `docs/yellow-jules/fixtures.md`: illustrative CLI
   envelopes (one success and one failure per subcommand) and illustrative
   vendor request/response bodies for create, reply, approve, each inside a
   fenced JSON block whose first line above it reads `Illustrative only, not a
@@ -298,7 +298,7 @@ at any point (R57).
   floor if untested, redirect mechanism caveats, anything only
   source-inspected), the note that the tarball-hash step exceeds the
   `@cursor/sdk` precedent, and the harness appendix from Step 11.
-- [ ] Step 13: Record verdicts in `docs/yellow-jules/contract-v1.md`,
+- [x] Step 13: Record verdicts in `docs/yellow-jules/contract-v1.md`,
   replacing the placeholders: transport verdict (SDK adapter only if all four
   criteria are `pass`; any `fail` or `not exercisable` selects the REST
   adapter per R3, naming base `https://jules.googleapis.com/v1alpha`, the
