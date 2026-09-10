@@ -1,0 +1,27 @@
+docs/yellow-jules/integration-plan.md
+  s_bfaae59535a9fa::t_f1cc82457dbc76 20-23,131-133,217-219
+docs/yellow-jules/capability-matrix.md
+  s_bfaae59535a9fa::t_63fbc61360998d 26-67
+docs/yellow-jules/contract-v1.md
+  s_bfaae59535a9fa::t_22b773835a0c33 29-35,41,48-49,56-100,103-105,123-129,159-162,167-172,176-182,195-206,212-214,217-224,227-232,234-237,239-254,257-261,263-269,276-311,356-410,416-429,441,456,459-466,478-493,497-499,514-516,524-526,543-561,564-574,579-583
+docs/yellow-jules/sdk-investigation.md
+  s_bfaae59535a9fa::t_5161ac103ed1c6 18-21,233-238,304-317,352-353,395-397,460-467,489-494,501-524,914-916,918-921,923-927
+docs/yellow-jules/fixtures.md
+  s_bfaae59535a9fa::t_a8e6e5809e60c1 27-30,248-249,251,256,258-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "74a183aa858eeff99ad64760e5259c65f0bfe8d4",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
