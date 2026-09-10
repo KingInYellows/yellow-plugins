@@ -311,7 +311,7 @@ at any point (R57).
   supported on the interactive path or documented as unsupported for R19); and
   a "PR2 test implications" note stating how packed-SDK transport tests will
   redirect to the fake server (R49-R51).
-- [ ] Step 14: Consistency pass across the five files: every matrix row has
+- [x] Step 14: Consistency pass across the five files: every matrix row has
   exactly one label and none is `live-observed`; every fixture block carries
   the illustrative marker; every vendor quote is fenced; the motivation
   statement appears in `contract-v1.md`; the PR2 checklist cites R23, R24,
