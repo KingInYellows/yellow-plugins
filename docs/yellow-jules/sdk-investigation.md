@@ -15,6 +15,10 @@ the registry integrity value, which `plugins/yellow-cursor` never recorded for
 its own pin (see
 `docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md`).
 
+Vendor-originated strings in this record are either inside a
+`--- begin … (reference only) ---` fence or paraphrased with a citation; none is
+quoted bare. The R53 smoke record inherits that rule.
+
 ## What it proves and what it does not
 
 | Proves                                                                                                                               | Does NOT prove                                                                                           |
@@ -226,12 +230,12 @@ Import side effects: no file created under `$INV/home`, `$INV/xdg`, `$INV/tmp`,
 or `$INV/data` (`find -newer marker`); no network activity
 (`NODE_DEBUG=net,http` printed nothing). With `JULES_API_KEY` unset, the import
 succeeds, `jules.with({})` succeeds, and the first request
-(`jules.session("s-1").info()`) throws `MissingApiKeyError` with the message
-"Jules API key is missing. Pass it to the constructor or set the JULES_API_KEY
-environment variable." The env var is read eagerly at client construction
-(`dist/index.mjs` L2358, run at module evaluation for the default `jules` export
-via `connect()` at L4334) but the throw is deferred to the first request
-(L135-139).
+(`jules.session("s-1").info()`) throws `MissingApiKeyError`, whose message
+(paraphrased; `index.mjs` L64) says the key is missing and names the constructor
+option and the `JULES_API_KEY` variable as the two ways to supply it. The env
+var is read eagerly at client construction (`dist/index.mjs` L2358, run at
+module evaluation for the default `jules` export via `connect()` at L4334) but
+the throw is deferred to the first request (L135-139).
 
 Resolver facts for PR2 (CJS caller anchored in the runtime dir via
 `createRequire`): `resolve('@google/jules-sdk')` throws
@@ -297,10 +301,20 @@ the packed `0.2.0` artifact.
   already in storage (dedup by id), and on later passes adds
   `filter=create_time>"<latest createTime>"`. `history()` on
   `DefaultActivityClient` always calls `hydrate()` first (M980-985), so it is a
-  network read despite the interface comment (T936-939 says "Does NOT open a
-  network connection"). Page tokens are documented as nanosecond timestamps
-  (`dist/utils/page-token.d.ts`). `streamActivities` (M794-879) dedups by
-  `(createTime, id)` and retries only the first `404` up to 10 times.
+  network read despite the interface JSDoc (T936-939), which claims the method
+  opens no network connection. Page tokens are documented as nanosecond
+  timestamps (`dist/utils/page-token.d.ts`). `streamActivities` (M794-879)
+  dedups by `(createTime, id)` and retries only the first `404` up to 10 times.
+- **Session enumeration and direct activity list**: `jules.sessions(options)`
+  (T1265; `dist/sessions.d.ts` L483-503: `pageSize`, `pageToken`, `limit`,
+  `persist` default `true` = write-through to session storage, `filter`) returns
+  a `SessionCursor` (exported, `dist/index.d.ts` L27) that is thenable for one
+  page (`GET sessions`, M2620-2627) and async-iterable for all pages.
+  `session.activities.list(options)` is `ActivityClient.list`
+  (`dist/activities/types.d.ts` L1461-1464, "NETWORK LIST"), implemented by
+  `DefaultActivityClient.list` over `NetworkAdapter.listActivities`
+  (M1155-1173); it is the one paginated activity read that does not go through
+  `hydrate()`. Neither was exercised by the harness (`source-inspected`).
 - **Storage default** (M4327-4330): `NodeFileStorage`/`NodeSessionStorage`
   rooted at `getRootDir()` (M349-369): `JULES_HOME` if writable, else **cwd if
   it contains a `package.json`**, else `HOME`, else `os.homedir()`, else
@@ -335,7 +349,8 @@ the packed `0.2.0` artifact.
 - **Activity types** (M598-668): `agentMessaged`, `userMessaged`,
   `planGenerated` (carries `plan: { id, steps[], createTime }`), `planApproved`
   (`planId`), `progressUpdated`, `sessionCompleted`, `sessionFailed` (`reason`);
-  an unknown activity key throws `Error("Unknown activity type")`.
+  an unknown activity key throws a plain `Error` whose message names an unknown
+  activity type (M667).
 - **Error classes** (`dist/errors.d.ts`): `JulesError`,
   `JulesNetworkError {url}`, `JulesApiError {url,status,statusText}`,
   `JulesAuthenticationError` (401/403), `JulesRateLimitError` (429),
@@ -377,8 +392,9 @@ although the SDK constructs it from `name` (the constructor strips the prefix);
 cache-valid; `history()` walked two pages and returned `act-1, act-2, act-3`
 (three unique ids) although `act-2` appeared on both pages. The in-process
 `fetch` wrapper saw 7 requests, all to the single loopback origin, all carrying
-the `X-Goog-Api-Key` header (presence only logged). The header value length
-matched the dummy key's length, so the env value is what was sent.
+the `X-Goog-Api-Key` header (presence only logged). The env value is what was
+sent: the harness confirmed presence only, and the productized test must never
+compare or log the header's length.
 
 Check (d) added a second `history()` pass, which issued two more list requests
 with `filter=create_time>"2026-09-10T00:00:03Z"` (the latest cached
@@ -441,14 +457,14 @@ A criterion that could not be exercised would have been recorded as
 
 ## 11. Documented-versus-source divergences
 
-| Readme or JSDoc says                                        | Source does                                                                             | Consequence for PR2                                                        |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `jules.with({ apiKey, pollingIntervalMs, timeout })`        | `JulesOptions` nests `pollingIntervalMs` and `requestTimeoutMs` under `config` (T61-71) | Adapter passes `config.requestTimeoutMs`; a top-level `timeout` is ignored |
-| "Configuration for 429 rate limit retry behavior" (T73)     | Retries on 429 and 500/502/503/504 (M152)                                               | Disable via `config.rateLimitRetry.maxRetryTimeMs: 0`; test by count       |
-| `history()` "Does NOT open a network connection" (T936-939) | `DefaultActivityClient.history()` hydrates from the network first (M980-985)            | Treat `history()` as a network read; use `activities.select()` for local   |
-| Readme lists 5 error classes                                | `errors.d.ts` declares 11                                                               | `JULES_*` table maps all 11 (contract-v1.md)                               |
-| `Platform.fetch` "Unified network fetch" (T771)             | `ApiClient` uses global `fetch` (M209)                                                  | Redirect only via `baseUrl`; global-fetch wrappers also work for tests     |
-| `storageFactory` "(Internal)" (T47)                         | Read from public `JulesOptions` (M2355) and exported memory classes                     | Pin-stability risk; re-verify (d) on every bump                            |
+| Readme or JSDoc says                                               | Source does                                                                             | Consequence for PR2                                                        |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `jules.with({ apiKey, pollingIntervalMs, timeout })`               | `JulesOptions` nests `pollingIntervalMs` and `requestTimeoutMs` under `config` (T61-71) | Adapter passes `config.requestTimeoutMs`; a top-level `timeout` is ignored |
+| JSDoc scopes `rateLimitRetry` to 429 rate limiting (T73)           | Retries on 429 and 500/502/503/504 (M152)                                               | Disable via `config.rateLimitRetry.maxRetryTimeMs: 0`; test by count       |
+| JSDoc says `history()` opens no network connection (T936-939)      | `DefaultActivityClient.history()` hydrates from the network first (M980-985)            | Treat `history()` as a network read; use `activities.select()` for local   |
+| Readme lists 5 error classes                                       | `errors.d.ts` declares 11                                                               | `JULES_*` table maps all 11 (contract-v1.md)                               |
+| JSDoc presents `Platform.fetch` as the unified network path (T771) | `ApiClient` uses global `fetch` (M209)                                                  | Redirect only via `baseUrl`; global-fetch wrappers also work for tests     |
+| `storageFactory` JSDoc-tagged internal (T47)                       | Read from public `JulesOptions` (M2355) and exported memory classes                     | Pin-stability risk; re-verify (d) on every bump                            |
 
 ## 12. Remaining unknowns
 
@@ -470,15 +486,42 @@ A criterion that could not be exercised would have been recorded as
 - The vendor's rate-limit headers (`Retry-After` is never read by the SDK;
   `grep -c` is 0), so Yellow's own backoff cannot rely on them through the SDK.
 - Cross-origin or downgrade redirects: the SDK follows `fetch` defaults
-  (redirects followed silently). Not exercised; relevant only on the REST
-  branch, which PR2 does not take.
+  (redirects followed silently) and `X-Goog-Api-Key` is not among the headers
+  `fetch` strips on a cross-origin redirect, so the SDK branch inherits the risk
+  through global `fetch`, not only the REST branch. Not exercised;
+  contract-v1.md requires a process-local fetch guard (`redirect: "manual"`,
+  pinned origin) and PR2 adds a 302-to-second-port fixture asserting the header
+  never arrives.
 
 ## Appendix A: harness
 
 Five files, run from `$INV`. The server binds `127.0.0.1:0` and exits 2 on any
 other bind address. Response bodies are illustrative shapes derived from
 `dist/types.d.ts`; only the request log is evidence. PR2 productizes this as
-`plugins/yellow-jules/tests/fake-http-server.ts` (R49).
+`plugins/yellow-jules/tests/fake-http-server.ts` (R49). This appendix is the
+historical evidence record, reproduced as executed on 2026-09-10; it is not
+maintained after PR2 lands, and the productized copy is authoritative from then
+on. Review after the run found these hardening gaps, which the productized copy
+closes and which did not affect the captured evidence:
+
+- The activities route has no `req.method === 'GET'` guard, unlike every sibling
+  route.
+- Header logging is a three-entry denylist; the productized server logs an
+  allowlist (`content-type`, `content-length`, `user-agent`) and records every
+  other header as name plus `<present>`.
+- Log and port-file paths default to cwd-relative names; derive both from the
+  test's temp directory with no env override.
+- The log is opened with `appendFileSync` per request (follows a pre-existing
+  symlink, never truncated at startup, synchronous in the handler); open once
+  with `O_CREAT|O_EXCL|O_WRONLY|O_NOFOLLOW` and truncate per scenario.
+- The request body is accumulated without a size cap and logged verbatim,
+  including `prompt`; cap the body (413 over the limit) and log a
+  `promptDigest`.
+- The client `fetch` wrapper assumes a plain-object `headers` init and a string
+  `input`; normalize with `new Headers(init?.headers ?? {})` and accept `URL`
+  and `Request` inputs.
+- `summarizeFetch()` rebuilds a `Set` over the whole log on every call; keep
+  running counters.
 
 `fake-jules-server.mjs`:
 
@@ -868,12 +911,19 @@ node -e 'import(require("node:url").pathToFileURL(process.env.SDK_MJS).href).the
 node -e 'require(process.env.SDK_MJS)'   # observation only
 env -u JULES_API_KEY node --input-type=module -e 'const m = await import(new URL("file://" + process.env.SDK_MJS)); await m.jules.session("s-1").info()'
 
-# Step 11: fake server checks (one server per check; FAKE_SCRIPT only for check c)
+# Step 11: fake server checks (one server per check; FAKE_SCRIPT only for check c).
+# start_server backgrounds the server and polls for the port file (readiness);
+# stop_server kills it by pid, which also works in non-interactive shells.
 export FAKE_PORT_FILE="$INV/server.port"
-FAKE_LOG="$INV/requests-b.jsonl" node fake-jules-server.mjs & node check-b.mjs; kill %1
+start_server() { rm -f "$FAKE_PORT_FILE"; FAKE_LOG="$1" FAKE_SCRIPT="${2:-}" node fake-jules-server.mjs & SRV=$!; for i in $(seq 1 50); do [ -s "$FAKE_PORT_FILE" ] && break; sleep 0.1; done; }
+stop_server() { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }
+touch "$INV/marker-b"; sleep 1
+start_server "$INV/requests-b.jsonl"; node check-b.mjs; stop_server
 find "$INV/home" "$INV/xdg" "$INV/tmp" "$INV/data" -newer "$INV/marker-b" -type f
-FAKE_LOG="$INV/requests-d.jsonl" node fake-jules-server.mjs & node check-d.mjs; kill %1
-FAKE_LOG="$INV/requests-c.jsonl" FAKE_SCRIPT=429,503 node fake-jules-server.mjs & MAX_RETRY_TIME_MS=0 node check-c.mjs; kill %1
-FAKE_LOG="$INV/requests-c-control.jsonl" FAKE_SCRIPT=429,503 node fake-jules-server.mjs & MAX_RETRY_TIME_MS=1500 node check-c.mjs; kill %1
+touch "$INV/marker-d"; sleep 1
+start_server "$INV/requests-d.jsonl"; node check-d.mjs; stop_server
+find "$INV/home" "$INV/xdg" "$INV/tmp" "$INV/data" -newer "$INV/marker-d" -type f
+start_server "$INV/requests-c.jsonl" "429,503"; MAX_RETRY_TIME_MS=0 node check-c.mjs; stop_server
+start_server "$INV/requests-c-control.jsonl" "429,503"; MAX_RETRY_TIME_MS=1500 node check-c.mjs; stop_server
 FAKE_BIND=0.0.0.0 node fake-jules-server.mjs   # exits 2: loopback only
 ```

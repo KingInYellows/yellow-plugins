@@ -17,13 +17,10 @@ fencing is needed beyond the fences in the linked evidence.
 
 ## Motivation
 
-The motivating value is asynchronous, unattended execution: Jules sessions run
-for a long time without a supervising CLI holding a connection. That value is
-realized fully only after the separate `yellow-goal` engine gains real-provider
-execution, persistent waiting, and asynchronous outcomes. v0's interactive
-commands and bounded supervision are deliberate scaffolding toward that
-milestone, not the end state; Cursor/Devin parity is a side effect. (Spec R56;
-brainstorm decision 2026-09-09; restated in [contract-v1.md](contract-v1.md).)
+Asynchronous, unattended execution, realized fully after the `yellow-goal`
+engine milestone; v0 is scaffolding. The authoritative statement is the
+Motivation section of [contract-v1.md](contract-v1.md) (R56; brainstorm decision
+2026-09-09).
 
 ## §5 Command surface and runtime contract
 
@@ -131,11 +128,9 @@ labeled (R49).
 
 Reconstructed from R23, R25, R54-R62.
 
-1. **PR1, contract and investigation** (R54-R57, docs only): this directory. No
-   `plugins/yellow-jules/`, no catalog file, no `READY_JULES`, no Linear or
-   setup-all change, no generated host enablement, no goal-engine change, no
-   live Jules session; existing unrelated baseline failures are reported, not
-   hidden (R57).
+1. **PR1, contract and investigation** (R54-R57, docs only): this directory,
+   bounded by the "PR1 exclusion list (R57)" section below; existing unrelated
+   baseline failures are reported, not hidden.
 2. **PR2, provider, runtime, complete Claude routing** (R1-R28, R29, R35-R37,
    R40, R42, R49-R53; atomic). `READY_JULES` ships only when every consumer
    handles it, in one PR that reverts as one; the PR description carries the
@@ -219,17 +214,15 @@ Other sites (R22, R25, R26, R27, R28):
 
 Reconstructed from the J-references in R11, R12, R14, R15, R17, R18, R19, R34.
 Revision 2 numbered its evidence items J1-J9; only J3, J4, J5, J7, J8, and J9
-are cited by the spec, so the others are recorded as unreconstructable. The "PR1
-status" column points at the evidence this PR produced.
+are cited by the spec. J1, J2, and J6 are not cited by any requirement and are
+not reconstructed. The "PR1 status" column points at the evidence this PR
+produced.
 
 | Item | Reconstructed claim (from citing requirements)                                                                                                                           | PR1 status                                                                                                                 |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| J1   | Not cited by any spec requirement; content not reconstructable                                                                                                           | n/a                                                                                                                        |
-| J2   | Not cited by any spec requirement; content not reconstructable                                                                                                           | n/a                                                                                                                        |
 | J3   | The approval endpoint accepts no plan id (R34); the vendor contract establishes no cancel, pause, resume, cost, or exactly-once (R11); REST field names for create (R12) | `packed-artifact-tested`: `POST sessions/{id}:approvePlan` with body `{}`; absence of the operations is `source-inspected` |
 | J4   | Sources come from the Sources API; the SDK constructs the resource name from `owner/repo` for lookup only (R17)                                                          | `packed-artifact-tested`: `GET sources/github/{owner}/{repo}` precedes every create                                        |
 | J5   | Activities paginate with `nextPageToken` and can repeat across pages; artifacts are change sets, media, or generated files (R18, R19)                                    | pagination and dedup `packed-artifact-tested`; artifact union `source-inspected`                                           |
-| J6   | Not cited by any spec requirement; content not reconstructable                                                                                                           | n/a                                                                                                                        |
 | J7   | `requireApproval`/`autoPr` serialize to `requirePlanApproval`/`automationMode`; the SDK keeps a local cache that must be isolated (R12, R15)                             | `packed-artifact-tested`: exact body captured; memory storage factory produces no files                                    |
 | J8   | The SDK retries rate-limited responses unless `rateLimitRetry.maxRetryTimeMs` is zero (R14)                                                                              | `packed-artifact-tested`: one POST per create at 0; replay of 429 and 5xx at the default                                   |
 | J9   | Cached reads are not fresh reads; status paths must read remotely (R15)                                                                                                  | `source-inspected`: `info()` cache tiers; `history()` hydrates; contract limits `info()` to one fresh read per process     |

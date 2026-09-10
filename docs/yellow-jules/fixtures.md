@@ -24,7 +24,10 @@ Illustrative only, not a captured response
   "sdkResolution": "data-dir",
   "sdkVersion": "0.2.0",
   "sdkIntegrity": "sha512-fKutNR8VvzsxqKA4uYkkJUZauXhiuIu9aVpjgeMuFADKt95y7oQbRJX/QmOS74fy2yAsY6SwKnIY6cJaaG6kpQ==",
-  "sourcesReachable": { "supported": true, "value": 3 }
+  "sourcesReachable": {
+    "supported": true,
+    "value": { "count": 3, "truncated": false }
+  }
 }
 ```
 
@@ -242,108 +245,19 @@ Illustrative only, not a captured response
   "ok": false,
   "operation": "collect",
   "error": {
-    "code": "JULES_UNSUPPORTED_CAPABILITY",
-    "message": "session completed with a Markdown explanation only; no change set, pull request, or generated file",
+    "code": "JULES_DATA_DIR",
+    "message": "artifact staging directory is group-writable",
     "retryable": false,
-    "recoveryAction": "No artifact to stage; the result is non-accepted for a code-changing task (R19)."
+    "recoveryAction": "Fix ownership and mode of the yellow-jules data directory (0700 directories, 0600 files), then retry; nothing was staged."
   }
 }
 ```
 
-### authorize (PR3)
+### authorize, supervise, integrate
 
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": true,
-  "operation": "authorize",
-  "grantId": "grant-2026-09-10-01",
-  "repository": "octo/repo",
-  "sourceResource": "sources/github/octo/repo",
-  "branchPattern": "scratch/jules-*",
-  "operations": ["create", "reply", "approve", "collect"],
-  "limits": { "activeSessions": 1, "totalTasks": 3, "correctiveRounds": 2 },
-  "expiresAt": "2026-09-11T00:00:00Z"
-}
-```
-
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": false,
-  "operation": "authorize",
-  "error": {
-    "code": "JULES_AUTHORITY_DENIED",
-    "message": "a grant cannot be created from within a session already operating under a grant",
-    "retryable": false,
-    "recoveryAction": "Run /jules:authorize from an owner session that holds no active grant."
-  }
-}
-```
-
-### supervise (PR3)
-
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": true,
-  "operation": "supervise",
-  "grantId": "grant-2026-09-10-01",
-  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
-  "decision": "observe",
-  "condition": "working",
-  "nextCheck": "2026-09-10T22:20:00Z"
-}
-```
-
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": false,
-  "operation": "supervise",
-  "error": {
-    "code": "JULES_GRANT_EXPIRED",
-    "message": "grant-2026-09-10-01 expired at 2026-09-11T00:00:00Z while sessions/314159265358979 is still inProgress",
-    "retryable": false,
-    "recoveryAction": "The remote session is still running. Containment without a grant: stop it in the Jules console, revoke the source connection, or rotate JULES_API_KEY."
-  }
-}
-```
-
-### integrate (PR4)
-
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": true,
-  "operation": "integrate",
-  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
-  "worktree": "/home/owner/.local/share/yellow-jules/worktrees/jl-0f3c9a2b",
-  "verification": "passed",
-  "stackProvider": "READY_GRAPHITE",
-  "handoff": "ready-for-submit"
-}
-```
-
-Illustrative only, not a captured response
-
-```json
-{
-  "ok": false,
-  "operation": "integrate",
-  "error": {
-    "code": "JULES_INVALID_INPUT",
-    "message": "artifact base 8baa0bdd does not match the intended branch head 97585121",
-    "retryable": false,
-    "recoveryAction": "Rebase the intended branch or request a corrected patch; nothing was applied."
-  }
-}
-```
+No fixtures. contract-v1.md defers these result shapes to shells 03 (PR3) and 04
+(PR4); illustrating them here would invent fields that drift once those shells
+fix the real shape.
 
 ## Vendor request and response bodies
 
