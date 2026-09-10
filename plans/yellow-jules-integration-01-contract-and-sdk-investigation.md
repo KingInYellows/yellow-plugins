@@ -317,7 +317,7 @@ at any point (R57).
   statement appears in `contract-v1.md`; the PR2 checklist cites R23, R24,
   R25; the R3 table has no blank cells; `plans/specs/yellow-jules-integration.md`
   is untouched.
-- [ ] Step 15: Validate and package. Run `pnpm validate:schemas`, `pnpm lint`,
+- [x] Step 15: Validate and package. Run `pnpm validate:schemas`, `pnpm lint`,
   `pnpm typecheck`; report any pre-existing failure verbatim rather than
   hiding it (R57). Run `npx prettier --check docs/yellow-jules` (never `pnpm
   format` repo-wide). Confirm `git diff --name-only main...HEAD | grep -E
@@ -327,7 +327,7 @@ at any point (R57).
   Commit through the active stack provider's own commands (gt-workflow's
   `smart-submit` skill on `READY_GRAPHITE`; `gh stack` on `READY_GITHUB`);
   the PR description carries the R57 exclusion list and both verdicts.
-- [ ] Step 16: List follow-ups in the PR description, not as work here: the
+- [x] Step 16: List follow-ups in the PR description, not as work here: the
   `docs/upstream-pins.md` row and `--ignore-scripts` in `installSdk()` for
   PR2; `tests/fake-http-server.ts` productizing the Step 11 harness (R49);
   `docs/yellow-jules/smoke-result.md` after PR2 (R53).
