@@ -519,8 +519,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Codex ships as a standalone binary; the npm package is no longer the
+      # install path (its Windows optional dependency has gone missing on npm
+      # and broke this leg). The official installers verify the archive's
+      # SHA-256 digest and stay unpinned (CODEX_RELEASE defaults to latest).
       - name: Install latest Codex CLI (unpinned, R16)
-        run: npm install -g @openai/codex
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          curl -fsSL https://chatgpt.com/codex/install.sh -o "${RUNNER_TEMP}/codex-install.sh"
+          CODEX_NON_INTERACTIVE=true sh "${RUNNER_TEMP}/codex-install.sh"
+          # The installer edits the login shell profile; later steps run
+          # non-login shells, so export the bin dir through GITHUB_PATH.
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install latest Codex CLI (unpinned, R16, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:CODEX_NON_INTERACTIVE = 'true'
+          Invoke-RestMethod https://chatgpt.com/codex/install.ps1 | Invoke-Expression
+          # install.ps1 writes the bin dir to the user PATH in the registry;
+          # export it for the remaining steps of this job too.
+          "$env:LOCALAPPDATA\Programs\OpenAI\Codex\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Verify Codex CLI version
         run: codex --version

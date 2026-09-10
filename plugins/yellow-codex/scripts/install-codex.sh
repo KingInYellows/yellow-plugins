@@ -3,6 +3,19 @@ set -Eeuo pipefail
 
 # install-codex.sh — Install OpenAI Codex CLI for yellow-codex plugin
 # Usage: bash install-codex.sh
+#
+# Codex ships as a standalone binary. This script prefers the Homebrew cask
+# on macOS and otherwise runs OpenAI's official installer, which downloads
+# the release archive for this OS/arch, verifies its SHA-256 digest, unpacks
+# it under ~/.codex/packages, links ~/.local/bin/codex, and adds that
+# directory to the shell profile. The npm package is no longer used: it
+# needs Node 22+ and its Windows optional dependency has gone missing on
+# npm before, so "npm install -g" is not a reliable path.
+#
+# Environment (all optional, passed through to the official installer):
+#   CODEX_INSTALL_DIR  directory for the codex link (default ~/.local/bin)
+#   CODEX_HOME         Codex home holding the unpacked releases (default ~/.codex)
+#   CODEX_RELEASE      version to install (default latest)
 
 # >>> generated: install-helpers (source: scripts/snippets/install-helpers.sh) >>>
 # DO NOT EDIT — regenerate with: pnpm generate:snippets
@@ -30,19 +43,17 @@ success() {
 # <<< generated: install-helpers <<<
 
 readonly MIN_CODEX_VERSION="0.140.0"
-readonly MIN_NODE_MAJOR=22
+readonly INSTALLER_URL="https://chatgpt.com/codex/install.sh"
+readonly WINDOWS_INSTALLER_URL="https://chatgpt.com/codex/install.ps1"
 
+installer_tmp=""
 cleanup() {
   local exit_code=$?
+  if [ -n "$installer_tmp" ]; then
+    rm -f "$installer_tmp"
+  fi
   if [ $exit_code -ne 0 ]; then
-    warning "Installation failed. Partial install may remain."
-    if [ "${install_path:-global}" = "local" ]; then
-      warning "To clean up: npm uninstall -g @openai/codex --prefix ~/.local"
-    elif [ "${install_path:-global}" = "npm-global" ]; then
-      warning "To clean up: npm uninstall -g @openai/codex --prefix ~/.npm-global"
-    else
-      warning "To clean up: npm uninstall -g @openai/codex"
-    fi
+    warning "Installation failed. A partial install may remain under ${CODEX_HOME:-$HOME/.codex}/packages and ${CODEX_INSTALL_DIR:-$HOME/.local/bin}/codex."
   fi
 }
 trap cleanup EXIT
@@ -85,9 +96,23 @@ EOF
 }
 # <<< generated: install-version-gte <<<
 
+# Report the version of a codex executable (default: whichever is first in
+# PATH); empty when it is missing or --version fails.
+codex_version() {
+  "${1:-codex}" --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true
+}
+
 # --- Check if already installed ---
-if command -v codex >/dev/null 2>&1; then
-  installed_version=$(codex --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
+# An explicit CODEX_RELEASE or CODEX_INSTALL_DIR is a request to (re)install
+# that release or relocate the link, so the fast path and the Homebrew cask
+# (which can honour neither) are skipped and the official installer runs.
+install_override=false
+if [ -n "${CODEX_RELEASE:-}" ] || [ -n "${CODEX_INSTALL_DIR:-}" ]; then
+  install_override=true
+  printf '[yellow-codex] Install override set (CODEX_RELEASE=%s CODEX_INSTALL_DIR=%s); running the official installer.\n' "${CODEX_RELEASE:-latest}" "${CODEX_INSTALL_DIR:-$HOME/.local/bin}"
+fi
+if [ "$install_override" = "false" ] && command -v codex >/dev/null 2>&1; then
+  installed_version=$(codex_version)
   if [ -n "$installed_version" ] && version_gte "$installed_version" "$MIN_CODEX_VERSION"; then
     success "codex already installed: v${installed_version}"
     exit 0
@@ -98,182 +123,121 @@ if command -v codex >/dev/null 2>&1; then
   fi
 fi
 
-# --- Check for brew cask on macOS ---
+# --- Detect OS/arch ---
 os=$(uname -s)
-if [ "$os" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+arch=$(uname -m)
+printf '[yellow-codex] Platform: %s/%s\n' "$os" "$arch"
+
+case "$os" in
+  MINGW*|MSYS*|CYGWIN*)
+    cat >&2 <<INSTRUCTIONS
+Native Windows detected. The official installer for Windows is PowerShell:
+  powershell -ExecutionPolicy ByPass -c "irm ${WINDOWS_INSTALLER_URL} | iex"
+It installs codex.exe under %LOCALAPPDATA%\Programs\OpenAI\Codex\bin and adds
+that directory to the user PATH. Run it from PowerShell, then re-run /codex:setup.
+(Inside WSL, run this script from the WSL shell instead.)
+INSTRUCTIONS
+    error "install-codex.sh supports macOS and Linux; use install.ps1 on native Windows."
+    ;;
+esac
+
+# --- Check for brew cask on macOS ---
+if [ "$install_override" = "false" ] && [ "$os" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
   printf '[yellow-codex] macOS detected with Homebrew. Installing via brew cask...\n'
   if brew install --cask codex 2>&1; then
     if command -v codex >/dev/null 2>&1; then
-      installed_version=$(codex --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
+      installed_version=$(codex_version)
       if [ -n "$installed_version" ] && version_gte "$installed_version" "$MIN_CODEX_VERSION"; then
         success "codex v${installed_version} installed via Homebrew cask"
         exit 0
       fi
-      warning "Homebrew codex v${installed_version:-unknown} is below v${MIN_CODEX_VERSION}. Falling back to npm..."
+      warning "Homebrew codex v${installed_version:-unknown} is below v${MIN_CODEX_VERSION}. Falling back to the official installer..."
     else
-      warning "brew cask install completed but codex not on PATH. Falling back to npm..."
+      warning "brew cask install completed but codex not on PATH. Falling back to the official installer..."
     fi
   else
-    warning "brew cask install failed — falling back to npm"
+    warning "brew cask install failed — falling back to the official installer"
   fi
-fi
-
-# --- Try activating Node via version manager if needed ---
-_current_node_major=""
-if command -v node >/dev/null 2>&1; then
-  _current_node_major=$(node -e "console.log(process.versions.node.split('.')[0])" 2>/dev/null || true)
-fi
-# Normalize non-numeric values to empty so the -z check catches them
-case "$_current_node_major" in ''|*[!0-9]*) _current_node_major="" ;; esac
-if [ -z "$_current_node_major" ] || [ "$_current_node_major" -lt "$MIN_NODE_MAJOR" ]; then
-  if command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env 2>/dev/null)" || true
-    fnm use "$MIN_NODE_MAJOR" 2>/dev/null || true
-  elif [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
-    # shellcheck disable=SC1091
-    . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" 2>/dev/null || true
-    nvm use "$MIN_NODE_MAJOR" 2>/dev/null || true
-  fi
-fi
-
-# --- Check Node.js version ---
-if ! command -v node >/dev/null 2>&1; then
-  error "Node.js is required but not found. Install Node.js >= ${MIN_NODE_MAJOR} from: https://nodejs.org/"
-fi
-
-node_major=$(node -e "console.log(process.versions.node.split('.')[0])")
-if [ "$node_major" -lt "$MIN_NODE_MAJOR" ]; then
-  error "Node.js >= ${MIN_NODE_MAJOR} required (found v${node_major}). Upgrade Node.js."
 fi
 
 # --- Dependency checks ---
-if ! command -v npm >/dev/null 2>&1; then
-  error "npm is required but not found. Install Node.js from: https://nodejs.org/"
-fi
-
-# --- Detect version manager (nvm/fnm) ---
-has_version_mgr=false
-npm_prefix=$(npm prefix -g 2>/dev/null || true)
-if [ -n "${NVM_DIR:-}" ] && printf '%s' "$npm_prefix" | grep -q "${NVM_DIR}"; then
-  has_version_mgr=true
-  warning "nvm detected (npm managed by nvm). Global npm binaries are per-Node-version."
-elif [ -d "${HOME}/.nvm" ] && printf '%s' "$npm_prefix" | grep -q ".nvm"; then
-  has_version_mgr=true
-  warning "nvm detected (npm managed by nvm). Global npm binaries are per-Node-version."
-fi
-if { [ -n "${FNM_DIR:-}" ] || [ -d "${HOME}/.fnm" ] || command -v fnm >/dev/null 2>&1; } && printf '%s' "$npm_prefix" | grep -q "fnm"; then
-  has_version_mgr=true
-  warning "fnm detected (npm managed by fnm). Global npm binaries are per-Node-version."
-fi
-
-# --- Detect OS/arch ---
-arch=$(uname -m)
-printf '[yellow-codex] Platform: %s/%s\n' "$os" "$arch"
-
-# --- Install codex ---
-printf '[yellow-codex] Installing @openai/codex via npm...\n'
-
-npm_output=""
-install_path="global"
-path_needs_update=false
-
-# Guard against fnm multishell ephemeral paths — install to ~/.npm-global instead
-npm_global_dir=$(npm prefix -g 2>/dev/null || true)
-if printf '%s' "$npm_global_dir" | grep -q 'fnm_multishells'; then
-  warning "fnm multishell detected — installing to ~/.npm-global to persist across sessions"
-  mkdir -p "${HOME}/.npm-global"
-  if npm_output=$(npm install -g @openai/codex --prefix "${HOME}/.npm-global" 2>&1); then
-    install_path="npm-global"
-    npm_bin="${HOME}/.npm-global/bin"
-    if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$npm_bin"; then
-      path_needs_update=true
-      case "$(basename "${SHELL:-}")" in
-        zsh)  rc_file="${HOME}/.zshrc" ;;
-        bash) rc_file="${HOME}/.bashrc" ;;
-        *)    rc_file="${HOME}/.profile" ;;
-      esac
-      warning "${npm_bin} is not in PATH."
-      warning "Add this line to ${rc_file}:"
-      warning "  export PATH=\"${npm_bin}:\$PATH\""
-      warning "Then restart your shell or run: source ${rc_file}"
-      export PATH="${npm_bin}:${PATH}"
-    fi
-  else
-    printf '%s\n' "$npm_output" >&2
-    error "npm install to ~/.npm-global failed."
-  fi
-elif npm_output=$(npm install -g @openai/codex 2>&1); then
-  true
-elif [ "$has_version_mgr" = "true" ]; then
-  printf '%s\n' "$npm_output" >&2
-  error "npm install failed under version manager. Check permissions or try reinstalling npm."
-elif printf '%s' "$npm_output" | grep -qi "EACCES\|permission denied\|EPERM"; then
-  warning "Global install failed with permission error — retrying with --prefix ~/.local"
-  if npm_output=$(npm install -g @openai/codex --prefix "${HOME:?HOME not set}/.local" 2>&1); then
-    install_path="local"
-    warning "Installed to ~/.local prefix"
-    local_bin="${HOME}/.local/bin"
-    path_needs_update=false
-    if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$local_bin"; then
-      path_needs_update=true
-      case "$(basename "${SHELL:-}")" in
-        zsh)  rc_file="${HOME}/.zshrc" ;;
-        bash) rc_file="${HOME}/.bashrc" ;;
-        *)    rc_file="${HOME}/.profile" ;;
-      esac
-      warning "${local_bin} is not in PATH."
-      warning "Add this line to ${rc_file}:"
-      warning "  export PATH=\"${local_bin}:\$PATH\""
-      warning "Then restart your shell or run: source ${rc_file}"
-      export PATH="${local_bin}:${PATH}"
-    fi
-  else
-    printf '%s\n' "$npm_output" >&2
-    error "npm install -g @openai/codex --prefix ~/.local also failed."
-  fi
+# The official installer needs a downloader, tar, mktemp and a SHA-256 tool
+# (it refuses to install an archive whose digest does not match).
+if command -v curl >/dev/null 2>&1; then
+  fetch() { curl -fsSL "$1" -o "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+  fetch() { wget -nv -O "$2" "$1"; }
 else
-  printf '%s\n' "$npm_output" >&2
+  error "curl or wget is required to download the Codex installer."
+fi
+for tool in tar mktemp; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    error "${tool} is required by the Codex installer but was not found."
+  fi
+done
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1 && ! command -v openssl >/dev/null 2>&1; then
+  error "sha256sum, shasum or openssl is required to verify the Codex download."
+fi
+
+# --- Install codex via the official installer ---
+# Download to a file first (rather than piping straight into sh) so a
+# truncated transfer fails here instead of executing half a script.
+printf '[yellow-codex] Downloading the official Codex installer from %s...\n' "$INSTALLER_URL"
+installer_tmp=$(mktemp "${TMPDIR:-/tmp}/codex-install.XXXXXX")
+if ! fetch "$INSTALLER_URL" "$installer_tmp"; then
+  error "Could not download ${INSTALLER_URL}. Check network access, or install manually with: brew install --cask codex (macOS) or the standalone binary from https://github.com/openai/codex/releases"
+fi
+if ! grep -q 'CODEX_INSTALL_DIR' "$installer_tmp"; then
+  error "Downloaded installer does not look like the Codex install script (no CODEX_INSTALL_DIR reference). Refusing to run it."
+fi
+
+bin_dir="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"
+printf '[yellow-codex] Installing Codex CLI to %s (non-interactive)...\n' "$bin_dir"
+if ! CODEX_NON_INTERACTIVE=true sh "$installer_tmp"; then
   cat >&2 <<'INSTRUCTIONS'
-npm install failed. Install codex manually using one of:
-  npm install -g @openai/codex     (Node.js 22+)
-  brew install --cask codex        (macOS)
+The official installer failed. Install codex manually using one of:
+  curl -fsSL https://chatgpt.com/codex/install.sh | sh   (macOS/Linux)
+  brew install --cask codex                              (macOS)
   Download from: https://github.com/openai/codex/releases (standalone binary)
 Then re-run /codex:setup
 INSTRUCTIONS
-  error "npm install -g @openai/codex failed."
+  error "Codex installer exited non-zero."
 fi
 
 # --- Verify installation ---
-if ! command -v codex >/dev/null 2>&1; then
-  npm_global_prefix=$(npm prefix -g 2>/dev/null || true)
-  npm_global_bin="${npm_global_prefix}/bin"
-  if [ -n "$npm_global_prefix" ] && [ -x "${npm_global_bin}/codex" ]; then
-    error "codex installed at ${npm_global_bin} but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
-  fi
-  error "codex not found in PATH after install."
+# Check the binary the installer placed, not whatever `codex` resolves to:
+# a stale npm or Homebrew codex earlier in PATH would otherwise be measured
+# instead and the incompatible version left in charge.
+installed_bin="${bin_dir}/codex"
+if [ ! -x "$installed_bin" ]; then
+  error "codex not found at ${installed_bin} after install."
 fi
 
-installed_version=$(codex --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
+installed_version=$(codex_version "$installed_bin")
 if [ -z "$installed_version" ]; then
-  error "codex binary found but 'codex --version' failed. Try reinstalling."
+  error "codex binary found at ${installed_bin} but 'codex --version' failed. Try reinstalling."
 fi
 
 if ! version_gte "$installed_version" "$MIN_CODEX_VERSION"; then
   warning "codex v${installed_version} installed but v${MIN_CODEX_VERSION}+ is recommended."
 fi
 
-if [ "$install_path" = "local" ]; then
-  if [ "${path_needs_update:-false}" = "true" ]; then
-    success "codex v${installed_version} installed to ~/.local/bin — restart your shell to use it"
-  else
-    success "codex v${installed_version} installed to ~/.local/bin (already in PATH)"
-  fi
-elif [ "$install_path" = "npm-global" ]; then
-  if [ "${path_needs_update:-false}" = "true" ]; then
-    success "codex v${installed_version} installed to ~/.npm-global/bin — restart your shell to use it"
-  else
-    success "codex v${installed_version} installed to ~/.npm-global/bin (persists across fnm sessions)"
-  fi
+path_needs_update=false
+if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$bin_dir"; then
+  path_needs_update=true
+  export PATH="${bin_dir}:${PATH}"
+fi
+
+resolved_bin=$(command -v codex 2>/dev/null || true)
+if [ -n "$resolved_bin" ] && [ "$resolved_bin" != "$installed_bin" ]; then
+  warning "A different codex at ${resolved_bin} (v$(codex_version "$resolved_bin")) comes first in PATH and shadows ${installed_bin}."
+  warning "Put ${bin_dir} earlier in PATH (export PATH=\"${bin_dir}:\$PATH\") or remove the old install."
+fi
+
+if [ "$path_needs_update" = "true" ]; then
+  # The official installer appends bin_dir to the shell profile it detects
+  # (~/.zshrc, ~/.bashrc, ~/.zprofile, ~/.bash_profile or ~/.profile).
+  success "codex v${installed_version} installed to ${bin_dir} — restart your shell (or run: export PATH=\"${bin_dir}:\$PATH\") to use it"
 else
-  success "codex v${installed_version} installed successfully (global binary in PATH)"
+  success "codex v${installed_version} installed to ${bin_dir} (already in PATH)"
 fi

@@ -40,7 +40,8 @@ and continue to Step 1:
 
 ```text
 [yellow-codex] Warning: codex installation failed. Install manually:
-  npm install -g @openai/codex     (requires Node.js 22+)
+  curl -fsSL https://chatgpt.com/codex/install.sh | sh   (macOS/Linux)
+  powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"   (Windows)
   brew install --cask codex        (macOS)
   https://github.com/openai/codex/releases (standalone binary)
 Then re-run /codex:setup
@@ -80,16 +81,12 @@ If the installed version is below minimum, use AskUserQuestion to offer upgrade.
 Check required CLI tools:
 
 ```bash
-# Node.js 22+ (hard prerequisite for Codex CLI)
-if command -v node >/dev/null 2>&1; then
-  node_major=$(node -e "console.log(process.versions.node.split('.')[0])")
-  if [ "$node_major" -ge 22 ]; then
-    printf '[yellow-codex] node: ok (v%s)\n' "$(node --version 2>/dev/null)"
-  else
-    printf '[yellow-codex] node: v%s (v22+ required for Codex CLI)\n' "$(node --version 2>/dev/null)" >&2
-  fi
+# Downloader (needed only when the install script has to fetch Codex —
+# the CLI itself is a standalone binary with no Node.js dependency)
+if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then
+  printf '[yellow-codex] downloader: ok (curl or wget)\n'
 else
-  printf '[yellow-codex] node: NOT FOUND (required for Codex CLI)\n' >&2
+  printf '[yellow-codex] downloader: NOT FOUND (curl or wget needed to install Codex)\n' >&2
 fi
 
 # jq (soft prerequisite — warn if missing)
@@ -221,7 +218,7 @@ Display a summary table:
 ```text
 yellow-codex Setup Results
 ─────────────────────────────
-Prerequisites:  node [ok v22.x | missing] | jq [ok | missing (degraded)]
+Prerequisites:  downloader [ok | missing] | jq [ok | missing (degraded)]
 Codex CLI:      installed (vX.X.X) | not installed
 Auth (API key): set | not set
 Auth (OAuth):   authenticated | not configured
@@ -240,7 +237,7 @@ If any step had a warning, list warnings at the bottom.
 | `codex` not found (Step 0) | AskUserQuestion: install now? | Offer install or show manual instructions |
 | `codex` below v0.140.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade |
 | Install script fails (Step 0) | "codex installation failed" | Warn, continue to Step 1 |
-| Node < 22 | "v22+ required for Codex CLI" | Warn, suggest standalone binary |
+| No curl/wget | "curl or wget needed to install Codex" | Warn, suggest brew cask or the GitHub release binary |
 | No auth configured | "No authentication configured" | Show both auth methods |
 | Test invocation parse error (Step 4, parse error on stderr) | "CLI argument parse error (flag drift?)" | Report clap error line |
 | Test invocation fails | "no response (check auth and network)" | Warn, suggest re-auth |

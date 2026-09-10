@@ -13,8 +13,11 @@ independent code review, debugging/rescue capabilities, and codebase research.
 
 ## Prerequisites
 
-- **Codex CLI** (`codex`) v0.140.0+ via `npm install -g @openai/codex`,
-  `brew install --cask codex`, or GitHub Releases (requires Node 22+)
+- **Codex CLI** (`codex`) v0.140.0+, a standalone binary: install via
+  `curl -fsSL https://chatgpt.com/codex/install.sh | sh` (macOS/Linux), the
+  PowerShell installer `irm https://chatgpt.com/codex/install.ps1 | iex`
+  (Windows), `brew install --cask codex`, or GitHub Releases. No Node.js
+  required.
 - **Authentication** -- `OPENAI_API_KEY` env var or `codex login` OAuth
 
 Run `/codex:setup` after install to detect the CLI, verify auth, and
