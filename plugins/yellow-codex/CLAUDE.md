@@ -18,9 +18,12 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   empirically verified on 0.140.0; earlier CLIs accepted `-a` on `codex exec`
   and `-a`/`-s` on `codex exec review`, which 0.140.0 rejects at argument
   parse (`-s` remains valid on plain `codex exec`), so the old floor
-  (v0.118.0) cannot be verified against the current syntax. Install via
-  `npm install -g @openai/codex` (requires Node 22+),
-  `brew install --cask codex` (macOS), or download from GitHub Releases.
+  (v0.118.0) cannot be verified against the current syntax. Codex is a
+  standalone binary: install via the official installer
+  (`curl -fsSL https://chatgpt.com/codex/install.sh | sh` on macOS/Linux,
+  `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell on
+  Windows), `brew install --cask codex` (macOS), or download from GitHub
+  Releases. The npm package is no longer used and Node.js is not required.
 - **Authentication** — One of:
   - `OPENAI_API_KEY` environment variable (`sk-` or `sk-proj-` prefix)
   - ChatGPT OAuth via `codex login` (v0.118+ stores state in the OS
