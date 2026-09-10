@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 20 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 19 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -36,7 +36,6 @@ Add the marketplace, then install individual plugins:
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup probe, request create/validate, zero-spend stub run)                        | 3 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
-| `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                                                | 2 agents, 6 commands, 2 skills, 1 MCP          |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 2 skills, 7 MCPs         |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 7 commands, 2 skills                |
@@ -73,9 +72,6 @@ Nine plugins connect to MCP servers. Authentication requirements vary by server.
 | `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                                                                     |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                    |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                      |
-
-`yellow-mempalace` also bundles an MCP server (local stdio) but is deprecated
-pending removal per `docs/memory-routing-protocol.md`.
 
 ### Context7 (user-level MCP)
 
@@ -293,7 +289,6 @@ yellow-plugins/
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
 │   ├── yellow-goal/           # yellow-goal engine bridge (3 commands)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
-│   ├── yellow-mempalace/      # MemPalace memory (2 agents, 6 commands, 2 skills, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 7 MCPs)
 │   ├── yellow-review/         # PR review (16 agents, 7 commands, 2 skills)

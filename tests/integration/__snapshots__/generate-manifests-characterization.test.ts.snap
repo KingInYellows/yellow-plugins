@@ -195,16 +195,6 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
       "category": "development"
     },
     {
-      "name": "yellow-mempalace",
-      "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
-      "version": "1.1.7",
-      "author": {
-        "name": "KingInYellows"
-      },
-      "source": "./plugins/yellow-mempalace",
-      "category": "development"
-    },
-    {
       "name": "yellow-goal",
       "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets and run zero-spend stub scenarios. Never imports the engine.",
       "version": "0.2.0",
@@ -235,7 +225,6 @@ exports[`manifest byte-identity baseline > plugin inventory (explicit sorted nam
   "yellow-docs",
   "yellow-goal",
   "yellow-linear",
-  "yellow-mempalace",
   "yellow-morph",
   "yellow-research",
   "yellow-review",
@@ -805,41 +794,6 @@ exports[`manifest byte-identity baseline > plugins/yellow-linear/.claude-plugin/
     "linear": {
       "type": "http",
       "url": "https://mcp.linear.app/mcp"
-    }
-  }
-}
-"
-`;
-
-exports[`manifest byte-identity baseline > plugins/yellow-mempalace/.claude-plugin/plugin.json raw bytes 1`] = `
-"{
-  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "yellow-mempalace",
-  "version": "1.1.7",
-  "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
-  "author": {
-    "name": "KingInYellows",
-    "url": "https://github.com/KingInYellows"
-  },
-  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-mempalace",
-  "repository": "https://github.com/KingInYellows/yellow-plugins",
-  "license": "MIT",
-  "keywords": [
-    "memory",
-    "knowledge-graph",
-    "ai-memory",
-    "mcp",
-    "chromadb"
-  ],
-  "mcpServers": {
-    "mempalace": {
-      "command": "mempalace-mcp",
-      "args": [],
-      "env": {
-        "PYTHONWARNINGS": "ignore",
-        "TRANSFORMERS_VERBOSITY": "error",
-        "TOKENIZERS_PARALLELISM": "false"
-      }
     }
   }
 }

@@ -164,8 +164,6 @@ importers:
 
   plugins/yellow-linear: {}
 
-  plugins/yellow-mempalace: {}
-
   plugins/yellow-morph:
     dependencies:
       '@morphllm/morphmcp':

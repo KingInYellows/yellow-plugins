@@ -12,7 +12,6 @@
 'yellow-devin': patch
 'yellow-docs': patch
 'yellow-linear': patch
-'yellow-mempalace': patch
 'yellow-research': patch
 'yellow-review': patch
 'yellow-ruvector': patch
