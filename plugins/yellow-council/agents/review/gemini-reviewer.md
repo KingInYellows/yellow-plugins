@@ -328,6 +328,9 @@ fi
 
 # --- Apply credential redaction ---
 REDACTED_FILE=$(mktemp /tmp/council-gemini-redacted-XXXXXX.txt)
+# Canonical program: council-patterns SKILL.md "11-Pattern Credential
+# Redaction" — byte-identical to it after dedent; tests/redaction.bats
+# fails the whole suite if any copy drifts.
 awk '
 function strip_deco(s,   prev, guard, limit) {
   # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in

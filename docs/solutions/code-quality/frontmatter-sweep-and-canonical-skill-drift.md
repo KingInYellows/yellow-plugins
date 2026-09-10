@@ -118,3 +118,21 @@ spots, as it did here; a carrier list next to the source is one read away
 from the code someone is actually editing.
 
 Full incident: `docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md`'s 2026-09-09 Update.
+
+## Update — 2026-09-09 (PR #782): canonical-copy-roster prevention item enacted
+
+PR #782, stacking directly on #781, closes the prevention gap the prior
+Update flagged: AGENTS.md's validation matrix now routes any edit to a
+redaction-awk carrier file to `bats plugins/yellow-council/tests/`, and the
+two reviewer-agent carriers that lacked a provenance comment above their
+copy of the program now carry one, matching the sites that already did.
+Landing in a follow-up PR rather than the PR that found the gap is fine —
+the point of flagging it was making sure it didn't get lost.
+
+Full incident continuation:
+`docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md`'s
+2026-09-09 (PR #782) Update.
+
+**Components (this Update):** `AGENTS.md`,
+`plugins/yellow-council/agents/review/gemini-reviewer.md`,
+`plugins/yellow-council/agents/review/opencode-reviewer.md`.

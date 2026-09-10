@@ -104,6 +104,11 @@ const SCAN_FILES = [
 /** The markers Rule R uses to detect a copy of the canonical redaction awk. */
 const CANONICAL_AWK =
   'function strip_deco(s) { }\nfunction cred_hit(re, minlen) { }';
+/**
+ * The default REDACTION_ANCHOR_MARKERS pair the validator parses out of
+ * REDACTION_LIB — matches the two markers embedded in CANONICAL_AWK above.
+ */
+const ANCHOR_MARKERS = ['function cred_hit(', 'function strip_deco('];
 const REDACTION_LIB =
   'plugins/yellow-council/tests/lib/extract-redaction-awk.bash';
 const SKILL_MD = 'plugins/yellow-council/skills/council-patterns/SKILL.md';
@@ -127,6 +132,16 @@ function writeFixture(
     spawnIds?: string[];
     redactionSources?: string[];
     exceptions?: unknown[];
+    anchorMarkers?: string[];
+    omitAnchorMarkers?: boolean;
+    /** Repo-relative file the markers must still appear in (liveness check). */
+    canonicalSource?: string;
+    /** A commented-out `# REDACTION_ANCHOR_MARKERS=(...)` above the real one. */
+    commentedAnchorMarkers?: string[];
+    /** Extra text appended to the lib body. */
+    libExtra?: string;
+    /** Roster `redaction_extra_sources`; every entry must be in REDACTION_SOURCES. */
+    redactionExtraSources?: string[];
   } = {}
 ): void {
   const reviewers = opts.reviewers ?? BASE_REVIEWERS;
@@ -144,7 +159,7 @@ function writeFixture(
           agent_path: agentPath(r),
           ships_redaction_awk: Boolean(r.awk),
         })),
-        redaction_extra_sources: [SKILL_MD],
+        redaction_extra_sources: opts.redactionExtraSources ?? [SKILL_MD],
         prose_sites: {},
         exceptions: opts.exceptions ?? [],
       },
@@ -168,12 +183,30 @@ function writeFixture(
     ...reviewers.filter((r) => r.awk).map((r) => agentPath(r)),
     SKILL_MD,
   ];
+  const anchorMarkers = opts.anchorMarkers ?? ANCHOR_MARKERS;
+  const anchorMarkersBlock = opts.omitAnchorMarkers
+    ? ''
+    : `REDACTION_ANCHOR_MARKERS=(\n${anchorMarkers
+        .map((s) => `  "${s}"`)
+        .join('\n')}\n)\n`;
+  // Written above the live array on purpose: an unanchored parse would let it
+  // win the first-match race and repoint carrier detection.
+  const commentedBlock = opts.commentedAnchorMarkers
+    ? `# REDACTION_ANCHOR_MARKERS=(\n${opts.commentedAnchorMarkers
+        .map((s) => `#   "${s}"`)
+        .join('\n')}\n# )\n`
+    : '';
+  // The validator checks the markers still appear in CANONICAL_SOURCE, so the
+  // fixture lib has to declare one.
+  const canonicalSource = opts.canonicalSource ?? SKILL_MD;
   writeFile(
     root,
     REDACTION_LIB,
-    `#!/usr/bin/env bash\nREDACTION_SOURCES=(\n${sources
+    `#!/usr/bin/env bash\nCANONICAL_SOURCE="${canonicalSource}"\nREDACTION_SOURCES=(\n${sources
       .map((s) => `  "${s}"`)
-      .join('\n')}\n)\n`
+      .join('\n')}\n)\n${commentedBlock}${anchorMarkersBlock}${
+      opts.libExtra ?? ''
+    }`
   );
 
   // Reviewer agent files are registered in the ledger unconditionally. An
@@ -438,17 +471,187 @@ describe('validate-council-roster', () => {
       // Bash skips a commented-out array element entirely; a naive
       // quoted-string scan must not treat it as still listed.
       const geminiPath = agentPath(BASE_REVIEWERS[2]);
-      const opencodePath = agentPath(BASE_REVIEWERS[3]);
-      writeFile(
-        root,
-        REDACTION_LIB,
-        `#!/usr/bin/env bash\nREDACTION_SOURCES=(\n  # "${geminiPath}"\n  "${opencodePath}"\n  "${SKILL_MD}"\n)\n`
+      const libPath = join(root, REDACTION_LIB);
+      const lib = readFileSync(libPath, 'utf8');
+      expect(lib).toContain(`  "${geminiPath}"\n`);
+      writeFileSync(
+        libPath,
+        lib.replace(`  "${geminiPath}"\n`, `  # "${geminiPath}"\n`)
       );
 
       const { status, stderr } = run(root);
 
       expect(status).toBe(1);
       expect(stderr).toMatch(/gemini-reviewer\.md.*never be drift-tested/s);
+    });
+
+    it('fails with a clear error, not a false pass, when REDACTION_ANCHOR_MARKERS is absent', () => {
+      writeFixture(root, { omitAnchorMarkers: true });
+
+      const { status, stdout, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /REDACTION_ANCHOR_MARKERS array not found or has fewer than 2 entries/
+      );
+      // An unavailable marker list must not be treated as "zero carriers" —
+      // that would silently green-light every carrier-dependent check.
+      expect(stdout).not.toMatch(/PASS/);
+    });
+
+    it('uses the parsed REDACTION_ANCHOR_MARKERS pair for carrier detection', () => {
+      const customMarkers = ['CUSTOM_MARKER_ONE(', 'CUSTOM_MARKER_TWO('];
+      // Plant a file carrying the custom marker pair (not the default
+      // CANONICAL_AWK markers) and not registered as a redaction source.
+      writeFile(
+        root,
+        'docs/security.md',
+        `# Security\n\n${customMarkers.join('\n')}\n`
+      );
+      writeFixture(root, {
+        reviewers: BASE_REVIEWERS.map((r) => ({ ...r, awk: false })),
+        // SKILL.md is deliberately NOT listed. Listing it would satisfy Rule R
+        // for that file whatever the parse did, and the "not a carrier"
+        // assertion below could then never fail. Unlisted, it is reported the
+        // moment carrier detection falls back to the default markers.
+        redactionSources: [],
+        redactionExtraSources: [],
+        anchorMarkers: customMarkers,
+        // The markers must still be live in CANONICAL_SOURCE; under this
+        // config the file carrying them is docs/security.md.
+        canonicalSource: 'docs/security.md',
+      });
+
+      const { status, stderr } = run(root);
+
+      expect(status).toBe(1);
+      // Flagged as a carrier only because it matches the parsed custom
+      // markers — proving the validator reads the lib's array, not a
+      // hardcoded default.
+      expect(stderr).toMatch(
+        /docs\/security\.md carries the canonical redaction program but is in neither/
+      );
+      // council-patterns/SKILL.md carries CANONICAL_AWK, not the custom
+      // pair, so it must not be flagged as a carrier under this config.
+      expect(stderr).not.toMatch(
+        /council-patterns\/SKILL\.md carries the canonical redaction program/
+      );
+    });
+
+    it('fails when REDACTION_ANCHOR_MARKERS repeats the same entry twice', () => {
+      // Two identical entries pass the arity check and then reduce carrier
+      // detection to a single-marker test, so any file quoting that one string
+      // reads as a carrier.
+      writeFixture(root, {
+        anchorMarkers: ['function cred_hit(', 'function cred_hit('],
+      });
+
+      const { status, stdout, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /REDACTION_ANCHOR_MARKERS entries #1 and #2 are identical — the two entries must be different strings/
+      );
+      expect(stdout).not.toMatch(/PASS/);
+    });
+
+    it('fails when a marker no longer appears in CANONICAL_SOURCE', () => {
+      // A stale marker matches nothing, so every carrier-dependent check
+      // would "pass" by finding zero carriers.
+      writeFixture(root, {
+        anchorMarkers: ['function cred_hit(', 'function long_gone_marker('],
+      });
+
+      const { status, stdout, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /REDACTION_ANCHOR_MARKERS entry #[12] does not appear in .*SKILL\.md; the marker set is stale/
+      );
+      expect(stdout).not.toMatch(/PASS/);
+    });
+
+    it('fails on an unscanned CANONICAL_SOURCE without echoing its value', () => {
+      // Simulates an accidentally pasted credential standing in for the file
+      // path: the diagnostic must report the declaration's line, never the
+      // value, or a real credential in this position would be printed into
+      // blocking CI logs.
+      const pastedCredential = 'sk-live-FAKE1234567890abcdefFAKE';
+      writeFixture(root, { canonicalSource: pastedCredential });
+
+      const { status, stdout, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /extract-redaction-awk\.bash:2: CANONICAL_SOURCE names a file that was not scanned/
+      );
+      expect(stderr).not.toContain(pastedCredential);
+      expect(stdout).not.toContain(pastedCredential);
+      expect(stdout).not.toMatch(/PASS/);
+    });
+
+    it('fails when REDACTION_ANCHOR_MARKERS holds more than two entries', () => {
+      // The body walker takes exactly two; a third is parsed here and
+      // silently ignored there.
+      writeFixture(root, {
+        anchorMarkers: [...ANCHOR_MARKERS, 'function third_marker('],
+      });
+
+      const { status, stdout, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /REDACTION_ANCHOR_MARKERS has 3 entries, expected exactly 2/
+      );
+      expect(stdout).not.toMatch(/PASS/);
+    });
+
+    it('is not repointed by a commented-out REDACTION_ANCHOR_MARKERS example', () => {
+      const customMarkers = ['CUSTOM_MARKER_ONE(', 'CUSTOM_MARKER_TWO('];
+      // Only the commented example names these. If the parse were unanchored
+      // it would win the first-match race, and this unregistered file would
+      // be flagged as a carrier.
+      writeFile(
+        root,
+        'docs/security.md',
+        `# Security\n\n${customMarkers.join('\n')}\n`
+      );
+      writeFixture(root, { commentedAnchorMarkers: customMarkers });
+      stamp(root);
+
+      const { status, stdout } = run(root);
+
+      expect(status).toBe(0);
+      expect(stdout).toMatch(/PASS/);
+    });
+
+    it('does not report the marker-declaring lib as a carrier, but keeps it in the ledger', () => {
+      writeFixture(root);
+      stamp(root);
+
+      const { status, stdout } = run(root);
+
+      expect(status).toBe(0);
+      expect(stdout).toMatch(/PASS/);
+      // In the walk (so Rule S stamps it), yet not a carrier: only its own
+      // REDACTION_ANCHOR_MARKERS array span is scrubbed.
+      const roster = JSON.parse(
+        readFileSync(join(root, 'scripts/council-roster.json'), 'utf8')
+      );
+      expect(roster.prose_sites[REDACTION_LIB]).toBeDefined();
+    });
+
+    it('reports the lib as a carrier when the canonical program is pasted into it', () => {
+      // The scrub covers the array literal only — a real copy of the program
+      // in the same file must still be detected.
+      writeFixture(root, { libExtra: `\n${CANONICAL_AWK}\n` });
+
+      const { status, stderr } = run(root);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(
+        /extract-redaction-awk\.bash carries the canonical redaction program but is in neither/
+      );
     });
   });
 

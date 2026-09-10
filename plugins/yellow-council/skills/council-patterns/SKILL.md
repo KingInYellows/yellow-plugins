@@ -439,6 +439,13 @@ function is_base64_line(s, minlen) {
 }
 ```
 
+This program is the source of truth. Verbatim copies ship in
+`agents/review/gemini-reviewer.md`, `agents/review/opencode-reviewer.md`, and
+two bodies in `commands/council/council.md` (Step 4 `local redact_awk=` and Step
+7 `section_body=$(awk '`). Any change here must be re-extracted and re-indented
+into every carrier, never retyped. `tests/redaction.bats` gates every body
+for byte-identity after dedent.
+
 Save as a sourced helper or paste inline. The 11 patterns:
 
 1. `sk-proj-` (OpenAI project key)

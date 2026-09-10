@@ -297,3 +297,86 @@ definitions in one place.
 `plugins/yellow-council/skills/council-patterns/SKILL.md`,
 `scripts/council-roster.json`,
 `plugins/yellow-council/tests/lib/extract-redaction-awk.bash`.
+
+## Update — 2026-09-09: multi-body walker hardening closes three silent-pass gaps (PR #782)
+
+PR #782 stacks directly on #781 and replaces the one-body-per-file extractor
+with a content-anchored multi-body walker plus a fatal identity gate. Four
+review findings extend the exact carrier-detection failure modes this doc
+already tracks.
+
+**Single-sourced markers.** The walker used to hardcode its own copy of the
+two marker strings that identify the program, even though the bash lib's
+header already claimed its array was the single source. It now receives both
+markers via `-v` assignment from that array, so only one place authors them.
+
+**Derived cross-check catches a corrupted anchor, not a deleted site.** The
+walker counts marker occurrences and fails if the counts disagree, catching a
+mangled anchor line that would otherwise let a copy silently vanish from the
+walk while the roster validator still counts it as shipped. Documented
+limitation, tracked not landed: a wholesale-deleted redaction site removes
+both counts together, so the check still reports agreement and passes — a
+companion pr-test-analyst finding flagged the same gap from the test side (no
+fixture pins a per-carrier body count). Storing a per-carrier count in the
+roster was declined — a stored count is itself a drift site. The tracked fix
+direction instead ties site presence to consumer presence: assert that every
+`awk "$redact_awk"` consumer in council.md sits after a
+`local redact_awk='` opener in the same function, rather than deriving
+presence from a number.
+
+**A fatal gate needs a test of its own failure path.** `redaction.bats`'
+`setup_file()` identity gate is fatal — if it fails, no behavioral test runs
+— and its own failure path had only been checked by hand. The comparison
+loop is now a lib function (`check_body_identity`) with a dedicated drift
+unit test in `extract.bats`.
+
+**Rule R had two more silent-pass shapes, both closed.** Adding the bash lib
+to the validator's file-exclusion set (to stop it tripping its own detector)
+also silently dropped it from the unrelated Rule S prose-sweep ledger — an
+exclusion built for one rule narrowed a different rule's coverage. Fixed by
+scrubbing just the marker-array span from the lib's body at carrier-detection
+time instead of excluding the whole file. Separately, the marker strings
+parsed from the bash array were never checked against the file they identify
+— a stale marker (renamed function, edited signature) used to yield zero
+carriers and a vacuous Rule R pass, the same silent-green class as the
+mutation-before-test and full-line-anchor bugs above, one layer up in the
+tooling. Fixed: markers must be found inside `CANONICAL_SOURCE`'s own body,
+arity pinned to exactly two, both array regexes anchored (this doc's
+original Key Insight, applied to a validator script), multi-match
+declarations treated as errors.
+
+**A silencing anti-pattern worth flagging on sight.** Mid-review, the
+SELF_FILES exclusion above was found with its Rule S ledger stamp deleted —
+and the validator's own error message had pointed that way: it reads
+`council-roster.json "prose_sites" lists "<file>", which no longer restates
+the roster — remove the entry`. That message is correct about the symptom
+(the file no longer restates the roster, because it had just been excluded
+from the walk) but "remove the entry" is a coverage-change instruction, not
+a green light — deleting the entry "fixed" the validator error by removing
+what it was checking, not by fixing the coverage gap. The eventual fix
+(scrub-the-span) restores the stamp. General lesson: when a validator's own
+error message tells you to delete its own tracking entry, that message is
+describing a coverage change, not authorizing one — the question to ask is
+why the file stopped being scanned, before deleting anything.
+
+**Basename-keyed extraction can compare a carrier against itself twice.**
+Body files are keyed by the carrier's basename; two carriers sharing a
+basename would silently overwrite the first's bodies with the second's, and
+the identity gate would then compare the survivor's bodies twice while never
+touching the overwritten file's actual content. Fixed: basename uniqueness
+is asserted before extraction. Path-keyed naming is tracked as follow-up,
+since no current carrier set collides.
+
+**Carrier discoverability closes the loop from the PR #781 Update above.**
+Both reviewer agents now carry a provenance comment above their copy of the
+program (matching council.md's sites), and AGENTS.md's validation matrix now
+routes any carrier-file edit to the bats gate.
+
+**Components (this Update):**
+`plugins/yellow-council/tests/lib/extract-redaction-bodies.awk`,
+`plugins/yellow-council/tests/lib/extract-redaction-awk.bash`,
+`plugins/yellow-council/tests/redaction.bats`,
+`plugins/yellow-council/tests/extract.bats`,
+`scripts/validate-council-roster.js`,
+`plugins/yellow-council/agents/review/gemini-reviewer.md`,
+`plugins/yellow-council/agents/review/opencode-reviewer.md`, `AGENTS.md`.

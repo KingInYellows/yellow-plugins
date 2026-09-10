@@ -138,7 +138,14 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `pnpm lint:plugins`.
 - Hook or shell-script changes: `pnpm validate:plugins` plus the affected Bats
   suite. Current Bats coverage exists for `yellow-core`, `yellow-ci`,
-  `yellow-debt`, `yellow-review`, and `yellow-ruvector`.
+  `yellow-council`, `yellow-debt`, `yellow-review`, and `yellow-ruvector`.
+- Edits to any file carrying the council credential-redaction awk program
+  (`plugins/yellow-council/skills/council-patterns/SKILL.md`,
+  `agents/review/gemini-reviewer.md`, `agents/review/opencode-reviewer.md`,
+  `commands/council/council.md`): `bats plugins/yellow-council/tests/`. The
+  identity gate there is fatal and aborts the whole file when any copy
+  differs from SKILL.md after dedent; `validate:agents` and `lint:plugins`
+  do not run it.
 - `plugins/yellow-core/commands/setup/all.md` or marketplace inventory changes:
   `pnpm validate:setup-all`.
 - TypeScript package changes: `pnpm test:unit`, `pnpm lint`, and
