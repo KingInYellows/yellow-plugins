@@ -1,0 +1,25 @@
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_92dcda3176fc7c::t_c10b5e96dd48b8 99-100
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_92dcda3176fc7c::t_a766f6a39e78da 52-55
+plans/shells/yellow-jules-integration-05-goal-engine-milestone.md
+  s_92dcda3176fc7c::t_2a5b6cf13987b6 69-77
+plans/specs/yellow-jules-integration.md
+  s_92dcda3176fc7c::t_dc5acfda94cf59 277-281,394-402,749-752
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "03337a62cbc4b9988f141991701f80d0cbd9e9df",
+  "prompts": {},
+  "sessions": {
+    "s_92dcda3176fc7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76fc52aa-a6a6-4527-a247-50fd6aea7d36",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
