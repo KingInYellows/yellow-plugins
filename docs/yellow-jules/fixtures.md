@@ -24,6 +24,7 @@ Illustrative only, not a captured response
   "sdkResolution": "data-dir",
   "sdkVersion": "0.2.0",
   "sdkIntegrity": "sha512-fKutNR8VvzsxqKA4uYkkJUZauXhiuIu9aVpjgeMuFADKt95y7oQbRJX/QmOS74fy2yAsY6SwKnIY6cJaaG6kpQ==",
+  "sdkEntrySha256": "3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e",
   "sourcesReachable": {
     "supported": true,
     "value": { "count": 3, "truncated": false }
@@ -73,6 +74,7 @@ Illustrative only, not a captured response
   "ok": false,
   "operation": "delegate",
   "localRequestId": "req-2026-09-10T22:00:00Z-7f3a",
+  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
   "error": {
     "code": "JULES_UNKNOWN_OUTCOME",
     "message": "network error after POST sessions was dispatched",
@@ -137,7 +139,8 @@ Illustrative only, not a captured response
     "new": 2,
     "pages": 1,
     "partialPagination": false,
-    "dedupWindowExceeded": false
+    "dedupWindowExceeded": false,
+    "unmappedActivity": false
   },
   "pendingPlan": {
     "planId": "plan-1",
@@ -205,7 +208,8 @@ Illustrative only, not a captured response
   "sessionResource": "sessions/314159265358979",
   "approvedPlanId": "plan-1",
   "observedPlanIdAfter": "plan-1",
-  "verificationDeferred": false
+  "verificationDeferred": false,
+  "verification": { "pages": 1, "partialPagination": false }
 }
 ```
 
@@ -234,6 +238,7 @@ Illustrative only, not a captured response
   "ok": true,
   "operation": "collect",
   "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
+  "sessionResource": "sessions/314159265358979",
   "artifacts": [
     {
       "kind": "patch",
@@ -244,7 +249,13 @@ Illustrative only, not a captured response
       "verification": "unverified"
     }
   ],
-  "activities": { "pages": 1, "partialPagination": false },
+  "skipped": [],
+  "activities": {
+    "pages": 1,
+    "partialPagination": false,
+    "unmappedActivity": false
+  },
+  "partialStaging": false,
   "noSupportedArtifact": false
 }
 ```
@@ -284,7 +295,7 @@ Illustrative only, not a captured response
 ```json
 {
   "prompt": "Investigate the flaky test in tests/integration/foo.test.ts and propose a fix.",
-  "title": "Investigate flaky test",
+  "title": "[yellow:jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d] Investigate flaky test",
   "sourceContext": {
     "source": "sources/github/octo/repo",
     "githubRepoContext": { "startingBranch": "main" }
@@ -303,7 +314,7 @@ Illustrative only, not a captured response
   "name": "sessions/314159265358979",
   "id": "314159265358979",
   "prompt": "Investigate the flaky test in tests/integration/foo.test.ts and propose a fix.",
-  "title": "Investigate flaky test",
+  "title": "[yellow:jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d] Investigate flaky test",
   "sourceContext": {
     "source": "sources/github/octo/repo",
     "githubRepoContext": { "startingBranch": "main" }

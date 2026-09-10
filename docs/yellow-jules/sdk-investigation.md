@@ -305,17 +305,18 @@ the packed `0.2.0` artifact.
   opens no network connection. Page tokens are documented as nanosecond
   timestamps (`dist/utils/page-token.d.ts`). `streamActivities` (M794-879)
   dedups by `(createTime, id)` and retries only the first `404` up to 10 times.
-- **Session handles, enumeration, and direct activity list**: `session(id)`
-  (T1222; `dist/client.d.ts` L163) rehydrates a client without a network request
+- **Session handles, enumeration, and direct activity list**: `session(config)`
+  (T1210; `index.mjs` L2723-2762) creates and `session(id)` (T1222;
+  `dist/client.d.ts` L163) rehydrates a client without a network request
   (exercised in section 5: `jules.session("s-1").info()`).
-  `jules.sessions(options)` (T1265; `ListSessionsOptions` at
-  `dist/sessions.d.ts` L4-24: `pageSize`, `pageToken`, `limit`, `persist`
-  default `true` = write-through to session storage, `filter`) returns a
-  `SessionCursor` (`dist/sessions.d.ts` L45, re-exported at `dist/index.d.ts`
-  L26) that is thenable for one page and async-iterable for all pages; its
-  `fetchPage` serializes `pageSize`, `pageToken`, and `filter` onto the
-  `GET sessions` query (M1797-1801). `session.activities.list(options)` is
-  `ActivityClient.list` (`dist/activities/types.d.ts` L50;
+  `jules.sessions(options)` (T1265; `index.mjs` L2620-2627;
+  `ListSessionsOptions` at `dist/sessions.d.ts` L4-24: `pageSize`, `pageToken`,
+  `limit`, `persist` default `true` = write-through to session storage,
+  `filter`) returns a `SessionCursor` (`dist/sessions.d.ts` L45, re-exported at
+  `dist/index.d.ts` L26) that is thenable for one page and async-iterable for
+  all pages; its `fetchPage` serializes `pageSize`, `pageToken`, and `filter`
+  onto the `GET sessions` query (M1797-1801). `session.activities.list(options)`
+  is `ActivityClient.list` (`dist/activities/types.d.ts` L50;
   `ListOptions { pageSize?, pageToken?, filter? }` at L5-9, "NETWORK LIST"),
   implemented by `DefaultActivityClient.list` over
   `NetworkAdapter.listActivities` (M1155-1173), which serializes `filter` at
@@ -486,6 +487,9 @@ A criterion that could not be exercised would have been recorded as
   `createTime` is inferred from the SDK's incremental-sync design, M1002-1031,
   not observed); the contract's watermark rule advances only on a complete walk
   so either order is safe.
+- Whether the vendor trims or normalizes whitespace in `title`, which the
+  contract's reconcile tag `[yellow:<local-id>]` relies on (tag emitted as a
+  prefix; extraction tolerates a missing trailing space).
 - Vendor identifier character sets. The harness echoed its own ids; the
   allowlist patterns in `contract-v1.md` are derived from `types.d.ts`
   resource-name formats only (`source-inspected`) and must be re-checked against
