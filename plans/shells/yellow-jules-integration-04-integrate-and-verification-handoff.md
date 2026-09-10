@@ -47,10 +47,15 @@ across restart, deadline, and base-mismatch cases.
 ## Implementation Steps (High-Level)
 
 1. **Implement base verification and worktree apply** — compare artifact base
-   to intended branch, fail on mismatch, create worktree via the skill, apply
-   the patch there only.
-2. **Run the verification contract** — invoke available review and CI tooling
-   against the applied patch, record unavailability rather than a pass.
+   to intended branch, fail on mismatch, refuse artifacts whose session has an
+   unreconciled policy deviation, scan the patch against R41's path deny-list
+   and fail on a match, create the worktree via the skill, apply the patch
+   there only, and require the user's diff acknowledgement before any command
+   runs inside the worktree.
+2. **Run the verification contract** — resolve and pin the contract from the
+   pre-apply trusted checkout, invoke available review and CI tooling against
+   the applied patch with lifecycle scripts disabled and no ambient
+   credentials, record unavailability or error rather than a pass.
 3. **Hand off through the stack provider** — resolve provider state, route
    branch and PR creation only through the ready provider, refuse all raw
    fallbacks and any merge.

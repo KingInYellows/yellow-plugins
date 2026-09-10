@@ -271,8 +271,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   confirmation is a runtime-validated single-operation authorization, not a
   caller-asserted flag: the wrapper's confirmation step mints a single-use
   confirmation token bound to the exact operation (kind, repository, branch,
-  and request id), and the runtime accepts the token exactly once and only
-  for that binding; TTY presence or absence on the CLI child's stdin proves
+  request id, target session, and a digest of the complete request payload:
+  reply body, source resource, or the evaluated plan id), and the runtime
+  accepts the token exactly once and only for that binding, so no field of
+  the confirmed mutation can change after confirmation; TTY presence or absence on the CLI child's stdin proves
   nothing by itself. The engine process interface (R59), which never runs
   interactively, presents a grant id instead. [§8]
 - **R30.** `/jules:authorize` shall create a grant record in the journal
@@ -367,7 +369,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   procedure writes the incremented epoch to the new host's file and
   invalidates the source journal, so a copied or restored data directory —
   which cannot carry the host-local file with it — fails loud instead of
-  writing in parallel. [§9; user decision 2026-09-09]
+  writing in parallel. The host-local file also records the canonical
+  absolute path of the data directory it authorizes; a copy at any other
+  path on the same host fails the same check. [§9; user decision 2026-09-09]
 - **R39.** When a grant or supervision deadline expires while a remote session
   is still active, the runtime shall report the running session and refuse
   further instructions; expiry is never reported as remote termination. The
@@ -433,7 +437,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   approve, collect, and supervise shall work on Codex through the same
   `dist/cli.js` with the same JSON contract and confirmation semantics.
   `authorize` is excluded from Codex parity until a host-neutral
-  owner-confirmation primitive is specified (Open Question 4). [user decision 2026-09-09]
+  owner-confirmation primitive is specified (Open Question 4); until then,
+  Codex skills cannot mint the R29 confirmation token, so mutating commands
+  on Codex require a grant created from Claude Code and refuse otherwise. [user decision 2026-09-09]
 
 ### Testing and evidence
 
@@ -559,7 +565,7 @@ dist/cli.js -> runtime.ts -> SdkAdapter (sdk-adapter.ts | rest-adapter.ts)
 Google Jules sessions / activities / sources
         |
         v
-collect -> <dataDir>/artifacts/<session>/   (never touches checkout)
+collect -> <dataDir>/artifacts/<local-id>/  (never touches checkout)
         |
         v
 integrate -> git-worktree -> verification -> /stack:status -> active stack provider -> human merge

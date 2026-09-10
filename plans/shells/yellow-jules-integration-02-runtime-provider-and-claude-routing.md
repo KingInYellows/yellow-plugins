@@ -110,10 +110,11 @@ owner-approved activity, not CI.
    atomic writes, lock, corrupt-journal refusal, request-id dedup.
 3. **Implement the adapter and resolver** — chosen transport behind the
    adapter interface, explicit create flags with serialized-request
-   assertion, retries disabled, isolated storage, consented data-dir install
-   with recorded-integrity-hash tarball verification and a fail-closed
-   `JULES_SDK_INTEGRITY` abort on mismatch, post-acceptance failure
-   classification to unknown-outcome.
+   assertion, retries disabled, isolated storage, and (only when shell 01's
+   verdict selects the SDK adapter) consented data-dir install with
+   recorded-integrity-hash tarball verification and a fail-closed
+   `JULES_SDK_INTEGRITY` abort on mismatch; post-acceptance failure
+   classification to unknown-outcome on either branch.
 4. **Implement runtime operations** — setup probe, source discovery, session
    create, fresh status with activity paging and dedup, reply, approve with
    plan re-fetch, collect with base recording and artifact kinds, policy
