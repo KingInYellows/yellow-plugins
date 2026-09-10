@@ -100,7 +100,8 @@ Illustrative only, not a captured response
       "createTime": "2026-09-10T22:00:03Z"
     }
   ],
-  "nextPageToken": "1757541603000000000"
+  "nextPageToken": "1757541603000000000",
+  "journalOnly": []
 }
 ```
 
@@ -131,10 +132,17 @@ Illustrative only, not a captured response
   "sessionResource": "sessions/314159265358979",
   "vendorState": "awaitingPlanApproval",
   "condition": "awaiting-approval",
-  "activities": { "processed": 2, "new": 2, "partialPagination": false },
+  "activities": {
+    "processed": 2,
+    "new": 2,
+    "pages": 1,
+    "partialPagination": false,
+    "dedupWindowExceeded": false
+  },
   "pendingPlan": {
     "planId": "plan-1",
-    "steps": [{ "id": "step-1", "index": 0, "title": "Read the failing test" }]
+    "steps": [{ "id": "step-1", "index": 0, "title": "Read the failing test" }],
+    "activityCreateTime": "2026-09-10T22:00:41Z"
   },
   "outputs": []
 }
@@ -180,7 +188,7 @@ Illustrative only, not a captured response
     "code": "JULES_CONFIRMATION_REQUIRED",
     "message": "reply is a mutating operation and no grant or confirmation token was supplied",
     "retryable": false,
-    "recoveryAction": "Re-run with --confirmation-token from the wrapper's confirmation step, or with --grant-id."
+    "recoveryAction": "Run `reply --dry-run`, confirm through the wrapper, then re-run with the token in the YELLOW_JULES_CONFIRMATION environment variable, or pass --grant-id."
   }
 }
 ```
@@ -196,7 +204,8 @@ Illustrative only, not a captured response
   "localRequestId": "req-2026-09-10T22:06:00Z-c3d4",
   "sessionResource": "sessions/314159265358979",
   "approvedPlanId": "plan-1",
-  "observedPlanIdAfter": "plan-1"
+  "observedPlanIdAfter": "plan-1",
+  "verificationDeferred": false
 }
 ```
 
@@ -228,12 +237,14 @@ Illustrative only, not a captured response
   "artifacts": [
     {
       "kind": "patch",
-      "path": "artifacts/jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d/changes.patch",
+      "path": "artifacts/jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d/patch.diff",
       "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
       "baseCommit": "8baa0bdd1c2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a",
+      "secretShapedContent": false,
       "verification": "unverified"
     }
   ],
+  "activities": { "pages": 1, "partialPagination": false },
   "noSupportedArtifact": false
 }
 ```

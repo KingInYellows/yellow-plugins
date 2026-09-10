@@ -305,16 +305,26 @@ the packed `0.2.0` artifact.
   opens no network connection. Page tokens are documented as nanosecond
   timestamps (`dist/utils/page-token.d.ts`). `streamActivities` (M794-879)
   dedups by `(createTime, id)` and retries only the first `404` up to 10 times.
-- **Session enumeration and direct activity list**: `jules.sessions(options)`
-  (T1265; `dist/sessions.d.ts` L483-503: `pageSize`, `pageToken`, `limit`,
-  `persist` default `true` = write-through to session storage, `filter`) returns
-  a `SessionCursor` (exported, `dist/index.d.ts` L27) that is thenable for one
-  page (`GET sessions`, M2620-2627) and async-iterable for all pages.
-  `session.activities.list(options)` is `ActivityClient.list`
-  (`dist/activities/types.d.ts` L1461-1464, "NETWORK LIST"), implemented by
-  `DefaultActivityClient.list` over `NetworkAdapter.listActivities`
-  (M1155-1173); it is the one paginated activity read that does not go through
-  `hydrate()`. Neither was exercised by the harness (`source-inspected`).
+- **Session handles, enumeration, and direct activity list**: `session(id)`
+  (T1222; `dist/client.d.ts` L163) rehydrates a client without a network request
+  (exercised in section 5: `jules.session("s-1").info()`).
+  `jules.sessions(options)` (T1265; `ListSessionsOptions` at
+  `dist/sessions.d.ts` L4-24: `pageSize`, `pageToken`, `limit`, `persist`
+  default `true` = write-through to session storage, `filter`) returns a
+  `SessionCursor` (`dist/sessions.d.ts` L45, re-exported at `dist/index.d.ts`
+  L26) that is thenable for one page and async-iterable for all pages; its
+  `fetchPage` serializes `pageSize`, `pageToken`, and `filter` onto the
+  `GET sessions` query (M1797-1801). `session.activities.list(options)` is
+  `ActivityClient.list` (`dist/activities/types.d.ts` L50;
+  `ListOptions { pageSize?, pageToken?, filter? }` at L5-9, "NETWORK LIST"),
+  implemented by `DefaultActivityClient.list` over
+  `NetworkAdapter.listActivities` (M1155-1173), which serializes `filter` at
+  M1164; it is the one paginated activity read that does not go through
+  `hydrate()`. Whether the vendor evaluates either `filter` server-side, and the
+  grammar it accepts, is not established by source (the SDK only forwards the
+  string; its own `hydrate()` builds `create_time>"<RFC3339>"`, M1008). None of
+  the three was exercised against the fake server beyond `session(id)`
+  (`source-inspected`).
 - **Storage default** (M4327-4330): `NodeFileStorage`/`NodeSessionStorage`
   rooted at `getRootDir()` (M349-369): `JULES_HOME` if writable, else **cwd if
   it contains a `package.json`**, else `HOME`, else `os.homedir()`, else
@@ -468,6 +478,14 @@ A criterion that could not be exercised would have been recorded as
 
 ## 12. Remaining unknowns
 
+- Whether `ListSessionsOptions.filter` and `ListOptions.filter` are evaluated
+  server-side, and the AIP-160 grammar and field names the vendor accepts (the
+  SDK forwards the string verbatim; the fake server ignored it). The contract
+  treats filters as optimizations only.
+- The order in which `GET sessions/{id}/activities` returns pages (ascending
+  `createTime` is inferred from the SDK's incremental-sync design, M1002-1031,
+  not observed); the contract's watermark rule advances only on a complete walk
+  so either order is safe.
 - Vendor identifier character sets. The harness echoed its own ids; the
   allowlist patterns in `contract-v1.md` are derived from `types.d.ts`
   resource-name formats only (`source-inspected`) and must be re-checked against
