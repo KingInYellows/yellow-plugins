@@ -46,6 +46,14 @@ on:
       - '**/*.sh'
       - '**/*.bats'
       - '**/*.txt'
+      # Rule R (scripts/validate-council-roster.js) walks a wider extension
+      # set than validate-flow-namespace.js's SCANNED_EXTENSIONS above — these
+      # three cover the gap so an unmatched carrier (e.g. a new .awk file)
+      # still schedules this workflow. Keep in sync with REDACTION_EXT in
+      # scripts/validate-council-roster.js.
+      - '**/*.awk'
+      - '**/*.py'
+      - '**/*.bash'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   push:
@@ -80,6 +88,11 @@ on:
       - '**/*.sh'
       - '**/*.bats'
       - '**/*.txt'
+      # Mirrors the Rule R extras added to pull_request.paths above — see the
+      # comment there.
+      - '**/*.awk'
+      - '**/*.py'
+      - '**/*.bash'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
       # The recursive extension globs above (e.g. '**/*.md') would otherwise
@@ -326,6 +339,21 @@ jobs:
                 # this script.
                 echo "::group::Provider-neutral command gate"
                 node scripts/validate-provider-neutral-commands.js
+                echo "::endgroup::"
+                # Council reviewer-roster drift gate: pins
+                # scripts/council-roster.json to council.md's loop and spawn
+                # definition sites, rejects reviewer-count claims that
+                # disagree with the derived totals, and fails when a file
+                # restating the roster has not been re-swept since the roster
+                # changed. Same rationale as the two gates above.
+                echo "::group::Council reviewer-roster drift"
+                node scripts/validate-council-roster.js
+                echo "::endgroup::"
+                # Narrative plugin-count drift. This validator has existed
+                # since the 2026-05-07 audit but ran only in
+                # `pnpm release:check`, so it gated nothing on a PR.
+                echo "::group::Narrative doc counts"
+                node scripts/validate-doc-counts.js
                 echo "::endgroup::"
                 ;;
               plans)

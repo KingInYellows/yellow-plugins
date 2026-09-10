@@ -37,6 +37,14 @@ on:
       - '**/*.sh'
       - '**/*.bats'
       - '**/*.txt'
+      # Rule R (scripts/validate-council-roster.js) walks a wider extension
+      # set than validate-flow-namespace.js's SCANNED_EXTENSIONS above — these
+      # three cover the gap so an unmatched carrier (e.g. a new .awk file)
+      # still schedules this workflow. Keep in sync with REDACTION_EXT in
+      # scripts/validate-council-roster.js.
+      - '**/*.awk'
+      - '**/*.py'
+      - '**/*.bash'
       - '.github/workflows/validate-schemas-fork.yml'
 
 permissions:
@@ -170,14 +178,17 @@ jobs:
               # `authoring` target). Fork PRs get the same enforcement so a
               # fork contributor sees identical blocking signals for authoring
               # rules, setup:all coverage, ERROR-* codes, snippet drift,
-              # flow: namespace sweep completeness, and the provider-neutral
-              # command gate.
+              # flow: namespace sweep completeness, the provider-neutral
+              # command gate, council reviewer-roster drift, and narrative
+              # plugin-count drift.
               node scripts/validate-agent-authoring.js
               node scripts/validate-setup-all.js
               node scripts/lint-error-codes.js
               node scripts/sync-shell-snippets.js --check
               node scripts/validate-flow-namespace.js
               node scripts/validate-provider-neutral-commands.js
+              node scripts/validate-council-roster.js
+              node scripts/validate-doc-counts.js
               ;;
             codex)
               # Codex-artifact schema validation + the R15 exposure lint
