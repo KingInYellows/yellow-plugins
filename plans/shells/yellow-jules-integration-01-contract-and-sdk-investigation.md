@@ -45,8 +45,8 @@ no provider-router or consumer change, no live Jules session.
 - Brainstorm doc and spec decisions — from existing codebase
 - `plugins/yellow-cursor/` adapter, resolver, and CLI contract as the pattern
   reference — from existing codebase
-- Registry result already obtained (`npm view` shows `latest: 0.2.0`) — from
-  existing session evidence, recorded as registry evidence only
+- Registry result (`npm view` shows `latest: 0.2.0`), recorded in the
+  brainstorm doc as registry evidence only — from existing codebase
 
 ## Covers Spec Requirements
 
@@ -62,7 +62,8 @@ no provider-router or consumer change, no live Jules session.
 
 1. **Reconcile the plan document** — bring revision 2's sections 5, 6, 14, 17
    into the repository, reconciled against the checkout, with the motivation
-   statement and the enumeration-site checklist for PR2.
+   statement and the enumeration-site checklist for PR2 sourced from spec
+   R23/R24 (not the brainstorm's provisional line numbers).
 2. **Write the provider-CLI contract v1** — subcommands, argument shapes, JSON
    output envelope, error-code table with retryable and recovery fields, exit
    codes, redaction guarantees, unsupported-capability responses.

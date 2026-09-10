@@ -41,6 +41,7 @@ across restart, deadline, and base-mismatch cases.
 - R8 (partial: integrate-command)
 - R41
 - R43
+- R52 (partial: integrate-scenarios)
 
 ## Implementation Steps (High-Level)
 

@@ -46,7 +46,8 @@ owner-approved activity, not CI.
 - Refreshed characterization snapshots, plugin-count doc updates, changesets
   for yellow-jules, yellow-core, yellow-linear, README and CLAUDE.md for the
   plugin
-- Human smoke procedure checklist and result-record template
+- Human smoke procedure checklist and the `docs/yellow-jules/smoke-result.md`
+  record template (R53)
 
 ## Consumes
 
@@ -96,7 +97,7 @@ owner-approved activity, not CI.
 - R49 (partial: test-layers)
 - R50
 - R51
-- R52
+- R52 (partial: pr2-scenarios)
 - R53 (partial: procedure-and-checklist)
 
 ## Implementation Steps (High-Level)
@@ -121,7 +122,9 @@ owner-approved activity, not CI.
    order, provider-router row and state, its own test suite and six
    fixtures for a seventh state, setup-all sites including the Step 2.5
    acceptable-state enumeration, Linear delegate sites including the tooling
-   argv slot, provider-groups validator fixtures, stale-comment fixes.
+   argv slot, provider-groups validator fixtures, a consumer-site validator
+   that enumerates provider ids against each consumer (R25), stale-comment
+   fixes.
 7. **Wire root scripts and CI** — typecheck and unit-test filters, main build
    drift step, fork-mirror matrix arm, snapshot refresh, plugin-count docs.
 8. **Write the three test layers' first two** — fake-adapter suite covering

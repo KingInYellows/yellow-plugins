@@ -28,6 +28,9 @@ Starting this shell requires explicit owner approval after PR4 ships.
   configured absolute path, argv array, closed stdin, bounded output, one
   deadline, signal escalation, and stores only provider job and grant
   references
+- Versioned `engine` mode in the yellow-jules CLI (capabilities handshake,
+  JSON Lines run events) under a new contract version; v0's single-object
+  contract is unchanged
 - New engine release artifact with SHA-256
 - yellow-goal plugin pin bump, release verification script update, and
   compatibility tests, keeping the engine-compat CI job zero-spend

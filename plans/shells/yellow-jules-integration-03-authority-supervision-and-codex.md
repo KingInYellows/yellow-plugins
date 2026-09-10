@@ -60,14 +60,16 @@ single-controller handoff procedure.
 - R46
 - R47
 - R48
+- R52 (partial: grant-and-lock-scenarios)
 - R53 (partial: smoke-outcome-gate)
 
 ## Implementation Steps (High-Level)
 
-1. **Confirm the smoke gate** — locate the completed human smoke result
-   record from shell 02's template; if absent or if it reports an unexpected
+1. **Confirm the smoke gate** — require `docs/yellow-jules/smoke-result.md`
+   with `result: pass` (R53); if absent, failed, or reporting an unexpected
    vendor PR, stop and surface the delivery-policy decision before any
-   further step.
+   further step. `depends_on` cannot express a human gate, so this check is
+   the gate.
 2. **Add the grant model and authorize command** — record fields, trial
    defaults with ceiling, listing and revocation, confirmation gate.
 3. **Enforce authority in the runtime** — check before every write, expiry and
@@ -89,5 +91,8 @@ single-controller handoff procedure.
 
 - Which research and review capabilities the installed Codex CLI actually
   exposes to supervision is discovered here (spec Open Question 2).
+- `authorize` stays Claude-only until a host-neutral owner-confirmation
+  primitive exists (spec Open Question 4); decide here whether grants need a
+  key-bound MAC beyond permissions and a separate store (spec Open Question 5).
 - Whether the R53 smoke surfaced a vendor PR despite the flags; if so, the
   delivery-policy decision precedes this shell.

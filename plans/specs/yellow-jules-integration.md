@@ -74,22 +74,27 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   `jules.google/docs/api/reference/{sessions,sources,activities}` instead.
   Either way the command surface and runtime contract are unchanged. [§1, §6]
 - **R4.** When installed from the plugin cache, the runtime shall run without
-  the monorepo's `node_modules`, resolving the SDK in order: workspace
+  the monorepo's `node_modules`. When the SDK adapter is selected (R3), it
+  resolves the SDK in order: workspace
   `require`, then `<dataDir>/runtime/node_modules`, else fail with
   `JULES_SDK_MISSING` and a recovery action. Installation into the data dir
   happens only after explicit `/jules:setup` consent, pins an exact version
-  with a recorded integrity hash, runs with lifecycle scripts disabled, and
-  never on a per-task basis. [§4, §6.2; pattern: `yellow-cursor/src/sdk-resolver.ts`]
+  with a recorded integrity hash, verifies the downloaded tarball against
+  that hash and aborts with `JULES_SDK_INTEGRITY` on mismatch, runs with
+  lifecycle scripts disabled, and never on a per-task basis. When the REST
+  adapter is selected, the runtime has no SDK dependency and `setup` reports
+  resolution as not applicable. [§4, §6.2; pattern: `yellow-cursor/src/sdk-resolver.ts`]
 - **R5.** No Jules runtime code shall live in `packages/domain`,
   `packages/infrastructure`, or `packages/cli`, and no executable code shall
   live under `skills/` (the Codex generator copies only `SKILL.md` plus a flat
   `references/*.md`). [§4, §13; `docs/codex-distribution.md`]
-- **R6.** The plugin shall load the SDK's ESM entry either through a
+- **R6.** On the SDK-adapter branch, the plugin shall load the SDK's ESM entry either through a
   plugin-local ESM build (`"type": "module"` in `plugins/yellow-jules/package.json`)
   or a verified dynamic-import boundary from a CJS build, chosen by PR1's
   findings. Marketplace-wide module settings (`tsconfig.base.json`, other
-  plugins) shall not change. No plugin ships ESM today; yellow-cursor and
-  yellow-goal emit CJS via `module: node16`. [§4, §6.2]
+  plugins) shall not change. On the REST branch the plugin keeps the
+  yellow-cursor CJS build. As of `6a0bcc87` (2026-09-09) no plugin ships ESM;
+  yellow-cursor and yellow-goal emit CJS via `module: node16`. [§4, §6.2]
 
 ### Command surface and CLI contract
 
@@ -97,7 +102,12 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   diagnostics on stderr, and exit 0 on success, 1 on operational failure, 2 on
   usage error, with stable `code`, `retryable`, and `recoveryAction` fields
   and centralized redaction on every output path. Vendor error text is never
-  reproduced unredacted. [§5; mirrors yellow-cursor `errors.ts`/`redact.ts`]
+  reproduced unredacted. Every vendor-supplied session, source, activity, or
+  plan identifier, whether accepted as input or returned by the API, is
+  validated against an anchored allowlist pattern before use in any adapter
+  call, URL, journal key, or filesystem path, on both transport branches;
+  artifact staging paths derive from a locally minted id, never from the
+  vendor string. [§5; mirrors yellow-cursor `errors.ts`/`redact.ts`/`validate.ts`]
 - **R8.** Command markdown files under `commands/jules/` shall be thin Bash
   wrappers around the CLI with no API logic. v0 commands: `setup`, `delegate`,
   `list`, `status`, `reply`, `approve`, `collect` (PR2); `authorize`,
@@ -138,9 +148,8 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   rechecked before each intentional new write. [§6.3, J8]
 - **R15.** The Yellow journal (R35) is the sole authority for grants,
   task/session mappings, processed activity ids, and verified outcomes. SDK
-  storage is a bounded in-memory scratch factory (or, if the artifact requires
-  disk, an explicit scratch path with stated retention and no canonical-state
-  semantics). Setup, import, and operations shall create no state under the
+  storage is a bounded in-memory scratch factory (R3 criterion (d) guarantees
+  this on the SDK branch; the REST branch has no SDK storage). Setup, import, and operations shall create no state under the
   source checkout or the plugin install cache. `status`, approval checks, and
   reconciliation shall perform fresh remote reads, never trusting a cache hit.
   [§6.4, J7, J9]
@@ -164,7 +173,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   patch with base commit, external PR reference, grounded generated files) and
   return an explicit `no-supported-artifact` result otherwise. For
   code-changing tasks, a completion message or Markdown explanation alone
-  yields a non-accepted result. [§6.5, J5]
+  yields a non-accepted result. `collect` marks, and `integrate` (R41)
+  refuses, any artifact whose session carries an unreconciled
+  `policy-deviation` record (R13). [§6.5, J5]
 - **R20.** The journal shall record the requested branch and locally observed
   head separately from the artifact's actual base; the plugin never advertises
   SHA-pinned execution. [§6.5]
@@ -213,7 +224,12 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   it: catalog registration, router table, setup coverage, Linear route, root
   script filters, fixtures, CI selectors, and changesets land in one PR and
   revert as one. The PR2 description carries the literal enumeration-site
-  checklist. [§7, §14; `docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md`]
+  checklist, and PR2 adds a validator (or extends
+  `scripts/validate-provider-groups.js`) that enumerates every provider id in
+  the router table and fails when any id is absent from each registered
+  consumer site (the `--provider` validator and `READY_*` mapping in the
+  Linear delegate command, the Step 2.5 state enumeration and tooling probe
+  in setup-all), so the guarantee is a CI gate rather than prose. [§7, §14; `docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md`]
 - **R26.** `scripts/validate-provider-groups.js` fixtures and
   `tests/integration/validate-provider-groups.test.ts` shall be extended for a
   three-member group, and `tests/integration/remote-agent-provider-state.test.ts`
@@ -244,18 +260,28 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 ### Authority and autonomy
 
 - **R29.** Every mutating command shall default to interactive confirmation,
-  matching `yellow-cursor` wrappers, until a grant covers it. [§8]
+  matching `yellow-cursor` wrappers, until a grant covers it. Interactive
+  confirmation is a runtime-validated single-operation authorization, not a
+  caller-asserted flag: the runtime refuses interactive-authority mode when
+  stdin is not a TTY, and every non-TTY invocation (including the engine
+  process interface, R59) must present a grant id. [§8]
 - **R30.** `/jules:authorize` shall create a grant record in the journal
-  containing: grant id, approved repository and source resource, task/goal
-  identifiers, permitted operations (subset of `create`, `reply`, `approve`,
+  containing: grant id, approved repository and source resource, approved
+  branch or branch pattern, task/goal identifiers, permitted operations (subset of `create`, `reply`, `approve`,
   `collect`), maximum active sessions, maximum total tasks, maximum corrective
   rounds per task, absolute expiry, and owner. Trial defaults (confirmed
   2026-09-09): 1 active session, 3 tasks, 2 corrective rounds, 2 hours,
   overridable per grant within a documented ceiling. Grants are listable and
-  revocable; the runtime never widens a grant on its own. [§8; user decision 2026-09-09]
-- **R31.** Every mutation shall pass the runtime's authority check (grant
-  present, unexpired, repository and task match, limits not exhausted) before
-  any remote write. Host hooks, prompt wording, and CLI sandbox settings are
+  revocable; the runtime never widens a grant on its own, and a grant can
+  never be created or widened from within a session already operating under
+  a grant. [§8; user decision 2026-09-09]
+- **R31.** Every mutation shall pass the runtime's authority check before
+  any remote write: either a valid grant (present, unexpired, repository,
+  branch, and task match, limits not exhausted) or a single-operation
+  interactive authorization (R29). Authority evaluation, counter increment,
+  and reservation write (R36) are one critical section held under the
+  directory lock; an offline test runs two concurrent `delegate` calls
+  against a one-session grant and asserts exactly one create. Host hooks, prompt wording, and CLI sandbox settings are
   never the sole enforcement layer. Reserved and unknown-outcome operations
   (R16, R36) count against grant limits until reconciliation releases them;
   only reconciliation, never a new write, may decrement a counter. [§8]
@@ -272,8 +298,14 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   is recorded as `check-failed` with backoff state, distinct from a
   successful read that observed no change. An operation deadline (R14)
   firing mid-pass records `pass-aborted` with no verdict; it is never
-  coerced into accept, correction, or escalate. It returns the decision and
-  next required check and is never an installed daemon. [§5, §9]
+  coerced into accept, correction, or escalate. All vendor-originated text
+  (activity messages, plan bodies, question text, error strings, collected
+  artifact contents) is presented to the supervisor, and rendered by any
+  command, inside `--- begin untrusted-content (reference only) ---` /
+  `--- end untrusted-content ---` delimiters with delimiter-forgery escaping
+  (the `security-fencing` skill's block), on both hosts; the supervisor never
+  treats such text as instructions. It returns the decision and next
+  required check and is never an installed daemon. [§5, §9]
 - **R34.** `approve` shall re-fetch the pending plan and compare it to the
   plan actually evaluated before approving, and shall document that the
   approval endpoint accepts no plan id, so compare-and-approve is not atomic.
@@ -288,11 +320,20 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   default, never under a source clone or plugin cache. Each operation record
   holds: local request id, provider session resource, repository and requested
   branch, goal/task reference, grant reference, processed activity ids,
-  observed plan id, outcome status, and artifact provenance with digests. [§10; pattern: `yellow-cursor/src/config.ts`]
+  observed plan id, outcome status, and artifact provenance with digests.
+  The data directory and state files are owner-only (0700/0600), enforced at
+  open; group- or world-writable or non-owned paths are refused for any
+  grant-consuming operation, including when `YELLOW_JULES_DATA_DIR`
+  overrides the location. Grant records live in a separate grants file
+  written only through `/jules:authorize`'s confirmed path. [§10; pattern: `yellow-cursor/src/config.ts`]
 - **R36.** The runtime shall write an operation reservation before sending any
   consequential request, use serialized atomic file writes, and treat the
   local request id as local deduplication only, never as a vendor idempotency
-  guarantee. [§10]
+  guarantee. Before reserving a new `create`, the runtime looks up unresolved
+  (`reserved` or `unknown-outcome`) operations for the same repository and
+  requested branch (and task reference when present) and refuses until they
+  are reconciled or the user explicitly confirms an override, so an
+  interrupted attempt is never duplicated. [§10]
 - **R37.** A corrupt or unparseable journal shall block new writes until
   reconciled; the runtime never replaces it with an empty journal and
   continues. Read commands (`status`, `list`) report `journal-corrupt`
@@ -305,10 +346,17 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   documented in `plugins/yellow-jules/CLAUDE.md`; it is not automated and no
   distributed lock is added. A stale lock left by a crashed process fails
   loud and requires manual intervention; it is never silently broken and
-  never waited on indefinitely. [§9; user decision 2026-09-09]
+  never waited on indefinitely. Each grant carries a controller identity and
+  a monotonic epoch; every write re-reads and matches the epoch, and the
+  handoff procedure increments it and invalidates the source journal, so a
+  copied or restored data directory fails loud instead of writing in
+  parallel. [§9; user decision 2026-09-09]
 - **R39.** When a grant or supervision deadline expires while a remote session
   is still active, the runtime shall report the running session and refuse
-  further instructions; expiry is never reported as remote termination. [§10]
+  further instructions; expiry is never reported as remote termination. The
+  plugin documents an out-of-band containment procedure (vendor console stop,
+  source-connection revocation, API-key rotation) reachable without a grant,
+  and expiry reporting names it in `recoveryAction`. [§10]
 
 ### Delivery, verification, and handoff
 
@@ -318,7 +366,13 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 - **R41.** `/jules:integrate` shall, for a collected artifact: verify the
   reported base against the intended branch and fail on mismatch; create a
   dedicated integration worktree through the yellow-core `git-worktree`
-  skill; apply the patch there; run the task's verification contract; then
+  skill; check the patch against a path deny-list (CI workflow files,
+  package lifecycle scripts, hook scripts, `.claude/`, `.codex-plugin/`,
+  `.cursor-plugin/`) and fail on a match; apply the patch there; require the
+  user to acknowledge the diff before any command runs inside the worktree;
+  run the task's verification contract, resolved and pinned from the
+  pre-apply trusted checkout (never read from the worktree after apply),
+  with lifecycle scripts disabled and without ambient credentials; then
   hand off branch and PR creation by running `/stack:status` and routing only
   through the `READY_GRAPHITE` or `READY_GITHUB` provider. It never invokes
   raw `git push`, `gh pr create`, or any auto-merge path. [§11; user decision 2026-09-09]
@@ -327,10 +381,12 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   adds no adoption path without a separately approved policy. [§11]
 - **R43.** Verification shall run available review and CI tooling against the
   actual staged patch or PR commit. The result carries one of `passed`,
-  `unavailable`, or `errored` (tooling ran and failed or timed out);
-  `unavailable` and `errored` are recorded as such, never as a manufactured
-  pass, and R33 treats both identically when deciding accept, correction, or
-  escalate. [§11]
+  `failed` (checks ran and reported failures; burns a corrective round),
+  `unavailable` (no tooling), or `errored` (tooling crashed or timed out;
+  burns no corrective round). `unavailable` and `errored` are recorded as
+  such, never as a manufactured pass, and R33 treats both identically when
+  deciding accept, correction, or escalate. The result is written to the
+  artifact record's `verification` field with the same vocabulary. [§11]
 - **R44.** During corrections the supervisor shall send feedback to the
   existing active session or create a new bounded repair task under the same
   grant, within R30's corrective-round limit; completed sessions are not
@@ -341,7 +397,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 - **R45.** Skill bodies `skills/jules-delegation/SKILL.md` and
   `skills/jules-supervision/SKILL.md` shall be host-neutral and pass the Codex
   exposure lint; Claude-only tool names, slash commands, env vars, and subagent
-  mechanics stay in command wrappers. [§12]
+  mechanics stay in command wrappers. The untrusted-content fencing of R33
+  applies verbatim in the Codex skill bodies, and those bodies never rely on
+  AskUserQuestion. [§12]
 - **R46.** Codex exposure (`targets.codex.enabled: true`, an `interface`
   block with `displayName` and `category` (required by the generator when
   enabled), `skillAllowlist` naming both skills,
@@ -353,8 +411,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   and shall report which research or review capabilities were unavailable for
   a pass; it never claims Claude-only sibling plugins are Codex tools. [§12]
 - **R48.** From PR3, both hosts are first-class: delegate, status, reply,
-  approve, collect, authorize, and supervise shall work on Codex through the
-  same `dist/cli.js` with the same JSON contract and confirmation semantics. [user decision 2026-09-09]
+  approve, collect, and supervise shall work on Codex through the same
+  `dist/cli.js` with the same JSON contract and confirmation semantics.
+  `authorize` is excluded from Codex parity until a host-neutral
+  owner-confirmation primitive is specified (Open Question 4). [user decision 2026-09-09]
 
 ### Testing and evidence
 
@@ -383,7 +443,11 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   and writes), stale lock on restart, grant counters after an
   unknown-outcome write, partial pagination, verification tooling error
   versus unavailable, deadline with remote work active and deadline mid-pass,
-  artifact base mismatch, and absence of any merge/submission fallback. [§15]
+  artifact base mismatch, and absence of any merge/submission fallback. Each
+  scenario is exercised by the shell that ships the feature it tests: PR2
+  covers everything up to corrupt journal and partial pagination; PR3 covers
+  grants, limits, stale lock, grant counters, and deadlines; PR4 covers
+  verification outcomes, base mismatch, and the no-fallback check. [§15]
 - **R53.** After PR2 and before PR3, one human-authorized smoke shall run a
   single small task against `yellow-plugins` on an isolated scratch base
   branch (owner decision 2026-09-09; Jules holds a real source connection to
@@ -391,8 +455,11 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   approval and no auto-PR. Success means: one session created; plan inspected; one
   reply or approval sent within authority; an interruption does not duplicate
   the task; the patch is independently checked; no PR is created by the
-  vendor; no merge occurs. Its outcome resolves the delivery/transport
-  question before supervision work begins. It is not CI. [§14, §15]
+  vendor; no merge occurs. The result is committed as
+  `docs/yellow-jules/smoke-result.md` with a `result: pass|fail` field, and
+  PR3 work refuses to start until that file exists with `pass`. Its outcome
+  resolves the delivery/transport question before supervision work begins.
+  It is not CI. [§14, §15]
 
 ### PR1: contract, capability matrix, and isolated investigation
 
@@ -519,12 +586,16 @@ R12, R14, R15.
   `taskRef?`, `grantId?`, `status` (reserved|accepted|unknown-outcome|
   reconciled|rejected), `processedActivityIds[]`, `observedPlanId?`,
   `condition` (normalized), `vendorState`, `artifacts[]`, timestamps.
-- **Grant record:** R30 fields plus `revokedAt?` and usage counters.
+- **Grant record:** R30 fields plus `controllerId`, `epoch`, `revokedAt?`,
+  and usage counters, stored in a separate grants file (R35).
 - **Artifact record:** `sessionResource`, `kind` (patch|pr-ref|generated-file|
   none), `baseCommit?`, `path`, `sha256`, `collectedAt`,
-  `verification` (unverified | verified | failed; never optional, initialized
-  to `unverified`). R33's accept step and R41's integrate read it with an
-  exact `verified` comparison; absence or any other value is not acceptable.
+  `verification` (unverified | passed | failed | unavailable | errored;
+  never optional, initialized to `unverified`, written by R43). R41's
+  integrate accepts `unverified` artifacts into its isolated apply-and-check
+  phase and sets the field from R43's result; R33's accept step and any
+  stack handoff require exactly `passed`, and absence or any other value is
+  not acceptable.
 - **Deviation record:** `policy-deviation` with external PR reference (R13).
 
 Writes are reservation-first and atomic (temp file + rename) under a directory
@@ -570,11 +641,13 @@ Traces: R49-R53.
 
 ### Engine interface (milestone)
 
-The engine treats `yellow-jules` as an executor process: `capabilities`
-handshake, `run` producing JSON Lines events that reference session and grant
-ids, and outcome events the engine persists across restarts. The plugin's
-journal remains the provider ledger; the engine holds references only.
-Traces: R58-R62.
+The engine invokes the released CLI's short-lived single-object JSON
+operations (R7) through the process interface (R59), passing a grant id
+(R29). A versioned `engine` mode adding a `capabilities` handshake and a
+JSON Lines `run` event stream is a Jules-side contract extension owned by
+shell 05 and specified there under a new contract version; v0's R7 contract
+is unchanged. The plugin's journal remains the provider ledger; the engine
+holds references only. Traces: R58-R62.
 
 ### Prior learnings that constrain implementation
 
@@ -635,3 +708,7 @@ implementation evidence named in each item.
    list depends on the installed Codex CLI version.
 3. Does the pinned SDK expose generated-file artifacts at all? If not, R19's
    generated-file branch is documented as unsupported rather than implemented.
+4. Host-neutral owner-confirmation primitive for `/jules:authorize` on Codex
+   (R48): until specified, authorize is Claude-only.
+5. Whether grant records need a key-bound MAC beyond owner-only permissions
+   and a separate grants file (R35): decide at shell 03 expansion.
