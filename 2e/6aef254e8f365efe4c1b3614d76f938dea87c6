@@ -1,0 +1,36 @@
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 49-50,100
+  s_92dcda3176fc7c::t_6d2b4fb142cef7 125-127
+docs/brainstorms/2026-09-09-yellow-jules-integration-brainstorm.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 5,15,75,82-85
+  s_92dcda3176fc7c::t_6d2b4fb142cef7 17
+plans/shells/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 48-49,65-66
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 63,68-69,71-72,94-96
+plans/shells/yellow-jules-integration-05-goal-engine-milestone.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 31-33
+docs/solutions/security-issues/pre-implementation-spec-review-authority-gaps.md
+  s_92dcda3176fc7c::t_6d2b4fb142cef7 1-173
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 44
+plans/specs/yellow-jules-integration.md
+  s_92dcda3176fc7c::t_6d2b4fb142cef7 176-178
+  s_92dcda3176fc7c::t_a7df8ebe92faa1 77-78,82-86,91,95-97,105-110,151-152,227-232,263-267,269-270,275-284,301-308,323-328,332-336,349-353,356-359,369-375,384-389,400-402,414-417,446-450,458-462,589-590,593-598,644-650,711-714
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2e6aef254e8f365efe4c1b3614d76f938dea87c6",
+  "prompts": {},
+  "sessions": {
+    "s_92dcda3176fc7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76fc52aa-a6a6-4527-a247-50fd6aea7d36",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
