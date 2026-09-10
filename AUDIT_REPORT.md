@@ -38,7 +38,8 @@ yellow-plugins/                          # pnpm monorepo (no published runtime)
 │   ├── yellow-semgrep/                  # 5 cmds, 2 agents, 1 skill, 1 MCP
 │   ├── yellow-docs/                     # 6 cmds, 10 agents, 1 skill
 │   ├── yellow-codex/                    # 4 cmds, 3 agents, 1 skill
-│   └── yellow-council/                  # 2 cmds, 2 agents, 1 skill
+│   ├── yellow-council/                  # 2 cmds, 2 agents, 1 skill
+│   └── yellow-mempalace/                # 6 cmds, 2 agents, 2 skills, 1 MCP
 ├── packages/{domain,infrastructure,cli} # Layered TS validators (never published)
 ├── schemas/                             # Local JSON schemas (drift from remote possible)
 └── scripts/                             # validate-{marketplace,plugin,setup-all,agent-authoring,versions}.js

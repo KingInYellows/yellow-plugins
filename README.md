@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 20 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 19 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 

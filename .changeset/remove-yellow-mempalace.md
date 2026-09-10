@@ -1,4 +1,5 @@
 ---
+'yellow-core': patch
 'yellow-ruvector': patch
 ---
 
