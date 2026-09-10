@@ -66,10 +66,15 @@ Starting this shell requires explicit owner approval after PR4 ships.
 2. **Design and implement the protocol revision in yellow-goal** — executor
    capability, permissions, persistence, async outcomes, verification, with
    existing invariants preserved.
-3. **Implement the engine's Jules executor** — process interface mirroring the
-   consumer transport, explicit path configuration, reference-only storage.
-4. **Release the engine** — publish and verify the new artifact.
-5. **Bump the plugin pin in this repository** — pin, verification script,
+3. **Ship the yellow-jules engine mode first** — add and release the
+   versioned `engine` mode (capabilities handshake, JSON Lines run events) in
+   this repository's yellow-jules plugin, so the engine's executor has a
+   released contract to target before it is written.
+4. **Implement the engine's Jules executor** — process interface mirroring the
+   consumer transport, explicit path configuration, reference-only storage,
+   targeting the released engine mode from step 3.
+5. **Release the engine** — publish and verify the new artifact.
+6. **Bump the plugin pin in this repository** — pin, verification script,
    compatibility tests, CI job kept zero-spend, changeset, submission. The
    `provider-protocol.ts` guards' hard-coded protocol and schema version
    constants change in this same coordinated PR (whichever way step 2 lands

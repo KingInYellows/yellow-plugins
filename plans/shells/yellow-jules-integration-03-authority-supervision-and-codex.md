@@ -96,3 +96,5 @@ single-controller handoff procedure.
   key-bound MAC beyond permissions and a separate store (spec Open Question 5).
 - Whether the R53 smoke surfaced a vendor PR despite the flags; if so, the
   delivery-policy decision precedes this shell.
+- How the R29 confirmation event is authenticated per host (spec Open
+  Question 6): settle before any non-grant mutation ships.

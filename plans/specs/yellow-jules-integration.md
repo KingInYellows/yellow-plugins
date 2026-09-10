@@ -274,7 +274,11 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   request id, target session, and a digest of the complete request payload:
   reply body, source resource, or the evaluated plan id), and the runtime
   accepts the token exactly once and only for that binding, so no field of
-  the confirmed mutation can change after confirmation; TTY presence or absence on the CLI child's stdin proves
+  the confirmed mutation can change after confirmation. The confirmation
+  event itself must be authenticated, not inferred from wrapper sequencing:
+  how the wrapper's approval becomes an unforgeable, host-issued capability
+  that an arbitrary CLI caller cannot mint is Open Question 6, settled in
+  shell 03 before any non-grant mutation ships; TTY presence or absence on the CLI child's stdin proves
   nothing by itself. The engine process interface (R59), which never runs
   interactively, presents a grant id instead. [§8]
 - **R30.** `/jules:authorize` shall create a grant record in the journal
@@ -387,12 +391,15 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   without modifying any checkout, applying changes, submitting a stack, or
   merging. [§5, §11]
 - **R41.** `/jules:integrate` shall, for a collected artifact: verify the
-  reported base against the intended branch and fail on mismatch; create a
-  dedicated integration worktree through the yellow-core `git-worktree`
-  skill; check the patch against a path deny-list (CI workflow files,
-  package lifecycle scripts, hook scripts, `.claude/`, `.codex-plugin/`,
-  `.cursor-plugin/`) and fail on a match; apply the patch there; require the
-  user to acknowledge the diff before any command runs inside the worktree;
+  reported base against the intended branch and fail on mismatch; check the
+  patch against a path deny-list (CI workflow files, package lifecycle
+  scripts, hook scripts, `.claude/`, `.codex-plugin/`, `.cursor-plugin/`)
+  and fail on a match; present the staged diff and require the user's
+  acknowledgement before applying it; create a dedicated integration
+  worktree through the yellow-core `git-worktree` skill with its `.env*`
+  copying disabled (the worktree manager copies those files by default);
+  apply the patch there; run no command inside the worktree before the
+  acknowledgement;
   run the task's verification contract, resolved and pinned from the
   pre-apply trusted checkout (never read from the worktree after apply),
   with lifecycle scripts disabled and without ambient credentials; then
@@ -739,3 +746,7 @@ implementation evidence named in each item.
    (R48): until specified, authorize is Claude-only.
 5. Whether grant records need a key-bound MAC beyond owner-only permissions
    and a separate grants file (R35): decide at shell 03 expansion.
+6. How the R29 confirmation event is authenticated on each host (a
+   runtime-owned prompt on a controlling terminal, a host-issued capability,
+   or grants only): decide at shell 03 expansion; until then the runtime
+   treats wrapper-minted tokens as unproven and requires a grant.

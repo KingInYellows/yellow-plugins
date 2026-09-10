@@ -49,9 +49,10 @@ across restart, deadline, and base-mismatch cases.
 1. **Implement base verification and worktree apply** — compare artifact base
    to intended branch, fail on mismatch, refuse artifacts whose session has an
    unreconciled policy deviation, scan the patch against R41's path deny-list
-   and fail on a match, create the worktree via the skill, apply the patch
-   there only, and require the user's diff acknowledgement before any command
-   runs inside the worktree.
+   and fail on a match, present the staged diff and require the user's
+   acknowledgement, then create the worktree via the skill with `.env*`
+   copying disabled and apply the patch there only; no command runs inside
+   the worktree before the acknowledgement.
 2. **Run the verification contract** — resolve and pin the contract from the
    pre-apply trusted checkout, invoke available review and CI tooling against
    the applied patch with lifecycle scripts disabled and no ambient
