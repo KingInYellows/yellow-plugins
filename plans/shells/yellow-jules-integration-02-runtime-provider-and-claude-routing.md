@@ -110,8 +110,10 @@ owner-approved activity, not CI.
    atomic writes, lock, corrupt-journal refusal, request-id dedup.
 3. **Implement the adapter and resolver** — chosen transport behind the
    adapter interface, explicit create flags with serialized-request
-   assertion, retries disabled, isolated storage, consented data-dir install,
-   post-acceptance failure classification to unknown-outcome.
+   assertion, retries disabled, isolated storage, consented data-dir install
+   with recorded-integrity-hash tarball verification and a fail-closed
+   `JULES_SDK_INTEGRITY` abort on mismatch, post-acceptance failure
+   classification to unknown-outcome.
 4. **Implement runtime operations** — setup probe, source discovery, session
    create, fresh status with activity paging and dedup, reply, approve with
    plan re-fetch, collect with base recording and artifact kinds, policy
@@ -139,8 +141,15 @@ owner-approved activity, not CI.
 
 - Session-overload: this shell exceeds one session; expansion should define
   checkpoints on one branch rather than splitting the release boundary.
-- If shell 01's verdict is REST, the packed-SDK layer becomes a
-  REST-transport layer against the same fake server; fixture names stay.
+- The packed-SDK transport suite, R49's `packed-artifact-tested` label,
+  R50's two cache fixtures (post-create cache failure, fresh GET after
+  stale cache), and R52's SDK-module-loading and installed-cache-execution
+  scenarios apply only if shell 01's R3 verdict keeps the SDK. If the
+  verdict is REST, the suite runs as a REST-transport suite against the
+  same fake server (fixture names stay), the SDK-only scenarios are
+  replaced by R3's HTTPS-only, origin-pinned, fail-closed checks, and the
+  verdict must name the label for REST-tested matrix rows since R49
+  defines none.
 - Smoke execution (R53) is a human gate after merge; this shell produces
   only the procedure and result template. Shell 03 claims the outcome-gate
   slice and must not start until the record exists.

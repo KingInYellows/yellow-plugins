@@ -32,8 +32,9 @@ no provider-router or consumer change, no live Jules session.
 - Illustrative request/response fixtures, marked illustrative
 - SDK investigation record: registry metadata, tarball integrity and local
   hash, actual exports and types, clean-install result with lifecycle scripts
-  disabled, ESM load result, captured create/reply/approve request bodies,
-  retry-configuration behavior, storage side effects, remaining unknowns
+  disabled and recorded Node version, ESM load result, captured
+  create/reply/approve request bodies, retry-configuration behavior, storage
+  side effects, remaining unknowns
 - Transport verdict (SDK adapter or REST adapter) and module-strategy verdict
   (plugin-local ESM or CJS with dynamic import) recorded in the contract doc
 - Autonomy boundaries and acceptance criteria section
@@ -62,8 +63,8 @@ no provider-router or consumer change, no live Jules session.
 
 1. **Reconcile the plan document** — bring revision 2's sections 5, 6, 14, 17
    into the repository, reconciled against the checkout, with the motivation
-   statement and the enumeration-site checklist for PR2 sourced from spec
-   R23/R24 (not the brainstorm's provisional line numbers).
+   statement (spec R56) and the enumeration-site checklist for PR2 sourced
+   from spec R23/R24 and R25 (not the brainstorm's provisional line numbers).
 2. **Write the provider-CLI contract v1** — subcommands, argument shapes, JSON
    output envelope, error-code table with retryable and recovery fields, exit
    codes, redaction guarantees, unsupported-capability responses.

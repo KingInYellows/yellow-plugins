@@ -51,7 +51,7 @@ single-controller handoff procedure.
 - R30
 - R31
 - R32
-- R33
+- R33 (partial: supervision-loop)
 - R34
 - R38
 - R39

@@ -70,9 +70,12 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   exactly as configured, (c) hidden HTTP retries can be disabled and the
   outgoing request count proves it, (d) SDK storage can be isolated to a
   bounded in-memory scratch with correct read-after-write inside one
-  invocation, then PR2 shall implement a REST adapter against
-  `jules.google/docs/api/reference/{sessions,sources,activities}` instead.
-  Either way the command surface and runtime contract are unchanged. [§1, §6]
+  invocation, then PR2 shall implement a REST adapter against the HTTPS-only
+  base `https://jules.googleapis.com/v1alpha` with `/sessions`, `/sources`,
+  and `/sessions/{session}/activities` paths, sending the API key only to
+  that origin and failing closed on HTTP, downgrade, or cross-origin
+  redirects. Either way the command surface and runtime contract are
+  unchanged. [§1, §6]
 - **R4.** When installed from the plugin cache, the runtime shall run without
   the monorepo's `node_modules`. When the SDK adapter is selected (R3), it
   resolves the SDK in order: workspace
@@ -106,8 +109,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   plan identifier, whether accepted as input or returned by the API, is
   validated against an anchored allowlist pattern before use in any adapter
   call, URL, journal key, or filesystem path, on both transport branches;
-  artifact staging paths derive from a locally minted id, never from the
-  vendor string. [§5; mirrors yellow-cursor `errors.ts`/`redact.ts`/`validate.ts`]
+  artifact staging paths, including the per-session directory R40 stages
+  into, derive from a locally minted id, never from the vendor
+  `sessionResource` string. [§5; mirrors yellow-cursor `errors.ts`/`redact.ts`/`validate.ts`]
 - **R8.** Command markdown files under `commands/jules/` shall be thin Bash
   wrappers around the CLI with no API logic. v0 commands: `setup`, `delegate`,
   `list`, `status`, `reply`, `approve`, `collect` (PR2); `authorize`,
@@ -246,7 +250,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   `validate-schemas-fork.yml` shall add a `yellow-jules` matrix arm (build,
   test, drift) mirroring its `yellow-goal` arm, since the main `build` and
   `unit-tests` jobs skip fork PRs. No new `paths:` globs are needed: both
-  workflows already trigger on `plugins/**`. [§13]
+  workflows already trigger on `plugins/**`. `.gitignore` shall add a
+  `!plugins/yellow-jules/dist/` negation beside the existing yellow-cursor
+  and yellow-goal exceptions, since `**/dist/` is ignored repo-wide and the
+  drift check above depends on the compiled output being tracked. [§13]
 - **R28.** Every plugin whose public behavior changes (`yellow-jules`,
   `yellow-core`, `yellow-linear`) shall carry a changeset; README, CLAUDE.md,
   `AGENTS.md` component counts, the "20 plugins" claims in root `CLAUDE.md`
@@ -262,9 +269,12 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 - **R29.** Every mutating command shall default to interactive confirmation,
   matching `yellow-cursor` wrappers, until a grant covers it. Interactive
   confirmation is a runtime-validated single-operation authorization, not a
-  caller-asserted flag: the runtime refuses interactive-authority mode when
-  stdin is not a TTY, and every non-TTY invocation (including the engine
-  process interface, R59) must present a grant id. [§8]
+  caller-asserted flag: the wrapper's confirmation step mints a single-use
+  confirmation token bound to the exact operation (kind, repository, branch,
+  and request id), and the runtime accepts the token exactly once and only
+  for that binding; TTY presence or absence on the CLI child's stdin proves
+  nothing by itself. The engine process interface (R59), which never runs
+  interactively, presents a grant id instead. [§8]
 - **R30.** `/jules:authorize` shall create a grant record in the journal
   containing: grant id, approved repository and source resource, approved
   branch or branch pattern, task/goal identifiers, permitted operations (subset of `create`, `reply`, `approve`,
@@ -277,8 +287,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   a grant. [§8; user decision 2026-09-09]
 - **R31.** Every mutation shall pass the runtime's authority check before
   any remote write: either a valid grant (present, unexpired, repository,
-  branch, and task match, limits not exhausted) or a single-operation
-  interactive authorization (R29). Authority evaluation, counter increment,
+  branch, and task match, requested operation within the grant's permitted
+  operations, resolved source resource matching the grant's approved source
+  resource, limits not exhausted) or a single-operation interactive
+  authorization (R29). Authority evaluation, counter increment,
   and reservation write (R36) are one critical section held under the
   directory lock; an offline test runs two concurrent `delegate` calls
   against a one-session grant and asserts exactly one create. Host hooks, prompt wording, and CLI sandbox settings are
@@ -347,10 +359,15 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   distributed lock is added. A stale lock left by a crashed process fails
   loud and requires manual intervention; it is never silently broken and
   never waited on indefinitely. Each grant carries a controller identity and
-  a monotonic epoch; every write re-reads and matches the epoch, and the
-  handoff procedure increments it and invalidates the source journal, so a
-  copied or restored data directory fails loud instead of writing in
-  parallel. [§9; user decision 2026-09-09]
+  a monotonic epoch whose authoritative value lives in a host-local file
+  outside `<dataDir>` (keyed by controller identity), never inside the
+  copied directory; the journal holds only a reference to it. Every write
+  re-reads the host-local file and matches it against the reference,
+  treating a missing or mismatched authority as fail-loud, and the handoff
+  procedure writes the incremented epoch to the new host's file and
+  invalidates the source journal, so a copied or restored data directory —
+  which cannot carry the host-local file with it — fails loud instead of
+  writing in parallel. [§9; user decision 2026-09-09]
 - **R39.** When a grant or supervision deadline expires while a remote session
   is still active, the runtime shall report the running session and refuse
   further instructions; expiry is never reported as remote termination. The
@@ -361,8 +378,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 ### Delivery, verification, and handoff
 
 - **R40.** `collect` shall stage patches and evidence in
-  `<dataDir>/artifacts/<session>/` without modifying any checkout, applying
-  changes, submitting a stack, or merging. [§5, §11]
+  `<dataDir>/artifacts/<local-id>/`, where `<local-id>` is the locally minted,
+  allowlist-validated id from R7 rather than the raw vendor session string,
+  without modifying any checkout, applying changes, submitting a stack, or
+  merging. [§5, §11]
 - **R41.** `/jules:integrate` shall, for a collected artifact: verify the
   reported base against the intended branch and fail on mismatch; create a
   dedicated integration worktree through the yellow-core `git-worktree`
@@ -451,8 +470,9 @@ ownership lock or queue service; vendor-PR adoption into local stacks
 - **R53.** After PR2 and before PR3, one human-authorized smoke shall run a
   single small task against `yellow-plugins` on an isolated scratch base
   branch (owner decision 2026-09-09; Jules holds a real source connection to
-  this repository, so the grant names that branch only) with explicit
-  approval and no auto-PR. Success means: one session created; plan inspected; one
+  this repository, and no grant exists yet, so the operator runs this smoke
+  under R29's single-operation interactive confirmation, bound to that
+  branch only) with explicit approval and no auto-PR. Success means: one session created; plan inspected; one
   reply or approval sent within authority; an interruption does not duplicate
   the task; the patch is independently checked; no PR is created by the
   vendor; no merge occurs. The result is committed as
@@ -586,8 +606,9 @@ R12, R14, R15.
   `taskRef?`, `grantId?`, `status` (reserved|accepted|unknown-outcome|
   reconciled|rejected), `processedActivityIds[]`, `observedPlanId?`,
   `condition` (normalized), `vendorState`, `artifacts[]`, timestamps.
-- **Grant record:** R30 fields plus `controllerId`, `epoch`, `revokedAt?`,
-  and usage counters, stored in a separate grants file (R35).
+- **Grant record:** R30 fields plus `controllerId`, `epochRef` (reference to
+  the host-local authoritative epoch; R38), `revokedAt?`, and usage
+  counters, stored in a separate grants file (R35).
 - **Artifact record:** `sessionResource`, `kind` (patch|pr-ref|generated-file|
   none), `baseCommit?`, `path`, `sha256`, `collectedAt`,
   `verification` (unverified | passed | failed | unavailable | errored;

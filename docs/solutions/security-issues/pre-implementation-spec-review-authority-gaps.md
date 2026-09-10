@@ -35,50 +35,53 @@ project-compliance, project-standards) plus the conditional personas
 `adversarial` and `security` (triggered by >5 requirements, new
 abstractions, and an auth-adjacent domain) still surfaced 27 findings: 1 P0,
 9 P1, and 17 P2. Two clusters stand out because they are not generic
-correctness or completeness issues:
+correctness or completeness issues. The requirement ids below mark where
+the spec as first submitted (commit `d9d4316d`) left each gap; the PR's
+second commit amended every one in place, so none is a current defect:
 
 1. **Authority/trust-boundary gaps** — cases where the spec defines what
    happens on success and failure, but not who is allowed to trigger the
    mutating action, what proves that authorization, or whether the record
    proving it can be forged or replayed. Concrete instances from the spec
-   (line refs are to the PR branch's `plans/specs/yellow-jules-integration.md`):
-   - `:246` — "interactive" mutation authority is a caller-asserted flag;
+   (requirement ids are from `plans/specs/yellow-jules-integration.md`):
+   - R29 — "interactive" mutation authority is a caller-asserted flag;
      any process able to exec the CLI inherits it.
-   - `:248` — a grant record has no branch scope, though the authority
+   - R30 — a grant record has no branch scope, though the authority
      check it backs (R53) is meant to authorize one branch.
-   - `:265` — no requirement fences vendor-originated text (plans,
+   - R33 — no requirement fences vendor-originated text (plans,
      activities, questions, artifacts) before the supervising LLM reads it
      or a command prints it.
-   - `:277` — a policy-deviation record blocks new delegation but not
+   - R19 — a policy-deviation record blocks new delegation but not
      `collect` or `integrate` of the already-flagged session's artifact.
-   - `:285` — the authority check trusts journal contents, but the journal
+   - R35 — the authority check trusts journal contents, but the journal
      location is env-var selected with no ownership/integrity requirement —
      a forged grant bypasses `authorize`.
-   - `:292` — no journal lookup for an unresolved reservation before
+   - R31/R36 — no journal lookup for an unresolved reservation before
      starting a new session (duplicate-session risk), and the
      authority-check + counter-increment + reservation-write sequence is
      not specified as one atomic critical section under the lock.
-   - `:301` — the directory lock can't detect a copied/restored data dir on
+   - R38 — the directory lock can't detect a copied/restored data dir on
      a second host; no controller epoch binds a session to one controller.
-   - `:309` — no stop path: cancel is unsupported and expiry only refuses
+   - R39 — no stop path: cancel is unsupported and expiry only refuses
      new instructions, so a runaway remote session has no containment
      procedure.
-   - `:315` — a vendor-supplied session id becomes a filesystem path in
+   - R7/R40 — a vendor-supplied session id becomes a filesystem path in
      `collect` with no anchored allowlist.
-   - `:318` — a vendor-authored patch can run dependency installs and
+   - R41 — a vendor-authored patch can run dependency installs and
      lifecycle scripts on the controller host during `integrate`, before a
      human sees the diff.
-   - `:355` — no host-neutral owner-confirmation primitive for `authorize`;
-     nothing stops a granted session from widening its own grant.
+   - R30/R48 — no host-neutral owner-confirmation primitive for
+     `authorize`; nothing stops a granted session from widening its own
+     grant.
 
 2. **Self-contradictions from late text amendments** — three places where
    an amendment made in one section left a cross-referenced section
    unreconciled: R31 ("a grant is required before every write") vs. R29 and
    the command table (interactive writes without a grant, since PR2
-   precedes grants) at `:256`; the artifact data model's "verified" gate vs.
-   `integrate` being the step that performs verification at `:523`; and the
+   precedes grants); the artifact data model's "verified" gate vs.
+   `integrate` being the step that performs verification (R41/R43); and the
    engine design's JSON-Lines run stream vs. R7's single-JSON-object CLI
-   contract at `:573`. None of these are typos — each is a coherent
+   contract (R7/R59). None of these are typos — each is a coherent
    sub-design that stopped matching a requirement written earlier or later
    in the same document.
 
@@ -164,9 +167,9 @@ whether or not a persona happens to be triggered.
   leakage, session-ID injection, TOCTOU, MCP response trust).
 - PR #785 findings not itemized above but folded into the same review
   outcome: R52's shell-slice claim not matching what its scenarios actually
-  need (`plans/specs/yellow-jules-integration.md:377`), and the brainstorm's
+  need (`plans/specs/yellow-jules-integration.md`), and the brainstorm's
   "paste verbatim" instruction going stale against later spec edits
-  (`docs/brainstorms/2026-09-09-yellow-jules-integration-brainstorm.md:75`)
+  (`docs/brainstorms/2026-09-09-yellow-jules-integration-brainstorm.md`)
   — both are spec-maintenance issues of the same "late edit, stale
   cross-reference" family as the three self-contradictions above, resolved
   by the same fix (re-anchor to the current requirement text, don't restate

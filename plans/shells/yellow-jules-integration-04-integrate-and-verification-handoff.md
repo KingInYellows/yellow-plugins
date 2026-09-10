@@ -20,8 +20,8 @@ across restart, deadline, and base-mismatch cases.
 
 - `integrate` command: base verification, worktree creation through the
   yellow-core git-worktree skill, patch apply, verification run,
-  stack-provider handoff via the provider guard, explicit refusal of raw push,
-  PR creation, or merge paths
+  stack-provider handoff via the provider guard, with explicit refusal of raw
+  push, direct PR creation, or merge paths
 - Verification result recording with honest unavailability when CI cannot run
 - End-to-end fake scenarios: crash recovery, deadline with remote work active,
   artifact base mismatch, no merge fallback
@@ -39,6 +39,7 @@ across restart, deadline, and base-mismatch cases.
 ## Covers Spec Requirements
 
 - R8 (partial: integrate-command)
+- R33 (partial: completion-verification)
 - R41
 - R43
 - R52 (partial: integrate-scenarios)

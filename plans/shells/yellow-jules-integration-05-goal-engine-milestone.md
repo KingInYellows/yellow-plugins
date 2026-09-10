@@ -32,8 +32,13 @@ Starting this shell requires explicit owner approval after PR4 ships.
   JSON Lines run events) under a new contract version; v0's single-object
   contract is unchanged
 - New engine release artifact with SHA-256
-- yellow-goal plugin pin bump, release verification script update, and
-  compatibility tests, keeping the engine-compat CI job zero-spend
+- yellow-goal plugin pin bump only after the new engine's annotated tag and
+  public GitHub Release asset are published and verified — `PINNED_ENGINE_VERSION`,
+  `PINNED_ENGINE_TAG`, `PINNED_ENGINE_COMMIT`, `PINNED_ENGINE_ASSET_NAME`,
+  `PINNED_ENGINE_ASSET_URL`, and `PINNED_ENGINE_ASSET_SHA256` updated together,
+  release verification script update, and compatibility tests, with the
+  release-pin tests, hash verification, and the blocking `Released Goal Engine
+  Compatibility` job all passing, keeping the engine-compat CI job zero-spend
 - Coordination record between the two repositories
 
 ## Consumes
@@ -65,7 +70,11 @@ Starting this shell requires explicit owner approval after PR4 ships.
    consumer transport, explicit path configuration, reference-only storage.
 4. **Release the engine** — publish and verify the new artifact.
 5. **Bump the plugin pin in this repository** — pin, verification script,
-   compatibility tests, CI job kept zero-spend, changeset, submission.
+   compatibility tests, CI job kept zero-spend, changeset, submission. The
+   `provider-protocol.ts` guards' hard-coded protocol and schema version
+   constants change in this same coordinated PR (whichever way step 2 lands
+   the v2-or-additive-v1 decision); until that PR merges, the released v1
+   engine must still pass every compatibility test.
 
 ## Open Questions
 
