@@ -1,0 +1,24 @@
+plugins/yellow-review/commands/review/review-pr.md
+  s_aa2a8cf97f9dcd::t_97b98d239ecf64 538-540
+  s_aa2a8cf97f9dcd::t_01e65703841b48 541
+plugins/yellow-review/tests/file-line-counts.bats
+  s_aa2a8cf97f9dcd::t_01e65703841b48 142
+plugins/yellow-review/commands/review/review-all.md
+  s_aa2a8cf97f9dcd::t_7ba076827d3cb4 225-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4f0ffca431b5eab898a68ea43566b67f6c7177c2",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
