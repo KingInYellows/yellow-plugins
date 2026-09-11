@@ -1,6 +1,6 @@
 {
   "name": "yellow-review",
-  "version": "3.3.1",
+  "version": "3.4.0",
   "interface": {
     "displayName": "Yellow Review",
     "category": "Developer Tools"

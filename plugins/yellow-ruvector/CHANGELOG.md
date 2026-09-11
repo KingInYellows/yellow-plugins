@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.7
+
+### Patch Changes
+
+- [`f0c818d`](https://github.com/KingInYellows/yellow-plugins/commit/f0c818d893721ccdd37b4239872761d3c731ded1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  `yellow-mempalace` plugin. It was deprecated in favor of `yellow-ruvector` as
+  the single standard memory system (see `docs/memory-routing-protocol.md`);
+  this completes that follow-up by deleting `plugins/yellow-mempalace/`, its
+  catalog source, and its marketplace/setup-all references, and drops the
+  now-dead `/mempalace:search` cross-reference from `/ruvector:memory`'s
+  description.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
 ## 1.2.6
 
 ### Patch Changes
