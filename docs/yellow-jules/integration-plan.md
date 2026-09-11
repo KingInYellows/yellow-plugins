@@ -194,6 +194,9 @@ the site list, not the line numbers, is authoritative.
 - [ ] per-provider error table (locator: line 666)
 - [ ] inline-Node classifier invocation: a third tooling-probe argv slot after
       `TOOLING_CURSOR` and `TOOLING_DEVIN`
+- [ ] `jules` dispatch branch: a fail-closed stub in PR2 (error-table row "Jules
+      delegation ships in PR3", non-zero exit, no vendor call); PR3 swaps in the
+      live `dist/cli.js delegate` call (Open Question 6)
 
 Other sites (R22, R25, R26, R27, R28):
 

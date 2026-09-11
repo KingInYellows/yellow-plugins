@@ -37,7 +37,8 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
   probe flag, corrected diagnostics and docstring
 - Setup-all coverage for Jules at every enumerated site
 - Linear delegate route accepting the third provider with a third tooling
-  argv slot and preserved conflict semantics
+  argv slot and preserved conflict semantics; its `jules` dispatch branch is
+  a fail-closed stub naming shell 03 (Open Question 6 decision, 2026-09-10)
 - Provider-groups validator fixtures for a three-member group, corrected header
 - Root typecheck and unit-test filters, main-workflow dist drift step,
   fork-mirror matrix arm
@@ -82,7 +83,7 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
 - R21
 - R22
 - R23
-- R24
+- R24 (partial: stub-dispatch-branch)
 - R25
 - R26
 - R27
@@ -95,7 +96,7 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
 - R49 (partial: test-layers)
 - R50
 - R51
-- R52 (partial: pr2-scenarios)
+- R52 (partial: pr2-read-only-scenarios-and-zero-mutating-request-test)
 
 
 ## Implementation Steps (High-Level)
@@ -113,17 +114,22 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
    recorded-integrity-hash tarball verification and a fail-closed
    `JULES_SDK_INTEGRITY` abort on mismatch; post-acceptance failure
    classification to unknown-outcome on either branch.
-4. **Implement runtime operations** — setup probe, source discovery, session
-   create, fresh status with activity paging and dedup, reply, approve with
-   plan re-fetch, collect with base recording and artifact kinds, policy
-   deviation on unexpected vendor PR, unsupported-capability errors.
+4. **Implement the read-only runtime operations** — setup probe, source
+   discovery, fresh status with activity paging and dedup, collect with base
+   recording and artifact kinds, policy deviation on unexpected vendor PR,
+   unsupported-capability errors. Session create, reply, and approve with
+   plan re-fetch move to shell 03 with their wrappers (Open Question 6
+   decision, 2026-09-10), so this PR compiles no vendor-mutating path; the
+   fake-server suite asserts zero mutating requests across every shipped
+   subcommand (R52).
 5. **Implement the CLI and v0 command wrappers** — JSON envelope, exit codes,
    redaction on every path, four thin Bash wrappers (`setup`, `list`, `status`, `collect`); the three mutating wrappers and their confirmation gates ship in shell 03 (Open Question 6 decision, 2026-09-10).
 6. **Register the provider and update every consumer** — catalog entry and
    order, provider-router row and state, its own test suite and six
    fixtures for a seventh state, setup-all sites including the Step 2.5
    acceptable-state enumeration, Linear delegate sites including the tooling
-   argv slot, provider-groups validator fixtures, a consumer-site validator
+   argv slot (the `jules` dispatch branch fails closed with an error-table
+   row naming shell 03, R24), provider-groups validator fixtures, a consumer-site validator
    that enumerates provider ids against each consumer (R25), stale-comment
    fixes.
 7. **Wire root scripts and CI** — typecheck and unit-test filters, main build
@@ -149,4 +155,4 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
   replaced by R3's HTTPS-only, origin-pinned, fail-closed checks, and the
   verdict must name the label for REST-tested matrix rows since R49
   defines none.
-- Open Question 6 decision, 2026-09-10: the R53 smoke runs after shell 03 under a grant; shell 03 produces the procedure and result template, and shell 04 holds the outcome gate. Runtime operations for delegate, reply, and approve are still implemented and fake-server-tested here, without a command surface.
+- Open Question 6 decision, 2026-09-10: the R53 smoke runs after shell 03 under a grant; shell 03 produces the procedure and result template, and shell 04 holds the outcome gate. The runtime operations for delegate, reply, and approve move to shell 03 together with their wrappers (amended 2026-09-11), so the controlled path and its authority gate ship in one PR; this shell's fake-server suite proves the absence of any mutating request instead.

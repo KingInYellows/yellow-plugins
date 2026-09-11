@@ -224,7 +224,13 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   implementation), preserving the rule that `--provider` overrides only
   `CONFLICT` and never enables an absent or failed provider. Tests cover two-
   and three-provider conflicts, scope filtering, unavailable tooling, and all
-  existing Cursor/Devin behavior. [§7]
+  existing Cursor/Devin behavior. Under the Open Question 6 decision
+  (2026-09-10) PR2 wires every site above, but its `jules` dispatch branch
+  is a fail-closed stub: it adds an error-table row ("Jules delegation
+  ships in PR3; use `--provider cursor|devin`"), exits non-zero, and issues
+  no vendor call, because PR2 ships no `delegate`. PR3 replaces the stub
+  with the live `node …/yellow-jules/dist/cli.js delegate` call; PR2 tests
+  cover the stub, PR3 tests the live path. [§7]
 - **R25.** `READY_JULES` shall not ship while any consumer lacks handling for
   it: catalog registration, router table, setup coverage, Linear route, root
   script filters, fixtures, CI selectors, and changesets land in one PR and
@@ -234,7 +240,11 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   the router table and fails when any id is absent from each registered
   consumer site (the `--provider` validator and `READY_*` mapping in the
   Linear delegate command, the Step 2.5 state enumeration and tooling probe
-  in setup-all), so the guarantee is a CI gate rather than prose. [§7, §14; `docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md`]
+  in setup-all), so the guarantee is a CI gate rather than prose. The
+  fail-closed `jules` stub in the Linear route (R24, Open Question 6) is
+  that consumer's handling for PR2: the id is recognized at every site and
+  refused with a named reason, so the atomicity rule and the validator hold
+  unchanged across the PR2/PR3 split. [§7, §14; `docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md`]
 - **R26.** `scripts/validate-provider-groups.js` fixtures and
   `tests/integration/validate-provider-groups.test.ts` shall be extended for a
   three-member group, and `tests/integration/remote-agent-provider-state.test.ts`
@@ -477,10 +487,21 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   unknown-outcome write, partial pagination, verification tooling error
   versus unavailable, deadline with remote work active and deadline mid-pass,
   artifact base mismatch, and absence of any merge/submission fallback. Each
-  scenario is exercised by the shell that ships the feature it tests: PR2
-  covers everything up to corrupt journal and partial pagination; PR3 covers
-  grants, limits, stale lock, grant counters, and deadlines; PR4 covers
-  verification outcomes, base mismatch, and the no-fallback check. [§15]
+  scenario is exercised by the shell that ships the feature it tests, and
+  the split is enumerated by name, never by list position (Open Question 6
+  decision, 2026-09-10). PR2: credential absence, inaccessible source,
+  invalid inputs, SDK module loading, generated manifest drift,
+  installed-cache execution, stdout/stderr/exit contract, provider conflicts
+  and scope filtering (including the fail-closed `jules` stub in the Linear
+  route, R24), unknown states, duplicate activities, pagination, partial
+  pagination, corrupt journal (reads), and one negative test: the fake
+  server observes zero mutating requests across every subcommand PR2
+  ships. PR3: unauthorized writes, expired grants, task limits, stale plan
+  observations, ambiguous creation/reply outcomes, crash recovery, corrupt
+  journal (writes), stale lock on restart, grant counters after an
+  unknown-outcome write, deadline with remote work active, and deadline
+  mid-pass. PR4: verification tooling error versus unavailable, artifact
+  base mismatch, and absence of any merge/submission fallback. [§15]
 - **R53.** After PR3 and before PR4 (Open Question 6 decision, 2026-09-10;
   originally after PR2), one human-authorized smoke shall run a
   single small task against `yellow-plugins` on an isolated scratch base
@@ -491,7 +512,11 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   plan inspected; one
   reply or approval sent within authority; an interruption does not duplicate
   the task; the patch is independently checked; no PR is created by the
-  vendor; no merge occurs. The result is committed as
+  vendor; no merge occurs. The smoke also records whether an archived
+  session appears in an unfiltered `jules.sessions()` walk
+  (`archiveVisibilityConfirmed: true|false`); that observation, not the
+  smoke's pass verdict, is what unlocks the `released` reconcile outcome in
+  `docs/yellow-jules/contract-v1.md`. The result is committed as
   `docs/yellow-jules/smoke-result.md` with a `result: pass|fail` field, and
   PR4 work refuses to start until that file exists with `pass`. Its outcome
   resolves the delivery/transport question under the grant-based authority
@@ -651,6 +676,12 @@ lock. Traces: R13, R16, R20, R30, R35, R36, R37.
 | supervise | one R33 pass; may call reply/approve/collect under grant | grant required | per grant |
 | integrate | base check, worktree, apply, verify, stack handoff (R41) | interactive | yes |
 
+Ship phase follows `docs/yellow-jules/contract-v1.md` "Subcommands": `setup`,
+`list`, `status`, and `collect` in PR2; `delegate`, `reply`, `approve`,
+`authorize`, and `supervise` in PR3; `integrate` in PR4 (Open Question 6
+decision). `status --reconcile` is parsed in PR2 but has no reachable
+reservation until PR3 ships `delegate`.
+
 Traces: R8, R9, R29, R31, R33.
 
 ### Provider router and consumer integration (PR2)
@@ -762,6 +793,8 @@ implementation evidence named in each item.
    `reply`, and `approve` ship in PR3 behind `authorize`; PR2 ships the
    read-only surface (`setup`, `list`, `status`, `collect`); the R53 smoke runs
    after PR3 under a grant; the authentication mechanism itself is still fixed
-   at shell 03 expansion. R8, R53, the PR stack, and the MVP scope carry the
-   shift. Reversible by moving the three commands back to PR2 with an interim
+   at shell 03 expansion. R8, R24, R25, R52, R53, the PR stack, and the MVP
+   scope carry the shift (R24, R25, and R52 amended 2026-09-11: the Linear
+   route's `jules` branch is a fail-closed stub in PR2, and the R52 split is
+   enumerated by name). Reversible by moving the three commands back to PR2 with an interim
    mechanism specified in shell 03.

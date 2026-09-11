@@ -153,6 +153,44 @@ Illustrative only, not a captured response
 }
 ```
 
+Illustrative only, not a captured response — `status --reconcile` after the R53
+smoke recorded `archiveVisibilityConfirmed: true`; a complete walk found no
+candidate, so the reservation is released
+
+```json
+{
+  "ok": true,
+  "operation": "status",
+  "reconciled": [
+    {
+      "localRequestId": "req-2026-09-10T22:00:00Z-7f3a",
+      "kind": "delegate",
+      "outcome": "released"
+    }
+  ]
+}
+```
+
+Illustrative only, not a captured response — the same walk before that flag is
+set: the outcome is degraded, so the envelope carries `requiresAttention`
+
+```json
+{
+  "ok": true,
+  "operation": "status",
+  "reconciled": [
+    {
+      "localRequestId": "req-2026-09-10T22:00:00Z-7f3a",
+      "kind": "delegate",
+      "outcome": "ambiguous-reconcile",
+      "reason": "archive-visibility-unverified"
+    }
+  ],
+  "requiresAttention": true,
+  "attention": ["reconciled:ambiguous-reconcile"]
+}
+```
+
 Illustrative only, not a captured response
 
 ```json

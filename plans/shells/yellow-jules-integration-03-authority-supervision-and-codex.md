@@ -17,7 +17,7 @@ single-controller handoff procedure.
 
 ## Produces
 
-- `delegate`, `reply`, and `approve` command wrappers with the R29 confirmation mechanism decided here (spec Open Question 6)
+- `delegate`, `reply`, and `approve` command wrappers with the R29 confirmation mechanism decided here (spec Open Question 6), together with their runtime operations (session create, reply, approve with plan re-fetch — moved from shell 02, amended 2026-09-11), the live `jules` dispatch branch replacing shell 02's fail-closed stub in the Linear delegate route (R24), and the confirmation-gated `abandon` path for a reservation that `status --reconcile` cannot resolve
 - Grant record type and `authorize` command with confirmation, listing, and revocation
 - Runtime authority check on every mutating operation, with expiry and limit
   exhaustion handling and deadline-versus-remote-state reporting
@@ -46,6 +46,7 @@ single-controller handoff procedure.
 ## Covers Spec Requirements
 
 - R8 (partial: mutating-authorize-and-supervise-commands)
+- R24 (partial: live-jules-dispatch-branch)
 - R29
 - R28 (partial: codex-distribution-doc)
 - R30
@@ -60,7 +61,7 @@ single-controller handoff procedure.
 - R46
 - R47
 - R48
-- R52 (partial: grant-and-lock-scenarios)
+- R52 (partial: mutating-surface-grant-and-lock-scenarios)
 - R53 (partial: procedure-and-checklist)
 
 ## Implementation Steps (High-Level)
@@ -72,13 +73,20 @@ single-controller handoff procedure.
    "Confirmation token").
 2. **Add the grant model and authorize command** — record fields, trial
    defaults with ceiling, listing and revocation, confirmation gate.
-3. **Build the `delegate`, `reply`, and `approve` command wrappers** — the
-   three mutating commands moved here from shell 02 (R8); each write is
-   authorized by either a valid grant from Step 2 (R30) or a successful
-   Step 1 confirmation (R29), never by requiring both (R31). A missing,
-   expired, or limit-exhausted grant falls through to confirmation; reject
-   with a recoverable action only when confirmation is unavailable (the
-   engine interface, R59) or the owner declines.
+3. **Build the `delegate`, `reply`, and `approve` runtime operations and
+   command wrappers** — the three mutating commands and their runtime
+   operations moved here from shell 02 (R8); each write is authorized by
+   either a valid grant from Step 2 (R30) or a successful Step 1
+   confirmation (R29), never by requiring both (R31). A missing, expired, or
+   limit-exhausted grant falls through to confirmation on hosts that can
+   mint the R29 event; on Codex it rejects with a recoverable action naming
+   `authorize`, because Codex cannot mint the token and R48 requires a
+   Claude-created grant. Reject likewise when confirmation is unavailable
+   (the engine interface, R59) or the owner declines. Replace the Linear
+   delegate route's fail-closed `jules` stub with the live call (R24), and
+   add the confirmation-gated `abandon` path that marks a reservation
+   `status --reconcile` left `ambiguous-reconcile` or `not-reached` as
+   terminal `failed` (contract-v1.md `delegate`).
 4. **Enforce authority in the runtime** — check before every write, expiry and
    exhaustion outcomes, deadline expiry reporting that never claims remote
    termination.

@@ -224,12 +224,16 @@ remaining unknown until the R53 smoke.
 - Per operation the test asserts the exact ordered path sequence server-side
   (create: `GET sources/…`, `GET sources/…`, `POST sessions`) and that the
   429/500/502/503/504 fixtures never see a replay (R14, R50). A redirect fixture
-  answers `POST sessions` with a 302 to a second loopback port (cross-origin)
-  and a second redirect fixture answers with a 302 to a plain-HTTP loopback
-  origin (downgrade); both capture every outbound hop and assert
-  `X-Goog-Api-Key` reaches neither redirect target, only the pinned `baseUrl`
-  origin. A filter fixture answers a filtered list with `400` and asserts
-  exactly one unfiltered retry.
+  answers `POST sessions` with a 302 to a second loopback port (cross-origin). A
+  second redirect fixture runs from an HTTPS loopback origin (a self-signed
+  certificate trusted only inside that test, so the pinned `baseUrl` is
+  `https://127.0.0.1:<port>`) and answers with a 302 to a plain-HTTP loopback
+  origin (downgrade) — the suite's ordinary plain-HTTP `baseUrl` seam cannot
+  express a downgrade, so this case must not reuse it. Both fixtures capture
+  every outbound hop and assert `X-Goog-Api-Key` reaches neither redirect
+  target, only the pinned `baseUrl` origin; the plain-HTTP assertion applies to
+  redirect targets only, never to the test's own pinned origin. A filter fixture
+  answers a filtered list with `400` and asserts exactly one unfiltered retry.
 - Storage isolation is asserted by `find -newer marker` over `HOME`, `XDG_*`,
   `TMPDIR`, cwd, and the data dir after every scenario, with
   `NODE_DISABLE_COMPILE_CACHE=1` set so Node's compile cache is excluded by
@@ -259,6 +263,9 @@ remaining unknown until the R53 smoke.
 Question 6 decision, see "Confirmation token"), so PR2 ships no mutating
 subcommand and parses no `--grant-id`; a hand-planted `state/grants.json` is
 never trusted, and the grant path activates only with `authorize`.
+`status --reconcile` is parsed in PR2 but has no reachable reservation until PR3
+ships `delegate`; PR2's fixture and test for it cover only the empty
+`reconciled: []` result, and the outcome scenarios ship with PR3 (R52).
 
 ### Argument shapes
 
@@ -298,11 +305,19 @@ them and records `resumePageToken` so the next `status` continues from it before
 starting a fresh watermarked read. A stored `resumePageToken` or
 `artifactResumePageToken` the vendor rejects (`400`/`404`) or that yields no
 progress is discarded and the walk restarts from the watermark (the session
-start for `collect`); storing it is a deliberate, recorded departure from R18's
-no-durable-page-tokens rule, and it never survives a terminal outcome. The dedup
-ring holds every id seen by `status` whose `createTime` falls within the
-5-minute overlap window, capped at 1000 entries; if the cap is reached the walk
-reports `dedupWindowExceeded: true` and counts may inflate. Ring membership
+start for `collect`). "No progress" is a walk that ends with the same
+`lastActivityId` it started from and no activity id outside the dedup ring; the
+journal counts consecutive no-progress restarts per operation, and the second
+one fails the walk with `JULES_NO_PROGRESS` instead of restarting again
+(recovery: run `status` later; if it recurs, re-verify the SDK pin), and a walk
+that makes progress resets the count. Storing the token is a deliberate,
+recorded departure from R18's no-durable-page-tokens rule, and it never survives
+a terminal outcome. The dedup ring holds every id seen by `status` whose
+`createTime` falls within the 5-minute overlap window, capped at 1000 entries;
+if the cap is reached the walk reports `dedupWindowExceeded: true`, counts may
+inflate, and — because ring membership is what suppresses re-acting —
+`supervise` treats that pass as check-failed (R33) and takes no act step on that
+session until a later `status` walk completes without the flag. Ring membership
 suppresses re-counting toward `new` and re-acting under `supervise`; it
 **never** suppresses an activity from being read, parsed, or used to extract
 plan or artifact state by `status`, `approve`, or `collect`.
@@ -320,31 +335,40 @@ runtime has observed, and `approve` compares against the same field.
   reports `truncated: true` when a `nextPageToken` remains; an unmappable
   (non-GitHub) source degrades the probe to `{ supported: false, reason }`
   rather than failing setup. Installing requires `--install-sdk` (explicit
-  consent), pins `0.2.0`, verifies the tarball sha512 against the recorded
-  integrity before extraction, records `sdkEntrySha256`, and runs with
-  `--ignore-scripts` (R4). The install uses a lockfile shipped with the plugin
-  that pins the full resolved tree with integrity hashes, so every package under
-  `runtime/node_modules/` (`yaml` and `zod` included; `yaml` floated from
-  `^2.8.2` to `2.9.0` in the PR1 install) is verified before extraction, and
-  `runtime/pin.json` records that set for the resolver to re-check;
-  `docs/upstream-pins.md` carries the pinned tree from PR2.
+  consent), pins `0.2.0`, installs with `npm ci --ignore-scripts` so every
+  package's `integrity` hash from the shipped lockfile is checked (npm raises
+  `EINTEGRITY` when the streamed tarball completes with a mismatch — the check
+  is not pre-extraction, so on any install failure the runtime removes
+  `runtime/` entirely before anything under it can be loaded), records
+  `sdkEntrySha256`, and never runs lifecycle scripts (R4). The install uses a
+  lockfile shipped with the plugin that pins the full resolved tree with
+  integrity hashes, so every package under `runtime/node_modules/` (`yaml` and
+  `zod` included; `yaml` floated from `^2.8.2` to `2.9.0` in the PR1 install) is
+  verified against its lockfile hash as it is installed, and `runtime/pin.json`
+  records that set for the resolver to re-check; `docs/upstream-pins.md` carries
+  the pinned tree from PR2.
 - `delegate --repo <owner/repo> --branch <ref> --prompt <text> [--title <text>] [--task-ref <id>] [--request-id <local-request-id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, observedHead?, sourceResource }`;
   on failure the envelope carries `localRequestId` and `localId` so a
   reservation can be reconciled. `--dry-run` performs validation and the source
-  read only and returns the same shape with `dryRun: true`; the confirmation
-  binding is described under "Confirmation token". The real call always resolves
-  the source through `sources.get` first (R17), reserves before the POST (R36),
-  passes `requireApproval: true, autoPr: false` (R12), and sets the vendor
-  `title` to `[yellow:<local-id>] <title>` (tag first, so vendor-side truncation
-  cannot strip it; `<title>` defaults to the first 60 characters of the prompt
-  when `--title` is omitted) as the reconcile match key; a `--title` containing
+  read only and returns a distinct shape,
+  `{ localRequestId, localId, repository, requestedBranch, observedHead?, sourceResource, dryRun: true }`
+  — no `sessionResource`, `vendorState`, or `condition`, because no session
+  exists and no reservation is written; the confirmation binding is described
+  under "Confirmation token". The real call always resolves the source through
+  `sources.get` first (R17), reserves before the POST (R36), passes
+  `requireApproval: true, autoPr: false` (R12), and sets the vendor `title` to
+  `[yellow:<local-id>] <title>` (tag first, so vendor-side truncation cannot
+  strip it; `<title>` defaults to the first 60 characters of the prompt when
+  `--title` is omitted) as the reconcile match key; a `--title` containing
   `[yellow:` is `JULES_INVALID_INPUT`. R36 duplicate-launch refusal has no
   automatic override: the recovery is `status --reconcile`, whose `released`
-  outcome frees the repository and branch, and a confirmation-gated abandon path
-  for a reservation reconcile cannot resolve ships with `delegate` in PR3 (shape
-  fixed in shell 03).
+  outcome (reachable only once archive visibility is confirmed, see `status`)
+  frees the repository and branch. A confirmation-gated `abandon` path, which
+  marks a reservation reconcile left `ambiguous-reconcile` or `not-reached` as
+  terminal `failed`, ships with `delegate` in PR3 and is owned by shell 03
+  (shape fixed there).
 - `list [--limit <n>] [--page-token <token>]` →
   `{ sessions: [{ localId?, sessionResource, vendorState, condition, title, createTime }], nextPageToken?, journalOnly: [{ localId, sessionResource?, condition }] }`.
   One `GET sessions` page (`pageSize` = `--limit`, default 20, max 100,
@@ -352,7 +376,7 @@ runtime has observed, and `approve` compares against the same field.
   session did not appear on **this page**; it is page-scoped and never implies
   the session is gone.
 - `status [--session <ref>] [--reconcile]` →
-  `{ localId?, sessionResource?, vendorState?, condition?, activities?: { processed: n, new: n, pages: n, partialPagination: bool, dedupWindowExceeded: bool, unmappedActivity: bool, resumePageToken? }, pendingPlan?: { planId, steps, activityCreateTime }, outputs?: [...], policyDeviation?, reconciled?: [{ localRequestId, kind, outcome: "bound" | "released" | "ambiguous-reconcile" | "policy-deviation" | "unknown-outcome" | "not-reached", sessionResource? }] }`.
+  `{ localId?, sessionResource?, vendorState?, condition?, activities?: { processed: n, new: n, pages: n, partialPagination: bool, dedupWindowExceeded: bool, unmappedActivity: bool, resumePageToken? }, pendingPlan?: { planId, steps, activityCreateTime }, outputs?: [...], policyDeviation?, reconciled?: [{ localRequestId, kind, outcome: "bound" | "released" | "ambiguous-reconcile" | "policy-deviation" | "unknown-outcome" | "not-reached", reason?, sessionResource? }], requiresAttention?, attention? }`.
   With `--session`: one `info()`, then the activity walk from the watermark
   (`filter=create_time>"<lastActivityCreateTime minus 5 minutes>"` as an
   optimization). `--session` is required unless `--reconcile` is given.
@@ -372,19 +396,29 @@ runtime has observed, and `approve` compares against the same field.
   `unknown-outcome`. A **complete** walk (every page read within the 5-page
   bound and the deadline) that finds no tagged candidate and no untagged session
   with the same source resource and starting branch created after the
-  reservation time minus 5 minutes is `released`: the reservation is marked
-  terminal `failed` and the repository and branch are free again; an untagged
-  same-source, same-branch session in that window is `ambiguous-reconcile`
-  (vendor-side title trimming is a remaining unknown), and a walk stopped by the
-  page cap or the deadline is `not-reached` and leaves the reservation in place.
-  The walk applies no archive-state filter; whether the vendor omits archived
-  sessions from an unfiltered list is a remaining unknown for the R53 smoke.
-  `reply` and `approve` unknown outcomes are resolved on their own session,
-  never by the sessions walk: one `info()` plus the activity walk, looking for a
-  `userMessaged` activity whose message digest equals the reservation's payload
-  digest, or a `planApproved` whose `planId` equals the reservation's observed
-  plan id; found binds, not found after a complete walk leaves
-  `unknown-outcome`, a partial walk leaves `not-reached`. Operations the
+  reservation time minus 5 minutes is `released` **only when the journal's
+  `archiveVisibilityConfirmed` flag is `true`**: the reservation is then marked
+  terminal `failed` and the repository and branch are free again. That flag
+  defaults to `false` and is set by the R53 smoke's recorded observation that an
+  archived session appears in an unfiltered `jules.sessions()` walk (the walk
+  applies no archive-state filter, and whether the vendor omits archived
+  sessions from an unfiltered list is the unknown the smoke settles); until it
+  is set, the same complete no-candidate walk is `ambiguous-reconcile` with
+  `reason: "archive-visibility-unverified"` and leaves the reservation in place,
+  so absence of evidence never frees the R36 guard. An untagged same-source,
+  same-branch session in that window is `ambiguous-reconcile` with
+  `reason: "untagged-candidate"` (vendor-side title trimming is a remaining
+  unknown), and a walk stopped by the page cap or the deadline is `not-reached`
+  and leaves the reservation in place. `reply` and `approve` unknown outcomes
+  are resolved on their own session, never by the sessions walk: one `info()`
+  plus the activity walk, looking for a `userMessaged` activity whose message
+  digest equals the reservation's payload digest, or a `planApproved` whose
+  `planId` equals the reservation's observed plan id, in either case with a
+  `createTime` at or after the reservation time minus the 5-minute overlap
+  window — an older match is a prior send, never this one. Exactly one
+  qualifying match binds; more than one is `ambiguous-reconcile` with
+  `reason: "multiple-candidates"`; none after a complete walk leaves
+  `unknown-outcome`, and a partial walk leaves `not-reached`. Operations the
   deadline prevented from being checked are reported as `not-reached`, never as
   resolved.
 - `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
@@ -410,9 +444,12 @@ runtime has observed, and `approve` compares against the same field.
   left); this re-fetch is bounded by that budget, not by the 20-page cap,
   because its pages carry no artifact bodies, so a vendor that ignores the
   filter costs time rather than making a long session unapprovable. A re-fetch
-  that ends before the newest page (budget, page failure, deadline) is never a
-  pass and fails closed with `JULES_INVALID_STATE`, recovery "retry with a
-  larger `--deadline-ms`"; a complete re-fetch whose newest `planGenerated`
+  that ends before the newest page is never a pass and fails closed with
+  `JULES_INVALID_STATE`, with `recoveryAction` split by cause: budget or
+  deadline exhausted — "retry with a larger `--deadline-ms`"; a page failure —
+  "retry; if it repeats, run `status`"; an activity the SDK mapper cannot parse
+  (`unmappedActivity`) — "re-verify the SDK pin with `/jules:setup`; a larger
+  deadline will not help"; a complete re-fetch whose newest `planGenerated`
   differs from `--plan-id` fails closed with `JULES_POLICY_DEVIATION`. Only then
   does it issue the POST (the endpoint takes no plan id), then re-read from the
   same start point within the remaining budget and record a deviation on
@@ -486,12 +523,33 @@ until the engine milestone introduces the versioned process interface
 (integration-plan.md §14).
 
 ```text
-{ "ok": true, "operation": "<subcommand>", ...result fields }
+{ "ok": true, "operation": "<subcommand>", ...result fields,
+  "requiresAttention"?: true, "attention"?: ["<flag-or-outcome>", ...] }
 { "ok": false, "operation": "<subcommand>", "localRequestId"?: "...",
   "localId"?: "...",
   "error": { "code": "JULES_*", "message": "...", "retryable": bool,
              "requestId"?: "...", "recoveryAction": "..." } }
 ```
+
+A success envelope is degraded when any of these is set, and every degraded
+success carries `requiresAttention: true` plus an `attention` list naming each
+trigger, so a caller checks one field instead of the full flag inventory (the
+exit code stays 0, see "Exit codes"): `partialPagination`, `unmappedActivity`,
+`dedupWindowExceeded`, `partialStaging`, `verificationDeferred`,
+`policyDeviation`, a `setup` result with `credentialSource: "none"`,
+`sdkResolution: "missing"`, or `sourcesReachable.supported: false`, and any
+`reconciled[].outcome` other than `bound` or `released`. The `attention` entries
+are the flag names, or `reconciled:<outcome>` for reconcile results. Each
+reconcile outcome has one disposition:
+
+| `outcome`             | Reservation     | Envelope                                                                       | Caller action                                        |
+| --------------------- | --------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `bound`               | resolved        | no attention entry                                                             | none                                                 |
+| `released`            | terminal failed | no attention entry                                                             | none; the repository and branch are free             |
+| `ambiguous-reconcile` | kept            | `attention`, `reason`                                                          | inspect the candidates; `abandon` (PR3) if warranted |
+| `policy-deviation`    | kept            | `attention`, top-level `policyDeviation: true`; `supervise` stops acting (R33) | reconcile by hand before any further write           |
+| `unknown-outcome`     | kept            | `attention`                                                                    | rerun `status --reconcile` later                     |
+| `not-reached`         | kept            | `attention`                                                                    | rerun with a larger `--deadline-ms`                  |
 
 `operation` is the subcommand name, or the literal `"unknown"` on a usage error
 where no valid subcommand was given (mirrors `yellow-cursor`). `localRequestId`
@@ -537,29 +595,30 @@ not the only permitted text. `sdk-adapter.ts` classifies SDK errors by
 (`JulesRateLimitError` and `JulesAuthenticationError` before their
 `JulesApiError` base), because a 429 is an instance of both.
 
-| Code                           | Retryable | Recovery action (default)                                                                                                                |
-| ------------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `JULES_AUTH_FAILED`            | false     | set `JULES_API_KEY` (401/403 or missing key), then retry                                                                                 |
-| `JULES_INVALID_INPUT`          | false     | fix the reported input or invocation and retry                                                                                           |
-| `JULES_SOURCE_ACCESS`          | false     | connect the repository to Jules; sources are discovered, never synthesized (R17)                                                         |
-| `JULES_RATE_LIMITED`           | true      | wait at least 60 s and retry; the runtime never retries a 429 itself                                                                     |
-| `JULES_SERVICE_UNAVAILABLE`    | true      | retry later (pre-dispatch only; see ambiguous-outcome design)                                                                            |
-| `JULES_NOT_FOUND`              | false     | verify the session or activity reference                                                                                                 |
-| `JULES_MALFORMED_RESPONSE`     | false     | report; the SDK response shape was unexpected (non-walk reads and pre-dispatch only)                                                     |
-| `JULES_INVALID_STATE`          | false     | the session is not awaiting approval, or its pending plan could not be completely re-read; run `status`                                  |
-| `JULES_UNSUPPORTED_CAPABILITY` | false     | not available on the vendor contract; no retry will help (R11)                                                                           |
-| `JULES_UNKNOWN_OUTCOME`        | false     | run `status --reconcile` (a `delegate`), or `status --session <ref> --reconcile` (a `reply` or `approve`); never relaunch (R16)          |
-| `JULES_JOURNAL_CORRUPT`        | false     | reconcile the journal by hand; writes are blocked (R37)                                                                                  |
-| `JULES_DUPLICATE_LAUNCH`       | false     | an unresolved operation exists for this repo/branch; run `status --reconcile` first; a complete walk with no candidate releases it (R36) |
-| `JULES_CONFIRMATION_REQUIRED`  | false     | confirm through the wrapper as fixed in shell 03, or pass a grant written by `authorize` (PR3) (R29)                                     |
-| `JULES_AUTHORITY_DENIED`       | false     | the grant does not cover this operation, repo, branch, or limit (R31)                                                                    |
-| `JULES_GRANT_EXPIRED`          | false     | the grant or deadline expired; remote session may still run; see containment                                                             |
-| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; reconcile before further writes (R13)                                     |
-| `JULES_DEADLINE_EXCEEDED`      | false     | the absolute operation deadline fired before any write was dispatched; no verdict recorded (R14, R33)                                    |
-| `JULES_STALE_LOCK`             | false     | a lock from a crashed process exists; remove by hand after inspection (R38)                                                              |
-| `JULES_SDK_MISSING`            | false     | run `/jules:setup` to install the pinned SDK (R4)                                                                                        |
-| `JULES_SDK_INTEGRITY`          | false     | the SDK tarball, entry file, or storage binding failed verification; do not use it (R4)                                                  |
-| `JULES_DATA_DIR`               | false     | the data directory is not owner-only, not owned by you, or its scratch dir is not writable (R35)                                         |
+| Code                           | Retryable | Recovery action (default)                                                                                                                 |
+| ------------------------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `JULES_AUTH_FAILED`            | false     | set `JULES_API_KEY` (401/403 or missing key), then retry                                                                                  |
+| `JULES_INVALID_INPUT`          | false     | fix the reported input or invocation and retry                                                                                            |
+| `JULES_SOURCE_ACCESS`          | false     | connect the repository to Jules; sources are discovered, never synthesized (R17)                                                          |
+| `JULES_RATE_LIMITED`           | true      | wait at least 60 s and retry; the runtime never retries a 429 itself                                                                      |
+| `JULES_SERVICE_UNAVAILABLE`    | true      | retry later (pre-dispatch only; see ambiguous-outcome design)                                                                             |
+| `JULES_NOT_FOUND`              | false     | verify the session or activity reference                                                                                                  |
+| `JULES_MALFORMED_RESPONSE`     | false     | report; the SDK response shape was unexpected (non-walk reads and pre-dispatch only)                                                      |
+| `JULES_INVALID_STATE`          | false     | the session is not awaiting approval, or its pending plan could not be completely re-read; run `status`                                   |
+| `JULES_UNSUPPORTED_CAPABILITY` | false     | not available on the vendor contract; no retry will help (R11)                                                                            |
+| `JULES_UNKNOWN_OUTCOME`        | false     | run `status --reconcile` (a `delegate`), or `status --session <ref> --reconcile` (a `reply` or `approve`); never relaunch (R16)           |
+| `JULES_JOURNAL_CORRUPT`        | false     | reconcile the journal by hand; writes are blocked (R37)                                                                                   |
+| `JULES_DUPLICATE_LAUNCH`       | false     | an unresolved operation exists for this repo/branch; run `status --reconcile` first; a complete walk with no candidate releases it (R36)  |
+| `JULES_CONFIRMATION_REQUIRED`  | false     | confirm through the wrapper as fixed in shell 03, or pass a grant written by `authorize` (PR3) (R29)                                      |
+| `JULES_AUTHORITY_DENIED`       | false     | the grant does not cover this operation, repo, branch, or limit (R31)                                                                     |
+| `JULES_GRANT_EXPIRED`          | false     | the grant or deadline expired; remote session may still run; see containment                                                              |
+| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; reconcile before further writes (R13)                                      |
+| `JULES_DEADLINE_EXCEEDED`      | false     | the absolute operation deadline fired before any write was dispatched; no verdict recorded (R14, R33)                                     |
+| `JULES_STALE_LOCK`             | false     | a lock from a crashed process exists; remove by hand after inspection (R38)                                                               |
+| `JULES_NO_PROGRESS`            | false     | two consecutive activity walks restarted from the watermark without advancing; run `status` later, and re-verify the SDK pin if it recurs |
+| `JULES_SDK_MISSING`            | false     | run `/jules:setup` to install the pinned SDK (R4)                                                                                         |
+| `JULES_SDK_INTEGRITY`          | false     | the SDK tarball, entry file, or storage binding failed verification; do not use it (R4)                                                   |
+| `JULES_DATA_DIR`               | false     | the data directory is not owner-only, not owned by you, or its scratch dir is not writable (R35)                                          |
 
 SDK class to code (all eleven classes in `dist/errors.d.ts`). "After dispatch"
 means a mutating POST has been sent and no clear rejection was received. A
