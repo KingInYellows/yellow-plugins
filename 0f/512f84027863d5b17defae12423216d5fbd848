@@ -1,0 +1,36 @@
+.github/workflows/validate-schemas.yml
+  s_1ed65cfba90080::t_4b449668037d83 1401-1402,1453-1462,1468-1470,1476
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_1ed65cfba90080::t_4b449668037d83 401-413
+plugins/yellow-review/tests/file-line-counts.bats
+  s_1ed65cfba90080::t_f50486528ca087 2-7,9-10,14,64-73,75-76,101-105,108-109,114-115,117-118,123,133,144,153,159-175,183,191-218,220,222-236,238-283
+  s_1ed65cfba90080::t_02f253c8882c31 77-80,93,97-98,237,284-288
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_1ed65cfba90080::t_93db51171a32df 72,86-91
+  s_1ed65cfba90080::t_efee6dcf4c1297 92
+plugins/yellow-review/commands/review/review-pr.md
+  s_1ed65cfba90080::t_f1115b785fdb5b 510-515,518-523,526-531,534-556,561,579-583
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-line-counts
+  s_1ed65cfba90080::t_3c722ee7835772 1-262
+tests/integration/thermonuclear-reviewer.test.ts
+  s_1ed65cfba90080::t_95604047ede26a 401
+  s_1ed65cfba90080::t_10f31fcf6d9f84 36-47,61-87,316,330-332,334,336-340,342-348,351,360-400,402-470
+plans/thermonuclear-review-integration.md
+  s_1ed65cfba90080::t_4b449668037d83 351-361,393-402
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0f512f84027863d5b17defae12423216d5fbd848",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
