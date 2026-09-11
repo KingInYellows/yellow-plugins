@@ -1,0 +1,36 @@
+plugins/yellow-review/tests/file-line-counts.bats
+  s_aa2a8cf97f9dcd::t_04fb4ed2cf70d9 99-107,149-152,159-210
+  s_aa2a8cf97f9dcd::t_858fd0436c0c87 211
+plugins/yellow-review/commands/review/review-all.md
+  s_aa2a8cf97f9dcd::t_00f40fee666512 228-241
+  s_aa2a8cf97f9dcd::t_7ba076827d3cb4 225-227
+tests/integration/thermonuclear-reviewer.test.ts
+  s_aa2a8cf97f9dcd::t_716e73108fc92f 300-314,316-321,331-342,366-380,401
+  s_aa2a8cf97f9dcd::t_a8b710169a93cd 343-346
+plugins/yellow-review/commands/review/review-pr.md
+  s_aa2a8cf97f9dcd::t_3266676baca7f8 745-749
+  s_aa2a8cf97f9dcd::t_fbbea81d1584fb 585-617
+  s_aa2a8cf97f9dcd::t_9275e82e6b2eef 619-631,633-645,655-660
+  s_aa2a8cf97f9dcd::t_a8b710169a93cd 677
+  s_aa2a8cf97f9dcd::t_a2a1dfbb008995 691-696,698-699,709-715,717,742-744
+  s_aa2a8cf97f9dcd::t_db498f63954006 535-556,579-580
+plans/thermonuclear-review-integration.md
+  s_aa2a8cf97f9dcd::t_c90954ba4f5a69 565-568
+  s_aa2a8cf97f9dcd::t_019593894f9050 385-390,393,397-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a97cee2be3288bb4a9fc160002b42b3b7b9e0a4e",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
