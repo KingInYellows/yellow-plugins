@@ -125,6 +125,17 @@ git diff --numstat origin/main...HEAD | awk '
 
 Binary files show `-` in numstat and are excluded.
 
+### Opt-in Only (never auto-selected)
+
+- `thermonuclear-reviewer` — strict structural-quality lane. It appears in
+  neither the always-on nor the conditional set at any size tier, and no
+  diff content triggers it. A repository reaches it only by naming it in
+  `reviewer_set.include` in `yellow-plugins.local.md`. Under
+  `review_pipeline: legacy` it is unreachable by design — the legacy
+  persona list is fixed and never reads `reviewer_set`. Its
+  `subagent_type` mapping lives in `review-pr.md` Step 4's "Opt-in only"
+  table, not here.
+
 ### Size Tiers
 
 - **Small** (< 100 lines): always-on persona set + code-simplifier
@@ -137,7 +148,8 @@ Binary files show `-` in numstat and are excluded.
 Wave 2 persona reviewers (`correctness-reviewer`,
 `maintainability-reviewer`, `reliability-reviewer`,
 `project-standards-reviewer`, `project-compliance-reviewer`,
-`adversarial-reviewer`) return structured JSON per the compact-return
+`adversarial-reviewer`, `thermonuclear-reviewer`) return structured JSON
+per the compact-return
 schema. The orchestrator aggregates and presents them as pipe-delimited
 tables.
 

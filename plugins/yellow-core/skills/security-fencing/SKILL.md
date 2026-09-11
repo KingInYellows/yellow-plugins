@@ -29,11 +29,15 @@ rg -l 'CRITICAL SECURITY RULES' plugins/ --type md \
   | wc -l
 ```
 
-At time of writing this returns **34** agent consumers (CHANGELOG.md
-mentions of the phrase are excluded — those are release-note references,
-not active fence consumers). The full enumeration in "Current consumers"
-below is hand-maintained — re-run the one-liner before relying on the
-list.
+At time of writing this returns **49** files (CHANGELOG.md mentions of the
+phrase are excluded — those are release-note references, not active fence
+consumers). Note the one-liner counts FILES, not agents: two matches sit
+outside `agents/` — `yellow-core/README.md` and
+`yellow-core/skills/create-agent-skills/SKILL.md` — so read it as an upper
+bound rather than an agent census. `thermonuclear-reviewer` uses brief
+untrusted-input rails instead of this heading and is not in the count.
+The full enumeration in "Current consumers" below is hand-maintained —
+re-run the one-liner before relying on the list.
 
 ## When to Use
 
@@ -127,14 +131,14 @@ not a local sibling of this SKILL.md):
 - `plugins/yellow-core/agents/research/` (1) — git-history-analyzer
   (repo-research-analyst does not currently include the block — add when
   it starts reading source files directly)
-- `plugins/yellow-review/agents/review/` (12) — adversarial-reviewer,
-  code-simplifier, comment-analyzer, correctness-reviewer,
-  maintainability-reviewer, plugin-contract-reviewer, pr-test-analyzer,
+- `plugins/yellow-review/agents/review/` (15) — adversarial-reviewer,
+  agent-cli-readiness-reviewer, agent-native-reviewer,
+  cli-readiness-reviewer, code-simplifier, comment-analyzer,
+  correctness-reviewer, maintainability-reviewer,
+  plugin-contract-reviewer, pr-test-analyzer,
   project-compliance-reviewer, project-standards-reviewer,
-  reliability-reviewer, silent-failure-hunter, type-design-analyzer.
-  (`code-reviewer.md` is a Wave-2 rename deprecation stub — no
-  CRITICAL SECURITY RULES block; see its body for the migration
-  pointer to `project-compliance-reviewer`.)
+  reliability-reviewer, silent-failure-hunter,
+  type-design-analyzer
 - `plugins/yellow-review/agents/workflow/` (1) — pr-comment-resolver
 - `plugins/yellow-debt/agents/scanners/` (5) — ai-pattern-scanner,
   architecture-scanner, complexity-scanner, duplication-scanner,
@@ -150,9 +154,24 @@ not a local sibling of this SKILL.md):
 
 - `plugins/yellow-browser-test/agents/testing/` (1) — app-discoverer
 
+**Document variant** (untrusted document content, not source code):
+
+- `plugins/yellow-docs/agents/review/` (7) —
+  adversarial-document-reviewer, coherence-reviewer, design-lens-reviewer,
+  feasibility-reviewer, product-lens-reviewer, scope-guardian-reviewer,
+  security-lens-reviewer
+
+**Session-transcript variant** (untrusted `transcript_tail` fields, not
+source code):
+
+- `plugins/yellow-core/agents/workflow/` (3) — staging-promoter,
+  staging-reviewer, staging-scorer
+
 The list above is hand-maintained and may drift; rerun the
 machine-verifiable one-liner above before relying on counts. Sum of
-per-directory counts here = **34**, matching the one-liner output.
+per-directory counts here = **47**, plus the 2 non-agent files noted above
+(`yellow-core/README.md` and `create-agent-skills/SKILL.md`, both outside
+`agents/`) = **49**, matching the one-liner output.
 
 ### Why this is a documentation skill, not an agent-injection skill
 

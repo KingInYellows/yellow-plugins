@@ -34,7 +34,7 @@ yellow-core integration before reviewing real PRs.
 
 ## Agents
 
-### Review (15)
+### Review (16)
 
 | Agent                          | Description                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -53,6 +53,7 @@ yellow-core integration before reviewing real PRs.
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |
 | `type-design-analyzer`         | Type design, encapsulation, invariants                                                                       |
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
+| `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
 ### Workflow (1)
 
@@ -66,11 +67,45 @@ yellow-core integration before reviewing real PRs.
 | -------------------- | -------------------------------------------------------------------- |
 | `pr-review-workflow` | Internal reference for adaptive selection and output format          |
 | `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
+| `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
+
+## Opt-in: thermonuclear structural review
+
+`thermonuclear-reviewer` is the one persona `/review:pr` never selects on
+its own. It applies a deliberately aggressive structural rubric at
+opus/xhigh, which is not worth paying on every PR — so a repository enables
+it explicitly in `yellow-plugins.local.md`:
+
+```yaml
+---
+reviewer_set:
+  include:
+    - thermonuclear-reviewer
+---
+```
+
+Then run `/review:pr` as usual. All default personas still run; this adds a
+high-pressure structural lane on top of them. Remove the entry to turn it
+off again.
+
+Two caveats worth knowing before enabling it:
+
+- Its findings are advisory and owned by a human. No automatic-fix lane
+  will ever apply a restructuring it proposes.
+- It is unreachable under `review_pipeline: legacy`. The legacy escape
+  hatch carries its own fixed persona list and never reads `reviewer_set`,
+  so `include` has no effect there.
+- Its category is `maintainability`. If the repository already sets
+  `focus_areas` without `maintainability` in it, the mapping filters this
+  persona back out after `reviewer_set.include` adds it — add
+  `maintainability` to `focus_areas` too, or the opt-in snippet above has
+  no effect.
 
 ## Confidence gating
 
-Three conditional personas (`agent-native-reviewer`,
-`agent-cli-readiness-reviewer`, `cli-readiness-reviewer`) report every
+Four conditional personas (`agent-native-reviewer`,
+`agent-cli-readiness-reviewer`, `cli-readiness-reviewer`,
+`thermonuclear-reviewer`) report every
 in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
 and severity — they no longer pre-filter below 75. They do cap at 40
 findings: overflow is dropped at the persona and is not counted in the
@@ -82,7 +117,7 @@ persona reviewers still apply their own anchor floors (for example,
 `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings
 confidence gate) apply the **single** confidence gate: suppress findings
 below anchor 75 except P0 at 50+. Sub-75 input
-from the three recall personas is expected; the report's "Findings suppressed
+from the four recall personas is expected; the report's "Findings suppressed
 at confidence < 75" line counts only what the orchestrator removes.
 Pre-existing findings pass through the same gate (gated-out items count as
 suppressed, not listed under Pre-existing).

@@ -363,6 +363,22 @@ Spawn unconditionally:
 |-------|---------------|---------|
 | `codex-reviewer` | `yellow-codex:review:codex-reviewer` | yellow-codex installed AND gross line count > 100 |
 
+#### Opt-in only (never auto-selected)
+
+Not spawned by any trigger above. Dispatched only when named in
+`reviewer_set.include`:
+
+| Agent | subagent_type | Reviewer category |
+|-------|---------------|-------------------|
+| `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
+
+A row in this table never auto-selects the agent — the always-on and
+conditional tables above are exhaustive for automatic dispatch. This is
+the only registry entry that maps the bare `thermonuclear-reviewer` name
+from `reviewer_set.include` to a spawnable `subagent_type`; without it the
+opt-in path has no mapping to dispatch. The graceful-degradation guard
+below covers this table too.
+
 #### Graceful-degradation guard (mandatory)
 
 For each agent above, attempt the Agent spawn. If the spawn fails with an
@@ -523,10 +539,11 @@ When a return fails compact-return validation (missing top-level field,
 malformed value, wrong type), drop the entire return. Record drop count in
 Coverage. Truncated JSON from an oversized findings list is a malformed
 return — persona prompts for `agent-native-reviewer`,
-`agent-cli-readiness-reviewer`, and `cli-readiness-reviewer` instruct
-those agents to emit at most 40 findings, ranking gate-surviving items
-first (anchors 75/100) by severity then confidence, then remaining
-findings, and dropping overflow rather than emitting partial JSON.
+`agent-cli-readiness-reviewer`, and `cli-readiness-reviewer`, plus the
+preloaded skill body for `thermonuclear-reviewer`, instruct those agents
+to emit at most 40 findings, ranking gate-surviving items first (anchors
+75/100) by severity then confidence, then remaining findings, and
+dropping overflow rather than emitting partial JSON.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
 continue to use the legacy prose finding format. This list is exhaustive
@@ -741,11 +758,12 @@ Apply the aggregation steps from
    the findings this gate actually removes — a P0 that survives the
    exception is never counted under `suppressed`, so the report's "Findings
    suppressed at confidence < 75" line stays accurate.
-   `agent-native-reviewer`, `agent-cli-readiness-reviewer` and
-   `cli-readiness-reviewer` do not pre-filter (they are told to report
-   everything with a confidence score) while the other personas keep their
-   own anchor floors, so sub-75 findings in the input are expected — gate
-   them here, do not treat them as a persona defect.
+   `agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+   `cli-readiness-reviewer` and `thermonuclear-reviewer` do not pre-filter
+   (they are told to report everything with a confidence score) while the
+   other personas keep their own anchor floors, so sub-75 findings in the
+   input are expected — gate them here, do not treat them as a persona
+   defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by

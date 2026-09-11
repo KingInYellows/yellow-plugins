@@ -92,7 +92,7 @@ means the file remains valid forward-and-backward.
 | `review_pipeline` | `persona` \| `legacy` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. |
 | `review_depth` | `small` \| `medium` \| `large` | auto | Forces a depth tier regardless of computed diff size. `large` always invokes `adversarial-reviewer`; `small` skips it even on large diffs. |
 | `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
-| `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. |
+| `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. This is also the only way to reach `thermonuclear-reviewer` (yellow-review): an opt-in structural-quality persona that appears in neither dispatch table, so it runs only when named here. Two silent drops apply to `include`, both visible in the precedence pseudo-code under "Reading the config from a command". First, `review_pipeline: legacy` branches before overrides are read at all, so `include` has no effect there. Second, `focus_areas` filters the merged set afterwards, and `thermonuclear-reviewer` is not always-on (its category is `maintainability`), so an included `thermonuclear-reviewer` survives only when `focus_areas` is unset or lists `maintainability`. Neither drop emits a diagnostic. |
 | `reviewer_set.exclude` | array of agent names | empty | Subtractive — agents are skipped even if always-on or their triggers fire. Applied after `include`. |
 | `stack` | array of `ts` \| `py` \| `rust` \| `go` | auto-detect | Forces language-specific reviewer behavior. When set, `polyglot-reviewer` (when triggered) scopes to listed languages and skips non-matching files. Auto-detect uses repo root signals: `package.json` → `ts`, `pyproject.toml`/`requirements.txt` → `py`, `Cargo.toml` → `rust`, `go.mod` → `go`. Multi-stack repos may set this explicitly to scope review to a subset. Acted on by W3-pending consumers (see status table). |
 | `agent_native_focus` | boolean | `false` | When `true`, always invokes the W3.5 agent-native reviewer triplet (`cli-readiness-reviewer`, `agent-cli-readiness-reviewer`, `agent-native-reviewer`) regardless of whether the diff touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`. Useful for repos that author Claude Code plugins but house plugin code outside the standard `plugins/` layout. Acted on by W3.5 (pending). |
@@ -143,12 +143,25 @@ Pseudo-code:
 config = load_yaml_frontmatter("yellow-plugins.local.md")
 review_pipeline = config.review_pipeline ?? "persona"
 review_depth = command_arg.depth ?? config.review_depth ?? auto_detect()
+
+# Precedence step 1: review_pipeline branches BEFORE any reviewer override is
+# read. The legacy path dispatches its own fixed persona list and consults
+# neither reviewer_set nor focus_areas — see
+# plugins/yellow-review/references/review-pr/legacy-fallback.md.
+if review_pipeline == "legacy":
+  use_legacy_dispatch(LEGACY_FIXED_PERSONA_LIST)
+  return
+
+# Precedence step 2 (persona path only): merge reviewer overrides.
 focus_areas = config.focus_areas ?? []  # empty = no filter
 include = config.reviewer_set.include ?? []
 exclude = config.reviewer_set.exclude ?? []
 
 # After computing the default reviewer set per Step 4 of review-pr.md:
 reviewer_set = (defaults ∪ include) \ exclude
+
+# Precedence step 3: focus_areas filters the merged set, so an included agent
+# is still dropped when its category is not listed.
 if focus_areas:
   # Always-on personas survive the filter regardless of focus_areas; filtering
   # them would defeat the always-on contract documented in
@@ -156,10 +169,7 @@ if focus_areas:
   always_on = {project-compliance-reviewer, correctness-reviewer,
                maintainability-reviewer, project-standards-reviewer}
   reviewer_set = always_on ∪ filter_by_category(reviewer_set \ always_on, focus_areas)
-if review_pipeline == "legacy":
-  use_legacy_dispatch(reviewer_set)
-else:
-  use_persona_dispatch(reviewer_set)
+use_persona_dispatch(reviewer_set)
 ```
 
 ### Validation
