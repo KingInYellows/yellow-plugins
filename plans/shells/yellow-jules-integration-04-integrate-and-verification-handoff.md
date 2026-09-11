@@ -8,6 +8,8 @@ depends_on: [yellow-jules-integration-02-runtime-provider-and-claude-routing, ye
 
 ## Context
 
+The R53 smoke outcome gate lives here (Open Question 6 decision, 2026-09-10): this shell refuses to start until `docs/yellow-jules/smoke-result.md` exists with `result: pass`.
+
 Collected patches still have no sanctioned path into a branch. This shell adds
 the one command that applies a staged artifact inside a dedicated integration
 worktree, verifies its actual base, runs the task's verification contract with
@@ -43,6 +45,7 @@ across restart, deadline, and base-mismatch cases.
 - R41
 - R43
 - R52 (partial: integrate-scenarios)
+- R53 (partial: smoke-outcome-gate)
 
 ## Implementation Steps (High-Level)
 
