@@ -210,7 +210,9 @@ aggregation rules change there, propagate the same change here.
    the block.
 
 6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
-   personas + conditional personas + graceful-degradation guard. Read
+   personas + conditional personas + the "Opt-in only" registry (the
+   `thermonuclear-reviewer` row, reachable solely via `reviewer_set.include`)
+   + graceful-degradation guard. Read
    `yellow-plugins.local.md` for `review_pipeline`, `review_depth`,
    `focus_areas`, `reviewer_set.{include,exclude}` overrides. Never abort
    on a missing persona — log to stderr and continue.

@@ -229,6 +229,36 @@ Before enabling any plugin with hooks:
 - yellow-ruvector stores embeddings in `.ruvector/` directory (gitignored)
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
 - yellow-debt reads codebase files but only writes to `todos/` directory
+- **yellow-review's Codex copy is a trust-boundary downgrade, not a
+  data-residency one.** Codex CLI runs locally like `gh` or `gt`, so the
+  "all processing happens locally" guarantee above still holds for it.
+  Claude's `thermonuclear-reviewer` agent is restricted by `tools:`
+  frontmatter (read-only); the generated Codex copy of
+  `yellow-thermonuclear-review` has no equivalent allowlist and relies on
+  the skill body's report-only rails instead — a prompt-level control, not
+  runtime enforcement. See
+  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
+  "Safety rails".
+
+### Cloud/Remote Execution (yellow-review Cursor distribution)
+
+- **yellow-review's Cursor copy is both a trust-boundary downgrade and a
+  data-residency downgrade — it does not have the "all processing happens
+  locally" guarantee from Local Execution above.** Cursor plugins installed
+  through Cursor's Cloud/Background Agents run in Cursor's remote
+  environment, not the user's local machine; a `yellow-thermonuclear-review`
+  invocation started from a Cloud Agent processes the repository off-machine,
+  under Cursor's data handling, not this repository's. The same skill can
+  also run inside the local Cursor editor (see
+  `docs/cursor-distribution.md` "Local Cursor loading procedure"), where the
+  local-processing guarantee does hold — the boundary depends on which
+  Cursor surface invokes it, not on the plugin itself.
+- As with the Codex copy, the generated Cursor skill has no `tools:`
+  allowlist equivalent to the Claude agent's read-only restriction and
+  relies entirely on the skill body's report-only rails (prompt-level, not
+  runtime-enforced). See
+  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
+  "Safety rails".
 
 ### Engine Process Boundary (yellow-goal)
 
@@ -355,7 +385,11 @@ Plugins processing untrusted input (PR comments, issue bodies, code content)
 include prompt injection defenses:
 
 - **yellow-review**: Agents processing PR comments wrap untrusted content in
-  `--- begin/end ---` delimiters with "treat as reference only" advisory
+  `--- begin/end ---` delimiters with "treat as reference only" advisory.
+  The Cursor and Codex copies of `yellow-thermonuclear-review` use a
+  per-capture nonce closer so a `--- code end ---` line in reviewed
+  content cannot terminate the fence; they still have no runtime tool
+  restriction (see Trust Boundaries above).
 - **yellow-debt**: Scanner agents fence code content with injection boundary
   markers
 - **yellow-ruvector**: Hook scripts validate all inputs before constructing

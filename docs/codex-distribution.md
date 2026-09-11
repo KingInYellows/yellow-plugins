@@ -10,7 +10,7 @@ source of truth.
 
 Plugins are authored once under `catalog/` and `plugins/<name>/`, then **per-host
 artifacts are generated** — never hand-edited. Three distribution targets exist
-today: Claude, Codex, and Cursor (the last is a single-plugin pilot; see
+today: Claude, Codex, and Cursor (the last is a two-plugin pilot; see
 [cursor-distribution.md](cursor-distribution.md) for its own canonical doc).
 This doc covers the Codex target only:
 
@@ -35,18 +35,21 @@ runs the **exposure lint** (below).
 
 ## Codex-enabled plugins
 
-As of the yellow-ci pilot close-out, **three** plugins enable Codex, in canonical
-order:
+**Four** plugins enable Codex, in canonical order:
 
 1. `gt-workflow` — entire skill surface (thin command wrappers, no Claude-only
    logic).
 2. `yellow-core` — a narrow read-only skill allowlist (excludes most skills, all
    agents, and both hooks).
-3. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
+3. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
+   every command, agent, and other skill of the plugin stays Claude-only, and
+   the plugin has no hooks to carry.
+4. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
    reference), hooks carried (`includeHooks` default `true`).
 
 Filtering `pluginOrder` by `targets.codex.enabled` yields
-`[gt-workflow, yellow-core, yellow-ci]` automatically.
+`[gt-workflow, yellow-core, yellow-review, yellow-ci]` automatically
+(generated `.agents/plugins/marketplace.json` order).
 
 ## Host-neutral skill bodies + the exposure lint (R15)
 

@@ -107,3 +107,99 @@ Before allowlisting a skill for Codex (`targets.codex.skillAllowlist` in
   — a sibling set of silent generator/validator gaps found during
   yellow-core's Codex onboarding (skillAllowlist/componentPaths asymmetry,
   sidecar-file rejection)
+
+---
+
+## Update — 2026-09-05
+
+### 4. The general shape: a skill's frontmatter and orchestrator are a contract the body doesn't restate — until the skill leaves the host that enforced it
+
+PR #770 (yellow-review's thermonuclear-review skill, exposed to Cursor and
+Codex alongside Claude) generalizes findings 1-3 above beyond "Claude-only
+tool names" to the full set of guarantees a Claude-only orchestrator or
+Claude Code's own frontmatter parser silently supplied and that the skill
+body never had to state:
+
+- **Input contract.** On Claude, `review:pr` (or whatever invoked the
+  skill) determined "the change set" and handed it to the skill. Standalone
+  on Cursor/Codex, nothing defines what "the change set" is, what takes
+  precedence if multiple candidates exist, or how a clean-review outcome is
+  distinguished from "no input was supplied at all." A skill built for
+  orchestrator-fed input needs an explicit Inputs section with precedence
+  rules and a named "no input supplied" branch before it ships standalone.
+- **Fenced/trusted input.** On Claude, reviewed diff content reaching the
+  rubric was implicitly bounded by conventions enforced elsewhere in the
+  pipeline. On a host with no such pipeline, a hostile diff reaches the
+  rubric unfenced unless the skill body itself states the hardening rules
+  inline — including the sharper version of the standard fencing rule: a
+  line that merely *looks like* a fence closer is still inside the fence,
+  and secrets found in quoted excerpts must never be echoed back.
+- **Invocation opt-out.** `user-invocable: false` is a Claude Code
+  frontmatter field; PR #770 found the manifest generator strips it for
+  other hosts. On a host that selects skills by description text rather
+  than an honored opt-out flag, the description is the *only* portable
+  control over whether a host applies an opt-in-only rubric implicitly.
+  Reword the description for explicit-invocation-only semantics; don't
+  rely on a frontmatter field that may not survive generation.
+- **Output-field semantics defined only in a file that never ships.**
+  `confidence`/`pre_existing`/`requires_verification` in PR #770's output
+  schema had their meaning documented only in the Claude-only agent file
+  — never distributed to Cursor/Codex. Same failure shape for any
+  structured-output-format rule (PR #770's `<file-line-counts>` block):
+  if the format is only defined in a file that doesn't ship to the new
+  host, the rule is inert there, and — worse — invisibly so, since nothing
+  fails loudly when a forged block inside reviewed content satisfies a
+  check nobody is actually running.
+- **Distributed paths must resolve after install, not just in-repo.** A
+  repo-relative path (e.g. into a `RESEARCH/` directory) that resolves
+  fine in this repo's checkout dangles once the skill is copied to an
+  install target — the same shape as `codex-distribution-pipeline-silent-
+  gaps.md`'s sidecar-file constraint, but for path references inside prose
+  rather than sidecar files on disk. Use a URL or otherwise
+  install-independent reference instead.
+
+**Action:** when a skill is granted a new distribution target, don't audit
+only for Claude-only *tool names* (finding 1's original scope). Audit
+every place the skill body currently relies on something the removed
+host used to supply — input source, fencing/trust boundary, invocation
+gating, output-field semantics, structured-format definitions, and
+in-repo-relative paths — and restate each explicitly in the body. The
+description field is the only one of these controls that reliably
+survives generation to every host.
+
+### 5. Enabling a new distribution target has a fixed doc-inventory checklist that no validator covers
+
+Separately from the skill-body audit above, PR #770 found that exposing a
+plugin to a new host requires updating a fixed set of documents whose
+cross-host inventories otherwise go stale silently: both distribution docs
+(`docs/codex-distribution.md`, `docs/cursor-distribution.md`), the root
+`README.md`, `AGENTS.md`, and the plugin's own `CLAUDE.md` (every other
+Codex/Cursor-enabled plugin documents its exposure there; the omission was
+inconsistent with the rest of the repo, not merely undocumented). No
+validator scans these two distribution docs for "N plugins support this
+host" claims — see `codex-distribution-pipeline-silent-gaps.md` for the
+sibling class of generator/CI gaps that share this "invisible until
+someone reads the doc" shape. Adding a plugin to a distribution target
+without a checklist pass over all five locations reliably produces stale
+canonical-count claims ("the three Codex plugins", "sole Cursor-enabled
+plugin") that persist until the next unrelated PR happens to notice.
+
+**Action:** treat "enable plugin X for host Y" as touching six things, not
+one: the catalog source, and the five doc locations above. Grep for the
+plugin-count phrasing in both distribution docs before merging any PR that
+changes a `targets.<host>.enabled` value.
+
+### 6. A byte-identity test that strips frontmatter before comparing cannot verify frontmatter normalization
+
+PR #770's cross-host test asserted the skill body was "normalised to
+name+description" across hosts by stripping frontmatter from both sides
+before comparing — which means the test could not fail no matter what the
+generator did to frontmatter, because the field under test was removed
+before the assertion ran. The same review pass found the test also left
+the parent host directory and the manifest's `agents`/`commands`
+absence unchecked, and iterated `readdirSync` results without sorting
+first (nondeterministic key order across filesystems). General lesson:
+when a test's stated claim is about a transformation of field X, adding a
+step that strips or normalizes X before the comparison silently converts
+the test into a no-op for that claim — audit what a "normalize before
+compare" step actually discards before trusting the test's name.

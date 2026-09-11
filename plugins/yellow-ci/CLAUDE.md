@@ -212,10 +212,10 @@ bodies.
 
 ## Codex Distribution
 
-`targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — the **third**
-plugin in this repo to enable Codex (after yellow-core and gt-workflow),
-producing the final canonical order `[gt-workflow, yellow-core, yellow-ci]`. See
-the canonical [`docs/codex-distribution.md`](../../docs/codex-distribution.md).
+`targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — Codex-enabled
+in the canonical order `[gt-workflow, yellow-core, yellow-review, yellow-ci]`.
+See the canonical
+[`docs/codex-distribution.md`](../../docs/codex-distribution.md).
 
 **8 allowlisted skills** (6 operational + 2 reference): `ci-setup`,
 `ci-setup-runner-targets`, `ci-status`, `ci-diagnose`, `ci-lint-workflows`,
