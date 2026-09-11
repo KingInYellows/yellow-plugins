@@ -494,8 +494,8 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   vendor; no merge occurs. The result is committed as
   `docs/yellow-jules/smoke-result.md` with a `result: pass|fail` field, and
   PR4 work refuses to start until that file exists with `pass`. Its outcome
-  resolves the delivery/transport question before supervision work begins.
-  It is not CI. [§14, §15]
+  resolves the delivery/transport question under the grant-based authority
+  surface PR3 ships. It is not CI. [§14, §15]
 
 ### PR1: contract, capability matrix, and isolated investigation
 
@@ -716,8 +716,9 @@ and `security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md`
 
 MVP is PR1 plus PR2 plus PR3 plus the R53 smoke (Open Question 6 decision,
 2026-09-10): an owner can set up, delegate with
-explicit flags, observe, reply, approve, and collect a patch to staging with
-interactive confirmation on every write. PR3 adds grants, supervision, and
+explicit flags, observe, reply, approve, and collect a patch to staging, with
+each mutating write confirmed via AskUserQuestion unless a valid grant (R30)
+covers the operation (R8). PR3 adds grants, supervision, and
 Codex parity. PR4 adds integrate and verification handoff. The engine
 milestone is last and separately approved.
 

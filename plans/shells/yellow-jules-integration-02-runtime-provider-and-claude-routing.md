@@ -9,7 +9,10 @@ depends_on: [yellow-jules-integration-01-contract-and-sdk-investigation]
 ## Context
 
 This shell ships the plugin as one atomic release boundary: the typed runtime
-behind the adapter chosen by shell 01, the four read-only v0 commands (`delegate`, `reply`, and `approve` moved to shell 03 (Open Question 6 decision, 2026-09-10)), the provider-local journal, artifact staging, and every consumer
+behind the adapter chosen by shell 01, the four read-only v0 commands
+(`setup`, `list`, `status`, `collect`; `delegate`, `reply`, and `approve`
+moved to shell 03 per the Open Question 6 decision, 2026-09-10), the
+provider-local journal, artifact staging, and every consumer
 that must recognize a third remote-agent provider (catalog, provider router,
 setup coverage, Linear delegate route, root script filters, CI drift gates,
 fixtures, changesets). The spec forbids shipping `READY_JULES` while any
@@ -146,4 +149,4 @@ The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision
   replaced by R3's HTTPS-only, origin-pinned, fail-closed checks, and the
   verdict must name the label for REST-tested matrix rows since R49
   defines none.
-- Open Question 6 decision, 2026-09-10: the R53 smoke runs after shell 03 under a grant; shell 03 produces the procedure and result template, and shell 04 holds the outcome gate. Runtime operations for create, reply, and approve are still implemented and fake-server-tested here, without a command surface.
+- Open Question 6 decision, 2026-09-10: the R53 smoke runs after shell 03 under a grant; shell 03 produces the procedure and result template, and shell 04 holds the outcome gate. Runtime operations for delegate, reply, and approve are still implemented and fake-server-tested here, without a command surface.

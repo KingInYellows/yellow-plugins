@@ -50,6 +50,12 @@ directory (not a normal workspace dependency) should:
    of vendoring/pinning, in a lockfile-equivalent or a companion pins
    document (e.g. `docs/upstream-pins.md`), so later audits have a
    provenance trail rather than "verified once by reading `.d.ts`."
+3. Verify the downloaded tarball against that recorded sha512 *before*
+   extraction, and abort the install on any mismatch through a dedicated
+   integrity-failure error rather than falling through to an unverified
+   artifact. `docs/yellow-jules/contract-v1.md`'s `JULES_SDK_INTEGRITY`
+   error code is the established precedent for this abort path — name the
+   equivalent error consistently in whichever plugin owns the installer.
 
 ## Why This Matters
 
@@ -81,5 +87,9 @@ npm install --prefix "$RUNTIME_DIR" @cursor/sdk@1.0.28 --no-save --no-audit --no
 ```bash
 npm install --prefix "$RUNTIME_DIR" @cursor/sdk@1.0.28 \
   --no-save --no-audit --no-fund --ignore-scripts
-# and record the resolved tarball's sha512 in docs/upstream-pins.md
+# record the resolved tarball's sha512 in docs/upstream-pins.md, then on
+# every subsequent install compare the downloaded tarball's sha512 against
+# that recorded value before extraction and abort on mismatch (see
+# `JULES_SDK_INTEGRITY` in docs/yellow-jules/contract-v1.md for the
+# equivalent abort-path convention)
 ```

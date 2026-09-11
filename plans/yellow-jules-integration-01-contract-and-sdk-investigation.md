@@ -173,8 +173,11 @@ at any point (R57).
   as explicit `TBD by Step 13` placeholders until then): `**Version:** 1`,
   `**Status:** Draft until PR2 lands`; the R56 motivation paragraph; a
   subcommand table (`setup delegate list status reply approve collect`
-  [PR2], `authorize supervise` [PR3], `integrate` [PR4]) with `Runtime op |
-  Authority | Confirm` columns copied from the spec's "Command to runtime
+  [PR2], `authorize supervise` [PR3], `integrate` [PR4]; amended under the
+  Open Question 6 decision, 2026-09-10: `delegate`, `reply`, and `approve`
+  move to PR3 behind `authorize`, leaving PR2 as `setup list status collect`)
+  with `Runtime op | Authority | Confirm` columns copied from the spec's
+  "Command to runtime
   mapping"; per-subcommand argument shapes, with the R29 confirmation token
   marked "minting mechanism: spec Open Question 6, settled in shell 03"; the
   output envelope `{ok:true, ...}` / `{ok:false, error:{code, message,
@@ -223,7 +226,8 @@ at any point (R57).
   license, repository, the "not an officially supported Google product"
   readme note). Run `npm pack @google/jules-sdk@0.2.0 --pack-destination
   "$INV" --ignore-scripts`, compute `openssl dgst -sha512 -binary
-  jules-sdk-0.2.0.tgz | base64 -w0`, and compare to the registry integrity;
+  google-jules-sdk-0.2.0.tgz | base64 -w0` (the emitted filename, not
+  `jules-sdk-0.2.0.tgz`), and compare to the registry integrity;
   `tar tzf` the archive; extract it; record `package.json` verbatim
   (fenced, reference only), the `scripts` block or its absence, the actual
   `exports`, and the presence of `dist/index.mjs`, `dist/index.d.ts`,
@@ -276,8 +280,10 @@ at any point (R57).
   captured body has `requirePlanApproval: true` and `automationMode:
   "AUTOMATION_MODE_UNSPECIFIED"`; send a reply; approve; (c) with
   `rateLimitRetry.maxRetryTimeMs: 0` (if the option exists) run one create
-  against the `429`/`503` mode and assert exactly one outgoing request per
-  call; (d) configure the in-memory storage option if one exists, then diff
+  against the `429`/`503` mode and assert exactly one `POST
+  /v1alpha/sessions` per call (`client.session()` also issues a source `GET`
+  first; that GET is not part of this count); (d) configure the in-memory
+  storage option if one exists, then diff
   `$INV/home`, `$INV/xdg`, `$INV/tmp`, and cwd before and after (`find
   "$INV" -newer "$INV/marker"`), and confirm `session.history()` or
   `session.select()` returns the just-created session inside the same
@@ -315,7 +321,7 @@ at any point (R57).
   exactly one label and none is `live-observed`; every fixture block carries
   the illustrative marker; every vendor quote is fenced; the motivation
   statement appears in `contract-v1.md`; the PR2 checklist cites R23, R24,
-  R25; the R3 table has no blank cells; `plans/specs/yellow-jules-integration.md` was untouched at PR1 submission (superseded 2026-09-10: the Open Question 6 decision amends R8, R53, the PR stack, the MVP scope, and Open Question 6).
+  R25; the R3 table has no blank cells; `plans/specs/yellow-jules-integration.md` is amended for this PR under the Open Question 6 decision (R8, R53, the PR stack, the MVP scope, and Open Question 6).
 - [x] Step 15: Validate and package. Run `pnpm validate:schemas`, `pnpm lint`,
   `pnpm typecheck`; report any pre-existing failure verbatim rather than
   hiding it (R57). Run `npx prettier --check docs/yellow-jules` (never `pnpm

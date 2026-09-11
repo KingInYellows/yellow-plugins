@@ -72,18 +72,23 @@ single-controller handoff procedure.
    "Confirmation token").
 2. **Add the grant model and authorize command** — record fields, trial
    defaults with ceiling, listing and revocation, confirmation gate.
-3. **Enforce authority in the runtime** — check before every write, expiry and
+3. **Build the `delegate`, `reply`, and `approve` command wrappers** — the
+   three mutating commands moved here from shell 02 (R8), each gated by the
+   Step 1 confirmation mechanism (R29) and bound to an active grant from
+   Step 2 (R30); reject with a recoverable action when the grant is missing,
+   expired, or limit-exhausted.
+4. **Enforce authority in the runtime** — check before every write, expiry and
    exhaustion outcomes, deadline expiry reporting that never claims remote
    termination.
-4. **Implement the supervision pass** — the six-step loop as one invocation,
+5. **Implement the supervision pass** — the six-step loop as one invocation,
    re-fetch before approval, concise answers with references, correction
    limits, pause on outside activity.
-5. **Author host-neutral skills** — delegation and supervision bodies that pass
+6. **Author host-neutral skills** — delegation and supervision bodies that pass
    the exposure lint and avoid AskUserQuestion reliance on Codex.
-6. **Enable Codex** — baseline the codex manifest test, flip the catalog target
+7. **Enable Codex** — baseline the codex manifest test, flip the catalog target
    with interface and allowlist, regenerate, run focused tests and a manual
    Codex host smoke, record unavailable-tool reporting.
-7. **Document handoff and release** — controller handoff procedure, Codex
+8. **Document handoff and release** — controller handoff procedure, Codex
    distribution doc, changesets, validators including `validate:agents` and
    `lint:plugins`, stack-provider submission.
 

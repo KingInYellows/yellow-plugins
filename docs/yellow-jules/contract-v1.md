@@ -385,12 +385,12 @@ runtime has observed, and `approve` compares against the same field.
   deadline prevented from being checked are reported as `not-reached`, never as
   resolved.
 - `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
-  → `{ localRequestId, sessionResource, sent: true }`. `--dry-run` validates,
-  performs one `info()`, and returns the same shape with `dryRun: true`. The
-  real call is one POST, non-blocking (R9).
+  → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
+  validates, performs one `info()`, and returns the same shape with
+  `dryRun: true`. The real call is one POST, non-blocking (R9).
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
-  `{ localRequestId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
+  `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
   `--dry-run` performs the R34 re-fetch: one `info()` (state must be
   `awaitingPlanApproval`, else `JULES_INVALID_STATE`) and an activity walk that
   starts at the journal's `pendingPlan.activityCreateTime` minus 5 minutes (no

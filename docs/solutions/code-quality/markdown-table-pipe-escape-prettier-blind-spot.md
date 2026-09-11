@@ -35,9 +35,16 @@ group. A 13-persona `/review:pr` pass (`adversarial`, `comment-analyzer`,
 `correctness`, `maintainability`, and `silent-failure-hunter` all independently
 flagged it) found that the pipe had split the table row: everything after the
 alternation's `|` spilled into the next column, off-by-one-shifting every
-subsequent cell in that row, and the separator row two lines above
-(`| --- | --- | --- |`) was three columns while the broken row rendered as four.
-The file had already passed `prettier --check` in this same PR's review cycle.
+remaining cell in that row. Counting raw `|` characters in the pre-fix committed
+blob (`git show <pre-fix commit>~1:docs/yellow-jules/contract-v1.md`) confirms
+the shape: the header row carries 4 pipes (3 columns), the separator row
+directly beneath it carries 5 pipes (4 columns), and every other data row in the
+table carries 4 pipes (3 columns) — except the broken "title tag" row, which
+also carries 5 pipes (4 columns), matching the separator. The separator had
+already been widened to 4 columns to match the broken row before the file was
+committed, which is why the file had already passed `prettier --check` in this
+same PR's review cycle: the committed table was already Prettier's own
+re-derived output.
 
 ## Root Cause
 
@@ -46,16 +53,18 @@ cell _content_ (a regex, a shell pipeline example, a type-union signature) must
 be written `\|` or the parser treats it as a new column boundary — this is
 standard GFM behavior, not a project-specific rule.
 
-Prettier's markdown table formatter does not require the header separator row
-and every data row to have the same column count to consider a table
-"formatted." When one data row has more raw `|`-delimited cells than the
-separator row, Prettier's printer widens/pads the separator row's column count
-to match the wider content row it just parsed, then re-emits a `--check`-clean
-file — the file looks internally consistent to Prettier because Prettier derives
-the "correct" column count from the very row that broke it, rather than from the
-table's declared header. `prettier --check` therefore returns 0 (a formatting
-round-trip, not a structural validity check) on a table that GFM itself will
-refuse to render as intended, or will render with visibly shifted columns.
+Prettier's markdown table formatter sizes the separator row from the _maximum_
+cell count seen across every row it parses in that table, not from the header.
+When one data row has more raw `|`-delimited cells than the header — here, the
+broken "title tag" row, at 4 cells against the header's 3 — Prettier widens the
+separator to that maximum and leaves the header and every other row at their
+own, unequal cell count; it never reconciles them back to one shared column
+count. `prettier --check` is a round-trip comparison against Prettier's own
+re-derived output, not a check that every row in a table shares the header's
+column count, so a file that already carries the widened separator (as this one
+did) is, by that narrower definition, already "formatted." `prettier --check`
+therefore returns 0 on a table that GFM itself will refuse to render as
+intended, or will render with visibly shifted columns.
 
 ## What Didn't Work
 

@@ -403,9 +403,12 @@ although the SDK constructs it from `name` (the constructor strips the prefix);
 cache-valid; `history()` walked two pages and returned `act-1, act-2, act-3`
 (three unique ids) although `act-2` appeared on both pages. The in-process
 `fetch` wrapper saw 7 requests, all to the single loopback origin, all carrying
-the `X-Goog-Api-Key` header (presence only logged). The env value is what was
-sent: the harness confirmed presence only, and the productized test must never
-compare or log the header's length.
+the `X-Goog-Api-Key` header (presence only logged); the fake server and fetch
+wrapper redact the value, so this harness proves only that the header was
+present on every request, not what value it carried. Source inspection (section
+6 above) is what establishes that the value is the `JULES_API_KEY` env fallback
+(T29/T30, M136). The productized test must never capture, compare, or log the
+header's value or length.
 
 Check (d) added a second `history()` pass, which issued two more list requests
 with `filter=create_time>"2026-09-10T00:00:03Z"` (the latest cached

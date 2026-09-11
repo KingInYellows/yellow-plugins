@@ -104,7 +104,7 @@ Illustrative only, not a captured response
       "createTime": "2026-09-10T22:00:03Z"
     }
   ],
-  "nextPageToken": "1757541603000000000",
+  "nextPageToken": "1789077603000000000",
   "journalOnly": []
 }
 ```
@@ -177,6 +177,7 @@ Illustrative only, not a captured response
   "ok": true,
   "operation": "reply",
   "localRequestId": "req-2026-09-10T22:05:00Z-a1b2",
+  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
   "sessionResource": "sessions/314159265358979",
   "sent": true
 }
@@ -189,6 +190,7 @@ Illustrative only, not a captured response
   "ok": false,
   "operation": "reply",
   "localRequestId": "req-2026-09-10T22:05:00Z-a1b2",
+  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
   "error": {
     "code": "JULES_CONFIRMATION_REQUIRED",
     "message": "reply is a mutating operation and no grant or confirmation token was supplied",
@@ -207,6 +209,7 @@ Illustrative only, not a captured response
   "ok": true,
   "operation": "approve",
   "localRequestId": "req-2026-09-10T22:06:00Z-c3d4",
+  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
   "sessionResource": "sessions/314159265358979",
   "approvedPlanId": "plan-1",
   "observedPlanIdAfter": "plan-1",
@@ -222,6 +225,7 @@ Illustrative only, not a captured response
   "ok": false,
   "operation": "approve",
   "localRequestId": "req-2026-09-10T22:06:00Z-c3d4",
+  "localId": "jl-0f3c9a2b7d4e4b1a9c8e6d5f4a3b2c1d",
   "error": {
     "code": "JULES_POLICY_DEVIATION",
     "message": "pending plan plan-2 differs from evaluated plan plan-1; not approved",

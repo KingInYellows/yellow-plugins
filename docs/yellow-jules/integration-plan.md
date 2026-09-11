@@ -110,20 +110,26 @@ sessions and activities or else stops and reports (R16).
 Reconstructed from R17, R18, R19, R20, R49. Implementation delegation requires a
 discovered GitHub source resource from the Sources API; sources are never
 synthesized from owner/repo strings or created through this API (R17). Activity
-retrieval paginates, deduplicates by activity id, persists the identifiers
-needed to reread after restart, uses overlapping reads on restart without
-assuming timestamp total order or durable page tokens, records
-`partial-pagination` on a mid-traversal failure, and claims no webhook (R18).
-`collect` retrieves every available artifact kind (change-set patch with base
-commit, external PR reference, grounded generated files) or returns an explicit
-`no-supported-artifact`; a completion message alone is non-accepted for a
-code-changing task; artifacts from sessions with an unreconciled
-`policy-deviation` are marked by `collect` and refused by `integrate` (R19). The
-journal records requested branch and observed head separately from the
-artifact's actual base; SHA-pinned execution is never advertised (R20). Evidence
-is layered as fake-adapter tests, packed-SDK contract tests against a local fake
-HTTP server, and a human-authorized live smoke, with every capability-matrix row
-labeled (R49).
+retrieval paginates, deduplicates by activity id within a bounded overlap
+window, and persists the identifiers and page-continuation state needed to
+reread after restart. Pages are assumed to arrive in ascending `createTime`
+(re-verified at the R53 smoke); restart uses overlapping reads keyed to a
+`createTime` watermark that advances only after a complete walk, so a reordered
+page cannot corrupt it. A resume page token is persisted across restarts as a
+deliberate, recorded departure from R18's default no-durable-page-tokens rule —
+a stored token the vendor rejects, or that yields no progress, is discarded and
+the walk restarts from the watermark instead. A mid-traversal failure records
+`partial-pagination` (never a manufactured end of results), and the walk claims
+no webhook (R18). `collect` retrieves every available artifact kind (change-set
+patch with base commit, external PR reference, grounded generated files) or
+returns an explicit `no-supported-artifact`; a completion message alone is
+non-accepted for a code-changing task; artifacts from sessions with an
+unreconciled `policy-deviation` are marked by `collect` and refused by
+`integrate` (R19). The journal records requested branch and observed head
+separately from the artifact's actual base; SHA-pinned execution is never
+advertised (R20). Evidence is layered as fake-adapter tests, packed-SDK contract
+tests against a local fake HTTP server, and a human-authorized live smoke, with
+every capability-matrix row labeled (R49).
 
 ## §14 Delivery plan and PR boundaries
 
@@ -141,12 +147,12 @@ Reconstructed from R23, R25, R54-R62.
    Setup-all covers the Jules credential probe, plugin enumeration, per-provider
    sections, status rows, setup command list, PARTIAL_TOOLING mapping, tooling
    probe, Step 2.5 acceptable-state enumeration, and the `remote-agent`
-   membership list (R23). 3. **PR3, bounded authority, supervision, Codex
-   surface** (R29-R34, R38, R39, R44-R48, and the `delegate`/`reply`/`approve`
-   surface). Followed by the R53 human smoke, committed as
-   `docs/yellow-jules/smoke-result.md`.
-3. **PR4, verification and handoff** (R41, R43, end-to-end fake scenarios).
-4. **Engine milestone** (R58-R62; `yellow-goal` repository first, then the
+   membership list (R23).
+3. **PR3, bounded authority, supervision, Codex surface** (R29-R34, R38, R39,
+   R44-R48, and the `delegate`/`reply`/`approve` surface). Followed by the R53
+   human smoke, committed as `docs/yellow-jules/smoke-result.md`.
+4. **PR4, verification and handoff** (R41, R43, end-to-end fake scenarios).
+5. **Engine milestone** (R58-R62; `yellow-goal` repository first, then the
    plugin pin bump): Provider Protocol revision, versioned process interface to
    the released CLI, references-only storage of provider ids, SHA-256 release
    asset, zero-spend compatibility job; starts only after PR4 ships and the
