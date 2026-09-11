@@ -381,8 +381,9 @@ During `/flow:expand-shell` planning (not code review) for
 `yellow-jules-integration-01-contract-and-sdk-investigation`, requirements
 R3, R12, R14, and R15 of `plans/specs/yellow-jules-integration.md` assume
 several vendor SDK options (`requireApproval`, `rateLimitRetry`/
-`maxRetryTimeMs`, a storage factory, a base-URL/fetch override) exist "on
-the inspected surface" — but the SDK's public readme documents none of
+`maxRetryTimeMs`, a storage factory) exist "on the inspected surface", and
+R49-R51's fake-server transport tests need a base-URL/fetch override the spec
+never names — but the SDK's public readme documents none of
 them; they exist only in compiled `dist/index.d.ts`/`dist/index.mjs`
 source, not yet inspected at planning time.
 
@@ -391,7 +392,7 @@ a spec's acceptance-criteria checklist is a closed two-state
 (pass/fail) enumeration over each requirement's verification outcome.
 When a requirement's dependency hasn't actually been verified yet (the
 vendor surface hasn't been source-inspected), that requirement's true
-state is a third value — **not yet exercisable** — which has no slot in a
+state is a third value — **not exercisable** — which has no slot in a
 pass/fail checklist. Without an explicit slot, an unverified requirement
 silently reads as an implicit pass, the same way an unhandled enum member
 elsewhere in this doc silently lands in "success."

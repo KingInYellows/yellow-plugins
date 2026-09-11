@@ -544,6 +544,10 @@ closes and which did not affect the captured evidence:
   and `Request` inputs.
 - `summarizeFetch()` rebuilds a `Set` over the whole log on every call; keep
   running counters.
+- A request body that fails to parse as JSON is stored as `{ _unparsed: raw }`
+  and routed through the handlers, which answer `200`; respond `400` on a parse
+  failure so a client encoding bug cannot look like a successful session
+  creation.
 
 `fake-jules-server.mjs`:
 

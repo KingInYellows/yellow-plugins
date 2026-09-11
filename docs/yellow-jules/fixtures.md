@@ -14,7 +14,9 @@ above each block is the marker the PR1 verification counts.
 
 ### setup
 
-Illustrative only, not a captured response
+Illustrative only, not a captured response The `sdkIntegrity` value is the real
+registry pin recorded in sdk-investigation.md; every sha256 value in this file
+is a placeholder.
 
 ```json
 {
@@ -191,7 +193,7 @@ Illustrative only, not a captured response
     "code": "JULES_CONFIRMATION_REQUIRED",
     "message": "reply is a mutating operation and no grant or confirmation token was supplied",
     "retryable": false,
-    "recoveryAction": "Run `reply --dry-run`, confirm through the wrapper, then re-run with the token in the YELLOW_JULES_CONFIRMATION environment variable, or pass --grant-id."
+    "recoveryAction": "Confirm through the wrapper as fixed in shell 03, or pass a grant id written by authorize (PR3)."
   }
 }
 ```

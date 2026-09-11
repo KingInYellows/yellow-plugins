@@ -33,10 +33,11 @@ Reconstructed from R7, R8, R9, R10, R11, R33, R40.
   before use in an adapter call, URL, journal key, or path; artifact paths
   derive from a locally minted id (R7). The full shape is
   [contract-v1.md](contract-v1.md).
-- Commands are thin Bash wrappers with no API logic: `setup`, `delegate`,
-  `list`, `status`, `reply`, `approve`, `collect` (PR2); `authorize`,
-  `supervise` (PR3); `integrate` (PR4). Every mutating wrapper confirms via
-  AskUserQuestion unless a valid grant covers the operation (R8).
+- Commands are thin Bash wrappers with no API logic: `setup`, `list`, `status`,
+  `collect` (PR2); `delegate`, `reply`, `approve` (PR3, Open Question 6
+  decision); `authorize`, `supervise` (PR3); `integrate` (PR4). Every mutating
+  wrapper confirms via AskUserQuestion unless a valid grant covers the operation
+  (R8).
 - Operations are short-lived: creation uses the interactive `session()` path;
   `run()`, `all()`, `result()`, `ask()`, `waitFor()` are never command
   implementations; messages are non-blocking; a coding session's duration is
@@ -131,20 +132,21 @@ Reconstructed from R23, R25, R54-R62.
 1. **PR1, contract and investigation** (R54-R57, docs only): this directory,
    bounded by the "PR1 exclusion list (R57)" section below; existing unrelated
    baseline failures are reported, not hidden.
-2. **PR2, provider, runtime, complete Claude routing** (R1-R28, R29, R35-R37,
-   R40, R42, R49-R53; atomic). `READY_JULES` ships only when every consumer
-   handles it, in one PR that reverts as one; the PR description carries the
-   literal enumeration-site checklist below and PR2 adds a validator that
-   enumerates provider ids against each consumer site (R25). Setup-all covers
-   the Jules credential probe, plugin enumeration, per-provider sections, status
-   rows, setup command list, PARTIAL_TOOLING mapping, tooling probe, Step 2.5
-   acceptable-state enumeration, and the `remote-agent` membership list (R23).
-   Followed by the R53 human smoke, committed as
+2. **PR2, provider, runtime, complete Claude routing** (R1-R28 read-only
+   surface, R35-R37, R40, R42, R49-R52; atomic; the Open Question 6 decision
+   moves R29 and `delegate`/`reply`/`approve` to PR3). `READY_JULES` ships only
+   when every consumer handles it, in one PR that reverts as one; the PR
+   description carries the literal enumeration-site checklist below and PR2 adds
+   a validator that enumerates provider ids against each consumer site (R25).
+   Setup-all covers the Jules credential probe, plugin enumeration, per-provider
+   sections, status rows, setup command list, PARTIAL_TOOLING mapping, tooling
+   probe, Step 2.5 acceptable-state enumeration, and the `remote-agent`
+   membership list (R23). 3. **PR3, bounded authority, supervision, Codex
+   surface** (R29-R34, R38, R39, R44-R48, and the `delegate`/`reply`/`approve`
+   surface). Followed by the R53 human smoke, committed as
    `docs/yellow-jules/smoke-result.md`.
-3. **PR3, bounded authority, supervision, Codex surface** (R30-R34, R38, R39,
-   R44-R48).
-4. **PR4, verification and handoff** (R41, R43, end-to-end fake scenarios).
-5. **Engine milestone** (R58-R62; `yellow-goal` repository first, then the
+3. **PR4, verification and handoff** (R41, R43, end-to-end fake scenarios).
+4. **Engine milestone** (R58-R62; `yellow-goal` repository first, then the
    plugin pin bump): Provider Protocol revision, versioned process interface to
    the released CLI, references-only storage of provider ids, SHA-256 release
    asset, zero-spend compatibility job; starts only after PR4 ships and the
@@ -227,7 +229,25 @@ produced.
 | J8   | The SDK retries rate-limited responses unless `rateLimitRetry.maxRetryTimeMs` is zero (R14)                                                                              | `packed-artifact-tested`: one POST per create at 0; replay of 429 and 5xx at the default                                   |
 | J9   | Cached reads are not fresh reads; status paths must read remotely (R15)                                                                                                  | `source-inspected`: `info()` cache tiers; `history()` hydrates; contract limits `info()` to one fresh read per process     |
 
+## PR2 checklist additions (review round 1)
+
+- A drift check over the units copied from `yellow-cursor` (`redact.ts`,
+  `validateRef` and `validateIdempotencyKey`, `errors.ts`, the `config.ts`
+  data-directory precedence), following the marker-delimited replica pattern
+  `scripts/validate-provider-groups.js` enforces.
+- The `remote-agent` group preference order: `yellow-cursor` stays the preferred
+  default and Jules joins without becoming it, so the `UNSELECTED` and
+  `CONFLICT` guidance text is updated deliberately alongside the provider-table
+  row.
+- The runtime's `SdkAdapter` port and a transport-neutral error kind union,
+  against which the error catalog is expressed (the SDK class table in
+  contract-v1.md is one implementation mapping); a PR2 design item, not contract
+  prose.
+
 ## PR1 exclusion list (R57)
+
+Verification uses the positive form:
+`git diff --name-only main...HEAD | grep -vE '^(docs|plans)/'` prints nothing.
 
 PR1 does not add or change any of: `plugins/yellow-jules/`;
 `catalog/plugins/yellow-jules.json` or `catalog/catalog.json`; `READY_JULES` or

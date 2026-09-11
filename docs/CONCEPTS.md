@@ -70,7 +70,8 @@ OpenCode) via its own Bash tool.
 The set of remote-agent-provider plugins (Cursor, Devin, and a planned
 Jules provider) governed by the same exactly-one-enabled pattern as the
 stacked-PR provider selection — exactly one member active at a time, with
-a preferred default among them.
+a preferred default among them (`yellow-cursor`; Jules joins the group without
+becoming the default).
 
 ## not-exercisable outcome
 

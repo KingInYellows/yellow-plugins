@@ -330,14 +330,16 @@ at any point (R57).
 - [x] Step 16: List follow-ups in the PR description, not as work here: the
   `docs/upstream-pins.md` row and `--ignore-scripts` in `installSdk()` for
   PR2; `tests/fake-http-server.ts` productizing the Step 11 harness (R49);
-  `docs/yellow-jules/smoke-result.md` after PR2 (R53).
+  `docs/yellow-jules/smoke-result.md` after PR3 (R53; Open Question 6 decision).
 
 ## Verification
 
 - `ls docs/yellow-jules` -> exactly `capability-matrix.md contract-v1.md
   fixtures.md integration-plan.md sdk-investigation.md`
 - `git diff --name-only main...HEAD | grep -E '^(plugins|catalog|\.claude-plugin|\.agents|\.changeset)/' | wc -l`
-  -> `0` (R57 exclusion list); `ls plugins/yellow-jules catalog/plugins/yellow-jules.json 2>&1`
+  -> `0` (R57 exclusion list), and `git diff --name-only main...HEAD | grep -vE
+  '^(docs|plans)/' | wc -l` -> `0` (positive form); `ls plugins/yellow-jules
+  catalog/plugins/yellow-jules.json 2>&1`
   -> both "No such file"
 - `rg -n 'READY_JULES|jules' plugins/yellow-core/lib/remote-agent-provider-state.js plugins/yellow-core/commands/setup/all.md plugins/yellow-linear/commands/linear/delegate.md catalog/`
   -> no matches (R57)

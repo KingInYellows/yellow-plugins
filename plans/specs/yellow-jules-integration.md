@@ -113,9 +113,10 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   into, derive from a locally minted id, never from the vendor
   `sessionResource` string. [§5; mirrors yellow-cursor `errors.ts`/`redact.ts`/`validate.ts`]
 - **R8.** Command markdown files under `commands/jules/` shall be thin Bash
-  wrappers around the CLI with no API logic. v0 commands: `setup`, `delegate`,
-  `list`, `status`, `reply`, `approve`, `collect` (PR2); `authorize`,
-  `supervise` (PR3); `integrate` (PR4). Every mutating wrapper confirms via
+  wrappers around the CLI with no API logic. v0 commands: `setup`, `list`,
+  `status`, `collect` (PR2); `delegate`, `reply`, `approve`,
+  `authorize`, `supervise` (PR3, Open Question 6 decision); `integrate` (PR4).
+  Every mutating wrapper confirms via
   AskUserQuestion unless a valid grant (R30) covers the operation. [§5, §8]
 - **R9.** Runtime operations shall be short-lived. Session creation uses the
   configured interactive `session()` path; `run()`, `all()`, `result()`,
@@ -480,17 +481,19 @@ ownership lock or queue service; vendor-PR adoption into local stacks
   covers everything up to corrupt journal and partial pagination; PR3 covers
   grants, limits, stale lock, grant counters, and deadlines; PR4 covers
   verification outcomes, base mismatch, and the no-fallback check. [§15]
-- **R53.** After PR2 and before PR3, one human-authorized smoke shall run a
+- **R53.** After PR3 and before PR4 (Open Question 6 decision, 2026-09-10;
+  originally after PR2), one human-authorized smoke shall run a
   single small task against `yellow-plugins` on an isolated scratch base
   branch (owner decision 2026-09-09; Jules holds a real source connection to
-  this repository, and no grant exists yet, so the operator runs this smoke
-  under R29's single-operation interactive confirmation, bound to that
-  branch only) with explicit approval and no auto-PR. Success means: one session created; plan inspected; one
+  this repository; amended 2026-09-10 under Open Question 6: the operator runs
+  this smoke under a grant written by `authorize`, bound to that branch only)
+  with explicit approval and no auto-PR. Success means: one session created;
+  plan inspected; one
   reply or approval sent within authority; an interruption does not duplicate
   the task; the patch is independently checked; no PR is created by the
   vendor; no merge occurs. The result is committed as
   `docs/yellow-jules/smoke-result.md` with a `result: pass|fail` field, and
-  PR3 work refuses to start until that file exists with `pass`. Its outcome
+  PR4 work refuses to start until that file exists with `pass`. Its outcome
   resolves the delivery/transport question before supervision work begins.
   It is not CI. [§14, §15]
 
@@ -700,16 +703,19 @@ and `security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md`
 ### PR stack (input to decompose, not binding)
 
 1. **PR1 — Contract and investigation** (R54-R57; docs only).
-2. **PR2 — Provider, runtime, complete Claude routing** (R1-R28, R29, R35-R37,
-   R40, R42, R49-R53; atomic). Followed by the R53 human smoke.
-3. **PR3 — Bounded authority, supervision, Codex surface** (R30-R34, R38, R39,
-   R44-R48).
+2. **PR2 — Provider, runtime, complete Claude routing** (R1-R28 read-only
+   surface, R35-R37, R40, R42, R49-R52; atomic; the Open Question 6 decision
+   moves R29 and `delegate`/`reply`/`approve` to PR3).
+3. **PR3 — Bounded authority, supervision, Codex surface** (R29-R34, R38, R39,
+   R44-R48, and the `delegate`/`reply`/`approve` surface). Followed by the R53
+   human smoke.
 4. **PR4 — Verification and handoff** (R41, R43, end-to-end fake scenarios).
 5. **Engine milestone** (R58-R62; yellow-goal repo first, then plugin pin bump).
 
 ## MVP Scope
 
-MVP is PR1 plus PR2 plus the R53 smoke: an owner can set up, delegate with
+MVP is PR1 plus PR2 plus PR3 plus the R53 smoke (Open Question 6 decision,
+2026-09-10): an owner can set up, delegate with
 explicit flags, observe, reply, approve, and collect a patch to staging with
 interactive confirmation on every write. PR3 adds grants, supervision, and
 Codex parity. PR4 adds integrate and verification handoff. The engine
@@ -748,5 +754,13 @@ implementation evidence named in each item.
    and a separate grants file (R35): decide at shell 03 expansion.
 6. How the R29 confirmation event is authenticated on each host (a
    runtime-owned prompt on a controlling terminal, a host-issued capability,
-   or grants only): decide at shell 03 expansion; until then the runtime
-   treats wrapper-minted tokens as unproven and requires a grant.
+   or grants only): decide at shell 03 expansion; until then the runtime treats
+   wrapper-minted tokens as unproven and requires a grant. **Decided
+   2026-09-10** under owner authority delegated in the PR #793 review, option
+   (b) of `docs/yellow-jules/contract-v1.md` "Confirmation token": `delegate`,
+   `reply`, and `approve` ship in PR3 behind `authorize`; PR2 ships the
+   read-only surface (`setup`, `list`, `status`, `collect`); the R53 smoke runs
+   after PR3 under a grant; the authentication mechanism itself is still fixed
+   at shell 03 expansion. R8, R53, the PR stack, and the MVP scope carry the
+   shift. Reversible by moving the three commands back to PR2 with an interim
+   mechanism specified in shell 03.
