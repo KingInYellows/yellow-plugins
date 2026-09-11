@@ -222,16 +222,23 @@ aggregation rules change there, propagate the same change here.
    |-------|---------------|-------------------|
    | `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
 
-   `/review:all` does not yet compute or append the `<file-line-counts>`
-   block this persona's size-threshold rule consumes (see
-   `thermonuclear-reviewer.md` "File line counts"). Per that rule, the
-   persona fails closed: with the block absent it emits no
-   size-threshold findings, so stack and batch reviews run
-   `thermonuclear-reviewer` without the 1,000-line crossing check until
-   #769 wires the block in.
-
-7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
-   selected agents in parallel except `code-simplifier`. Wave 2 persona
+7. **Compact-return pass 1** (mirrors review-pr.md Step 5, including item
+   6's `<file-line-counts>` block): when `thermonuclear-reviewer` is in
+   this PR's dispatched set, Read
+   `${CLAUDE_PLUGIN_ROOT}/commands/review/review-pr.md` Step 5 items 2 and
+   6 — item 2's sanitizer entry (the literal-delimiter substitution and
+   XML-escaping order, including the `file-line-counts` delimiter pair)
+   and item 6's collection-and-injection shell snippet — and run that
+   procedure against this PR before spawning the persona. Bind `DIFF_BASE`
+   to the base ref this PR resolved above in sub-step 2
+   (`origin/<baseRefName>`, or its fallback-ladder result) inside the same
+   Bash call that runs item 6's snippet, not a prior one — a shell
+   variable set in an earlier Bash call does not survive into a new one,
+   so a separately-set `DIFF_BASE` reads as unset and fails the
+   `git merge-base` step closed. Do not reconstruct the snippet here; this
+   procedure is slated to move into a shared script both commands call, but
+   until that lands this file must track review-pr.md's copy verbatim.
+   Launch all selected agents in parallel except `code-simplifier`. Wave 2 persona
    agents return the structured JSON compact-return schema — including
    the cross-plugin `security-reviewer` and `performance-reviewer`,
    which must NOT be treated as legacy. Pre-Wave-2

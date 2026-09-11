@@ -398,6 +398,19 @@ Located at `skills/pr-review-workflow/scripts/`:
 
 Both require `gh` and `jq` to be installed.
 
+## File Line Counts Script
+
+Same directory. Not GraphQL; it reads only the local repository:
+
+- **file-line-counts** `<diff-base-ref>` — Prints a
+  `file-line-counts rows=N dropped=M skipped=K` header, N
+  `<path> base=<n> head=<n>` rows, and a matching `end` footer, measured at
+  the merge-base of the ref and `HEAD`. Fails closed (exit 1, no header)
+  on an unresolved merge-base, a truncated numstat stream, a failed object
+  probe, or more than 500 changed files. Consumed by `review-pr.md` Step 5
+  item 6 for the `thermonuclear-reviewer` size rule; `review-all.md`
+  delegates to that item rather than calling the script itself.
+
 ## Verification Loop
 
 After resolving threads:
