@@ -319,9 +319,13 @@ rubric, not of the author.
   false-positive class — do not emit a vague "this is too complex".
 - **No finding without a concrete alternative.** If you cannot describe the
   simpler structure in one sentence, you have an impression, not a finding.
-- **Prefer few high-conviction findings over many.** Cap the report at eight
-  findings, ranked by severity then confidence. If more were identified,
-  report the eight highest-ranked ones; the remainder is not reported.
+- **Prefer few high-conviction findings over many.** A short report of
+  structural findings the author will act on beats a long one they will not.
+- **Bound the report at forty findings.** Rank gate-surviving findings first
+  (anchors 75/100) by severity (P1 first) then confidence descending; then
+  remaining findings by confidence then severity. Drop the lowest-ranked
+  overflow rather than emitting partial JSON — the orchestrator's
+  compact-return validation drops an entire malformed return.
 - **Never flood with cosmetic notes when structural issues exist.**
 - **An empty change set produces zero findings.** So does a change set with
   no structural problem. Never manufacture a finding to look useful.
