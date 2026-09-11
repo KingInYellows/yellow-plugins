@@ -1,0 +1,28 @@
+plugins/yellow-ci/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_1c0b5414040c49 217
+  s_aa2a8cf97f9dcd::t_0d0eb926a2cacc 215-216
+AGENTS.md
+  s_aa2a8cf97f9dcd::t_49ba66f95df499 303
+docs/solutions/workflow/graphite-stack-descendant-rebase-onto-procedure.md
+  s_aa2a8cf97f9dcd::t_45bae2c0b3961b 47-58,63-64
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_aa2a8cf97f9dcd::t_d7136f91b8a9ff 32-35
+tests/integration/thermonuclear-reviewer.test.ts
+  s_aa2a8cf97f9dcd::t_10c9f50e4e8b39 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bad7778fa61a3ff924c09eec330320fe38a62f22",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
