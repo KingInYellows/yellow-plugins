@@ -36,15 +36,14 @@ group. A 13-persona `/review:pr` pass (`adversarial`, `comment-analyzer`,
 flagged it) found that the pipe had split the table row: everything after the
 alternation's `|` spilled into the next column, off-by-one-shifting every
 remaining cell in that row. Counting raw `|` characters in the pre-fix committed
-blob (`git show <pre-fix commit>~1:docs/yellow-jules/contract-v1.md`) confirms
-the shape: the header row carries 4 pipes (3 columns), the separator row
-directly beneath it carries 5 pipes (4 columns), and every other data row in the
-table carries 4 pipes (3 columns) — except the broken "title tag" row, which
-also carries 5 pipes (4 columns), matching the separator. The separator had
-already been widened to 4 columns to match the broken row before the file was
-committed, which is why the file had already passed `prettier --check` in this
-same PR's review cycle: the committed table was already Prettier's own
-re-derived output.
+blob (`git show <pre-fix commit>:docs/yellow-jules/contract-v1.md`) confirms the
+shape: the header row carries 4 pipes (3 columns), the separator row directly
+beneath it carries 5 pipes (4 columns), and every other data row in the table
+carries 4 pipes (3 columns) — except the broken "title tag" row, which also
+carries 5 pipes (4 columns), matching the separator. The separator had already
+been widened to 4 columns to match the broken row before the file was committed,
+which is why the file had already passed `prettier --check` in this same PR's
+review cycle: the committed table was already Prettier's own re-derived output.
 
 ## Root Cause
 

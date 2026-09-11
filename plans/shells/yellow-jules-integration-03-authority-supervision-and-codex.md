@@ -73,10 +73,12 @@ single-controller handoff procedure.
 2. **Add the grant model and authorize command** — record fields, trial
    defaults with ceiling, listing and revocation, confirmation gate.
 3. **Build the `delegate`, `reply`, and `approve` command wrappers** — the
-   three mutating commands moved here from shell 02 (R8), each gated by the
-   Step 1 confirmation mechanism (R29) and bound to an active grant from
-   Step 2 (R30); reject with a recoverable action when the grant is missing,
-   expired, or limit-exhausted.
+   three mutating commands moved here from shell 02 (R8); each write is
+   authorized by either a valid grant from Step 2 (R30) or a successful
+   Step 1 confirmation (R29), never by requiring both (R31). A missing,
+   expired, or limit-exhausted grant falls through to confirmation; reject
+   with a recoverable action only when confirmation is unavailable (the
+   engine interface, R59) or the owner declines.
 4. **Enforce authority in the runtime** — check before every write, expiry and
    exhaustion outcomes, deadline expiry reporting that never claims remote
    termination.

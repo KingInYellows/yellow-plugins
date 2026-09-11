@@ -46,16 +46,23 @@ directory (not a normal workspace dependency) should:
 1. Include `--ignore-scripts` unless a specific lifecycle script is known
    to be required — and if one is required, that should be a deliberate,
    documented exception, not a default omission.
-2. Have a recorded tarball integrity hash (sha512) captured at the moment
-   of vendoring/pinning, in a lockfile-equivalent or a companion pins
-   document (e.g. `docs/upstream-pins.md`), so later audits have a
-   provenance trail rather than "verified once by reading `.d.ts`."
-3. Verify the downloaded tarball against that recorded sha512 *before*
-   extraction, and abort the install on any mismatch through a dedicated
-   integrity-failure error rather than falling through to an unverified
-   artifact. `docs/yellow-jules/contract-v1.md`'s `JULES_SDK_INTEGRITY`
-   error code is the established precedent for this abort path — name the
-   equivalent error consistently in whichever plugin owns the installer.
+2. Ship a lockfile (`package-lock.json` or `npm-shrinkwrap.json`) that pins
+   the *complete* resolved dependency tree — transitive packages included —
+   with an `integrity` hash per package, captured at the moment of
+   vendoring, and record that same pin set in a companion file (e.g.
+   `runtime/pin.json`) so later audits have a provenance trail rather than
+   "verified once by reading `.d.ts`." A single tarball's sha512 is not
+   enough: `npm install` resolves and extracts transitive dependencies too,
+   and a plain `npm install` has no per-package hash to check them against.
+3. Install with `npm ci --ignore-scripts`, not `npm install`, so npm
+   verifies every resolved package's `integrity` hash from the shipped
+   lockfile before extraction and aborts the whole install on any mismatch
+   through a dedicated integrity-failure error, rather than falling through
+   to an unverified tree. Keep the lockfile synchronized with the recorded
+   pin set on every version bump. `docs/yellow-jules/contract-v1.md`'s
+   `JULES_SDK_INTEGRITY` error code is the established precedent for this
+   abort path — name the equivalent error consistently in whichever plugin
+   owns the installer.
 
 ## Why This Matters
 
@@ -85,11 +92,13 @@ npm install --prefix "$RUNTIME_DIR" @cursor/sdk@1.0.28 --no-save --no-audit --no
 
 **Good**:
 ```bash
-npm install --prefix "$RUNTIME_DIR" @cursor/sdk@1.0.28 \
-  --no-save --no-audit --no-fund --ignore-scripts
-# record the resolved tarball's sha512 in docs/upstream-pins.md, then on
-# every subsequent install compare the downloaded tarball's sha512 against
-# that recorded value before extraction and abort on mismatch (see
+# $RUNTIME_DIR ships a package.json + package-lock.json pinning the full
+# resolved tree (every transitive package's integrity hash included),
+# captured at vendor time and mirrored into runtime/pin.json
+npm ci --prefix "$RUNTIME_DIR" --no-audit --no-fund --ignore-scripts
+# `npm ci` verifies every resolved package's integrity hash against the
+# lockfile before extraction and aborts the install on any mismatch; keep
+# the lockfile and runtime/pin.json in sync on every version bump (see
 # `JULES_SDK_INTEGRITY` in docs/yellow-jules/contract-v1.md for the
 # equivalent abort-path convention)
 ```

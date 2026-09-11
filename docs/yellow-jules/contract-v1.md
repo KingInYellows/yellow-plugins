@@ -224,9 +224,12 @@ remaining unknown until the R53 smoke.
 - Per operation the test asserts the exact ordered path sequence server-side
   (create: `GET sources/…`, `GET sources/…`, `POST sessions`) and that the
   429/500/502/503/504 fixtures never see a replay (R14, R50). A redirect fixture
-  answers `POST sessions` with a 302 to a second loopback port and asserts the
-  API-key header never reaches it. A filter fixture answers a filtered list with
-  `400` and asserts exactly one unfiltered retry.
+  answers `POST sessions` with a 302 to a second loopback port (cross-origin)
+  and a second redirect fixture answers with a 302 to a plain-HTTP loopback
+  origin (downgrade); both capture every outbound hop and assert
+  `X-Goog-Api-Key` reaches neither redirect target, only the pinned `baseUrl`
+  origin. A filter fixture answers a filtered list with `400` and asserts
+  exactly one unfiltered retry.
 - Storage isolation is asserted by `find -newer marker` over `HOME`, `XDG_*`,
   `TMPDIR`, cwd, and the data dir after every scenario, with
   `NODE_DISABLE_COMPILE_CACHE=1` set so Node's compile cache is excluded by
@@ -386,8 +389,9 @@ runtime has observed, and `approve` compares against the same field.
   resolved.
 - `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
-  validates, performs one `info()`, and returns the same shape with
-  `dryRun: true`. The real call is one POST, non-blocking (R9).
+  validates, performs one `info()`, and returns the same fields with
+  `sent: false, dryRun: true`. A dry-run never reports `sent: true`, because it
+  issues no POST. The real call is one POST, non-blocking (R9).
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
@@ -397,21 +401,24 @@ runtime has observed, and `approve` compares against the same field.
   `pendingPlan` in the journal is `JULES_INVALID_STATE`, recovery "run
   `status`"), **not** at the watermark, so the plan is always re-read fresh from
   the vendor and the read stays bounded when the filter is honoured; it returns
-  `{ ..., dryRun: true, observedPlanId }`, the plan id the confirmation binds
-  to. The real call repeats that re-fetch inside 40 % of the deadline and
-  requires it to reach the **newest page** (no `nextPageToken` left); this
-  re-fetch is bounded by that budget, not by the 20-page cap, because its pages
-  carry no artifact bodies, so a vendor that ignores the filter costs time
-  rather than making a long session unapprovable. A re-fetch that ends before
-  the newest page (budget, page failure, deadline) is never a pass and fails
-  closed with `JULES_INVALID_STATE`, recovery "retry with a larger
-  `--deadline-ms`"; a complete re-fetch whose newest `planGenerated` differs
-  from `--plan-id` fails closed with `JULES_POLICY_DEVIATION`. Only then does it
-  issue the POST (the endpoint takes no plan id), then re-read from the same
-  start point within the remaining budget and record a deviation on mismatch
-  (R34). If the post-POST re-read is partial for any reason (page cap, page
-  failure, deadline after the POST was answered `2xx`), the result is `ok: true`
-  with `approvedPlanId` set, `observedPlanIdAfter: null`,
+  `{ localRequestId, localId, sessionResource, dryRun: true, observedPlanId }`,
+  where `observedPlanId` is the plan id the confirmation binds to. The dry-run
+  envelope carries neither `approvedPlanId` nor the post-POST verification
+  fields (`observedPlanIdAfter`, `verificationDeferred`, `verification`),
+  because it issues no POST. The real call repeats that re-fetch inside 40 % of
+  the deadline and requires it to reach the **newest page** (no `nextPageToken`
+  left); this re-fetch is bounded by that budget, not by the 20-page cap,
+  because its pages carry no artifact bodies, so a vendor that ignores the
+  filter costs time rather than making a long session unapprovable. A re-fetch
+  that ends before the newest page (budget, page failure, deadline) is never a
+  pass and fails closed with `JULES_INVALID_STATE`, recovery "retry with a
+  larger `--deadline-ms`"; a complete re-fetch whose newest `planGenerated`
+  differs from `--plan-id` fails closed with `JULES_POLICY_DEVIATION`. Only then
+  does it issue the POST (the endpoint takes no plan id), then re-read from the
+  same start point within the remaining budget and record a deviation on
+  mismatch (R34). If the post-POST re-read is partial for any reason (page cap,
+  page failure, deadline after the POST was answered `2xx`), the result is
+  `ok: true` with `approvedPlanId` set, `observedPlanIdAfter: null`,
   `verificationDeferred: true`, and `verification.partialPagination: true`
   (recovery: run `status`), never a failure envelope and never
   `JULES_UNKNOWN_OUTCOME`.
@@ -645,8 +652,9 @@ following the marker-delimited replica pattern
    not by example: session `title`, plan bodies and step text, activity
    messages, question text, `progressUpdated` text, `sessionFailed.reason`,
    `bashOutput.output`, artifact contents, `outputs[].pullRequest.title` and
-   `.description`, `suggestedCommitMessage`, and vendor `error.message`; only
-   values that passed the identifier allowlist are rendered bare.
+   `.description`, `suggestedCommitMessage`, `GeneratedFile.path` (rendered as
+   `vendorPath` and recorded in `manifest.json`), and vendor `error.message`;
+   only values that passed the identifier allowlist are rendered bare.
    `suggestedCommitMessage` is never passed to `git commit`, a PR title, or a PR
    body without human authorship.
 8. **Staged artifacts.** Patches and generated files are staged byte-exact
@@ -676,8 +684,8 @@ than widen:
 | source resource                | `^sources/github/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/(?!\.{1,2}$)[A-Za-z0-9_.-]{1,100}$`                                                                                                                                                                                                                                                        | `sources/github/{owner}/{repo}`; repo never `.` or `..`        |
 | `--repo` input                 | `^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/(?!\.{1,2}$)[A-Za-z0-9_.-]{1,100}$`                                                                                                                                                                                                                                                                       | GitHub owner and repo rules; `.github` stays valid             |
 | `baseCommitId`                 | `^[0-9a-f]{40}$` or `^[0-9a-f]{64}$`                                                                                                                                                                                                                                                                                                          | `GitPatch.baseCommitId`; reaches git argv                      |
-| `pullRequest.url`              | parse-then-compare, never a templated regex: `new URL(value)`, `protocol === "https:"`, `hostname === "github.com"`, split the pathname, strict-equal the owner and repo segments to the session's validated source, then `^/pull/[0-9]{1,10}$` on the remainder; any other value is reported as `policy-deviation`, never rendered as a link | `PullRequest.url`, `SessionResource.url`                       |
-| session `url`                  | display-only vendor text: rendered inside the untrusted-content fence after an `https:` scheme check, never compared to the source, never opened by the runtime                                                                                                                                                                               | runtime                                                        |
+| `pullRequest.url`              | parse-then-compare, never a templated regex: `new URL(value)`, `protocol === "https:"`, `hostname === "github.com"`, split the pathname, strict-equal the owner and repo segments to the session's validated source, then `^/pull/[0-9]{1,10}$` on the remainder; any other value is reported as `policy-deviation`, never rendered as a link | `PullRequest.url`                                              |
+| session `url`                  | display-only vendor text: rendered inside the untrusted-content fence after an `https:` scheme check, never compared to the source, never opened by the runtime                                                                                                                                                                               | `SessionResource.url`                                          |
 | `GeneratedFile.path`           | data only: recorded in `manifest.json`, never used in any filesystem operation by `collect`; `integrate` (PR4) validates it as a relative POSIX path with no `..`, no leading `/`, no symlink traversal before any apply                                                                                                                      | `GeneratedFile.path`                                           |
 | page token, resume token       | `^(?!\.{1,2}$)[A-Za-z0-9_.=-]{1,512}$`, query parameter only, never a path                                                                                                                                                                                                                                                                    | opaque; documented as ns timestamp                             |
 | branch / ref                   | `yellow-cursor/src/validate.ts` `validateRef` rules (`REF_METACHAR_RE`, no `..`, no leading `-`)                                                                                                                                                                                                                                              | git ref rules                                                  |
@@ -796,8 +804,10 @@ creates `.jules/` anywhere and treats a populated `sdk-scratch/` as
 
 **MVP (PR1 + PR2 + PR3 + the R53 smoke; Open Question 6 decision):** an owner
 can `setup`, `delegate` with explicit flags, observe with `list`/`status`,
-`reply`, `approve`, and `collect` a patch to staging with interactive
-confirmation on every write; `docs/yellow-jules/smoke-result.md` exists with
+`reply`, `approve`, and `collect` a patch to staging, with each mutating write
+confirmed through the confirmation-token mechanism (presented via
+AskUserQuestion; the mechanism itself is fixed in shell 03) unless a valid grant
+(R30) covers the operation; `docs/yellow-jules/smoke-result.md` exists with
 `result: pass` recording one session created, plan inspected, one reply or
 approval within authority, an interruption that did not duplicate the task, an
 independently checked patch, no vendor PR, and no merge.
