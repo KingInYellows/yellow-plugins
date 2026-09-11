@@ -1,0 +1,21 @@
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_4ec10e72edd892 322-328
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_4ec10e72edd892 322-328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f35724a440ccd2bbdfbaaee3074ffaf463ef88ee",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

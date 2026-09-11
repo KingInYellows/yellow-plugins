@@ -1,0 +1,53 @@
+README.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 50-53
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 3,21-22,79-96,112-116,126-127,132-135,158-176,342-354
+tests/integration/thermonuclear-reviewer.test.ts
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 512-519,521-544
+docs/cursor-distribution.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 45-48,208-210
+plugins/yellow-review/.cursor-plugin/plugin.json
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 5
+.agents/plugins/marketplace.json
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 35
+plans/thermonuclear-review-integration.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 532,543,818
+.cursor-plugin/marketplace.json
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 15
+docs/codex-distribution.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 38,46-48,51
+AGENTS.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 303-305
+plugins/yellow-review/.codex-plugin/plugin.json
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 8
+catalog/plugins/yellow-review.json
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 30,44
+plugins/yellow-review/commands/review/review-all.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 213-215
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 101-103
+.changeset/thermonuclear-cross-host.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 2
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 3,22-23,80-97,113-117,127-128,133-136,159-177,347-359
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 3,21-22,79-96,112-116,126-127,132-135,158-176,342-354
+plugins/yellow-review/CLAUDE.md
+  s_1ed65cfba90080::t_ebdc2f0bca9d02 256-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c3a680fde27a23e44a5ec46da4b1121a8011868c",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

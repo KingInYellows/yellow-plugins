@@ -1,0 +1,41 @@
+plugins/yellow-core/CLAUDE.md
+  s_25ce909db53e22::t_95d5df59550c47 344-345,354
+plugins/yellow-core/README.md
+  s_25ce909db53e22::t_95d5df59550c47 106-107,118
+plugins/yellow-review/CLAUDE.md
+  s_25ce909db53e22::t_95d5df59550c47 226-234,240-243
+plugins/yellow-review/commands/review/review-pr.md
+  s_25ce909db53e22::t_c53ce22e0adac3 501-506,516-517,532-533,557,560,562-563,566-567,578
+.changeset/thermonuclear-line-counts.md
+  s_25ce909db53e22::t_456cdf78ba8c85 1-11,14,31,58-63
+tests/integration/thermonuclear-reviewer.test.ts
+  s_25ce909db53e22::t_b40118cf700566 315,317-324,326-329,471-472
+plans/thermonuclear-review-integration.md
+  s_25ce909db53e22::t_456cdf78ba8c85 349
+plugins/yellow-review/commands/review/review-all.md
+  s_aa2a8cf97f9dcd::t_7ba076827d3cb4 225-227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f2dbc3a7cdb3e621f5d023bbb1493e728cabc656",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
