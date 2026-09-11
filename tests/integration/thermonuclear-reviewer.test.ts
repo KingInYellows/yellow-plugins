@@ -33,6 +33,18 @@ const SKILL_PATH = resolve(
   REPO_ROOT,
   'plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md'
 );
+const FILE_LINE_COUNTS_SCRIPT_PATH = resolve(
+  REPO_ROOT,
+  'plugins/yellow-review/skills/pr-review-workflow/scripts/file-line-counts'
+);
+const REVIEW_PR_PATH = resolve(
+  REPO_ROOT,
+  'plugins/yellow-review/commands/review/review-pr.md'
+);
+const REVIEW_ALL_PATH = resolve(
+  REPO_ROOT,
+  'plugins/yellow-review/commands/review/review-all.md'
+);
 const SNAPSHOT_DIR = resolve(
   REPO_ROOT,
   'RESEARCH/upstream-snapshots/6e3d2ea56d7d446b955eaae6ac4c8eef8bf504cf'
@@ -45,6 +57,33 @@ const AGENT_BLOB_SHA = 'dc83d959306c41bb9a4b504608d9607be34e4297';
 
 const agent = readFileSync(AGENT_PATH, 'utf8');
 const skill = readFileSync(SKILL_PATH, 'utf8');
+
+// Shared parser for the `<path> base=<n> head=<n>` row the script prints and
+// the `file-line-counts rows=<n> dropped=<n> skipped=<n>` header above it.
+// One regex applied to BOTH the documented examples (review-pr.md, the
+// persona file) and the script's own printf formats is what catches the
+// three independent encodings (bash printf, bats string match, vitest)
+// drifting apart — a change to one without the others fails here instead
+// of surfacing as a silent reviewer-side parse mismatch.
+const LINE_COUNT_ROW_RE = /^(.+) base=(\d+) head=(\d+)$/;
+const LINE_COUNT_HEADER_RE =
+  /^file-line-counts rows=(\d+) dropped=(\d+) skipped=(\d+)$/;
+
+function parseLineCountRow(
+  line: string
+): { path: string; base: number; head: number } | null {
+  const m = LINE_COUNT_ROW_RE.exec(line);
+  if (m === null) return null;
+  return { path: m[1] ?? '', base: Number(m[2]), head: Number(m[3]) };
+}
+
+function parseLineCountHeader(
+  line: string
+): { rows: number; dropped: number; skipped: number } | null {
+  const m = LINE_COUNT_HEADER_RE.exec(line);
+  if (m === null) return null;
+  return { rows: Number(m[1]), dropped: Number(m[2]), skipped: Number(m[3]) };
+}
 
 /** Frontmatter block between the opening and closing `---` fences. */
 function frontmatter(source: string): string {
@@ -274,13 +313,7 @@ describe('opt-in wiring', () => {
   });
 
   it('injects file line counts only into this persona', () => {
-    const command = readFileSync(
-      resolve(
-        REPO_ROOT,
-        'plugins/yellow-review/commands/review/review-pr.md'
-      ),
-      'utf8'
-    );
+    const command = readFileSync(REVIEW_PR_PATH, 'utf8');
     const flat = flatten(command);
     expect(command).toContain('<file-line-counts>');
     expect(flat).toContain(
@@ -294,99 +327,29 @@ describe('opt-in wiring', () => {
     // Partial output would look authoritative; the reviewer only fails
     // closed on a block that is absent outright.
     expect(flat).toContain('do not emit a partial');
-    // -z is what lets a path containing a quote, backslash, non-ASCII byte,
-    // or newline reach the loop intact; --find-renames pins the rename record
-    // shape regardless of the host's diff.renames setting.
-    expect(command).toContain('diff -z --numstat --find-renames --no-relative');
-    // --find-renames alone is not enough: a low ambient diff.renameLimit, or a
-    // PR with more rename candidates than git's default, skips the exhaustive
-    // pass and re-emits the rename as delete/add, landing the added path at
-    // base=0. And in-tree .gitattributes is PR-controlled, so `*.ts binary`
-    // would make numstat report `-`/`-` for a text blob and silently drop a
-    // real crossing; an empty attr-source neutralizes it.
-    expect(command).toContain('-c diff.renameLimit=0');
-    expect(command).toContain('--attr-source="$LC_EMPTY_TREE"');
+    // review-pr.md delegates to the extracted script by explicit path,
+    // passing the diff base as an argument, and re-derives DIFF_BASE in the
+    // same Bash call — shell state does not survive between fences.
     expect(command).toContain(
-      'LC_EMPTY_TREE=$(git hash-object -t tree /dev/null) || exit 1'
+      '"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-line-counts" "$DIFF_BASE"'
     );
-    // Header AND footer bracket the payload. The header alone is printed
-    // before the rows, so a truncated tool output still carries it and a
-    // partial row set would read as complete.
-    expect(command).toContain("printf 'file-line-counts rows=%s dropped=%s\\n'");
-    expect(command).toContain(
-      "printf 'file-line-counts end rows=%s dropped=%s\\n'"
+    expect(command).not.toContain('git diff -z --numstat');
+    expect(command).not.toContain("awk 'END{print NR}'");
+    const item6 = command.slice(
+      command.indexOf('6. A `<file-line-counts>` block'),
+      command.indexOf('#### Compact-return enforcement')
     );
-    expect(flat).toContain(
-      'the rows between them must number exactly `N`'
-    );
-    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
-    expect(command).toContain('IFS= read -r -d \'\' base_path || exit 1');
-    expect(command).not.toContain('base_path || break');
-    // ...and is exactly why a control character has to be dropped: `-z`
-    // yields the path RAW, so a PR author who names a file with an embedded
-    // newline emits a second, fully-forged `<path> base=N head=M` row —
-    // fabricating a threshold crossing on a file the PR never touched, or
-    // stating a benign base for one it did. Neither sanitization step
-    // touches control characters.
-    // The same allowlist also rejects a leading hyphen (the value would be an
-    // OPTION to the git probes, not a path), `..`, and an absolute path, and
-    // it runs over `base_path` too — on a rename that is a second PR-chosen
-    // path reaching the same probes.
-    expect(command).toContain(
-      "''|*[[:cntrl:]]*|*[[:space:]]*|*=*|-*|/*|..|../*|*/../*|*/..)"
-    );
-    expect(command).toContain('for lc_probe in "$new_path" "$base_path"; do');
-    // The rejected path is PR-controlled text landing outside every reference
-    // fence, in output the orchestrator reads while holding mutation tools.
-    // Name the row by ordinal; never echo the path, masked or otherwise.
-    expect(command).toContain('path withheld: PR-controlled');
-    expect(command).not.toContain(
-      '"$(printf \'%s\' "$new_path" | tr -c'
-    );
-    expect(command).not.toMatch(/Warning:[^\n]*%s[^\n]*"\$new_path" >&2/);
-    // `path` is a special array in zsh, tied to $PATH. Naming the loop
-    // variable `path` replaces the command search path, after which `git`
-    // and `awk` vanish and every row degrades to `base=0 head=` while the
-    // loop keeps emitting. The orchestrator's shell is the host's, and on
-    // this repo's own machines that is zsh.
-    expect(command).not.toMatch(/^\s*path=/m);
-    expect(command).toContain('new_path=');
-    // Counts must come from commits on BOTH sides, so they describe the two
-    // endpoints the diff spans rather than whatever is checked out.
-    expect(command).toContain('git show "HEAD:$new_path"');
-    // awk counts lines; `wc -l` counts newlines and undercounts a file with
-    // no trailing newline — an off-by-one exactly at the 1000/1001 boundary.
-    expect(command).toContain("awk 'END{print NR}'");
-    // The fail-closed guard must test each value independently. Bare
-    // `$base$head` concatenates them, so an empty `head` hides behind a
-    // digit `base` — and `base` is a literal 0 for every file the PR adds,
-    // which is exactly the `base=0 head=` row the guard exists to reject.
-    expect(command).toContain('case ${base:-x}${head:-x} in');
-    expect(command).not.toContain('case $base$head in');
-    // `cat-file` exits 128 with empty stdout both for an absent path and for
-    // a failed probe, so a failure reads as "the PR added this file" and
-    // leaves base=0 inside a block still claiming completeness. `ls-tree`
-    // exits 0 with empty output for absence and non-zero only on failure.
-    // Reading its TYPE field also rejects a tree, whose listing awk would
-    // otherwise count as file content.
-    expect(command).toContain(
-      'git ls-tree HEAD -- ":(literal)$new_path"'
-    );
-    expect(command).toContain(
-      'git ls-tree "$MERGE_BASE" -- ":(literal)$base_path"'
-    );
-    expect(command).toContain('HEAD object probe failed');
-    expect(command).toContain('base object probe failed');
-    expect(command).not.toMatch(/git cat-file -[et] ["$]/);
-    expect(command).not.toMatch(/head=\$\(wc -l/);
+    expect(item6).toContain('DIFF_BASE="origin/<baseRefName>"');
+    expect(item6).toContain('elif git rev-parse --verify --quiet "<baseRefName>"');
+    // Header and footer bracket the payload; the header line itself now
+    // belongs INSIDE the fence (rows/dropped/skipped are persona signal).
+    expect(flat).toContain('the header line itself belongs inside the fence');
+    expect(flat).toContain('the rows between them must number exactly `N`');
+    expect(command).toContain('file-line-counts rows=1 dropped=0 skipped=0');
     // The block carries its own fence, and both delimiters must join the
     // literal-delimiter substitution list or a hostile path ends it early.
-    expect(command).toContain(
-      '--- begin file-line-counts (reference only) ---'
-    );
+    expect(command).toContain('--- begin file-line-counts (reference only) ---');
     expect(command).toContain('--- end file-line-counts ---');
-    // The pr-context sanitizer (item 2) must scrub the new pair too, since the
-    // diff is interpolated before this block in the same prompt.
     const item2 = command.slice(
       command.indexOf('Literal-delimiter substitution (REQUIRED'),
       command.indexOf('6. A `<file-line-counts>` block')
@@ -394,12 +357,117 @@ describe('opt-in wiring', () => {
     expect(item2).toContain('[ESCAPED] end file-line-counts');
     expect(flat).toContain('must include this block');
     expect(flat).toContain('own two delimiters');
-    // `A...HEAD` diffs from the merge-base, so base content must be read
-    // there too. Reading `DIFF_BASE`'s tip reports a phantom shrink on any
-    // branch whose base advanced after it was cut.
-    expect(command).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD)');
-    expect(command).toContain('git show "$MERGE_BASE:$base_path"');
-    expect(command).not.toContain('git show "$DIFF_BASE:$base_path"');
+  });
+
+  it('the extracted file-line-counts script carries the safety properties review-pr.md used to inline', () => {
+    const script = readFileSync(FILE_LINE_COUNTS_SCRIPT_PATH, 'utf8');
+    expect(script.startsWith('#!/bin/bash\n')).toBe(true);
+    expect(script).toContain('set -uo pipefail');
+    // Locale-independent bracket-expression classes.
+    expect(script).toContain('export LC_ALL=C');
+    // Every ambient input git would otherwise take is pinned: rename
+    // detection and its limit, cwd-relative paths, and in-tree attributes.
+    expect(script).toContain(
+      'git -c diff.renameLimit=0 --attr-source="$LC_EMPTY_TREE" diff -z --numstat --find-renames --no-relative "$DIFF_BASE"...HEAD'
+    );
+    expect(script).toContain('LC_EMPTY_TREE=$(git hash-object -t tree /dev/null) || exit 1');
+    // An unresolved merge-base must stop the block rather than read the
+    // index, and a truncated record stream must exit, never break.
+    expect(script).toContain('MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1');
+    expect(script).toContain("IFS= read -r -d '' base_path || exit 1");
+    expect(script).not.toContain('base_path || break');
+    // Safe-path allowlist covers forgery AND argument/traversal injection,
+    // on both paths of a rename, and never echoes the rejected path.
+    expect(script).toContain(
+      "''|*[[:cntrl:]]*|*[[:space:]]*|*=*|-*|/*|..|../*|*/../*|*/..)"
+    );
+    expect(script).toContain('for lc_probe in "$new_path" "$base_path"; do');
+    expect(script).toContain('(path withheld: PR-controlled)');
+    expect(script).not.toMatch(/^\s*path=/m);
+    // Object classification goes through ONE batch-check call, whose
+    // `missing` answer is distinguishable from a probe failure; a failure
+    // stops the block instead of silently shortening it.
+    expect(script).toContain(
+      "git cat-file --batch-check='%(objectname) %(objecttype)'"
+    );
+    expect(script).not.toMatch(/git cat-file -[te] /);
+    expect(script).not.toContain('git ls-tree');
+    expect(script).toContain('object probe failed; omitting file-line-counts');
+    // Counts come from COMMITS on both sides, read through a file (not a
+    // pipe) and counted by awk (lines), never wc -l (newlines).
+    expect(script).toContain('git show "$MERGE_BASE:$base_path" >|"$LC_TMP" || exit 1');
+    expect(script).toContain('git show "HEAD:$new_path" >|"$LC_TMP" || exit 1');
+    expect(script).toContain("awk 'END{print NR}' \"$LC_TMP\"");
+    expect(script).not.toMatch(/\$\(wc -l|\| *wc -l/);
+    // The fail-closed guard tests each value independently.
+    expect(script).toContain('case ${base:-x}${head:-x} in');
+    expect(script).not.toContain('case $base$head in');
+    // The 500-file cap is enforced before any file is measured.
+    const capIndex = script.indexOf('-gt 500');
+    const firstMeasureIndex = script.indexOf("awk 'END{print NR}'");
+    expect(capIndex).toBeGreaterThan(-1);
+    expect(firstMeasureIndex).toBeGreaterThan(-1);
+    expect(capIndex).toBeLessThan(firstMeasureIndex);
+    // Header AND footer are printed only after the loop, and carry all
+    // three counters so the persona and the orchestrator read one shape.
+    expect(script).toContain(
+      "printf 'file-line-counts rows=%s dropped=%s skipped=%s\\n' \"$rows\" \"$dropped\" \"$skipped\""
+    );
+    expect(script).toContain(
+      "printf 'file-line-counts end rows=%s dropped=%s skipped=%s\\n' \"$rows\" \"$dropped\" \"$skipped\""
+    );
+  });
+
+  it('the row and header formats round-trip through one parser across the script and the documented examples', () => {
+    const script = readFileSync(FILE_LINE_COUNTS_SCRIPT_PATH, 'utf8');
+    expect(script).toContain(
+      "printf '%s base=%s head=%s\\n' \"$new_path\" \"$base\" \"$head\""
+    );
+    expect(parseLineCountRow('src/foo.ts base=986 head=1034')).toEqual({
+      path: 'src/foo.ts',
+      base: 986,
+      head: 1034,
+    });
+    expect(
+      parseLineCountHeader('file-line-counts rows=1 dropped=0 skipped=0')
+    ).toEqual({ rows: 1, dropped: 0, skipped: 0 });
+    expect(parseLineCountRow('src/foo.ts base=986 head=')).toBeNull();
+    expect(parseLineCountHeader('file-line-counts rows=1 dropped=0')).toBeNull();
+
+    // The documented examples in the persona file and review-pr.md must
+    // parse under the same regex used against real script output.
+    const command = readFileSync(REVIEW_PR_PATH, 'utf8');
+    for (const doc of [agent, command]) {
+      const rowLine = doc
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.startsWith('path/to/file.ts base='));
+      expect(rowLine).toBeDefined();
+      expect(parseLineCountRow(rowLine ?? '')).toEqual({
+        path: 'path/to/file.ts',
+        base: 986,
+        head: 1034,
+      });
+      const headerLine = doc
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.startsWith('file-line-counts rows='));
+      expect(headerLine).toBeDefined();
+      expect(parseLineCountHeader(headerLine ?? '')).toEqual({
+        rows: 1,
+        dropped: 0,
+        skipped: 0,
+      });
+    }
+  });
+
+  it('review-all.md delegates to review-pr.md Step 5 item 6 instead of duplicating the collection logic', () => {
+    const reviewAll = readFileSync(REVIEW_ALL_PATH, 'utf8');
+    const flat = flatten(reviewAll);
+    expect(flat).toContain('Step 5 item');
+    expect(flat).toContain('Do not reconstruct');
+    expect(reviewAll).not.toContain('git diff -z --numstat');
+    expect(reviewAll).not.toContain('scripts/file-line-counts" "$DIFF_BASE"');
   });
 
   it('is documented as the reachable-only-via-include reviewer', () => {

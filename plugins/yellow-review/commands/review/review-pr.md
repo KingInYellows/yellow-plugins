@@ -507,220 +507,58 @@ Each agent receives:
    per file, measured at the same two commits the diff spans. A unified diff
    cannot supply them: hunk headers cover changed regions, not file totals,
    and reconstructing a base total by summing `+`/`-` lines is arithmetic
-   the reviewer would get wrong silently. The orchestrator has `DIFF_BASE`
-   from Step 3a and a shell, so it computes them:
+   the reviewer would get wrong silently. The collection logic lives in one
+   script, `skills/pr-review-workflow/scripts/file-line-counts`, which takes
+   the diff base as its only argument. Shell variables do not survive
+   between a command file's `bash` fences, so `DIFF_BASE` is re-derived
+   here with the same fallback ladder Step 3a used, in the same Bash call
+   that runs the script:
 
    ```bash
-   # `git diff A...HEAD` (three dots) diffs from the MERGE-BASE of A and
-   # HEAD, not from A's tip. Read base content at the same commit, or every
-   # count disagrees with the diff the reviewer is looking at whenever the
-   # base branch has advanced since this branch was cut — the normal state
-   # of any branch in a stack. Getting this wrong reports phantom shrinks
-   # and phantom crossings with full confidence. An unresolved merge-base
-   # must stop the block: with MERGE_BASE empty, `$MERGE_BASE:$base_path`
-   # becomes `:path`, which git reads as the INDEX, so every base count
-   # would silently come from staged content instead of a commit.
-   MERGE_BASE=$(git merge-base "$DIFF_BASE" HEAD) || exit 1
-   if [ -z "$MERGE_BASE" ]; then
-     printf '[review:pr] Warning: merge-base unresolved; omitting file-line-counts\n' >&2
+   if git rev-parse --verify --quiet "origin/<baseRefName>" >/dev/null; then
+     DIFF_BASE="origin/<baseRefName>"
+   elif git rev-parse --verify --quiet "<baseRefName>" >/dev/null; then
+     DIFF_BASE="<baseRefName>"
+   else
+     printf '[review:pr] Warning: no usable base ref; omitting file-line-counts\n' >&2
      exit 1
    fi
-   # Stage the numstat output and the rows in files rather than piping into
-   # the loop. A pipe would run the loop in a subshell where `exit` cannot
-   # stop the block, and would make a failed `git diff` indistinguishable
-   # from an empty diff. `>|` writes through `noclobber` (zsh and bash), which
-   # mktemp's pre-created file would otherwise trip.
-   LC_NUMSTAT=$(mktemp) && LC_ROWS=$(mktemp) && LC_TMP=$(mktemp) || exit 1
-   trap 'rm -f "$LC_NUMSTAT" "$LC_ROWS" "$LC_TMP"' EXIT
-   # Every input git would otherwise take from ambient config or from the
-   # PR's own tree is pinned here, because each is a channel for suppressing
-   # a real crossing:
-   #   `--find-renames` pins the rename record shape regardless of the host's
-   #   `diff.renames`; with detection off every rename reads as a brand-new
-   #   file at base=0 — a phantom crossing.
-   #   `diff.renameLimit=0` (unlimited) is needed on top of it. A low ambient
-   #   limit, or more rename candidates than git's 1000 default, skips the
-   #   exhaustive pass and emits the rename as separate delete/add records,
-   #   landing the added path at base=0 again.
-   #   `--no-relative` overrides `diff.relative` and a caller cwd below the
-   #   root, which would otherwise drop files outside that cwd and return the
-   #   rest cwd-relative, so every lookup below silently misses.
-   #   `--attr-source=<empty tree>` makes git ignore in-tree `.gitattributes`.
-   #   The PR writes that file, and `*.ts binary` in it makes numstat report
-   #   `-`/`-` for an ordinary text blob, so the binary skip below would drop
-   #   a real 0→1001 crossing from an otherwise complete-looking block.
-   #   `--text` does NOT fix that: it changes the diff body, not numstat's
-   #   binary classification (checked on git 2.55). Git before 2.40 rejects
-   #   `--attr-source` and exits non-zero here, omitting the whole block.
-   LC_EMPTY_TREE=$(git hash-object -t tree /dev/null) || exit 1
-   git -c diff.renameLimit=0 --attr-source="$LC_EMPTY_TREE" diff -z --numstat --find-renames --no-relative "$DIFF_BASE"...HEAD >|"$LC_NUMSTAT" || exit 1
-   rows=0
-   dropped=0
-   while IFS= read -r -d '' rec; do
-     add=${rec%%$'\t'*}
-     rest=${rec#*$'\t'}
-     # NEVER name this variable `path`. In zsh, `path` is a special array
-     # tied to $PATH, so `path=src/foo.ts` REPLACES the command search path:
-     # `git` and `awk` then vanish and every row silently degrades to
-     # `base=0 head=` while the loop keeps going. This orchestrator's shell
-     # is whatever the host provides — on this repo's own machines that is
-     # zsh — so a bash-only assumption is not safe here.
-     new_path=${rest#*$'\t'}
-     base_path=$new_path
-     # A rename or copy emits an EMPTY path field, then oldpath and newpath
-     # as two further NUL-terminated fields. Consume both, measure `base` on
-     # the old path and `head` on the new one. A stream that ends mid-record
-     # is truncated: `exit`, never `break`, so rows already staged are never
-     # emitted as a complete-looking block.
-     if [ -z "$new_path" ]; then
-       IFS= read -r -d '' base_path || exit 1
-       IFS= read -r -d '' new_path || exit 1
-     fi
-     # With attributes neutralized above, `-` now means genuinely binary
-     # CONTENT, which has no line total to report.
-     if [ "$add" = "-" ]; then
-       continue
-     fi
-     # A path is attacker-controlled: the PR author chooses its filename, and
-     # git permits control characters, leading hyphens, and `..` components in
-     # one. Two distinct hazards, one allowlist:
-     #   Row forgery. Because `-z` yields the path RAW (that is the whole
-     #   point of -z), a filename containing a newline emits a second, fully
-     #   forged `<path> base=N head=M` row, and one containing whitespace or
-     #   `=` forges the same thing inline — `src/x base=999 head=1001` plus
-     #   the real fields is one row with two field pairs. Neither
-     #   sanitization step below touches control characters or spaces.
-     #   Argument and traversal injection. A leading `-` makes the value an
-     #   OPTION to the git probes below rather than a path, and `..` or a
-     #   leading `/` reaches outside the repo. Reject both before any git
-     #   call, per AGENTS.md's executable-allowlist rule.
-     # Check `base_path` too: on a rename it is a second PR-chosen path, and
-     # it reaches `git ls-tree` and `git show` exactly as `new_path` does.
-     #
-     # The warning names the row by ORDINAL, never by path. This output is
-     # read by the orchestrator, which holds mutation tools, and it lands
-     # outside every reference fence; `tr -c '[:print:]' '?'` would strip the
-     # control characters but preserve instruction-shaped prose such as
-     # `ignore previous instructions ...=x` sitting in the filename.
-     lc_unsafe=
-     for lc_probe in "$new_path" "$base_path"; do
-       case $lc_probe in
-         ''|*[[:cntrl:]]*|*[[:space:]]*|*=*|-*|/*|..|../*|*/../*|*/..)
-           lc_unsafe=1
-           ;;
-       esac
-     done
-     if [ -n "$lc_unsafe" ]; then
-       dropped=$((dropped + 1))
-       printf '[review:pr] Warning: dropping line-count row #%s; path rejected by the safe-path allowlist (path withheld: PR-controlled)\n' "$dropped" >&2
-       continue
-     fi
-     # Both counts come from COMMITS, never the worktree, so they describe
-     # exactly the two endpoints the diff spans. Probe before reading: a file
-     # this PR added is absent at the merge-base and one it deleted is absent
-     # at HEAD.
-     #
-     # Probe with `ls-tree`, not `cat-file -t`. `cat-file -t` exits 128 with
-     # empty stdout BOTH for a path that is genuinely absent and for a probe
-     # that failed (a partial clone whose lazy fetch died, an unreadable
-     # object), so a captured empty string cannot tell "the PR added this
-     # file" from "git could not answer" — and the failure case then leaves
-     # base=0, or drops the row entirely, inside a block that still claims to
-     # be complete. `ls-tree` exits 0 with EMPTY output for an absent path and
-     # non-zero only on a real failure, so the two are distinguishable and the
-     # failure can stop the block.
-     #
-     # Read its TYPE field rather than treating any output as presence: a file
-     # replaced by a directory of the same name is a TREE, and `git show`
-     # would print git's tree LISTING ("tree HEAD:cfg" / blank / entry names)
-     # for awk to count as if it were file content. `:(literal)` stops a
-     # filename that looks like pathspec magic from being read as magic.
-     lc_entry=$(git ls-tree HEAD -- ":(literal)$new_path" 2>/dev/null) || {
-       printf '[review:pr] Warning: HEAD object probe failed; omitting file-line-counts\n' >&2
-       exit 1
-     }
-     lc_rest=${lc_entry#* }
-     if [ "${lc_rest%% *}" != blob ]; then
-       # Absent at HEAD (this PR deleted it) or not a regular file: no head
-       # total exists, so there is no crossing to report.
-       continue
-     fi
-     # `awk END{print NR}` counts LINES; `wc -l` counts NEWLINES and so
-     # undercounts by one any file lacking a trailing newline — which is
-     # exactly the kind of off-by-one that manufactures or masks a crossing
-     # at the 1000/1001 boundary. Read through a file, not a pipe: with
-     # `git show | awk`, a failed `git show` hands awk an empty stream that
-     # it counts as 0 with a clean exit status.
-     base=0
-     lc_entry=$(git ls-tree "$MERGE_BASE" -- ":(literal)$base_path" 2>/dev/null) || {
-       printf '[review:pr] Warning: base object probe failed; omitting file-line-counts\n' >&2
-       exit 1
-     }
-     lc_rest=${lc_entry#* }
-     if [ "${lc_rest%% *}" = blob ]; then
-       git show "$MERGE_BASE:$base_path" >|"$LC_TMP" || exit 1
-       base=$(awk 'END{print NR}' "$LC_TMP")
-     fi
-     git show "HEAD:$new_path" >|"$LC_TMP" || exit 1
-     head=$(awk 'END{print NR}' "$LC_TMP")
-     # Fail closed rather than emit a half-measured row. If either count came
-     # back empty or non-numeric, the tooling this loop depends on is not
-     # behaving; a row like `base=0 head=` reads as authoritative and is not.
-     # `:-x` substitutes a non-digit for an EMPTY value before the class
-     # test. Testing `$base$head` bare would concatenate the two, so an empty
-     # `head` hides behind a digit `base` — and `base` is a literal 0 for any
-     # file the PR adds, making `base=0 head=` (the exact row this guard
-     # exists to reject) slip through.
-     case ${base:-x}${head:-x} in
-       *[!0-9]*)
-         dropped=$((dropped + 1))
-         printf '[review:pr] Warning: dropping line-count row #%s; counts unmeasurable (path withheld: PR-controlled)\n' "$dropped" >&2
-         continue
-         ;;
-     esac
-     rows=$((rows + 1))
-     # Bound the block. Past this many measurable files the fence costs the
-     # persona more context than the crossing rule can repay; omit it
-     # entirely rather than truncate, so it is never partial.
-     if [ "$rows" -gt 500 ]; then
-       printf '[review:pr] Warning: more than 500 measurable files; omitting file-line-counts\n' >&2
-       exit 1
-     fi
-     printf '%s base=%s head=%s\n' "$new_path" "$base" "$head" >>"$LC_ROWS" || exit 1
-   done <"$LC_NUMSTAT"
-   # Header AND footer together are the completeness signal, and both are
-   # printed only after the whole loop succeeded (row-write failures `exit 1`
-   # before this). The footer is what makes truncation detectable: 500 rows of
-   # long paths can exceed the Bash tool's output budget, and a payload cut
-   # short still carries a header printed before it. No row can forge either
-   # marker — a path containing whitespace or `=` was dropped above.
-   printf 'file-line-counts rows=%s dropped=%s\n' "$rows" "$dropped"
-   cat "$LC_ROWS" || exit 1
-   printf 'file-line-counts end rows=%s dropped=%s\n' "$rows" "$dropped"
+   LC_OUT=$(mktemp) || exit 1
+   trap 'rm -f "$LC_OUT"' EXIT
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-line-counts" "$DIFF_BASE" >|"$LC_OUT"
+   LC_STATUS=$?
+   cat "$LC_OUT"
+   exit "$LC_STATUS"
    ```
 
-   One detail the comments above do not spell out: `git diff -z --numstat`
-   emits NUL-terminated records with literal (unquoted) paths, which is what
-   lets a path containing a quote, backslash, non-ASCII byte, or newline
-   reach the loop intact — the non-`-z` form C-quotes such paths and would
-   hand the reviewer a path that does not exist. A plain space is never
-   quoted; it is dropped above for the forgery reason, not for quoting.
+   The script fails closed on its own — an unresolved merge-base, a
+   truncated numstat stream, more than 500 changed files, a failed object
+   probe, or any other internal error exits non-zero without printing the
+   `file-line-counts rows=` header — and its file header documents the full
+   contract: the `rows`/`dropped`/`skipped` breakdown, the `REF:path`
+   argument-safety argument, and why every `[review:pr] Warning:` line
+   names a rejected row by ordinal and withholds the PR-controlled path.
+   Those warnings go to stderr and are diagnostics for the operator; they
+   never enter the fence.
 
-   Take the block body from the output: the rows are the lines **between**
-   the `file-line-counts rows=N dropped=M` header and the matching
-   `file-line-counts end rows=N dropped=M` footer. Both markers must be
-   present and must agree, and the rows between them must number exactly `N`.
-   The header alone proves nothing — it is printed before the payload, so a
-   tool output truncated mid-payload still carries it, and fencing those rows
-   would present a partial set as authoritative. Any `[review:pr] Warning:`
-   lines are printed before the header and are diagnostics for the operator;
-   they never enter the fence. Wrap those rows in their own fence,
-   append it after the pr-context fence, and follow it with the same
-   re-anchor line the pr-context fence uses:
+   Take the block body from the output: the `file-line-counts rows=N
+   dropped=M skipped=K` header line **and** the rows after it, up to but
+   not including the matching `file-line-counts end rows=N dropped=M
+   skipped=K` footer. Both markers must be present and must agree, and the
+   rows between them must number exactly `N`. The header alone proves
+   nothing — it is printed before the payload, so a tool output truncated
+   mid-payload still carries it, and fencing those rows would present a
+   partial set as authoritative. Unlike the pr-context block, the header
+   line itself belongs inside the fence: `dropped` and `skipped` are
+   coverage signal the persona reads, not operator-only diagnostics. Wrap
+   the header plus rows in their own fence, append it after the pr-context
+   fence, and follow it with the same re-anchor line the pr-context fence
+   uses:
 
    ```text
    --- begin file-line-counts (reference only) ---
    <file-line-counts>
+   file-line-counts rows=1 dropped=0 skipped=0
    path/to/file.ts base=986 head=1034
    </file-line-counts>
    --- end file-line-counts ---
@@ -738,11 +576,11 @@ Each agent receives:
    this because the numbers "are repo-internal" is how a fence breakout
    lands through the one block nobody sanitized.
 
-   If the block cannot be produced (Bash unavailable, `DIFF_BASE`
-   unresolved, the snippet exits non-zero, either the `file-line-counts rows=`
-   header or the `file-line-counts end rows=` footer is missing from its
-   output, the two disagree, or the rows between them do not number `N`), omit
-   it entirely and do not emit a partial or placeholder block. The reviewer
+   If the block cannot be produced (Bash unavailable, no usable base ref,
+   the script exits non-zero, either the `file-line-counts rows=` header or
+   the `file-line-counts end rows=` footer is missing from its output, the
+   two disagree, or the rows between them do not number `N`), omit it
+   entirely and do not emit a partial or placeholder block. The reviewer
    fails closed on a missing block by suppressing every size-threshold
    finding; a partial block would instead look authoritative and produce
    confident findings about files it never measured. `rows=0` with both

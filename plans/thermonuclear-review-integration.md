@@ -348,9 +348,17 @@ Branch `agent/feat/thermonuclear-reviewer`, title
 
 - [x] 1.4.1 In `review-pr.md` Step 5, add the persona-scoped `<file-line-counts>`
       block, appended only when `thermonuclear-reviewer` is dispatched (B1).
-      Before emitting a row, reject paths with newlines, leading hyphens,
-      `..`, or other unsafe characters; relative paths must resolve inside
-      the repository. Added files have `base=0` (no `$DIFF_BASE:$path` blob).
+      The collection logic is the `skills/pr-review-workflow/scripts/file-line-counts`
+      script, which review-pr.md calls with the diff base as its argument.
+      Reject paths with newlines, whitespace, `=`, a leading hyphen, a
+      leading `/`, or a `..` component before emitting a row — the first
+      three forge a second row or corrupt the real one's field boundaries;
+      the rest are the executable-allowlist rule, kept even though every
+      git call reads paths through the `REF:path` object-specifier form
+      (`git cat-file --batch-check` input, `git show "$MERGE_BASE:$p"`),
+      which treats everything after the colon as a tree-relative lookup
+      that a leading `-` cannot turn into a flag and a `..` cannot escape.
+      Added files have `base=0` (no `$MERGE_BASE:$path` blob).
       Renames map the numstat preimage path to the postimage path so the
       base count is the old blob, not a missing current-path lookup. Count
       logical lines including a final unterminated record — do not use raw
@@ -382,12 +390,16 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       `reviewer_set.include`". Without this row, `reviewer_set.include`
       has no subagent_type mapping to dispatch and the opt-in path is
       unreachable.
-- [x] 1.4.1c Mirror 1.4.1's `<file-line-counts>` collection and injection into
-      `review-all.md`'s own inline pass (it inherits Step 5 of `review-pr.md`
-      by reference for this concern: Step 7 of `review-all.md`'s Step 4 loop
-      reads review-pr.md Step 5 items 2 and 6 and runs that procedure
-      in-place, rebinding `DIFF_BASE` to review-all's own per-PR base ref
-      rather than duplicating the snippet). Without this, a
+- [x] 1.4.1c Delegate `review-all.md`'s inline pass to `review-pr.md`
+      Step 5 item 6 by reference rather than mirroring the collection
+      logic: Step 7 of `review-all.md`'s Step 4 loop runs that procedure
+      (which calls the `file-line-counts` script) against the PR before
+      spawning the persona, binding `DIFF_BASE` to review-all's own
+      per-PR base ref in the same Bash call, and never reconstructs the
+      snippet. This supersedes the task's original premise that
+      `review-all.md` "does not inherit Step 5 by reference"; delegation
+      is exactly what shipped, and it is why a second, independently
+      drifting copy of the logic does not exist. Without this, a
       `thermonuclear-reviewer` opted in via `/review:all` never receives the
       block and every size-threshold finding is silently suppressed.
 - [x] 1.4.1d `pnpm changeset` — **patch** for `yellow-review`. Stack item 3
