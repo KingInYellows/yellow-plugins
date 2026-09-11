@@ -31,11 +31,13 @@ components:
 
 PR #793 (`docs(yellow-jules): PR1 provider-CLI contract set`, a docs-only
 provider-CLI contract for a new remote-agent plugin) had already been through
-two prior review-fix passes (commits `599c2744`, `865f2f0e`) before a third
-13-persona `/review:pr` pass surfaced three P1 findings that were each locally
-correct — a rule added in one section, read on its own, was well-specified — but
-broke when read against a rule added in a different section, at a different
-time:
+two prior review-fix passes (the commits titled
+`docs(yellow-jules): apply first review pass to the PR1 contract set` and
+`… apply second review pass …`; hashes are not cited because a restack rewrote
+them once already) before a third 13-persona `/review:pr` pass surfaced three P1
+findings that were each locally correct — a rule added in one section, read on
+its own, was well-specified — but broke when read against a rule added in a
+different section, at a different time:
 
 1. **Reconcile has no zero-candidate outcome** (`contract-v1.md`, reconcile
    outcomes as reviewed in PR #793 round 1; a `released` outcome was added
