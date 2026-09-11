@@ -1,5 +1,185 @@
 # Changelog
 
+## 3.4.0
+
+### Minor Changes
+
+- [`05a6ff4`](https://github.com/KingInYellows/yellow-plugins/commit/05a6ff48450ebbf5d82194a98867febf871f39e4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expose
+  `yellow-thermonuclear-review` — and only that skill — to the Cursor and Codex
+  distribution targets. `catalog/plugins/yellow-review.json` sets
+  `targets.codex.enabled: true`, adds a `targets.cursor` block, and pins both to
+  `skillAllowlist: ["yellow-thermonuclear-review"]`; the generated trees are
+  emitted by `pnpm generate:manifests` and contain the one SKILL.md per host, no
+  agents, no commands, and no other skill.
+
+  The rubric is the only part of this feature that is host-portable. The
+  persona's tool restriction and the orchestrator's `<file-line-counts>`
+  injection are Claude Code mechanisms with no equivalent on either target,
+  which is why the report-only rails, the untrusted-input handling, and the
+  fail-closed size rule are authored into the skill body rather than the agent
+  frontmatter — the generator copies only `SKILL.md` plus a flat
+  `references/*.md` from inside `skills/<name>/` and normalises frontmatter to
+  `name` + `description`, so anything outside that never ships.
+
+  Also documents the MIT attribution inline for the same reason: a relative path
+  to a plugin-root licence file would dangle in every distributed copy.
+
+- [`88506d6`](https://github.com/KingInYellows/yellow-plugins/commit/88506d6b5a063e81ae7f01e783b54d4a59cbcb49)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `thermonuclear-reviewer`, an opt-in structural-quality review persona, and its
+  preloaded `yellow-thermonuclear-review` skill. The rubric is adapted from
+  Cursor's MIT-licensed `thermo-nuclear-code-quality-review`
+  (`cursor/plugins@6e3d2ea`, snapshotted under `RESEARCH/upstream-snapshots/`),
+  with the MIT notice reproduced inline in the skill body.
+
+  It asks whether a change leaves the codebase with fewer moving parts:
+  code-judo restructurings, spaghetti-condition growth, weak type and module
+  boundaries, misplaced ownership, non-atomic orchestration, and file-size
+  threshold crossings. It is deliberately more aggressive than the always-on
+  `maintainability-reviewer`, whose calibration as the low-false-positive
+  everyday lane is unchanged.
+
+  `/review:pr` never selects it. It appears in neither dispatch table; a
+  repository opts in by naming it in `reviewer_set.include` in
+  `yellow-plugins.local.md`. It runs opus/xhigh with depth calibration so
+  trivial diffs get a cheap pass, is read-only (`Read`/`Grep`/`Glob`), emits
+  `advisory`/`human` findings capped at P1, and is unreachable under
+  `review_pipeline: legacy` by design — that path has a fixed persona list and
+  never reads `reviewer_set`.
+
+  The file-size rule is a crossing rule, not an absolute ceiling, and it is
+  evidence-gated: it consumes a `<file-line-counts>` block supplied by the
+  orchestrator and suppresses all size findings when that block is missing
+  rather than estimating base counts from a diff.
+
+  yellow-core changes are documentation only: `local-config` names the opt-in
+  reviewer as the sole way to reach it, and the `security-fencing` consumer
+  inventory is refreshed to the 15 `yellow-review/agents/review/` agents that
+  carry the `## CRITICAL SECURITY RULES` block (the inventory's grep-based
+  definition; it claimed 12 and omitted three — `thermonuclear-reviewer` is
+  deliberately not among them, carrying prose rails in its skill body instead of
+  the heading). Three of the fifteen (`agent-cli-readiness-reviewer`,
+  `agent-native-reviewer`, `cli-readiness-reviewer`) state the untrusted-input
+  rule in prose without the `--- begin ... (reference only) ---` delimiter
+  template.
+
+### Patch Changes
+
+- [`c8f41b7`](https://github.com/KingInYellows/yellow-plugins/commit/c8f41b7afc3ea98653b321eb1416a70d0683a00b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Set
+  `experimental.cacheTtl: 1h` on the five always-run `/review:pr` agents
+  (`project-compliance-reviewer`, `correctness-reviewer`,
+  `maintainability-reviewer`, `project-standards-reviewer`, and the Step 8
+  `code-simplifier`) — the agents whose stable system prompt is re-sent on every
+  review. A second review within the hour reads those prompts from cache.
+  `learnings-researcher` (yellow-core) stays at the default: `/review:pr` and
+  the flow/docs callers dispatch it once, and a `1h` write bills about 2x base
+  input versus 1.25x for `5m`. `/review:all` dispatches it once per PR and can
+  pay back on a slow batch, but the common path is a single `/review:pr`. A
+  `subagentPromptCacheTtl` setting or env var overrides the frontmatter for all
+  subagents. Verified against Claude Code 2.1.259; ignored while a subscription
+  is drawing on usage credits.
+
+- [`1717627`](https://github.com/KingInYellows/yellow-plugins/commit/17176277de077334ac76d289491ca9d7fe0439b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop filtering
+  review findings at the persona stage. Four reviewer agents
+  (`agent-native-reviewer`, `agent-cli-readiness-reviewer`,
+  `cli-readiness-reviewer`, `coherence-reviewer`) suppressed findings below
+  confidence 75 and two capped the count at 5–7, while `/review:pr` and
+  `/docs:review` already apply the same 75 gate after aggregation. Anthropic's
+  Sonnet 5 / Opus 5 prompting guides show the Claude 5 generation follows such
+  instructions literally, so the redundant persona-side gate lowered measured
+  recall. Personas now report findings with a confidence score and severity,
+  capped at 40 (lowest-ranked overflow dropped, not counted as
+  orchestrator-suppressed); the aggregators keep the single gate and count only
+  findings the gate actually removes as suppressed (`/review:pr` P0 at 50+ and
+  `/docs:review` P1 at 50+ survive and are excluded from that count).
+
+- [`9e1c8fc`](https://github.com/KingInYellows/yellow-plugins/commit/9e1c8fc46b33297297b20f38c001c1f1645679d6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  Step 5 now appends a `<file-line-counts>` block when — and only when —
+  `thermonuclear-reviewer` is in the dispatched set, giving that persona the
+  authoritative before/after line totals its size-threshold rule needs.
+
+  A unified diff cannot supply them: hunk headers describe changed regions, not
+  file totals, and summing `+`/`-` lines is arithmetic a reviewer gets wrong
+  silently. The orchestrator already resolves `DIFF_BASE` in Step 3a, so it
+  computes the counts with `git diff -z --numstat --find-renames` plus
+  `git cat-file -t` / `git show`, handling adds (base 0), deletes and binaries
+  (skipped), and renames (base measured on the old path, so a rename does not
+  read as a crossing). Base content is read at
+  `git merge-base "$DIFF_BASE" HEAD`, not at `DIFF_BASE`'s tip, so the counts
+  span exactly what the three-dot diff spans — reading the tip instead reports a
+  phantom shrink or a phantom crossing on any branch whose base has advanced
+  since it was cut, which is the normal state of a branch in a stack. Paths are
+  read NUL-delimited so a filename containing a quote, backslash, non-ASCII
+  byte, or newline stays intact; a path containing a control character,
+  whitespace, or `=` is dropped with a warning because it could forge the
+  `base=`/`head=` fields that follow it in a row. The values go through the same
+  literal-delimiter-then-XML sanitization as the pr-context fence, and the
+  pr-context sanitizer now scrubs the file-line-counts delimiters too. The
+  numstat output, file contents, and rows are staged in temp files rather than
+  piped, so a failed `git` command or a truncated rename record exits the
+  snippet instead of leaving a partial block, an unresolved merge-base omits the
+  block, more than 500 measurable files omits it, and a
+  `file-line-counts rows=N dropped=M` header line marks a complete result.
+
+  The loop variable is `new_path`, never `path`: in zsh `path` is a special
+  array tied to `$PATH`, so naming it `path` replaces the command search path
+  and `git`/`awk` disappear — the loop then keeps running and emits
+  `base=0 head=` for every file instead of failing closed. Both counts are read
+  from commits (merge-base and `HEAD`) via `awk 'END{print NR}'` rather than the
+  worktree via `wc -l`, so they describe the same two endpoints the diff spans
+  and do not undercount a file lacking a trailing newline — an off-by-one
+  landing exactly at the 1000/1001 boundary. A row whose counts come back empty
+  or non-numeric is dropped with a warning rather than emitted half-measured;
+  each value is tested independently (`${base:-x}${head:-x}`) because
+  concatenating them lets an empty `head` hide behind the literal `0` that every
+  added file's `base` starts at. Object types are probed with
+  `git cat-file -t ... = blob` rather than `-e`, since `-e` also succeeds for a
+  tree: a file replaced by a directory of the same name would otherwise have
+  git's tree listing counted as file content.
+
+  The block is fenced as `--- begin file-line-counts (reference only) ---` /
+  `--- end file-line-counts ---`, and both delimiters join the literal-delimiter
+  substitution list. Paths are PR-supplied, and `-z` yields them raw, so a
+  filename containing a newline would otherwise emit a second, fully-forged
+  `<path> base=N head=M` row — enough to fabricate a threshold crossing on a
+  file the PR never touched, or to state a benign base for one it did. Rows
+  whose path contains a control character are dropped with a warning to stderr
+  rather than silently.
+
+  When the block cannot be produced it is omitted entirely rather than emitted
+  partially — the reviewer fails closed on a missing block by suppressing every
+  size finding, whereas a partial block would look authoritative.
+
+  No other persona receives the block, and no dispatch table changed:
+  `thermonuclear-reviewer` remains reachable only through
+  `reviewer_set.include`.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 3.3.1
 
 ### Patch Changes

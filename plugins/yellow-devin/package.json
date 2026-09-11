@@ -1,6 +1,6 @@
 {
   "name": "yellow-devin",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains"
 }
