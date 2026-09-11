@@ -1,0 +1,43 @@
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_aa2a8cf97f9dcd::t_d580b58fd76876 76-81
+docs/yellow-jules/capability-matrix.md
+  s_d3d6184d1e92bf::t_bb2f3ba7bf92ed 26-45,47-62,64-71
+  s_d3d6184d1e92bf::t_e2ffc6e4f8975c 46
+  s_aa2a8cf97f9dcd::t_cb4541e8c1a759 17
+  s_aa2a8cf97f9dcd::t_a00e89e20bc1b2 63
+docs/yellow-jules/contract-v1.md
+  s_aa2a8cf97f9dcd::t_81596c1cef6d06 392-394,404-407,808
+  s_aa2a8cf97f9dcd::t_cb4541e8c1a759 807
+  s_aa2a8cf97f9dcd::t_8a34bb40f9af97 655-657,687-688
+  s_aa2a8cf97f9dcd::t_000192755f18f3 227-232
+  s_aa2a8cf97f9dcd::t_b15edb4fb7b93f 408-421,809-810
+docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md
+  s_aa2a8cf97f9dcd::t_da53c1ed1ab48d 95-101
+  s_aa2a8cf97f9dcd::t_45070766cbe64b 49-65
+docs/solutions/code-quality/markdown-table-pipe-escape-prettier-blind-spot.md
+  s_aa2a8cf97f9dcd::t_49c76ab77ce688 39-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b3514476b23265b9d31a9d9aa1c9de597641d435",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    },
+    "s_d3d6184d1e92bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2196b7cc-f67f-4f9d-be4d-0c44b840f2aa",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
