@@ -1,0 +1,37 @@
+docs/solutions/integration-issues/vendor-list-absence-inference-and-per-claim-evidence.md
+  s_1ed65cfba90080::t_03fe64d4c97184 11-15,38-41,56,58,68,70-74,148-149
+  s_1ed65cfba90080::t_141ac45f0e78a6 1-10,16-37,42-55,57,59-67,69,75-147,150-152
+docs/solutions/logic-errors/capacity-guard-unlisted-dependents-and-blocked-recovery.md
+  s_1ed65cfba90080::t_03fe64d4c97184 3-4,41,44,65
+  s_1ed65cfba90080::t_141ac45f0e78a6 1-2,5-40,42-43,45-64,66-132
+docs/solutions/code-quality/layered-contract-fixes-cross-cutting-collision.md
+  s_1ed65cfba90080::t_03fe64d4c97184 34-40
+docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md
+  s_1ed65cfba90080::t_03fe64d4c97184 2-4,8-22,38-40,46-48,50-54,61-74,76-88,92-95,97-99,103-107,112,118
+  s_1ed65cfba90080::t_141ac45f0e78a6 75,123-126,128-129
+docs/solutions/code-quality/multi-pass-contract-review-prior-fix-audit-and-freeze-criterion.md
+  s_1ed65cfba90080::t_03fe64d4c97184 11-16,42-47,80-82,90,125,136-137
+  s_1ed65cfba90080::t_141ac45f0e78a6 1-10,17-41,48-79,83-89,91-124,126-135,138-139
+docs/solutions/code-quality/solution-doc-citations-die-on-restack-and-prescriptions-need-a-mechanism.md
+  s_1ed65cfba90080::t_141ac45f0e78a6 1-11,16-41,44-60,62-67,72-84,86,88-127
+  s_1ed65cfba90080::t_03fe64d4c97184 12-15,42-43,61,68-71,85,87
+docs/solutions/code-quality/phase-boundary-move-orphaned-triggers-and-derived-artifacts.md
+  s_1ed65cfba90080::t_141ac45f0e78a6 1-9,18-39,44-53,63-73,77-89,93-95,97-103,106-116,119-121
+  s_1ed65cfba90080::t_03fe64d4c97184 10-17,40-43,54-62,74-76,90-92,96,104-105,117-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ca3278843904b764136557d9f1a93a4fb1c50157",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
