@@ -8,8 +8,7 @@ depends_on: [yellow-jules-integration-02-runtime-provider-and-claude-routing]
 
 ## Context
 
-With the runtime and routing live and the human smoke resolved, this shell adds
-what lets a supervisor act without asking on every step while staying inside
+With the runtime and routing live, this shell ships the three mutating commands (`delegate`, `reply`, `approve`, moved here from shell 02 (Open Question 6 decision, 2026-09-10)) and adds what lets a supervisor act without asking on every step while staying inside
 owner-set limits: a grant object created by a dedicated command, a runtime
 authority check on every mutation, a bounded one-pass supervision loop, and
 pause-on-outside-activity behavior. It also makes Codex a first-class host by
@@ -18,8 +17,8 @@ single-controller handoff procedure.
 
 ## Produces
 
-- Grant record type and `authorize` command with confirmation, listing, and
-  revocation
+- `delegate`, `reply`, and `approve` command wrappers with the R29 confirmation mechanism decided here (spec Open Question 6)
+- Grant record type and `authorize` command with confirmation, listing, and revocation
 - Runtime authority check on every mutating operation, with expiry and limit
   exhaustion handling and deadline-versus-remote-state reporting
 - `supervise` command implementing one bounded decision pass and returning
@@ -34,19 +33,20 @@ single-controller handoff procedure.
   before the flip
 - Codex host-tool availability reporting in supervision
 - Documented manual controller handoff procedure in the plugin CLAUDE.md
-- Codex distribution doc update, changesets, updated smoke evidence pointer
+- Codex distribution doc update, changesets
+- Human smoke procedure checklist and the `docs/yellow-jules/smoke-result.md` record template (R53); the smoke runs after this PR merges and before shell 04
 
 ## Consumes
 
-- Runtime, journal, CLI contract, v0 commands, fake adapter and transport
-  suites, smoke result record — from Shell
+- Runtime, journal, CLI contract, read-only v0 commands, fake adapter and transport suites — from Shell
   yellow-jules-integration-02-runtime-provider-and-claude-routing
 - Codex generator, exposure lint, codex manifest tests, Codex distribution
   doc — from existing codebase
 
 ## Covers Spec Requirements
 
-- R8 (partial: authorize-and-supervise-commands)
+- R8 (partial: mutating-authorize-and-supervise-commands)
+- R29
 - R28 (partial: codex-distribution-doc)
 - R30
 - R31
@@ -61,15 +61,15 @@ single-controller handoff procedure.
 - R47
 - R48
 - R52 (partial: grant-and-lock-scenarios)
-- R53 (partial: smoke-outcome-gate)
+- R53 (partial: procedure-and-checklist)
 
 ## Implementation Steps (High-Level)
 
-1. **Confirm the smoke gate** — require `docs/yellow-jules/smoke-result.md`
-   with `result: pass` (R53); if absent, failed, or reporting an unexpected
-   vendor PR, stop and surface the delivery-policy decision before any
-   further step. `depends_on` cannot express a human gate, so this check is
-   the gate.
+1. **Decide the R29 confirmation mechanism** — settle spec Open Question 6's
+   authentication question (host-issued capability, runtime-owned prompt, or
+   grants only) before any non-grant mutation ships; the confirmation's format
+   must survive `redactDeep` unchanged in a dry-run envelope (contract-v1.md
+   "Confirmation token").
 2. **Add the grant model and authorize command** — record fields, trial
    defaults with ceiling, listing and revocation, confirmation gate.
 3. **Enforce authority in the runtime** — check before every write, expiry and
@@ -94,7 +94,6 @@ single-controller handoff procedure.
 - `authorize` stays Claude-only until a host-neutral owner-confirmation
   primitive exists (spec Open Question 4); decide here whether grants need a
   key-bound MAC beyond permissions and a separate store (spec Open Question 5).
-- Whether the R53 smoke surfaced a vendor PR despite the flags; if so, the
-  delivery-policy decision precedes this shell.
+- Whether the R53 smoke surfaces a vendor PR despite the flags; the smoke now runs after this shell (Open Question 6 decision, 2026-09-10), so that decision precedes shell 04.
 - How the R29 confirmation event is authenticated per host (spec Open
-  Question 6): settle before any non-grant mutation ships.
+  Question 6): settle before any non-grant mutation ships. Decided 2026-09-10, option (b): the three mutating commands ship here; the mechanism itself is fixed at this shell's expansion.

@@ -315,8 +315,7 @@ at any point (R57).
   exactly one label and none is `live-observed`; every fixture block carries
   the illustrative marker; every vendor quote is fenced; the motivation
   statement appears in `contract-v1.md`; the PR2 checklist cites R23, R24,
-  R25; the R3 table has no blank cells; `plans/specs/yellow-jules-integration.md`
-  is untouched.
+  R25; the R3 table has no blank cells; `plans/specs/yellow-jules-integration.md` was untouched at PR1 submission (superseded 2026-09-10: the Open Question 6 decision amends R8, R53, the PR stack, the MVP scope, and Open Question 6).
 - [x] Step 15: Validate and package. Run `pnpm validate:schemas`, `pnpm lint`,
   `pnpm typecheck`; report any pre-existing failure verbatim rather than
   hiding it (R57). Run `npx prettier --check docs/yellow-jules` (never `pnpm
@@ -359,7 +358,7 @@ at any point (R57).
   pre-existing failures listed in the PR description
 - `rg -l $'\r' docs/yellow-jules` -> no output (LF only)
 - `ls .changeset/*.md 2>/dev/null | grep -v README` -> unchanged from `main`
-- `git diff main...HEAD -- plans/specs/yellow-jules-integration.md` -> empty
+- `git diff main...HEAD -- plans/specs/yellow-jules-integration.md` -> empty at PR1 submission; after the Open Question 6 decision it touches only R8, R53, the PR stack, the MVP scope, and Open Question 6
 
 ## Context Files
 
