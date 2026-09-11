@@ -1,0 +1,19 @@
+plans/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_bfaae59535a9fa::t_d963ccba96045f 320,330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c7624c3e02f515467e9427412f4be5593476d9b7",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

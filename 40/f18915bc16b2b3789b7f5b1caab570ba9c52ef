@@ -1,0 +1,27 @@
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_bfaae59535a9fa::t_610bde24beb591 12,20,28,46,96,118,132,149
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_bfaae59535a9fa::t_235bba19acc4cd 11,20-21,36-37,41,48-49,64,68-72,97,99
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_bfaae59535a9fa::t_d98a570715a046 11-12,48
+plans/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_bfaae59535a9fa::t_bc5e00418e2cc6 318,361
+docs/solutions/code-quality/layered-contract-fixes-cross-cutting-collision.md
+  s_bfaae59535a9fa::t_5773dfa4563ae8 40-60,62-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "40f18915bc16b2b3789b7f5b1caab570ba9c52ef",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+docs/yellow-jules/capability-matrix.md
+  s_bfaae59535a9fa::t_af8ea4455280a4 26-68
+docs/yellow-jules/sdk-investigation.md
+  s_bfaae59535a9fa::t_af8ea4455280a4 308-310,312-319,490-492
+docs/yellow-jules/contract-v1.md
+  s_bfaae59535a9fa::t_938250bda81257 67-70,93-95,97-98,107-115,230,236-240,249-285,288-296,299-311,314-320,322-327,330-343,350,353-357,359-370,372,374-381,385-391,400-408,448,453-456,497-519,522-539,563-568,575-576,619-635,699-707
+docs/yellow-jules/fixtures.md
+  s_bfaae59535a9fa::t_af8ea4455280a4 27,77,142-143,211-212,241,252-258,298,317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "597785b320c0c0e8b038996ca9073a9741335d04",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

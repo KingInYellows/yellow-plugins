@@ -1,0 +1,19 @@
+docs/yellow-jules/contract-v1.md
+  s_bfaae59535a9fa::t_d1642c2fa636b8 17-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "464ca0a50b9d11129e665e26123d6ffaea16f667",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
