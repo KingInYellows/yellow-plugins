@@ -1,0 +1,22 @@
+docs/yellow-jules/capability-matrix.md
+  s_aa2a8cf97f9dcd::t_cb4541e8c1a759 17
+docs/yellow-jules/contract-v1.md
+  s_aa2a8cf97f9dcd::t_cb4541e8c1a759 800
+  s_aa2a8cf97f9dcd::t_8a34bb40f9af97 648-650,680-681,801-805
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f8f008eac1e06d96aa77dc15e206f283dfe9f747",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
