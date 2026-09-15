@@ -1,0 +1,44 @@
+docs/brainstorms/2026-09-09-yellow-jules-integration-brainstorm.md
+  s_92dcda3176fc7c::t_dd71b62f62814c 3
+  s_92dcda3176fc7c::t_685ab75b5093db 69-70,73-74,80-81
+  s_92dcda3176fc7c::t_44d365c5e4a81b 1-2,4,6-68,71-72,75-79,82-85
+  s_92dcda3176fc7c::t_3f21f1ca4e28e5 5
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_92dcda3176fc7c::t_bc762578fd2f0c 1-62,64-66,72,74-75,77-78,80,82-83,87-93
+  s_92dcda3176fc7c::t_3f21f1ca4e28e5 63,67-71,73,76,79,81,84-86
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_92dcda3176fc7c::t_3f21f1ca4e28e5 100,121-124,131-133,141-143
+  s_92dcda3176fc7c::t_bc762578fd2f0c 1-99,101-120,125-130,134-140
+plans/shells/yellow-jules-integration-05-goal-engine-milestone.md
+  s_92dcda3176fc7c::t_bc762578fd2f0c 1-72
+plans/specs/yellow-jules-integration.md
+  s_92dcda3176fc7c::t_3b4526d1127048 1-158,163-184,188,200,209-210,212-218,225-226,234-235,243-251,255-258,262-270,277-278,283-297,301-304,309-328,334-344,349-381,387,392-432,436-523,528-553,556-577,592-596,598-599,601-610,626,630,632,634-635,637
+  s_92dcda3176fc7c::t_97c8eeddabaaec 193-194,204-208,223-224,236-240,578-591
+  s_92dcda3176fc7c::t_37332d10008787 189,201-203,305,433-434
+  s_92dcda3176fc7c::t_4685ebb5ab28ab 190-192,252-254,345-348,388-391,611-625,631,633,636
+  s_92dcda3176fc7c::t_0816c9c22bc126 185-187,211,233,435
+  s_92dcda3176fc7c::t_0dbaca95aad7be 227-232,627-629
+  s_92dcda3176fc7c::t_3f21f1ca4e28e5 159-162,195-199,219-222,241-242,259-261,271-276,279-282,298-300,329-333,382-386,524-527,554-555,597,600
+  s_92dcda3176fc7c::t_e600c07728e3cd 306-308
+plans/shells/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_92dcda3176fc7c::t_bc762578fd2f0c 1-90
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_92dcda3176fc7c::t_bc762578fd2f0c 1-55,58-61
+  s_92dcda3176fc7c::t_3f21f1ca4e28e5 56-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d9d4316dfa35378635ee3e5b7dbdc7ba0fe515dd",
+  "prompts": {},
+  "sessions": {
+    "s_92dcda3176fc7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76fc52aa-a6a6-4527-a247-50fd6aea7d36",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

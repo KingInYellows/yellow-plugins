@@ -1,0 +1,23 @@
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_92dcda3176fc7c::t_fe6e6d07a0013a 113-117
+plans/specs/yellow-jules-integration.md
+  s_92dcda3176fc7c::t_fe6e6d07a0013a 274-277,372-374,440-442,568
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_92dcda3176fc7c::t_fe6e6d07a0013a 50-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e87ce5a73dc5922e97495139c4181fb967dce42f",
+  "prompts": {},
+  "sessions": {
+    "s_92dcda3176fc7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76fc52aa-a6a6-4527-a247-50fd6aea7d36",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

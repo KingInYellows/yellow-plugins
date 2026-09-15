@@ -1,0 +1,41 @@
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_25ce909db53e22::t_89e1e847339a38 1-300
+catalog/plugins/yellow-review.json
+  s_25ce909db53e22::t_7765e2037a78e8 25-50
+.agents/plugins/marketplace.json
+  s_25ce909db53e22::t_89e1e847339a38 34-45
+  s_25ce909db53e22::t_698c2944a4f7ec 33
+.cursor-plugin/marketplace.json
+  s_25ce909db53e22::t_89e1e847339a38 11-15
+plugins/yellow-review/.cursor-plugin/plugin.json
+  s_25ce909db53e22::t_89e1e847339a38 1-19
+plans/thermonuclear-review-integration.md
+  s_25ce909db53e22::t_08f2f1b7aafade 444,449,452,454,457-458
+  s_25ce909db53e22::t_92a27d752097b3 460-464
+  s_25ce909db53e22::t_5f37a01154bc75 703
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_25ce909db53e22::t_89e1e847339a38 1-300
+plugins/yellow-review/.codex-plugin/plugin.json
+  s_25ce909db53e22::t_89e1e847339a38 1-10
+.changeset/thermonuclear-cross-host.md
+  s_25ce909db53e22::t_08f2f1b7aafade 1-22
+tests/integration/thermonuclear-reviewer.test.ts
+  s_25ce909db53e22::t_cf912e3ce0fc57 21,307-360
+  s_25ce909db53e22::t_4e5bc9be0384d9 361-362
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "a6ef725169658d4fd86b4f93512a5658615acfc9",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
