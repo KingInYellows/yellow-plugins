@@ -1,0 +1,26 @@
+docs/plugin-validation-guide.md
+  s_6476068b869a82::t_ad911cf2f07929 226-231
+tests/integration/validate-plugin.test.ts
+  s_6476068b869a82::t_57d60fe5a4730a 465-491
+AGENTS.md
+  s_6476068b869a82::t_ad911cf2f07929 228-232
+scripts/lib/plugin-rules.js
+  s_6476068b869a82::t_a2d9548083acce 292-297,299-300,305-310
+  s_6476068b869a82::t_7ccfec6b86bdec 311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2607f1845c14f314cddc96f3eecaa8e201897dd7",
+  "prompts": {},
+  "sessions": {
+    "s_6476068b869a82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb99cbb0-34fd-4434-9fc8-3e13aa1ba3e7",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
