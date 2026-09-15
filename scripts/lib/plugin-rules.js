@@ -289,13 +289,25 @@ function compareHookEntries(event, mEntries, jEntries) {
   return driftFound;
 }
 
-// RULE 7: hooks.json shape + sync check. Shape and parseability errors block
-// CI (Claude Code 2.1.131+ auto-discovers hooks/hooks.json and rejects a
+// RULE 7: hooks.json coexistence + shape + sync check. Coexistence with
+// inline plugin.json hooks is an error: Claude Code auto-discovers
+// hooks/hooks.json AND loads the inline block with no dedup, so every hook
+// fires twice (observed on 2.1.272; six plugins shipped "reference-only"
+// mirrors under the stale belief the file was not loaded). Shape and
+// parseability errors also block CI (Claude Code 2.1.131+ rejects a
 // malformed file at install time). Drift between plugin.json inline hooks
-// and hooks.json is a warning only.
+// and hooks.json stays a warning — it only matters while a plugin is
+// mid-migration from a hooks-only file to the inline block.
 function ruleHooksJson(pluginDir, inlineHooks, hasInlineHooks, errors) {
   const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
   if (!fs.existsSync(hooksJsonPath)) return;
+
+  if (hasInlineHooks) {
+    addError(
+      errors,
+      'hooks/hooks.json coexists with inline hooks in plugin.json — Claude Code auto-discovers hooks/hooks.json and registers every hook twice. Keep the inline block (generated from catalog/) and delete hooks/hooks.json.'
+    );
+  }
 
   let hooksJson;
   let parseSuccessful = false;

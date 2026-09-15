@@ -223,8 +223,12 @@ mv plugins/hookify-old plugins/hookify
 
 > **Rules 6–11** run inside `validate-plugin.js` but have no numbered heading
 > here. They cover plugin-local inline hook script paths and content sanity —
-> shebang, `set -e`, decision output (RULES 6 + 8); `hooks.json` drift against
-> the manifest's inline hook config (RULE 7); `userConfig` entry shape — a
+> shebang, `set -e`, decision output (RULES 6 + 8); `hooks/hooks.json` checks
+> (RULE 7) — an error when the file coexists with inline `hooks` in the
+> manifest (Claude Code auto-discovers the file and registers every hook
+> twice), errors for unparseable or mis-shaped files, and drift warnings
+> against the inline block for hooks-only plugins mid-migration; `userConfig`
+> entry shape — a
 > required `type` from the supported set, a required `title`, and the
 > allowlist of fields Claude Code's remote validator accepts, applied to both
 > the top-level object and each `channels[].userConfig` (RULE 9); and
