@@ -145,7 +145,7 @@ function validatePlugin(pluginDir) {
   const inlineHooks = collectInlineHooks(manifest.hooks);
   const hasInlineHooks = Object.keys(inlineHooks).length > 0;
   ruleInlineHookScripts(manifest, inlineHooks, hasInlineHooks, pluginDir, errors);
-  ruleHooksJson(pluginDir, inlineHooks, hasInlineHooks, errors);
+  ruleHooksJson(pluginDir, hasInlineHooks, errors);
 
   ruleUserConfig(manifest, errors);
   ruleDependencies(manifest, marketplacePluginNames);

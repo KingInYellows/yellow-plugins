@@ -485,7 +485,7 @@ printf 'plain text\\n'
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(
-      /hooks\/hooks\.json coexists with inline hooks in plugin\.json/
+      /hooks\/hooks\.json: coexists with inline hooks in plugin\.json/
     );
   });
 

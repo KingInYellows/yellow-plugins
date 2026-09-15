@@ -14,10 +14,12 @@
  * pipeline as every other generated file.
  *
  * Generator hook-authority rule (R20): this module is the ONLY producer of
- * `hooks/codex-hooks.json`. emit-claude.js has no code path that reads any
- * `hooks/hooks.json` reference-only mirror (yellow-ci's documented
- * pattern) — Claude's hook config comes solely from `source.hooks` inline
- * in the generated plugin.json, unchanged by this module's existence.
+ * `hooks/codex-hooks.json`. emit-claude.js has no code path that reads a
+ * `hooks/hooks.json` file (the former "reference-only mirror" pattern,
+ * retired 2026-09 because Claude Code auto-loads it; validate-plugin.js
+ * RULE 7 now rejects one next to inline hooks) — Claude's hook config comes
+ * solely from `source.hooks` inline in the generated plugin.json, unchanged
+ * by this module's existence.
  */
 
 const { readFileSync, openSync, closeSync, constants, realpathSync, readdirSync, lstatSync } = require('fs');

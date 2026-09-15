@@ -143,16 +143,18 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
+Ten plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
 yellow-composio, yellow-morph, yellow-research, and yellow-semgrep are shell;
-yellow-ci and gt-workflow run a dependency-free Node runtime:
+yellow-ci, gt-workflow, and github-workflow run a dependency-free Node
+runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle                                          |
+| yellow-ruvector | PreToolUse, PostToolUse, UserPromptSubmit, SessionStart, Stop | Memory recall, edit tracking, session lifecycle                              |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
+| github-workflow | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages (same Node entrypoint as gt-workflow)         |
 | yellow-core     | SessionStart, Stop, PreCompact                    | Staging-queue drain; transcript-tail capture; compaction-preservation instruction        |
 | yellow-composio | SessionStart                                      | Warn if `composio_mcp_url` is non-HTTPS (advisory only)                                  |
 | yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
@@ -186,6 +188,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 | Hook               | Event            | Script                  | Time Budget | What It Does                                           |
 | ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
+| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit context and coedit suggestions                |
 | session-start      | SessionStart     | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
 | user-prompt-submit | UserPromptSubmit | `user-prompt-submit.sh` | 50ms        | Recall relevant memories                               |
 | post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 50ms        | Append file changes to queue                           |

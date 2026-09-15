@@ -541,10 +541,12 @@ describe('generator hook-authority rule (R20)', () => {
     const root = makeCodexFixtureRoot([
       { name: 'hook-plugin', codexEnabled: true, hooks: inlineHooks },
     ]);
-    // yellow-ci's documented reference-only mirror pattern: a hooks/hooks.json
-    // file sitting on disk with DIFFERENT content than the inline `hooks`
-    // field. If either emitter ever reads it, the generated output would
-    // reflect this decoy content instead of `source.hooks`.
+    // Decoy: a hooks/hooks.json file sitting on disk with DIFFERENT content
+    // than the inline `hooks` field (the retired "reference-only mirror"
+    // pattern — validate-plugin.js RULE 7 now rejects it in real plugins,
+    // but the generator must still never read one). If either emitter ever
+    // reads it, the generated output would reflect this decoy content
+    // instead of `source.hooks`.
     mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
     writeJson(join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json'), {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash DECOY-NEVER-READ.sh', timeout: 99 }] }],

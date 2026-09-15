@@ -116,11 +116,12 @@ Alternatives rejected:
 
 - [x] 2.1 In `scripts/lib/plugin-rules.js` `ruleHooksJson`, after the
       `fs.existsSync` check and before parsing: when `hasInlineHooks` is true,
-      `addError(errors, 'hooks/hooks.json coexists with inline hooks in plugin.json — Claude Code auto-discovers hooks/hooks.json and registers every hook twice. Keep the inline block (generated from catalog/) and delete hooks/hooks.json.')`.
-      Keep the existing parse/shape/per-event checks and the drift warnings
-      running after it (hooks-only plugins with no inline block still need
-      them; do not `return` early on the coexistence error so a malformed file
-      reports all its problems in one run).
+      `addError(errors, 'hooks/hooks.json: coexists with inline hooks in plugin.json — …')`.
+      Keep the parse/shape/per-event checks (they run for hooks-only plugins
+      with no inline block and must stay unconditional). Remove the drift
+      comparison and its `compareHookInternals` / `compareHookEntries`
+      helpers — they were only reachable when inline hooks and the file
+      coexisted, which is now the error itself (review finding).
 - [x] 2.2 Update the RULE 7 header comment (`plugin-rules.js:292-295`) to say
       coexistence is an error, drift is a warning kept for the
       hooks-only → inline migration case.
@@ -216,7 +217,8 @@ the six plugins is Cursor-enabled; Cursor packaging does not copy `hooks/`).
   lands and Claude Code refetches; the warning persists for them until then.
   Expected; the changeset is the fix.
 - **Hooks-only plugin (no inline block).** Still valid upstream; RULE 7 must
-  keep accepting it. The guard keys on `hasInlineHooks`, not on file presence.
+  keep accepting it. The guard keys on `hasInlineHooks`, not on file presence;
+  the parse/shape/per-event checks still run for it.
 - **`hooks` as a string path in plugin.json.** Already warned at
   `plugin-rules.js:213`; `collectInlineHooks` yields no inline hooks for it, so
   the new guard does not fire — correct, since only one source exists.

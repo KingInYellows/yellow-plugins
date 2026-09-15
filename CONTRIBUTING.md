@@ -458,7 +458,8 @@ share code:
    `validate-marketplace.js`, `validate-agent-authoring.js`,
    `validate-setup-all.js`). These enforce rules that JSON Schema cannot
    express: filesystem path existence, directory layout, `.md` presence,
-   hook-script sanity, `hooks.json` drift, the userConfig shape allowlist.
+   hook-script sanity, the `hooks/hooks.json` coexistence/shape check, the
+   userConfig shape allowlist.
    `validate-plugin.js` does **not** AJV-load `schemas/plugin.schema.json`.
    Since PR-A it is a thin orchestrator: per-rule checks live in
    `scripts/lib/plugin-rules.js`, path/hook helpers in
@@ -487,7 +488,8 @@ for unification (YAGNI).
 
 Yellow-plugins runs two local validation passes: `pnpm validate:plugins`
 checks plugin-specific rules in `scripts/validate-plugin.js` (path existence,
-hook script sanity, userConfig allowlist, hooks.json drift), and
+hook script sanity, userConfig allowlist, `hooks/hooks.json` coexistence/shape
+check), and
 `pnpm validate:schemas` runs AJV against `schemas/plugin.schema.json`. CI
 runs both. **Neither passing guarantees the plugin will install successfully
 via `claude doctor`.** Claude Code's remote validator can reject keys our

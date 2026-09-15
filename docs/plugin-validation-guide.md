@@ -226,9 +226,8 @@ mv plugins/hookify-old plugins/hookify
 > shebang, `set -e`, decision output (RULES 6 + 8); `hooks/hooks.json` checks
 > (RULE 7) — an error when the file coexists with inline `hooks` in the
 > manifest (Claude Code auto-discovers the file and registers every hook
-> twice), errors for unparseable or mis-shaped files, and drift warnings
-> against the inline block for hooks-only plugins mid-migration; `userConfig`
-> entry shape — a
+> twice) and errors for unparseable or mis-shaped files, which also run for
+> hooks-only plugins; `userConfig` entry shape — a
 > required `type` from the supported set, a required `title`, and the
 > allowlist of fields Claude Code's remote validator accepts, applied to both
 > the top-level object and each `channels[].userConfig` (RULE 9); and
