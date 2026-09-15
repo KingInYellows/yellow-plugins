@@ -142,19 +142,19 @@ Alternatives rejected:
 
 ### Phase 3: Docs and verification
 
-- [ ] 3.1 `docs/security.md:213` — "Check `hooks.json` for hook configuration"
+- [x] 3.1 `docs/security.md:213` — "Check `hooks.json` for hook configuration"
       → "Check the `hooks` block in `.claude-plugin/plugin.json` (generated
       from `catalog/`)".
-- [ ] 3.2 Append a dated `## Update — 2026-09-15` section to
+- [x] 3.2 Append a dated `## Update — 2026-09-15` section to
       `docs/solutions/build-errors/claude-code-plugin-manifest-validation-errors.md`
       (repo convention: append, don't rewrite) stating the "can remain for
       reference, not loaded" guidance is superseded — Claude Code auto-loads
       `hooks/hooks.json`, mirrors were deleted, RULE 7 now blocks coexistence.
       Link the July update in `ci-schema-drift-hooks-inline-vs-string.md`.
-- [ ] 3.3 Optional, one line each: `AUDIT_REPORT.md:142` (H-04 resolved) and
+- [x] 3.3 Optional, one line each: `AUDIT_REPORT.md:142` (H-04 resolved) and
       `docs/optimization/analysis.md:158` (citation now historical). Skip if
       those snapshot docs are treated as frozen.
-- [ ] 3.4 Run the targeted gates: `pnpm validate:plugins`,
+- [x] 3.4 Run the targeted gates: `pnpm validate:plugins`,
       `pnpm validate:schemas`, `pnpm test:integration`, `pnpm lint`,
       `pnpm typecheck`. `validate:generated` is unaffected (mirrors are not
       catalog-sourced) — confirm it still passes.

@@ -137,6 +137,8 @@ After (inlined from hooks.json):
 
 The hook handler JSON files (e.g., `hooks/hooks.json`) can remain in the repo for reference but are no longer loaded by Claude Code.
 
+> **Superseded — see "Update — 2026-09-15" below.** Claude Code now auto-discovers `hooks/hooks.json`; the reference mirrors were deleted.
+
 ## Prevention Strategies
 
 ### 1. Schema-level enforcement
@@ -179,3 +181,27 @@ When creating plugin.json:
 - [Skill frontmatter requirements](../code-quality/skill-frontmatter-attribute-and-format-requirements.md) — Another Claude Code format strictness issue (`user-invocable` spelling)
 - `docs/plugin-validation-guide.md` — Plugin validation reference
 - `schemas/official-marketplace.schema.json` — Local marketplace schema (updated with `additionalProperties: false`)
+
+## Update — 2026-09-15
+
+The "can remain in the repo for reference but are no longer loaded" guidance
+above is no longer true. Claude Code (observed on 2.1.272; the warning is
+reported from ~2.1.267) auto-discovers `hooks/hooks.json` at the plugin root
+**and** loads the inline `hooks` block in `plugin.json`, with no dedup between
+the two sources. The six plugins that kept a "REFERENCE ONLY" mirror
+(yellow-ruvector, yellow-ci, yellow-morph, yellow-debt, gt-workflow,
+github-workflow) therefore registered every hook twice — a SessionStart
+banner printed twice for yellow-ruvector, once for inline-only plugins — and
+startup printed `hooks.json: unknown key "_comment" ignored` because the
+loader only recognises `hooks` and `description` at the top level.
+
+Resolution: the mirrors were deleted; the inline `plugin.json` block (generated
+from `catalog/`) is the only Claude-side hook source, and `validate-plugin.js`
+RULE 7 now errors when `hooks/hooks.json` coexists with inline hooks. The
+"Always inline the hook definitions" checklist item above still stands — the
+change is that a file mirror is no longer harmless. `hooks/codex-hooks.json`
+is a separate, generated Codex contract and is unaffected. See also the
+"Update — 2026-07-16" section in
+[ci-schema-drift-hooks-inline-vs-string.md](./ci-schema-drift-hooks-inline-vs-string.md)
+for the string-path vs inline-object history, and
+`plans/fix-hooks-json-mirror-double-registration.md`.

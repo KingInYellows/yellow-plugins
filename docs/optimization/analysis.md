@@ -159,6 +159,10 @@ plugin CLAUDE.md catalogs]**.
 authoritative (e.g. `plugins/gt-workflow/hooks/hooks.json:2` says "REFERENCE
 ONLY") **[relayed]**.
 
+> Historical (2026-09-15): the "reference-only" premise was wrong — Claude Code
+> auto-discovers `hooks/hooks.json` and double-registered every hook. The
+> mirrors were deleted; `plugin.json` `hooks` is the sole source.
+
 | Plugin | Event | Purpose |
 |---|---|---|
 | gt-workflow | PreToolUse(Bash) | block raw `git push`, force `gt submit` |

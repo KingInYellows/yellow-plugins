@@ -210,7 +210,9 @@ yellow-ruvector has the most hooks. Its shell scripts:
 Before enabling any plugin with hooks:
 
 1. Review the hook scripts in `plugins/<name>/hooks/scripts/`
-2. Check `hooks.json` for hook configuration
+2. Check the `hooks` block in `.claude-plugin/plugin.json` (generated from
+   `catalog/`) for hook configuration — plugins do not ship a separate
+   `hooks/hooks.json`
 3. Verify scripts match the documented behavior above
 4. Test in a non-production environment first
 
