@@ -66,11 +66,15 @@ function hookCommandInterpreter(command) {
  */
 function resolveHookScriptPath(command, pluginDir) {
   const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
+  // One source of truth for the interpreter set: strip the prefix
+  // HOOK_SCRIPT_INTERPRETER_RE matched, then parse the script argument.
+  const prefix = resolved.match(HOOK_SCRIPT_INTERPRETER_RE);
+  if (!prefix) return null;
   // Accept double-quoted, single-quoted, and unquoted script paths so a
   // command like `bash "scripts/my hook.sh"` resolves correctly.
-  const match = resolved.match(
-    /^(?:bash|node)\s+(?:"([^"]+)"|'([^']+)'|(\S+))/
-  );
+  const match = resolved
+    .slice(prefix[0].length)
+    .match(/^(?:"([^"]+)"|'([^']+)'|(\S+))/);
   if (!match) return null;
   const scriptPath = match[1] || match[2] || match[3];
   const normalized = path.resolve(pluginDir, scriptPath);
@@ -323,7 +327,7 @@ function validateHookScriptPath(
   eventName,
   pluginDir,
   errors,
-  interpreter = 'bash'
+  interpreter
 ) {
   if (!fs.existsSync(scriptPath)) {
     addError(errors, `Hook script not found for ${eventName}: ${scriptPath}`);

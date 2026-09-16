@@ -595,6 +595,17 @@ process.stdout.write('{"continue": true}\\n');
     );
   });
 
+  it('warns on a single-quoted ${CLAUDE_PLUGIN_ROOT} placeholder (never expands), not as word-splitting', () => {
+    writeHookScript(pluginDir, 'hooks/scripts/guard.sh', SHEBANG_HOOK);
+    writePluginManifest(
+      pluginDir,
+      hookManifest("bash '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh'")
+    );
+    const { stderr } = runValidator(pluginDir);
+    expect(stderr).toMatch(/single-quotes \$\{CLAUDE_PLUGIN_ROOT\}/);
+    expect(stderr).not.toMatch(/unquoted \$\{CLAUDE_PLUGIN_ROOT\}/);
+  });
+
   it('passes a quoted command when the plugin lives under a path containing a space', () => {
     // Claude Code runs shell-form commands through `sh -c`; the quoted
     // placeholder is what keeps a plugin-cache path with a space intact.

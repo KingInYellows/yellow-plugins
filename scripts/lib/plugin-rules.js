@@ -166,9 +166,15 @@ function rulePathFields(manifest, pluginDir, errors) {
   }
 }
 
-// `${CLAUDE_PLUGIN_ROOT}` not immediately preceded by a double quote. The
-// official hook docs: "in shell form, wrap each placeholder in double quotes".
-const UNQUOTED_PLUGIN_ROOT_RE = /(^|[^"])\$\{CLAUDE_PLUGIN_ROOT\}/;
+// `${CLAUDE_PLUGIN_ROOT}` not immediately preceded by a quote. The official
+// hook docs: "in shell form, wrap each placeholder in double quotes". A
+// single quote is excluded here only because it is not the word-splitting
+// failure this warning describes — it is worse (the placeholder never
+// expands), and gets its own check below.
+const UNQUOTED_PLUGIN_ROOT_RE = /(^|[^"'])\$\{CLAUDE_PLUGIN_ROOT\}/;
+// A single-quoted placeholder is passed to the script literally — `sh -c`
+// never expands it, so the command targets a path named "${CLAUDE_PLUGIN_ROOT}".
+const SINGLE_QUOTED_PLUGIN_ROOT_RE = /'\$\{CLAUDE_PLUGIN_ROOT\}/;
 
 // RULES 6 + 8: Hook script existence + content checks (shebang, decision
 // output, set -e) over inline event-keyed hook configs. Both rules iterate
@@ -197,6 +203,10 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
           if (UNQUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
             logWarning(
               `${eventName} hook command has unquoted \${CLAUDE_PLUGIN_ROOT} — word-splits on paths with spaces; quote it: ${hook.command}`
+            );
+          } else if (SINGLE_QUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
+            logWarning(
+              `${eventName} hook command single-quotes \${CLAUDE_PLUGIN_ROOT} — the shell never expands it; use double quotes: ${hook.command}`
             );
           }
           const interpreter = hookCommandInterpreter(hook.command);
