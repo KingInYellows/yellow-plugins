@@ -93,13 +93,55 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
+# --- Embedder provenance check (jq only; no CLI, no model load) ---
+# ruvector 0.2.34 embeds with onnx-minilm (384d) by default. A store stamped
+# by the older hash embedder (64d) is still readable, so hooks_recall keeps
+# working, but every hooks_remember is refused (ADR-210) and the write loss
+# is silent. Surface it once per session so the operator runs the
+# /ruvector:status remediation. Absent file or absent stamp is a fresh or
+# legacy store, not a mismatch — stay silent; RUVECTOR_EMBEDDER=hash or
+# RUVECTOR_ONNX=0 selects the hash embedder on purpose — stay silent.
+provenance_note=""
+INTEL_JSON="${RUVECTOR_DIR}/intelligence.json"
+if [ -f "$INTEL_JSON" ]; then
+  store_kind=$(jq -r '.embeddingProvenance.embedderKind // ""' "$INTEL_JSON" 2>/dev/null) || store_kind=""
+  if [ "$store_kind" = "hash" ]; then
+    embedder_sel=$(printf '%s' "${RUVECTOR_EMBEDDER:-}" | tr '[:upper:]' '[:lower:]')
+    if [ "$embedder_sel" != "hash" ] && [ "${RUVECTOR_ONNX:-}" != "0" ]; then
+      store_dim=$(jq -r '.embeddingProvenance.dimension // "?"' "$INTEL_JSON" 2>/dev/null) || store_dim="?"
+      provenance_note="[ruvector] store is hash-embedded (${store_dim}d); the default embedder is onnx-minilm — memory writes are refused until you run /ruvector:status"
+    fi
+  fi
+  unset store_kind embedder_sel store_dim
+fi
+
+# Emit the allow payload, carrying the provenance note as systemMessage when
+# set. Every exit path below the provenance check goes through here so the
+# note is never dropped by an early exit.
+finish() {
+  local msg="${1:-}"
+  if [ -n "$provenance_note" ]; then
+    if [ -n "$msg" ]; then
+      msg=$(printf '%s\n\n%s' "$msg" "$provenance_note")
+    else
+      msg="$provenance_note"
+    fi
+  fi
+  if [ -n "$msg" ]; then
+    jq -n --arg msg "$msg" '{systemMessage: $msg, continue: true, permission: "allow"}' \
+      || json_exit
+    exit 0
+  fi
+  json_exit
+}
+
 # Resolve ruvector command: require direct binary for SessionStart (3s budget).
 # npx resolution alone (~2700ms) consumes nearly the whole budget before any
 # of the three CLI calls below run, so skip entirely when the binary is absent.
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
 else
-  json_exit
+  finish
 fi
 
 # Per-call caps inside the 3s hooks.json watchdog: 0.9s resume + 0.8s per
@@ -167,10 +209,5 @@ if [ -n "$recent_learnings" ] || [ -n "$skill_learnings" ]; then
   fi
 fi
 
-# Return learnings as systemMessage if available
-if [ -n "$learnings" ]; then
-  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true, permission: "allow"}' \
-    || json_exit
-else
-  json_exit
-fi
+# Return learnings (and any provenance note) as systemMessage if available
+finish "$learnings"

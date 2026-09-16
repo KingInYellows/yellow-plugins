@@ -63,7 +63,9 @@ ruvector.
 - `/ruvector:setup` — Install ruvector and initialize `.ruvector/` directory
 - `/ruvector:index` — Index codebase for semantic search
 - `/ruvector:search` — Search codebase by meaning using vector similarity
-- `/ruvector:status` — Show ruvector health, DB stats, and queue status
+- `/ruvector:status` — Show ruvector health, DB stats, queue status, and
+  embedder provenance (`PROVENANCE: OK | MISMATCH | UNSTAMPED | UNKNOWN`
+  from a `hooks reembed --dry-run` stamp comparison, with remediation)
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
 - `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
@@ -92,7 +94,10 @@ ruvector.
 - `user-prompt-submit.sh` — Inject relevant memories before Claude processes each
   user prompt via `hooks recall` (1s budget)
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
-  via `hooks recall` (3s budget)
+  via `hooks recall` (3s budget). Also a jq-only embedder-provenance check:
+  a `hash`-stamped store with the default (onnx-minilm) embedder adds one
+  `[ruvector] store is hash-embedded …` line to `systemMessage`; silent for
+  unstamped stores and when `RUVECTOR_EMBEDDER=hash` / `RUVECTOR_ONNX=0`
 - `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/MultiEdit/Bash tools (1s budget). Stdout is dual-client allow JSON (`continue` + `permission`) so Cursor's Claude-plugin bridge does not block the tool.
 - `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
   `hooks post-edit` and `hooks post-command` (<50ms)
@@ -198,6 +203,13 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 - Hook recall uses hash embeddings (not ONNX semantic) — paraphrased queries
   (e.g., "fix the bug" vs "correct the error") score near-zero similarity.
   Use the `--semantic` flag via MCP for higher quality but ~300-1500ms overhead
+- A store stamped by the pre-0.2.34 hash embedder refuses every
+  `hooks_remember` (ADR-210) while `hooks_recall` keeps answering — the
+  write loss is silent. `session-start.sh` and `/ruvector:status` now
+  surface it; the fix is `npx -y --ignore-scripts ruvector@0.2.34 hooks
+  reembed` followed by a Claude Code restart (the running MCP server holds
+  the pre-reembed snapshot and would clobber the store on its next save).
+  See `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
 
 ## Maintenance
 

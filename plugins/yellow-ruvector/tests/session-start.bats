@@ -282,3 +282,73 @@ exit 0'
   grep -q 'not-a-store' "$PROJECT_ROOT/wt/.ruvector"
   echo "$stderr" | grep -q 'diverged from the shared store'
 }
+
+# --- Embedder provenance check (jq only, no CLI call) ---
+# A hash-stamped store (pre-ADR-210 default) is readable by the onnx-minilm
+# default embedder but every write is refused; the hook must say so once
+# per session. Fresh/legacy (no stamp) stores and a deliberate hash
+# selection stay silent.
+
+write_provenance() {
+  # $1 = embedderKind, $2 = dimension
+  printf '{"embeddingProvenance":{"embedderKind":"%s","modelId":null,"dimension":%s,"normalize":true,"prefixPolicy":"none"}}\n' \
+    "$1" "$2" > "$RUVECTOR_DIR/intelligence.json"
+}
+
+@test "provenance: hash-stamped store adds the mismatch line to systemMessage" {
+  write_provenance hash 64
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded (64d)")' > /dev/null
+  echo "$output" | jq -e '.systemMessage | contains("/ruvector:status")' > /dev/null
+}
+
+@test "provenance: mismatch line is appended after recall learnings, not instead of them" {
+  write_provenance hash 64
+  make_ruvector_stub 'case "$2" in recall) echo "mock-learning";; esac
+exit 0'
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.systemMessage | contains("mock-learning")' > /dev/null
+  echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
+  # Exactly one occurrence — the note is emitted once per session.
+  [ "$(echo "$output" | jq -r '.systemMessage' | grep -c 'store is hash-embedded')" -eq 1 ]
+}
+
+@test "provenance: onnx-minilm-stamped store stays silent" {
+  write_provenance onnx-minilm 384
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
+}
+
+@test "provenance: unstamped store (fresh or legacy) stays silent" {
+  printf '{"memories":[]}\n' > "$RUVECTOR_DIR/intelligence.json"
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
+}
+
+@test "provenance: RUVECTOR_EMBEDDER=hash on purpose stays silent" {
+  write_provenance hash 64
+  make_ruvector_stub 'exit 0'
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_EMBEDDER=hash PATH="$1:$PATH" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
+}
+
+@test "provenance: mismatch line survives the no-ruvector-binary early exit" {
+  # The check is jq-only, so it must still surface when the CLI is absent
+  # (the binary gate used to json_exit before any systemMessage was built).
+  write_provenance hash 64
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | PATH="/usr/bin:/bin" CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
+}

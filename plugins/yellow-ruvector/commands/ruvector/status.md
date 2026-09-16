@@ -1,6 +1,6 @@
 ---
 name: ruvector:status
-description: "Show ruvector health, DB stats, and queue status. Use when user says \"ruvector status\", \"check vector DB\", \"how many vectors\", \"is ruvector working\", or wants to verify the installation."
+description: "Show ruvector health, DB stats, queue status, and embedder provenance (PROVENANCE: OK / MISMATCH with reembed remediation). Use when user says \"ruvector status\", \"check vector DB\", \"how many vectors\", \"is ruvector working\", or wants to verify the installation."
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -87,7 +87,69 @@ Report:
 
 Warn if queue > 5MB or > 1000 entries.
 
-### Step 6: Display Summary
+### Step 6: Embedder Provenance
+
+The store's `embeddingProvenance` stamp must match the embedder the CLI
+resolves for this machine, or every `hooks_remember` is refused (ADR-210)
+while `hooks_recall` keeps working — a silent write loss. Compare all three
+fields (`embedderKind`, `modelId`, `dimension`); a mismatch in any one is a
+mismatch.
+
+```bash
+STORE=$(jq -c '.embeddingProvenance // null' .ruvector/intelligence.json 2>/dev/null || echo null)
+# --dry-run reads the store and resolves the active embedder without writing.
+# wouldReembed is the store's re-embeddable vector count (memories with
+# retained source text), NOT a pending count — it is the same before and
+# after a completed reembed.
+DRY=$(npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run 2>/dev/null | tail -1)
+TARGET=$(printf '%s' "$DRY" | jq -c '.targetProvenance // null')
+COUNT=$(printf '%s' "$DRY" | jq -r '.wouldReembed // "?"')
+DROP=$(printf '%s' "$DRY" | jq -r '.wouldDrop // 0')
+printf 'store=%s\ntarget=%s\ncount=%s drop=%s\n' "$STORE" "$TARGET" "$COUNT" "$DROP"
+```
+
+Interpret the three outcomes and print exactly one `PROVENANCE:` line:
+
+- Store stamp `null` (no `embeddingProvenance` key) →
+  `PROVENANCE: UNSTAMPED (legacy store; writes fail with
+  ERR_LEGACY_STORE_READONLY until reembedded)` — same remediation as a
+  mismatch.
+- Store `{embedderKind, modelId, dimension}` all equal to target →
+  `PROVENANCE: OK (<kind>/<modelId>/<dimension>, <COUNT> vectors)`.
+- Any field differs →
+  `PROVENANCE: MISMATCH (store <kind>/<dimension> → active
+  <kind>/<modelId>/<dimension>, <COUNT> vectors to reembed)` followed by
+  the remediation block below.
+
+A reembed writes the new stamp only after every vector succeeds, so an
+interrupted reembed leaves the old stamp and reports as MISMATCH — there is
+no separate "incomplete" state to detect.
+
+Remediation (print verbatim under MISMATCH / UNSTAMPED):
+
+```
+1. Quiesce writes: finish or abandon any ruvector-writing command in this
+   session (seed-solutions, remember). The running MCP server holds an
+   in-memory snapshot of the store; its next save would overwrite the
+   reembedded file.
+2. npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run   # expect wouldDrop: 0
+   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed             # ~1 min per 750 vectors
+3. Restart Claude Code so the MCP server reloads the reembedded store.
+4. Verify in the fresh session: hooks_remember a test line, then
+   hooks_recall it. Re-run /ruvector:status — expect PROVENANCE: OK.
+```
+
+If the dry-run itself fails (no network for the ONNX model, `dist` not
+built), report `PROVENANCE: UNKNOWN (<error from the CLI>)` and the store
+stamp alone; do not guess the active embedder. If `wouldDrop` is non-zero,
+say so: those memories have no retained source text and `hooks reembed`
+refuses until `--drop-missing` is passed.
+
+`RUVECTOR_EMBEDDER=hash` (or `RUVECTOR_ONNX=0`) makes the CLI resolve the
+hash embedder; a hash-stamped store then reports OK. That is deliberate,
+not a mismatch.
+
+### Step 7: Display Summary
 
 ```
 ## ruvector Status
@@ -114,6 +176,11 @@ Warn if queue > 5MB or > 1000 entries.
 | Pending entries | 7 |
 | Queue size | 2.1 KB |
 | Oldest entry | 2 hours ago |
+
+### Embedder
+
+PROVENANCE: MISMATCH (store hash/64 → active onnx-minilm/all-MiniLM-L6-v2/384, 756 vectors to reembed)
+<remediation block>
 ```
 
 ## Error Handling
@@ -122,3 +189,6 @@ Warn if queue > 5MB or > 1000 entries.
 - **No .ruvector/ directory:** "Not initialized. Run `/ruvector:setup` to set
   up."
 - **MCP unavailable:** Show CLI info only, note MCP status as unavailable.
+- **Provenance dry-run fails:** `PROVENANCE: UNKNOWN` with the CLI's error;
+  never infer the active embedder from the MCP `hooks_capabilities` output —
+  the running server can predate a reembed.
