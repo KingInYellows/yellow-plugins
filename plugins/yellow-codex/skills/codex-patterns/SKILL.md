@@ -37,7 +37,7 @@ OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 DIFF_FILE=$(mktemp /tmp/codex-reviewer-diff-XXXXXX.txt)
 SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 
-git diff "${BASE_REF}...HEAD" > "$DIFF_FILE"
+git diff "${BASE_REF}...HEAD" >| "$DIFF_FILE"
 DIFF_STATUS=$?
 # Guard before invoking: a failed git diff (nonzero status — can leave a
 # nonempty but PARTIAL file when an external diff/textconv driver fails
@@ -53,7 +53,7 @@ codex exec \
   -c 'mcp_servers={}' \
   --ephemeral \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   --output-schema "$SCHEMA_FILE" \
   -o "$OUTPUT_FILE" \
   </dev/null
@@ -112,7 +112,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
   "$TASK_PROMPT"
 ```
@@ -128,7 +128,7 @@ codex exec \
   -s read-only \
   --ephemeral \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
   "$ANALYSIS_PROMPT"
 ```
@@ -173,13 +173,26 @@ Convenience alias: `--full-auto` sets `-a on-request -s workspace-write`.
 
 ## Model Selection (`-m` / `--model`)
 
-| Model | Speed | Cost | When to Use |
-|-------|-------|------|-------------|
-| `gpt-5.4` | Medium | Standard | Default for all operations |
-| `gpt-5.4-mini` | Fast | Low | Cost-sensitive review, quick analysis |
-| `gpt-5.3-codex` | Medium | Standard | 1M context window (huge diffs) |
+No `-m` by default. Every invocation in this plugin passes
+`${CODEX_MODEL:+-m "$CODEX_MODEL"}` — the flag appears only when
+`CODEX_MODEL` is set; otherwise codex resolves the model through its own
+precedence (`~/.codex/config.toml` `model`, then the account default —
+`gpt-6-astra` under ChatGPT auth on codex-cli 0.153.3). The expansion
+yields exactly zero or two arguments in both backslash-continued and
+`CODEX_CMD=(...)` array form; never write `-m "${CODEX_MODEL:-<name>}"`,
+which hardcodes an account-specific default.
 
-Default: `gpt-5.4`. Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
+| Model | Status | When to Use |
+|-------|--------|-------------|
+| (unset) | Default | Account default via codex's config precedence — works on API-key and ChatGPT accounts |
+| `gpt-5.6-luna` | Current, cheap | `/codex:setup` smoke test only (`CODEX_SMOKE_MODEL` overrides) |
+| `gpt-5.3-codex` | Current | 1M context window (huge diffs); ChatGPT accounts reject `gpt-5.x-codex` names |
+| `gpt-5.4`, `gpt-5.4-mini` | Legacy | Do not hardcode — OpenAI lists them as legacy; ChatGPT-account auth rejects them with HTTP 400 (`invalid_request_error`, exit 1) |
+
+The exit-1 arm in `codex-reviewer` recognises the 400 rejection and returns
+`verdict=UNAVAILABLE` naming the rejected model. See
+`docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md`
+(2026-09-05 and 2026-09-16 updates).
 
 ## Output Parsing
 
@@ -321,12 +334,12 @@ Or ensure `.codexignore` is populated in the project root.
 Exit code 1 with stderr containing "rate_limit_exceeded":
 
 ```bash
-codex_output=$(codex exec ... 2>"$STDERR_FILE") || {
+codex_output=$(codex exec ... 2>|"$STDERR_FILE") || {
   codex_exit=$?
   if [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5
-    codex_output=$(codex exec ... 2>"$STDERR_FILE") || {
+    codex_output=$(codex exec ... 2>|"$STDERR_FILE") || {
       printf '[yellow-codex] Still rate limited. Try again later.\n'
     }
   fi

@@ -85,9 +85,9 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
-  "$TASK_PROMPT" 2>"$STDERR_FILE" || {
+  "$TASK_PROMPT" 2>|"$STDERR_FILE" || {
     codex_exit=$?
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-executor] Timed out after 5 minutes\n'

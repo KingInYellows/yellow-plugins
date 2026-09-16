@@ -193,12 +193,30 @@ elif command -v codex >/dev/null 2>&1; then
 fi
 
 if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
+  # mktemp created the file, so `>|` (not `>`) — zsh `noclobber` refuses a
+  # plain `>` onto an existing path and the probe never runs.
   SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
-  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>"$SETUP_ERR_FILE") || true
+  # Explicit cheap model for the smoke test only (every other codex exec in
+  # this plugin omits -m and lets the CLI resolve the account default).
+  # Override with CODEX_SMOKE_MODEL. Never a gpt-5.4* name: OpenAI lists
+  # those as legacy and ChatGPT-account auth rejects them with a 400.
+  smoke_model="${CODEX_SMOKE_MODEL:-gpt-5.6-luna}"
+  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only -m "$smoke_model" "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE") || true
+  if [ -z "$test_output" ] && grep -q "not supported when using Codex with a ChatGPT account" "$SETUP_ERR_FILE" 2>/dev/null; then
+    # The account cannot use the explicit smoke model (exit 1, HTTP 400
+    # invalid_request_error). Retry once with no -m so the CLI's own model
+    # precedence (~/.codex/config.toml, then the account default) decides —
+    # the same path the plugin's real invocations take.
+    printf '[yellow-codex] Test invocation: model %s rejected for this account; retrying with the account default\n' "$smoke_model"
+    test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE") || true
+  fi
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
     printf '[yellow-codex] Test invocation: ok\n'
   elif [ -n "$test_output" ]; then
     printf '[yellow-codex] Test invocation: response received (model accessible)\n'
+  elif grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
+    printf '[yellow-codex] Test invocation: model rejected — set CODEX_SMOKE_MODEL to a model this account allows:\n' >&2
+    grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null >&2
   elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Test invocation: CLI argument parse error (flag drift?):\n' >&2
     grep -m2 -E "^error:" "$SETUP_ERR_FILE" 2>/dev/null >&2

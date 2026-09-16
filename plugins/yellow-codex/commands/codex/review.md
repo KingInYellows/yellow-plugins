@@ -168,9 +168,9 @@ SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 # a temp file and named in the prompt (letting Codex fetch its own diff was
 # tested and rejected: it explores the repo until timeout).
 if [ -n "$BASE_REF" ]; then
-  git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>"$STDERR_FILE"
+  git diff "${BASE_REF}...HEAD" >| "$DIFF_FILE" 2>|"$STDERR_FILE"
 else
-  git diff --cached > "$DIFF_FILE" 2>"$STDERR_FILE"
+  git diff --cached >| "$DIFF_FILE" 2>|"$STDERR_FILE"
 fi
 DIFF_STATUS=$?
 
@@ -231,13 +231,13 @@ CODEX_CMD=(codex exec
   -c 'mcp_servers={}'
   --ephemeral
   --json
-  -m "${CODEX_MODEL:-gpt-5.4}"
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"}
   --output-schema "$SCHEMA_FILE"
   -o "$OUTPUT_FILE"
 )
 
 # Execute with timeout
-timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>"$STDERR_FILE" || {
+timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>|"$STDERR_FILE" || {
   codex_exit=$?
   if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
     printf '[yellow-codex] Error: review timed out after 5 minutes.\n'
@@ -252,7 +252,7 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
   elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5
-    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>"$STDERR_FILE" || {
+    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>|"$STDERR_FILE" || {
       printf '[yellow-codex] Error: still rate limited. Try again later.\n'
     }
   else

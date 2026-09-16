@@ -89,9 +89,9 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -s read-only \
   --ephemeral \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
-  "$ANALYSIS_PROMPT" 2>"$STDERR_FILE" || {
+  "$ANALYSIS_PROMPT" 2>|"$STDERR_FILE" || {
     codex_exit=$?
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-analyst] Timed out after 5 minutes\n'
