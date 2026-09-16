@@ -20,6 +20,7 @@ const path = require('path');
 const { addError, logWarning, logSuccess } = require('./logging');
 const {
   VALID_HOOK_EVENTS,
+  hookCommandInterpreter,
   resolveHookScriptPath,
   validatePathFile,
   validatePathOrPathsDir,
@@ -165,6 +166,10 @@ function rulePathFields(manifest, pluginDir, errors) {
   }
 }
 
+// `${CLAUDE_PLUGIN_ROOT}` not immediately preceded by a double quote. The
+// official hook docs: "in shell form, wrap each placeholder in double quotes".
+const UNQUOTED_PLUGIN_ROOT_RE = /(^|[^"])\$\{CLAUDE_PLUGIN_ROOT\}/;
+
 // RULES 6 + 8: Hook script existence + content checks (shebang, decision
 // output, set -e) over inline event-keyed hook configs. Both rules iterate
 // the same scripts; validateHookScriptPath folds them into one pass. A
@@ -185,16 +190,23 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
         if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
         for (const hook of entry.hooks) {
           if (hook.type !== 'command' || !hook.command) continue;
+          // Claude Code runs shell-form commands through `sh -c`; an
+          // unquoted placeholder word-splits on a plugin-cache path with a
+          // space and the hook fails open (a PreToolUse guard silently does
+          // not run). Warning, not error: third-party catalogs keep working.
+          if (UNQUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
+            logWarning(
+              `${eventName} hook command has unquoted \${CLAUDE_PLUGIN_ROOT} — word-splits on paths with spaces; quote it: ${hook.command}`
+            );
+          }
+          const interpreter = hookCommandInterpreter(hook.command);
           const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
           if (!scriptPath) {
-            // resolveHookScriptPath returns null for non-bash commands (which
-            // need no path check) AND for bash commands escaping the plugin
-            // directory — the latter is a containment violation.
-            const resolved = hook.command.replaceAll(
-              '${CLAUDE_PLUGIN_ROOT}',
-              pluginDir
-            );
-            if (/^bash\s+/.test(resolved)) {
+            // resolveHookScriptPath returns null for commands that are not
+            // `bash <path>` / `node <path>` (which need no path check) AND
+            // for those that escape the plugin directory — the latter is a
+            // containment violation.
+            if (interpreter) {
               addError(
                 errors,
                 `Hook script path escapes plugin directory: ${hook.command}`
@@ -202,7 +214,13 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
             }
             continue;
           }
-          validateHookScriptPath(scriptPath, eventName, pluginDir, errors);
+          validateHookScriptPath(
+            scriptPath,
+            eventName,
+            pluginDir,
+            errors,
+            interpreter
+          );
         }
       }
     }

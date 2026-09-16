@@ -44,16 +44,33 @@ const DECISION_PROTOCOL_EVENTS = new Set([
   'SessionStart',
 ]);
 
+// Interpreters whose hook commands name a plugin-local script as their first
+// argument. `bash` scripts get the shebang / decision-output / `set -e`
+// content checks; `node` entrypoints get existence + containment only.
+const HOOK_SCRIPT_INTERPRETER_RE = /^(bash|node)\s+/;
+
+/**
+ * Return the interpreter ("bash" | "node") a hook command starts with, or
+ * null for any other command form (which gets no script-path checks).
+ */
+function hookCommandInterpreter(command) {
+  const match = command.match(HOOK_SCRIPT_INTERPRETER_RE);
+  return match ? match[1] : null;
+}
+
 /**
  * Resolve a hook command to a script path within the plugin directory.
- * Returns the resolved path, or null if the command is not a "bash <path>"
- * format or the path escapes the plugin directory.
+ * Returns the resolved path, or null if the command is not a
+ * "bash <path>" / "node <path>" format or the path escapes the plugin
+ * directory.
  */
 function resolveHookScriptPath(command, pluginDir) {
   const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
   // Accept double-quoted, single-quoted, and unquoted script paths so a
   // command like `bash "scripts/my hook.sh"` resolves correctly.
-  const match = resolved.match(/^bash\s+(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  const match = resolved.match(
+    /^(?:bash|node)\s+(?:"([^"]+)"|'([^']+)'|(\S+))/
+  );
   if (!match) return null;
   const scriptPath = match[1] || match[2] || match[3];
   const normalized = path.resolve(pluginDir, scriptPath);
@@ -301,7 +318,13 @@ function collectInlineHooks(hooks) {
  * Centralizes per-script-path checks so RULE 6 and RULE 8 cannot drift.
  * eventName is required for the DECISION_PROTOCOL_EVENTS gate.
  */
-function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
+function validateHookScriptPath(
+  scriptPath,
+  eventName,
+  pluginDir,
+  errors,
+  interpreter = 'bash'
+) {
   if (!fs.existsSync(scriptPath)) {
     addError(errors, `Hook script not found for ${eventName}: ${scriptPath}`);
     return;
@@ -342,6 +365,11 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
       `Hook script not readable: ${scriptPath} (check file permissions)`
     );
   }
+  // A `node <entrypoint>` command runs the file through the interpreter, so
+  // it has no executable-bit, shebang, or shell-content contract — the
+  // existence, symlink, and containment checks above are the whole rule.
+  if (interpreter !== 'bash') return;
+
   if ((lstat.mode & 0o111) === 0) {
     logWarning(
       `Hook script not executable: ${scriptPath} (check file permissions)`
@@ -389,6 +417,7 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
 module.exports = {
   VALID_HOOK_EVENTS,
   DECISION_PROTOCOL_EVENTS,
+  hookCommandInterpreter,
   resolveHookScriptPath,
   resolvePluginPath,
   countMarkdownRecursive,

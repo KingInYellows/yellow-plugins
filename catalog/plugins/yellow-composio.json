@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh\"",
             "timeout": 3
           }
         ]
