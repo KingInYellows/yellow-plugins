@@ -470,8 +470,10 @@ printf 'plain text\\n'
   it('errors when hooks/hooks.json is present without inline plugin.json hooks (RULE 7: hooks-only is not a carve-out)', () => {
     // Upstream documents hooks-only plugins as valid, but in this catalog-
     // generated marketplace the file is an un-cataloged hook source:
-    // emit-codex.js never mirrors it, RULES 6/8 never inspect its scripts,
-    // and generate-manifests --check cannot see it. Presence alone errors.
+    // emit-codex.js never mirrors it and RULES 6/8 never inspect its
+    // scripts. generate-manifests --check also reports it as forbidden (see
+    // generate-manifests-codex.test.ts), but this validator rejects it
+    // outright regardless. Presence alone errors.
     mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
     writeFileSync(
       join(pluginDir, 'hooks', 'hooks.json'),

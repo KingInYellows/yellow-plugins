@@ -546,7 +546,8 @@ describe('generator hook-authority rule (R20)', () => {
     // pattern — validate-plugin.js RULE 7 now rejects it in real plugins,
     // but the generator must still never read one). If either emitter ever
     // reads it, the generated output would reflect this decoy content
-    // instead of `source.hooks`.
+    // instead of `source.hooks`. The sweep reports it as a 'forbidden' diff
+    // and leaves it in place (see the next test); apply still succeeds.
     mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
     writeJson(join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json'), {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash DECOY-NEVER-READ.sh', timeout: 99 }] }],
@@ -592,40 +593,45 @@ describe('generator hook-authority rule (R20)', () => {
     expect(codexManifest.hooks).toBe('./hooks/codex-hooks.json');
   });
 
-  it('reports a hand-written hooks/hooks.json as stale in --check and removes it on apply', () => {
+  it.each([
+    ['Codex-enabled', true],
+    ['Codex-disabled', false],
+  ])('reports a hand-written hooks/hooks.json as forbidden in --check and leaves it untouched on apply (%s plugin)', (_label, codexEnabled) => {
     // Claude Code auto-loads plugins/<name>/hooks/hooks.json as a second
     // hook source next to the inline plugin.json block. The generator never
     // emits it, so validate-plugin.js RULE 7 rejects its presence — and the
-    // stale sweep here gives `generate-manifests --check` the same signal,
-    // so a reintroduced file fails validate:generated too, not only
-    // validate:plugins.
+    // sweep here gives `generate-manifests --check` the same signal (a
+    // 'forbidden' diff fails --check like any other), so a reintroduced
+    // file fails validate:generated too, not only validate:plugins. Apply
+    // must NOT delete it: the generator has no catalog source to regenerate
+    // a hand-written file from, and the apply path also runs unattended
+    // from sync-manifests.js. The sweep loop runs for every plugin
+    // regardless of Codex enablement, so both variants are pinned.
     const inlineHooks = {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
     };
     const root = makeCodexFixtureRoot([
-      { name: 'hook-plugin', codexEnabled: true, hooks: inlineHooks },
+      { name: 'hook-plugin', codexEnabled, hooks: inlineHooks },
     ]);
     const first = generateManifests({ mode: 'apply', rootDir: root });
     expect(first.status).toBe('ok');
 
     const hooksJson = join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json');
+    mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
     writeJson(hooksJson, { hooks: inlineHooks });
+
+    const forbiddenDiff = (r: { diffs: { path: string; state: string }[] }) =>
+      r.diffs.some((d) => d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'forbidden');
 
     const checked = generateManifests({ mode: 'check', rootDir: root });
     expect(checked.status).toBe('ok');
-    expect(
-      checked.diffs.some(
-        (d: { path: string; state: string }) =>
-          d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'stale'
-      )
-    ).toBe(true);
+    expect(forbiddenDiff(checked)).toBe(true);
 
     const applied = generateManifests({ mode: 'apply', rootDir: root });
     expect(applied.status).toBe('ok');
-    expect(applied.written).toContain('plugins/hook-plugin/hooks/hooks.json');
-    expect(existsSync(hooksJson)).toBe(false);
-    // The generated sibling survives — only the un-cataloged file is swept.
-    expect(existsSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'))).toBe(true);
+    expect(forbiddenDiff(applied)).toBe(true);
+    expect(applied.written).not.toContain('plugins/hook-plugin/hooks/hooks.json');
+    expect(existsSync(hooksJson)).toBe(true);
   });
 });
 

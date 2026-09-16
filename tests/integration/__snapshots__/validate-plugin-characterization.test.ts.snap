@@ -40,7 +40,7 @@ exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 5
 
 exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 7: hooks/hooks.json present (well-formed, no inline hooks) 1`] = `
 [
-  "hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file (hooks/codex-hooks.json is generated, never hand-written).",
+  "hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file.",
 ]
 `;
 

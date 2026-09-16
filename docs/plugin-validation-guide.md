@@ -227,7 +227,7 @@ mv plugins/hookify-old plugins/hookify
 > presence (RULE 7) — an error whenever the file exists, with or without
 > inline `hooks` in the manifest, because Claude Code auto-loads it as a
 > second hook source and hook config in this repo lives only in `catalog/`
-> (`pnpm validate:generated` reports the same file as stale); `userConfig`
+> (`pnpm validate:generated` reports the same file as `forbidden`, never deletes it); `userConfig`
 > entry shape — a
 > required `type` from the supported set, a required `title`, and the
 > allowlist of fields Claude Code's remote validator accepts, applied to both

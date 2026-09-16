@@ -224,10 +224,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   and easier to audit in `plugin.json`. If a file path is used, ensure the file
   exists and is covered by validation.
 - `plugins/<name>/hooks/hooks.json` must not exist. Claude Code auto-loads
-  the file as a second hook source next to the inline `hooks` block, and in
-  this repo it is an un-cataloged source no generator or validator sees.
-  `validate-plugin.js` RULE 7 errors on its presence (with or without inline
-  hooks) and `pnpm validate:generated` reports it as stale. Hook config lives
+  the file as a second hook source next to the inline `hooks` block, and no
+  `catalog/` tooling ever generates it. `validate-plugin.js` RULE 7 errors
+  on its presence (with or without inline hooks) and `pnpm validate:generated`
+  reports it as `forbidden` (never deleted, even by apply). Hook config lives
   in `catalog/plugins/<name>.json#hooks` and is generated into `plugin.json`;
   `hooks/codex-hooks.json` is generated too, never hand-written.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate

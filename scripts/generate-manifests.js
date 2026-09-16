@@ -580,7 +580,9 @@ function validateCursorRootConfig(catalog, errors) {
  * @returns {{
  *   status: 'ok'|'error',
  *   errors: string[],
- *   diffs: { path: string, state: 'differs'|'missing'|'stale' }[],
+ *   diffs: { path: string, state: 'differs'|'missing'|'stale'|'forbidden' }[],
+ *          ('forbidden' = a hand-written plugins/<name>/hooks/hooks.json:
+ *          reported in every mode, never deleted, fails --check)
  *   written: string[],
  *   checked: number,
  *   results: { [pluginName: string]: 'ok'|'error' },
@@ -903,7 +905,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // correspond to a current target — Codex disabled for a plugin, a skill
   // dropped from codex.skillAllowlist, or hooks removed — so `--check`
   // doesn't stay clean while a disabled plugin's artifacts still linger.
-  // Scoped to the locations this generator exclusively owns per plugin.
+  // Scoped to the locations this generator exclusively owns per plugin,
+  // plus one forbidden hand-written file (hooks/hooks.json, below) that is
+  // reported here but never deleted.
   const expectedPaths = new Set(targets.map((t) => t.path));
   for (const name of catalog.pluginOrder) {
     const sweepErrorsBefore = errors.length;
@@ -915,13 +919,22 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const staleCandidates = [
       join(pluginRoot, '.codex-plugin', 'plugin.json'),
       join(pluginRoot, 'hooks', 'codex-hooks.json'),
-      // Never generated, but Claude Code auto-loads it as a second hook
-      // source next to the inline plugin.json block (RULE 7 in
-      // validate-plugin rejects it for the same reason). Sweeping it here
-      // makes `--check` flag a reintroduced file as stale and `apply`
-      // remove it, so the catalog stays the only hook source.
-      join(pluginRoot, 'hooks', 'hooks.json'),
     ];
+    // hooks/hooks.json is never generated, but Claude Code auto-loads it as
+    // a second hook source next to the inline plugin.json block —
+    // validate-plugin.js RULE 7 rejects its presence. `--check` reports a
+    // reintroduced file as stale so `pnpm validate:generated` fails too;
+    // `apply` refuses rather than deletes, because unlike every other
+    // candidate here the generator holds no source to regenerate it from
+    // (this apply path also runs unattended from sync-manifests.js during
+    // `pnpm apply:changesets`).
+    const forbiddenHooksJson = join(pluginRoot, 'hooks', 'hooks.json');
+    if (existsSync(forbiddenHooksJson)) {
+      result.diffs.push({
+        path: relative(rootDir, forbiddenHooksJson),
+        state: 'forbidden',
+      });
+    }
     // This loop runs unconditionally (no isCodexEnabled guard, so it also
     // covers Codex-disabled plugins), so componentPaths.skills can carry a
     // path-escaping override (e.g. "../yellow-core/skills") that was never
@@ -1502,12 +1515,21 @@ function main() {
   for (const diff of result.diffs) {
     console.log(`[generate-manifests] DRIFT: ${diff.path} (${diff.state})`);
   }
+  const forbidden = result.diffs.filter((d) => d.state === 'forbidden');
+  for (const diff of forbidden) {
+    console.error(
+      `[generate-manifests] ${diff.path} is not generated and is not allowed (validate-plugin RULE 7) — delete it by hand; hook config lives in catalog/plugins/<name>.json#hooks`
+    );
+  }
 
   if (mode === 'apply') {
     console.log(
       `[generate-manifests] Complete: ${result.checked} targets checked, ${result.written.length} rewritten`
     );
-    return;
+    // Apply never touches a forbidden file, so the warning above is the only
+    // signal — exit non-zero so an unattended caller (sync-manifests.js
+    // during apply:changesets) cannot miss it.
+    process.exit(forbidden.length > 0 ? 1 : 0);
   }
 
   if (result.diffs.length > 0) {

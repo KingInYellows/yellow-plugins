@@ -168,10 +168,12 @@ function rulePathFields(manifest, pluginDir, errors) {
 // RULES 6 + 8: Hook script existence + content checks (shebang, decision
 // output, set -e) over inline event-keyed hook configs. Both rules iterate
 // the same scripts; validateHookScriptPath folds them into one pass. A
-// string-valued `hooks` field never reaches here: schemas/plugin.schema.json
-// allows only the inline form, so validate:schemas rejects it first.
-function ruleInlineHookScripts(inlineHooks, hasInlineHooks, pluginDir, errors) {
-  if (hasInlineHooks) {
+// string-valued `hooks` field gets only the RULE 5c path-existence check
+// in this module (rulePathFields); rejecting the string form is the
+// schema gate's job (schemas/plugin.schema.json allows only inline hooks,
+// enforced by the CI AJV step), which runs separately from this script.
+function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
+  if (Object.keys(inlineHooks).length > 0) {
     for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       if (!VALID_HOOK_EVENTS.has(eventName)) {
         logWarning(
@@ -221,7 +223,7 @@ function ruleHooksJson(pluginDir, errors) {
   if (!fs.existsSync(hooksJsonPath)) return;
   addError(
     errors,
-    'hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file (hooks/codex-hooks.json is generated, never hand-written).'
+    'hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file.'
   );
 }
 
