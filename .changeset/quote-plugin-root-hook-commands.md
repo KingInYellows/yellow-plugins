@@ -15,6 +15,8 @@ shell-form hook commands through `sh -c`, so an unquoted placeholder
 word-splits when the plugin cache lives under a path with a space and the
 hook fails open — a PreToolUse guard silently never runs. All commands now
 use `bash "${CLAUDE_PLUGIN_ROOT}/…"` / `node "${CLAUDE_PLUGIN_ROOT}/…"`, as
-the hooks reference recommends. `pnpm validate:plugins` (RULE 6) now warns
-on an unquoted placeholder and applies its existence and containment checks
-to `node` entrypoints as well as `bash` scripts.
+the hooks reference recommends. `pnpm validate:plugins` (RULE 6) now errors
+on an unquoted or single-quoted placeholder, tokenises the script argument
+as one shell word (so `"${CLAUDE_PLUGIN_ROOT}"/x.sh` and interpreter flags
+parse), and applies its existence and containment checks to `node`
+entrypoints as well as `bash` scripts.

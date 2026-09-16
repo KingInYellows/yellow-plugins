@@ -198,7 +198,7 @@ describe('validate-plugin baseline (regression net)', () => {
             hooks: [
               {
                 type: 'command',
-                command: 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/example.sh',
+                command: 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/example.sh"',
                 timeout: 5000,
               },
             ],
@@ -220,7 +220,7 @@ describe('validate-plugin baseline (regression net)', () => {
             hooks: [
               {
                 type: 'command',
-                command: 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/missing.sh',
+                command: 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/missing.sh"',
                 timeout: 5000,
               },
             ],
@@ -244,7 +244,7 @@ describe('validate-plugin baseline (regression net)', () => {
             hooks: [
               {
                 type: 'command',
-                command: 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/seteh.sh',
+                command: 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/seteh.sh"',
                 timeout: 5000,
               },
             ],
@@ -405,7 +405,7 @@ printf 'plain text\\n'
               {
                 type: 'command',
                 command:
-                  'bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-plain.sh',
+                  'bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-plain.sh"',
                 timeout: 5000,
               },
             ],
@@ -582,28 +582,74 @@ process.stdout.write('{"continue": true}\\n');
     expect(stderr).toMatch(/Hook script path escapes plugin directory/);
   });
 
-  it('warns on an unquoted ${CLAUDE_PLUGIN_ROOT} placeholder (warning, not error)', () => {
+  it('errors on an unquoted ${CLAUDE_PLUGIN_ROOT} placeholder, for bash and node alike', () => {
+    // Claude Code runs shell-form commands through `sh -c`; unquoted, the
+    // placeholder word-splits on a plugin-cache path with a space and the
+    // hook fails open. An error (not a warning) so the fixed form cannot
+    // regress under a green CI.
     writeHookScript(pluginDir, 'hooks/scripts/guard.sh', SHEBANG_HOOK);
-    writePluginManifest(
-      pluginDir,
-      hookManifest('bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh')
-    );
-    const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBe(0);
-    expect(stderr).toMatch(
-      /PreToolUse hook command has unquoted \$\{CLAUDE_PLUGIN_ROOT\}/
-    );
+    mkdirSync(join(pluginDir, 'hooks', 'scripts'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', 'scripts', 'entry.js'), NODE_HOOK, 'utf8');
+    for (const command of [
+      'bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh',
+      'node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entry.js --hook check-git-push',
+    ]) {
+      writePluginManifest(pluginDir, hookManifest(command));
+      const { status, stderr } = runValidator(pluginDir);
+      expect(status).toBeGreaterThan(0);
+      expect(stderr).toMatch(
+        /PreToolUse hook command has unquoted \$\{CLAUDE_PLUGIN_ROOT\}/
+      );
+      // Quoting is reported alone — the resolver is not run on a
+      // mis-quoted command, so no second "escapes" error appears.
+      expect(stderr).not.toMatch(/escapes plugin directory/);
+    }
   });
 
-  it('warns on a single-quoted ${CLAUDE_PLUGIN_ROOT} placeholder (never expands), not as word-splitting', () => {
+  it('errors on a single-quoted ${CLAUDE_PLUGIN_ROOT} placeholder (never expands), not as word-splitting', () => {
     writeHookScript(pluginDir, 'hooks/scripts/guard.sh', SHEBANG_HOOK);
     writePluginManifest(
       pluginDir,
       hookManifest("bash '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh'")
     );
-    const { stderr } = runValidator(pluginDir);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/single-quotes \$\{CLAUDE_PLUGIN_ROOT\}/);
     expect(stderr).not.toMatch(/unquoted \$\{CLAUDE_PLUGIN_ROOT\}/);
+    // The script exists, but the validator must not report it as found.
+    expect(stderr).not.toMatch(/Hook script not found/);
+  });
+
+  it('accepts the docs-literal form that quotes only the placeholder, and interpreter flags before the script', () => {
+    writeHookScript(pluginDir, 'hooks/scripts/guard.sh', SHEBANG_HOOK);
+    mkdirSync(join(pluginDir, 'hooks', 'scripts'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', 'scripts', 'entry.js'), NODE_HOOK, 'utf8');
+    for (const command of [
+      'bash "${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/guard.sh',
+      'node --enable-source-maps "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entry.js" --hook check-git-push',
+      'bash "prefix-${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/guard.sh',
+    ]) {
+      writePluginManifest(pluginDir, hookManifest(command));
+      const { stderr } = runValidator(pluginDir);
+      expect(stderr).not.toMatch(/unquoted \$\{CLAUDE_PLUGIN_ROOT\}/);
+      expect(stderr).not.toMatch(/escapes plugin directory/);
+      expect(stderr).not.toMatch(/Hook script not found for PreToolUse: .*--enable-source-maps/);
+    }
+  });
+
+  it('does not treat a command whose first token merely starts with "node" or "bash" as an interpreter', () => {
+    // HOOK_SCRIPT_INTERPRETER_RE anchors on `bash `/`node ` + whitespace.
+    // `nodejs …` is an unrecognized interpreter: no existence/containment
+    // check, but a warning because the placeholder is referenced.
+    writePluginManifest(
+      pluginDir,
+      hookManifest('nodejs "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/missing.js"')
+    );
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBe(0);
+    expect(stderr).not.toMatch(/Hook script not found/);
+    expect(stderr).not.toMatch(/escapes plugin directory/);
+    expect(stderr).toMatch(/unrecognized interpreter/);
   });
 
   it('passes a quoted command when the plugin lives under a path containing a space', () => {
@@ -627,12 +673,11 @@ process.stdout.write('{"continue": true}\\n');
     }
   });
 
-  it('reproduces the word-split for an unquoted command under a path containing a space', () => {
-    // The validator substitutes the real plugin directory for the
-    // placeholder, so an unquoted command under a spaced path resolves to
-    // the truncated first word — outside the plugin — exactly as `sh -c`
-    // would split it at runtime. Both the quoting warning and the
-    // containment error fire.
+  it('reports only the quoting error for an unquoted command under a path containing a space', () => {
+    // The script argument is tokenised before the placeholder is
+    // substituted, so the checkout path cannot change the verdict: the
+    // unquoted form is the one error regardless of whether the plugin
+    // directory contains a space.
     const spacedRoot = mkdtempSync(join(tmpdir(), 'yellow validate space-'));
     try {
       const spacedPluginDir = join(spacedRoot, 'test-plugin');
@@ -645,7 +690,7 @@ process.stdout.write('{"continue": true}\\n');
       const { status, stderr } = runValidator(spacedPluginDir);
       expect(status).toBeGreaterThan(0);
       expect(stderr).toMatch(/unquoted \$\{CLAUDE_PLUGIN_ROOT\}/);
-      expect(stderr).toMatch(/Hook script path escapes plugin directory/);
+      expect(stderr).not.toMatch(/Hook script path escapes plugin directory/);
     } finally {
       rmSync(spacedRoot, { recursive: true, force: true });
     }

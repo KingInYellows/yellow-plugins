@@ -224,7 +224,7 @@ Markdown output style, or RULES 5b/5c fail the manifest.
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\"",
             "timeout": 3
           }
         ]
@@ -264,6 +264,9 @@ Markdown output style, or RULES 5b/5c fail the manifest.
 Every `type: "command"` hook path in the manifest must resolve to a real file
 inside the plugin, so the `SessionStart` entry above needs this companion
 script — `validate-plugin.js` fails with `Hook script not found` without it.
+Keep the placeholder double-quoted as shown: Claude Code runs the command
+through `sh -c`, so an unquoted `${CLAUDE_PLUGIN_ROOT}` word-splits on a
+path with a space and `validate-plugin.js` (RULE 6) rejects it.
 
 Because this template's `userConfig` includes a sensitive field, the hook
 must also emit `${CLAUDE_PLUGIN_DATA}/credential-status.json` via

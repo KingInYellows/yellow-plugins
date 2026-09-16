@@ -20,6 +20,7 @@ const path = require('path');
 const { addError, logWarning, logSuccess } = require('./logging');
 const {
   VALID_HOOK_EVENTS,
+  HOOK_SCRIPT_PREFIX_SRC,
   hookCommandInterpreter,
   resolveHookScriptPath,
   validatePathFile,
@@ -166,15 +167,24 @@ function rulePathFields(manifest, pluginDir, errors) {
   }
 }
 
-// `${CLAUDE_PLUGIN_ROOT}` not immediately preceded by a quote. The official
-// hook docs: "in shell form, wrap each placeholder in double quotes". A
-// single quote is excluded here only because it is not the word-splitting
-// failure this warning describes — it is worse (the placeholder never
-// expands), and gets its own check below.
-const UNQUOTED_PLUGIN_ROOT_RE = /(^|[^"'])\$\{CLAUDE_PLUGIN_ROOT\}/;
-// A single-quoted placeholder is passed to the script literally — `sh -c`
-// never expands it, so the command targets a path named "${CLAUDE_PLUGIN_ROOT}".
-const SINGLE_QUOTED_PLUGIN_ROOT_RE = /'\$\{CLAUDE_PLUGIN_ROOT\}/;
+// Placeholder quoting, checked only on the shape RULE 6 parses — the
+// script argument right after `bash`/`node` (and any interpreter flags).
+// A placeholder elsewhere in a command (inside a longer double-quoted
+// string, say) is not word-split and is not this check's business.
+// The official hook docs: "in shell form, wrap each placeholder in double
+// quotes". Unquoted word-splits on a plugin-cache path with a space and
+// the hook fails open; single-quoted is worse — `sh -c` never expands it,
+// so the command targets a literal path named "${CLAUDE_PLUGIN_ROOT}/…".
+// Both are errors: this validator only runs over this repo's own
+// catalog-generated manifests, so there is no third-party leniency to
+// preserve, and a warning cannot stop the fail-open form from regressing
+// under a green CI.
+const UNQUOTED_PLUGIN_ROOT_RE = new RegExp(
+  `${HOOK_SCRIPT_PREFIX_SRC}\\$\\{CLAUDE_PLUGIN_ROOT\\}`
+);
+const SINGLE_QUOTED_PLUGIN_ROOT_RE = new RegExp(
+  `${HOOK_SCRIPT_PREFIX_SRC}'\\$\\{CLAUDE_PLUGIN_ROOT\\}`
+);
 
 // RULES 6 + 8: Hook script existence + content checks (shebang, decision
 // output, set -e) over inline event-keyed hook configs. Both rules iterate
@@ -196,30 +206,39 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
         if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
         for (const hook of entry.hooks) {
           if (hook.type !== 'command' || !hook.command) continue;
-          // Claude Code runs shell-form commands through `sh -c`; an
-          // unquoted placeholder word-splits on a plugin-cache path with a
-          // space and the hook fails open (a PreToolUse guard silently does
-          // not run). Warning, not error: third-party catalogs keep working.
+          // Quoting first, and stop on a hit: resolving a mis-quoted
+          // command would only add a second, misleading error (the
+          // unquoted form under a spaced plugin path resolves to a
+          // truncated first word and reads as a containment escape).
           if (UNQUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
-            logWarning(
-              `${eventName} hook command has unquoted \${CLAUDE_PLUGIN_ROOT} — word-splits on paths with spaces; quote it: ${hook.command}`
+            addError(
+              errors,
+              `${eventName} hook command has unquoted \${CLAUDE_PLUGIN_ROOT} — word-splits on paths with spaces and the hook fails open; write bash "\${CLAUDE_PLUGIN_ROOT}/…": ${hook.command}`
             );
-          } else if (SINGLE_QUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
-            logWarning(
-              `${eventName} hook command single-quotes \${CLAUDE_PLUGIN_ROOT} — the shell never expands it; use double quotes: ${hook.command}`
+            continue;
+          }
+          if (SINGLE_QUOTED_PLUGIN_ROOT_RE.test(hook.command)) {
+            addError(
+              errors,
+              `${eventName} hook command single-quotes \${CLAUDE_PLUGIN_ROOT} — the shell never expands it, so the script can never be found; use double quotes: ${hook.command}`
             );
+            continue;
           }
           const interpreter = hookCommandInterpreter(hook.command);
           const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
           if (!scriptPath) {
             // resolveHookScriptPath returns null for commands that are not
-            // `bash <path>` / `node <path>` (which need no path check) AND
+            // `bash <path>` / `node <path>` (which get no path check) AND
             // for those that escape the plugin directory — the latter is a
             // containment violation.
             if (interpreter) {
               addError(
                 errors,
                 `Hook script path escapes plugin directory: ${hook.command}`
+              );
+            } else if (hook.command.includes('${CLAUDE_PLUGIN_ROOT}')) {
+              logWarning(
+                `${eventName} hook command uses an unrecognized interpreter — script existence and containment not checked (RULE 6 parses \`bash\`/\`node\` only): ${hook.command}`
               );
             }
             continue;

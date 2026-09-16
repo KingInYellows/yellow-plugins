@@ -45,9 +45,19 @@ const DECISION_PROTOCOL_EVENTS = new Set([
 ]);
 
 // Interpreters whose hook commands name a plugin-local script as their first
-// argument. `bash` scripts get the shebang / decision-output / `set -e`
-// content checks; `node` entrypoints get existence + containment only.
+// non-flag argument. `bash` scripts get the shebang / decision-output /
+// `set -e` content checks; `node` entrypoints get existence + containment
+// only. Known gap: any other command form (`sh`, `python3`, `env node`, a
+// bare "${CLAUDE_PLUGIN_ROOT}/x.sh") gets no script-path checks at all —
+// the caller warns when such a command references the placeholder.
 const HOOK_SCRIPT_INTERPRETER_RE = /^(bash|node)\s+/;
+// Leading interpreter flags (`node --enable-source-maps`, `bash -x`) before
+// the script argument. Always matches (possibly empty).
+const HOOK_INTERPRETER_FLAGS_SRC = '(?:-\\S+\\s+)*';
+const HOOK_INTERPRETER_FLAGS_RE = new RegExp(`^${HOOK_INTERPRETER_FLAGS_SRC}`);
+// "interpreter + flags" prefix, for rules that inspect the script argument
+// without resolving it (plugin-rules.js's placeholder-quoting checks).
+const HOOK_SCRIPT_PREFIX_SRC = `^(?:bash|node)\\s+${HOOK_INTERPRETER_FLAGS_SRC}`;
 
 /**
  * Return the interpreter ("bash" | "node") a hook command starts with, or
@@ -59,24 +69,54 @@ function hookCommandInterpreter(command) {
 }
 
 /**
+ * First shell word of `s`: adjacent quoted and unquoted segments up to the
+ * first unquoted whitespace, with the quotes removed — so
+ * `"a b"/c`, `"a b/c"` and `a\ b` all yield one word (backslash escapes
+ * are not interpreted; no catalog command uses them).
+ */
+function firstShellWord(s) {
+  let out = '';
+  let quote = null;
+  for (const ch of s) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else out += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) break;
+    out += ch;
+  }
+  return out;
+}
+
+/**
  * Resolve a hook command to a script path within the plugin directory.
  * Returns the resolved path, or null if the command is not a
- * "bash <path>" / "node <path>" format or the path escapes the plugin
- * directory.
+ * "bash [flags] <path>" / "node [flags] <path>" format or the path
+ * escapes the plugin directory. The placeholder is substituted textually
+ * before parsing; callers reject single-quoted placeholders first, since
+ * `sh -c` never expands those and the substituted path would validate a
+ * script the shell can never reach.
  */
 function resolveHookScriptPath(command, pluginDir) {
-  const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
   // One source of truth for the interpreter set: strip the prefix
-  // HOOK_SCRIPT_INTERPRETER_RE matched, then parse the script argument.
-  const prefix = resolved.match(HOOK_SCRIPT_INTERPRETER_RE);
+  // HOOK_SCRIPT_INTERPRETER_RE matched and any interpreter flags, then
+  // take the script argument as ONE shell word before substituting the
+  // placeholder. Substituting into the whole command first would let the
+  // checkout path change the verdict (a directory with a space word-splits
+  // inside the validator) and would resolve the docs-literal form
+  // `bash "${CLAUDE_PLUGIN_ROOT}"/hooks/x.sh` to the plugin root.
+  const prefix = command.match(HOOK_SCRIPT_INTERPRETER_RE);
   if (!prefix) return null;
-  // Accept double-quoted, single-quoted, and unquoted script paths so a
-  // command like `bash "scripts/my hook.sh"` resolves correctly.
-  const match = resolved
-    .slice(prefix[0].length)
-    .match(/^(?:"([^"]+)"|'([^']+)'|(\S+))/);
-  if (!match) return null;
-  const scriptPath = match[1] || match[2] || match[3];
+  const rest = command.slice(prefix[0].length);
+  const flags = rest.match(HOOK_INTERPRETER_FLAGS_RE)[0];
+  const word = firstShellWord(rest.slice(flags.length));
+  if (!word) return null;
+  const scriptPath = word.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
   const normalized = path.resolve(pluginDir, scriptPath);
   if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
   return normalized;
@@ -321,6 +361,12 @@ function collectInlineHooks(hooks) {
  * (shebang / decision-output / set -e) to a single hook script path.
  * Centralizes per-script-path checks so RULE 6 and RULE 8 cannot drift.
  * eventName is required for the DECISION_PROTOCOL_EVENTS gate.
+ * interpreter ("bash" | "node", from hookCommandInterpreter) gates RULE 8
+ * and the executable-mode part of RULE 6: a `node` entrypoint gets only
+ * the existence / symlink / regular-file / readability checks (containment
+ * was already enforced by the caller's resolveHookScriptPath). Anything
+ * other than "node" gets the full bash checks, so an omitted argument
+ * fails strict rather than open.
  */
 function validateHookScriptPath(
   scriptPath,
@@ -371,8 +417,13 @@ function validateHookScriptPath(
   }
   // A `node <entrypoint>` command runs the file through the interpreter, so
   // it has no executable-bit, shebang, or shell-content contract — the
-  // existence, symlink, and containment checks above are the whole rule.
-  if (interpreter !== 'bash') return;
+  // existence, symlink, and regular-file checks above, plus the containment
+  // check the caller's resolveHookScriptPath already applied, are the whole
+  // rule. The decision-output scan is skipped too: a node entrypoint
+  // typically delegates to lib/ (gt-workflow's entrypoint-claude.js calls
+  // runHook), so the literal strings the bash heuristic looks for are not
+  // in the file the command names.
+  if (interpreter === 'node') return;
 
   if ((lstat.mode & 0o111) === 0) {
     logWarning(
@@ -421,6 +472,7 @@ function validateHookScriptPath(
 module.exports = {
   VALID_HOOK_EVENTS,
   DECISION_PROTOCOL_EVENTS,
+  HOOK_SCRIPT_PREFIX_SRC,
   hookCommandInterpreter,
   resolveHookScriptPath,
   resolvePluginPath,
