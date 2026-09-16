@@ -76,12 +76,8 @@ function checkGitPush(camelCaseEnvelope) {
   // Real PreToolUse envelopes nest the Bash command under `tool_input`
   // (-> toolInput after snake->camel), the SAME shape as PostToolUse — NOT
   // a root-level `.command`. See docs/solutions/code-quality/
-  // posttooluse-hook-input-schema-field-paths.md's 2026-07-20/07-22
-  // corrections: gt-workflow's sibling file reads root-level `.command` by
-  // design, preserved there only for characterization-testing parity with
-  // a deleted bash predecessor. This file has no such predecessor to
-  // preserve, so it reads the field path real Claude Code/Codex envelopes
-  // actually use.
+  // posttooluse-hook-input-schema-field-paths.md; gt-workflow's sibling
+  // reads the same path since 2026-09-16.
   const command = typeof camelCaseEnvelope.toolInput?.command === 'string' ? camelCaseEnvelope.toolInput.command : '';
 
   if (GIT_PUSH_RE.test(command)) {

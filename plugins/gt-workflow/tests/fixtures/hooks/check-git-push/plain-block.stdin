@@ -1,1 +1,1 @@
-{"command": "git push"}
+{"tool_name":"Bash","tool_input":{"command":"git push"}}

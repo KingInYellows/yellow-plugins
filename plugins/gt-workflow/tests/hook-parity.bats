@@ -129,6 +129,22 @@ assert_parity() {
   assert_parity check-git-push null-envelope
 }
 
+@test "check-git-push: root-level command (the deleted bash script's shape) is ignored, not blocked" {
+  # Until 2026-09-16 the policy read `.command` at the envelope root — a
+  # field no host sends — so the fixtures above passed while a real
+  # PreToolUse payload ({"tool_input":{"command":"git push"}}) was allowed.
+  # The fixtures now carry the real nested shape; this one pins the old
+  # flat shape as non-blocking so the field path cannot silently regress.
+  assert_parity check-git-push root-level-command-ignored
+}
+
+@test "check-git-push: real Claude Code PreToolUse envelope blocks a raw git push (exit 2)" {
+  run --separate-stderr bash -c 'printf "%s" "{\"session_id\":\"s\",\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git push origin main\"}}" | node "$1" --hook check-git-push' _ "$ENTRYPOINT"
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  echo "$stderr" | grep -q 'Raw `git push` is not allowed'
+}
+
 # --- check-commit-message ---
 
 @test "check-commit-message: conventional-allow-silent matches golden" {

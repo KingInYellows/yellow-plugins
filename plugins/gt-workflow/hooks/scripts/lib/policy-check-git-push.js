@@ -4,11 +4,14 @@
  * Host-agnostic policy for the PreToolUse "block raw git push" hook.
  *
  * Pure — no I/O, no console.*, no timestamps — so both entrypoints and the
- * parity harness can call it directly. Reproduces
- * plugins/gt-workflow/hooks/check-git-push.sh's logic exactly, including
- * reading `command` at the envelope's top level (not `toolInput.command`)
- * — that field path is preserved as-is from the original bash script per
- * this shell's characterization-testing charter; it is not corrected here.
+ * parity harness can call it directly. Reproduces the deleted
+ * plugins/gt-workflow/hooks/check-git-push.sh's blocking regex; the field
+ * path is NOT reproduced: that script (and this file until 2026-09-16) read
+ * `command` at the envelope root, a field no host sends. Real PreToolUse
+ * envelopes on Claude Code and Codex nest it under `tool_input.command`
+ * (-> toolInput after snake->camel), the same shape check-commit-message
+ * reads — so the backstop allowed every raw `git push`. See
+ * docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md.
  */
 
 // Mirrors the bash script's POSIX ERE: (^|[;&()|$`]|[[:space:]])git[[:space:]]+push
@@ -21,11 +24,18 @@ const BLOCK_MESSAGE = [
 ].join('\n');
 
 /**
- * @param {{command?: string}} camelCaseEnvelope
+ * @param {{toolInput?: {command?: string}}} camelCaseEnvelope
  * @returns {{decision: 'allow'|'deny', message: string|null}}
  */
 function checkGitPush(camelCaseEnvelope) {
-  const command = camelCaseEnvelope.command ?? '';
+  // Type-checked, not just `?? ''`: a non-string command (object, number)
+  // would otherwise be coerced by the regex test. No root-level `.command`
+  // fallback — keeping one would preserve the fail-open path for any
+  // envelope that is not the real shape.
+  const command =
+    typeof camelCaseEnvelope.toolInput?.command === 'string'
+      ? camelCaseEnvelope.toolInput.command
+      : '';
 
   if (GIT_PUSH_RE.test(command)) {
     return { decision: 'deny', message: BLOCK_MESSAGE };

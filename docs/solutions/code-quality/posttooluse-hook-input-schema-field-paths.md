@@ -47,6 +47,18 @@ tags:
 > the field path (breaking the characterization-testing charter) or keep it
 > as documented, deliberately-preserved bash-parity behavior.
 
+> **Update (2026-09-16): resolved — field path fixed.** The decision went
+> to correctness: `policy-check-git-push.js` now reads
+> `toolInput?.command` (string-typed), the same read
+> `policy-check-commit-message.js` and github-workflow's sibling already
+> use, with no root-level fallback. The `check-git-push/*.stdin` fixtures
+> carry the real nested envelope; a new `root-level-command-ignored`
+> fixture pins the deleted bash script's flat shape as *allowed* (exit 0,
+> no output) so the path cannot regress silently, and a bats case feeds a
+> full Claude Code PreToolUse envelope and asserts exit 2 with the block
+> message. The characterization charter is retired for this hook — parity
+> with a shape no host sends was worth less than a backstop that fires.
+
 ## Problem
 
 PostToolUse hooks receive a different JSON schema than PreToolUse hooks. A
