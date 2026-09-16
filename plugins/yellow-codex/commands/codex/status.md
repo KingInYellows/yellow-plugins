@@ -117,6 +117,9 @@ if [ -f "$CODEX_CONFIG" ]; then
 else
   printf '[yellow-codex] Config: defaults (no config.toml)\n'
 fi
+# The env override wins over config.toml at every codex exec site; after a
+# model rejection this is the value to check first.
+printf '[yellow-codex] CODEX_MODEL override: %s\n' "${CODEX_MODEL:-<unset: config.toml model, else the account default>}"
 ```
 
 ### Step 6: Report Summary

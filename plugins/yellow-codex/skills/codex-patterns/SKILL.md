@@ -188,8 +188,8 @@ and the Bash tool runs zsh on hosts whose login shell is zsh. Never write
 | Model | Status | When to Use |
 |-------|--------|-------------|
 | (unset) | Default | Account default via codex's config precedence — works on API-key and ChatGPT accounts |
-| `gpt-5.6-luna` | Current, cheap | `/codex:setup` smoke test only (`CODEX_SMOKE_MODEL` overrides) |
-| `gpt-5.3-codex` | Current | 1M context window (huge diffs); ChatGPT accounts reject `gpt-5.x-codex` names |
+| (unset) — smoke test | Default | `/codex:setup` probes the same no-`-m` shape; `CODEX_SMOKE_MODEL` forces a model for the probe only and is retried without it on a 400 |
+| `gpt-5.3-codex` | Current, API-key accounts only | 1M context window (huge diffs); ChatGPT accounts reject `gpt-5.x-codex` names (verified 2026-09-16) — on ChatGPT auth, omit `-m` and split the diff instead |
 | `gpt-5.4`, `gpt-5.4-mini` | Legacy | Do not hardcode — OpenAI lists them as legacy; ChatGPT-account auth rejects them with HTTP 400 (`invalid_request_error`, exit 1) |
 
 The exit-1 arm in `codex-reviewer` recognises the model rejection by its
@@ -304,7 +304,7 @@ diff_bytes=$(git diff "${BASE}...HEAD" | wc -c)
 estimated_tokens=$((diff_bytes / 4))
 if [ "$estimated_tokens" -gt 100000 ]; then
   printf '[yellow-codex] Warning: diff is ~%d tokens (limit ~128K). Review may fail.\n' "$estimated_tokens"
-  printf '[yellow-codex] Consider reviewing by file group or using gpt-5.3-codex (1M context).\n'
+  printf '[yellow-codex] Consider reviewing by file group, or (API-key accounts only) CODEX_MODEL=gpt-5.3-codex for its 1M context.\n'
 fi
 ```
 
@@ -327,24 +327,51 @@ Or ensure `.codexignore` is populated in the project root.
 | Exit Code | Meaning | Recovery |
 |-----------|---------|----------|
 | 0 | Success | Parse output |
-| 1 | General error (includes 429 rate limit) | Parse stderr for "rate_limit_exceeded" |
+| 1 | General error: 429 rate limit (`rate_limit_exceeded`) or an HTTP 400 API refusal such as a model rejection (`The '<name>' model is not supported`) | Read the API error out of the captured output (see below); model rejection → set or unset `CODEX_MODEL` / fix `model` in `~/.codex/config.toml` |
 | 2 | Argument parse error OR authentication failure | If stderr matches `unexpected argument`, `invalid value`, `unrecognized subcommand`, or `required arguments`, the invocation itself is wrong (CLI flag drift) — fix the command; otherwise run `/codex:setup`, check OPENAI_API_KEY |
 | 3 | Configuration error | Check ~/.codex/config.toml |
-| 4 | Model/API error | Try different model |
+| 4 | Reserved by the CLI for model/API errors; not observed for model rejection in practice (that is exit 1, above) | Try different model |
 | 124 | Timeout (from `timeout` utility) | Suggest smaller scope |
 | 137 | SIGKILL (timeout escalation) | Suggest smaller scope |
 
-### Rate Limit Detection
+### Where API errors land: stdout with `--json`, stderr without
 
-Exit code 1 with stderr containing "rate_limit_exceeded":
+Without `--json`, codex prints API refusals on stderr. With `--json` it
+reports them as `{"type":"error","message":"…"}` JSONL events on **stdout**
+and leaves stderr empty (verified on codex-cli 0.153.3), so every `--json`
+site captures both streams into one diagnostics file — `>|"$STDERR_FILE"
+2>&1` — and reads the message out of the error events only, never by
+grepping the whole stream (which can echo repository content Codex read):
 
 ```bash
-codex_output=$(codex exec ... 2>|"$STDERR_FILE") || {
+codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+```
+
+### Model Rejection Detection
+
+Exit code 1 with the API error naming the model (HTTP 400
+`invalid_request_error`):
+
+```bash
+if [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported"; then
+  rejected_model=$(printf '%s' "$codex_api_error" | grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" | head -n1 | sed -E "s/^The '([^']+)' model$/\\1/")
+  # CODEX_MODEL set → set it to an allowed model or unset it;
+  # unset → the model came from ~/.codex/config.toml or the account default.
+fi
+```
+
+### Rate Limit Detection
+
+Exit code 1 with the API error containing "rate_limit_exceeded":
+
+```bash
+codex_output=$(codex exec ... --json ... >|"$STDERR_FILE" 2>&1) || {
   codex_exit=$?
-  if [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
+  codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+  if [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5
-    codex_output=$(codex exec ... 2>|"$STDERR_FILE") || {
+    codex_output=$(codex exec ... --json ... >|"$STDERR_FILE" 2>&1) || {
       printf '[yellow-codex] Still rate limited. Try again later.\n'
     }
   fi

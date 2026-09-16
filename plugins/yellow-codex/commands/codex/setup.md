@@ -193,31 +193,42 @@ elif command -v codex >/dev/null 2>&1; then
 fi
 
 if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
-  # mktemp created the file, so `>|` (not `>`) — zsh `noclobber` refuses a
-  # plain `>` onto an existing path and the probe never runs.
+  # Probe the same shape every real invocation in this plugin uses: no -m,
+  # so codex resolves the model from ~/.codex/config.toml and then the
+  # account default. A green test then certifies the path the plugin
+  # actually takes. CODEX_SMOKE_MODEL forces an explicit model for the probe
+  # only (never a gpt-5.4* name — legacy, rejected by ChatGPT-account auth);
+  # if the account rejects it, retry once without it. This call does not
+  # pass --json, so the API error is on stderr. mktemp created the files, so
+  # `>|`: zsh noclobber refuses a plain `>` onto an existing path.
   SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
-  # Explicit cheap model for the smoke test only (every other codex exec in
-  # this plugin omits -m and lets the CLI resolve the account default).
-  # Override with CODEX_SMOKE_MODEL. Never a gpt-5.4* name: OpenAI lists
-  # those as legacy and ChatGPT-account auth rejects them with a 400.
-  smoke_model="${CODEX_SMOKE_MODEL:-gpt-5.6-luna}"
-  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only -m "$smoke_model" "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE") || true
-  if [ -z "$test_output" ] && grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported" "$SETUP_ERR_FILE" 2>/dev/null; then
-    # The account cannot use the explicit smoke model (exit 1, HTTP 400
-    # invalid_request_error). Retry once with no -m so the CLI's own model
-    # precedence (~/.codex/config.toml, then the account default) decides —
-    # the same path the plugin's real invocations take.
-    printf '[yellow-codex] Test invocation: model %s rejected for this account; retrying with the account default\n' "$smoke_model"
-    test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE") || true
+  smoke_model="${CODEX_SMOKE_MODEL:-}"
+  smoke_retried=0
+  test_output=$(timeout 45 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only ${smoke_model:+-m} ${smoke_model:+"$smoke_model"} "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE"); smoke_exit=$?
+  if [ -n "$smoke_model" ] && [ "$smoke_exit" -ne 0 ] && grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
+    printf '[yellow-codex] Test invocation: model %s rejected for this account (HTTP 400); retrying with the account default\n' "$smoke_model"
+    smoke_retried=1
+    # The retry overwrites the capture: the branches below report only the
+    # attempt that ran last (the original rejection was already printed).
+    test_output=$(timeout 45 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE"); smoke_exit=$?
   fi
+  smoke_result=failed
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
+    smoke_result=ok
     printf '[yellow-codex] Test invocation: ok\n'
+  elif [ "$smoke_exit" -eq 124 ] || [ "$smoke_exit" -eq 137 ]; then
+    printf '[yellow-codex] Test invocation: timed out after 45s (slow model or network) — re-run /codex:setup, or set CODEX_SMOKE_MODEL to a faster model\n' >&2
   elif [ -n "$test_output" ]; then
+    smoke_result=ok
     printf '[yellow-codex] Test invocation: response received (model accessible)\n'
   elif grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
-    # Any 400 (model still rejected after the retry, or another request
-    # error). Bounded excerpt: CLI stderr is untrusted output.
-    printf '[yellow-codex] Test invocation: request rejected (HTTP 400) — if it names a model, set CODEX_SMOKE_MODEL to one this account allows:\n' >&2
+    # A 400 from whichever attempt ran last. Bounded excerpt: CLI stderr is
+    # untrusted output.
+    if [ "$smoke_retried" -eq 1 ] || [ -z "$smoke_model" ]; then
+      printf '[yellow-codex] Test invocation: the account default model was rejected (HTTP 400) — check the model key in ~/.codex/config.toml or your account entitlements:\n' >&2
+    else
+      printf '[yellow-codex] Test invocation: request rejected (HTTP 400) — set CODEX_SMOKE_MODEL to a model this account allows, or unset it:\n' >&2
+    fi
     grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null | head -c 200 >&2; printf '\n' >&2
   elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Test invocation: CLI argument parse error (flag drift?):\n' >&2
@@ -225,6 +236,7 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   else
     printf '[yellow-codex] Test invocation: no response (check auth and network)\n' >&2
   fi
+  printf '[yellow-codex] smoke_result=%s\n' "$smoke_result"
   rm -f "$SETUP_ERR_FILE"
 else
   printf '[yellow-codex] Test invocation: skipped (codex CLI or authentication unavailable)\n'
@@ -260,4 +272,7 @@ If any step had a warning, list warnings at the bottom.
 | No curl/wget | "curl or wget needed to install Codex" | Warn, suggest brew cask or the GitHub release binary |
 | No auth configured | "No authentication configured" | Show both auth methods |
 | Test invocation parse error (Step 4, parse error on stderr) | "CLI argument parse error (flag drift?)" | Report clap error line |
+| Smoke model rejected (Step 4, `CODEX_SMOKE_MODEL` set) | "model X rejected for this account (HTTP 400); retrying with the account default" | Automatic retry without `-m` |
+| Test invocation HTTP 400 (Step 4) | "the account default model was rejected" / "request rejected (HTTP 400)" | Fix `model` in `~/.codex/config.toml` / set or unset `CODEX_SMOKE_MODEL` |
+| Test invocation timed out (Step 4, exit 124/137) | "timed out after 45s" | Re-run; try a faster `CODEX_SMOKE_MODEL` |
 | Test invocation fails | "no response (check auth and network)" | Warn, suggest re-auth |

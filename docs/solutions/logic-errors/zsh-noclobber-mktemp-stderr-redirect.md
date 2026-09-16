@@ -168,12 +168,12 @@ had nothing wrong with it locally (each one independently reinvented the
 same "mktemp then redirect stderr" idiom, correctly under bash's default
 semantics, with no local signal that zsh's `noclobber` would break it).
 
-## Update — 2026-09-16: yellow-codex sweep (13 sites) + a wider grep
+## Update — 2026-09-16: yellow-codex sweep (16 sites) + a wider grep
 
 The 2026-07-18 done-criterion grep only inspects the 12 lines after each
 `mktemp`, so it missed every yellow-codex site where the redirect sits
 further down the same block (the `codex exec … 2>"$STDERR_FILE"` line is
-20–30 lines below the `mktemp` that created the file). Thirteen plain
+20–30 lines below the `mktemp` that created the file). Sixteen plain
 redirects onto mktemp-created files were still live in
 `plugins/yellow-codex` (`codex-reviewer.md` ×4, `codex-analyst.md`,
 `codex-executor.md`, `rescue.md` ×2, `review.md` ×4, `setup.md`,
@@ -191,5 +191,6 @@ rg -n 'mktemp' plugins/<name> -A12 | rg '(^|[^>|])>\s*"?\$'
 rg -n '(^|[^>|&])>\s*"?\$\{?(OUTPUT_FILE|STDERR_FILE|DIFF_FILE|FENCED_OUTPUT_FILE|SETUP_ERR_FILE)' plugins/<name>
 ```
 
-The second form is the one to keep: name the variables `mktemp` assigns
-in the plugin and grep the whole tree, not a fixed window.
+The second form is the one to keep: derive the variable names `mktemp`
+assigns from the tree (`rg -oN '^\s*([A-Z_]+)=\$\(mktemp' -r '$1'
+plugins/<name> | sort -u`) and grep the whole tree, not a fixed window.

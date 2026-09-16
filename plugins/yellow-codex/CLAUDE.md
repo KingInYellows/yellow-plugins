@@ -100,10 +100,14 @@ No `-m` by default: every `codex exec` site passes
 `${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}`, so codex resolves the model from
 `~/.codex/config.toml` and then the account default unless `CODEX_MODEL` is
 set. `gpt-5.4` / `gpt-5.4-mini` are legacy and ChatGPT-account auth rejects
-them (HTTP 400, exit 1) — never hardcode a fallback name. `/codex:setup`'s
-smoke test is the one explicit model (`CODEX_SMOKE_MODEL`, default
-`gpt-5.6-luna`) and retries once without `-m` on rejection. Full table and
-rationale: `skills/codex-patterns/SKILL.md` "Model Selection";
+them (HTTP 400, exit 1; `gpt-5.x-codex` names too) — never hardcode a
+fallback name. `/codex:setup`'s smoke test probes the same no-`-m` shape;
+`CODEX_SMOKE_MODEL` forces a model for the probe only and is retried
+without it on a 400. With `--json` the API refusal is a stdout JSONL
+`{"type":"error"}` event, so every `--json` site captures both streams into
+one diagnostics file and reads only those events (`codex-patterns`
+"Where API errors land"). Full table and rationale:
+`skills/codex-patterns/SKILL.md` "Model Selection";
 `docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md`.
 
 ## Cross-Plugin Dependencies

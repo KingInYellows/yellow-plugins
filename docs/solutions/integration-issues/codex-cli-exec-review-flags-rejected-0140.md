@@ -393,10 +393,17 @@ default (`gpt-6-astra` here, codex-cli 0.153.3) and succeeds.
   generic arm) before the rate-limit check and returns
   `verdict=UNAVAILABLE` with `summary=Codex rejected model <name>: set
   CODEX_MODEL …`. With `--json` that message is a stdout JSONL event
-  (`{"type":"error",…}` then `turn.failed`) and stderr is empty — verified
-  live — so the reviewer and `/codex:review` now capture stdout and stderr
-  into the same diagnostics file instead of sending stdout to
-  `/dev/null`; the result still arrives via `-o`.
+  (`{"type":"error","message":…}` then `turn.failed`) and stderr is empty —
+  verified live — so every `--json` site (reviewer, `/codex:review`,
+  `/codex:rescue`, `codex-analyst`, `codex-executor`) captures stdout and
+  stderr into one diagnostics file and extracts the message from the error
+  events with `jq` (never by grepping the whole stream, which can echo
+  repository content); the result still arrives via `-o`. The same arm now
+  exists at every site, the rate-limit detection reads the same events, and
+  the generic arm prints a bounded, fenced, redacted excerpt. `/codex:setup`
+  probes the production no-`-m` shape rather than a hardcoded smoke model
+  (a green setup with `-m` said nothing about the path real invocations
+  take).
 
 **Components (this Update):** the four invocation-site files above,
 `plugins/yellow-codex/commands/codex/setup.md`,

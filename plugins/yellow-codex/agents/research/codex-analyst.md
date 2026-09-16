@@ -91,8 +91,13 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   --json \
   ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
-  "$ANALYSIS_PROMPT" 2>|"$STDERR_FILE" || {
+  "$ANALYSIS_PROMPT" >|"$STDERR_FILE" 2>&1 || {
     codex_exit=$?
+    # $STDERR_FILE holds both streams: with --json, API refusals arrive as
+    # {"type":"error","message":…} JSONL events on stdout and stderr stays
+    # empty. Read the message out of those events only — echoed diff or
+    # tool output elsewhere in the stream can never match the diagnostics.
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-analyst] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
@@ -103,8 +108,22 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       else
         printf '[codex-analyst] Auth failed\n'
       fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported"; then
+      # HTTP 400 from the model endpoint (exit 1, not the exit-2 auth path):
+      # this account cannot use the requested model — a legacy gpt-5.4* name,
+      # or a gpt-5.x-codex name under ChatGPT auth. Capture limited to
+      # model-identifier characters.
+      rejected_model=$(printf '%s' "$codex_api_error" | grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" | head -n1 | sed -E "s/^The '([^']+)' model$/\\1/")
+      if [ -n "${CODEX_MODEL:-}" ]; then
+        printf '[codex-analyst] Codex rejected model %s — set CODEX_MODEL to a model this account allows, or unset it to use the account default.\n' "$rejected_model"
+      else
+        printf '[codex-analyst] Codex rejected model %s — it came from the account default or the model key in ~/.codex/config.toml; change or remove that key.\n' "$rejected_model"
+      fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
+      printf '[codex-analyst] Rate limited\n'
     else
       printf '[codex-analyst] Error: exit code %d\n' "$codex_exit"
+      [ -n "$codex_api_error" ] && printf '[codex-analyst] api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)"
     fi
   }
 

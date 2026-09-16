@@ -58,20 +58,23 @@ below and supporting utilities:
   wrapping
 - `wc -c` — Step 3's diff-size pre-flight and Step 6's `FINDINGS` byte-cap
   check
-- `grep` — Step 4's exit-code diagnosis (parse-error/rate-limit pattern
-  matching against `$STDERR_FILE`) and Step 6's `FINDINGS_LINES` count
+- `grep` — Step 4's exit-code diagnosis (parse-error / model-rejection /
+  rate-limit pattern matching against `$STDERR_FILE` and the API error
+  event extracted from it) and Step 6's `FINDINGS_LINES` count
 - `head` — Step 4's `ERR_PEEK` truncation and Step 6's `FINDINGS` byte-cap
   truncation
 - `tr` — Step 4's `ERR_PEEK` newline flattening and Step 6's `SUMMARY`
   newline flattening
 - `awk` — Step 4's `ERR_PEEK` redaction; Step 6's `FINDINGS`/`SUMMARY`
   credential redaction and confidence-score threshold mapping
-- `jq` — Step 6's extraction of `overall_correctness`/
+- `jq` — Step 4's `{"type":"error"}` event extraction from the captured
+  `--json` stream, and Step 6's extraction of `overall_correctness`/
   `overall_confidence_score`/P1 finding count (one TSV-producing call) and
   `overall_explanation` (a second call, kept separate so its embedded
   newlines survive for the flatten step) from the Codex JSON result
 - `cut` — Step 6 splits the TSV row into its three fields
-- `sed` — Step 6's findings-block sentinel escaping and fenced-output
+- `sed` — Step 4's rejected-model-name extraction from the API error event
+  and Step 6's findings-block sentinel escaping and fenced-output
   delimiter escaping
 
 If you find yourself wanting to use `Bash` for anything outside this
@@ -169,7 +172,7 @@ if [ "$estimated_tokens" -gt 100000 ]; then
   printf '[codex-reviewer] Diff too large (~%d tokens) — returning UNAVAILABLE with a P3 finding\n' "$estimated_tokens" >&2
   FINDING="**[P3] codex — n/a:1** Diff too large for Codex review (~${estimated_tokens} estimated tokens).
   Finding: The diff exceeds the 100K estimated-token pre-flight limit.
-  Fix: Use gpt-5.3-codex (1M context) or review by file group.
+  Fix: Review by file group, or (API-key accounts only) set CODEX_MODEL=gpt-5.3-codex for its 1M context — ChatGPT accounts reject that name.
   [codex] confidence: N/A"
   FENCED_OUTPUT_FILE=$(mktemp /tmp/council-codex-fenced-XXXXXX.txt)
   {
@@ -195,7 +198,8 @@ fi
 
 If the diff exceeds 100K estimated tokens, emit the full 6-key block above
 (a single retained P3 finding noting the diff was too large, suggesting
-`gpt-5.3-codex` (1M context) or reviewing by file group). **Stop here** — do
+`gpt-5.3-codex` (1M context, API-key accounts only — ChatGPT auth rejects
+it) or reviewing by file group). **Stop here** — do
 not proceed to Step 4 (Codex invocation) or any subsequent steps.
 
 ### 4. Invoke Codex Review
@@ -331,9 +335,10 @@ fi
 # launched; remote-URL servers still log fast-failing auth errors at startup
 # but do not stall the run. --json makes codex stream its JSONL event log to
 # stdout (separate from -o, which only captures the final message); that raw
-# stream can echo untrusted diff content unfenced, so it's discarded here
-# rather than left to print straight into this agent's own context ahead of
-# Step 6's redaction pass — $OUTPUT_FILE is the only channel Step 6 parses.
+# stream can echo untrusted diff content, so it is captured into
+# $STDERR_FILE alongside stderr (never printed raw) — the exit-1 arms below
+# read only the {"type":"error"} events out of it, bounded, and
+# $OUTPUT_FILE is still the only channel Step 6 parses.
 # </dev/null is required: plain `exec` appends stdin to the prompt and will
 # block waiting for EOF if stdin is left attached to a pipe or terminal.
 # read-only sandbox still permits command execution (it gates writes), so
@@ -351,11 +356,12 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   </dev/null \
   >|"$STDERR_FILE" 2>&1 || {
     codex_exit=$?
-    # $STDERR_FILE holds BOTH streams: with --json, codex reports API
-    # refusals as JSONL events on stdout ({"type":"error",...} /
-    # turn.failed) and leaves stderr empty, so the diagnostics below
-    # would never match a stderr-only capture. The review result itself
-    # arrives via -o "$OUTPUT_FILE", never stdout.
+  # $STDERR_FILE holds both streams: with --json, API refusals arrive as
+    # {"type":"error","message":…} JSONL events on stdout and stderr stays
+    # empty. Read the message out of those events only — echoed diff or tool
+    # output elsewhere in the stream can never match the diagnostics.
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    # The review result itself arrives via -o "$OUTPUT_FILE", never stdout.
     # Diagnostics mirror the codex-patterns skill error catalog. Every branch
     # emits a structured partial and stops — a silent fall-through into
     # Step 5 would leave verdict= unset and degrade to council.md's
@@ -406,26 +412,52 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         printf 'confidence=N/A\n'
         printf 'summary=Codex authentication failed (exit 2).\n'
       fi
-    elif [ "$codex_exit" -eq 1 ] && grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported" "$STDERR_FILE" 2>/dev/null; then
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported"; then
       # HTTP 400 from the model endpoint surfaces as exit 1 (not the exit-2
       # auth path): the account cannot use the requested model — e.g. a
       # legacy gpt-5.4* name, or any gpt-5.x-codex name under ChatGPT auth.
-      # Matched on the model-specific message, not the generic
-      # invalid_request_error type (that is any 400 — schema, context
-      # length — and falls through to the generic arm below). The capture
-      # is limited to model-identifier characters so nothing else from
-      # stderr can reach the summary= line unredacted.
-      rejected_model=$(grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" "$STDERR_FILE" 2>/dev/null | sed -E "s/^The '([^']+)' model$/\\1/")
-      rejected_model="${rejected_model:-${CODEX_MODEL:-<account default>}}"
+      # Matched on the model-specific message inside the API error event,
+      # not the generic invalid_request_error type (that is any 400 —
+      # schema, context length — and gets its own arm below). The capture
+      # is limited to model-identifier characters so nothing else can reach
+      # the summary= line unredacted.
+      rejected_model=$(printf '%s' "$codex_api_error" | grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" | head -n1 | sed -E "s/^The '([^']+)' model$/\\1/")
+      rejected_model="${rejected_model:-the account default model}"
       printf '[codex-reviewer] Codex rejected model %s — returning UNAVAILABLE\n' "$rejected_model" >&2
       printf 'verdict=UNAVAILABLE\n'
       printf 'confidence=N/A\n'
-      printf 'summary=Codex rejected model %s: set CODEX_MODEL to a model your account allows (or unset it to use the account default).\n' "$rejected_model"
-    elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
+      if [ -n "${CODEX_MODEL:-}" ]; then
+        printf 'summary=Codex rejected model %s: set CODEX_MODEL to a model your account allows, or unset it to use the account default.\n' "$rejected_model"
+      else
+        printf 'summary=Codex rejected model %s: it came from the account default or the model key in ~/.codex/config.toml — change or remove that key.\n' "$rejected_model"
+      fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
       printf '[codex-reviewer] Rate limited\n' >&2
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
       printf 'summary=Codex rate limited (exit 1).\n'
+    elif [ "$codex_exit" -eq 1 ] && [ -n "$codex_api_error" ]; then
+      # Any other API refusal (a 400 for schema or context length, a 5xx):
+      # surface a bounded, redacted excerpt so the caller sees the cause
+      # instead of a bare exit code.
+      API_PEEK=$(printf '%s' "$codex_api_error" | head -c 200 | awk '{
+          gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential ---")
+          gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential ---")
+          gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential ---")
+          gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential ---")
+          gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential ---")
+          gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential ---")
+          gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential ---")
+          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential ---")
+          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential ---")
+          gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential ---")
+          gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential ---")
+          print
+        }' | tr '\n' ' ')
+      printf '[codex-reviewer] Codex API error: %s\n' "$API_PEEK" >&2
+      printf 'verdict=ERROR\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=Codex API error (exit 1): %s\n' "$API_PEEK"
     else
       printf '[codex-reviewer] Error: exit code %d\n' "$codex_exit" >&2
       printf 'verdict=ERROR\n'
