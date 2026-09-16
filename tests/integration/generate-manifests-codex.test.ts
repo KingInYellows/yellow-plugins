@@ -591,6 +591,42 @@ describe('generator hook-authority rule (R20)', () => {
     );
     expect(codexManifest.hooks).toBe('./hooks/codex-hooks.json');
   });
+
+  it('reports a hand-written hooks/hooks.json as stale in --check and removes it on apply', () => {
+    // Claude Code auto-loads plugins/<name>/hooks/hooks.json as a second
+    // hook source next to the inline plugin.json block. The generator never
+    // emits it, so validate-plugin.js RULE 7 rejects its presence — and the
+    // stale sweep here gives `generate-manifests --check` the same signal,
+    // so a reintroduced file fails validate:generated too, not only
+    // validate:plugins.
+    const inlineHooks = {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+    };
+    const root = makeCodexFixtureRoot([
+      { name: 'hook-plugin', codexEnabled: true, hooks: inlineHooks },
+    ]);
+    const first = generateManifests({ mode: 'apply', rootDir: root });
+    expect(first.status).toBe('ok');
+
+    const hooksJson = join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json');
+    writeJson(hooksJson, { hooks: inlineHooks });
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('ok');
+    expect(
+      checked.diffs.some(
+        (d: { path: string; state: string }) =>
+          d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'stale'
+      )
+    ).toBe(true);
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(applied.written).toContain('plugins/hook-plugin/hooks/hooks.json');
+    expect(existsSync(hooksJson)).toBe(false);
+    // The generated sibling survives — only the un-cataloged file is swept.
+    expect(existsSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'))).toBe(true);
+  });
 });
 
 describe('commandWindows emission (Windows command override)', () => {

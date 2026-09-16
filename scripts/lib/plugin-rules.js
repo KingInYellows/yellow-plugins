@@ -167,14 +167,10 @@ function rulePathFields(manifest, pluginDir, errors) {
 
 // RULES 6 + 8: Hook script existence + content checks (shebang, decision
 // output, set -e) over inline event-keyed hook configs. Both rules iterate
-// the same scripts; validateHookScriptPath folds them into one pass.
-function ruleInlineHookScripts(
-  manifest,
-  inlineHooks,
-  hasInlineHooks,
-  pluginDir,
-  errors
-) {
+// the same scripts; validateHookScriptPath folds them into one pass. A
+// string-valued `hooks` field never reaches here: schemas/plugin.schema.json
+// allows only the inline form, so validate:schemas rejects it first.
+function ruleInlineHookScripts(inlineHooks, hasInlineHooks, pluginDir, errors) {
   if (hasInlineHooks) {
     for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       if (!VALID_HOOK_EVENTS.has(eventName)) {
@@ -208,86 +204,25 @@ function ruleInlineHookScripts(
         }
       }
     }
-  } else if (typeof manifest.hooks === 'string') {
-    if (
-      manifest.hooks === './hooks/hooks.json' ||
-      manifest.hooks === 'hooks/hooks.json'
-    ) {
-      logWarning(
-        'hooks field points to standard hooks/hooks.json — Claude Code auto-discovers this file. ' +
-          'Explicit declaration may cause duplicate hooks error in Claude Code v2.1+. ' +
-          'Consider using inline hooks in plugin.json instead.'
-      );
-    }
   }
 }
 
-// RULE 7: hooks.json coexistence + shape check. Coexistence with inline
-// plugin.json hooks is an error: Claude Code auto-discovers hooks/hooks.json
-// AND loads the inline block with no dedup, so every hook fires twice
-// (observed on 2.1.272; six plugins shipped "reference-only" mirrors under
-// the stale belief the file was not loaded). Parse, top-level shape, and
-// per-event shape errors also block CI (Claude Code 2.1.131+ rejects a
-// malformed file at install time) and run for hooks-only plugins too.
-function ruleHooksJson(pluginDir, hasInlineHooks, errors) {
+// RULE 7: hooks/hooks.json must not exist. Claude Code auto-discovers the
+// file as a second hook source (observed on 2.1.272: it loaded six
+// "reference-only" mirrors alongside the inline plugin.json block and fired
+// every hook twice). In this marketplace hook config lives only in catalog/
+// and is generated into plugin.json, so a hand-written hooks/hooks.json is
+// an un-cataloged source that emit-codex.js never mirrors and RULES 6/8
+// never inspect. Presence is the error; there is nothing left to validate
+// inside the file. Repo policy, not a Claude Code rule — upstream still
+// documents hooks-only plugins as valid.
+function ruleHooksJson(pluginDir, errors) {
   const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
   if (!fs.existsSync(hooksJsonPath)) return;
-
-  if (hasInlineHooks) {
-    addError(
-      errors,
-      'hooks/hooks.json: coexists with inline hooks in plugin.json — Claude Code auto-discovers hooks/hooks.json and registers every hook twice. Keep the inline block (generated from catalog/) and delete hooks/hooks.json.'
-    );
-  }
-
-  let hooksJson;
-  let parseSuccessful = false;
-  try {
-    hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
-    parseSuccessful = true;
-  } catch (parseErr) {
-    addError(
-      errors,
-      `hooks/hooks.json: cannot parse — must be valid JSON for Claude Code to load the hook config (${parseErr.message})`
-    );
-  }
-  if (!parseSuccessful) return;
-
-  // Shape check: root must be an object, top-level "hooks" must be a
-  // non-null object (not array). Literal `null` parses but fails here.
-  const rootIsObject =
-    typeof hooksJson === 'object' &&
-    hooksJson !== null &&
-    !Array.isArray(hooksJson);
-  const hooksField = rootIsObject ? hooksJson.hooks : undefined;
-  const hasValidShape =
-    typeof hooksField === 'object' &&
-    hooksField !== null &&
-    !Array.isArray(hooksField);
-
-  if (!hasValidShape) {
-    addError(
-      errors,
-      'hooks/hooks.json: top-level "hooks" key is required and must be a non-null object — Claude Code 2.1.131+ rejects plugins with a different shape'
-    );
-    return;
-  }
-
-  // Per-event shape check: each event's value must be an array of hook
-  // entries. Runs unconditionally — hooks-only plugins must also be checked.
-  for (const [event, value] of Object.entries(hooksField)) {
-    if (!VALID_HOOK_EVENTS.has(event)) {
-      logWarning(
-        `hooks/hooks.json: unknown hook event "${event}". Known events: ${[...VALID_HOOK_EVENTS].join(', ')}`
-      );
-    }
-    if (!Array.isArray(value)) {
-      addError(
-        errors,
-        `hooks/hooks.json: event "${event}" must be an array of hook entries — got ${value === null ? 'null' : typeof value}; Claude Code 2.1.131+ rejects non-array event values`
-      );
-    }
-  }
+  addError(
+    errors,
+    'hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file (hooks/codex-hooks.json is generated, never hand-written).'
+  );
 }
 
 // RULE 9 helper: validate one userConfig object (top-level or per-channel).

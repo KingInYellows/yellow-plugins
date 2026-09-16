@@ -194,8 +194,10 @@ MIT
 **File**: `.claude-plugin/plugin.json`
 
 Every key below is accepted by `schemas/plugin.schema.json`. `hooks` is
-inline-only (a `hooks/hooks.json` path is rejected by the local schema by
-policy), `repository` is a string, and `dependencies` is an **array** whose
+inline-only — a `hooks/hooks.json` path is rejected by the local schema, and
+the file itself must not exist under `plugins/<name>/` (`validate-plugin.js`
+RULE 7 errors on its presence; hook config lives in `catalog/`),
+`repository` is a string, and `dependencies` is an **array** whose
 object form carries a `reason` (a yellow-plugins extension). `outputStyles` is
 left out because it is optional and path-checked — add `"outputStyles":
 "./output-styles"` only once that directory exists and holds at least one

@@ -915,6 +915,12 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const staleCandidates = [
       join(pluginRoot, '.codex-plugin', 'plugin.json'),
       join(pluginRoot, 'hooks', 'codex-hooks.json'),
+      // Never generated, but Claude Code auto-loads it as a second hook
+      // source next to the inline plugin.json block (RULE 7 in
+      // validate-plugin rejects it for the same reason). Sweeping it here
+      // makes `--check` flag a reintroduced file as stale and `apply`
+      // remove it, so the catalog stays the only hook source.
+      join(pluginRoot, 'hooks', 'hooks.json'),
     ];
     // This loop runs unconditionally (no isCodexEnabled guard, so it also
     // covers Codex-disabled plugins), so componentPaths.skills can carry a

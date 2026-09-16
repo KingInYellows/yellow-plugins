@@ -187,26 +187,6 @@ describe('validate-plugin baseline (regression net)', () => {
     expect(stderr).toMatch(/MAJOR\.MINOR\.PATCH/);
   });
 
-  it('warns on hooks-string anti-pattern (./hooks/hooks.json)', () => {
-    // Create the file so the path-existence check (PR-A) passes; the
-    // anti-pattern warning is what this test asserts.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(
-      join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify({ hooks: {} }),
-      'utf8'
-    );
-    writePluginManifest(pluginDir, {
-      ...VALID_BASE_MANIFEST,
-      hooks: './hooks/hooks.json',
-    });
-    const { status, stderr } = runValidator(pluginDir);
-    // Warning, not error — plugin is still valid
-    expect(status).toBe(0);
-    expect(stderr).toMatch(/hooks\/hooks\.json/);
-    expect(stderr).toMatch(/duplicate hooks/);
-  });
-
   it('passes hooks inline-object form with valid script paths', () => {
     writeHookScript(pluginDir, 'hooks/scripts/example.sh', SHEBANG_HOOK);
     writePluginManifest(pluginDir, {
@@ -462,11 +442,10 @@ printf 'plain text\\n'
     expect(stderr).toMatch(/at least one \.md file/);
   });
 
-  it('errors when a well-formed hooks/hooks.json coexists with inline plugin.json hooks (RULE 7: coexistence check)', () => {
+  it('errors when hooks/hooks.json is present alongside inline plugin.json hooks (RULE 7: presence check)', () => {
     // Claude Code auto-discovers hooks/hooks.json AND loads the inline block,
     // with no dedup between the two sources — every hook fires twice. A
-    // byte-identical "reference-only" mirror is still a double registration,
-    // so the coexistence itself is the error, independent of drift.
+    // byte-identical "reference-only" mirror is still a double registration.
     const hooks = {
       SessionStart: [
         {
@@ -484,97 +463,15 @@ printf 'plain text\\n'
     writePluginManifest(pluginDir, { ...VALID_BASE_MANIFEST, hooks });
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: coexists with inline hooks in plugin\.json/
-    );
+    expect(stderr).toMatch(/hooks\/hooks\.json: not allowed/);
+    expect(stderr).toMatch(/catalog\/plugins\/<name>\.json#hooks/);
   });
 
-  it('errors when hooks/hooks.json has events at the top level (RULE 7: shape check, missing "hooks" wrapper)', () => {
-    // Claude Code 2.1.131+ auto-discovers hooks/hooks.json and validates the
-    // top-level shape against { hooks: { ... } }. A file with events at the
-    // root (no wrapper) causes "Hook load failed: expected record, received
-    // undefined at path ['hooks']" and the plugin fails to load. The
-    // validator must catch this before the file ships.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(
-      join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify(
-        {
-          PostToolUse: [
-            {
-              matcher: '*',
-              hooks: [{ type: 'command', command: 'echo broken' }],
-            },
-          ],
-        },
-        null,
-        2
-      ),
-      'utf8'
-    );
-    writePluginManifest(pluginDir, {
-      ...VALID_BASE_MANIFEST,
-      hooks: {
-        PostToolUse: [
-          {
-            matcher: '*',
-            hooks: [{ type: 'command', command: 'echo broken' }],
-          },
-        ],
-      },
-    });
-    const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: top-level "hooks" key is required/
-    );
-  });
-
-  it('errors when hooks/hooks.json contains literal null (RULE 7: shape check, root must be an object)', () => {
-    // JSON.parse('null') succeeds and returns null. The shape check must
-    // still fire — a null root has no "hooks" key, so Claude Code's
-    // auto-discovery would reject it.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(join(pluginDir, 'hooks', 'hooks.json'), 'null', 'utf8');
-    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
-    const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: top-level "hooks" key is required/
-    );
-  });
-
-  it('errors when hooks/hooks.json is unparseable JSON (RULE 7: parse failure is now hard error)', () => {
-    // Previously a logWarning at validate-plugin.js:790; promoted to addError
-    // since Claude Code's auto-discovery rejects unparseable files at install
-    // time the same way it rejects malformed shape.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(
-      join(pluginDir, 'hooks', 'hooks.json'),
-      '{not valid json',
-      'utf8'
-    );
-    writePluginManifest(pluginDir, {
-      ...VALID_BASE_MANIFEST,
-      hooks: {
-        PostToolUse: [
-          {
-            matcher: '*',
-            hooks: [{ type: 'command', command: 'echo unparseable' }],
-          },
-        ],
-      },
-    });
-    const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(/hooks\/hooks\.json: cannot parse/);
-  });
-
-  it('runs hooks/hooks.json shape check even when plugin.json has no inline hooks', () => {
-    // The shape gate must fire whenever the file is present on disk —
-    // dropping the `hasInlineHooks` guard ensures Claude Code's auto-discovery
-    // contract is enforced even for plugins that only ship hooks/hooks.json.
-    // A well-formed file with no inline manifest block must pass.
+  it('errors when hooks/hooks.json is present without inline plugin.json hooks (RULE 7: hooks-only is not a carve-out)', () => {
+    // Upstream documents hooks-only plugins as valid, but in this catalog-
+    // generated marketplace the file is an un-cataloged hook source:
+    // emit-codex.js never mirrors it, RULES 6/8 never inspect its scripts,
+    // and generate-manifests --check cannot see it. Presence alone errors.
     mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
     writeFileSync(
       join(pluginDir, 'hooks', 'hooks.json'),
@@ -596,78 +493,24 @@ printf 'plain text\\n'
     );
     writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
     const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBe(0);
-    expect(stderr).not.toMatch(/hooks\/hooks\.json/);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/hooks\/hooks\.json: not allowed/);
   });
 
-  it('errors when hooks/hooks.json has a non-array event value with inline hooks present (RULE 7: per-event shape check)', () => {
-    // Top-level shape can be valid ({ hooks: { ... } }) but each event must be
-    // an array of hook entries. Claude Code's runtime expects
-    // Record<EventName, Array<HookEntry>>; a string/object/number value under
-    // an event key passes the top-level check but fails at install time. This
-    // case exercises the hasInlineHooks=true branch — the next test exercises
-    // the hooks-only path.
+  it('reports the same presence error for an unparseable hooks/hooks.json (RULE 7: contents are not inspected)', () => {
+    // Presence is fatal, so the validator no longer parses the file — a
+    // malformed one produces the one presence error, not a parse error.
     mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
     writeFileSync(
       join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify({ hooks: { SessionStart: 'not-an-array' } }, null, 2),
+      '{not valid json',
       'utf8'
     );
-    writePluginManifest(pluginDir, {
-      ...VALID_BASE_MANIFEST,
-      hooks: {
-        SessionStart: [
-          {
-            matcher: '*',
-            hooks: [{ type: 'command', command: 'echo ok' }],
-          },
-        ],
-      },
-    });
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: event "SessionStart" must be an array of hook entries — got string/
-    );
-  });
-
-  it('runs per-event array check even when plugin.json has no inline hooks (RULE 7: hoisted out of drift branch)', () => {
-    // The per-event check must fire for hooks-only plugins (plugin.json with
-    // no inline hooks). Previously this validation lived inside the
-    // hasInlineHooks-gated drift branch and silently passed.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(
-      join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify({ hooks: { PostToolUse: { matcher: '*' } } }, null, 2),
-      'utf8'
-    );
-    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
-    const { status, stderr } = runValidator(pluginDir);
-    expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: event "PostToolUse" must be an array of hook entries — got object/
-    );
-  });
-
-  it('warns on unknown hook event name in hooks/hooks.json even when plugin.json has no inline hooks (RULE 7: event-name recognition)', () => {
-    // Mirrors the inline-hooks unknown-event warning so typos in hooks-only
-    // plugins (e.g., "SesionStart") are caught — the inline branch is gated
-    // on hasInlineHooks and would otherwise skip them.
-    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
-    writeFileSync(
-      join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify(
-        { hooks: { SesionStart: [{ hooks: [{ type: 'command', command: 'echo ok' }] }] } },
-        null,
-        2
-      ),
-      'utf8'
-    );
-    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
-    const { stderr } = runValidator(pluginDir);
-    expect(stderr).toMatch(
-      /hooks\/hooks\.json: unknown hook event "SesionStart"/
-    );
+    expect(stderr).toMatch(/hooks\/hooks\.json: not allowed/);
+    expect(stderr).not.toMatch(/cannot parse/);
   });
 });
 

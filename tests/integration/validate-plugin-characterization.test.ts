@@ -163,16 +163,16 @@ describe('validate-plugin characterization: invalid-fixture error arrays', () =>
     ).toMatchSnapshot();
   });
 
-  it('RULE 7: hooks/hooks.json with events at the top level', () => {
+  it('RULE 7: hooks/hooks.json present (well-formed, no inline hooks)', () => {
     expect(
       errorsFor(
-        'bad-hooks-json',
+        'hooks-json-present',
         base,
         (pluginDir) => {
           mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
           writeFileSync(
             join(pluginDir, 'hooks', 'hooks.json'),
-            JSON.stringify({ PostToolUse: [] }, null, 2),
+            JSON.stringify({ hooks: { PostToolUse: [] } }, null, 2),
             'utf8'
           );
         }

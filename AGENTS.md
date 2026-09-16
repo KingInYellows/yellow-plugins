@@ -223,13 +223,13 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - Inline `hooks` and `mcpServers` are preferred when the configuration is small
   and easier to audit in `plugin.json`. If a file path is used, ensure the file
   exists and is covered by validation.
-- Avoid explicitly declaring the default `hooks/hooks.json` path unless you have
-  verified Claude Code will not auto-discover it twice.
-- Never ship `hooks/hooks.json` alongside inline `hooks` in `plugin.json` —
-  Claude Code auto-discovers the file and loads the inline block with no
-  dedup, so every hook fires twice. `validate-plugin.js` RULE 7 errors on the
-  coexistence. Hook config lives in `catalog/` and is generated into
-  `plugin.json`; there is no reference mirror.
+- `plugins/<name>/hooks/hooks.json` must not exist. Claude Code auto-loads
+  the file as a second hook source next to the inline `hooks` block, and in
+  this repo it is an un-cataloged source no generator or validator sees.
+  `validate-plugin.js` RULE 7 errors on its presence (with or without inline
+  hooks) and `pnpm validate:generated` reports it as stale. Hook config lives
+  in `catalog/plugins/<name>.json#hooks` and is generated into `plugin.json`;
+  `hooks/codex-hooks.json` is generated too, never hand-written.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate
   untrusted user config directly into shell commands; pass it through
   environment variables or validated wrapper scripts.
