@@ -64,8 +64,10 @@ ruvector.
 - `/ruvector:index` — Index codebase for semantic search
 - `/ruvector:search` — Search codebase by meaning using vector similarity
 - `/ruvector:status` — Show ruvector health, DB stats, queue status, and
-  embedder provenance (`PROVENANCE: OK | MISMATCH | UNSTAMPED | UNKNOWN`
-  from a `hooks reembed --dry-run` stamp comparison, with remediation)
+  embedder provenance (`PROVENANCE: FRESH | OK | MISMATCH | UNSTAMPED |
+  UNKNOWN`, computed in the command's bash block from a whole-stamp
+  comparison against `hooks reembed --dry-run`, with remediation; the
+  dry-run is bounded at 90 s and costs a model load)
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
 - `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
@@ -94,10 +96,15 @@ ruvector.
 - `user-prompt-submit.sh` — Inject relevant memories before Claude processes each
   user prompt via `hooks recall` (1s budget)
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
-  via `hooks recall` (3s budget). Also a jq-only embedder-provenance check:
-  a `hash`-stamped store with the default (onnx-minilm) embedder adds one
-  `[ruvector] store is hash-embedded …` line to `systemMessage`; silent for
-  unstamped stores and when `RUVECTOR_EMBEDDER=hash` / `RUVECTOR_ONNX=0`
+  via `hooks recall` (3s budget: 0.2s provenance parse + 0.9s resume +
+  2×0.65s recall = 2.8s worst case). Also a jq-only embedder-provenance
+  check: a `hash`-stamped store with the default (onnx-minilm) embedder, or
+  a stamp-less store that already holds vectors (`ERR_LEGACY_STORE_READONLY`),
+  adds one `[ruvector] …` line to `systemMessage`; silent for fresh stores
+  and when the env selects hash the way upstream resolves it
+  (`RUVECTOR_EMBEDDER=hash`, or `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER`
+  unset). The gate reads the hook shell's env, not the MCP server's —
+  `/ruvector:status` is the definitive check
 - `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/MultiEdit/Bash tools (1s budget). Stdout is dual-client allow JSON (`continue` + `permission`) so Cursor's Claude-plugin bridge does not block the tool.
 - `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
   `hooks post-edit` and `hooks post-command` (<50ms)
@@ -161,7 +168,12 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
    - Use `type=decision` for successful patterns, `type=context` for mistakes
      and fixes, and `type=project` for session summaries
 
-5. If `hooks_remember` fails or is unavailable, skip silently.
+5. If `hooks_remember` fails with a provenance refusal (message names
+   ADR-210 / "does not match the active embedder", or code
+   `ERR_LEGACY_STORE_READONLY`), do not retry and do not skip silently —
+   it is store-wide: report `[ruvector] memory writes refused — run
+   /ruvector:status for the reembed + restart steps` and continue. For any
+   other failure (timeout, connection refused, unavailable), skip silently.
 
 ## Known Limitations
 

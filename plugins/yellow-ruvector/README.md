@@ -84,7 +84,7 @@ external services or API keys required.
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |
 | Queue growing large  | Check `/ruvector:status`, queue flushes on session start |
 | Cursor blocks Shell / edits | Re-run `/ruvector:setup`, then start a new Cursor session |
-| `hooks_remember` refused / "store is hash-embedded" at session start | Run `/ruvector:status` — `PROVENANCE: MISMATCH` prints the `hooks reembed` + restart steps |
+| `hooks_remember` refused / "store is hash-embedded" at session start | Run `/ruvector:status` — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the `hooks reembed` + restart steps (status diagnoses; the reembed + restart is the fix) |
 
 `ruvector hooks init` writes empty-stdout PreToolUse commands into
 `~/.claude/settings.json`. Cursor treats that as invalid JSON and blocks

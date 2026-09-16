@@ -209,3 +209,4 @@ All commands and agents must work when ruvector is unavailable:
 | Timeout (search > 5s) | Report timeout, suggest smaller scope or re-indexing |
 | Permission denied on `.ruvector/` | Check file permissions, suggest `chmod -R u+rw .ruvector/` |
 | MCP tool not found via ToolSearch | Verify plugin is installed and MCP server is configured |
+| Provenance refusal on `hooks_remember` (ADR-210 "does not match the active embedder", or `ERR_LEGACY_STORE_READONLY`) | Store-wide, not per-entry: do not retry; report "memory writes refused — run `/ruvector:status`" and continue (reembed + restart is the fix) |

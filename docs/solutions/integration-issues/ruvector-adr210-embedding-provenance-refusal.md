@@ -23,9 +23,11 @@ components:
 ## Symptom
 
 Every `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` call fails with a
-provenance refusal (upstream ADR-210: "store embedding provenance
-`{embedderKind: hash, dimension: 64}` does not match the active embedder
-`onnx-minilm/384`"), while `hooks_recall`, the SessionStart learnings
+provenance refusal — upstream's `ProvenanceMismatchError`, paraphrased:
+"Embedding-provenance mismatch (ADR-210): refusing vector write … store
+records `{ embedder=hash, dim=64, … }` but the active embedder is
+`{ embedder=onnx-minilm, dim=384, … }` (differs on: …)" — while
+`hooks_recall`, the SessionStart learnings
 injection, and `/ruvector:memory` all keep returning results. Nothing in the
 session says memory writes stopped landing; the `/flow:work` Phase 4
 learning-record step degrades silently ("skip silently if unavailable").
@@ -38,8 +40,13 @@ Store stamp, seen with `jq '.embeddingProvenance' .ruvector/intelligence.json`:
 
 ## Why reads still work
 
-ADR-210 gates **writes** on a three-field stamp match (`embedderKind`,
-`modelId`, `dimension`) so a store never holds vectors from two embedders.
+ADR-210 gates **writes** on a full stamp match — `compareProvenance` diffs
+`embedderKind`, `modelId`, `dimension`, `normalize` and `prefixPolicy`, and
+`assertProvenanceMatch` refuses on any difference — so a store never holds
+vectors from two embedders. Two adjacent states matter: a store with
+vectors but no stamp at all (pre-provenance) is refused with
+`ERR_LEGACY_STORE_READONLY`; a stamp-less store with no vectors is fresh and
+the first write stamps it.
 Reads are not gated: a query is embedded with the active embedder and
 compared against whatever vectors are stored. With a hash-stamped store and
 an ONNX query the similarity scores are near zero rather than an error, so
@@ -80,9 +87,15 @@ created earlier keeps its hash stamp until reembedded.
   when the store stamp is `hash` and neither `RUVECTOR_EMBEDDER=hash` nor
   `RUVECTOR_ONNX=0` is set (jq only; inside the 3 s budget; silent for an
   unstamped fresh/legacy store).
-- `/ruvector:status` Step 6 runs the dry-run, compares all three stamp
-  fields against `targetProvenance`, and prints `PROVENANCE: OK | MISMATCH |
-  UNSTAMPED | UNKNOWN` with the remediation above.
+- `/ruvector:status` Step 6 computes the verdict in its bash block: `FRESH`
+  (no file, or no stamp and no vectors), `UNSTAMPED` (vectors, no stamp),
+  `OK` / `MISMATCH` (whole-stamp equality against the dry-run's
+  `targetProvenance`, naming the differing fields), or `UNKNOWN` (dry-run
+  failed or timed out — the CLI's `error`/`hint` come as a stdout JSON
+  line, not stderr) — and prints the remediation above. Detection covers
+  only `$PROJECT_DIR/.ruvector`; a nested-launch session or a server that
+  cached the machine-global `~/.ruvector` during the heal window is not
+  seen by the hook.
 
 ## Related
 
