@@ -231,7 +231,7 @@ CODEX_CMD=(codex exec
   -c 'mcp_servers={}'
   --ephemeral
   --json
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"}
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}
   --output-schema "$SCHEMA_FILE"
   -o "$OUTPUT_FILE"
 )

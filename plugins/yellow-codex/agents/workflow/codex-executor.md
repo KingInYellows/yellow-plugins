@@ -85,7 +85,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
   "$TASK_PROMPT" 2>|"$STDERR_FILE" || {
     codex_exit=$?

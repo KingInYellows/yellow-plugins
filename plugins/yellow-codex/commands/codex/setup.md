@@ -202,7 +202,7 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   # those as legacy and ChatGPT-account auth rejects them with a 400.
   smoke_model="${CODEX_SMOKE_MODEL:-gpt-5.6-luna}"
   test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only -m "$smoke_model" "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE") || true
-  if [ -z "$test_output" ] && grep -q "not supported when using Codex with a ChatGPT account" "$SETUP_ERR_FILE" 2>/dev/null; then
+  if [ -z "$test_output" ] && grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported" "$SETUP_ERR_FILE" 2>/dev/null; then
     # The account cannot use the explicit smoke model (exit 1, HTTP 400
     # invalid_request_error). Retry once with no -m so the CLI's own model
     # precedence (~/.codex/config.toml, then the account default) decides —
@@ -215,8 +215,10 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   elif [ -n "$test_output" ]; then
     printf '[yellow-codex] Test invocation: response received (model accessible)\n'
   elif grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
-    printf '[yellow-codex] Test invocation: model rejected — set CODEX_SMOKE_MODEL to a model this account allows:\n' >&2
-    grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null >&2
+    # Any 400 (model still rejected after the retry, or another request
+    # error). Bounded excerpt: CLI stderr is untrusted output.
+    printf '[yellow-codex] Test invocation: request rejected (HTTP 400) — if it names a model, set CODEX_SMOKE_MODEL to one this account allows:\n' >&2
+    grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null | head -c 200 >&2; printf '\n' >&2
   elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Test invocation: CLI argument parse error (flag drift?):\n' >&2
     grep -m2 -E "^error:" "$SETUP_ERR_FILE" 2>/dev/null >&2

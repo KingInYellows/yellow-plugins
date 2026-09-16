@@ -89,7 +89,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -s read-only \
   --ephemeral \
   --json \
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
   "$ANALYSIS_PROMPT" 2>|"$STDERR_FILE" || {
     codex_exit=$?

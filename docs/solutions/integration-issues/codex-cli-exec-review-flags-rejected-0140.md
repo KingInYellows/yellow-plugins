@@ -375,18 +375,24 @@ the exit-2 auth path), and `codex exec` with no `-m` resolves the account
 default (`gpt-6-astra` here, codex-cli 0.153.3) and succeeds.
 
 - Every `-m "${CODEX_MODEL:-gpt-5.4}"` site is now
-  `${CODEX_MODEL:+-m "$CODEX_MODEL"}` — zero or two arguments, verified in
-  both the backslash-continued and `CODEX_CMD=(...)` array forms. The CLI's
-  own precedence (`~/.codex/config.toml`, then the account default) decides
-  when the variable is unset; `CODEX_MODEL` still wins when set.
+  `${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}` — zero or two
+  arguments in both bash and zsh, verified in the backslash-continued and
+  `CODEX_CMD=(...)` array forms. The single-expansion form
+  `${CODEX_MODEL:+-m "$CODEX_MODEL"}` was tried first and rejected in
+  review: zsh does not word-split the alternate value and passes one
+  argument `-m <name>`, and the Bash tool runs zsh on zsh-login hosts.
+  The CLI's own precedence (`~/.codex/config.toml`, then the account
+  default) decides when the variable is unset; `CODEX_MODEL` still wins
+  when set.
 - `/codex:setup`'s smoke test keeps one explicit cheap model
   (`CODEX_SMOKE_MODEL`, default `gpt-5.6-luna`) and retries once without
   `-m` on the 400 rejection, so setup passes on both auth types.
-- `codex-reviewer`'s exit-1 arm greps for
-  `not supported when using Codex with a ChatGPT account|invalid_request_error`
-  before the rate-limit check and returns `verdict=UNAVAILABLE` with
-  `summary=Codex rejected model <name>: set CODEX_MODEL …`, the model name
-  parsed from the error message.
+- `codex-reviewer`'s exit-1 arm greps for the model-specific message
+  (`The '<name>' model is not supported`, identifier characters only — the
+  generic `invalid_request_error` type is any 400 and falls through to the
+  generic arm) before the rate-limit check and returns
+  `verdict=UNAVAILABLE` with `summary=Codex rejected model <name>: set
+  CODEX_MODEL …`.
 
 **Components (this Update):** the four invocation-site files above,
 `plugins/yellow-codex/commands/codex/setup.md`,

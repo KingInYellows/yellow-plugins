@@ -97,7 +97,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ## Model Selection
 
 No `-m` by default: every `codex exec` site passes
-`${CODEX_MODEL:+-m "$CODEX_MODEL"}`, so codex resolves the model from
+`${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}`, so codex resolves the model from
 `~/.codex/config.toml` and then the account default unless `CODEX_MODEL` is
 set. `gpt-5.4` / `gpt-5.4-mini` are legacy and ChatGPT-account auth rejects
 them (HTTP 400, exit 1) — never hardcode a fallback name. `/codex:setup`'s

@@ -345,7 +345,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'mcp_servers={}' \
   --json \
   --ephemeral \
-  ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"} \
   --output-schema "$SCHEMA_FILE" \
   -o "$OUTPUT_FILE" \
   </dev/null \
@@ -402,13 +402,16 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         printf 'confidence=N/A\n'
         printf 'summary=Codex authentication failed (exit 2).\n'
       fi
-    elif [ "$codex_exit" -eq 1 ] && grep -qE "not supported when using Codex with a ChatGPT account|invalid_request_error" "$STDERR_FILE" 2>/dev/null; then
+    elif [ "$codex_exit" -eq 1 ] && grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported" "$STDERR_FILE" 2>/dev/null; then
       # HTTP 400 from the model endpoint surfaces as exit 1 (not the exit-2
       # auth path): the account cannot use the requested model — e.g. a
       # legacy gpt-5.4* name, or any gpt-5.x-codex name under ChatGPT auth.
-      # Name the model so the operator knows which CODEX_MODEL to change;
-      # with -m omitted the CLI's own precedence picked it.
-      rejected_model=$(grep -m1 -oE "The '[^']+' model" "$STDERR_FILE" 2>/dev/null | sed -E "s/^The '([^']+)' model$/\\1/")
+      # Matched on the model-specific message, not the generic
+      # invalid_request_error type (that is any 400 — schema, context
+      # length — and falls through to the generic arm below). The capture
+      # is limited to model-identifier characters so nothing else from
+      # stderr can reach the summary= line unredacted.
+      rejected_model=$(grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" "$STDERR_FILE" 2>/dev/null | sed -E "s/^The '([^']+)' model$/\\1/")
       rejected_model="${rejected_model:-${CODEX_MODEL:-<account default>}}"
       printf '[codex-reviewer] Codex rejected model %s — returning UNAVAILABLE\n' "$rejected_model" >&2
       printf 'verdict=UNAVAILABLE\n'
