@@ -5,9 +5,10 @@
 // `node entrypoint-codex.js`. SessionStart output is identical on both hosts
 // (R36), so this shares `formatSessionStartOutput` with entrypoint-claude.js —
 // the two entrypoints are intentionally byte-equivalent, kept separate for the
-// per-host entrypoint convention (and referenced independently by
-// hooks.json / codex-hooks.json). NOTE: plugin-shipped hooks do not currently
-// fire on Codex (`plugin_hooks` is `removed` on codex-cli 0.144.x) — this
+// per-host entrypoint convention (and referenced independently by the inline
+// hooks block in .claude-plugin/plugin.json / hooks/codex-hooks.json).
+// NOTE: plugin-shipped hooks do not currently fire on Codex (`plugin_hooks`
+// is `removed` on codex-cli 0.144.x) — this
 // entrypoint is carried but inert there until upstream restores the feature.
 
 const { formatSessionStartOutput } = require('./lib/envelope.js');
