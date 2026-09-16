@@ -91,7 +91,7 @@ and rebase WS3, or merge their changesets if they land together.
 
 ### WS1: RULE 7 — hook config only from catalog/ (stack on #797)
 
-- [ ] 1.1 `scripts/lib/plugin-rules.js` `ruleHooksJson`: if the file exists,
+- [x] 1.1 `scripts/lib/plugin-rules.js` `ruleHooksJson`: if the file exists,
       `addError` unconditionally — `hooks/hooks.json: not allowed — Claude Code
       auto-loads it as a second hook source; hook config lives in
       catalog/plugins/<name>.json#hooks and is generated into plugin.json.
@@ -101,12 +101,12 @@ and rebase WS3, or merge their changesets if they land together.
       update the call site in `scripts/validate-plugin.js:148` and drop the
       now-unused `hasInlineHooks` plumbing only if nothing else uses it
       (RULE 6 still does — keep it there).
-- [ ] 1.2 Delete the RULE 6 string-pointer branch (`plugin-rules.js:211-222`)
+- [x] 1.2 Delete the RULE 6 string-pointer branch (`plugin-rules.js:211-222`)
       and its test `validate-plugin.test.ts:190` ("warns on hooks-string
       anti-pattern"); the schema already rejects string `hooks`, so the branch
       is unreachable when `validate:schemas` runs — say "unreachable under the
       schema gate", not "dead", in the changeset.
-- [ ] 1.3 Tests: replace `validate-plugin.test.ts:465` (coexistence),
+- [x] 1.3 Tests: replace `validate-plugin.test.ts:465` (coexistence),
       `:573`, `:634`, `:652` (hooks-only trio) with two cases — file present
       with inline hooks → error; file present without inline hooks → same
       error — and keep the parse-failure/`null`/events-at-top-level cases only
@@ -114,64 +114,68 @@ and rebase WS3, or merge their changesets if they land together.
       error; collapse to one). Update the characterization fixture
       `validate-plugin-characterization.test.ts:165` (`bad-hooks-json`) and
       refresh its snapshot with `pnpm vitest run tests/integration/validate-plugin-characterization.test.ts -u`.
-- [ ] 1.4 `scripts/generate-manifests.js` (~917): add
+- [x] 1.4 `scripts/generate-manifests.js` (~917): add
       `join(pluginRoot, 'hooks', 'hooks.json')` to the stale-artifact sweep so
       `pnpm validate:generated` also fails on a reintroduced file. Add a case to
       `tests/integration/generate-manifests-codex.test.ts` next to the R20
       decoy test (`:537`) asserting `--check` reports it.
-- [ ] 1.5 Docs: `AGENTS.md:220-232` (drop "also run for hooks-only plugins";
+- [x] 1.5 Docs: `AGENTS.md:220-232` (drop "also run for hooks-only plugins";
       state the file is forbidden), `docs/plugin-validation-guide.md:224-230`,
       `docs/plugin-template.md:196-199` (say the file must not exist, not just
       that the path form is rejected), `CONTRIBUTING.md:461,491` wording.
-- [ ] 1.6 Changeset: none needed for plugins (validator + docs only) — confirm
+- [x] 1.6 Changeset: none needed for plugins (validator + docs only) — confirm
       `changeset-check` accepts a no-plugin-change PR, else add an empty
       changeset (`pnpm changeset --empty`).
 
 ### WS2: quote `${CLAUDE_PLUGIN_ROOT}` in catalog hook commands
 
-- [ ] 2.1 Edit the 15 catalog commands to `bash "${CLAUDE_PLUGIN_ROOT}/…"` /
+- [x] 2.1 Edit the 15 catalog commands to `bash "${CLAUDE_PLUGIN_ROOT}/…"` /
       `node "${CLAUDE_PLUGIN_ROOT}/…"` (match `github-workflow.json:28`).
       `pnpm generate:manifests`; confirm `hooks/codex-hooks.json` for yellow-ci
       and gt-workflow regenerate with the quoted form and the
       `entrypoint-codex.js` rewrite intact.
-- [ ] 2.2 `scripts/lib/plugin-paths.js` `resolveHookScriptPath`: accept
+- [x] 2.2 `scripts/lib/plugin-paths.js` `resolveHookScriptPath`: accept
       `^(bash|node)\s+` so `node` commands get the same existence and
       containment checks; keep the bash-only `set -e`/decision-output content
       checks in `validateHookScriptPath` gated on the interpreter (a `.js`
       entrypoint has no shebang contract). Update `ruleInlineHookScripts`'s
       escape check (`plugin-rules.js:199`) to cover `node` too.
-- [ ] 2.3 New RULE 6 warning in `ruleInlineHookScripts`: any `command`
+- [x] 2.3 New RULE 6 warning in `ruleInlineHookScripts`: any `command`
       containing `${CLAUDE_PLUGIN_ROOT}` not immediately preceded by `"` →
       `logWarning('hook command has unquoted ${CLAUDE_PLUGIN_ROOT} — word-splits
       on paths with spaces; quote it')`. Warning, not error, so third-party
       catalogs are not broken; the catalog itself will be clean.
-- [ ] 2.4 Tests in `tests/integration/validate-plugin.test.ts`: (a) quoted
+- [x] 2.4 Tests in `tests/integration/validate-plugin.test.ts`: (a) quoted
       `node "${CLAUDE_PLUGIN_ROOT}/hooks/x.js"` with a missing file → error;
       (b) a plugin dir created under a temp path containing a space, quoted
       command → passes, unquoted → warning; (c) `node` command escaping the
       plugin dir → error.
-- [ ] 2.5 Refresh `tests/integration/generate-manifests-characterization.test.ts`
+- [x] 2.5 Refresh `tests/integration/generate-manifests-characterization.test.ts`
       snapshot (`vitest -u`) — generated `plugin.json` bytes change for nine
       plugins. Run `pnpm validate:generated`, `validate:versions`.
-- [ ] 2.6 One changeset file listing all nine plugins at `patch`
+- [x] 2.6 One changeset file listing all nine plugins at `patch`
       (gt-workflow, yellow-ci, yellow-composio, yellow-core, yellow-debt,
       yellow-morph, yellow-research, yellow-ruvector, yellow-semgrep) —
       multi-package single file is the repo convention
       (`.changeset/remove-hooks-json-mirrors.md`).
-- [ ] 2.7 Live check on the enabled provider: run one gated `git push` through
+- [x] 2.7 Live check on the enabled provider: run one gated `git push` through
       gt-workflow's PreToolUse and one Edit through yellow-ruvector's; both
       still fire once.
 
 ### WS3: ruvector embedder provenance
 
-- [ ] 3.1 Local runbook (no PR; do first, in a session with no other ruvector
+- [x] 3.1 Local runbook (no PR; do first, in a session with no other ruvector
       writes pending): `npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run`
       (expect `wouldReembed: 541, wouldDrop: 0`), then `… hooks reembed`,
       confirm the JSON `targetProvenance` is `onnx-minilm/384`, then **restart
       Claude Code** (the running MCP server holds the pre-reembed snapshot —
       `seed-solutions.md` Step 5.2). Verify with `hooks_remember` +
-      `hooks_recall` round-trip.
-- [ ] 3.2 `plugins/yellow-ruvector/hooks/scripts/session-start.sh`: cheap
+      `hooks_recall` round-trip. *(Executed 2026-09-16: dry-run 754 → reembed
+      756 vectors, 0 dropped, stamp now onnx-minilm/all-MiniLM-L6-v2/384;
+      pre-reembed copy in the session scratchpad. Restart + round-trip
+      verification pending — must happen in a fresh session; no
+      `hooks_remember` was issued in the reembedding session.)*
+- [x] 3.2 `plugins/yellow-ruvector/hooks/scripts/session-start.sh`: cheap
       check inside the 3s budget — if `.ruvector/intelligence.json` exists,
       has `embeddingProvenance`, its `embedderKind` is `hash`, and
       `RUVECTOR_EMBEDDER` is not `hash`, append one line to the systemMessage:
@@ -179,7 +183,7 @@ and rebase WS3, or merge their changesets if they land together.
       onnx-minilm — memory writes are refused until you run /ruvector:status`.
       Absent file or absent `embeddingProvenance` → silent (fresh/legacy store,
       not a mismatch). jq only; no model load.
-- [ ] 3.3 `plugins/yellow-ruvector/commands/ruvector/status.md`: new step —
+- [x] 3.3 `plugins/yellow-ruvector/commands/ruvector/status.md`: new step —
       run `npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run`,
       parse `wouldReembed` / `wouldDrop` / `targetProvenance`; compare
       `targetProvenance` (embedderKind, modelId, dimension — all three) with the
@@ -187,52 +191,85 @@ and rebase WS3, or merge their changesets if they land together.
       (store hash/64 → active onnx-minilm/384, 541 vectors pending)` with the
       exact reembed + restart remediation. `wouldReembed > 0` with matching
       stamps = interrupted reembed; report that case explicitly.
-- [ ] 3.4 Bats: extend `plugins/yellow-ruvector/tests/session-start.bats` with
+- [x] 3.4 Bats: extend `plugins/yellow-ruvector/tests/session-start.bats` with
       fixtures for (hash stamp → warning line), (onnx stamp → no line), (no
       stamp → no line), (`RUVECTOR_EMBEDDER=hash` → no line). Keep under the
       existing per-call timeouts.
-- [ ] 3.5 `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
+- [x] 3.5 `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
       — frontmatter per an existing entry (`validate-solutions.js` gates it):
       symptom (refusal text), why recall still works (writes gated, reads
       not), remediation, and the "restart after reembed" trap. Reference
       `skills/memory-query/SKILL.md:114` and `seed-solutions.md` Step 6.
-- [ ] 3.6 Changeset `yellow-ruvector: patch`; README/CLAUDE.md note for the new
+- [x] 3.6 Changeset `yellow-ruvector: patch`; README/CLAUDE.md note for the new
       status output; `pnpm validate:agents && pnpm lint:plugins`.
 
 ### WS4: yellow-codex model default, exit-1 diagnostics, noclobber
 
-- [ ] 4.1 Replace every `-m "${CODEX_MODEL:-gpt-5.4}"` with
+- [x] 4.1 Replace every `-m "${CODEX_MODEL:-gpt-5.4}"` with
       `${CODEX_MODEL:+-m "$CODEX_MODEL"}` (codex resolves the model from its
       config precedence when `-m` is absent — verified: `gpt-6-astra` under
       ChatGPT auth). Sites: `codex-reviewer.md:348,~419`, `codex-analyst.md:92`,
       `codex-executor.md:88`, `rescue.md:144,165`, `review.md:234,520`,
       `codex-patterns/SKILL.md:56,115,131`. Check each site's array/quoting
       form so the empty expansion does not leave a stray argument.
-- [ ] 4.2 `commands/codex/setup.md:197` smoke test: keep an explicit cheap
+- [x] 4.2 `commands/codex/setup.md:197` smoke test: keep an explicit cheap
       model but make it overridable and non-legacy —
       `-m "${CODEX_SMOKE_MODEL:-gpt-5.6-luna}"` — and on a 400 `not supported
       … ChatGPT account` retry once with no `-m` before reporting failure, so
       setup passes on both auth types.
-- [ ] 4.3 `skills/codex-patterns/SKILL.md:178-182` model table + `CLAUDE.md:101-105,135`:
+- [x] 4.3 `skills/codex-patterns/SKILL.md:178-182` model table + `CLAUDE.md:101-105,135`:
       document "no `-m` by default; `CODEX_MODEL` overrides; gpt-5.4 /
       gpt-5.4-mini are legacy; ChatGPT accounts reject gpt-5.x-codex names";
       link `docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md`
       (2026-09-05 update) and append a dated update there.
-- [ ] 4.4 `codex-reviewer.md:405-414` exit-1 arm: before the generic fallback,
+- [x] 4.4 `codex-reviewer.md:405-414` exit-1 arm: before the generic fallback,
       `grep -q 'not supported when using Codex with a ChatGPT account\|invalid_request_error' "$STDERR_FILE"`
       → `summary=Codex rejected model <name>: set CODEX_MODEL to a model your
       account allows (or unset it to use the account default).` Same
       structured 6-key return; `verdict=UNAVAILABLE`.
-- [ ] 4.5 Noclobber sweep: change every `mktemp` + same-block `>`/`2>` to
+- [x] 4.5 Noclobber sweep: change every `mktemp` + same-block `>`/`2>` to
       `>|`/`2>|` at the listed sites. Done-criterion from the July doc:
       `rg -n 'mktemp' plugins/yellow-codex -A12 | rg '(^|[^>|])>\s*"?\$' `
       returns nothing. Append a dated update to
       `docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md`.
-- [ ] 4.6 Contract check: run `/codex:review` (or the reviewer agent) on a
+- [x] 4.6 Contract check: run `/codex:review` (or the reviewer agent) on a
       small diff before and after; assert the return still has
       `verdict=`, `confidence=`, `summary=`, `fenced_output_path=`,
       `findings_block_begin/end` lines. Changeset `yellow-codex: patch`;
       `pnpm validate:agents && pnpm lint:plugins`.
+
+### WS5: gt-workflow push guard reads `tool_input.command`
+
+- [x] 5.1 `plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js:28`:
+      read `camelCaseEnvelope.toolInput?.command` (string-typed, else `''`),
+      mirroring `plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js:84`
+      and gt-workflow's own `policy-check-commit-message.js:49`. Drop the
+      root-level `.command` read entirely — no real host sends it; keeping a
+      fallback would preserve the fail-open path for a malformed envelope.
+      Update the JSDoc param type.
+- [x] 5.2 Fixtures `plugins/gt-workflow/tests/fixtures/hooks/check-git-push/*.stdin`
+      (`plain-block`, `metachar-*`, `allowed-non-push`): nest the command as
+      `{"tool_name":"Bash","tool_input":{"command":…}}` — the shape Claude
+      Code and Codex actually send. Golden outputs are unchanged (same
+      deny/allow decisions). Add `root-level-command-ignored.stdin` +
+      `.golden.txt` (flat `{"command":"git push"}` → allow, exit 0, no
+      output) so the old shape is pinned as non-blocking, and a matching
+      `@test` in `hook-parity.bats`.
+- [x] 5.3 Live check: `printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}' | node plugins/gt-workflow/hooks/scripts/entrypoint-claude.js --hook check-git-push`
+      → exit 2 with the block message; same payload through
+      `entrypoint-codex.js` → camelCase `hookSpecificOutput` deny. `bats tests/`
+      from the plugin dir green.
+- [x] 5.4 Docs: `docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md`
+      — append a dated update: gt-workflow now reads the real path; the
+      "preserved for characterization parity" note in github-workflow's
+      `policy-check-git-push.js:76-83` comment is stale → trim it to the
+      one-line field-path statement. `plugins/gt-workflow/CLAUDE.md:218`
+      backstop bullet unchanged (behaviour now matches the prose).
+- [x] 5.5 Changeset `gt-workflow: patch` — "PreToolUse `git push` backstop
+      now reads `tool_input.command`; it previously read a root-level
+      `command` that no host sends, so raw `git push` was never blocked".
+      `pnpm validate:agents && pnpm lint:plugins` (CLAUDE.md untouched, but
+      run anyway).
 
 ## Technical Details
 
@@ -247,6 +284,11 @@ WS2: 9 `catalog/plugins/*.json`, generated `plugins/*/.claude-plugin/plugin.json
 generate-manifests snapshot, one changeset. WS3: `plugins/yellow-ruvector/hooks/scripts/session-start.sh`,
 `commands/ruvector/status.md`, `tests/session-start.bats`, new solution doc,
 changeset. WS4: the yellow-codex files listed above, two solution-doc updates,
+changeset. WS5: `plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js`,
+`plugins/gt-workflow/tests/fixtures/hooks/check-git-push/*`,
+`plugins/gt-workflow/tests/hook-parity.bats`,
+`plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js` (comment
+only), `docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md`,
 changeset.
 
 No new dependencies. No schema changes. WS1 removes ~60 lines; WS2 changes
@@ -270,7 +312,10 @@ generated bytes for nine plugins.
    ChatGPT auth; the exit-1 arm's summary names the rejected model; the
    noclobber done-criterion grep is empty; `/review:pr` still parses the
    codex return.
-5. All: `pnpm validate:schemas && pnpm test:integration && pnpm lint && pnpm typecheck`
+5. WS5: the nested-envelope payload exits 2 with the block message on both
+   entrypoints; the flat `{"command": …}` payload is allowed; gt-workflow
+   `bats tests/` green.
+6. All: `pnpm validate:schemas && pnpm test:integration && pnpm lint && pnpm typecheck`
    green; plugin Markdown changes pass `pnpm validate:agents && pnpm lint:plugins`.
 
 ## Edge Cases
@@ -290,6 +335,14 @@ generated bytes for nine plugins.
 - **Bash-shebang `.sh` scripts** are unaffected by zsh `noclobber`; the sweep
   targets inline snippets only.
 - **WS1 stacks on #797**: if #797 merges first, `gt sync`/restack WS1 onto main.
+
+## Follow-ups surfaced during execution
+
+- **gt-workflow push guard reads the wrong field** (found during 2.7) —
+  promoted to WS5 / stack item 5. github-workflow's sibling already reads
+  `tool_input.command` and its comment records that gt-workflow's root-level
+  read was kept only for characterization parity with the deleted
+  `check-git-push.sh`; that parity is no longer worth a fail-open backstop.
 
 ## References
 
@@ -315,6 +368,14 @@ generated bytes for nine plugins.
 Trunk is PR #797's branch on purpose: item 1 edits `ruleHooksJson`, which
 only exists there. After #797 merges, `gt sync` restacks all four onto `main`.
 Task 3.1 (local reembed) is an ops step, not a branch — run it before item 3.
+
+## Stack Progress
+<!-- Updated by flow:work. Do not edit manually. -->
+- [x] 1. agent/feat/rule7-reject-hooks-json (completed 2026-09-16)
+- [x] 2. agent/fix/quote-plugin-root-hook-commands (completed 2026-09-16)
+- [x] 3. agent/feat/ruvector-provenance-check (completed 2026-09-16)
+- [x] 4. agent/fix/codex-model-default-noclobber (completed 2026-09-16)
+- [x] 5. agent/fix/gt-push-guard-tool-input (completed 2026-09-16)
 
 ### 1. agent/feat/rule7-reject-hooks-json
 - **Type:** feat
@@ -342,4 +403,11 @@ Task 3.1 (local reembed) is an ops step, not a branch — run it before item 3.
 - **Description:** yellow-codex: drop hardcoded gpt-5.4, diagnose model rejection, noclobber-safe redirects
 - **Scope:** plugins/yellow-codex/agents/review/codex-reviewer.md, plugins/yellow-codex/agents/research/codex-analyst.md, plugins/yellow-codex/agents/workflow/codex-executor.md, plugins/yellow-codex/commands/codex/review.md, plugins/yellow-codex/commands/codex/rescue.md, plugins/yellow-codex/commands/codex/setup.md, plugins/yellow-codex/skills/codex-patterns/SKILL.md, plugins/yellow-codex/CLAUDE.md, docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md, docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md, .changeset/
 - **Tasks:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
+- **Depends on:** (none)
+
+### 5. agent/fix/gt-push-guard-tool-input
+- **Type:** fix
+- **Description:** gt-workflow: PreToolUse git-push backstop reads tool_input.command (was root-level command; never blocked)
+- **Scope:** plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js, plugins/gt-workflow/tests/fixtures/hooks/check-git-push/, plugins/gt-workflow/tests/hook-parity.bats, plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js, docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md, .changeset/
+- **Tasks:** 5.1, 5.2, 5.3, 5.4, 5.5
 - **Depends on:** (none)
