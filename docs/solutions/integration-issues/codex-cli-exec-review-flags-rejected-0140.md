@@ -392,7 +392,11 @@ default (`gpt-6-astra` here, codex-cli 0.153.3) and succeeds.
   generic `invalid_request_error` type is any 400 and falls through to the
   generic arm) before the rate-limit check and returns
   `verdict=UNAVAILABLE` with `summary=Codex rejected model <name>: set
-  CODEX_MODEL …`.
+  CODEX_MODEL …`. With `--json` that message is a stdout JSONL event
+  (`{"type":"error",…}` then `turn.failed`) and stderr is empty — verified
+  live — so the reviewer and `/codex:review` now capture stdout and stderr
+  into the same diagnostics file instead of sending stdout to
+  `/dev/null`; the result still arrives via `-o`.
 
 **Components (this Update):** the four invocation-site files above,
 `plugins/yellow-codex/commands/codex/setup.md`,

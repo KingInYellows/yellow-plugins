@@ -349,9 +349,13 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   --output-schema "$SCHEMA_FILE" \
   -o "$OUTPUT_FILE" \
   </dev/null \
-  >/dev/null \
-  2>|"$STDERR_FILE" || {
+  >|"$STDERR_FILE" 2>&1 || {
     codex_exit=$?
+    # $STDERR_FILE holds BOTH streams: with --json, codex reports API
+    # refusals as JSONL events on stdout ({"type":"error",...} /
+    # turn.failed) and leaves stderr empty, so the diagnostics below
+    # would never match a stderr-only capture. The review result itself
+    # arrives via -o "$OUTPUT_FILE", never stdout.
     # Diagnostics mirror the codex-patterns skill error catalog. Every branch
     # emits a structured partial and stops — a silent fall-through into
     # Step 5 would leave verdict= unset and degrade to council.md's
