@@ -154,6 +154,10 @@ else
     DRY_ERR=$(tail -c 300 "$ERRF" 2>/dev/null | tr '\n' ' '); rm -f "$ERRF" "$OUTF"
     if [ "$DRY_RC" -eq 124 ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (registry or model download stalled)"
+    elif [ "$DRY_RC" -eq 137 ]; then
+      VERDICT=UNKNOWN; DETAIL="dry-run was killed after the 90 s deadline plus the 5 s grace"
+    elif [ "$DRY_RC" -ne 0 ]; then
+      VERDICT=UNKNOWN; DETAIL="dry-run exited $DRY_RC: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
     elif [ -z "$DRY" ] || [ "$(printf '%s' "$DRY" | jq -r '.success // false')" != "true" ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run failed: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
     else
@@ -200,7 +204,10 @@ Print exactly one line from the fenced `verdict=` / `detail=` values:
 - `PROVENANCE: UNKNOWN (<detail>)` — report the store stamp alone; do not
   guess the active embedder, and never infer it from the MCP
   `hooks_capabilities` output (the running server can predate a reembed).
-  Includes the no-compatible-timeout case, where the dry-run never ran.
+  Includes the no-compatible-timeout case, where the dry-run never ran, and
+  the timed-out (124), killed (137), and other nonzero-exit dry-run cases,
+  where a successful-looking JSON line is never trusted unless the dry-run
+  itself exited 0.
 
 A reembed writes the new stamp only after every vector succeeds, so an
 interrupted reembed leaves the old stamp and reports as MISMATCH — there is
@@ -287,9 +294,11 @@ PROVENANCE: MISMATCH (store hash/64 → active onnx-minilm/all-MiniLM-L6-v2/384;
 - **No .ruvector/ directory:** "Not initialized. Run `/ruvector:setup` to set
   up."
 - **MCP unavailable:** Show CLI info only, note MCP status as unavailable.
-- **Provenance dry-run fails or times out:** `PROVENANCE: UNKNOWN` with the
-  CLI's `error`/`hint` (stdout JSON) or the stderr tail; never infer the
-  active embedder from the MCP `hooks_capabilities` output — the running
-  server can predate a reembed.
+- **Provenance dry-run fails, times out, is killed, or exits nonzero:**
+  `PROVENANCE: UNKNOWN` with the CLI's `error`/`hint` (stdout JSON) or the
+  stderr tail; a killed (137) or otherwise nonzero dry-run exit is never
+  treated as success even when stdout has a well-formed success JSON line;
+  never infer the active embedder from the MCP `hooks_capabilities` output
+  — the running server can predate a reembed.
 - **No GNU-compatible `timeout`/`gtimeout` on PATH:** `PROVENANCE: UNKNOWN`
   without starting the dry-run; suggest `brew install coreutils` on macOS.

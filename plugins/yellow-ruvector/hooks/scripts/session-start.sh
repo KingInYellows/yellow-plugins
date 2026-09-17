@@ -166,7 +166,13 @@ run_budgeted() {
 # system context.
 provenance_note=""
 INTEL_JSON="${RUVECTOR_DIR}/intelligence.json"
-if [ -f "$INTEL_JSON" ]; then
+if [ -f "$INTEL_JSON" ] && [ -z "$TIMEOUT_CMD" ]; then
+  # No GNU-compatible timeout to bound this jq parse (see TIMEOUT_CMD probe
+  # above) — on a large store, an unbounded parse could outrun the 3s
+  # SessionStart watchdog before `finish` ever emits its required JSON.
+  # Skip rather than risk the host killing the hook mid-parse.
+  printf '[ruvector] provenance check skipped: no GNU-compatible timeout to bound the jq parse\n' >&2
+elif [ -f "$INTEL_JSON" ]; then
   store_kind=""; store_dim="?"; vec_count=0
   # Pipe-joined, not @tsv: tab is IFS whitespace, so a leading empty field
   # (no stamp) would collapse and shift the columns under `read`.

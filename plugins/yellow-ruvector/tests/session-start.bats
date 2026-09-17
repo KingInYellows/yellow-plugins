@@ -425,6 +425,26 @@ exit 0'
   echo "$output" | jq -e '.systemMessage | contains("ERR_LEGACY_STORE_READONLY")' > /dev/null
 }
 
+@test "provenance: no GNU-compatible timeout skips the parse instead of running it unbounded" {
+  # Shadow any real timeout/gtimeout on PATH with BusyBox-style stubs (no
+  # --kill-after support, like the TIMEOUT_CMD probe at the top of the
+  # script) so TIMEOUT_CMD resolves to "" without hiding the rest of PATH —
+  # jq must stay resolvable so a bug that calls it anyway is caught, not
+  # masked by "command not found".
+  for name in timeout gtimeout; do
+    printf '#!/bin/sh\nexit 1\n' > "$MOCK_BIN/$name"
+    chmod +x "$MOCK_BIN/$name"
+  done
+  write_provenance hash 64
+  make_ruvector_stub 'exit 0'
+  run --separate-stderr run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  # The note must never surface without a bounded parse to produce it.
+  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
+  echo "$stderr" | grep -q 'provenance check skipped: no GNU-compatible timeout'
+}
+
 @test "provenance: stamped store plus a hanging ruvector still emits JSON within the 3s budget" {
   # The combined worst case (provenance parse + three hanging CLI calls) is
   # the path the per-call caps were rebalanced for.
