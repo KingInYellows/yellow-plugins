@@ -1,0 +1,40 @@
+plugins/yellow-ruvector/tests/session-start.bats
+  s_6aa8fc918111f8::t_68633749fc9408 61-78
+  s_6aa8fc918111f8::t_911429bfb8ca67 425,427-428,432
+  s_6aa8fc918111f8::t_6a4cf0a99372b2 124,126-127,130,140,142-143,146
+  s_6aa8fc918111f8::t_c01aed2f51b4dc 337-339
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_6aa8fc918111f8::t_e7f4199c16aeaf 280-281
+  s_6aa8fc918111f8::t_0ff1d0ceed490c 181-185
+  s_6aa8fc918111f8::t_6b43892ed3d2f5 198
+  s_6aa8fc918111f8::t_85710e4f30ee57 128-143,145-158,160-168
+.changeset/ruvector-provenance-check.md
+  s_6aa8fc918111f8::t_e7ee69aa964226 14-15
+docs/solutions/logic-errors/ifs-tab-read-collapses-leading-empty-tsv-field.md
+  s_6aa8fc918111f8::t_58fe3e621558ad 22-25,27-28,31,35-50
+  s_6aa8fc918111f8::t_2beec31f9db5bb 105-107
+  s_6aa8fc918111f8::t_299a2bed20c929 77
+plugins/yellow-ruvector/CLAUDE.md
+  s_6aa8fc918111f8::t_075a7717ff2d2c 100-101
+  s_6aa8fc918111f8::t_439aa1858f3353 223-228
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_6aa8fc918111f8::t_1fbaa3eeb5aa0c 122-127
+docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md
+  s_6aa8fc918111f8::t_277ce3b184f83e 93-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "632c343394792fd8acff04dd9efd2db2d28b20cb",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
