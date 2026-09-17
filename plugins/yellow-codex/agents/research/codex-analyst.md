@@ -24,6 +24,9 @@ return structured analysis — never file edits.
 - You invoke `codex exec` in read-only sandbox with `--ephemeral`
 - You return structured analysis to the spawning command
 - You wrap ALL Codex output in injection fences before returning
+- `jq` is recommended (not required) for Step 3's exit-1 diagnostics —
+  without it, a bounded `grep` fallback still extracts the API error
+  message so the model-rejection and rate-limit arms fire
 
 ## Use Cases
 
@@ -97,7 +100,15 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     # {"type":"error","message":…} JSONL events on stdout and stderr stays
     # empty. Read the message out of those events only — echoed diff or
     # tool output elsewhere in the stream can never match the diagnostics.
-    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    # No cap here — the model-rejection/rate-limit regexes below must see
+    # the whole message; display sites cap independently.
+    if command -v jq >/dev/null 2>&1; then
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
+    else
+      # jq unavailable: bounded grep fallback for the "message" field of a
+      # {"type":"error",...} JSONL event, so the arms below still fire.
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep -o '"type":"error"[^}]*' | grep -m1 -o '"message":"[^"]*"' | sed -E 's/^"message":"//; s/"$//')
+    fi
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-analyst] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
@@ -123,7 +134,33 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       printf '[codex-analyst] Rate limited\n'
     else
       printf '[codex-analyst] Error: exit code %d\n' "$codex_exit"
-      [ -n "$codex_api_error" ] && printf '[codex-analyst] api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)"
+      # Bounded, fenced diagnostic: the API error message (if any), redacted
+      # and injection-fenced — never a raw dump of the event stream, which
+      # can echo repository content or credentials Codex read.
+      if [ -n "$codex_api_error" ]; then
+        printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
+        printf 'api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)" | awk '{
+          line = NR
+          # OpenAI project keys (must precede generic sk- pattern)
+          gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+          # OpenAI / generic sk- API keys
+          gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+          # GitHub tokens (ghp_, gho_, ghs_, ghu_)
+          gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+          # GitHub fine-grained PATs
+          gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+          # AWS access keys
+          gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+          # Bearer tokens in output
+          gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20}[A-Za-z0-9_\.\-]*/, "--- redacted credential at line " line " ---")
+          # Authorization headers with token values
+          gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+          # Generic private key blocks
+          gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+          print
+        }' >&2
+        printf -- '--- end codex-diagnostics ---\n' >&2
+      fi
     fi
   }
 

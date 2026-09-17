@@ -242,8 +242,22 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDER
   # $STDERR_FILE holds both streams: with --json, API refusals arrive as
   # {"type":"error","message":…} JSONL events on stdout and stderr stays
   # empty. Read the message out of those events only — echoed diff or tool
-  # output elsewhere in the stream can never match the diagnostics.
-  codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+  # output elsewhere in the stream can never match the diagnostics. jq is
+  # optional in this file (Step 4b's awk fallback), so both the
+  # model-rejection and rate-limit branches below need a match even when
+  # jq is absent — a missing jq must not silently swallow a real 429's
+  # retry message or a rejected model into the generic exit-1 arm.
+  if command -v jq >/dev/null 2>&1; then
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+  else
+    # Bounded grep fallback: first {"type":"error",...} JSONL line, then
+    # its "message" field value. Does not unescape JSON string escapes
+    # (\" \\ etc.) — an acceptable degradation vs. the jq path above,
+    # since the model-rejection and rate-limit patterns matched against
+    # it below are plain substrings.
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep '"type":"error"' | head -n1 | \
+      grep -oE '"message":"[^"]*"' | head -n1 | sed -E 's/^"message":"//; s/"$//' | head -c 400)
+  fi
   if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
     printf '[yellow-codex] Error: review timed out after 5 minutes.\n'
   elif [ "$codex_exit" -eq 2 ]; then

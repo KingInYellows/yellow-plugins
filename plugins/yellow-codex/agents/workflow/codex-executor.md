@@ -26,6 +26,9 @@ approval.
 - You parse proposed changes from Codex output
 - You return a structured report to the spawning command
 - You wrap ALL Codex output in injection fences before returning
+- `jq` is recommended (not required) for Step 3's exit-1 diagnostics —
+  without it, a bounded `grep` fallback still extracts the API error
+  message so the model-rejection and rate-limit arms fire
 
 ## Workflow
 
@@ -93,7 +96,15 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     # {"type":"error","message":…} JSONL events on stdout and stderr stays
     # empty. Read the message out of those events only — echoed diff or
     # tool output elsewhere in the stream can never match the diagnostics.
-    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    # No cap here — the model-rejection/rate-limit regexes below must see
+    # the whole message; display sites cap independently.
+    if command -v jq >/dev/null 2>&1; then
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
+    else
+      # jq unavailable: bounded grep fallback for the "message" field of a
+      # {"type":"error",...} JSONL event, so the arms below still fire.
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep -o '"type":"error"[^}]*' | grep -m1 -o '"message":"[^"]*"' | sed -E 's/^"message":"//; s/"$//')
+    fi
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-executor] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
@@ -123,7 +134,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # three `error:` lines — never a raw dump of the event stream, which can
       # echo repository content Codex read.
       printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | head -c 500 | awk '{
+      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null | head -c 300; } | awk '{
         line = NR
         # OpenAI project keys (must precede generic sk- pattern)
         gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
