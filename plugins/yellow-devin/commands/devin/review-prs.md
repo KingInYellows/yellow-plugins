@@ -406,7 +406,14 @@ How would you like to remediate?
 
 Options:
 
-- **Fix locally** — Commit and push fixes via Graphite
+- **Fix locally** — Commit and push fixes through the resolved stacked-PR
+  provider. If the router state (Step 1b) is `READY_GRAPHITE` and either
+  `GT_AVAILABLE` is false or this PR is in `GT_DEGRADED_PRS` (set in Step
+  4), present this option instead as **Fix locally (commit only)** — `gt`
+  is unavailable or `gt track` failed for this PR; fixes will be committed
+  locally but NOT submitted (raw `git push` is blocked by the gt-workflow
+  guard). You will need to track and submit the branch through the
+  gt-workflow provider afterwards.
 - **Message Devin** — Send fix instructions to session (disabled if all
   sessions are terminal, with note explaining why)
 - **Comment on PR** — Post review feedback as a PR comment with `@devin` prefix.
@@ -448,12 +455,12 @@ git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
 ```
 
-The gt-workflow PreToolUse guard denies raw `git push` under `READY_GRAPHITE`,
-so this path stops after the local commit — it no longer pushes. Record this
-PR in the Step 7 summary as "committed locally, not submitted — track
-`<branch>` with Graphite, then submit it through the gt-workflow provider"
-(or re-run `/devin:review-prs` after fixing `gt`). Do not resolve this PR's review threads; nothing was
-pushed.
+The gt-workflow PreToolUse guard denies raw `git push` under
+`READY_GRAPHITE`, so this path stops after the local commit — it no longer
+pushes. Record this PR in the Step 7 summary as "committed locally, not
+submitted — track `<branch>` with Graphite, then submit it through the
+gt-workflow provider" (or re-run `/devin:review-prs` after fixing `gt`). Do
+not resolve this PR's review threads; nothing was pushed.
 
 If the router state is `READY_GITHUB`:
 
