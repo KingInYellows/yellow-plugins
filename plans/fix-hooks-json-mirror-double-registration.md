@@ -122,20 +122,31 @@ Alternatives rejected:
       comparison and its `compareHookInternals` / `compareHookEntries`
       helpers — they were only reachable when inline hooks and the file
       coexisted, which is now the error itself (review finding).
-- [x] 2.2 Update the RULE 7 header comment (`plugin-rules.js:292-295`) to say
-      coexistence is an error, drift is a warning kept for the
-      hooks-only → inline migration case.
+- [x] 2.2 Update the RULE 7 header comment (`plugin-rules.js:225-231`) to say
+      coexistence is an error. No drift comparison remains anywhere in the
+      rule — 2.1 removed it outright rather than downgrading it to a
+      warning, so the comment says only that; it does not describe any
+      migration-case warning (review finding: an earlier draft of this step
+      claimed a drift warning survives for the hooks-only → inline migration
+      case, which was never implemented and contradicts 2.1).
 - [x] 2.3 Add a test in `tests/integration/validate-plugin.test.ts` next to the
       RULE 7 block (~line 465): valid `hooks/hooks.json` + inline `hooks` in
       the manifest → non-zero status and the coexistence message in stderr.
       Add a sibling asserting a hooks-only plugin (no inline `hooks`) with a
       valid `hooks/hooks.json` still passes.
-- [x] 2.4 Existing tests that pair a malformed `hooks/hooks.json` with inline
-      hooks (`validate-plugin.test.ts:576`, characterization `:166`) already
-      expect failure; check their stderr assertions still match and refresh
+- [x] 2.4 The actual malformed-hooks.json-with-inline-hooks case is
+      `validate-plugin.test.ts` "errors when hooks/hooks.json has a
+      non-array event value with inline hooks present" (~line 603); check
+      its stderr assertion still matches (review finding: `:576` and
+      characterization `:166`, cited in an earlier draft of this step, are
+      both hooks-only fixtures — `writePluginManifest(pluginDir,
+      VALID_BASE_MANIFEST)` / `base` with no `hooks` key — not malformed
+      files paired with inline hooks; they don't exercise the coexistence
+      path and needed no re-check here). Refresh
       `tests/integration/__snapshots__/validate-plugin-characterization.test.ts.snap`
       with `pnpm vitest run tests/integration/validate-plugin-characterization.test.ts -u`
-      only if the error array for that fixture legitimately gains the new line.
+      only if the error array for the characterization `bad-hooks-json`
+      fixture (~line 166, still hooks-only) legitimately gains a new line.
 - [x] 2.5 Document the rule: add a bullet under the hooks guidance in
       `AGENTS.md:224-227` ("Never ship `hooks/hooks.json` alongside inline
       hooks — RULE 7 errors on it") and mention the new error in
@@ -208,8 +219,11 @@ the six plugins is Cursor-enabled; Cursor packaging does not copy `hooks/`).
 5. One changeset bumps all six plugins at `patch`; after `pnpm apply:changesets`
    `pnpm validate:versions` passes (three-way sync incl. `.codex-plugin` for
    yellow-ci / gt-workflow).
-6. `rg 'not loaded by Claude Code' docs/ AGENTS.md` returns only the historical
-   Feb 2026 text, now followed by the dated update.
+6. `rg 'not loaded by Claude Code' docs/ AGENTS.md --glob '!docs/research/**'`
+   returns no matches. (The unqualified command also matches a historical
+   example in `docs/research/semgrep-to-fix-fixer-claude-code-plugin-mcp.md`
+   that predates and is unrelated to this change; excluded rather than
+   edited.)
 
 ## Edge Cases
 
