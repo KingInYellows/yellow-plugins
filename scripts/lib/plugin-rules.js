@@ -222,80 +222,23 @@ function ruleInlineHookScripts(
   }
 }
 
-// RULE 7 helper: compare the inner hooks array of one entry (command, type,
-// timeout). Returns true if any drift was found (and logs each warning).
-function compareHookInternals(event, i, mHooks, jHooks) {
-  let driftFound = false;
-  if (mHooks.length !== jHooks.length) {
-    logWarning(
-      `hooks.json inner hooks count mismatch for ${event}[${i}]: ` +
-        `plugin.json has ${mHooks.length}, hooks.json has ${jHooks.length}`
-    );
-    driftFound = true;
-  }
-  for (let j = 0; j < Math.min(mHooks.length, jHooks.length); j++) {
-    if (mHooks[j].command !== jHooks[j].command) {
-      logWarning(
-        `hooks.json command drift for ${event}[${i}].hooks[${j}]: ` +
-          `plugin.json="${mHooks[j].command}" vs hooks.json="${jHooks[j].command}"`
-      );
-      driftFound = true;
-    }
-    if (mHooks[j].type !== jHooks[j].type) {
-      logWarning(
-        `hooks.json type drift for ${event}[${i}].hooks[${j}]: ` +
-          `plugin.json="${mHooks[j].type}" vs hooks.json="${jHooks[j].type}"`
-      );
-      driftFound = true;
-    }
-    if (mHooks[j].timeout !== jHooks[j].timeout) {
-      logWarning(
-        `hooks.json timeout drift for ${event}[${i}].hooks[${j}]: ` +
-          `plugin.json=${mHooks[j].timeout} vs hooks.json=${jHooks[j].timeout}`
-      );
-      driftFound = true;
-    }
-  }
-  return driftFound;
-}
-
-// RULE 7 helper: compare the entries array for a single shared event
-// (entry count, per-entry matcher, inner hooks). Returns true if any drift
-// was found (and logs each warning).
-function compareHookEntries(event, mEntries, jEntries) {
-  if (!Array.isArray(mEntries) || !Array.isArray(jEntries)) return false;
-  let driftFound = false;
-  if (mEntries.length !== jEntries.length) {
-    logWarning(
-      `hooks.json entry count mismatch for ${event}: ` +
-        `plugin.json has ${mEntries.length}, hooks.json has ${jEntries.length}`
-    );
-    driftFound = true;
-  }
-  for (let i = 0; i < Math.min(mEntries.length, jEntries.length); i++) {
-    const mEntry = mEntries[i] || {};
-    const jEntry = jEntries[i] || {};
-    if (mEntry.matcher !== jEntry.matcher) {
-      logWarning(
-        `hooks.json matcher drift for ${event}[${i}]: ` +
-          `plugin.json="${mEntry.matcher}" vs hooks.json="${jEntry.matcher}"`
-      );
-      driftFound = true;
-    }
-    if (compareHookInternals(event, i, mEntry.hooks || [], jEntry.hooks || [])) {
-      driftFound = true;
-    }
-  }
-  return driftFound;
-}
-
-// RULE 7: hooks.json shape + sync check. Shape and parseability errors block
-// CI (Claude Code 2.1.131+ auto-discovers hooks/hooks.json and rejects a
-// malformed file at install time). Drift between plugin.json inline hooks
-// and hooks.json is a warning only.
-function ruleHooksJson(pluginDir, inlineHooks, hasInlineHooks, errors) {
+// RULE 7: hooks.json coexistence + shape check. Coexistence with inline
+// plugin.json hooks is an error: Claude Code auto-discovers hooks/hooks.json
+// AND loads the inline block with no dedup, so every hook fires twice
+// (observed on 2.1.272; six plugins shipped "reference-only" mirrors under
+// the stale belief the file was not loaded). Parse, top-level shape, and
+// per-event shape errors also block CI (Claude Code 2.1.131+ rejects a
+// malformed file at install time) and run for hooks-only plugins too.
+function ruleHooksJson(pluginDir, hasInlineHooks, errors) {
   const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
   if (!fs.existsSync(hooksJsonPath)) return;
+
+  if (hasInlineHooks) {
+    addError(
+      errors,
+      'hooks/hooks.json: coexists with inline hooks in plugin.json — Claude Code auto-discovers hooks/hooks.json and registers every hook twice. Keep the inline block (generated from catalog/) and delete hooks/hooks.json.'
+    );
+  }
 
   let hooksJson;
   let parseSuccessful = false;
@@ -344,40 +287,6 @@ function ruleHooksJson(pluginDir, inlineHooks, hasInlineHooks, errors) {
         `hooks/hooks.json: event "${event}" must be an array of hook entries — got ${value === null ? 'null' : typeof value}; Claude Code 2.1.131+ rejects non-array event values`
       );
     }
-  }
-
-  if (!hasInlineHooks) return;
-
-  // Drift check between plugin.json inline hooks and hooks.json.
-  const manifestEvents = new Set(Object.keys(inlineHooks));
-  const jsonEvents = new Set(Object.keys(hooksField));
-  let driftFound = false;
-
-  for (const event of manifestEvents) {
-    if (!jsonEvents.has(event)) {
-      logWarning(
-        `hooks.json missing event "${event}" declared in plugin.json`
-      );
-      driftFound = true;
-    }
-  }
-  for (const event of jsonEvents) {
-    if (!manifestEvents.has(event)) {
-      logWarning(`hooks.json has extra event "${event}" not in plugin.json`);
-      driftFound = true;
-    }
-  }
-  for (const event of manifestEvents) {
-    if (!jsonEvents.has(event)) continue;
-    if (compareHookEntries(event, inlineHooks[event], hooksField[event])) {
-      driftFound = true;
-    }
-  }
-
-  if (driftFound) {
-    logWarning('hooks.json sync check completed with drift warnings');
-  } else {
-    logSuccess('hooks.json sync check passed — no drift');
   }
 }
 
@@ -502,8 +411,6 @@ module.exports = {
   ruleKeywords,
   rulePathFields,
   ruleInlineHookScripts,
-  compareHookInternals,
-  compareHookEntries,
   ruleHooksJson,
   validateUserConfigEntries,
   ruleUserConfig,

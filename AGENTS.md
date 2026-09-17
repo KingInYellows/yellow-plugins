@@ -225,6 +225,11 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   exists and is covered by validation.
 - Avoid explicitly declaring the default `hooks/hooks.json` path unless you have
   verified Claude Code will not auto-discover it twice.
+- Never ship `hooks/hooks.json` alongside inline `hooks` in `plugin.json` —
+  Claude Code auto-discovers the file and loads the inline block with no
+  dedup, so every hook fires twice. `validate-plugin.js` RULE 7 errors on the
+  coexistence. Hook config lives in `catalog/` and is generated into
+  `plugin.json`; there is no reference mirror.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate
   untrusted user config directly into shell commands; pass it through
   environment variables or validated wrapper scripts.

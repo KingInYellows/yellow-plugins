@@ -155,9 +155,16 @@ plugin CLAUDE.md catalogs]**.
 
 ### 1.4 Hooks (context-injection surface)
 
-`hooks/hooks.json` files are reference-only; `plugin.json` `hooks` blocks are
-authoritative (e.g. `plugins/gt-workflow/hooks/hooks.json:2` says "REFERENCE
-ONLY") **[relayed]**.
+`plugin.json` `hooks` blocks, generated from `catalog/`, are the sole
+Claude-side hook source.
+
+> Historical (as of this census, pre-2026-09-15): six plugins also carried a
+> hand-maintained `hooks/hooks.json` mirror annotated "reference-only" (e.g.
+> `plugins/gt-workflow/hooks/hooks.json:2` said "REFERENCE ONLY") **[relayed]**.
+> That premise was wrong — Claude Code auto-discovers `hooks/hooks.json` **and**
+> loads the inline block with no dedup, so every hook in those plugins
+> double-registered. The mirrors were deleted on 2026-09-15; see
+> `docs/solutions/build-errors/claude-code-plugin-manifest-validation-errors.md`.
 
 | Plugin | Event | Purpose |
 |---|---|---|

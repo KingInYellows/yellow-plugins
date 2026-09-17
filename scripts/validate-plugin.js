@@ -24,8 +24,9 @@
  * NOTE: JSON Schema validation (AJV) runs separately via validate-schemas.js /
  * `pnpm validate:schemas`. This script enforces additional rules not expressible
  * in JSON Schema: path existence, directory structure, .md file presence, hook
- * script sanity, hooks.json drift, and the userConfig shape constraints. Always
- * run both together via `pnpm validate:schemas`.
+ * script sanity, the hooks/hooks.json coexistence/shape check, and the
+ * userConfig shape constraints. Always run both together via
+ * `pnpm validate:schemas`.
  */
 
 const fs = require('fs');
@@ -145,7 +146,7 @@ function validatePlugin(pluginDir) {
   const inlineHooks = collectInlineHooks(manifest.hooks);
   const hasInlineHooks = Object.keys(inlineHooks).length > 0;
   ruleInlineHookScripts(manifest, inlineHooks, hasInlineHooks, pluginDir, errors);
-  ruleHooksJson(pluginDir, inlineHooks, hasInlineHooks, errors);
+  ruleHooksJson(pluginDir, hasInlineHooks, errors);
 
   ruleUserConfig(manifest, errors);
   ruleDependencies(manifest, marketplacePluginNames);

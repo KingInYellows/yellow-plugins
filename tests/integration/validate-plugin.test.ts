@@ -462,6 +462,33 @@ printf 'plain text\\n'
     expect(stderr).toMatch(/at least one \.md file/);
   });
 
+  it('errors when a well-formed hooks/hooks.json coexists with inline plugin.json hooks (RULE 7: coexistence check)', () => {
+    // Claude Code auto-discovers hooks/hooks.json AND loads the inline block,
+    // with no dedup between the two sources — every hook fires twice. A
+    // byte-identical "reference-only" mirror is still a double registration,
+    // so the coexistence itself is the error, independent of drift.
+    const hooks = {
+      SessionStart: [
+        {
+          matcher: '*',
+          hooks: [{ type: 'command', command: 'echo ok', timeout: 3 }],
+        },
+      ],
+    };
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks }, null, 2),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, { ...VALID_BASE_MANIFEST, hooks });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: coexists with inline hooks in plugin\.json/
+    );
+  });
+
   it('errors when hooks/hooks.json has events at the top level (RULE 7: shape check, missing "hooks" wrapper)', () => {
     // Claude Code 2.1.131+ auto-discovers hooks/hooks.json and validates the
     // top-level shape against { hooks: { ... } }. A file with events at the
