@@ -48,7 +48,7 @@ overhead) and maintainers (one source of truth for hook config).
 - `AGENTS.md:226` already warns against this pattern in prose. Prose did not
   prevent six violations, so this plan also adds an enforced check.
 - Nothing consumes the mirrors at runtime except Claude Code's auto-discovery:
-  - RULE 7 (`ruleHooksJson`, `scripts/lib/plugin-rules.js:296`) returns early
+  - RULE 7 (`ruleHooksJson`, `scripts/lib/plugin-rules.js:232`) returns early
     when the file is absent.
   - `scripts/lib/generate/emit-codex.js` produces `hooks/codex-hooks.json`
     from `source.hooks` and never reads the mirror. `yellow-ci` and
@@ -247,7 +247,7 @@ the six plugins is Cursor-enabled; Cursor packaging does not copy `hooks/`).
 
 ## References
 
-- Validator: `scripts/lib/plugin-rules.js:292-380` (RULE 7), `scripts/validate-plugin.js:144-148` (call site)
+- Validator: `scripts/lib/plugin-rules.js:225-291` (RULE 7), `scripts/validate-plugin.js:149` (call site)
 - Tests: `tests/integration/validate-plugin.test.ts:465-640`, `tests/integration/validate-plugin-characterization.test.ts:166`
 - Generator hook authority: `scripts/lib/generate/emit-codex.js:16-21`
 - Prose rule that was not enforced: `AGENTS.md:226`
