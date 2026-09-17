@@ -1,0 +1,41 @@
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_2544e3a9ffcf50::t_00a9ffff5e8916 16-20
+plugins/gt-workflow/tests/hook-parity.bats
+  s_2544e3a9ffcf50::t_6725821ada4841 40-49,55,149-169
+  s_2544e3a9ffcf50::t_00a9ffff5e8916 144-145
+docs/solutions/code-quality/golden-fixture-parity-vs-contract-correctness.md
+  s_2544e3a9ffcf50::t_65720617e95448 40-47
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.stdin
+  s_2544e3a9ffcf50::t_baa88b037f4904 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.golden.txt
+  s_2544e3a9ffcf50::t_baa88b037f4904 1-4
+plugins/gt-workflow/CLAUDE.md
+  s_2544e3a9ffcf50::t_65720617e95448 197-198,217-218,221-224,243-246
+docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md
+  s_2544e3a9ffcf50::t_65720617e95448 27-28,94-97
+  s_2544e3a9ffcf50::t_d42d68a54e2595 98
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.stdin
+  s_2544e3a9ffcf50::t_baa88b037f4904 1
+.changeset/gt-push-guard-tool-input.md
+  s_2544e3a9ffcf50::t_65720617e95448 3,11-14
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt
+  s_2544e3a9ffcf50::t_baa88b037f4904 1-6
+plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_2544e3a9ffcf50::t_baa88b037f4904 26-28,30,34-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fecea22c2be6afadf363c1086c70d159f8cb5f7c",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

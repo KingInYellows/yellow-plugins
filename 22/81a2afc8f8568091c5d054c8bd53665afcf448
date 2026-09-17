@@ -1,0 +1,21 @@
+docs/solutions/code-quality/golden-fixture-parity-vs-contract-correctness.md
+  s_2544e3a9ffcf50::t_b0da15eea6398b 67-119,127-129
+docs/solutions/security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md
+  s_2544e3a9ffcf50::t_2f1abeee66d161 73-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2281a2afc8f8568091c5d054c8bd53665afcf448",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
