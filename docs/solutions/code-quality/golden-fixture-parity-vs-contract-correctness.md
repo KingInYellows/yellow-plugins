@@ -64,6 +64,59 @@ underlying bug. At least one fixture per contract-sensitive hook should be
 captured from (or cross-checked against) a live/real payload or the host's
 primary-source docs, not derived from the implementation under test.
 
+---
+
+## Update — 2026-09-17
+
+### Fixing the field path was not the whole fix — a review still found three stale-invariant artifacts
+
+`/review:pr` on the 2026-09-16 fix (above) found that correcting the field
+path and retiring the parity charter left three artifacts still asserting
+the pre-fix invariant — each one true when it was written, each one now
+false as a side effect of the correctness fix, and none of them caught by
+running the code or the fixtures:
+
+- `plugins/gt-workflow/tests/hook-parity.bats`'s file header still said
+  every golden fixture was captured from the deleted bash script. Re-running
+  that capture procedure on the `check-git-push` goldens (now hand-built
+  Node-contract fixtures, not bash captures) would have silently inverted
+  them back to the never-fires shape.
+- `plugins/gt-workflow/CLAUDE.md` said hook behavior was "unchanged from
+  the original bash hooks" and that the parity gate "reproduces the deleted
+  bash hooks' behavior exactly" — both literally true before 2026-09-16 and
+  false after, with nothing marking the sentence as stale.
+- `plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js`'s
+  header comment still said gt-workflow's sibling read a root-level field;
+  only the inline comment near the actual read had been updated in the
+  original fix.
+
+None of these were "the bug" — they were prose asserting a behavioral
+invariant (parity, no-change, field shape) that the bug fix invalidated as
+a side effect. The general lesson: **a correctness fix that makes a
+previously-inert guard fire for the first time isn't done when the code and
+fixtures are done.** Grep every artifact whose truth depended on the old
+(never-firing) behavior — test-harness header comments describing capture
+provenance, the owning plugin's `CLAUDE.md` prose about "unchanged"
+behavior, and header/doc comments in sibling files that read the same
+envelope shape — not just the fixtures a parity harness replays.
+
+This blast radius isn't bounded by the plugin that owns the fix, either:
+`plugins/yellow-devin/commands/devin/review-prs.md:449` documents a
+degraded-mode exception ("fall back to raw `git push`") that assumed the
+gt-workflow guard would never actually block it. Once the guard started
+firing for real, that documented exception became a hard stop under
+`READY_GRAPHITE` — a correctness fix in one plugin silently broke a
+documented workaround in an unrelated plugin that keyed off the same host
+behavior. That cross-plugin instance was flagged as an advisory follow-up,
+not fixed in the same change — sweeping for this class of drift should
+include sibling plugins that reference the same hook/guard, not just the
+owning plugin's own docs and tests.
+
+Separately, the same review also found a second recurrence of the
+fail-open-on-shape-mismatch class this fix was meant to close: see the
+2026-09-17 update in
+[bash-to-node-port-drops-fail-closed-and-bounds.md](../security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md).
+
 ## Related Documentation
 
 - [posttooluse-hook-input-schema-field-paths.md](./posttooluse-hook-input-schema-field-paths.md) —
@@ -71,3 +124,6 @@ primary-source docs, not derived from the implementation under test.
 - [codex-plugin-manifest-and-hook-contract.md](../integration-issues/codex-plugin-manifest-and-hook-contract.md) —
   primary-source hook envelope/contract facts the fixtures should have been
   checked against
+- [bash-to-node-port-drops-fail-closed-and-bounds.md](../security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md) —
+  the fail-open/fail-closed class the same fix's follow-up review found a
+  third instance of (present-but-wrong-type input)
