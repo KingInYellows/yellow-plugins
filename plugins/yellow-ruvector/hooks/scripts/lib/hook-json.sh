@@ -20,3 +20,12 @@ json_exit() {
   emit_allow_json
   exit 0
 }
+
+# emit_message_json <message>
+# Allow payload carrying <message> as systemMessage (the host injects it
+# into the session). Falls back to the plain allow payload if jq fails so
+# the hook never emits empty stdout. Requires jq — callers gate on it.
+emit_message_json() {
+  jq -n --arg msg "$1" '{systemMessage: $msg, continue: true, permission: "allow"}' \
+    || emit_allow_json
+}

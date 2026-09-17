@@ -36,7 +36,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:setup`               | Install ruvector and initialize `.ruvector/` directory |
 | `/ruvector:index [path]`        | Index codebase for semantic search (always repo-wide; `path` only narrows the preview) |
 | `/ruvector:search <query>`      | Search codebase by meaning using vector similarity     |
-| `/ruvector:status`              | Show ruvector health, DB stats, and queue status       |
+| `/ruvector:status`              | Show health, DB stats, queue, and embedder provenance  |
 | `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
 | `/ruvector:memory [filter]`     | Browse and search stored memories                      |
 | `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
@@ -84,6 +84,7 @@ external services or API keys required.
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |
 | Queue growing large  | Check `/ruvector:status`, queue flushes on session start |
 | Cursor blocks Shell / edits | Re-run `/ruvector:setup`, then start a new Cursor session |
+| `hooks_remember` refused / "store is hash-embedded" at session start | Run `/ruvector:status` — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the `hooks reembed` + restart steps (status diagnoses; the reembed + restart is the fix) |
 
 `ruvector hooks init` writes empty-stdout PreToolUse commands into
 `~/.claude/settings.json`. Cursor treats that as invalid JSON and blocks

@@ -93,18 +93,11 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
-# Resolve ruvector command: require direct binary for SessionStart (3s budget).
-# npx resolution alone (~2700ms) consumes nearly the whole budget before any
-# of the three CLI calls below run, so skip entirely when the binary is absent.
-if command -v ruvector >/dev/null 2>&1; then
-  RUVECTOR_CMD=(ruvector)
-else
-  json_exit
-fi
-
-# Per-call caps inside the 3s hooks.json watchdog: 0.9s resume + 0.8s per
-# recall — a deterministic 2.8s worst case including the three
-# --kill-after=0.1 escalations — leaves headroom for jq output. macOS ships
+# Per-call caps inside the 3s hooks.json watchdog: 0.2s provenance parse +
+# 0.9s resume + 0.65s per recall — a deterministic 2.8s worst case including
+# the four --kill-after=0.1 escalations — leaves headroom for jq output
+# (the recalls dropped from 0.8s when the provenance parse was added, so
+# the ceiling stayed where it was). macOS ships
 # gtimeout (brew install coreutils); fall back to unwrapped calls if neither
 # exists (documented risk, same as user-prompt-submit.sh). Never use
 # --foreground here — it stops timeout from killing forked descendants.
@@ -114,7 +107,8 @@ fi
 # below fail before ruvector ever runs. A non-GNU `timeout` may also sit ahead
 # of a working `gtimeout` on PATH, so probe each candidate for GNU-compatible
 # --kill-after support and use the first that passes; fall back to the
-# unwrapped path only if none do.
+# unwrapped path only if none do. Resolved before the provenance check below
+# so that check is budgeted too.
 TIMEOUT_CMD=""
 for _tcmd_name in timeout gtimeout; do
   _tcmd="$(command -v "$_tcmd_name" || true)"
@@ -125,7 +119,12 @@ for _tcmd_name in timeout gtimeout; do
 done
 unset _tcmd_name _tcmd
 
-if [ -z "$TIMEOUT_CMD" ]; then
+# Gated on the ruvector binary being present: this warning is about budget
+# enforcement for the ruvector CLI calls below (session-start/recall), which
+# never run when the binary is absent. Without this gate, a user who never
+# installed ruvector sees this warning on every session even though the
+# no-binary early exit (below) makes it irrelevant.
+if [ -z "$TIMEOUT_CMD" ] && command -v ruvector >/dev/null 2>&1; then
   printf '[ruvector] no GNU-compatible timeout found; session-start CLI calls run without per-call budget enforcement\n' >&2
 fi
 
@@ -138,6 +137,97 @@ run_budgeted() {
   fi
 }
 
+# --- Embedder provenance check (jq only; no CLI, no model load) ---
+# ruvector 0.2.34 embeds with onnx-minilm (384d) by default. A store stamped
+# by the older hash embedder (64d) is still readable, so hooks_recall keeps
+# working, but every hooks_remember is refused (ADR-210) and the write loss
+# is silent. A store with vectors but NO stamp (pre-provenance) is refused
+# too (ERR_LEGACY_STORE_READONLY, upstream isLegacyVectorStore). A stamp-less
+# store with no vectors is fresh: the first write stamps it — stay silent.
+# Surface a mismatch once per session so the operator runs the
+# /ruvector:status remediation; status is the diagnosis, the reembed +
+# restart is the fix.
+#
+# Env gate mirrors upstream resolveEmbedderSelection precedence:
+# RUVECTOR_EMBEDDER=hash selects hash (silent); =auto|minilm selects ONNX
+# regardless of RUVECTOR_ONNX (warn); only when RUVECTOR_EMBEDDER is unset
+# or unrecognized does RUVECTOR_ONNX=0 select hash (silent). Known gaps this
+# jq-only check cannot see: the default `auto` also falls back to hash when
+# the ONNX model fails to load (offline), and the refusal happens in the MCP
+# server, which runs with Claude Code's launch environment, not this
+# shell's — so the note can over- or under-warn in those cases;
+# /ruvector:status's CLI-resolved verdict is the definitive check.
+#
+# One jq parse of the whole store (~0.1s per 10MB, measured), budgeted at
+# 0.2s: a store too large to parse in budget degrades to "no note" (with a
+# stderr line) rather than eating into the CLI calls' budget. The dimension
+# is validated to digits before it is interpolated — intelligence.json is
+# project data a cloned repo can ship, and this line lands in the session's
+# system context.
+provenance_note=""
+INTEL_JSON="${RUVECTOR_DIR}/intelligence.json"
+if [ -f "$INTEL_JSON" ] && [ -z "$TIMEOUT_CMD" ]; then
+  # No GNU-compatible timeout to bound this jq parse (see TIMEOUT_CMD probe
+  # above) — on a large store, an unbounded parse could outrun the 3s
+  # SessionStart watchdog before `finish` ever emits its required JSON.
+  # Skip rather than risk the host killing the hook mid-parse.
+  printf '[ruvector] provenance check skipped: no GNU-compatible timeout to bound the jq parse\n' >&2
+elif [ -f "$INTEL_JSON" ]; then
+  store_kind=""; store_dim="?"; vec_count=0
+  # Pipe-joined, not @tsv: tab is IFS whitespace, so a leading empty field
+  # (no stamp) would collapse and shift the columns under `read`.
+  prov_tsv=$(run_budgeted 0.2 jq -r '[(.embeddingProvenance.embedderKind // ""), ((.embeddingProvenance.dimension // "?") | tostring), ([.memories[]? | select(((.embedding // []) | length) > 0)] | length | tostring)] | join("|")' "$INTEL_JSON" 2>/dev/null) || {
+    printf '[ruvector] provenance check skipped: intelligence.json did not parse within budget\n' >&2
+    prov_tsv=""
+  }
+  if [ -n "$prov_tsv" ]; then
+    IFS='|' read -r store_kind store_dim vec_count <<< "$prov_tsv"
+    case "$store_dim" in ''|*[!0-9]*) store_dim="?";; esac
+    case "$vec_count" in ''|*[!0-9]*) vec_count=0;; esac
+  fi
+  embedder_sel=$(printf '%s' "${RUVECTOR_EMBEDDER:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+  hash_selected=0
+  case "$embedder_sel" in
+    hash) hash_selected=1 ;;
+    auto|minilm) hash_selected=0 ;;
+    *) [ "${RUVECTOR_ONNX:-}" = "0" ] && hash_selected=1 ;;
+  esac
+  if [ "$store_kind" = "hash" ] && [ "$hash_selected" -eq 0 ]; then
+    provenance_note="[ruvector] store is hash-embedded (${store_dim}d) but the default embedder is onnx-minilm — hooks_remember is refused until the store is reembedded; run /ruvector:status for the steps (reembed + restart)"
+  elif [ -z "$store_kind" ] && [ "$vec_count" -gt 0 ]; then
+    provenance_note="[ruvector] store has ${vec_count} vectors but no embedding-provenance stamp — hooks_remember is refused (ERR_LEGACY_STORE_READONLY) until the store is reembedded; run /ruvector:status for the steps"
+  fi
+  unset store_kind store_dim vec_count embedder_sel hash_selected prov_tsv
+fi
+
+# Emit the allow payload, carrying the provenance note as systemMessage when
+# set. Every exit path below the provenance check goes through here so the
+# note is never dropped by an early exit.
+finish() {
+  local msg="${1:-}"
+  if [ -n "$provenance_note" ]; then
+    if [ -n "$msg" ]; then
+      msg=$(printf '%s\n\n%s' "$msg" "$provenance_note")
+    else
+      msg="$provenance_note"
+    fi
+  fi
+  if [ -n "$msg" ]; then
+    emit_message_json "$msg"
+    exit 0
+  fi
+  json_exit
+}
+
+# Resolve ruvector command: require direct binary for SessionStart (3s budget).
+# npx resolution alone (~2700ms) consumes nearly the whole budget before any
+# of the three CLI calls below run, so skip entirely when the binary is absent.
+if command -v ruvector >/dev/null 2>&1; then
+  RUVECTOR_CMD=(ruvector)
+else
+  finish
+fi
+
 learnings=""
 
 # --- Priority 1: Run ruvector's built-in session-start hook ---
@@ -147,12 +237,12 @@ run_budgeted 0.9 "${RUVECTOR_CMD[@]}" hooks session-start --resume 2>/dev/null |
 }
 
 # --- Priority 2: Load top learnings for context ---
-recent_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 3 "recent mistakes and fixes" 2>/dev/null) || {
+recent_learnings=$(run_budgeted 0.65 "${RUVECTOR_CMD[@]}" hooks recall --top-k 3 "recent mistakes and fixes" 2>/dev/null) || {
   printf '[ruvector] Failed to retrieve learnings\n' >&2
   recent_learnings=""
 }
 
-skill_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 2 "useful patterns and techniques" 2>/dev/null) || {
+skill_learnings=$(run_budgeted 0.65 "${RUVECTOR_CMD[@]}" hooks recall --top-k 2 "useful patterns and techniques" 2>/dev/null) || {
   printf '[ruvector] Failed to retrieve skill learnings\n' >&2
   skill_learnings=""
 }
@@ -167,10 +257,5 @@ if [ -n "$recent_learnings" ] || [ -n "$skill_learnings" ]; then
   fi
 fi
 
-# Return learnings as systemMessage if available
-if [ -n "$learnings" ]; then
-  jq -n --arg msg "$learnings" '{systemMessage: $msg, continue: true, permission: "allow"}' \
-    || json_exit
-else
-  json_exit
-fi
+# Return learnings (and any provenance note) as systemMessage if available
+finish "$learnings"
