@@ -627,14 +627,27 @@ process.stdout.write('{"continue": true}\\n');
     for (const command of [
       'bash "${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/guard.sh',
       'node --enable-source-maps "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entry.js" --hook check-git-push',
-      'bash "prefix-${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/guard.sh',
     ]) {
       writePluginManifest(pluginDir, hookManifest(command));
-      const { stderr } = runValidator(pluginDir);
+      const { status, stderr } = runValidator(pluginDir);
+      expect(status).toBe(0);
       expect(stderr).not.toMatch(/unquoted \$\{CLAUDE_PLUGIN_ROOT\}/);
       expect(stderr).not.toMatch(/escapes plugin directory/);
       expect(stderr).not.toMatch(/Hook script not found for PreToolUse: .*--enable-source-maps/);
     }
+
+    // Excluded from the accepted list above: the resolver substitutes the
+    // placeholder inside the quoted word, so a prefix like `prefix-` before
+    // it yields a path (`prefix-<pluginDir>/…`) that never exists — and at
+    // runtime `sh -c` expands it to the same nonexistent path. This form is
+    // genuinely invalid, not merely unsupported by quoting detection.
+    writePluginManifest(
+      pluginDir,
+      hookManifest('bash "prefix-${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/guard.sh')
+    );
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/Hook script not found for PreToolUse/);
   });
 
   it('does not treat a command whose first token merely starts with "node" or "bash" as an interpreter', () => {
@@ -694,5 +707,68 @@ process.stdout.write('{"continue": true}\\n');
     } finally {
       rmSync(spacedRoot, { recursive: true, force: true });
     }
+  });
+
+  it('rejects a hook command whose script path has an unterminated quote', () => {
+    // `bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh` never closes its
+    // opening `"`. `sh -c` rejects that command outright as an unterminated
+    // quoted string, so even though a file exists at the quote-stripped
+    // path, RULE 6 must fail rather than report the script as found.
+    writeHookScript(pluginDir, 'hooks/scripts/guard.sh', SHEBANG_HOOK);
+    writePluginManifest(
+      pluginDir,
+      hookManifest('bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard.sh')
+    );
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/unterminated quote/);
+    expect(stderr).not.toMatch(/Hook script not found/);
+    expect(stderr).not.toMatch(/escapes plugin directory/);
+  });
+
+  it('resolves the real entrypoint past a value-taking interpreter option in separated form', () => {
+    // `--require`/`-r` takes its value as a separate word, not just
+    // `--require=value`. Without consuming that operand, the resolver
+    // would select `preload.js` as "the script" and never check
+    // `entry.js` — the actual command Claude Code runs.
+    mkdirSync(join(pluginDir, 'hooks', 'scripts'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', 'scripts', 'preload.js'), NODE_HOOK, 'utf8');
+    writeFileSync(join(pluginDir, 'hooks', 'scripts', 'entry.js'), NODE_HOOK, 'utf8');
+    writePluginManifest(
+      pluginDir,
+      hookManifest(
+        'node --require "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/preload.js" "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entry.js"'
+      )
+    );
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBe(0);
+    expect(stderr).not.toMatch(/Hook script not found/);
+    expect(stderr).not.toMatch(/escapes plugin directory/);
+
+    // The failure case: entry.js is missing, preload.js exists. If the
+    // resolver mistook preload.js for the script, this would pass; it
+    // must instead report entry.js as the missing hook script.
+    rmSync(join(pluginDir, 'hooks', 'scripts', 'entry.js'));
+    const { status: missingStatus, stderr: missingStderr } =
+      runValidator(pluginDir);
+    expect(missingStatus).toBeGreaterThan(0);
+    expect(missingStderr).toMatch(/Hook script not found for PreToolUse:.*entry\.js/);
+  });
+
+  it('rejects a value-taking option operand that hides a containment escape behind it (-r short form)', () => {
+    // Same operand-skipping requirement as --require, exercised via the
+    // short flag `-r` and with the escaping path as the actual script
+    // argument (not the option's operand).
+    mkdirSync(join(pluginDir, 'hooks', 'scripts'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', 'scripts', 'preload.js'), NODE_HOOK, 'utf8');
+    writePluginManifest(
+      pluginDir,
+      hookManifest(
+        'node -r "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/preload.js" "${CLAUDE_PLUGIN_ROOT}/../outside.js"'
+      )
+    );
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/Hook script path escapes plugin directory/);
   });
 });

@@ -21,6 +21,7 @@ const { addError, logWarning, logSuccess } = require('./logging');
 const {
   VALID_HOOK_EVENTS,
   HOOK_SCRIPT_PREFIX_SRC,
+  UNTERMINATED_HOOK_SCRIPT_QUOTE,
   hookCommandInterpreter,
   resolveHookScriptPath,
   validatePathFile,
@@ -226,6 +227,19 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
           }
           const interpreter = hookCommandInterpreter(hook.command);
           const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
+          if (scriptPath === UNTERMINATED_HOOK_SCRIPT_QUOTE) {
+            // The script argument opens a quote it never closes (e.g.
+            // `bash "${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh` with no closing
+            // `"`). `sh -c` rejects the command outright — even if a file
+            // happens to exist at the quote-stripped path, the hook never
+            // runs, so this must fail rather than silently pass or fold
+            // into the "escapes plugin directory" message below.
+            addError(
+              errors,
+              `${eventName} hook command has an unterminated quote in the script path — the shell will reject this command: ${hook.command}`
+            );
+            continue;
+          }
           if (!scriptPath) {
             // resolveHookScriptPath returns null for commands that are not
             // `bash <path>` / `node <path>` (which get no path check) AND

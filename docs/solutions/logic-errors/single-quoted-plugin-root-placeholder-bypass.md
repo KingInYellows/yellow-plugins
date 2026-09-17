@@ -57,9 +57,17 @@ Two smaller defects rode along in the same code path:
 - `validateHookScriptPath`'s interpreter gate was `if (interpreter !==
   'bash') return`, which skipped all content checks not just for `node`
   entrypoints (intentional — node scripts have no shebang/`set -e`
-  contract) but for *any* other interpreter value, including when the
-  script argument was omitted entirely. An omitted argument should fail
-  strict, not silently pass.
+  contract) but for *any* other interpreter value reaching that function.
+  `validateHookScriptPath` only runs once `resolveHookScriptPath` has
+  already resolved a script path, so `interpreter` there is always
+  `"bash"` or `"node"` — the gate change only affects commands that
+  already resolved. An omitted script argument (a bare `bash`) never gets
+  this far: `HOOK_SCRIPT_INTERPRETER_RE` requires trailing whitespace
+  after the interpreter, so `resolveHookScriptPath` returns `null` and the
+  RULE 6 caller's fallback has no `else` branch for that case — it still
+  silently passes. That stays a known gap (see the "Known gap" comment
+  above `HOOK_SCRIPT_INTERPRETER_RE` in `plugin-paths.js`), not something
+  this change fixes.
 - `resolveHookScriptPath` matched `bash`/`node` directly against the script
   argument, rejecting `node --enable-source-maps "${CLAUDE_PLUGIN_ROOT}"/x.js`
   because it parsed `--enable-source-maps` as the script and reported
