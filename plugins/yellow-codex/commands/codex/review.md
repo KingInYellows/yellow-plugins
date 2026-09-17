@@ -168,9 +168,9 @@ SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 # a temp file and named in the prompt (letting Codex fetch its own diff was
 # tested and rejected: it explores the repo until timeout).
 if [ -n "$BASE_REF" ]; then
-  git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>"$STDERR_FILE"
+  git diff "${BASE_REF}...HEAD" >| "$DIFF_FILE" 2>|"$STDERR_FILE"
 else
-  git diff --cached > "$DIFF_FILE" 2>"$STDERR_FILE"
+  git diff --cached >| "$DIFF_FILE" 2>|"$STDERR_FILE"
 fi
 DIFF_STATUS=$?
 
@@ -231,14 +231,33 @@ CODEX_CMD=(codex exec
   -c 'mcp_servers={}'
   --ephemeral
   --json
-  -m "${CODEX_MODEL:-gpt-5.4}"
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}
   --output-schema "$SCHEMA_FILE"
   -o "$OUTPUT_FILE"
 )
 
 # Execute with timeout
-timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>"$STDERR_FILE" || {
+timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDERR_FILE" 2>&1 || {
   codex_exit=$?
+  # $STDERR_FILE holds both streams: with --json, API refusals arrive as
+  # {"type":"error","message":…} JSONL events on stdout and stderr stays
+  # empty. Read the message out of those events only — echoed diff or tool
+  # output elsewhere in the stream can never match the diagnostics. jq is
+  # optional in this file (Step 4b's awk fallback), so both the
+  # model-rejection and rate-limit branches below need a match even when
+  # jq is absent — a missing jq must not silently swallow a real 429's
+  # retry message or a rejected model into the generic exit-1 arm.
+  if command -v jq >/dev/null 2>&1; then
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+  else
+    # Bounded grep fallback: first {"type":"error",...} JSONL line, then
+    # its "message" field value. Does not unescape JSON string escapes
+    # (\" \\ etc.) — an acceptable degradation vs. the jq path above,
+    # since the model-rejection and rate-limit patterns matched against
+    # it below are plain substrings.
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep '"type":"error"' | head -n1 | \
+      grep -oE '"message":"[^"]*"' | head -n1 | sed -E 's/^"message":"//; s/"$//' | head -c 400)
+  fi
   if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
     printf '[yellow-codex] Error: review timed out after 5 minutes.\n'
   elif [ "$codex_exit" -eq 2 ]; then
@@ -249,19 +268,33 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
     else
       printf '[yellow-codex] Error: authentication failed. Run /codex:setup.\n'
     fi
-  elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
+  elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported"; then
+    # HTTP 400 from the model endpoint (exit 1): this account cannot use the
+    # requested model — a legacy gpt-5.4* name, or a gpt-5.x-codex name
+    # under ChatGPT auth. Capture limited to model-identifier characters.
+    rejected_model=$(printf '%s' "$codex_api_error" | grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" | head -n1 | sed -E "s/^The '([^']+)' model$/\\1/")
+    if [ -n "${CODEX_MODEL:-}" ]; then
+      printf '[yellow-codex] Error: Codex rejected model %s. Set CODEX_MODEL to a model this account allows, or unset it to use the account default.\n' "$rejected_model"
+    else
+      printf '[yellow-codex] Error: Codex rejected model %s. It came from the account default or the model key in ~/.codex/config.toml — change or remove that key.\n' "$rejected_model"
+    fi
+  elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5
-    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>"$STDERR_FILE" || {
+    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDERR_FILE" 2>&1 || {
       printf '[yellow-codex] Error: still rate limited. Try again later.\n'
     }
   else
     printf '[yellow-codex] Error: codex exited with code %d\n' "$codex_exit"
-    # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
-    # transitions test the ORIGINAL $0 before any mutation — never the
-    # redacted copy — so redaction cannot blind the END check (see
+    # Bounded, fenced diagnostic: the API error message (if any) and up to
+    # three `error:` lines — never a raw dump of the captured event stream,
+    # which can echo repository content Codex read. Canonical 11-pattern
+    # redaction (council-patterns SKILL.md). PEM state transitions test the
+    # ORIGINAL $0 before any mutation — never the redacted copy — so
+    # redaction cannot blind the END check (see
     # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
-    head -5 "$STDERR_FILE" 2>/dev/null | awk '{
+    printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
+    { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | head -c 500 | awk '{
       if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
       if (in_pem) {
         print "--- redacted credential at line " NR " ---"
@@ -291,6 +324,7 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
       gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
       print
     }' >&2
+    printf -- '--- end codex-diagnostics ---\n' >&2
   fi
 }
 
@@ -517,7 +551,7 @@ Note at bottom: "These findings are from Codex (OpenAI). Cross-reference with
 | Empty diff at Step 4 (failed/bad base ref) | "git diff produced no output" + captured git stderr | Stop |
 | Schema missing at Step 4 | "output schema not found — reinstall yellow-codex" | Stop |
 | Diff exceeds 100K tokens | AskUserQuestion: continue or split? | User decides |
-| Timeout (5 min) | "review timed out" | Suggest smaller scope or gpt-5.3-codex |
+| Timeout (5 min) | "review timed out" | Suggest smaller scope, or `CODEX_MODEL=gpt-5.3-codex` on API-key accounts only |
 | Argument parse error (exit 2 + parse error on stderr) | "CLI rejected the invocation (flag drift?)" | Report clap error line |
 | Auth failure (exit 2, no parse error on stderr) | "authentication failed" | Suggest /codex:setup |
 | Rate limit (exit 1 + stderr) | Retry once after 5s | Report if still limited |

@@ -26,6 +26,9 @@ approval.
 - You parse proposed changes from Codex output
 - You return a structured report to the spawning command
 - You wrap ALL Codex output in injection fences before returning
+- `jq` is recommended (not required) for Step 3's exit-1 diagnostics —
+  without it, a bounded `grep` fallback still extracts the API error
+  message so the model-rejection and rate-limit arms fire
 
 ## Workflow
 
@@ -85,10 +88,23 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
-  -m "${CODEX_MODEL:-gpt-5.4}" \
+  ${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"} \
   -o "$OUTPUT_FILE" \
-  "$TASK_PROMPT" 2>"$STDERR_FILE" || {
+  "$TASK_PROMPT" >|"$STDERR_FILE" 2>&1 || {
     codex_exit=$?
+    # $STDERR_FILE holds both streams: with --json, API refusals arrive as
+    # {"type":"error","message":…} JSONL events on stdout and stderr stays
+    # empty. Read the message out of those events only — echoed diff or
+    # tool output elsewhere in the stream can never match the diagnostics.
+    # No cap here — the model-rejection/rate-limit regexes below must see
+    # the whole message; display sites cap independently.
+    if command -v jq >/dev/null 2>&1; then
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
+    else
+      # jq unavailable: bounded grep fallback for the "message" field of a
+      # {"type":"error",...} JSONL event, so the arms below still fire.
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep -o '"type":"error"[^}]*' | grep -m1 -o '"message":"[^"]*"' | sed -E 's/^"message":"//; s/"$//')
+    fi
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-executor] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
@@ -99,30 +115,52 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       else
         printf '[codex-executor] Auth failed\n'
       fi
-    elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "The '[A-Za-z0-9._:/-]{1,64}' model is not supported"; then
+      # HTTP 400 from the model endpoint (exit 1, not the exit-2 auth path):
+      # this account cannot use the requested model — a legacy gpt-5.4* name,
+      # or a gpt-5.x-codex name under ChatGPT auth. Capture limited to
+      # model-identifier characters.
+      rejected_model=$(printf '%s' "$codex_api_error" | grep -m1 -oE "The '[A-Za-z0-9._:/-]{1,64}' model" | head -n1 | sed -E "s/^The '([^']+)' model$/\\1/")
+      if [ -n "${CODEX_MODEL:-}" ]; then
+        printf '[codex-executor] Codex rejected model %s — set CODEX_MODEL to a model this account allows, or unset it to use the account default.\n' "$rejected_model"
+      else
+        printf '[codex-executor] Codex rejected model %s — it came from the account default or the model key in ~/.codex/config.toml; change or remove that key.\n' "$rejected_model"
+      fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
       printf '[codex-executor] Rate limited\n'
     else
       printf '[codex-executor] Error: exit code %d\n' "$codex_exit"
-      head -5 "$STDERR_FILE" 2>/dev/null | awk '{
+      # Bounded, fenced diagnostic: the API error message (if any) and up to
+      # three `error:` lines — never a raw dump of the event stream, which can
+      # echo repository content Codex read.
+      printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
+      # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+      # transitions test the ORIGINAL $0 before any mutation — never the
+      # redacted copy — so redaction cannot blind the END check (see
+      # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+      # This redacts the ENTIRE PEM block (header, base64 body, END line),
+      # not just the header, so no key material survives to the 300-byte cap.
+      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | awk '{
+        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+        if (in_pem) {
+          print "--- redacted credential at line " NR " ---"
+          if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+          next
+        }
         line = NR
-        # OpenAI project keys (must precede generic sk- pattern)
         gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-        # OpenAI / generic sk- API keys
-        gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-        # GitHub tokens (ghp_, gho_, ghs_, ghu_)
-        gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-        # GitHub fine-grained PATs
-        gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
-        # AWS access keys
+        gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+        gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+        gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
+        gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+        gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
         gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-        # Bearer tokens in output
-        gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
-        # Authorization headers with token values
-        gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
-        # Generic private key blocks
-        gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+        gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+        gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+        gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
         print
-      }' >&2
+      }' | head -c 300 >&2
+      printf -- '--- end codex-diagnostics ---\n' >&2
     fi
   }
 
@@ -147,17 +185,17 @@ EXECUTOR_OUTPUT=$(printf '%s\n' "$EXECUTOR_OUTPUT" | awk '{
   # OpenAI project keys (must precede generic sk- pattern)
   gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
   # OpenAI / generic sk- API keys
-  gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+  gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
   # GitHub tokens (ghp_, gho_, ghs_, ghu_)
-  gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+  gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
   # GitHub fine-grained PATs
-  gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+  gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
   # AWS access keys
   gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
   # Bearer tokens in output
-  gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+  gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20}[A-Za-z0-9_\.\-]*/, "--- redacted credential at line " line " ---")
   # Authorization headers with token values
-  gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+  gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
   # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
   if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
     print "--- redacted credential at line " line " ---"
