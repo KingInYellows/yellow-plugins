@@ -1,0 +1,46 @@
+plugins/yellow-codex/commands/codex/review.md
+  s_2544e3a9ffcf50::t_e9788cc7447628 540
+  s_2544e3a9ffcf50::t_0eec652ed4fdae 242-246,257-267,275-280,282-283,313
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_2544e3a9ffcf50::t_99b8a0556c246c 90,92-96,107-118,122-126,131,133,135,139,141,146,171,173,175,179,181
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_2544e3a9ffcf50::t_99b8a0556c246c 94,96-100,111-123,126
+plugins/yellow-codex/commands/codex/setup.md
+  s_2544e3a9ffcf50::t_850fdc2d0c1071 211-213
+  s_2544e3a9ffcf50::t_609637c9f65477 196-203,205-206,208-210,215,217,219,222,225-231,239,275-276
+  s_2544e3a9ffcf50::t_05db7e0a13adce 207,220,277
+docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md
+  s_2544e3a9ffcf50::t_e2f4d587a60701 171,176,194-196
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_2544e3a9ffcf50::t_e9788cc7447628 191-192,307,330,333,337-362,365,368,370-371,374
+plugins/yellow-codex/commands/codex/rescue.md
+  s_2544e3a9ffcf50::t_99b8a0556c246c 146,148-152,163-174,183,188-192,197,201,203,207,209,214,261,265,267,273
+plugins/yellow-codex/CLAUDE.md
+  s_2544e3a9ffcf50::t_e2f4d587a60701 103-110
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_2544e3a9ffcf50::t_8d7e7e7ac3852d 396-406
+.changeset/codex-model-default-noclobber.md
+  s_2544e3a9ffcf50::t_e2f4d587a60701 6,10-17
+plugins/yellow-codex/commands/codex/status.md
+  s_2544e3a9ffcf50::t_07e6a34ea0bbe9 120-122
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2544e3a9ffcf50::t_0eec652ed4fdae 70-71,443-456
+  s_2544e3a9ffcf50::t_e9788cc7447628 175,201-202
+  s_2544e3a9ffcf50::t_fc8507f1b2abca 61-63,76-77,338-341,359-364,415,419-425,429-434,439-442,457-460
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "701d1b7358b07cbb41ab4c3a134524f1f6151049",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
