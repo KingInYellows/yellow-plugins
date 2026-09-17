@@ -1,0 +1,35 @@
+scripts/lib/plugin-rules.js
+  s_6aa8fc918111f8::t_9cdfe2cc024bb7 230-242
+  s_6aa8fc918111f8::t_03b87136dcf884 24
+docs/solutions/logic-errors/single-quoted-plugin-root-placeholder-bypass.md
+  s_6aa8fc918111f8::t_d8fe085313517d 60-70
+tests/integration/validate-plugin.test.ts
+  s_6aa8fc918111f8::t_8f5806718564c5 728-773
+  s_6aa8fc918111f8::t_0e390221e3d766 632-633,638-650
+  s_6aa8fc918111f8::t_17813ecd90cc1d 711-727
+scripts/lib/plugin-paths.js
+  s_6aa8fc918111f8::t_02c9b37f5e860a 194,197,224
+  s_6aa8fc918111f8::t_2ce3f52645f995 583
+  s_6aa8fc918111f8::t_4faa83896442b6 91-99
+  s_6aa8fc918111f8::t_3959f04a2b1b68 113-115
+  s_6aa8fc918111f8::t_b4258ea238caf5 55-59,65-89
+  s_6aa8fc918111f8::t_08de0b81cb8b86 118
+  s_6aa8fc918111f8::t_08a60f907e268b 119,121-127,129-131,134,142-188,195-196,198-203,207-212,216-223
+  s_6aa8fc918111f8::t_7e7f523b4b1f43 90,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "918734f5d2f32717b0dcf25cd1118da452a4ceed",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
