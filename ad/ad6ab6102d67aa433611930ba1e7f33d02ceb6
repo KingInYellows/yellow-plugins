@@ -24,6 +24,8 @@ scripts/validate-plugin.js
   s_2544e3a9ffcf50::t_1a718b1f467a3f 27
 docs/plugin-template.md
   s_2544e3a9ffcf50::t_e471ef87a3e8f1 197-200
+AUDIT_REPORT.md
+  s_6aa8fc918111f8::t_438b851107b4b8 142
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -38,6 +40,14 @@ docs/plugin-template.md
         "model": "claude-opus-5"
       },
       "human_author": null
+    },
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
     }
   }
 }
