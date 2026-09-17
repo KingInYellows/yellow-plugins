@@ -37,6 +37,14 @@ match that same wrong shape, so the harness reports full parity while the
 underlying hook never fires against a real PreToolUse envelope from either
 host.
 
+> **Update (2026-09-16):** resolved for this hook — the field path was
+> corrected, the `check-git-push` fixtures now carry the real nested
+> envelope, and the parity charter is retired for that hook. See the
+> 2026-09-16 update in
+> [posttooluse-hook-input-schema-field-paths.md](./posttooluse-hook-input-schema-field-paths.md).
+> The lesson above stands: the harness reported 100% parity for two months
+> while the hook never fired.
+
 ## Detection
 
 Ask where each fixture's shape came from — the implementation under test, or

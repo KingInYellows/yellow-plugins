@@ -24,7 +24,8 @@ tags:
 > PostToolUse; the table's "PreToolUse path" column is preserved below only
 > as a record of what `check-git-push.sh` actually read (and, per
 > characterization-testing scope in the gt-workflow Codex pilot shell 04,
-> continues to read in its Node port) — not as guidance for new hooks. See
+> what its Node port continued to read until the 2026-09-16 fix below) —
+> not as guidance for new hooks. See
 > `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`'s
 > 2026-07-20 update for the related envelope-case-transform correction.
 
@@ -89,6 +90,11 @@ PostToolUse hook input schema nests fields as follows:
 | Tool exit code   | `.tool_result.exit_code`    | (not applicable) |
 | File path        | `.tool_input.file_path`     | `.file_path`     |
 | Tool name        | `.tool_name`                | `.tool_name`     |
+
+The "PreToolUse path" column is historical: it records what the deleted
+`check-git-push.sh` read, and no hook in this repo reads it any more (see
+the 2026-09-16 update above). Real PreToolUse envelopes use the same
+`.tool_input.*` paths as the PostToolUse column.
 
 Correct PostToolUse field extraction:
 

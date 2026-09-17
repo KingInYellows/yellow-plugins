@@ -13,11 +13,11 @@
  * specifically (`runHook` returns with no output, i.e. no PreToolUse
  * decision, which Claude Code/Codex both treat as allow — see
  * tests/hooks.bats's "malformed JSON fails open" case). NOT the same
- * detection regex or envelope field path: this file's regex is
- * deliberately broader (see below) and reads the envelope field path real
- * Claude Code/Codex hosts actually use, rather than gt-workflow's
- * root-level field (see the field-path comment on `checkGitPush` below).
- * A provider-appropriate block message only otherwise. Kept as an
+ * detection regex (this file's is deliberately broader, see below) or
+ * block message (a provider-appropriate one). Both files read the same
+ * envelope field path (`tool_input.command` -> `toolInput.command`) since
+ * 2026-09-16 — see the field-path comment on `checkGitPush` below for
+ * gt-workflow's history there. Kept as an
  * independent file rather than a cross-plugin require so github-workflow
  * has no runtime dependency on
  * gt-workflow being installed — this repo's "never fall back to the other

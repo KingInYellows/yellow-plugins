@@ -23,19 +23,29 @@ const BLOCK_MESSAGE = [
   '   If you need to force-push a single branch, use `gt submit` which handles it safely.',
 ].join('\n');
 
+const MALFORMED_MESSAGE =
+  '⛔  Hook input has a non-string tool_input.command. Cannot verify command safety.';
+
 /**
- * @param {{toolInput?: {command?: string}}} camelCaseEnvelope
+ * @param {{toolInput?: {command?: unknown}}} camelCaseEnvelope
  * @returns {{decision: 'allow'|'deny', message: string|null}}
  */
 function checkGitPush(camelCaseEnvelope) {
-  // Type-checked, not just `?? ''`: a non-string command (object, number)
-  // would otherwise be coerced by the regex test. No root-level `.command`
-  // fallback — keeping one would preserve the fail-open path for any
-  // envelope that is not the real shape.
-  const command =
-    typeof camelCaseEnvelope.toolInput?.command === 'string'
-      ? camelCaseEnvelope.toolInput.command
-      : '';
+  // No root-level `.command` fallback — keeping one would preserve the
+  // fail-open path for any envelope that is not the real shape.
+  const command = camelCaseEnvelope.toolInput?.command;
+
+  // Absent command (non-Bash tool_input, or no tool_input at all): nothing
+  // to check, allow. Present but not a string (object, array, number, null):
+  // a shape this hook cannot verify, so it fails closed the same way
+  // run-hook.js treats truncated stdin, rather than being coerced by the
+  // regex test — `RegExp.test` stringifies its argument.
+  if (command === undefined) {
+    return { decision: 'allow', message: null };
+  }
+  if (typeof command !== 'string') {
+    return { decision: 'deny', message: MALFORMED_MESSAGE };
+  }
 
   if (GIT_PUSH_RE.test(command)) {
     return { decision: 'deny', message: BLOCK_MESSAGE };
