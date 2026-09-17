@@ -582,7 +582,10 @@ function validateCursorRootConfig(catalog, errors) {
  *   errors: string[],
  *   diffs: { path: string, state: 'differs'|'missing'|'stale'|'forbidden' }[],
  *          ('forbidden' = a hand-written plugins/<name>/hooks/hooks.json:
- *          reported in every mode, never deleted, fails --check)
+ *          reported in every mode, never deleted; forces status:'error' in
+ *          'check' and 'apply' modes so no caller — CLI or in-process, e.g.
+ *          sync-manifests.js's `apply:changesets` path — can miss it.
+ *          'dry-run' still always reports cleanly (never fails on its own).)
  *   written: string[],
  *   checked: number,
  *   results: { [pluginName: string]: 'ok'|'error' },
@@ -1425,6 +1428,25 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       }
     }
   }
+  // A forbidden hooks/hooks.json is reported as a diff (above) rather than
+  // gated with the earlier `errors.length > 0` abort — it must not block
+  // writing every other legitimate target. But it still has to fail the
+  // run: otherwise an in-process caller that only checks `status` (e.g.
+  // sync-manifests.js's `apply:changesets` path, which never goes through
+  // this file's CLI exit-code logic below) would see 'ok' with the
+  // forbidden file left in place. Exempt 'dry-run': its documented contract
+  // is to always exit 0 on its own (see the file header), matching the
+  // CLI's dry-run branch below.
+  if (mode !== 'dry-run') {
+    for (const diff of result.diffs) {
+      if (diff.state !== 'forbidden') {
+        continue;
+      }
+      errors.push(
+        `${diff.path} is not generated and is not allowed (validate-plugin RULE 7) — delete it by hand; hook config lives in catalog/plugins/<name>.json#hooks`
+      );
+    }
+  }
   if (errors.length > 0) {
     result.status = 'error';
   }
@@ -1515,8 +1537,14 @@ function main() {
   for (const diff of result.diffs) {
     console.log(`[generate-manifests] DRIFT: ${diff.path} (${diff.state})`);
   }
-  const forbidden = result.diffs.filter((d) => d.state === 'forbidden');
-  for (const diff of forbidden) {
+  // Reachable with a 'forbidden' diff only in 'dry-run' mode: 'check' and
+  // 'apply' already turn a forbidden diff into status:'error' above (which
+  // exits before this point), so this is dry-run's informational-only echo
+  // of the same message, consistent with its "always exit 0" contract.
+  for (const diff of result.diffs) {
+    if (diff.state !== 'forbidden') {
+      continue;
+    }
     console.error(
       `[generate-manifests] ${diff.path} is not generated and is not allowed (validate-plugin RULE 7) — delete it by hand; hook config lives in catalog/plugins/<name>.json#hooks`
     );
@@ -1526,10 +1554,7 @@ function main() {
     console.log(
       `[generate-manifests] Complete: ${result.checked} targets checked, ${result.written.length} rewritten`
     );
-    // Apply never touches a forbidden file, so the warning above is the only
-    // signal — exit non-zero so an unattended caller (sync-manifests.js
-    // during apply:changesets) cannot miss it.
-    process.exit(forbidden.length > 0 ? 1 : 0);
+    process.exit(0);
   }
 
   if (result.diffs.length > 0) {

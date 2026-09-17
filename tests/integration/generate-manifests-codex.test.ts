@@ -547,14 +547,16 @@ describe('generator hook-authority rule (R20)', () => {
     // but the generator must still never read one). If either emitter ever
     // reads it, the generated output would reflect this decoy content
     // instead of `source.hooks`. The sweep reports it as a 'forbidden' diff
-    // and leaves it in place (see the next test); apply still succeeds.
+    // and leaves it in place (see the next test); apply still writes every
+    // other legitimate target correctly, but overall status is 'error'
+    // (the forbidden file itself is never touched).
     mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
     writeJson(join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json'), {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash DECOY-NEVER-READ.sh', timeout: 99 }] }],
     });
 
     const result = generateManifests({ mode: 'apply', rootDir: root });
-    expect(result.status).toBe('ok');
+    expect(result.status).toBe('error');
 
     const claudeManifest = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', '.claude-plugin', 'plugin.json'), 'utf8')
@@ -601,12 +603,15 @@ describe('generator hook-authority rule (R20)', () => {
     // hook source next to the inline plugin.json block. The generator never
     // emits it, so validate-plugin.js RULE 7 rejects its presence — and the
     // sweep here gives `generate-manifests --check` the same signal (a
-    // 'forbidden' diff fails --check like any other), so a reintroduced
-    // file fails validate:generated too, not only validate:plugins. Apply
-    // must NOT delete it: the generator has no catalog source to regenerate
-    // a hand-written file from, and the apply path also runs unattended
-    // from sync-manifests.js. The sweep loop runs for every plugin
-    // regardless of Codex enablement, so both variants are pinned.
+    // 'forbidden' diff forces status:'error', failing --check like any
+    // other error), so a reintroduced file fails validate:generated too,
+    // not only validate:plugins. Apply must NOT delete it: the generator
+    // has no catalog source to regenerate a hand-written file from — it
+    // still writes every other legitimate target, but also returns
+    // status:'error' so an unattended in-process caller (sync-manifests.js
+    // during `apply:changesets`) cannot mistake the run for a clean one.
+    // The sweep loop runs for every plugin regardless of Codex enablement,
+    // so both variants are pinned.
     const inlineHooks = {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
     };
@@ -624,14 +629,20 @@ describe('generator hook-authority rule (R20)', () => {
       r.diffs.some((d) => d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'forbidden');
 
     const checked = generateManifests({ mode: 'check', rootDir: root });
-    expect(checked.status).toBe('ok');
+    expect(checked.status).toBe('error');
     expect(forbiddenDiff(checked)).toBe(true);
 
     const applied = generateManifests({ mode: 'apply', rootDir: root });
-    expect(applied.status).toBe('ok');
+    expect(applied.status).toBe('error');
     expect(forbiddenDiff(applied)).toBe(true);
     expect(applied.written).not.toContain('plugins/hook-plugin/hooks/hooks.json');
     expect(existsSync(hooksJson)).toBe(true);
+    if (codexEnabled) {
+      // The forbidden hooks.json sits in the same hooks/ directory as the
+      // generated codex-hooks.json sibling — the sweep must fail loudly on
+      // the forbidden file without collaterally deleting the generated one.
+      expect(existsSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'))).toBe(true);
+    }
   });
 });
 
