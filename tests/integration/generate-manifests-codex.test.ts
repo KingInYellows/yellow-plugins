@@ -557,6 +557,7 @@ describe('generator hook-authority rule (R20)', () => {
 
     const result = generateManifests({ mode: 'apply', rootDir: root });
     expect(result.status).toBe('error');
+    expect(result.results['hook-plugin']).toBe('error');
 
     const claudeManifest = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', '.claude-plugin', 'plugin.json'), 'utf8')
@@ -631,10 +632,17 @@ describe('generator hook-authority rule (R20)', () => {
     const checked = generateManifests({ mode: 'check', rootDir: root });
     expect(checked.status).toBe('error');
     expect(forbiddenDiff(checked)).toBe(true);
+    // The forbidden file must be attributed to its own plugin, not just
+    // reflected in the global status — otherwise API consumers see a
+    // contradictory 'ok' entry for a plugin the run just named broken, and
+    // main()'s per-plugin error line / ::error annotation (both gated on
+    // 'error') silently omit it.
+    expect(checked.results['hook-plugin']).toBe('error');
 
     const applied = generateManifests({ mode: 'apply', rootDir: root });
     expect(applied.status).toBe('error');
     expect(forbiddenDiff(applied)).toBe(true);
+    expect(applied.results['hook-plugin']).toBe('error');
     expect(applied.written).not.toContain('plugins/hook-plugin/hooks/hooks.json');
     expect(existsSync(hooksJson)).toBe(true);
     if (codexEnabled) {

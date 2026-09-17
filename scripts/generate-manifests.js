@@ -937,6 +937,18 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         path: relative(rootDir, forbiddenHooksJson),
         state: 'forbidden',
       });
+      // Attribute to this plugin now, not just the global status: the late
+      // `mode !== 'dry-run'` loop below turns this diff into an error
+      // message, but by then the diff carries no plugin name to attribute
+      // it with. Without this, result.results[name] stays 'ok' while the
+      // run fails overall, so per-plugin consumers (main()'s error lines
+      // and its GitHub Actions ::error annotations, both gated on 'error')
+      // silently omit the plugin that actually has the forbidden file.
+      // dry-run is exempt to match this file's documented contract that
+      // dry-run always exits 0 and never fails a plugin.
+      if (mode !== 'dry-run') {
+        result.results[name] = 'error';
+      }
     }
     // This loop runs unconditionally (no isCodexEnabled guard, so it also
     // covers Codex-disabled plugins), so componentPaths.skills can carry a
