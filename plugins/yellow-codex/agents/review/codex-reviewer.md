@@ -360,7 +360,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     # {"type":"error","message":…} JSONL events on stdout and stderr stays
     # empty. Read the message out of those events only — echoed diff or tool
     # output elsewhere in the stream can never match the diagnostics.
-    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
     # The review result itself arrives via -o "$OUTPUT_FILE", never stdout.
     # Diagnostics mirror the codex-patterns skill error catalog. Every branch
     # emits a structured partial and stops — a silent fall-through into
@@ -439,25 +439,44 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     elif [ "$codex_exit" -eq 1 ] && [ -n "$codex_api_error" ]; then
       # Any other API refusal (a 400 for schema or context length, a 5xx):
       # surface a bounded, redacted excerpt so the caller sees the cause
-      # instead of a bare exit code.
-      API_PEEK=$(printf '%s' "$codex_api_error" | head -c 200 | awk '{
-          gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential ---")
-          gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential ---")
-          gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential ---")
-          gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential ---")
-          gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential ---")
-          gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential ---")
-          gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential ---")
-          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential ---")
-          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential ---")
-          gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential ---")
-          gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential ---")
+      # instead of a bare exit code. Redact BEFORE truncating (same
+      # invariant Step 6 enforces for SUMMARY/FINDINGS, and the exit-2
+      # argument-parse arm above) — a credential straddling the 200-byte cut
+      # would otherwise leave a remnant too short for the {20,}-style gsub
+      # patterns to match. Canonical 11-pattern redaction (council-patterns
+      # SKILL.md). PEM state transitions test the ORIGINAL $0 before any
+      # mutation — never the redacted copy — so redaction cannot blind the
+      # END check (see
+      # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+      API_PEEK=$(printf '%s' "$codex_api_error" | awk '{
+          if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+          if (in_pem) {
+            print "--- redacted credential at line " NR " ---"
+            if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+            next
+          }
+          line = NR
+          gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+          gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+          gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+          gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
+          gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+          gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+          gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+          gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
           print
-        }' | tr '\n' ' ')
+        }' | tr '\n' ' ' | head -c 200)
+      # Fence the excerpt before it ever leaves this process — $API_PEEK can
+      # contain echoed request/config text from an unclassified API failure,
+      # and summary= is a parsed contract field, not a free-text channel.
+      printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
       printf '[codex-reviewer] Codex API error: %s\n' "$API_PEEK" >&2
+      printf -- '--- end codex-diagnostics ---\n' >&2
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
-      printf 'summary=Codex API error (exit 1): %s\n' "$API_PEEK"
+      printf 'summary=Codex API error (exit 1); see fenced diagnostics.\n'
     else
       printf '[codex-reviewer] Error: exit code %d\n' "$codex_exit" >&2
       printf 'verdict=ERROR\n'

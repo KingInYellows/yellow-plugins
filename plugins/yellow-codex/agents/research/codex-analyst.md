@@ -139,24 +139,30 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # can echo repository content or credentials Codex read.
       if [ -n "$codex_api_error" ]; then
         printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
+        # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+        # transitions test the ORIGINAL $0 before any mutation — never the
+        # redacted copy — so redaction cannot blind the END check (see
+        # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+        # This redacts the ENTIRE PEM block (header, base64 body, END line),
+        # not just the header, so no key material survives to the 300-byte cap.
         printf 'api-error: %s\n' "$codex_api_error" | awk '{
+          if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+          if (in_pem) {
+            print "--- redacted credential at line " NR " ---"
+            if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+            next
+          }
           line = NR
-          # OpenAI project keys (must precede generic sk- pattern)
           gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-          # OpenAI / generic sk- API keys
+          gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
           gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
-          # GitHub tokens (ghp_, gho_, ghs_, ghu_)
+          gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
           gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
-          # GitHub fine-grained PATs
           gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
-          # AWS access keys
           gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-          # Bearer tokens in output
-          gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20}[A-Za-z0-9_\.\-]*/, "--- redacted credential at line " line " ---")
-          # Authorization headers with token values
-          gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
-          # Generic private key blocks
-          gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+          gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
           print
         }' | head -c 300 >&2
         printf -- '--- end codex-diagnostics ---\n' >&2

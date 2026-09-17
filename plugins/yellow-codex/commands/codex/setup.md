@@ -252,11 +252,29 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
     fi
     printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
     grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null | awk '{
+      # Single-line whole-span guard: a complete PEM block (BEGIN...END) can
+      # land inside one escaped JSON message line (literal \n, not a real
+      # newline) — collapse it before the state machine or generic patterns
+      # run, so the key body is never left exposed.
+      gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----.*-----END [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " NR " ---")
+      # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+      # transitions test the ORIGINAL $0 before any mutation — never the
+      # redacted copy — so redaction cannot blind the END check (see
+      # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+      # Covers a truncated/unterminated BEGIN with no END on this record too.
+      if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+      if (in_pem) {
+        print "--- redacted credential at line " NR " ---"
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+        next
+      }
       line = NR
       # OpenAI project keys (must precede generic sk- pattern)
       gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+      gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
       # OpenAI / generic sk- API keys
       gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+      gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
       # GitHub tokens (ghp_, gho_, ghs_, ghu_)
       gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
       # GitHub fine-grained PATs
@@ -264,11 +282,11 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
       # AWS access keys
       gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
       # Bearer tokens in output
-      gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20}[A-Za-z0-9_\.\-]*/, "--- redacted credential at line " line " ---")
-      # Authorization headers with token values
-      gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
-      # Generic private key blocks
-      gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+      gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+      # Authorization headers with token values (optional scheme prefix, e.g.
+      # "Authorization: Basic <token>")
+      gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+      gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
       print
     }' | head -c 200 >&2
     printf '\n' >&2

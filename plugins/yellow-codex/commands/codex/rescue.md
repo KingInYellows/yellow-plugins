@@ -198,11 +198,28 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # Bounded, fenced diagnostic: the API error message (if any) and up to
       # three `error:` lines — never a raw dump of the event stream, which can
       # echo repository content Codex read.
+      # Redact BEFORE truncating (canonical 11-pattern block, see
+      # codex-reviewer.md's git-diff-failure diagnostics): the api-error text
+      # above is deliberately uncapped, so a credential can land past the old
+      # 400-byte truncation point. Truncating first (head -c 500 before awk)
+      # could cut a credential mid-pattern, leaving the fragment unmatched
+      # and exposed. Redacting the full text first means only redaction
+      # markers, never raw credential fragments, ever reach the 500-byte cap.
       printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | head -c 500 | awk '{
+      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | awk '{
+        # PEM state transitions test the ORIGINAL $0 before any mutation —
+        # never the redacted copy — so redaction cannot blind the END check.
+        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+        if (in_pem) {
+          print "--- redacted credential at line " NR " ---"
+          if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+          next
+        }
         line = NR
         # OpenAI project keys (must precede generic sk- pattern)
         gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+        # Anthropic API keys (must precede generic sk- pattern)
+        gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
         # OpenAI / generic sk- API keys
         gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
         # Google API keys (Gemini, etc.)
@@ -214,13 +231,14 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         # AWS access keys
         gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
         # Bearer tokens in output
-        gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20}[A-Za-z0-9_\.\-]*/, "--- redacted credential at line " line " ---")
-        # Authorization headers with token values
-        gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
-        # Generic private key blocks
-        gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+        gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+        # Authorization headers with token values (scheme-aware: optional
+        # scheme word before the opaque token, e.g. "Authorization: Basic …")
+        gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+        # AWS/session tokens (ses_…)
+        gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
         print
-      }' >&2
+      }' | head -c 500 >&2
       printf -- '--- end codex-diagnostics ---\n' >&2
     fi
   }
