@@ -70,6 +70,29 @@ closed (deny) on truncation for the PreToolUse hook specifically, while
 preserving the original fail-open behavior for PostToolUse's parse
 failures.
 
+**Update (2026-09-17, PR #802 review):** A third variant of the same
+fail-open-on-shape-mismatch class surfaced once `policy-check-git-push.js`
+was fixed to read `toolInput.command` (see
+[posttooluse-hook-input-schema-field-paths.md](../code-quality/posttooluse-hook-input-schema-field-paths.md)'s
+2026-09-16 update). A present-but-non-string `tool_input.command` (e.g. a
+number or object, not the missing-field case) was coerced to `''` and
+silently allowed — no fixture exercised that shape, the same blind spot
+that let the missing-dependency and truncation variants ship undetected.
+Fixed to deny with `MALFORMED_MESSAGE` when `command` is present but not a
+string, mirroring `run-hook.js`'s existing truncation-deny path; `undefined`
+(field genuinely absent) still allows — that shape means "not a Bash
+tool call, nothing to check," not "can't verify," so it stays an
+intentional allow rather than joining the fail-closed cases below. The
+three variants found across two reviews of the same hook — missing
+dependency, truncated/malformed JSON, and present-but-wrong-type field —
+say the same thing three times: **for a security-relevant guard, don't
+special-case "can't verify the input" as allow.** Any shape the guard
+receives but can't positively confirm as safe (present-but-truncated,
+present-but-wrong-type) should fail closed by default, and each new
+ported/edited hook should get a fixture for all three variants (absent,
+truncated, wrong-type) up front instead of waiting for a review to find
+the next one.
+
 ## Related Documentation
 
 - [golden-fixture-parity-vs-contract-correctness.md](../code-quality/golden-fixture-parity-vs-contract-correctness.md) —

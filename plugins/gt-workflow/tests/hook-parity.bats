@@ -37,11 +37,22 @@
 # `null.command`/`null.toolInput` inside the policy function. Its golden
 # reflects run-hook.js's actual fixed output directly (there is no deleted
 # bash script to have captured a "true" answer from for this case).
+#
+# check-git-push's fixtures are NOT bash-parity captures since 2026-09-16.
+# The deleted bash script read `.command` at the envelope root — a field no
+# host sends — so its goldens proved parity with a shape that never fires.
+# The *.stdin files now carry the real nested `tool_input.command` shape
+# and their goldens are the Node contract for it; only
+# root-level-command-ignored still represents the deleted script's shape,
+# pinned as non-blocking. Do not re-capture these goldens from the bash
+# script: it would invert them. See
+# docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md.
 
 bats_require_minimum_version 1.5.0
 
 FIXTURE_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/fixtures/hooks" && pwd)"
 ENTRYPOINT="$BATS_TEST_DIRNAME/../hooks/scripts/entrypoint-claude.js"
+CODEX_ENTRYPOINT="$BATS_TEST_DIRNAME/../hooks/scripts/entrypoint-codex.js"
 
 run_entrypoint() {
   local hook="$1" stdin_file="$2"
@@ -127,6 +138,35 @@ assert_parity() {
 
 @test "check-git-push: null-envelope does not crash (regression, PR #661)" {
   assert_parity check-git-push null-envelope
+}
+
+@test "check-git-push: root-level command (the deleted bash script's shape) is ignored, not blocked" {
+  # Pins the deleted script's flat shape as non-blocking so the field path
+  # cannot silently regress — see the header for the 2026-09-16 history.
+  assert_parity check-git-push root-level-command-ignored
+}
+
+@test "check-git-push: real host PreToolUse envelope blocks a raw git push (exit 2)" {
+  # Full envelope as Claude Code and Codex both send it (session_id,
+  # hook_event_name, tool_name, nested tool_input.command).
+  assert_parity check-git-push real-host-envelope
+}
+
+@test "check-git-push: real host PreToolUse envelope on the Codex entrypoint emits hookSpecificOutput deny" {
+  # The Codex formatter emits a JSON decision on stdout with exit 0 instead
+  # of exit 2 + stderr; same policy, same fixture, different output contract.
+  run --separate-stderr node "$CODEX_ENTRYPOINT" --hook check-git-push < "$FIXTURE_ROOT/check-git-push/real-host-envelope.stdin"
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.permissionDecision')" = "deny" ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "PreToolUse" ]
+  printf '%s' "$output" | jq -e '.hookSpecificOutput.permissionDecisionReason | test("Raw `git push` is not allowed")' >/dev/null
+}
+
+@test "check-git-push: present-but-non-string tool_input.command fails closed (exit 2)" {
+  # A shape no host sends for Bash; the policy cannot verify it, so it
+  # denies like run-hook.js's truncation path instead of coercing it to ''.
+  assert_parity check-git-push non-string-command
 }
 
 # --- check-commit-message ---

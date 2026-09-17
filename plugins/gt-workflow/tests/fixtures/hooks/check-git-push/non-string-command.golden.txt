@@ -1,0 +1,4 @@
+EXIT_CODE=2
+--- STDOUT ---
+--- STDERR ---
+⛔  Hook input has a non-string tool_input.command. Cannot verify command safety.

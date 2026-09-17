@@ -194,7 +194,8 @@ without `-r`).
 Both hooks run through a shared cross-host Node runtime under
 `hooks/scripts/` rather than standalone bash scripts (the original
 `check-git-push.sh` / `check-commit-message.sh` were deleted once
-`tests/hook-parity.bats` proved byte/semantic-equivalent behavior):
+`tests/hook-parity.bats` proved byte/semantic-equivalent behavior; the
+git-push field path was then corrected on 2026-09-16 — see below):
 
 - `hooks/scripts/lib/policy-check-git-push.js` /
   `lib/policy-check-commit-message.js` — pure decision functions
@@ -213,10 +214,14 @@ Both hooks run through a shared cross-host Node runtime under
   per-host wrappers (~13 lines) calling `runHook` with the matching
   formatter
 
-Behavior (unchanged from the original bash hooks):
+Behavior (unchanged from the original bash hooks, except the PreToolUse
+field path):
 
 - **PreToolUse (Bash)** — Backstop that blocks raw `git push` and points the
-  workflow back to `gt submit --no-interactive`
+  workflow back to `gt submit --no-interactive`. Reads
+  `tool_input.command` (the shape both hosts send); the deleted bash script
+  read a root-level `command` no host sends, so it never fired on a real
+  payload. A present-but-non-string `tool_input.command` fails closed.
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
@@ -235,7 +240,10 @@ plugin directory (see root `CLAUDE.md`'s bats list).
 
 - `tests/hook-parity.bats` — parity gate proving the Node hook runtime
   (`hooks/scripts/entrypoint-claude.js`) reproduces the deleted bash hooks'
-  behavior exactly, against golden fixtures in `tests/fixtures/hooks/`.
+  decisions for check-commit-message, and the real-host envelope contract
+  for check-git-push (whose goldens are Node-contract fixtures, not bash
+  captures — see the file header), against golden fixtures in
+  `tests/fixtures/hooks/`.
 - `tests/gt-cleanup.bats` — the deterministic bash embedded in the
   gt-cleanup skill: flag parsing and branch classification live in
   `skills/gt-cleanup/SKILL.md`; the batch-cap-15 review queue, the

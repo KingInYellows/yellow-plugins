@@ -13,11 +13,11 @@
  * specifically (`runHook` returns with no output, i.e. no PreToolUse
  * decision, which Claude Code/Codex both treat as allow — see
  * tests/hooks.bats's "malformed JSON fails open" case). NOT the same
- * detection regex or envelope field path: this file's regex is
- * deliberately broader (see below) and reads the envelope field path real
- * Claude Code/Codex hosts actually use, rather than gt-workflow's
- * root-level field (see the field-path comment on `checkGitPush` below).
- * A provider-appropriate block message only otherwise. Kept as an
+ * detection regex (this file's is deliberately broader, see below) or
+ * block message (a provider-appropriate one). Both files read the same
+ * envelope field path (`tool_input.command` -> `toolInput.command`) since
+ * 2026-09-16 — see the field-path comment on `checkGitPush` below for
+ * gt-workflow's history there. Kept as an
  * independent file rather than a cross-plugin require so github-workflow
  * has no runtime dependency on
  * gt-workflow being installed — this repo's "never fall back to the other
@@ -76,12 +76,8 @@ function checkGitPush(camelCaseEnvelope) {
   // Real PreToolUse envelopes nest the Bash command under `tool_input`
   // (-> toolInput after snake->camel), the SAME shape as PostToolUse — NOT
   // a root-level `.command`. See docs/solutions/code-quality/
-  // posttooluse-hook-input-schema-field-paths.md's 2026-07-20/07-22
-  // corrections: gt-workflow's sibling file reads root-level `.command` by
-  // design, preserved there only for characterization-testing parity with
-  // a deleted bash predecessor. This file has no such predecessor to
-  // preserve, so it reads the field path real Claude Code/Codex envelopes
-  // actually use.
+  // posttooluse-hook-input-schema-field-paths.md; gt-workflow's sibling
+  // reads the same path since 2026-09-16.
   const command = typeof camelCaseEnvelope.toolInput?.command === 'string' ? camelCaseEnvelope.toolInput.command : '';
 
   if (GIT_PUSH_RE.test(command)) {

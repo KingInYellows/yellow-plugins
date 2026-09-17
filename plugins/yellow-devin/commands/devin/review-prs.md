@@ -406,7 +406,14 @@ How would you like to remediate?
 
 Options:
 
-- **Fix locally** — Commit and push fixes via Graphite
+- **Fix locally** — Commit and push fixes through the resolved stacked-PR
+  provider. If the router state (Step 1b) is `READY_GRAPHITE` and either
+  `GT_AVAILABLE` is false or this PR is in `GT_DEGRADED_PRS` (set in Step
+  4), present this option instead as **Fix locally (commit only)** — `gt`
+  is unavailable or `gt track` failed for this PR; fixes will be committed
+  locally but NOT submitted (raw `git push` is blocked by the gt-workflow
+  guard). You will need to track and submit the branch through the
+  gt-workflow provider afterwards.
 - **Message Devin** — Send fix instructions to session (disabled if all
   sessions are terminal, with note explaining why)
 - **Comment on PR** — Post review feedback as a PR comment with `@devin` prefix.
@@ -446,11 +453,14 @@ If `GT_AVAILABLE` is false, or PR number is in `GT_DEGRADED_PRS`:
 ```bash
 git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
-git push
 ```
 
-Note: degraded-mode `git push` is a documented exception to the repo convention
-when `gt submit` is unavailable.
+The gt-workflow PreToolUse guard denies raw `git push` under
+`READY_GRAPHITE`, so this path stops after the local commit — it no longer
+pushes. Record this PR in the Step 7 summary as "committed locally, not
+submitted — track `<branch>` with Graphite, then submit it through the
+gt-workflow provider" (or re-run `/devin:review-prs` after fixing `gt`). Do
+not resolve this PR's review threads; nothing was pushed.
 
 If the router state is `READY_GITHUB`:
 
@@ -463,7 +473,8 @@ node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" subm
 Read the JSON result's `status` field; `SUCCESS` continues, anything else
 reports the result's `recoveryAction`.
 
-Only after the push succeeds, resolve the review threads that were actually
+Only after a push succeeds (the `GT_AVAILABLE`-true Graphite path or the
+`READY_GITHUB` path), resolve the review threads that were actually
 addressed. Leave likely false positives unresolved unless you add a short human
 explanation and are confident dismissal is appropriate.
 
@@ -613,13 +624,20 @@ No action. Record in final report as skipped.
 **5g. Post-remediation stack maintenance:**
 
 If PR is part of a stack and changes were made, and the router state (Step
-1b) is `READY_GRAPHITE` and `GT_AVAILABLE`:
+1b) is `READY_GRAPHITE`, `GT_AVAILABLE` is true, and PR is not in
+`GT_DEGRADED_PRS`:
 
 ```bash
 gt upstack restack
 ```
 
 On conflict: abort restack, report to user, continue to next PR.
+
+If PR is part of a stack and changes were made, the router state is
+`READY_GRAPHITE`, and PR is in `GT_DEGRADED_PRS`: skip the restack step for
+this PR. Its commit landed via the local-commit fallback in Step 5f, not
+through `gt`, so restacking now would run around an untracked, unsubmitted
+commit and could fail again or mutate dependent branches.
 
 If PR is part of a stack and changes were made, and the router state is
 `READY_GITHUB`:
@@ -653,15 +671,16 @@ Present aggregate report across all processed PRs:
 ```
 === Devin PR Review Summary ===
 
-Processed: 5 PRs from 3 Devin sessions
+Processed: 6 PRs from 3 Devin sessions
 - Fixed locally: 2 (#142, #145)
+- Committed locally, not submitted: 1 (#150 — degraded mode; track and submit through the gt-workflow provider)
 - Messaged Devin: 1 (#148 → session abc123)
 - Commented on PR: 1 (#149)
 - Skipped: 1 (#151)
 
 Findings: 9 total (1 P0, 4 P1, 3 P2, 1 P3)
 Comments: 12 resolved, 3 false positives dismissed
-CI: 4/5 PRs passing
+CI: 4/6 PRs passing
 ```
 
 If any PRs were skipped due to TOCTOU (closed between discovery and review),
