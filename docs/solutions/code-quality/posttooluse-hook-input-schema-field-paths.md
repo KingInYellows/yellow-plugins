@@ -52,13 +52,16 @@ tags:
 > to correctness: `policy-check-git-push.js` now reads
 > `toolInput?.command` (string-typed), the same read
 > `policy-check-commit-message.js` and github-workflow's sibling already
-> use, with no root-level fallback. The `check-git-push/*.stdin` fixtures
-> carry the real nested envelope; a new `root-level-command-ignored`
-> fixture pins the deleted bash script's flat shape as *allowed* (exit 0,
-> no output) so the path cannot regress silently, and a bats case feeds a
-> full Claude Code PreToolUse envelope and asserts exit 2 with the block
-> message. The characterization charter is retired for this hook — parity
-> with a shape no host sends was worth less than a backstop that fires.
+> use, with no root-level fallback. Of the `check-git-push/*.stdin`
+> fixtures, the command-bearing ones now carry the real nested envelope;
+> `malformed-json` and `null-envelope` intentionally stay non-JSON/`null`
+> (they test input parsing, not envelope shape), and the new
+> `root-level-command-ignored` fixture pins the deleted bash script's flat
+> shape as *allowed* (exit 0, no output) so the path cannot regress
+> silently. A bats case feeds a full Claude Code PreToolUse envelope and
+> asserts exit 2 with the block message. The characterization charter is
+> retired for this hook — parity with a shape no host sends was worth less
+> than a backstop that fires.
 
 ## Problem
 

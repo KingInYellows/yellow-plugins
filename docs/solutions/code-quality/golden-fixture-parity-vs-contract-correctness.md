@@ -107,10 +107,11 @@ gt-workflow guard would never actually block it. Once the guard started
 firing for real, that documented exception became a hard stop under
 `READY_GRAPHITE` — a correctness fix in one plugin silently broke a
 documented workaround in an unrelated plugin that keyed off the same host
-behavior. That cross-plugin instance was flagged as an advisory follow-up,
-not fixed in the same change — sweeping for this class of drift should
-include sibling plugins that reference the same hook/guard, not just the
-owning plugin's own docs and tests.
+behavior. That cross-plugin instance was fixed in the same PR: the
+degraded-mode branch no longer falls back to raw `git push` — it halts and
+surfaces the PR for manual `gt track` + `gt submit` instead — and sweeping
+for this class of drift should include sibling plugins that reference the
+same hook/guard, not just the owning plugin's own docs and tests.
 
 Separately, the same review also found a second recurrence of the
 fail-open-on-shape-mismatch class this fix was meant to close: see the

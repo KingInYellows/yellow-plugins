@@ -80,14 +80,18 @@ silently allowed — no fixture exercised that shape, the same blind spot
 that let the missing-dependency and truncation variants ship undetected.
 Fixed to deny with `MALFORMED_MESSAGE` when `command` is present but not a
 string, mirroring `run-hook.js`'s existing truncation-deny path; `undefined`
-(field genuinely absent) still allows. The three variants found across two
-reviews of the same hook — missing dependency, truncated/malformed JSON,
-and present-but-wrong-type field — say the same thing three times: **for a
-security-relevant guard, don't special-case "can't verify the input" as
-allow.** Any shape the guard can't positively confirm as safe (absent,
-truncated, wrong type) should fail closed by default, and each new
-ported/edited hook should get a fixture for all three variants up front
-instead of waiting for a review to find the next one.
+(field genuinely absent) still allows — that shape means "not a Bash
+tool call, nothing to check," not "can't verify," so it stays an
+intentional allow rather than joining the fail-closed cases below. The
+three variants found across two reviews of the same hook — missing
+dependency, truncated/malformed JSON, and present-but-wrong-type field —
+say the same thing three times: **for a security-relevant guard, don't
+special-case "can't verify the input" as allow.** Any shape the guard
+receives but can't positively confirm as safe (present-but-truncated,
+present-but-wrong-type) should fail closed by default, and each new
+ported/edited hook should get a fixture for all three variants (absent,
+truncated, wrong-type) up front instead of waiting for a review to find
+the next one.
 
 ## Related Documentation
 

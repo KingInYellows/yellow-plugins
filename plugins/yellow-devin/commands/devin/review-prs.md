@@ -446,11 +446,14 @@ If `GT_AVAILABLE` is false, or PR number is in `GT_DEGRADED_PRS`:
 ```bash
 git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
-git push
 ```
 
-Note: degraded-mode `git push` is a documented exception to the repo convention
-when `gt submit` is unavailable.
+The gt-workflow PreToolUse guard denies raw `git push` under `READY_GRAPHITE`,
+so this path stops after the local commit — it no longer pushes. Record this
+PR in the Step 7 summary as "committed locally, not submitted — run
+`gt track` then `gt submit` on `<branch>`" (or re-run `/devin:review-prs`
+after fixing `gt`). Do not resolve this PR's review threads; nothing was
+pushed.
 
 If the router state is `READY_GITHUB`:
 
@@ -463,7 +466,8 @@ node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" subm
 Read the JSON result's `status` field; `SUCCESS` continues, anything else
 reports the result's `recoveryAction`.
 
-Only after the push succeeds, resolve the review threads that were actually
+Only after a push succeeds (the `GT_AVAILABLE`-true Graphite path or the
+`READY_GITHUB` path), resolve the review threads that were actually
 addressed. Leave likely false positives unresolved unless you add a short human
 explanation and are confident dismissal is appropriate.
 
@@ -653,8 +657,9 @@ Present aggregate report across all processed PRs:
 ```
 === Devin PR Review Summary ===
 
-Processed: 5 PRs from 3 Devin sessions
+Processed: 6 PRs from 3 Devin sessions
 - Fixed locally: 2 (#142, #145)
+- Committed locally, not submitted: 1 (#150 — degraded mode; run `gt track` then `gt submit`)
 - Messaged Devin: 1 (#148 → session abc123)
 - Commented on PR: 1 (#149)
 - Skipped: 1 (#151)
