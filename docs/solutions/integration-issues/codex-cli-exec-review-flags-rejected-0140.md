@@ -363,3 +363,49 @@ preconditions for `plugins/yellow-codex/agents/review/codex-reviewer.md`,
 `plugins/yellow-codex/agents/research/codex-analyst.md`,
 `plugins/yellow-codex/agents/workflow/codex-executor.md`,
 `plugins/yellow-codex/commands/codex/*.md`.
+
+## Update — 2026-09-16: hardcoded `gpt-5.4` default removed; exit-1 arm names the rejected model
+
+The 2026-09-05 update treated the rejection as an operator-environment
+gotcha. It is a defect: OpenAI now lists `gpt-5.4` / `gpt-5.4-mini` as
+legacy, ChatGPT-account auth rejects them with HTTP 400
+(`{"type":"invalid_request_error","message":"The 'gpt-5.4-mini' model is
+not supported when using Codex with a ChatGPT account."}`, exit **1**, not
+the exit-2 auth path), and `codex exec` with no `-m` resolves the account
+default (`gpt-6-astra` here, codex-cli 0.153.3) and succeeds.
+
+- Every `-m "${CODEX_MODEL:-gpt-5.4}"` site is now
+  `${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}` — zero or two
+  arguments in both bash and zsh, verified in the backslash-continued and
+  `CODEX_CMD=(...)` array forms. The single-expansion form
+  `${CODEX_MODEL:+-m "$CODEX_MODEL"}` was tried first and rejected in
+  review: zsh does not word-split the alternate value and passes one
+  argument `-m <name>`, and the Bash tool runs zsh on zsh-login hosts.
+  The CLI's own precedence (`~/.codex/config.toml`, then the account
+  default) decides when the variable is unset; `CODEX_MODEL` still wins
+  when set.
+- `/codex:setup`'s smoke test keeps one explicit cheap model
+  (`CODEX_SMOKE_MODEL`, default `gpt-5.6-luna`) and retries once without
+  `-m` on the 400 rejection, so setup passes on both auth types.
+- `codex-reviewer`'s exit-1 arm greps for the model-specific message
+  (`The '<name>' model is not supported`, identifier characters only — the
+  generic `invalid_request_error` type is any 400 and falls through to the
+  generic arm) before the rate-limit check and returns
+  `verdict=UNAVAILABLE` with `summary=Codex rejected model <name>: set
+  CODEX_MODEL …`. With `--json` that message is a stdout JSONL event
+  (`{"type":"error","message":…}` then `turn.failed`) and stderr is empty —
+  verified live — so every `--json` site (reviewer, `/codex:review`,
+  `/codex:rescue`, `codex-analyst`, `codex-executor`) captures stdout and
+  stderr into one diagnostics file and extracts the message from the error
+  events with `jq` (never by grepping the whole stream, which can echo
+  repository content); the result still arrives via `-o`. The same arm now
+  exists at every site, the rate-limit detection reads the same events, and
+  the generic arm prints a bounded, fenced, redacted excerpt. `/codex:setup`
+  probes the production no-`-m` shape rather than a hardcoded smoke model
+  (a green setup with `-m` said nothing about the path real invocations
+  take).
+
+**Components (this Update):** the four invocation-site files above,
+`plugins/yellow-codex/commands/codex/setup.md`,
+`plugins/yellow-codex/skills/codex-patterns/SKILL.md` "Model Selection",
+`plugins/yellow-codex/CLAUDE.md`.

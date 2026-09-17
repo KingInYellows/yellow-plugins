@@ -96,13 +96,19 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 ## Model Selection
 
-| Model | Speed | Cost | When to Use |
-|-------|-------|------|-------------|
-| `gpt-5.4` | Medium | Standard | Default for all operations |
-| `gpt-5.4-mini` | Fast | Low | Cost-sensitive, quick analysis |
-| `gpt-5.3-codex` | Medium | Standard | Large diffs (1M context window) |
-
-Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
+No `-m` by default: every `codex exec` site passes
+`${CODEX_MODEL:+-m} ${CODEX_MODEL:+"$CODEX_MODEL"}`, so codex resolves the model from
+`~/.codex/config.toml` and then the account default unless `CODEX_MODEL` is
+set. `gpt-5.4` / `gpt-5.4-mini` are legacy and ChatGPT-account auth rejects
+them (HTTP 400, exit 1; `gpt-5.x-codex` names too) — never hardcode a
+fallback name. `/codex:setup`'s smoke test probes the same no-`-m` shape;
+`CODEX_SMOKE_MODEL` forces a model for the probe only and is retried
+without it on a 400. With `--json` the API refusal is a stdout JSONL
+`{"type":"error"}` event, so every `--json` site captures both streams into
+one diagnostics file and reads only those events (`codex-patterns`
+"Where API errors land"). Full table and rationale:
+`skills/codex-patterns/SKILL.md` "Model Selection";
+`docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md`.
 
 ## Cross-Plugin Dependencies
 
@@ -132,8 +138,9 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
   `.codexignore` or filter diffs.
 - **Rate limits** — Codex CLI hits OpenAI API. Concurrent invocations may
   trigger 429 errors.
-- **Cost** — Each invocation uses OpenAI API tokens. Default model (`gpt-5.4`)
-  is the most expensive.
+- **Cost** — Each invocation uses OpenAI API tokens (or ChatGPT-plan
+  quota). With `-m` omitted the account default applies; set `CODEX_MODEL`
+  to a cheaper model for bulk runs.
 - **`--output-schema` is silently ignored by `codex exec review`** — on every
   model; the subcommand, not the model, is the deciding factor. Use plain
   `codex exec` (as `codex-reviewer` does) when structured JSON is required.
