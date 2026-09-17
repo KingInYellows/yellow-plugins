@@ -1187,6 +1187,47 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
   }
 
+  // Repository-wide forbidden-hooks sweep: the per-plugin loop above only
+  // ever walks catalog.pluginOrder, so a plugins/<name>/ directory that has
+  // not (yet) been added to the catalog — mid-way through adding a new
+  // plugin, say — never reaches the forbiddenHooksJson check, and
+  // `pnpm validate:generated` could report success while
+  // plugins/<name>/hooks/hooks.json sits in an uncatalogued directory.
+  // Enumerate plugins/* directly (not via loadPluginSources, which is keyed
+  // off pluginOrder the same way) and flag any directory outside
+  // pluginOrder that carries the forbidden file. No assertWithinRoot check
+  // is needed here: unlike componentPaths.skills elsewhere in this file,
+  // entry.name is an actual directory name readdirSync found under
+  // pluginsRoot, not a catalog-supplied path, so it cannot escape
+  // pluginsRoot. There is also no catalog entry to attribute the error to
+  // via result.results (that map is keyed by catalog plugin name only) —
+  // the directory name rides along in diff.path instead, which the
+  // `mode !== 'dry-run'` loop below still turns into an error message
+  // naming it, even without the dedicated per-plugin "ERROR: plugin X:"
+  // line main() prints from result.results.
+  const catalogedPlugins = new Set(catalog.pluginOrder);
+  const pluginsRoot = join(rootDir, 'plugins');
+  let pluginDirEntries = [];
+  try {
+    pluginDirEntries = readdirSync(pluginsRoot, { withFileTypes: true });
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      errors.push(`cannot read ${pluginsRoot}: ${err.message}`);
+    }
+  }
+  for (const entry of pluginDirEntries) {
+    if (!entry.isDirectory() || catalogedPlugins.has(entry.name)) {
+      continue;
+    }
+    const orphanHooksJson = join(pluginsRoot, entry.name, 'hooks', 'hooks.json');
+    if (existsSync(orphanHooksJson)) {
+      result.diffs.push({
+        path: relative(rootDir, orphanHooksJson),
+        state: 'forbidden',
+      });
+    }
+  }
+
   // Stale Cursor artifact sweep — same rationale and containment discipline
   // as the Codex sweep above (Cursor disabled for a plugin, or a skill
   // dropped from cursor.skillAllowlist), with two adjustments: (a)

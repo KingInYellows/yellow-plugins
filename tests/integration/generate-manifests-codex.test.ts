@@ -652,6 +652,42 @@ describe('generator hook-authority rule (R20)', () => {
       expect(existsSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'))).toBe(true);
     }
   });
+
+  it('flags plugins/<name>/hooks/hooks.json even when that directory is not yet in catalog.pluginOrder', () => {
+    // Mirrors adding a new plugin directory under plugins/ before its
+    // catalog/plugins/<name>.json entry exists. The per-plugin sweep above
+    // only walks catalog.pluginOrder, so without a repository-wide pass an
+    // uncatalogued directory's hooks/hooks.json would never be checked —
+    // `pnpm validate:generated` could report success while the forbidden
+    // file sits there undetected.
+    const root = makeCodexFixtureRoot([{ name: 'catalogued-plugin', codexEnabled: false }]);
+    const orphanHooksDir = join(root, 'plugins', 'orphan-plugin', 'hooks');
+    mkdirSync(orphanHooksDir, { recursive: true });
+    writeJson(join(orphanHooksDir, 'hooks.json'), {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash NEVER-CATALOGUED.sh', timeout: 5 }] }],
+    });
+
+    const orphanForbiddenDiff = (r: { diffs: { path: string; state: string }[] }) =>
+      r.diffs.some((d) => d.path === 'plugins/orphan-plugin/hooks/hooks.json' && d.state === 'forbidden');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(orphanForbiddenDiff(checked)).toBe(true);
+    // No catalog entry exists to attribute the error to via result.results
+    // (that map is keyed by catalog plugin name only) — the directory name
+    // still surfaces in the error text via diff.path, so main() names it
+    // in the generic error list even without a dedicated per-plugin line.
+    expect(checked.results['orphan-plugin']).toBeUndefined();
+    expect(
+      checked.errors.some((e: string) => e.includes('plugins/orphan-plugin/hooks/hooks.json'))
+    ).toBe(true);
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(orphanForbiddenDiff(applied)).toBe(true);
+    expect(applied.written).not.toContain('plugins/orphan-plugin/hooks/hooks.json');
+    expect(existsSync(join(orphanHooksDir, 'hooks.json'))).toBe(true);
+  });
 });
 
 describe('commandWindows emission (Windows command override)', () => {
