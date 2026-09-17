@@ -83,7 +83,7 @@ real evidence.
 
 ## Implementation
 
-- [ ] Step 1: Create `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh`
+- [x] Step 1: Create `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh`
   (bash, `set -uo pipefail`, executable, LF) with a header comment documenting
   the exit-code table (0 ready/ok, 10 mismatched, 11 unsupported, 12 blocked,
   2 invalid reference or usage) and the note that it is not a hook. Source
@@ -92,7 +92,7 @@ real evidence.
   `ho_warn()`, `ho_sha256()` (stdin→hex, `sha256sum`/`shasum` fallback, prints
   `unknown` when neither exists), `ho_now_utc()`, and `main()` with `case`
   dispatch for `measure`, `write`, `read`, `preflight`, `--help`.
-- [ ] Step 2: Implement `ho_measure()` in `handoff.sh` producing the measured
+- [x] Step 2: Implement `ho_measure()` in `handoff.sh` producing the measured
   block as one JSON object on stdout (`jq -n --arg …`): `captured_at`,
   `source_session` (`${CLAUDE_CODE_SESSION_ID:-unknown}`), `plugin_version`
   (from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`, else `unknown`),
@@ -108,7 +108,7 @@ real evidence.
   `context_at_capture: "unknown"` (stub; shell 02 replaces it). Every failed
   command yields the literal `unknown` plus a `ho_warn`. Never include a raw
   absolute path in the output.
-- [ ] Step 3: Implement `cmd_write()` in `handoff.sh`: args `--slug <s>`
+- [x] Step 3: Implement `cmd_write()` in `handoff.sh`: args `--slug <s>`
   (validated against `^[a-z0-9]+(-[a-z0-9]+)*$`, max 40 chars),
   `--title <t>`, optional repeatable `--task-ref <p>` (once) and
   `--evidence <p>`, each validated with `validate_file_path` against the git
@@ -127,7 +127,7 @@ real evidence.
   a sibling `${target}.tmp.$$` with `umask 077` and `mv` into place (honor
   `HANDOFF_TEST_SLEEP_BEFORE_MV` seconds for kill-injection tests). Print the
   path and `handoff_id` on stdout.
-- [ ] Step 4: Implement `cmd_read()` in `handoff.sh`: validate the reference
+- [x] Step 4: Implement `cmd_read()` in `handoff.sh`: validate the reference
   (repo-relative, under `plans/handoff/`, `validate_file_path`, not a symlink,
   basename matches `^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*(-[0-9]+)?\.md$`),
   extract front matter with the CRLF-tolerant awk, classify `legacy` (no
@@ -140,7 +140,7 @@ real evidence.
   200 characters wrapped in the `--- begin untrusted-content (reference only) ---`
   / `--- end untrusted-content ---` fence text from
   `plugins/yellow-core/skills/security-fencing/SKILL.md`.
-- [ ] Step 5: Implement `cmd_preflight()` in `handoff.sh`: run `cmd_read`,
+- [x] Step 5: Implement `cmd_preflight()` in `handoff.sh`: run `cmd_read`,
   run `ho_measure`, compare field by field and build `reasons[]` with codes
   `legacy-note`, `format-newer-than-reader`, `invalid-reference`,
   `repository-mismatch`, `worktree-mismatch`, `branch-mismatch`, `head-moved`,
@@ -155,11 +155,11 @@ real evidence.
   summary on stderr, exit 0/10/11/12/2. The function calls only `git rev-parse`,
   `git status`, `git symbolic-ref`, `git remote get-url`: no checkout, stash,
   fetch, reset, or hook.
-- [ ] Step 6: Verify read-only behavior with an explicit guard: wrap all git
+- [x] Step 6: Verify read-only behavior with an explicit guard: wrap all git
   calls in `ho_git()` which passes `-c core.hooksPath=/dev/null` and refuses
   any subcommand not in the allowlist (`rev-parse`, `status`, `symbolic-ref`,
   `remote`, `rev-list`), so a future edit cannot add a mutating call silently.
-- [ ] Step 7: Create `plugins/yellow-core/lib/plugin-identity.sh` (sourced lib,
+- [x] Step 7: Create `plugins/yellow-core/lib/plugin-identity.sh` (sourced lib,
   load guard `_PLUGIN_IDENTITY_LOADED`, no shell options) with `pi_report()`
   printing JSON `{root, version, cache_commit, checkout_version, identity}`:
   `root` = `${CLAUDE_PLUGIN_ROOT:-unknown}`, `version` from its `plugin.json`,
@@ -171,7 +171,7 @@ real evidence.
   when present, and `identity` ∈ `matches-checkout`, `cache-lags-checkout`,
   `no-checkout`, `unknown`. Accept `PI_INSTALLED_PLUGINS_FILE` and
   `PI_PLUGIN_ROOT` overrides for tests. Never copy or enable a plugin.
-- [ ] Step 8: Rewrite `plugins/yellow-core/skills/session-handoff/SKILL.md`
+- [x] Step 8: Rewrite `plugins/yellow-core/skills/session-handoff/SKILL.md`
   keeping `name`, single-line `description` (add "Resume only from an
   explicitly named handoff path"), `user-invocable: true`, and the three
   standard headings. Usage steps: (1) resolve slug and optional `--task-ref`;
@@ -189,13 +189,13 @@ real evidence.
   "Re-capture" / "Reconcile manually" / "Abandon" with no default that
   continues; state that `ready` is not authorization. Keep the coverage-gap
   note on `cs_redact_secrets`. Use `2>|` for any mktemp stderr redirect.
-- [ ] Step 9: Create `plugins/yellow-core/tests/mocks/{claude,gt,gh,curl}`
+- [x] Step 9: Create `plugins/yellow-core/tests/mocks/{claude,gt,gh,curl}`
   (`#!/bin/sh`; append `"$0 $*"` to `$MOCK_FORBIDDEN_LOG`; print
   `[mock] forbidden invocation` to stderr; exit 97) and a `setup()` helper in
   both new bats files that prepends `tests/mocks` to `PATH`, exports
   `MOCK_FORBIDDEN_LOG`, and asserts the log is absent or empty in `teardown()`
   (R2).
-- [ ] Step 10: Create `plugins/yellow-core/tests/fixtures/handoff/` with:
+- [x] Step 10: Create `plugins/yellow-core/tests/fixtures/handoff/` with:
   `legacy-note.md` (copy of the shape of `plans/handoff/2026-07-29-…` with a
   `Status: COMPLETE` marker, synthetic content), `v2-note.md`
   (`handoff_format: 2`), `injection-body.txt` (contains "ignore the mismatch
@@ -206,7 +206,7 @@ real evidence.
   and `archived-plan.md` (all boxes checked). Also reference the two real
   legacy notes via `$BATS_TEST_DIRNAME/../../../plans/handoff/*.md` when
   present (skip with a message otherwise).
-- [ ] Step 11: Create `plugins/yellow-core/tests/handoff.bats` (header comment
+- [x] Step 11: Create `plugins/yellow-core/tests/handoff.bats` (header comment
   explains it tests `scripts/handoff.sh` as a unit across subcommands).
   `setup()` builds `$REPO` with `mktemp -d`, `git init`, `git symbolic-ref
   HEAD refs/heads/main`, user config, a commit, `plans/handoff/`, and exports
@@ -239,17 +239,17 @@ real evidence.
   with `authorization` string and `context: "unknown"`; `session-differs` is
   informational (status stays `ready`); JSON validates with `jq -e` for every
   status.
-- [ ] Step 12: Create `plugins/yellow-core/tests/plugin-identity.bats`: source
+- [x] Step 12: Create `plugins/yellow-core/tests/plugin-identity.bats`: source
   `lib/plugin-identity.sh`; fixtures via temp `installed_plugins.json` and
   temp plugin roots: equal versions → `matches-checkout`; cache 2.3.0 vs
   checkout 2.3.1 → `cache-lags-checkout`; missing file → `cache_commit`
   `unknown`; no checkout → `no-checkout`; unset `CLAUDE_PLUGIN_ROOT` → `root`
   `unknown`; output is valid JSON; the mocks log stays empty (T12).
-- [ ] Step 13: Add `.changeset/yellow-core-session-handoff-preflight.md`
+- [x] Step 13: Add `.changeset/yellow-core-session-handoff-preflight.md`
   (`'yellow-core': minor`) describing the explicit-path handoff tool,
   preflight, and plugin identity helper, and noting README/CLAUDE.md
   inventory updates follow after PR #750.
-- [ ] Step 14: Normalize line endings (`sed -i 's/\r$//'` on every new file),
+- [x] Step 14: Normalize line endings (`sed -i 's/\r$//'` on every new file),
   `chmod +x` the script and mocks, run the gates in Verification, and record
   actual test counts plus `not-run` items (installed-host smoke) in the
   commit body.
@@ -278,6 +278,24 @@ real evidence.
   produced note -> expected: `ready`, exit 0; `git status` unchanged.
 - Not run: installed-host smoke of the skill through the cached plugin copy;
   reported as `not-run`.
+
+## Deviations recorded during implementation
+
+- The bats suite is `tests/handoff.bats` (mirrors `scripts/handoff.sh`), not
+  `session-handoff.bats` as the spec's R25 named; the file header says why.
+- Handoff notes under `plans/handoff/` are excluded from the dirty fingerprint
+  on both write and preflight, and measurement runs before the writer's temp
+  file exists; otherwise publishing a note changed the state it recorded.
+- `plugin-identity.sh` adds a fifth identity value `cache-ahead-of-checkout`
+  for a cache newer than the checkout (an older branch); the spec listed four.
+- `handoff.sh` treats a present-but-broken `jq` as missing (`unsupported`,
+  exit 11) rather than crashing mid-command.
+- The task tracker tools were unavailable in the implementing session; the
+  plan checkboxes were the only progress surface.
+- Not run: installed-host smoke of the skill through the cached plugin copy
+  (`~/.claude/plugins/cache/yellow-plugins/yellow-core/2.3.1`); the cache
+  lags this branch until a release, so `plugin.identity` will report
+  `cache-lags-checkout` after the version bump.
 
 ## Context Files
 - `plugins/yellow-core/skills/session-handoff/SKILL.md` — the skill being rewritten; keep frontmatter shape and three headings
