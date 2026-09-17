@@ -546,14 +546,18 @@ describe('generator hook-authority rule (R20)', () => {
     // pattern — validate-plugin.js RULE 7 now rejects it in real plugins,
     // but the generator must still never read one). If either emitter ever
     // reads it, the generated output would reflect this decoy content
-    // instead of `source.hooks`.
+    // instead of `source.hooks`. The sweep reports it as a 'forbidden' diff
+    // and leaves it in place (see the next test); apply still writes every
+    // other legitimate target correctly, but overall status is 'error'
+    // (the forbidden file itself is never touched).
     mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
     writeJson(join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json'), {
       SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash DECOY-NEVER-READ.sh', timeout: 99 }] }],
     });
 
     const result = generateManifests({ mode: 'apply', rootDir: root });
-    expect(result.status).toBe('ok');
+    expect(result.status).toBe('error');
+    expect(result.results['hook-plugin']).toBe('error');
 
     const claudeManifest = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', '.claude-plugin', 'plugin.json'), 'utf8')
@@ -590,6 +594,99 @@ describe('generator hook-authority rule (R20)', () => {
       readFileSync(join(root, 'plugins', 'hook-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
     );
     expect(codexManifest.hooks).toBe('./hooks/codex-hooks.json');
+  });
+
+  it.each([
+    ['Codex-enabled', true],
+    ['Codex-disabled', false],
+  ])('reports a hand-written hooks/hooks.json as forbidden in --check and leaves it untouched on apply (%s plugin)', (_label, codexEnabled) => {
+    // Claude Code auto-loads plugins/<name>/hooks/hooks.json as a second
+    // hook source next to the inline plugin.json block. The generator never
+    // emits it, so validate-plugin.js RULE 7 rejects its presence — and the
+    // sweep here gives `generate-manifests --check` the same signal (a
+    // 'forbidden' diff forces status:'error', failing --check like any
+    // other error), so a reintroduced file fails validate:generated too,
+    // not only validate:plugins. Apply must NOT delete it: the generator
+    // has no catalog source to regenerate a hand-written file from — it
+    // still writes every other legitimate target, but also returns
+    // status:'error' so an unattended in-process caller (sync-manifests.js
+    // during `apply:changesets`) cannot mistake the run for a clean one.
+    // The sweep loop runs for every plugin regardless of Codex enablement,
+    // so both variants are pinned.
+    const inlineHooks = {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+    };
+    const root = makeCodexFixtureRoot([
+      { name: 'hook-plugin', codexEnabled, hooks: inlineHooks },
+    ]);
+    const first = generateManifests({ mode: 'apply', rootDir: root });
+    expect(first.status).toBe('ok');
+
+    const hooksJson = join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json');
+    mkdirSync(join(root, 'plugins', 'hook-plugin', 'hooks'), { recursive: true });
+    writeJson(hooksJson, { hooks: inlineHooks });
+
+    const forbiddenDiff = (r: { diffs: { path: string; state: string }[] }) =>
+      r.diffs.some((d) => d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'forbidden');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(forbiddenDiff(checked)).toBe(true);
+    // The forbidden file must be attributed to its own plugin, not just
+    // reflected in the global status — otherwise API consumers see a
+    // contradictory 'ok' entry for a plugin the run just named broken, and
+    // main()'s per-plugin error line / ::error annotation (both gated on
+    // 'error') silently omit it.
+    expect(checked.results['hook-plugin']).toBe('error');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(forbiddenDiff(applied)).toBe(true);
+    expect(applied.results['hook-plugin']).toBe('error');
+    expect(applied.written).not.toContain('plugins/hook-plugin/hooks/hooks.json');
+    expect(existsSync(hooksJson)).toBe(true);
+    if (codexEnabled) {
+      // The forbidden hooks.json sits in the same hooks/ directory as the
+      // generated codex-hooks.json sibling — the sweep must fail loudly on
+      // the forbidden file without collaterally deleting the generated one.
+      expect(existsSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'))).toBe(true);
+    }
+  });
+
+  it('flags plugins/<name>/hooks/hooks.json even when that directory is not yet in catalog.pluginOrder', () => {
+    // Mirrors adding a new plugin directory under plugins/ before its
+    // catalog/plugins/<name>.json entry exists. The per-plugin sweep above
+    // only walks catalog.pluginOrder, so without a repository-wide pass an
+    // uncatalogued directory's hooks/hooks.json would never be checked —
+    // `pnpm validate:generated` could report success while the forbidden
+    // file sits there undetected.
+    const root = makeCodexFixtureRoot([{ name: 'catalogued-plugin', codexEnabled: false }]);
+    const orphanHooksDir = join(root, 'plugins', 'orphan-plugin', 'hooks');
+    mkdirSync(orphanHooksDir, { recursive: true });
+    writeJson(join(orphanHooksDir, 'hooks.json'), {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash NEVER-CATALOGUED.sh', timeout: 5 }] }],
+    });
+
+    const orphanForbiddenDiff = (r: { diffs: { path: string; state: string }[] }) =>
+      r.diffs.some((d) => d.path === 'plugins/orphan-plugin/hooks/hooks.json' && d.state === 'forbidden');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(orphanForbiddenDiff(checked)).toBe(true);
+    // No catalog entry exists to attribute the error to via result.results
+    // (that map is keyed by catalog plugin name only) — the directory name
+    // still surfaces in the error text via diff.path, so main() names it
+    // in the generic error list even without a dedicated per-plugin line.
+    expect(checked.results['orphan-plugin']).toBeUndefined();
+    expect(
+      checked.errors.some((e: string) => e.includes('plugins/orphan-plugin/hooks/hooks.json'))
+    ).toBe(true);
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(orphanForbiddenDiff(applied)).toBe(true);
+    expect(applied.written).not.toContain('plugins/orphan-plugin/hooks/hooks.json');
+    expect(existsSync(join(orphanHooksDir, 'hooks.json'))).toBe(true);
   });
 });
 

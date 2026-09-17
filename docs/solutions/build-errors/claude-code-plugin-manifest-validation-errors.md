@@ -197,9 +197,11 @@ loader only recognises `hooks` and `description` at the top level.
 
 Resolution: the mirrors were deleted; the inline `plugin.json` block (generated
 from `catalog/`) is the only Claude-side hook source, and `validate-plugin.js`
-RULE 7 now errors when `hooks/hooks.json` coexists with inline hooks. The
-"Always inline the hook definitions" checklist item above still stands — the
-change is that a file mirror is no longer harmless. `hooks/codex-hooks.json`
+RULE 7 now errors whenever `hooks/hooks.json` exists, with or without inline
+hooks (a hooks-only file is an un-cataloged hook source in this repo), and
+`pnpm validate:generated` reports it as `forbidden` (never deleted). The "Always inline the hook
+definitions" checklist item above still stands — the change is that a file
+mirror is no longer harmless. `hooks/codex-hooks.json`
 is a separate, generated Codex contract and is unaffected. See also the
 "Update — 2026-07-16" section in
 [ci-schema-drift-hooks-inline-vs-string.md](./ci-schema-drift-hooks-inline-vs-string.md)

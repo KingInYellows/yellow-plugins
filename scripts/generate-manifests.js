@@ -580,7 +580,12 @@ function validateCursorRootConfig(catalog, errors) {
  * @returns {{
  *   status: 'ok'|'error',
  *   errors: string[],
- *   diffs: { path: string, state: 'differs'|'missing'|'stale' }[],
+ *   diffs: { path: string, state: 'differs'|'missing'|'stale'|'forbidden' }[],
+ *          ('forbidden' = a hand-written plugins/<name>/hooks/hooks.json:
+ *          reported in every mode, never deleted; forces status:'error' in
+ *          'check' and 'apply' modes so no caller — CLI or in-process, e.g.
+ *          sync-manifests.js's `apply:changesets` path — can miss it.
+ *          'dry-run' still always reports cleanly (never fails on its own).)
  *   written: string[],
  *   checked: number,
  *   results: { [pluginName: string]: 'ok'|'error' },
@@ -903,7 +908,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // correspond to a current target — Codex disabled for a plugin, a skill
   // dropped from codex.skillAllowlist, or hooks removed — so `--check`
   // doesn't stay clean while a disabled plugin's artifacts still linger.
-  // Scoped to the locations this generator exclusively owns per plugin.
+  // Scoped to the locations this generator exclusively owns per plugin,
+  // plus one forbidden hand-written file (hooks/hooks.json, below) that is
+  // reported here but never deleted.
   const expectedPaths = new Set(targets.map((t) => t.path));
   for (const name of catalog.pluginOrder) {
     const sweepErrorsBefore = errors.length;
@@ -916,6 +923,33 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       join(pluginRoot, '.codex-plugin', 'plugin.json'),
       join(pluginRoot, 'hooks', 'codex-hooks.json'),
     ];
+    // hooks/hooks.json is never generated, but Claude Code auto-loads it as
+    // a second hook source next to the inline plugin.json block —
+    // validate-plugin.js RULE 7 rejects its presence. `--check` reports a
+    // reintroduced file as stale so `pnpm validate:generated` fails too;
+    // `apply` refuses rather than deletes, because unlike every other
+    // candidate here the generator holds no source to regenerate it from
+    // (this apply path also runs unattended from sync-manifests.js during
+    // `pnpm apply:changesets`).
+    const forbiddenHooksJson = join(pluginRoot, 'hooks', 'hooks.json');
+    if (existsSync(forbiddenHooksJson)) {
+      result.diffs.push({
+        path: relative(rootDir, forbiddenHooksJson),
+        state: 'forbidden',
+      });
+      // Attribute to this plugin now, not just the global status: the late
+      // `mode !== 'dry-run'` loop below turns this diff into an error
+      // message, but by then the diff carries no plugin name to attribute
+      // it with. Without this, result.results[name] stays 'ok' while the
+      // run fails overall, so per-plugin consumers (main()'s error lines
+      // and its GitHub Actions ::error annotations, both gated on 'error')
+      // silently omit the plugin that actually has the forbidden file.
+      // dry-run is exempt to match this file's documented contract that
+      // dry-run always exits 0 and never fails a plugin.
+      if (mode !== 'dry-run') {
+        result.results[name] = 'error';
+      }
+    }
     // This loop runs unconditionally (no isCodexEnabled guard, so it also
     // covers Codex-disabled plugins), so componentPaths.skills can carry a
     // path-escaping override (e.g. "../yellow-core/skills") that was never
@@ -1150,6 +1184,47 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
+    }
+  }
+
+  // Repository-wide forbidden-hooks sweep: the per-plugin loop above only
+  // ever walks catalog.pluginOrder, so a plugins/<name>/ directory that has
+  // not (yet) been added to the catalog — mid-way through adding a new
+  // plugin, say — never reaches the forbiddenHooksJson check, and
+  // `pnpm validate:generated` could report success while
+  // plugins/<name>/hooks/hooks.json sits in an uncatalogued directory.
+  // Enumerate plugins/* directly (not via loadPluginSources, which is keyed
+  // off pluginOrder the same way) and flag any directory outside
+  // pluginOrder that carries the forbidden file. No assertWithinRoot check
+  // is needed here: unlike componentPaths.skills elsewhere in this file,
+  // entry.name is an actual directory name readdirSync found under
+  // pluginsRoot, not a catalog-supplied path, so it cannot escape
+  // pluginsRoot. There is also no catalog entry to attribute the error to
+  // via result.results (that map is keyed by catalog plugin name only) —
+  // the directory name rides along in diff.path instead, which the
+  // `mode !== 'dry-run'` loop below still turns into an error message
+  // naming it, even without the dedicated per-plugin "ERROR: plugin X:"
+  // line main() prints from result.results.
+  const catalogedPlugins = new Set(catalog.pluginOrder);
+  const pluginsRoot = join(rootDir, 'plugins');
+  let pluginDirEntries = [];
+  try {
+    pluginDirEntries = readdirSync(pluginsRoot, { withFileTypes: true });
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      errors.push(`cannot read ${pluginsRoot}: ${err.message}`);
+    }
+  }
+  for (const entry of pluginDirEntries) {
+    if (!entry.isDirectory() || catalogedPlugins.has(entry.name)) {
+      continue;
+    }
+    const orphanHooksJson = join(pluginsRoot, entry.name, 'hooks', 'hooks.json');
+    if (existsSync(orphanHooksJson)) {
+      result.diffs.push({
+        path: relative(rootDir, orphanHooksJson),
+        state: 'forbidden',
+      });
     }
   }
 
@@ -1406,6 +1481,25 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       }
     }
   }
+  // A forbidden hooks/hooks.json is reported as a diff (above) rather than
+  // gated with the earlier `errors.length > 0` abort — it must not block
+  // writing every other legitimate target. But it still has to fail the
+  // run: otherwise an in-process caller that only checks `status` (e.g.
+  // sync-manifests.js's `apply:changesets` path, which never goes through
+  // this file's CLI exit-code logic below) would see 'ok' with the
+  // forbidden file left in place. Exempt 'dry-run': its documented contract
+  // is to always exit 0 on its own (see the file header), matching the
+  // CLI's dry-run branch below.
+  if (mode !== 'dry-run') {
+    for (const diff of result.diffs) {
+      if (diff.state !== 'forbidden') {
+        continue;
+      }
+      errors.push(
+        `${diff.path} is not generated and is not allowed (validate-plugin RULE 7) — delete it by hand; hook config lives in catalog/plugins/<name>.json#hooks`
+      );
+    }
+  }
   if (errors.length > 0) {
     result.status = 'error';
   }
@@ -1496,12 +1590,24 @@ function main() {
   for (const diff of result.diffs) {
     console.log(`[generate-manifests] DRIFT: ${diff.path} (${diff.state})`);
   }
+  // Reachable with a 'forbidden' diff only in 'dry-run' mode: 'check' and
+  // 'apply' already turn a forbidden diff into status:'error' above (which
+  // exits before this point), so this is dry-run's informational-only echo
+  // of the same message, consistent with its "always exit 0" contract.
+  for (const diff of result.diffs) {
+    if (diff.state !== 'forbidden') {
+      continue;
+    }
+    console.error(
+      `[generate-manifests] ${diff.path} is not generated and is not allowed (validate-plugin RULE 7) — delete it by hand; hook config lives in catalog/plugins/<name>.json#hooks`
+    );
+  }
 
   if (mode === 'apply') {
     console.log(
       `[generate-manifests] Complete: ${result.checked} targets checked, ${result.written.length} rewritten`
     );
-    return;
+    process.exit(0);
   }
 
   if (result.diffs.length > 0) {

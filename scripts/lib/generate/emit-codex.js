@@ -17,7 +17,7 @@
  * `hooks/codex-hooks.json`. emit-claude.js has no code path that reads a
  * `hooks/hooks.json` file (the former "reference-only mirror" pattern,
  * retired 2026-09 because Claude Code auto-loads it; validate-plugin.js
- * RULE 7 now rejects one next to inline hooks) — Claude's hook config comes
+ * RULE 7 now rejects the file outright) — Claude's hook config comes
  * solely from `source.hooks` inline in the generated plugin.json, unchanged
  * by this module's existence.
  */

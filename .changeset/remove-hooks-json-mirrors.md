@@ -13,4 +13,4 @@ hook in these plugins was registered twice and startup printed
 `hooks.json: unknown key "_comment" ignored`. The inline `plugin.json` block
 (generated from `catalog/`) is now the only Claude-side hook source;
 `hooks/codex-hooks.json` is unchanged. `pnpm validate:plugins` (RULE 7) now
-errors when a plugin ships both.
+errors on any `hooks/hooks.json`, with or without inline hooks.

@@ -24,7 +24,7 @@
  * NOTE: JSON Schema validation (AJV) runs separately via validate-schemas.js /
  * `pnpm validate:schemas`. This script enforces additional rules not expressible
  * in JSON Schema: path existence, directory structure, .md file presence, hook
- * script sanity, the hooks/hooks.json coexistence/shape check, and the
+ * script sanity, the hooks/hooks.json presence check, and the
  * userConfig shape constraints. Always run both together via
  * `pnpm validate:schemas`.
  */
@@ -140,13 +140,13 @@ function validatePlugin(pluginDir) {
   ruleKeywords(manifest, errors);
   rulePathFields(manifest, pluginDir, errors);
 
-  // RULES 6/7/8 operate on inline event-keyed hook configs. collectInlineHooks
+  // RULES 6/8 operate on inline event-keyed hook configs. collectInlineHooks
   // merges the top-level inline-object form and inline objects nested in the
-  // array form into a single event-keyed dict.
+  // array form into a single event-keyed dict. RULE 7 is a filesystem
+  // presence check (hooks/hooks.json must not exist) and reads no config.
   const inlineHooks = collectInlineHooks(manifest.hooks);
-  const hasInlineHooks = Object.keys(inlineHooks).length > 0;
-  ruleInlineHookScripts(manifest, inlineHooks, hasInlineHooks, pluginDir, errors);
-  ruleHooksJson(pluginDir, hasInlineHooks, errors);
+  ruleInlineHookScripts(inlineHooks, pluginDir, errors);
+  ruleHooksJson(pluginDir, errors);
 
   ruleUserConfig(manifest, errors);
   ruleDependencies(manifest, marketplacePluginNames);
