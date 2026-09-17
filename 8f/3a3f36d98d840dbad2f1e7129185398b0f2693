@@ -1,0 +1,37 @@
+plans/fix-hooks-json-mirror-double-registration.md
+  s_6aa8fc918111f8::t_ba7c5e9d24bb7f 222-226
+  s_6aa8fc918111f8::t_0ee476027a661e 125-131
+  s_6aa8fc918111f8::t_ba664ee1353776 137-145,148-149
+AUDIT_REPORT.md
+  s_6aa8fc918111f8::t_a188e4aeec8785 142
+plans/pr-797-review-follow-ups.md
+  s_6aa8fc918111f8::t_52b21b5b365eb1 137-138
+  s_6aa8fc918111f8::t_e23a893075b6d9 441
+  s_6aa8fc918111f8::t_c5441793c11308 449
+  s_6aa8fc918111f8::t_4ddc1a3d341809 174-184
+  s_6aa8fc918111f8::t_d8ab7a90280d3e 377
+  s_6aa8fc918111f8::t_3e372e80bb500a 425
+  s_6aa8fc918111f8::t_384e67e18cc8c1 359-363
+  s_6aa8fc918111f8::t_fae9b9c00e3586 162-165
+  s_6aa8fc918111f8::t_90370ddf66e962 238-242
+  s_6aa8fc918111f8::t_2b5a9ac96c854a 417
+  s_6aa8fc918111f8::t_07bfce39b63a82 433
+docs/optimization/analysis.md
+  s_6aa8fc918111f8::t_4379278b512c9c 158-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8f3a3f36d98d840dbad2f1e7129185398b0f2693",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
