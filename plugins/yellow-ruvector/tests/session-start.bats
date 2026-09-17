@@ -58,6 +58,24 @@ gnu_timeout_available() {
   return 1
 }
 
+# Millisecond-resolution clock for budget assertions. `date +%s` truncates to
+# whole seconds, so a run lasting up to 3.999s can still read as an elapsed
+# delta of 3 and pass a `<= 3` check — the budget it is meant to enforce is
+# 3000ms, not "fewer than 4 wall-clock second boundaries crossed". Bash 5+
+# exposes EPOCHREALTIME (seconds.microseconds); macOS bats runs under
+# Homebrew bash 5 where it is always available, so the `date +%s%N` fallback
+# only matters on non-GNU-date / pre-5 bash combinations.
+now_ms() {
+  if [ -n "${EPOCHREALTIME:-}" ]; then
+    local epoch="$EPOCHREALTIME"
+    local s="${epoch%%.*}"
+    local frac="${epoch#*.}"
+    printf '%d' $(( s * 1000 + 10#${frac:0:3} ))
+  else
+    echo $(( $(date +%s%N) / 1000000 ))
+  fi
+}
+
 @test "outputs continue:true with a healthy silent ruvector" {
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}'
@@ -103,13 +121,13 @@ exit 0'
   gnu_timeout_available || \
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'sleep 30'
-  start_s="$(date +%s)"
+  start_ms="$(now_ms)"
   run --separate-stderr run_hook '{"cwd":""}'
-  end_s="$(date +%s)"
-  elapsed_s=$(( end_s - start_s ))
+  end_ms="$(now_ms)"
+  elapsed_ms=$(( end_ms - start_ms ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
-  [ "$elapsed_s" -le 3 ]
+  [ "$elapsed_ms" -le 3000 ]
 }
 
 @test "hanging recall still emits continue:true when session-start succeeds fast" {
@@ -119,13 +137,13 @@ exit 0'
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'case "$2" in recall) sleep 30;; esac
 exit 0'
-  start_s="$(date +%s)"
+  start_ms="$(now_ms)"
   run --separate-stderr run_hook '{"cwd":""}'
-  end_s="$(date +%s)"
-  elapsed_s=$(( end_s - start_s ))
+  end_ms="$(now_ms)"
+  elapsed_ms=$(( end_ms - start_ms ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
-  [ "$elapsed_s" -le 3 ]
+  [ "$elapsed_ms" -le 3000 ]
 }
 
 @test "worktree store-heal links .ruvector from the main checkout" {
@@ -316,6 +334,9 @@ exit 0'
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.systemMessage | contains("mock-learning")' > /dev/null
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
+  # Recall learnings must come first; a regression that prepends the
+  # provenance note ahead of them must fail this.
+  echo "$output" | jq -e '.systemMessage | (index("mock-learning") < index("store is hash-embedded"))' > /dev/null
   # Exactly one occurrence — the note is emitted once per session.
   [ "$(echo "$output" | jq -r '.systemMessage' | grep -c 'store is hash-embedded')" -eq 1 ]
 }
@@ -401,12 +422,12 @@ exit 0'
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   write_provenance hash 64
   make_ruvector_stub 'sleep 30'
-  start_s="$(date +%s)"
+  start_ms="$(now_ms)"
   run --separate-stderr run_hook '{"cwd":""}'
-  end_s="$(date +%s)"
-  elapsed_s=$(( end_s - start_s ))
+  end_ms="$(now_ms)"
+  elapsed_ms=$(( end_ms - start_ms ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
-  [ "$elapsed_s" -le 3 ]
+  [ "$elapsed_ms" -le 3000 ]
 }

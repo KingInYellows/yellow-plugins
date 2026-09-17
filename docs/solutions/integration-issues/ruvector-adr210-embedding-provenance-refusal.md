@@ -90,12 +90,15 @@ created earlier keeps its hash stamp until reembedded.
 - `/ruvector:status` Step 6 computes the verdict in its bash block: `FRESH`
   (no file, or no stamp and no vectors), `UNSTAMPED` (vectors, no stamp),
   `OK` / `MISMATCH` (whole-stamp equality against the dry-run's
-  `targetProvenance`, naming the differing fields), or `UNKNOWN` (dry-run
-  failed or timed out — the CLI's `error`/`hint` come as a stdout JSON
-  line, not stderr) — and prints the remediation above. Detection covers
-  only `$PROJECT_DIR/.ruvector`; a nested-launch session or a server that
-  cached the machine-global `~/.ruvector` during the heal window is not
-  seen by the hook.
+  `targetProvenance`, naming the differing fields), or `UNKNOWN` (the store
+  file is not parseable by `jq`; no GNU-compatible `timeout`/`gtimeout` is on
+  PATH, so the dry-run is skipped; or the dry-run failed or timed out — the
+  CLI's `error`/`hint` come as a stdout JSON line, not stderr) — and prints
+  the remediation above. A corrupted store therefore reports the same
+  `UNKNOWN` verdict as a CLI/model timeout; check the detail text rather than
+  assuming a timeout. Detection covers only `$PROJECT_DIR/.ruvector`; a
+  nested-launch session or a server that cached the machine-global
+  `~/.ruvector` during the heal window is not seen by the hook.
 
 ## Related
 

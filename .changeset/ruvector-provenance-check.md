@@ -11,6 +11,7 @@ the write loss was silent. `session-start.sh` now adds one
 `RUVECTOR_EMBEDDER=hash` / `RUVECTOR_ONNX=0`), and `/ruvector:status` gains
 a `PROVENANCE: FRESH | OK | MISMATCH | UNSTAMPED | UNKNOWN` step (verdict
 computed in the command's bash block from a whole-stamp comparison with
-`hooks reembed --dry-run`'s `targetProvenance`, bounded at 90 s) that prints
+`hooks reembed --dry-run`'s `targetProvenance`, bounded at 90 s plus a 5 s
+kill grace) that prints
 the reembed + restart remediation. A stamp-less store that already holds
 vectors is reported too (`ERR_LEGACY_STORE_READONLY`).

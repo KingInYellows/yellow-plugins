@@ -19,25 +19,35 @@ string — every variable after it is bound to the wrong column.
 
 ## Symptoms
 
-- A parsed row's values are shifted one column left of what the jq filter
-  produced, but only for rows whose *first* column is empty.
+- A parsed row's values are shifted left of what the jq filter produced,
+  for any row where a leading, middle, or trailing column is empty — not
+  only a leading one, though a leading empty column is the case observed
+  here.
 - Rows where every column is non-empty parse correctly, so the bug survives
-  code review and manual testing unless the empty-first-field case is
-  exercised explicitly.
+  code review and manual testing unless a row with at least one empty
+  column is exercised explicitly.
 - A branch keyed on the shifted variable (e.g. `if [ -z "$store_kind" ]`)
   silently never matches, because the variable now holds what was meant for
-  the next column.
+  a different column.
 
 ## Root Cause
 
-Bash's word-splitting treats **space, tab, and newline** as "IFS whitespace"
-unconditionally — this classification is independent of what `IFS` is
-actually set to. When `IFS` consists *only* of characters from that
-whitespace set (as `IFS=$'\t'` does), `read` collapses runs of the delimiter
-and strips leading/trailing occurrences entirely, exactly like the default
-`IFS=$' \t\n'` behavior. Assigning `IFS` to "just tab" does not opt out of
-this collapsing — tab is already a member of the whitespace set regardless
-of what else `IFS` contains.
+Bash classifies **space, tab, and newline** as "IFS whitespace" characters,
+but that treatment is conditional on membership in `IFS` — a character only
+gets whitespace-splitting behavior when it is actually present in `IFS`.
+When `IFS` consists *only* of characters from that whitespace set (as
+`IFS=$'\t'` does), `read` applies the same collapsing rules as the default
+`IFS=$' \t\n'`: runs of consecutive delimiter characters count as a single
+boundary, and leading or trailing delimiter characters are stripped rather
+than producing an empty field. `jq @tsv` represents an empty column as two
+adjacent tabs (or a tab at the very start or end of the row); under
+whitespace-only `IFS` that adjacency collapses, silently absorbing the
+empty field and shifting every later value left — whether the empty column
+was first, in the middle, or last. Assigning `IFS` to "just tab" does not
+opt out of this collapsing; it is *non-whitespace* `IFS` (e.g. `IFS='|'`,
+where tab is no longer a member of `IFS` at all) that switches to strict,
+single-delimiter splitting, under which an empty field between two
+delimiters is preserved.
 
 So `read -r a b c <<< $'\tvalue2\tvalue3'` (empty first column) assigns
 `a=value2 b=value3 c=` instead of the intended `a= b=value2 c=value3`. This
@@ -64,7 +74,7 @@ non-whitespace byte absent from the data) — for both the jq join and the
 `IFS` assignment:
 
 ```bash
-prov_tsv=$(jq -r '[(.embeddingProvenance.embedderKind // ""), ((.embeddingProvenance.dimension // "?") | tostring), (vec_count | tostring)] | join("|")' "$INTEL_JSON")
+prov_tsv=$(jq -r '[(.embeddingProvenance.embedderKind // ""), ((.embeddingProvenance.dimension // "?") | tostring), ([.memories[]? | select(((.embedding // []) | length) > 0)] | length | tostring)] | join("|")' "$INTEL_JSON")
 IFS='|' read -r store_kind store_dim vec_count <<< "$prov_tsv"
 ```
 
@@ -92,8 +102,9 @@ is itself IFS whitespace.
   guaranteed non-empty.
 - Test the empty-leading-field case explicitly — it is the one case this bug
   class cannot surface in code review or a happy-path test run.
-- `mapfile`/`readarray` combined with `jq -r '@sh'`-style quoting sidesteps
-  `IFS` entirely for cases with more than a couple of columns.
+- Use `mapfile`/`readarray` with one JSON value per line (or NUL-delimited
+  output); `jq -r '@sh'` emits one shell-quoted line and still requires
+  parsing.
 
 ## Related
 

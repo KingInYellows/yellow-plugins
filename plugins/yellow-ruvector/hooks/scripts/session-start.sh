@@ -119,7 +119,12 @@ for _tcmd_name in timeout gtimeout; do
 done
 unset _tcmd_name _tcmd
 
-if [ -z "$TIMEOUT_CMD" ]; then
+# Gated on the ruvector binary being present: this warning is about budget
+# enforcement for the ruvector CLI calls below (session-start/recall), which
+# never run when the binary is absent. Without this gate, a user who never
+# installed ruvector sees this warning on every session even though the
+# no-binary early exit (below) makes it irrelevant.
+if [ -z "$TIMEOUT_CMD" ] && command -v ruvector >/dev/null 2>&1; then
   printf '[ruvector] no GNU-compatible timeout found; session-start CLI calls run without per-call budget enforcement\n' >&2
 fi
 

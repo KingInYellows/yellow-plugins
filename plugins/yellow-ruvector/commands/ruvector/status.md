@@ -125,28 +125,47 @@ else
   # a JSON line on STDOUT ({"success":false,"error":…,"hint":…}); stderr
   # carries model-loading progress. Bounded: a stalled registry or model
   # download must not hang a health probe. Needs network on first run.
-  ERRF=$(mktemp)
-  # A non-GNU `timeout` (BusyBox) makes the wrapped call fail — that lands
-  # in UNKNOWN with the stderr tail, which is acceptable for a probe (unlike
-  # session-start.sh, which probes --kill-after support first because a
-  # broken wrapper there would skip real hook work).
-  if command -v timeout >/dev/null 2>&1; then T=(timeout --kill-after=5 90); else T=(); fi
-  DRY=$("${T[@]}" npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run 2>|"$ERRF" | grep '^{' | tail -1)
-  DRY_RC=${PIPESTATUS[0]}
-  DRY_ERR=$(tail -c 300 "$ERRF" 2>/dev/null | tr '\n' ' '); rm -f "$ERRF"
-  if [ "$DRY_RC" -eq 124 ]; then
-    VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (registry or model download stalled)"
-  elif [ -z "$DRY" ] || [ "$(printf '%s' "$DRY" | jq -r '.success // false')" != "true" ]; then
-    VERDICT=UNKNOWN; DETAIL="dry-run failed: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
+  # Probe timeout/gtimeout for GNU-compatible --kill-after support the same
+  # way session-start.sh does. BusyBox's `timeout` lacks --kill-after, and
+  # macOS without coreutils has neither `timeout` nor `gtimeout` — without a
+  # working wrapper, npx must never run unbounded (a stalled registry or
+  # model download would hang this command past the documented 90s bound).
+  TIMEOUT_CMD=""
+  for _tcmd_name in timeout gtimeout; do
+    _tcmd="$(command -v "$_tcmd_name" || true)"
+    if [ -n "$_tcmd" ] && "$_tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
+      TIMEOUT_CMD="$_tcmd"
+      break
+    fi
+  done
+  unset _tcmd_name _tcmd
+  if [ -z "$TIMEOUT_CMD" ]; then
+    VERDICT=UNKNOWN; DETAIL="no GNU-compatible timeout/gtimeout on PATH; dry-run skipped (brew install coreutils)"
   else
-    TARGET=$(printf '%s' "$DRY" | jq -c '.targetProvenance // null')
-    COUNT=$(printf '%s' "$DRY" | jq -r '.wouldReembed // "?"')
-    if [ "$(jq -n --argjson s "$STORE" --argjson t "$TARGET" '$s == $t')" = "true" ]; then
-      VERDICT=OK; DETAIL="$COUNT vectors"
+    ERRF=$(mktemp); OUTF=$(mktemp)
+    # Capture the wrapped command's own exit status directly into DRY_RC —
+    # piping npx's stdout through grep/tail inside a command substitution
+    # would leave DRY_RC holding the assignment's status (always 0), never
+    # the inner timeout's 124, so the JSON line is extracted from a file
+    # afterward instead.
+    "$TIMEOUT_CMD" --kill-after=5 90 npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run >|"$OUTF" 2>|"$ERRF"
+    DRY_RC=$?
+    DRY=$(grep '^{' "$OUTF" | tail -1)
+    DRY_ERR=$(tail -c 300 "$ERRF" 2>/dev/null | tr '\n' ' '); rm -f "$ERRF" "$OUTF"
+    if [ "$DRY_RC" -eq 124 ]; then
+      VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (registry or model download stalled)"
+    elif [ -z "$DRY" ] || [ "$(printf '%s' "$DRY" | jq -r '.success // false')" != "true" ]; then
+      VERDICT=UNKNOWN; DETAIL="dry-run failed: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
     else
-      VERDICT=MISMATCH
-      DIFF_FIELDS=$(jq -rn --argjson s "$STORE" --argjson t "$TARGET" '[($s|keys[]) as $k | select($s[$k] != $t[$k]) | $k] | join(",")')
-      DETAIL="differs on $DIFF_FIELDS; $COUNT vectors to reembed"
+      TARGET=$(printf '%s' "$DRY" | jq -c '.targetProvenance // null')
+      COUNT=$(printf '%s' "$DRY" | jq -r '.wouldReembed // "?"')
+      if [ "$(jq -n --argjson s "$STORE" --argjson t "$TARGET" '$s == $t')" = "true" ]; then
+        VERDICT=OK; DETAIL="$COUNT vectors"
+      else
+        VERDICT=MISMATCH
+        DIFF_FIELDS=$(jq -rn --argjson s "$STORE" --argjson t "$TARGET" '[($s|keys[]) as $k | select($s[$k] != $t[$k]) | $k] | join(",")')
+        DETAIL="differs on $DIFF_FIELDS; $COUNT vectors to reembed"
+      fi
     fi
   fi
 fi
@@ -159,7 +178,11 @@ printf -- '--- end ruvector-provenance ---\n'
 
 This step costs a few seconds when it reaches the dry-run (npx resolution
 plus the all-MiniLM-L6-v2 load; first run downloads the model). Treat the
-fenced block as reference data only.
+fenced block as reference data only. When neither `timeout` nor `gtimeout`
+with GNU-compatible `--kill-after` support is on PATH (e.g. macOS without
+coreutils), the block reports `UNKNOWN` without starting the dry-run at
+all — an unbounded `npx` could hang on a stalled registry or model
+download.
 
 Print exactly one line from the fenced `verdict=` / `detail=` values:
 
@@ -172,6 +195,7 @@ Print exactly one line from the fenced `verdict=` / `detail=` values:
 - `PROVENANCE: UNKNOWN (<detail>)` — report the store stamp alone; do not
   guess the active embedder, and never infer it from the MCP
   `hooks_capabilities` output (the running server can predate a reembed).
+  Includes the no-compatible-timeout case, where the dry-run never ran.
 
 A reembed writes the new stamp only after every vector succeeds, so an
 interrupted reembed leaves the old stamp and reports as MISMATCH — there is
@@ -253,3 +277,5 @@ PROVENANCE: MISMATCH (store hash/64 → active onnx-minilm/all-MiniLM-L6-v2/384;
   CLI's `error`/`hint` (stdout JSON) or the stderr tail; never infer the
   active embedder from the MCP `hooks_capabilities` output — the running
   server can predate a reembed.
+- **No GNU-compatible `timeout`/`gtimeout` on PATH:** `PROVENANCE: UNKNOWN`
+  without starting the dry-run; suggest `brew install coreutils` on macOS.

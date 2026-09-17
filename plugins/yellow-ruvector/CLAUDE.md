@@ -97,7 +97,8 @@ ruvector.
   user prompt via `hooks recall` (1s budget)
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
   via `hooks recall` (3s budget: 0.2s provenance parse + 0.9s resume +
-  2×0.65s recall = 2.8s worst case). Also a jq-only embedder-provenance
+  2×0.65s recall = 2.4s, plus four `--kill-after=0.1` escalations (0.4s) =
+  2.8s worst case). Also a jq-only embedder-provenance
   check: a `hash`-stamped store with the default (onnx-minilm) embedder, or
   a stamp-less store that already holds vectors (`ERR_LEGACY_STORE_READONLY`),
   adds one `[ruvector] …` line to `systemMessage`; silent for fresh stores
@@ -219,8 +220,12 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
   `hooks_remember` (ADR-210) while `hooks_recall` keeps answering — the
   write loss is silent. `session-start.sh` and `/ruvector:status` now
   surface it; the fix is `npx -y --ignore-scripts ruvector@0.2.34 hooks
-  reembed` followed by a Claude Code restart (the running MCP server holds
-  the pre-reembed snapshot and would clobber the store on its next save).
+  reembed --dry-run` first, then `hooks reembed` (add `--drop-missing`
+  if the dry-run reports `wouldDrop` — memories without retained source
+  text; reembed otherwise refuses, and `--drop-missing` discards those
+  memories), followed by a Claude Code restart (the running MCP server
+  holds the pre-reembed snapshot and would clobber the store on its next
+  save).
   See `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
 
 ## Maintenance
