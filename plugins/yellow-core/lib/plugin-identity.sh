@@ -37,6 +37,22 @@ pi_json_version() {
   fi
 }
 
+# Portable dotted-decimal comparison (no GNU sort -V): prints lt | eq | gt,
+# or "unknown" when either side is not numeric dotted-decimal.
+pi_compare_versions() {
+  local a="$1" b="$2" i x y
+  case "$a$b" in *[!0-9.]*) printf 'unknown'; return 0 ;; esac
+  local -a pa pb
+  IFS=. read -r -a pa <<< "$a"
+  IFS=. read -r -a pb <<< "$b"
+  for i in 0 1 2 3; do
+    x="${pa[$i]:-0}"; y="${pb[$i]:-0}"
+    if [ "$x" -lt "$y" ]; then printf 'lt'; return 0; fi
+    if [ "$x" -gt "$y" ]; then printf 'gt'; return 0; fi
+  done
+  printf 'eq'
+}
+
 pi_report() {
   local plugin="${1:-yellow-core}"
   local root="${PI_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
@@ -62,7 +78,8 @@ pi_report() {
   fi
 
   if [ -z "$checkout" ]; then
-    checkout=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+    checkout=$(git -c core.hooksPath=/dev/null -c core.fsmonitor=false --no-optional-locks \
+      rev-parse --show-toplevel 2>/dev/null || printf '')
   fi
   if [ -n "$checkout" ] && [ -f "$checkout/plugins/$plugin/package.json" ]; then
     checkout_version=$(pi_json_version "$checkout/plugins/$plugin/package.json")
@@ -75,13 +92,11 @@ pi_report() {
   elif [ "$version" = "$checkout_version" ]; then
     identity="matches-checkout"
   else
-    local lowest
-    lowest=$(printf '%s\n%s\n' "$version" "$checkout_version" | sort -V | head -n 1)
-    if [ "$lowest" = "$version" ]; then
-      identity="cache-lags-checkout"
-    else
-      identity="cache-ahead-of-checkout"
-    fi
+    case "$(pi_compare_versions "$version" "$checkout_version")" in
+      lt) identity="cache-lags-checkout" ;;
+      gt) identity="cache-ahead-of-checkout" ;;
+      *) identity="unknown" ;;
+    esac
   fi
 
   if command -v jq >/dev/null 2>&1; then

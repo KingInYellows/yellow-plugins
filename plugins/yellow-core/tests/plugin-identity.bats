@@ -67,6 +67,14 @@ teardown() {
   echo "$output" | jq -e '.root == "unknown" and .identity == "unknown"' >/dev/null
 }
 
+@test "pi_compare_versions is a portable dotted-decimal comparison" {
+  [ "$(pi_compare_versions 2.3.1 2.3.1)" = "eq" ]
+  [ "$(pi_compare_versions 2.3.0 2.3.1)" = "lt" ]
+  [ "$(pi_compare_versions 2.10.0 2.9.9)" = "gt" ]
+  [ "$(pi_compare_versions 3.0 2.99.99)" = "gt" ]
+  [ "$(pi_compare_versions 2.3.1-rc1 2.3.1)" = "unknown" ]
+}
+
 @test "output is always valid JSON and exits 0" {
   run pi_report yellow-core
   [ "$status" -eq 0 ]
