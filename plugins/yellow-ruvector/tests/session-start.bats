@@ -64,7 +64,12 @@ gnu_timeout_available() {
 # 3000ms, not "fewer than 4 wall-clock second boundaries crossed". Bash 5+
 # exposes EPOCHREALTIME (seconds.microseconds); macOS bats runs under
 # Homebrew bash 5 where it is always available, so the `date +%s%N` fallback
-# only matters on non-GNU-date / pre-5 bash combinations.
+# only matters on non-GNU-date / pre-5 bash combinations. That fallback must
+# itself detect nanosecond support: BSD/macOS `date` prints `%N` literally
+# (e.g. "1789669452N"), which is not all-digit and would error inside the
+# arithmetic expansion. When neither EPOCHREALTIME nor a numeric `%N` is
+# available, fall back to whole-second resolution (the old, coarser
+# granularity) rather than failing.
 now_ms() {
   if [ -n "${EPOCHREALTIME:-}" ]; then
     local epoch="$EPOCHREALTIME"
@@ -72,7 +77,12 @@ now_ms() {
     local frac="${epoch#*.}"
     printf '%d' $(( s * 1000 + 10#${frac:0:3} ))
   else
-    echo $(( $(date +%s%N) / 1000000 ))
+    local ns
+    ns="$(date +%s%N)"
+    case "$ns" in
+      *[!0-9]*) echo $(( $(date +%s) * 1000 )) ;;
+      *) echo $(( ns / 1000000 )) ;;
+    esac
   fi
 }
 
