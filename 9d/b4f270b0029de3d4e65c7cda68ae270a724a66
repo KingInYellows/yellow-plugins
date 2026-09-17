@@ -1,0 +1,26 @@
+tests/integration/generate-manifests-codex.test.ts
+  s_6aa8fc918111f8::t_ba16645429c4d9 640-645
+  s_6aa8fc918111f8::t_4e5870f4aa09ce 606-614
+  s_6aa8fc918111f8::t_2a669695b541bc 550-552,559
+  s_6aa8fc918111f8::t_f4129ac579ff40 632,636
+scripts/generate-manifests.js
+  s_6aa8fc918111f8::t_f2d7805a610a37 1540-1547,1557
+  s_6aa8fc918111f8::t_f850a44d9e611e 1431-1449
+  s_6aa8fc918111f8::t_94a44915e6c157 585-588
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9db4f270b0029de3d4e65c7cda68ae270a724a66",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
