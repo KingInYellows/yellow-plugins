@@ -134,7 +134,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # three `error:` lines — never a raw dump of the event stream, which can
       # echo repository content Codex read.
       printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null | head -c 300; } | awk '{
+      { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | awk '{
         line = NR
         # OpenAI project keys (must precede generic sk- pattern)
         gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
@@ -153,7 +153,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         # Generic private key blocks
         gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
         print
-      }' >&2
+      }' | head -c 300 >&2
       printf -- '--- end codex-diagnostics ---\n' >&2
     fi
   }

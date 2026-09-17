@@ -139,7 +139,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # can echo repository content or credentials Codex read.
       if [ -n "$codex_api_error" ]; then
         printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-        printf 'api-error: %s\n' "$(printf '%s' "$codex_api_error" | head -c 300)" | awk '{
+        printf 'api-error: %s\n' "$codex_api_error" | awk '{
           line = NR
           # OpenAI project keys (must precede generic sk- pattern)
           gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
@@ -158,7 +158,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
           # Generic private key blocks
           gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
           print
-        }' >&2
+        }' | head -c 300 >&2
         printf -- '--- end codex-diagnostics ---\n' >&2
       fi
     fi

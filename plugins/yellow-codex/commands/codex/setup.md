@@ -202,9 +202,14 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   # rejected by ChatGPT-account auth). With neither set, no -m is passed and
   # codex resolves ~/.codex/config.toml then the account default, matching
   # an unconfigured production invocation. If the account rejects the
-  # probed model, retry once without it. This call does not pass --json, so
-  # the API error is on stderr. mktemp created the files, so `>|`: zsh
-  # noclobber refuses a plain `>` onto an existing path.
+  # probed model, retry once without it — but only when the rejected model
+  # came from CODEX_SMOKE_MODEL (a probe-only override). When it came from
+  # CODEX_MODEL, every real review/rescue/analysis invocation passes that
+  # same rejected model, so a retry that swaps in the account default would
+  # report a false "ok" for a broken production path — leave it failed
+  # instead. This call does not pass --json, so the API error is on
+  # stderr. mktemp created the files, so `>|`: zsh noclobber refuses a
+  # plain `>` onto an existing path.
   SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
   smoke_model="${CODEX_SMOKE_MODEL:-${CODEX_MODEL:-}}"
   if [ -n "${CODEX_SMOKE_MODEL:-}" ]; then
@@ -214,7 +219,7 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   fi
   smoke_retried=0
   test_output=$(timeout 45 codex exec --ephemeral -c 'approval_policy="never"' -c 'mcp_servers={}' -s read-only ${smoke_model:+-m} ${smoke_model:+"$smoke_model"} "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>| "$SETUP_ERR_FILE"); smoke_exit=$?
-  if [ -n "$smoke_model" ] && [ "$smoke_exit" -ne 0 ] && grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
+  if [ -n "$smoke_model" ] && [ "$smoke_exit" -ne 0 ] && [ "$smoke_model_source" = "CODEX_SMOKE_MODEL" ] && grep -q "invalid_request_error" "$SETUP_ERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Test invocation: model %s (from %s) rejected for this account (HTTP 400); retrying with the account default\n' "$smoke_model" "$smoke_model_source"
     smoke_retried=1
     # The retry overwrites the capture: the branches below report only the
@@ -236,11 +241,17 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
     # codex-executor's diagnostic block before it reaches the terminal.
     if [ "$smoke_retried" -eq 1 ] || [ -z "$smoke_model" ]; then
       printf '[yellow-codex] Test invocation: the account default model was rejected (HTTP 400) — check the model key in ~/.codex/config.toml or your account entitlements:\n' >&2
+    elif [ "$smoke_model_source" = "CODEX_MODEL" ]; then
+      # No retry ran for this source (see the gate above), so this is
+      # necessarily the untouched CODEX_MODEL rejection — call out that
+      # production is broken rather than pointing at CODEX_SMOKE_MODEL,
+      # which cannot fix it.
+      printf '[yellow-codex] Test invocation: CODEX_MODEL=%s is rejected by this account (HTTP 400) — every review/rescue/analysis invocation will fail; set CODEX_MODEL to an allowed model or unset it:\n' "$smoke_model" >&2
     else
       printf '[yellow-codex] Test invocation: request rejected (HTTP 400) — set CODEX_SMOKE_MODEL to a model this account allows, or unset it:\n' >&2
     fi
     printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-    grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null | head -c 200 | awk '{
+    grep -m1 -o '"message":"[^"]*"' "$SETUP_ERR_FILE" 2>/dev/null | awk '{
       line = NR
       # OpenAI project keys (must precede generic sk- pattern)
       gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
@@ -259,7 +270,7 @@ if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
       # Generic private key blocks
       gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
       print
-    }' >&2
+    }' | head -c 200 >&2
     printf '\n' >&2
     printf -- '--- end codex-diagnostics ---\n' >&2
   elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
@@ -304,7 +315,9 @@ If any step had a warning, list warnings at the bottom.
 | No curl/wget | "curl or wget needed to install Codex" | Warn, suggest brew cask or the GitHub release binary |
 | No auth configured | "No authentication configured" | Show both auth methods |
 | Test invocation parse error (Step 4, parse error on stderr) | "CLI argument parse error (flag drift?)" | Report clap error line |
-| Smoke model rejected (Step 4, `CODEX_SMOKE_MODEL` or `CODEX_MODEL` set) | "model X (from CODEX_SMOKE_MODEL/CODEX_MODEL) rejected for this account (HTTP 400); retrying with the account default" | Automatic retry without `-m` |
-| Test invocation HTTP 400 (Step 4) | "the account default model was rejected" / "request rejected (HTTP 400)" | Fix `model` in `~/.codex/config.toml` / set or unset `CODEX_SMOKE_MODEL` |
+| Smoke model rejected (Step 4, `CODEX_SMOKE_MODEL` set) | "model X (from CODEX_SMOKE_MODEL) rejected for this account (HTTP 400); retrying with the account default" | Automatic retry without `-m` (probe only — `CODEX_MODEL` is untouched) |
+| Smoke model rejected (Step 4, `CODEX_MODEL` set, no `CODEX_SMOKE_MODEL`) | "CODEX_MODEL=X is rejected by this account (HTTP 400) — every review/rescue/analysis invocation will fail" | No retry; `smoke_result=failed`. Set `CODEX_MODEL` to an allowed model or unset it |
+| Test invocation HTTP 400 (Step 4, account default or no model) | "the account default model was rejected" | Fix `model` in `~/.codex/config.toml` or check account entitlements |
+| Test invocation HTTP 400 (Step 4, `CODEX_SMOKE_MODEL` set, retry not applicable) | "request rejected (HTTP 400)" | Set or unset `CODEX_SMOKE_MODEL` |
 | Test invocation timed out (Step 4, exit 124) | "timed out after 45s" | Re-run; try a faster `CODEX_SMOKE_MODEL` |
 | Test invocation fails | "no response (check auth and network)" | Warn, suggest re-auth |

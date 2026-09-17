@@ -149,7 +149,17 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     # {"type":"error","message":…} JSONL events on stdout and stderr stays
     # empty. Read the message out of those events only — echoed diff or
     # tool output elsewhere in the stream can never match the diagnostics.
-    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    # No cap here — the model-rejection/rate-limit regexes below must see
+    # the whole message; the display site at the bottom of this block caps
+    # independently via `head -c 500`.
+    if command -v jq >/dev/null 2>&1; then
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
+    else
+      # jq unavailable (a supported degraded state per /codex:setup): bounded
+      # grep fallback for the "message" field of a {"type":"error",...} JSONL
+      # event, so the model-rejection and rate-limit arms below still fire.
+      codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep -o '"type":"error"[^}]*' | grep -m1 -o '"message":"[^"]*"' | sed -E 's/^"message":"//; s/"$//')
+    fi
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[yellow-codex] Codex timed out after 5 minutes.\n'
     elif [ "$codex_exit" -eq 2 ]; then
