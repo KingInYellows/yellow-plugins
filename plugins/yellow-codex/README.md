@@ -23,6 +23,24 @@ independent code review, debugging/rescue capabilities, and codebase research.
 Run `/codex:setup` after install to detect the CLI, verify auth, and
 install if needed.
 
+## Model Selection
+
+No command passes `-m` by default. Codex resolves the model in this order:
+
+1. `CODEX_MODEL` environment variable, if set (every `codex exec` site
+   forwards it as `-m "$CODEX_MODEL"`).
+2. The `model` key in `~/.codex/config.toml`.
+3. Your account's default.
+
+`CODEX_SMOKE_MODEL` is separate: it forces a model for `/codex:setup`'s
+smoke test only and is retried without it if the API refuses.
+
+If a command reports `Codex rejected model <name>`, the API returned HTTP
+400 for that model name — typically a legacy `gpt-5.4`/`gpt-5.4-mini` or a
+`gpt-5.x-codex` name under ChatGPT-account auth. Set `CODEX_MODEL` to a
+model your account allows, or unset it (and remove the `model` key from
+`~/.codex/config.toml`) to fall back to the account default.
+
 ## Commands
 
 | Command          | Description                                              |

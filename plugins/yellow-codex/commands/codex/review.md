@@ -186,7 +186,8 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
   # transitions test the ORIGINAL $0 before any mutation — never the
   # redacted copy — so redaction cannot blind the END check (see
   # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
-  head -c 500 "$STDERR_FILE" | awk '{
+  # Redact first, cap after (see the diagnostics block below).
+  awk '{
     if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print "--- redacted credential at line " NR " ---"
@@ -205,7 +206,7 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
     gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
     gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
     print
-  }' >&2
+  }' "$STDERR_FILE" | head -c 500 >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
   exit 1
 fi
@@ -247,16 +248,18 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDER
   # model-rejection and rate-limit branches below need a match even when
   # jq is absent — a missing jq must not silently swallow a real 429's
   # retry message or a rejected model into the generic exit-1 arm.
+  # Deliberately uncapped (same as rescue.md): the only place this text is
+  # printed is the diagnostics block below, which redacts before capping.
   if command -v jq >/dev/null 2>&1; then
-    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null | head -c 400)
+    codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | jq -r 'select(.type=="error") | .message // empty' 2>/dev/null)
   else
-    # Bounded grep fallback: first {"type":"error",...} JSONL line, then
-    # its "message" field value. Does not unescape JSON string escapes
+    # Grep fallback: first {"type":"error",...} JSONL line, then its
+    # "message" field value. Does not unescape JSON string escapes
     # (\" \\ etc.) — an acceptable degradation vs. the jq path above,
     # since the model-rejection and rate-limit patterns matched against
     # it below are plain substrings.
     codex_api_error=$(grep '^{' "$STDERR_FILE" 2>/dev/null | grep '"type":"error"' | head -n1 | \
-      grep -oE '"message":"[^"]*"' | head -n1 | sed -E 's/^"message":"//; s/"$//' | head -c 400)
+      grep -oE '"message":"[^"]*"' | head -n1 | sed -E 's/^"message":"//; s/"$//')
   fi
   if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
     printf '[yellow-codex] Error: review timed out after 5 minutes.\n'
@@ -293,8 +296,11 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDER
     # ORIGINAL $0 before any mutation — never the redacted copy — so
     # redaction cannot blind the END check (see
     # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+    # Redact BEFORE truncating (order matches rescue.md and setup.md): a
+    # byte cap ahead of the awk can split a credential into a fragment no
+    # pattern matches.
     printf -- '--- begin codex-diagnostics (reference only) ---\n' >&2
-    { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | head -c 500 | awk '{
+    { [ -n "$codex_api_error" ] && printf 'api-error: %s\n' "$codex_api_error"; grep -m3 -E '^error:' "$STDERR_FILE" 2>/dev/null; } | awk '{
       if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
       if (in_pem) {
         print "--- redacted credential at line " NR " ---"
@@ -323,7 +329,7 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >|"$STDER
       # OpenCode session IDs
       gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
       print
-    }' >&2
+    }' | head -c 500 >&2
     printf -- '--- end codex-diagnostics ---\n' >&2
   fi
 }
