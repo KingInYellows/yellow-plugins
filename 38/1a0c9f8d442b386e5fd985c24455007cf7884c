@@ -1,0 +1,79 @@
+docs/plugin-validation-guide.md
+  s_9faf0dc507d8cf::t_fc43c11ef9c623 247-258,268-280
+  s_9faf0dc507d8cf::t_5c2d94b71f1917 281-293
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 259-263,265-267
+  s_9faf0dc507d8cf::t_7174179531317d 264,294
+scripts/validate-plugin.js
+  s_9faf0dc507d8cf::t_861272569a8dfe 35,37
+  s_9faf0dc507d8cf::t_d974510911c1b8 130-139,194-195,197
+  s_9faf0dc507d8cf::t_32667787ce7183 187-192
+scripts/generate-manifests.js
+  s_9faf0dc507d8cf::t_485f1046e10462 660
+  s_9faf0dc507d8cf::t_32667787ce7183 79-81,88-100
+  s_9faf0dc507d8cf::t_861272569a8dfe 74,78,85,109,960,1466,1476,1481,1487
+  s_9faf0dc507d8cf::t_001869240ab364 77,1491-1492
+  s_9faf0dc507d8cf::t_d1362385d9b23f 110
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 746
+  s_9faf0dc507d8cf::t_549cd455b12df2 111-134,748,816,849,870,889,922,940,988,1242,1306,1460
+  s_9faf0dc507d8cf::t_5d42c1a19d6b7d 1276-1279
+  s_9faf0dc507d8cf::t_e6173054795861 82-84,86-87,101-108,738,740,807,989,1307,1467-1475,1477-1480,1482-1486,1488-1489
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 72-73,75,1490
+  s_9faf0dc507d8cf::t_54b8a003651f06 71,76,1004,1283,1512-1514
+tests/integration/validate-plugin.test.ts
+  s_9faf0dc507d8cf::t_9b2943c000081f 935-945
+  s_9faf0dc507d8cf::t_2b9f4e2eca49d0 908-934
+  s_9faf0dc507d8cf::t_17789e436cd44f 897-907,946-965
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 863-896,980-987
+  s_9faf0dc507d8cf::t_7e8b1262d1e0ef 989
+  s_9faf0dc507d8cf::t_59b6621f441647 31,776-862,966-979,988
+scripts/lib/plugin-paths.js
+  s_9faf0dc507d8cf::t_e6173054795861 245-247,262-266
+  s_9faf0dc507d8cf::t_3d1408a91b1603 378-381
+  s_9faf0dc507d8cf::t_d974510911c1b8 303-330,352-361,394-397,476-480,524-528,705-706,709,799
+  s_9faf0dc507d8cf::t_dd58490f8d8fbb 238-244,248-261,267-281,689-692,703-704,707-708,710-729
+  s_9faf0dc507d8cf::t_11f09f387b14f5 362,364,372
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 339-341
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 227-232,282-302,331-338,342-351,363,365-371,373-377,382-388,693-702,797-798,800
+scripts/lib/generate/write.js
+  s_9faf0dc507d8cf::t_e6173054795861 46-52
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 38-45,53
+tests/integration/generate-manifests-codex.test.ts
+  s_9faf0dc507d8cf::t_3979815ff95349 1218-1219,1522-1538,1570-1577
+  s_9faf0dc507d8cf::t_14e41c05682639 1220,1592
+  s_9faf0dc507d8cf::t_3fa1b6cd1c9cc6 1209-1217
+  s_9faf0dc507d8cf::t_3ae134ee9095c9 1407-1408,1410,1501
+  s_9faf0dc507d8cf::t_7a9ee12dadb8e5 20
+  s_9faf0dc507d8cf::t_8a62bb99ab8d49 41
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 21,1417-1439,1445,1451-1454
+  s_9faf0dc507d8cf::t_9f319ac290232d 1348-1406,1409,1411-1416,1492-1500,1502-1507,1591
+  s_9faf0dc507d8cf::t_9b2943c000081f 1508-1521,1578-1590
+  s_9faf0dc507d8cf::t_2b9f4e2eca49d0 1539-1569
+  s_9faf0dc507d8cf::t_17789e436cd44f 1440-1444,1446-1450,1455-1491
+  s_ecffdbc39c3a6a::t_a0caa98ce071a7 42
+scripts/lib/plugin-rules.js
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 25,284-289
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "381a0c9f8d442b386e5fd985c24455007cf7884c",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    },
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
