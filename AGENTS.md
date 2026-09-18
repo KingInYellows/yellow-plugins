@@ -359,8 +359,13 @@ rule id in parentheses is what the failure message cites.
 
 - Hook scripts must be plugin-local, readable, and normal files; symlinks are
   rejected.
-- Hook commands in manifests should use `${CLAUDE_PLUGIN_ROOT}` and bounded
-  timeouts.
+- Hook commands in manifests should use a double-quoted
+  `"${CLAUDE_PLUGIN_ROOT}"` and bounded timeouts. Shell-form commands run
+  through `sh -c`: unquoted word-splits on a path with a space (the hook
+  fails open), single-quoted never expands. RULE 6 errors on both, and
+  parses only `bash`/`node` commands (an optional interpreter flag before
+  the script is fine); any other interpreter gets a warning and no path
+  check.
 - For hooks that must emit JSON or decisions (`PreToolUse`, `PostToolUse`,
   `Stop`, and `SessionStart`), do not use `set -e`. Use `set -uo pipefail` and
   centralize exits through a helper that always prints `{"continue": true}` or

@@ -223,7 +223,13 @@ mv plugins/hookify-old plugins/hookify
 
 > **Rules 6–11** run inside `validate-plugin.js` but have no numbered heading
 > here. They cover plugin-local inline hook script paths and content sanity —
-> shebang, `set -e`, decision output (RULES 6 + 8); `hooks/hooks.json`
+> for `bash "${CLAUDE_PLUGIN_ROOT}/…"` and `node "${CLAUDE_PLUGIN_ROOT}/…"`
+> commands, existence and containment of the script (both interpreters,
+> leading interpreter flags allowed), plus shebang, `set -e`, and decision
+> output for `bash` scripts only; an unquoted or single-quoted
+> `${CLAUDE_PLUGIN_ROOT}` in the script argument is an error (`hook command
+> has unquoted …` / `single-quotes …`) and any other interpreter is a
+> warning with no path check (RULES 6 + 8); `hooks/hooks.json`
 > presence (RULE 7) — an error whenever the file exists, with or without
 > inline `hooks` in the manifest, because Claude Code auto-loads it as a
 > second hook source and hook config in this repo lives only in `catalog/`

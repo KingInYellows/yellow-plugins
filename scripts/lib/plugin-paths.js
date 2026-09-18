@@ -44,18 +44,186 @@ const DECISION_PROTOCOL_EVENTS = new Set([
   'SessionStart',
 ]);
 
+// Interpreters whose hook commands name a plugin-local script as their first
+// non-flag argument. `bash` scripts get the shebang / decision-output /
+// `set -e` content checks; `node` entrypoints get existence + containment
+// only. Known gap: any other command form (`sh`, `python3`, `env node`, a
+// bare "${CLAUDE_PLUGIN_ROOT}/x.sh") gets no script-path checks at all —
+// the caller warns when such a command references the placeholder.
+const HOOK_SCRIPT_INTERPRETER_RE = /^(bash|node)\s+/;
+// Leading interpreter flags (`node --enable-source-maps`, `bash -x`) before
+// the script argument. Always matches (possibly empty). This is a coarse
+// approximation used only by plugin-rules.js's placeholder-quoting checks,
+// which just need to land on "the first word that isn't obviously a flag" —
+// resolveHookScriptPath below has its own option-arity-aware skip because
+// it must pick out the exact script argument to resolve.
+const HOOK_INTERPRETER_FLAGS_SRC = '(?:-\\S+\\s+)*';
+// "interpreter + flags" prefix, for rules that inspect the script argument
+// without resolving it (plugin-rules.js's placeholder-quoting checks).
+const HOOK_SCRIPT_PREFIX_SRC = `^(?:bash|node)\\s+${HOOK_INTERPRETER_FLAGS_SRC}`;
+
+// Interpreter options that take their value as a separate word
+// (`node --require preload.js entry.js`, not `--require=preload.js`).
+// Without consuming that operand, the script-argument scan below would
+// select it instead of the real entrypoint — e.g. `node --require
+// source-map-support/register "${CLAUDE_PLUGIN_ROOT}/hooks/main.js"` would
+// validate `source-map-support/register` and never check `main.js`.
+// `--opt=value` is already a single word and needs no special handling.
+const HOOK_OPTION_TAKES_VALUE = {
+  node: new Set([
+    '-r',
+    '--require',
+    '--import',
+    '--loader',
+    '--experimental-loader',
+    '--input-type',
+    '--stack-trace-limit',
+  ]),
+  bash: new Set(['-o', '-O', '+O', '--rcfile', '--init-file']),
+};
+// Options whose value is inline code, not a script path — a command using
+// one of these has no separate script argument to resolve at all.
+const HOOK_OPTION_IS_INLINE_SCRIPT = {
+  node: new Set(['-e', '--eval', '-p', '--print']),
+  bash: new Set(['-c']),
+};
+
+// Sentinel resolveHookScriptPath returns when the script argument has an
+// unterminated quote (e.g. `bash "${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh`
+// with no closing `"`). Distinct from null (not a bash/node command, or a
+// containment escape) so the caller can report a specific error instead of
+// folding it into "escapes plugin directory" or silently skipping it —
+// `sh -c` rejects the command outright, so a guard hook using this form
+// never runs.
+const UNTERMINATED_HOOK_SCRIPT_QUOTE = Symbol('unterminated-hook-script-quote');
+
+/**
+ * Return the interpreter ("bash" | "node") a hook command starts with, or
+ * null for any other command form (which gets no script-path checks).
+ */
+function hookCommandInterpreter(command) {
+  const match = command.match(HOOK_SCRIPT_INTERPRETER_RE);
+  return match ? match[1] : null;
+}
+
+/**
+ * First shell word of `s`: adjacent quoted and unquoted segments up to the
+ * first unquoted whitespace, with the quotes removed — so
+ * `"a b"/c`, `"a b/c"` and `a\ b` all yield one word (backslash escapes
+ * are not interpreted; no catalog command uses them). Returns null if a
+ * quote opened by `s` is never closed — `sh -c` would reject that command,
+ * so the caller must not treat the quote-stripped remainder as a real word.
+ */
+function firstShellWord(s) {
+  return consumeShellWord(s).word;
+}
+
+/**
+ * Like firstShellWord, but also returns what is left of `s` after the
+ * consumed word (raw, quotes and all) so a caller can keep parsing forward.
+ * Returns { word: null, rest: '' } if a quote opened here is never closed.
+ */
+function consumeShellWord(s) {
+  let word = '';
+  let quote = null;
+  let i = 0;
+  for (; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+      else word += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) break;
+    word += ch;
+  }
+  if (quote !== null) return { word: null, rest: '' };
+  return { word, rest: s.slice(i) };
+}
+
+/**
+ * Skip leading interpreter option words in `rest` (the hook command with
+ * the interpreter already stripped), consuming the operand of any option
+ * known to take a separate value so it is never mistaken for the script
+ * argument. A word is treated as an option if it starts with `-` (or `+`
+ * for bash's `+O`); anything else ends the scan.
+ * Returns:
+ *   - { rest, quoteError: false } — rest starts at the script argument
+ *     (rest is '' if the command has nothing after its options)
+ *   - { rest: null, quoteError: false } — an inline-script option (-c,
+ *     -e/--eval, -p/--print) was seen; there is no separate script
+ *     argument to resolve
+ *   - { rest: null, quoteError: true } — an option or its operand opens a
+ *     quote it never closes
+ */
+function skipHookInterpreterOptions(rest, interpreter) {
+  const takesValue = HOOK_OPTION_TAKES_VALUE[interpreter] || new Set();
+  const isInlineScript = HOOK_OPTION_IS_INLINE_SCRIPT[interpreter] || new Set();
+  let remaining = rest;
+  for (;;) {
+    remaining = remaining.replace(/^\s+/, '');
+    const looksLikeOption =
+      remaining.startsWith('-') ||
+      (interpreter === 'bash' && remaining.startsWith('+'));
+    if (!looksLikeOption) return { rest: remaining, quoteError: false };
+    const { word, rest: afterWord } = consumeShellWord(remaining);
+    if (word === null) return { rest: null, quoteError: true };
+    if (!word) return { rest: remaining, quoteError: false };
+    if (isInlineScript.has(word)) return { rest: null, quoteError: false };
+    if (!takesValue.has(word)) {
+      remaining = afterWord;
+      continue;
+    }
+    // Consume this option's separate-word operand so it is skipped along
+    // with the flag itself; `--opt=value` never reaches this branch since
+    // it is one word matched (or not) against the exact option name above.
+    const operandStart = afterWord.replace(/^\s+/, '');
+    const { word: operand, rest: afterOperand } =
+      consumeShellWord(operandStart);
+    if (operand === null) return { rest: null, quoteError: true };
+    remaining = afterOperand;
+  }
+}
+
 /**
  * Resolve a hook command to a script path within the plugin directory.
- * Returns the resolved path, or null if the command is not a "bash <path>"
- * format or the path escapes the plugin directory.
+ * Returns the resolved path; null if the command is not a
+ * "bash [flags] <path>" / "node [flags] <path>" format, an option like
+ * `-c`/`-e`/`-p` means there is no separate script argument, the script
+ * argument is empty, or the path escapes the plugin directory; or the
+ * UNTERMINATED_HOOK_SCRIPT_QUOTE sentinel if an option or the script
+ * argument opens a quote it never closes (`sh -c` rejects that command
+ * outright, so it must not be conflated with the containment-escape case).
+ * The placeholder is substituted textually before parsing; callers reject
+ * single-quoted placeholders first, since `sh -c` never expands those and
+ * the substituted path would validate a script the shell can never reach.
  */
 function resolveHookScriptPath(command, pluginDir) {
-  const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
-  // Accept double-quoted, single-quoted, and unquoted script paths so a
-  // command like `bash "scripts/my hook.sh"` resolves correctly.
-  const match = resolved.match(/^bash\s+(?:"([^"]+)"|'([^']+)'|(\S+))/);
-  if (!match) return null;
-  const scriptPath = match[1] || match[2] || match[3];
+  // One source of truth for the interpreter set: strip the prefix
+  // HOOK_SCRIPT_INTERPRETER_RE matched, then skip interpreter options
+  // (consuming known value-taking options' operands) before taking the
+  // script argument as ONE shell word and substituting the placeholder.
+  // Substituting into the whole command first would let the checkout path
+  // change the verdict (a directory with a space word-splits inside the
+  // validator) and would resolve the docs-literal form
+  // `bash "${CLAUDE_PLUGIN_ROOT}"/hooks/x.sh` to the plugin root.
+  const prefix = command.match(HOOK_SCRIPT_INTERPRETER_RE);
+  if (!prefix) return null;
+  const interpreter = prefix[1];
+  const { rest, quoteError } = skipHookInterpreterOptions(
+    command.slice(prefix[0].length),
+    interpreter
+  );
+  if (quoteError) return UNTERMINATED_HOOK_SCRIPT_QUOTE;
+  if (rest === null) return null; // inline-script option: no script to resolve
+  const word = firstShellWord(rest);
+  if (word === null) return UNTERMINATED_HOOK_SCRIPT_QUOTE;
+  if (!word) return null;
+  const scriptPath = word.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
   const normalized = path.resolve(pluginDir, scriptPath);
   if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
   return normalized;
@@ -300,8 +468,20 @@ function collectInlineHooks(hooks) {
  * (shebang / decision-output / set -e) to a single hook script path.
  * Centralizes per-script-path checks so RULE 6 and RULE 8 cannot drift.
  * eventName is required for the DECISION_PROTOCOL_EVENTS gate.
+ * interpreter ("bash" | "node", from hookCommandInterpreter) gates RULE 8
+ * and the executable-mode part of RULE 6: a `node` entrypoint gets only
+ * the existence / symlink / regular-file / readability checks (containment
+ * was already enforced by the caller's resolveHookScriptPath). Anything
+ * other than "node" gets the full bash checks, so an omitted argument
+ * fails strict rather than open.
  */
-function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
+function validateHookScriptPath(
+  scriptPath,
+  eventName,
+  pluginDir,
+  errors,
+  interpreter
+) {
   if (!fs.existsSync(scriptPath)) {
     addError(errors, `Hook script not found for ${eventName}: ${scriptPath}`);
     return;
@@ -342,6 +522,16 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
       `Hook script not readable: ${scriptPath} (check file permissions)`
     );
   }
+  // A `node <entrypoint>` command runs the file through the interpreter, so
+  // it has no executable-bit, shebang, or shell-content contract — the
+  // existence, symlink, and regular-file checks above, plus the containment
+  // check the caller's resolveHookScriptPath already applied, are the whole
+  // rule. The decision-output scan is skipped too: a node entrypoint
+  // typically delegates to lib/ (gt-workflow's entrypoint-claude.js calls
+  // runHook), so the literal strings the bash heuristic looks for are not
+  // in the file the command names.
+  if (interpreter === 'node') return;
+
   if ((lstat.mode & 0o111) === 0) {
     logWarning(
       `Hook script not executable: ${scriptPath} (check file permissions)`
@@ -389,6 +579,9 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
 module.exports = {
   VALID_HOOK_EVENTS,
   DECISION_PROTOCOL_EVENTS,
+  HOOK_SCRIPT_PREFIX_SRC,
+  UNTERMINATED_HOOK_SCRIPT_QUOTE,
+  hookCommandInterpreter,
   resolveHookScriptPath,
   resolvePluginPath,
   countMarkdownRecursive,

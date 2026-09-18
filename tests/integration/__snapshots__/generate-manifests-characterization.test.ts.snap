@@ -322,7 +322,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
+            "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-git-push",
             "timeout": 1
           }
         ]
@@ -334,7 +334,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
+            "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-commit-message",
             "timeout": 1
           }
         ]
@@ -398,7 +398,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plug
         "hooks": [
           {
             "type": "command",
-            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js",
+            "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\"",
             "timeout": 3
           }
         ]
@@ -494,7 +494,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-composio/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh\\"",
             "timeout": 3
           }
         ]
@@ -533,7 +533,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh\\"",
             "timeout": 5
           }
         ]
@@ -545,7 +545,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\\"",
             "timeout": 3
           }
         ]
@@ -645,7 +645,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\\"",
             "timeout": 3
           }
         ]
@@ -847,7 +847,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-morph/.claude-plugin/p
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm-morph.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm-morph.sh\\"",
             "timeout": 5
           }
         ]
@@ -959,7 +959,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh\\"",
             "timeout": 3
           }
         ]
@@ -1043,7 +1043,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-tool-use.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-tool-use.sh\\"",
             "timeout": 1
           }
         ]
@@ -1055,7 +1055,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit.sh\\"",
             "timeout": 1
           }
         ]
@@ -1067,7 +1067,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\\"",
             "timeout": 3
           }
         ]
@@ -1079,7 +1079,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-use.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-use.sh\\"",
             "timeout": 1
           }
         ]
@@ -1091,7 +1091,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh\\"",
             "timeout": 10
           }
         ]
@@ -1147,7 +1147,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-semgrep/.claude-plugin
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh\\"",
             "timeout": 3
           }
         ]
