@@ -121,10 +121,12 @@ Visualize your stack and navigate between branches.
 
 ## Hooks
 
-The plugin installs a **PreToolUse** hook that intercepts any Bash call
-containing `git push` and blocks it, redirecting Claude to use
-`gt submit --no-interactive` instead. This enforces the Graphite-first
-convention automatically — no rule gets silently bypassed.
+The plugin installs a **PreToolUse** hook that tokenises each Bash call and
+blocks any simple command that runs `git push` — including `/usr/bin/git
+push`, `git -C dir push`, `bash -c "git push"` and `sudo`/`env`/`timeout`
+wrappers — redirecting Claude to use `gt submit --no-interactive` instead.
+Quoted literals such as `echo "git push"` are not blocked. This enforces the
+Graphite-first convention automatically — no rule gets silently bypassed.
 
 ## Installation
 
