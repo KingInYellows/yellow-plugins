@@ -64,3 +64,13 @@ written here — keeping the two layers separate is the point of the file.
 
 A council reviewer that shells out to an external LLM CLI (e.g. Gemini or
 OpenCode) via its own Bash tool.
+
+## Gate C
+
+The evidence-verification gate in `/plan:complete` that confirms a plan's
+underlying work actually shipped as a merged PR before archival, evaluated
+as three deterministic tiers in order — file-provenance (exact
+commit-to-merged-PR lookup), strict (slug-matched merged-PR search), and
+loose (token-coverage scoring over the 100 most recent merged PRs) —
+falling through to a user-confirmed override prompt only when all three
+tiers find no unique match.

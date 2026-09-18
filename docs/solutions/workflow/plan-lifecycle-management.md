@@ -231,3 +231,90 @@ Gate C is now three tiers, evaluated in order: **provenance → strict →
 loose → AskUserQuestion override**, with provenance and loose short-circuiting
 only on unique matches; strict passes on any match. At most one of the three
 trailers appears per archival commit.
+
+---
+
+## Update — 2026-09-18
+
+All three Gate C tiers were exercised for the first time against a PR that
+merged through Graphite's merge queue (not a direct squash-merge) — and all
+three returned zero evidence, including the file-provenance tier the
+2026-07-19 update above added specifically to sidestep the other two tiers'
+text-matching blind spots.
+
+### Graphite MQ merges are invisible to all three tiers, not just strict/loose
+
+**Confirmed case:** PR #808 — draft, then `gh pr ready 808`, then `gt merge`
+(queued as MQ PR #811, ~20s Graphite cache delay before the queue picked it
+up), landed on `main` as squash commit `80f125dd`. `gh pr view 808` shows
+`state: CLOSED`, `mergedAt: null`, `mergeCommit: null` — indefinitely, not a
+propagation-lag artifact that clears on retry.
+
+- **File-provenance tier** — `gh api repos/{owner}/{repo}/commits/{sha}/pulls
+  --jq '[.[]|select(.state=="closed")]'` against the squash commit returned 0
+  PRs, unchanged on a retry ~15s later. GitHub's commit→PR association
+  endpoint does not link a Graphite-MQ squash commit back to its source PR —
+  this lines up with
+  [merge-queue-closed-pr-null-mergedat-detection.md](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md)'s
+  finding that `mergeCommit`/`mergedAt` never populate for MQ merges: there is
+  nothing for this endpoint to return regardless of how long you wait.
+- **Strict tier** (`gh pr list --state merged` slug search) — 0 matches.
+  `--state merged` filters on PR *state*; an MQ-closed PR's state is
+  `closed`, never `merged`, independent of slug/title.
+- **Loose tier** (100 most-recent `--state merged` PRs, scored by
+  slug-token coverage) — 0 matches for the same root cause: the PR never
+  enters either tier's candidate set before scoring starts.
+
+For a Graphite-MQ-merged PR, expect the full provenance → strict → loose →
+override fallthrough every time — this is the normal path for that merge
+type, not a rare edge case.
+
+### Verifying an MQ merge when Gate C has nothing: diff-stat equality
+
+With a PR number already known from context (not discovered by search),
+diff-stat equality between the squash commit and the reviewed branch head is
+fast corroboration before taking the override path:
+
+```bash
+git diff --stat "$SQUASH_SHA"^ "$SQUASH_SHA"       # squash commit's own diff
+git diff --stat "$MERGE_BASE" "$BRANCH_HEAD_SHA"    # branch diff vs. its merge-base
+# both must report identical files-changed / insertions / deletions
+```
+
+This is corroborating evidence, not proof — treat it as sufficient only when
+paired with an independently-known candidate PR number, never as a blind
+filter to search for "which PR merged" among candidates with no other
+supporting reason. Record the result through Gate C's existing override path
+(`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`) — no new
+trailer format needed for this case.
+
+### Stale main-clone trunk breaks Phase 6 *and* Phase 8, distinct from a Graphite API outage
+
+Separately, in the same session: Phase 6 (`gt checkout --trunk` / sync) can
+fail for a reason unrelated to Gate C — a shared main clone's local `main`
+had untracked files that collided with paths a just-merged PR had committed,
+so `git pull --ff-only` refused to update. Archiving from a disposable
+worktree tracked straight off `origin/main` instead
+(`git worktree add -b plan/archive-<slug> <path> origin/main` +
+`gt track --parent main --force`) unblocks the *commit*, but not the
+*submit*: `gt submit --no-interactive` still aborted with "Aborting submit
+because trunk branch is out of date and could not be updated," and after
+falling back to a manual `git push` + `gh pr create`, `gt merge` reported
+"The following branches do not have associated PRs" for a PR that
+demonstrably existed (PR #812).
+
+Treat either message as `gt`'s local trunk cache being stale relative to
+GitHub — not something to retry. This is a different failure mode from
+[the Graphite API outage fallback](./graphite-api-outage-fallback.md): that
+one is the Graphite API itself returning 503s with local git fully healthy;
+this one is the Graphite API reachable but local git state `gt` refuses to
+trust. The same fallback shape resolves both — skip `gt` for push/create/merge
+and go direct to GitHub:
+
+```bash
+git push -u origin "$BRANCH"
+gh pr create --title "..." --body "..." --base main
+gh pr merge <number> --squash
+```
+
+(PR #812 landed this way as squash commit `22cfd85b`.)
