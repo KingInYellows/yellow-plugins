@@ -200,6 +200,23 @@ git-push field path was then corrected on 2026-09-16 — see below):
 - `hooks/scripts/lib/policy-check-git-push.js` /
   `lib/policy-check-commit-message.js` — pure decision functions
   (`camelCaseEnvelope -> {decision, message}`), host-agnostic
+- `hooks/scripts/lib/git-push-detector.js` — `commandInvokesGitPush(cmd)`,
+  the tokenising detector behind check-git-push (shell-word lexer with
+  `$(…)`/expansion placeholders, `<(…)` process substitution, redirection
+  dropping, heredoc/here-string/pipe binding incl. pipes into `{ }`/`if`
+  groups, reserved-word and wrapper peeling, git global-option arity
+  table, `-c core.pager=`/`PAGER=` value re-scan, `rebase --exec`/
+  `submodule foreach`/`bisect run`/`subtree push`, expanding-heredoc
+  `$(…)` bodies, `sh -c`/`eval`/`su -c`/`sudo -s`/heredoc/pipe recursion
+  capped at depth 3 and 16 wrapper layers with stdin inherited through
+  every level, denies what it cannot read, fails closed on parser error).
+  Kept byte-identical to github-workflow's copy by
+  `tests/integration/git-push-detector-parity.test.ts`; edit both or that
+  suite fails. `${IFS}`, `$GIT push` indirection, shell aliases/`hash -p`,
+  `export`ed command variables, `exec <<<` stdin re-plumbing, nested
+  backticks, script files written in the same command and interpreter
+  one-liners are documented out of scope — see
+  `docs/solutions/security-issues/substring-regex-command-denylist-evasion.md`
 - `hooks/scripts/lib/envelope.js` — `snakeToCamelEnvelope` (both hosts'
   stdin is snake_case, only output differs — see
   `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`),
@@ -217,11 +234,16 @@ git-push field path was then corrected on 2026-09-16 — see below):
 Behavior (unchanged from the original bash hooks, except the PreToolUse
 field path):
 
-- **PreToolUse (Bash)** — Backstop that blocks raw `git push` and points the
-  workflow back to `gt submit --no-interactive`. Reads
+- **PreToolUse (Bash)** — Backstop that blocks raw `git push` (path-
+  qualified, with global options, via `bash -c`, or behind a wrapper) and
+  points the workflow back to `gt submit --no-interactive`. Reads
   `tool_input.command` (the shape both hosts send); the deleted bash script
   read a root-level `command` no host sends, so it never fired on a real
-  payload. A present-but-non-string `tool_input.command` fails closed.
+  payload. A present-but-non-string `tool_input.command` fails closed. Hook
+  `timeout` is 5 s (was 1 s): a cold Node start on a slow disk could exceed
+  1 s. The detector itself is bounded by the parity suite's 64 KB
+  adversarial inputs (each < 500 ms; < 256 MB RSS over the whole set); a
+  warm run on a real command is tens of milliseconds.
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
@@ -242,7 +264,8 @@ plugin directory (see root `CLAUDE.md`'s bats list).
   (`hooks/scripts/entrypoint-claude.js`) reproduces the deleted bash hooks'
   decisions for check-commit-message, and the real-host envelope contract
   for check-git-push (whose goldens are Node-contract fixtures, not bash
-  captures — see the file header), against golden fixtures in
+  captures — see the file header; the 2026-09-17 tokeniser deny/allow
+  corpus lives there too), against golden fixtures in
   `tests/fixtures/hooks/`.
 - `tests/gt-cleanup.bats` — the deterministic bash embedded in the
   gt-cleanup skill: flag parsing and branch classification live in

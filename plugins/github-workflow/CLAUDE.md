@@ -90,7 +90,17 @@ cross-plugin require — this plugin has no runtime dependency on
 provider's files" reading of this repo's provider-neutrality invariant):
 
 - `check-git-push` (PreToolUse) — blocks raw `git push`, pointing at
-  `github-stack-submit` instead of Graphite's `gt submit`.
+  `github-stack-submit` instead of Graphite's `gt submit`. Detection is
+  `hooks/scripts/lib/git-push-detector.js`, a byte-identical copy of
+  gt-workflow's tokenising detector (the root
+  `tests/integration/git-push-detector-parity.test.ts` fails on drift —
+  edit both copies together). A present-but-non-string
+  `tool_input.command` fails closed; an absent `tool_input` or unparseable
+  envelope still fails open. Hook `timeout` is 5 s (was 1 s) for the same
+  reason as gt-workflow's sibling: a cold Node start on a slow disk could
+  exceed 1 s and a timed-out PreToolUse hook is non-blocking; the parity
+  suite bounds the detector at < 500 ms (and < 256 MB over its whole
+  adversarial set) on 64 KB input.
 - `check-commit-message` (PostToolUse) — warns on a non-conventional
   commit message, triggered on `git commit` instead of `gt modify`/`gt
   commit`/`gt create`.
