@@ -32,9 +32,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { colors, logError, logWarning, logInfo, logSuccess } = require('./lib/logging');
+const { addError, colors, logError, logWarning, logInfo, logSuccess } = require('./lib/logging');
 const { readMarketplaceManifest } = require('./lib/marketplace-reader');
-const { collectInlineHooks } = require('./lib/plugin-paths');
+const { collectInlineHooks, pluginRootProblem } = require('./lib/plugin-paths');
 const {
   ruleRequiredFields,
   ruleNameMatchesDir,
@@ -127,6 +127,16 @@ function validatePlugin(pluginDir) {
   const errors = [];
   const marketplacePluginNames = getMarketplacePluginNames();
 
+  // A symlinked plugin root is invisible to every per-path check (they
+  // walk strictly below it and realpath resolves through it), so refuse it
+  // before reading anything.
+  const rootProblem = pluginRootProblem(pluginDir);
+  if (rootProblem !== null) {
+    console.log(`\n${colors.cyan}Validating plugin: ${dirName}${colors.reset}`);
+    addError(errors, `Plugin directory ${rootProblem}: ${pluginDir}`);
+    return { valid: false, errors };
+  }
+
   const loaded = loadManifest(manifestPath);
   if (loaded.failure) return loaded.failure;
   const { manifest } = loaded;
@@ -170,13 +180,24 @@ function validatePlugin(pluginDir) {
  */
 function discoverPlugins() {
   const pluginsDir = path.join(PROJECT_ROOT, 'plugins');
+  // lstat first, not existsSync: a symlinked plugins/ (dangling or not)
+  // would otherwise be followed — readdir would validate every entry
+  // below the target as a real directory, or a dangling link would read
+  // as "no plugins/" and pass vacuously. Same policy as the generator.
+  const rootProblem = pluginRootProblem(pluginsDir);
+  if (rootProblem !== null) {
+    logError(`plugins/ ${rootProblem}`);
+    process.exit(2);
+  }
   if (!fs.existsSync(pluginsDir)) {
     logWarning('No plugins/ directory found. Nothing to validate.');
     return [];
   }
   const entries = fs.readdirSync(pluginsDir, { withFileTypes: true });
+  // Symlinked entries are visited too — validatePlugin rejects them with
+  // a clear error instead of this discovery silently skipping them.
   return entries
-    .filter((e) => e.isDirectory())
+    .filter((e) => e.isDirectory() || e.isSymbolicLink())
     .map((e) => path.join(pluginsDir, e.name));
 }
 

@@ -17,6 +17,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -35,6 +37,8 @@ const addFormats = require('ajv-formats');
 const { generateManifests } = require('../../scripts/generate-manifests.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { loadCatalog, loadPluginSources } = require('../../scripts/lib/generate/catalog-reader.js');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { sweepCandidateProblem } = require('../../scripts/lib/plugin-paths.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { validateArtifacts, runExposureLint } = require('../../scripts/validate-codex.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1202,6 +1206,18 @@ describe('regeneration against a POLLUTED generated tree (stale-sweep branches)'
     expect(readFileSync(join(genRefDir, 'extra.md'), 'utf8')).toBe('# Extra\n');
   });
 
+  it('treats a stale plain file two or more levels above a candidate as "nothing to inspect", not as an error (ENOTDIR in the ancestor walk)', () => {
+    // sweepCandidateProblem's realpath branch already folds ENOTDIR into
+    // "not there yet"; the ancestor walk must agree, or a plain file two
+    // levels up turns the self-healing sweep into `cannot inspect`.
+    const { root } = makeGeneratedRefFixture();
+    const pluginRoot = join(root, 'plugins', 'ref-plugin');
+    const stale = join(pluginRoot, 'codex', 'stale-file');
+    writeFileSync(stale, 'stale plain file\n', 'utf8');
+    const candidate = join(stale, 'sub', 'deep.md');
+    expect(sweepCandidateProblem(candidate, pluginRoot, realpathSync(pluginRoot), root)).toBeNull();
+  });
+
   it('check mode reports a plain FILE named references as drift without mutating or hard-erroring (ENOTDIR read path)', () => {
     // Unlike apply mode (which unlinks the stale file before the content
     // pass), check mode leaves the plain file in place, so the content
@@ -1327,5 +1343,250 @@ describe('exposure lint registry-gated sibling-path detection (true-positive pat
     expect(matchSet).toContain('../sibling-plugin');
     // Self-exclusion: the plugin's own path must not appear in the match set.
     expect(matchSet).not.toContain('talkative-plugin');
+  });
+});
+
+describe('stale sweep symlink hardening (dangling hooks/hooks.json, symlinked hooks/ directory)', () => {
+  it('reports a DANGLING hooks/hooks.json symlink as forbidden and never unlinks it', () => {
+    // existsSync follows the link and reports "absent", so the pre-2026-09-17
+    // sweep silently passed a plugin whose hooks/hooks.json is a dangling
+    // symlink — yet the directory entry is still there for Claude Code to
+    // auto-load and comes back to life as soon as its target is created.
+    const inlineHooks = {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+    };
+    const root = makeCodexFixtureRoot([{ name: 'hook-plugin', codexEnabled: true, hooks: inlineHooks }]);
+    expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
+
+    const hooksJson = join(root, 'plugins', 'hook-plugin', 'hooks', 'hooks.json');
+    symlinkSync(join(root, 'nowhere.json'), hooksJson, 'file');
+    expect(existsSync(hooksJson)).toBe(false); // dangling: existsSync lies
+    expect(lstatSync(hooksJson).isSymbolicLink()).toBe(true);
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(checked.diffs.some((d: { path: string; state: string }) => d.path === 'plugins/hook-plugin/hooks/hooks.json' && d.state === 'forbidden')).toBe(true);
+    expect(checked.results['hook-plugin']).toBe('error');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.written).not.toContain('plugins/hook-plugin/hooks/hooks.json');
+    expect(lstatSync(hooksJson).isSymbolicLink()).toBe(true); // refused, not followed or removed
+  });
+
+  it('refuses to sweep a stale codex-hooks.json that lives behind a symlinked hooks/ directory', () => {
+    // hooks/ -> an external directory holding a codex-hooks.json the plugin
+    // no longer declares. Lexical assertWithinRoot passes (the candidate
+    // path is plugins/<name>/hooks/codex-hooks.json on paper); unlinking it
+    // would delete a file outside the generator-owned tree, through the
+    // symlink. Both --check and apply must error, and the external file
+    // must survive apply.
+    const root = makeCodexFixtureRoot([{ name: 'linked-hooks-plugin', codexEnabled: true }]);
+    const external = join(root, 'external-hooks');
+    mkdirSync(external, { recursive: true });
+    const externalArtifact = join(external, 'codex-hooks.json');
+    writeJson(externalArtifact, { hooks: {} });
+    symlinkSync(external, join(root, 'plugins', 'linked-hooks-plugin', 'hooks'), 'dir');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(checked.errors.some((e: string) => e.includes('refusing to sweep') && e.includes('hooks is a symlink'))).toBe(true);
+    expect(checked.results['linked-hooks-plugin']).toBe('error');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(existsSync(externalArtifact)).toBe(true);
+    expect(applied.written).not.toContain('plugins/linked-hooks-plugin/hooks/codex-hooks.json');
+  });
+
+  it('still sweeps a genuine stale codex-hooks.json in a real hooks/ directory (no false positive)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'plain-plugin', codexEnabled: true }]);
+    const staleArtifact = join(root, 'plugins', 'plain-plugin', 'hooks', 'codex-hooks.json');
+    mkdirSync(join(root, 'plugins', 'plain-plugin', 'hooks'), { recursive: true });
+    writeJson(staleArtifact, { hooks: {} });
+
+    // Drift (including 'stale') is reported through diffs; only errors and
+    // forbidden files flip status, so a clean stale sweep stays 'ok' here.
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('ok');
+    expect(checked.diffs.some((d: { path: string; state: string }) => d.path === 'plugins/plain-plugin/hooks/codex-hooks.json' && d.state === 'stale')).toBe(true);
+    expect(checked.errors.some((e: string) => e.includes('refusing to sweep'))).toBe(false);
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(existsSync(staleArtifact)).toBe(false);
+  });
+
+  it('refuses a plugin whose root plugins/<name> is itself a symlink (review P2)', () => {
+    // findSymlinkedAncestor walks strictly below the root and realpath
+    // resolves through it, so without an explicit root lstat the sweep and
+    // every generated-file write would land in the link target.
+    const root = makeCodexFixtureRoot([{ name: 'linked-root-plugin', codexEnabled: true }]);
+    const real = join(root, 'plugins', 'linked-root-plugin');
+    const moved = join(root, 'outside-target');
+    renameSync(real, moved);
+    symlinkSync(moved, real, 'dir');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(checked.errors.some((e: string) => e.includes('plugins/linked-root-plugin is a symlink'))).toBe(true);
+    expect(checked.results['linked-root-plugin']).toBe('error');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.written).toEqual([]);
+    expect(existsSync(join(moved, '.codex-plugin', 'plugin.json'))).toBe(false);
+  });
+
+  it('treats a hooks/hooks.json behind a symlink-loop ANCESTOR as present (lexistsSync counts ELOOP as present) and errors instead of crashing', () => {
+    // `hooks` is itself a directory symlink cycle, so lstat on
+    // hooks/hooks.json raises ELOOP while resolving the ancestor. lstat on
+    // a looping leaf would simply succeed, which is why the loop is placed
+    // above the file.
+    const root = makeCodexFixtureRoot([{ name: 'loop-plugin', codexEnabled: true }]);
+    const pluginRoot = join(root, 'plugins', 'loop-plugin');
+    symlinkSync(join(pluginRoot, 'loop-b'), join(pluginRoot, 'loop-a'), 'dir');
+    symlinkSync(join(pluginRoot, 'loop-a'), join(pluginRoot, 'loop-b'), 'dir');
+    symlinkSync(join(pluginRoot, 'loop-a'), join(pluginRoot, 'hooks'), 'dir');
+    expect(() => lstatSync(join(pluginRoot, 'hooks', 'hooks.json'))).toThrow(/ELOOP/);
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(checked.diffs.some((d: { path: string; state: string }) => d.path === 'plugins/loop-plugin/hooks/hooks.json' && d.state === 'forbidden')).toBe(true);
+    expect(() => generateManifests({ mode: 'apply', rootDir: root })).not.toThrow();
+  });
+
+  it('refuses to WRITE a generated file through a symlinked hooks/ directory (review P2: content writes get the sweep policy)', () => {
+    // hooks are declared, so hooks/codex-hooks.json is an expected write
+    // target rather than a stale candidate; without the write-side check
+    // mkdirSync + atomicWrite would create the file in the link target.
+    const inlineHooks = {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+    };
+    const root = makeCodexFixtureRoot([{ name: 'write-through-plugin', codexEnabled: true, hooks: inlineHooks }]);
+    const external = join(root, 'shared-hooks');
+    mkdirSync(external, { recursive: true });
+    symlinkSync(external, join(root, 'plugins', 'write-through-plugin', 'hooks'), 'dir');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('refusing to write plugins/write-through-plugin/hooks/codex-hooks.json') && e.includes('hooks is a symlink'))).toBe(true);
+    expect(applied.results['write-through-plugin']).toBe('error');
+    expect(existsSync(join(external, 'codex-hooks.json'))).toBe(false);
+    expect(applied.written).toEqual([]);
+  });
+
+  it('refuses a symlinked plugin root on the Claude-target write path too (review P1)', () => {
+    // A Codex-DISABLED plugin only reaches the Claude manifest loop, which
+    // used to lack the root guard.
+    const root = makeCodexFixtureRoot([{ name: 'claude-only-linked', codexEnabled: false }]);
+    const real = join(root, 'plugins', 'claude-only-linked');
+    const moved = join(root, 'elsewhere');
+    renameSync(real, moved);
+    symlinkSync(moved, real, 'dir');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('plugins/claude-only-linked is a symlink'))).toBe(true);
+    expect(applied.results['claude-only-linked']).toBe('error');
+    expect(existsSync(join(moved, '.claude-plugin', 'plugin.json'))).toBe(false);
+  });
+
+  it('sweeps a dangling stale symlink at a generated-artifact path (unlink removes the link only)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'dangling-plugin', codexEnabled: true }]);
+    const staleLink = join(root, 'plugins', 'dangling-plugin', 'hooks', 'codex-hooks.json');
+    mkdirSync(join(root, 'plugins', 'dangling-plugin', 'hooks'), { recursive: true });
+    symlinkSync(join(root, 'gone.json'), staleLink, 'file');
+
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('ok');
+    expect(checked.diffs.some((d: { path: string; state: string }) => d.path === 'plugins/dangling-plugin/hooks/codex-hooks.json' && d.state === 'stale')).toBe(true);
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(() => lstatSync(staleLink)).toThrow();
+  });
+
+  it('never writes through a planted `<target>.tmp` symlink (atomicWrite creates the tmp with O_EXCL)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'tmp-planted', codexEnabled: true }]);
+    const external = join(root, 'captured.json');
+    const manifest = join(root, 'plugins', 'tmp-planted', '.codex-plugin', 'plugin.json');
+    mkdirSync(join(root, 'plugins', 'tmp-planted', '.codex-plugin'), { recursive: true });
+    symlinkSync(external, manifest + '.tmp', 'file');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(existsSync(external)).toBe(false);
+    expect(lstatSync(manifest).isSymbolicLink()).toBe(false);
+    expect(() => lstatSync(manifest + '.tmp')).toThrow();
+    expect(JSON.parse(readFileSync(manifest, 'utf8')).name).toBe('tmp-planted');
+  });
+
+  it('refuses to WRITE a root-level marketplace through a symlinked `.agents/plugins` (review P1: root-level targets get the on-disk policy too)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'root-linked', codexEnabled: true }]);
+    const external = join(root, 'elsewhere-marketplace');
+    mkdirSync(external, { recursive: true });
+    mkdirSync(join(root, '.agents'), { recursive: true });
+    symlinkSync(external, join(root, '.agents', 'plugins'), 'dir');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('refusing to write .agents/plugins/marketplace.json') && e.includes('.agents/plugins is a symlink'))).toBe(true);
+    expect(existsSync(join(external, 'marketplace.json'))).toBe(false);
+    expect(applied.written).toEqual([]);
+  });
+
+  it('refuses to WRITE .claude-plugin/marketplace.json through a symlinked `.claude-plugin` (root-level, Claude target)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'claude-root-linked', codexEnabled: false }]);
+    const external = join(root, 'elsewhere-claude');
+    mkdirSync(external, { recursive: true });
+    rmSync(join(root, '.claude-plugin'), { recursive: true, force: true });
+    symlinkSync(external, join(root, '.claude-plugin'), 'dir');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('refusing to write .claude-plugin/marketplace.json') && e.includes('.claude-plugin is a symlink'))).toBe(true);
+    expect(existsSync(join(external, 'marketplace.json'))).toBe(false);
+    expect(applied.written).toEqual([]);
+  });
+
+  it('refuses everything when plugins/ itself is a symlink (review P2: no per-plugin container ever lstat\'s it)', () => {
+    const root = makeCodexFixtureRoot([{ name: 'p1', codexEnabled: true }, { name: 'p2', codexEnabled: false }]);
+    const moved = join(root, 'outside-plugins');
+    renameSync(join(root, 'plugins'), moved);
+    symlinkSync(moved, join(root, 'plugins'), 'dir');
+    writeFileSync(join(moved, 'p1', '.cursor-plugin-stale'), 'x', 'utf8');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('plugins is a symlink'))).toBe(true);
+    expect(applied.results.p1).toBe('error');
+    expect(applied.results.p2).toBe('error');
+    expect(applied.written).toEqual([]);
+    expect(existsSync(join(moved, 'p1', '.codex-plugin', 'plugin.json'))).toBe(false);
+    expect(existsSync(join(moved, 'p1', '.claude-plugin', 'plugin.json'))).toBe(false);
+  });
+
+  it('reports a leftover `<target>.tmp` DIRECTORY as a labeled write error instead of a raw EISDIR', () => {
+    const root = makeCodexFixtureRoot([{ name: 'tmp-dir', codexEnabled: true }]);
+    const manifest = join(root, 'plugins', 'tmp-dir', '.codex-plugin', 'plugin.json');
+    mkdirSync(manifest + '.tmp', { recursive: true });
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('error');
+    expect(applied.errors.some((e: string) => e.includes('[atomicWrite]') && e.includes('already exists and could not be replaced'))).toBe(true);
+    expect(existsSync(manifest)).toBe(false);
+  });
+
+  it('replaces a leftover regular `<target>.tmp` from an interrupted run', () => {
+    const root = makeCodexFixtureRoot([{ name: 'tmp-leftover', codexEnabled: true }]);
+    const manifest = join(root, 'plugins', 'tmp-leftover', '.codex-plugin', 'plugin.json');
+    mkdirSync(join(root, 'plugins', 'tmp-leftover', '.codex-plugin'), { recursive: true });
+    writeFileSync(manifest + '.tmp', '{ half-written', 'utf8');
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(JSON.parse(readFileSync(manifest, 'utf8')).name).toBe('tmp-leftover');
+    expect(() => lstatSync(manifest + '.tmp')).toThrow();
   });
 });
