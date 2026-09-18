@@ -90,7 +90,7 @@ reported unsupported.
 
 ## Implementation
 
-- [ ] Step 1: Create `plugins/yellow-core/lib/context-observer.py`
+- [x] Step 1: Create `plugins/yellow-core/lib/context-observer.py`
   (`#!/usr/bin/env python3`, executable, LF, stdlib only, Python 3.7+
   compatible, no imports beyond `sys os json time datetime re tempfile`).
   `main()` reads all of stdin as bytes, writes the identical bytes to
@@ -99,7 +99,7 @@ reported unsupported.
   path including SIGPIPE-style `BrokenPipeError`. Header comment: exit 0
   always, no git, no network, no subprocess; a stderr line only when
   `CONTEXT_OBSERVER_DEBUG=1`.
-- [ ] Step 2: In `context-observer.py` implement `parse_payload(raw)` →
+- [x] Step 2: In `context-observer.py` implement `parse_payload(raw)` →
   `None` for malformed JSON or non-object; `sanitize_session_id(s)` accepting
   only `^[A-Za-z0-9_-]{1,128}$` (else `None` → write nothing);
   `project_slug(payload)` = `workspace.project_dir` else `cwd` else `None`,
@@ -114,7 +114,7 @@ reported unsupported.
   `used_percentage`, `remaining_percentage`, `context_window_size` (each `None`
   when absent or not int/float), and `current_usage_null`
   (`payload.get("context_window", {}).get("current_usage") is None`).
-- [ ] Step 3: In `context-observer.py` implement the advisory state per R21:
+- [x] Step 3: In `context-observer.py` implement the advisory state per R21:
   `watermark_remaining` from `YELLOW_CONTEXT_WATERMARK` (int 1-99, default 50,
   invalid → 50). Load the previous record for the same `session_id` (ignore
   unreadable or malformed); `prev_state = advisory.last_state` else `"unknown"`.
@@ -127,7 +127,7 @@ reported unsupported.
   where `last_state` is `state` except that `"unknown"` leaves the previous
   non-unknown `last_state` in place (a null sample must not manufacture a
   crossing). No stdout, no stderr, no other side effect on a crossing.
-- [ ] Step 4: In `context-observer.py` implement `write_record(path, obj)`:
+- [x] Step 4: In `context-observer.py` implement `write_record(path, obj)`:
   `os.makedirs(dir, mode=0o700, exist_ok=True)` then `os.chmod(dir, 0o700)`
   best-effort; `tempfile.NamedTemporaryFile(dir=dir, prefix=".<sid>.", suffix=".tmp", delete=False)`
   with `os.fchmod(fd, 0o600)`; `json.dump` + `\n`, `flush`, `os.fsync`; honor
