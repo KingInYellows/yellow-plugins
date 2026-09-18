@@ -1,5 +1,44 @@
 # github-workflow
 
+## 0.3.2
+
+### Patch Changes
+
+- [`901d917`](https://github.com/KingInYellows/yellow-plugins/commit/901d917f8f3510d7abda2872a8ca0fda2761f725)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The PreToolUse
+  `git push` backstop now reads `tool_input.command`. It previously read a
+  root-level `command` that no host sends (a field path carried over from the
+  deleted `check-git-push.sh`), so a real Claude Code or Codex PreToolUse
+  payload containing `git push` was allowed through. The parity fixtures now use
+  the real nested envelope, and a new fixture pins the old flat shape as
+  non-blocking. A present-but-non-string `tool_input.command` now fails closed
+  instead of being coerced to an allow. github-workflow's sibling policy file
+  changes only in its comments (it already read the nested path).
+  `/devin:review-prs`'s degraded-mode "Fix locally" path (`GT_AVAILABLE` false
+  or PR in `GT_DEGRADED_PRS`) now stops after the local commit instead of
+  running a raw `git push`, since this guard denies that command under
+  `READY_GRAPHITE`; it records the PR as committed-but-unsubmitted in the final
+  summary instead.
+
+- [`3812fc6`](https://github.com/KingInYellows/yellow-plugins/commit/3812fc66ed19497a3d3d2fe9c24eefa496fca192)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  `hooks/hooks.json` reference mirrors. Claude Code auto-discovers that file and
+  also loads the inline `hooks` block in `plugin.json`, so every hook in these
+  plugins was registered twice and startup printed
+  `hooks.json: unknown key "_comment" ignored`. The inline `plugin.json` block
+  (generated from `catalog/`) is now the only Claude-side hook source;
+  `hooks/codex-hooks.json` is unchanged. `pnpm validate:plugins` (RULE 7) now
+  errors on any `hooks/hooks.json`, with or without inline hooks.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
 ## 0.3.1
 
 ### Patch Changes

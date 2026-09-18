@@ -1,5 +1,79 @@
 # yellow-council
 
+## 0.3.1
+
+### Patch Changes
+
+- [`13030d0`](https://github.com/KingInYellows/yellow-plugins/commit/13030d0ff0e82d88e519a3f97813d059a12a4261)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Sync both
+  copies of the credential-redaction awk program in
+  `commands/council/council.md` (the Step 4 claude-leg pass and the Step 7
+  report-build pass) to the canonical program in `council-patterns` SKILL.md.
+  The copies were 101 lines behind: they still ran the single-pass
+  `strip_deco()` that #703 showed leaks under stacked diff prefixes, and lacked
+  the `pem_release` / `pem_was_in` stray-window fix. The hardening in #703 never
+  reached council.md because the redaction test extractor could not see its
+  indented, two-body layout; a follow-up wires the extractor and identity gate
+  so the copies cannot drift again.
+
+- [`ccbee07`](https://github.com/KingInYellows/yellow-plugins/commit/ccbee074236552307d02bbe0385403331a3768a4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  `tests/redaction.bats` extractor now discovers every copy of the
+  credential-redaction awk program by content instead of a single fixed opener
+  pattern, so it returns all bodies a file carries rather than assuming one body
+  per file. `redaction.bats` runs a fatal identity gate against the
+  `council-patterns` SKILL.md canonical for every discovered body before the
+  behavioral suite runs, so a drifted copy fails fast instead of silently
+  passing behavioral cases with stale logic. `commands/council/council.md`'s two
+  copies (the Step 4 claude-leg pass and the Step 7 report-build pass) are now
+  covered by that gate, and its `redaction_known_untested` entry in
+  `scripts/council-roster.json` is removed now that both bodies are wired in.
+
+- [`8fc6206`](https://github.com/KingInYellows/yellow-plugins/commit/8fc620610667b5313d55f7779f8245e9bf5984d3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Close two leaks
+  in the credential-redaction awk program for narrowly wrapped keys. A key whose
+  BEGIN delimiter shares its line with prose runs under the bounded stray
+  window, and a decoy END inside a real key hands the rest of the body to the
+  re-arm window; both treated any body line under 20 characters as stray and
+  released, printing the rest of the key and its END marker into the committed
+  council report (a real 2048-bit key wrapped at 12 characters leaked 134 of 136
+  body lines). Body lines of 12 to 19 characters that carry a digit or `+`, `/`,
+  `=` and a non-hex character now count as key material, a pure base64 line of
+  the width the last key-shaped line established continues the body unless it
+  reads as a plain word, both rules re-arm after a decoy END while the chain is
+  unbroken, and the span cap rises to 400 so a 4096-bit key wrapped narrowly is
+  not released mid-body. Single words, equal-length words and short commit SHAs
+  on their own lines still count as stray; digit-bearing identifiers can keep
+  the bounded window open, but three subsequent plain lines still release it, so
+  a quoted marker followed by a short list cannot swallow the report. A bare
+  BEGIN line that arrives inside the bounded window a prose mention opened now
+  re-runs the entry test and starts a real block, so a genuine key
+  quoted-then-pasted is redacted at any wrap width instead of releasing after
+  three narrow lines. All five shipped copies are re-extracted from SKILL.md and
+  gated for identity.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 0.3.0
 
 ### Minor Changes
