@@ -1,0 +1,57 @@
+docs/plugin-validation-guide.md
+  s_9faf0dc507d8cf::t_7174179531317d 264,284
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 259-263,265-267
+  s_9faf0dc507d8cf::t_fc43c11ef9c623 247-258,268-283
+scripts/lib/plugin-paths.js
+  s_9faf0dc507d8cf::t_dd58490f8d8fbb 238-277,685-688,699-700,703-704,706-725
+  s_9faf0dc507d8cf::t_3d1408a91b1603 374-377
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 335-337
+  s_9faf0dc507d8cf::t_11f09f387b14f5 358,360,368
+  s_9faf0dc507d8cf::t_d974510911c1b8 299-326,348-357,390-393,472-476,520-524,701-702,705,795
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 227-232,278-298,327-334,338-347,359,361-367,369-373,378-384,689-698,793-794,796
+tests/integration/validate-plugin.test.ts
+  s_9faf0dc507d8cf::t_9b2943c000081f 912-922
+  s_9faf0dc507d8cf::t_7e8b1262d1e0ef 966
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 863-900,957-964
+  s_9faf0dc507d8cf::t_59b6621f441647 31,776-862,943-956,965
+  s_9faf0dc507d8cf::t_17789e436cd44f 901-911,923-942
+scripts/validate-plugin.js
+  s_9faf0dc507d8cf::t_861272569a8dfe 35,37
+  s_9faf0dc507d8cf::t_d974510911c1b8 130-139,188-189,191
+tests/integration/generate-manifests-codex.test.ts
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 20,1403-1425,1431,1437-1440
+  s_9faf0dc507d8cf::t_9b2943c000081f 1494-1520
+  s_9faf0dc507d8cf::t_9f319ac290232d 1333-1392,1395,1397-1402,1478-1486,1488-1493,1521
+  s_9faf0dc507d8cf::t_17789e436cd44f 1426-1430,1432-1436,1441-1477
+  s_9faf0dc507d8cf::t_3ae134ee9095c9 1393-1394,1396,1487
+scripts/lib/plugin-rules.js
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 25,284-289
+scripts/generate-manifests.js
+  s_9faf0dc507d8cf::t_861272569a8dfe 74,78-90,787-788,941,970,1290,1451-1456,1460-1463
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 725
+  s_9faf0dc507d8cf::t_485f1046e10462 641
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 72-73,75,971-972,1291-1292,1465
+  s_9faf0dc507d8cf::t_001869240ab364 77,1464,1466-1467
+  s_9faf0dc507d8cf::t_549cd455b12df2 92-115,727,786,797,830,851,870,903,921,969,1225,1289,1445,1457-1459
+  s_9faf0dc507d8cf::t_5d42c1a19d6b7d 1259-1262
+  s_9faf0dc507d8cf::t_54b8a003651f06 71,76,987,1266,1487-1489
+  s_9faf0dc507d8cf::t_d1362385d9b23f 91
+scripts/lib/generate/write.js
+  s_9faf0dc507d8cf::t_8ee4a55d199fda 38-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2e372f13c65e57f72860d53da06ae19580271aed",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
