@@ -1,0 +1,36 @@
+plugins/yellow-ruvector/tests/status-provenance.bats
+  s_9faf0dc507d8cf::t_84cc01ba6ae935 56-58,60,67-71,73-76,78,82-83,94-112
+  s_9faf0dc507d8cf::t_5b0a60ff3c3762 66,77,79-81,86-93
+  s_9faf0dc507d8cf::t_12ea1b3d8ba625 1-55,59,61-65,72,84-85,113-151
+.changeset/ruvector-status-sigkill-provenance-fields.md
+  s_9faf0dc507d8cf::t_67f6f4e40088a3 1-18
+docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md
+  s_9faf0dc507d8cf::t_a991e53d21c070 3,92-96,98-99,110-156
+  s_9faf0dc507d8cf::t_e64243487072ef 157
+  s_9faf0dc507d8cf::t_5b0a60ff3c3762 100-102
+plugins/yellow-ruvector/CLAUDE.md
+  s_9faf0dc507d8cf::t_f948ed228d555f 68-70
+  s_9faf0dc507d8cf::t_5b0a60ff3c3762 71-74
+  s_9faf0dc507d8cf::t_67f6f4e40088a3 245-257
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_9faf0dc507d8cf::t_bd46985981caa7 171-175,182-183,195,198,203-209
+  s_9faf0dc507d8cf::t_ff3b141e706fe7 97-101,160-164,242-247,340-341
+  s_9faf0dc507d8cf::t_5b0a60ff3c3762 176-180,184-193,196-197,248-251,347-349
+  s_9faf0dc507d8cf::t_84cc01ba6ae935 194,199-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6d2cd462867ea6210bff43b5eeebb9234c389312",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
