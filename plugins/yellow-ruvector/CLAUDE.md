@@ -65,9 +65,13 @@ ruvector.
 - `/ruvector:search` — Search codebase by meaning using vector similarity
 - `/ruvector:status` — Show ruvector health, DB stats, queue status, and
   embedder provenance (`PROVENANCE: FRESH | OK | MISMATCH | UNSTAMPED |
-  UNKNOWN`, computed in the command's bash block from a whole-stamp
-  comparison against `hooks reembed --dry-run`, with remediation; the
-  dry-run is bounded at 90 s and costs a model load)
+  UNKNOWN`, computed in the command's bash block by comparing the five
+  enforced stamp fields against `hooks reembed --dry-run`'s
+  `targetProvenance` — extra keys ignored, a missing enforced field is a
+  mismatch, no object `targetProvenance` at all is UNKNOWN, as is a jq
+  failure during the compare — with remediation; the dry-run is bounded
+  at 90 s and costs a model load, and an exit 137 is reported as SIGKILL
+  without assuming the deadline elapsed)
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
 - `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
@@ -238,3 +242,16 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
   internally
 - **Team usage:** `.ruvector/` should be gitignored (per-developer data). Team
   learnings can be exported via `/ruvector:memory` and shared manually.
+
+## Testing
+
+Bats shell tests live in `tests/` — run `bats tests/` from inside this
+plugin directory. One suite per hook script (`session-start.bats`,
+`pre-tool-use.bats`, `post-tool-use.bats`, `user-prompt-submit.bats`,
+`stop.bats`), `validate.bats` for `hooks/scripts/lib/validate.sh`,
+`repair-cursor-pretooluse.bats` for the repair script, and
+`status-provenance.bats`, which extracts the provenance bash block from
+`commands/ruvector/status.md` at run time and drives it with a stubbed
+`npx` (five-field compare, missing `targetProvenance`, rc=137 wording).
+Edit the block's first line (`INTEL=.ruvector/intelligence.json`) or its
+closing fence and that suite's extractor stops matching — keep them.

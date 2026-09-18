@@ -94,9 +94,11 @@ The store's `embeddingProvenance` stamp must match the embedder the MCP
 server resolves, or every `hooks_remember` is refused (ADR-210) while
 `hooks_recall` keeps working — a silent write loss. Upstream
 `compareProvenance` refuses on any of the five stamp fields (`embedderKind`,
-`modelId`, `dimension`, `normalize`, `prefixPolicy`), so the block compares
-the whole stamp. It also computes the verdict, so the `PROVENANCE:` line
-never depends on a by-eye JSON comparison.
+`modelId`, `dimension`, `normalize`, `prefixPolicy`), so the block projects
+both stamps onto exactly those five fields before comparing — an extra
+informational key on either side is ignored; an enforced field missing on
+one side is a mismatch. It also computes the verdict, so the `PROVENANCE:`
+line never depends on a by-eye JSON comparison.
 
 ```bash
 INTEL=.ruvector/intelligence.json
@@ -155,23 +157,56 @@ else
     if [ "$DRY_RC" -eq 124 ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (registry or model download stalled)"
     elif [ "$DRY_RC" -eq 137 ]; then
-      VERDICT=UNKNOWN; DETAIL="dry-run was killed after the 90 s deadline plus the 5 s grace"
+      # 137 = SIGKILL. timeout(1) only reports 137 when the --kill-after
+      # grace fired after TERM was ignored, but the same code reaches here
+      # from any external SIGKILL (the OOM killer, a supervisor) — the
+      # deadline cannot be inferred from the exit code alone.
+      VERDICT=UNKNOWN; DETAIL="dry-run process was killed (SIGKILL, exit 137): either the 5 s --kill-after grace fired or an external signal such as the OOM killer; JSON not trusted"
     elif [ "$DRY_RC" -ne 0 ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run exited $DRY_RC: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
     elif [ -z "$DRY" ] || [ "$(printf '%s' "$DRY" | jq -r '.success // false')" != "true" ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run failed: $(printf '%s' "$DRY" | jq -r '[.error, .hint] | map(select(. != null)) | join(" — ")' 2>/dev/null) ${DRY_ERR}"
     else
       TARGET=$(printf '%s' "$DRY" | jq -c '.targetProvenance // null')
-      COUNT=$(printf '%s' "$DRY" | jq -r '.wouldReembed // "?"')
-      DROP=$(printf '%s' "$DRY" | jq -r '.wouldDrop // 0')
-      if [ "$(jq -n --argjson s "$STORE" --argjson t "$TARGET" '$s == $t')" = "true" ]; then
-        VERDICT=OK; DETAIL="$COUNT vectors"
+      # Digits only: both are jq -r raw output from the CLI's stdout and
+      # are interpolated into DETAIL and the fenced drop= line — a string
+      # with a newline could otherwise forge a second verdict= line.
+      COUNT=$(printf '%s' "$DRY" | jq -r '.wouldReembed // "?"'); case "$COUNT" in ''|*[!0-9]*) COUNT="?";; esac
+      DROP=$(printf '%s' "$DRY" | jq -r '.wouldDrop // 0'); case "$DROP" in ''|*[!0-9]*) DROP=0;; esac
+      if [ "$(printf '%s' "$TARGET" | jq -r 'type')" != "object" ]; then
+        # Older CLI with no targetProvenance in its dry-run output (null),
+        # or a non-object value: nothing to compare against — do not
+        # project it into a spurious verdict either way.
+        VERDICT=UNKNOWN; DETAIL="dry-run reported no usable targetProvenance (older ruvector CLI?); $COUNT vectors"
       else
-        VERDICT=MISMATCH
-        DIFF_FIELDS=$(jq -rn --argjson s "$STORE" --argjson t "$TARGET" '[($s|keys[]) as $k | select($s[$k] != $t[$k]) | $k] | join(",")')
-        DETAIL="differs on $DIFF_FIELDS; $COUNT vectors to reembed"
-        if [ "${DROP:-0}" != "0" ]; then
-          DETAIL="$DETAIL; $DROP memories lack source text and would be dropped"
+        # Compare only the five fields upstream compareProvenance enforces.
+        # One static jq program, no bash-into-jq interpolation: the field
+        # list travels as data and each side is projected once with plain
+        # indexing (`$x[$k]` is null for a missing key and keeps a present
+        # `false`; the `//` operator would fold `normalize: false` into
+        # null and make it equal to a missing field), so an informational
+        # extra key (a newer CLI adding `stampedAt`) is ignored while an
+        # enforced field missing on either side differs. A non-object store
+        # stamp (a hand-edited file) projects to all-null and reports
+        # MISMATCH on every field instead of a jq error. Missing and an
+        # explicit null compare equal — the hash stamp legitimately carries
+        # `modelId: null`.
+        if ! DIFF_FIELDS=$(jq -rn --argjson s "$STORE" --argjson t "$TARGET" \
+          --argjson fields '["embedderKind","modelId","dimension","normalize","prefixPolicy"]' '
+            def proj($o): (if ($o | type) == "object" then $o else {} end) as $x
+              | reduce $fields[] as $k ({}; .[$k] = $x[$k]);
+            proj($s) as $a | proj($t) as $b
+              | [$fields[] | select($a[.] != $b[.])] | sort | join(",")' 2>/dev/null); then
+          # A jq failure must not read as "no differing fields".
+          VERDICT=UNKNOWN; DETAIL="provenance compare failed (jq error); $COUNT vectors"
+        elif [ -z "$DIFF_FIELDS" ]; then
+          VERDICT=OK; DETAIL="$COUNT vectors"
+        else
+          VERDICT=MISMATCH
+          DETAIL="differs on $DIFF_FIELDS; $COUNT vectors to reembed"
+          if [ "${DROP:-0}" != "0" ]; then
+            DETAIL="$DETAIL; $DROP memories lack source text and would be dropped"
+          fi
         fi
       fi
     fi
@@ -204,10 +239,16 @@ Print exactly one line from the fenced `verdict=` / `detail=` values:
 - `PROVENANCE: UNKNOWN (<detail>)` — report the store stamp alone; do not
   guess the active embedder, and never infer it from the MCP
   `hooks_capabilities` output (the running server can predate a reembed).
-  Includes the no-compatible-timeout case, where the dry-run never ran, and
-  the timed-out (124), killed (137), and other nonzero-exit dry-run cases,
-  where a successful-looking JSON line is never trusted unless the dry-run
-  itself exited 0.
+  Includes the no-compatible-timeout case, where the dry-run never ran;
+  the timed-out (124) case; the SIGKILLed (137) case — which may be the
+  5 s `--kill-after` grace firing after TERM was ignored *or* an external
+  signal such as the OOM killer, so the detail names both rather than
+  asserting the deadline elapsed; other nonzero-exit dry-run cases, where
+  a successful-looking JSON line is never trusted unless the dry-run
+  itself exited 0; a dry-run whose JSON carries no object
+  `targetProvenance` (older CLI), which is reported as UNKNOWN rather than
+  compared as null; and a jq failure during the five-field compare
+  itself, which must not read as "no differing fields".
 
 A reembed writes the new stamp only after every vector succeeds, so an
 interrupted reembed leaves the old stamp and reports as MISMATCH — there is
@@ -296,9 +337,16 @@ PROVENANCE: MISMATCH (store hash/64 → active onnx-minilm/all-MiniLM-L6-v2/384;
 - **MCP unavailable:** Show CLI info only, note MCP status as unavailable.
 - **Provenance dry-run fails, times out, is killed, or exits nonzero:**
   `PROVENANCE: UNKNOWN` with the CLI's `error`/`hint` (stdout JSON) or the
-  stderr tail; a killed (137) or otherwise nonzero dry-run exit is never
+  stderr tail; a SIGKILLed (137 — kill-after grace or an external signal
+  such as the OOM killer) or otherwise nonzero dry-run exit is never
   treated as success even when stdout has a well-formed success JSON line;
   never infer the active embedder from the MCP `hooks_capabilities` output
   — the running server can predate a reembed.
 - **No GNU-compatible `timeout`/`gtimeout` on PATH:** `PROVENANCE: UNKNOWN`
   without starting the dry-run; suggest `brew install coreutils` on macOS.
+- **Dry-run JSON carries no object `targetProvenance` (older CLI):**
+  `PROVENANCE: UNKNOWN` with "no usable targetProvenance" — never a
+  `null`-vs-store compare.
+- **Provenance compare itself fails (jq error):** `PROVENANCE: UNKNOWN`
+  with "provenance compare failed (jq error)" — never `OK` on an empty
+  field list.

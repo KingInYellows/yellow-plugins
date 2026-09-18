@@ -1,6 +1,6 @@
 ---
 title: 'ruvector: hooks_remember refused by ADR-210 provenance check while hooks_recall keeps working'
-date: 2026-09-16
+date: 2026-09-17
 category: integration-issues
 track: bug
 problem: 'A .ruvector store stamped by the old hash embedder (64d) silently refuses every hooks_remember once ruvector 0.2.34 defaults to onnx-minilm (384d); reads still succeed so the write loss goes unnoticed'
@@ -89,16 +89,71 @@ created earlier keeps its hash stamp until reembedded.
   unstamped fresh/legacy store).
 - `/ruvector:status` Step 6 computes the verdict in its bash block: `FRESH`
   (no file, or no stamp and no vectors), `UNSTAMPED` (vectors, no stamp),
-  `OK` / `MISMATCH` (whole-stamp equality against the dry-run's
-  `targetProvenance`, naming the differing fields), or `UNKNOWN` (the store
+  `OK` / `MISMATCH` (equality of the five enforced stamp fields —
+  `embedderKind`, `modelId`, `dimension`, `normalize`, `prefixPolicy` —
+  against the dry-run's `targetProvenance`, both sides projected so an
+  informational extra key is ignored and a missing enforced field is a
+  mismatch, naming the differing fields), or `UNKNOWN` (the store
   file is not parseable by `jq`; no GNU-compatible `timeout`/`gtimeout` is on
-  PATH, so the dry-run is skipped; or the dry-run failed or timed out — the
+  PATH, so the dry-run is skipped; the dry-run failed, timed out, or was
+  SIGKILLed — exit 137 may be the 5 s `--kill-after` grace or an external
+  signal such as the OOM killer, so the detail names both; the dry-run
+  carried no object `targetProvenance` at all; or the five-field compare
+  itself failed in jq, which must not read as "no differing fields" — the
   CLI's `error`/`hint` come as a stdout JSON line, not stderr) — and prints
   the remediation above. A corrupted store therefore reports the same
   `UNKNOWN` verdict as a CLI/model timeout; check the detail text rather than
   assuming a timeout. Detection covers only `$PROJECT_DIR/.ruvector`; a
   nested-launch session or a server that cached the machine-global
   `~/.ruvector` during the heal window is not seen by the hook.
+
+## Non-atomic store write race
+
+**Symptom.** `PROVENANCE:` flips from `OK` to `MISMATCH` (store `hash`/64d
+against an `onnx-minilm`/384d target) on a store that was healthy shortly
+before, and `.ruvector/intelligence.json.corrupt-<epoch>` appears next to
+a much smaller `intelligence.json`. Trigger shape (observed 2026-09-17):
+several subagents running in parallel, each firing yellow-ruvector's
+PostToolUse hooks (which shell out to the `ruvector` CLI), while the MCP
+server was saving a multi-MB store.
+
+**Cause.** Upstream, not the plugin. ruvector 0.2.34 (the version every
+hook pins) saves `intelligence.json` with a plain `fs.writeFileSync` in
+both processes that write it — `bin/mcp-server.js:320` and
+`bin/cli.js:3220` (`Intelligence.save()`; line numbers verified against the
+installed `ruvector@0.2.34` package) — so a concurrent reader can observe a
+torn, half-written file. A CLI process on the hook path that reads mid-write
+judges the file corrupt, renames it aside as `.corrupt-<epoch>` (the
+quarantine-on-corrupt read, `readIntelStoreSafe`, ships in ruvector ≥
+0.2.41's `cli.js`; 0.2.34's own `load()` returns an empty store instead) and
+starts a fresh store — hash-stamped, 64d, because the hook path resolved the
+hash embedder. The MCP server still holds the good snapshot in memory, so
+recall keeps answering from it until the server restarts. ruvector 0.2.41
+and 0.3.1 fix the CLI side (`atomicWriteFileSync`: temp file in the same
+directory + `rename()`, `cli.js:3282` / `:3331`) but `bin/mcp-server.js`
+still writes plainly at line 396 in both, and its `load()` still degrades a
+parse failure to an empty store — so the race remains reachable from the
+server's save.
+
+**Recovery.** The quarantined file is usually complete (it parses and holds
+every memory). Stop the MCP server, move the fresh hash-stamped
+`intelligence.json` aside (`intelligence.json.hash-fresh-<epoch>`), copy the
+`.corrupt-<epoch>` file back over `intelligence.json`, restart, and confirm
+with `/ruvector:status` — do not reembed; that would rebuild the small
+fresh store, not restore the lost one.
+
+**Avoidance.** Do not run many hook-firing subagents in parallel while the
+MCP server has unsaved writes (a burst of `hooks_remember` calls followed
+immediately by a parallel resolver fan-out is the exact shape). Keep the
+`.corrupt-*` file until `/ruvector:status` reports `OK` on the restored
+store. A `rename()`-based write alone would not fully close the window — a
+reader that opened the file before the rename still reads the old inode,
+and `npm/write-file-atomic#64` documents the same partial-protection
+caveat — so the upstream fix also needs a parse-retry (or quarantine that
+never overwrites) on the reader side.
+
+**Upstream.** Filed as https://github.com/ruvnet/RuVector/issues/995
+(follow-up to #634 / #698, which fixed `cli.js` only).
 
 ## Related
 
