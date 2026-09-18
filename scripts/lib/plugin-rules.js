@@ -14,7 +14,6 @@
  * RULE 10 — it was the reverted userConfig `pattern` rule).
  */
 
-const fs = require('fs');
 const path = require('path');
 
 const { addError, logWarning, logSuccess } = require('./logging');
@@ -23,6 +22,7 @@ const {
   HOOK_SCRIPT_PREFIX_SRC,
   UNTERMINATED_HOOK_SCRIPT_QUOTE,
   hookCommandInterpreter,
+  lexistsSync,
   resolveHookScriptPath,
   validatePathFile,
   validatePathOrPathsDir,
@@ -281,7 +281,12 @@ function ruleInlineHookScripts(inlineHooks, pluginDir, errors) {
 // documents hooks-only plugins as valid.
 function ruleHooksJson(pluginDir, errors) {
   const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
-  if (!fs.existsSync(hooksJsonPath)) return;
+  // lexistsSync (lstat-based), not existsSync: existsSync follows symlinks
+  // and reports a dangling hooks/hooks.json symlink as absent, yet the
+  // path still exists for Claude Code to try to load — and would spring
+  // back the moment its target reappears. Any entry at that path is an
+  // error; the same helper drives generate-manifests' forbidden check.
+  if (!lexistsSync(hooksJsonPath)) return;
   addError(
     errors,
     'hooks/hooks.json: not allowed — Claude Code auto-loads it as a second hook source; hook config lives in catalog/plugins/<name>.json#hooks and is generated into plugin.json. Delete this file.'

@@ -68,6 +68,73 @@ const {
   atomicWrite,
   serializeJson,
 } = require('./lib/generate/write');
+const {
+  lexistsSync,
+  pluginRootProblem,
+  resolvePluginRootReal,
+  sweepCandidateProblem,
+} = require('./lib/plugin-paths');
+
+/**
+ * The catalog plugins whose plugins/<name> root — or plugins/ itself — is
+ * a symlink, checked once up front. Each refusal is pushed to `errors`,
+ * and the abort gate after the package.json loop returns before any
+ * target is assembled, so the only loop that consults the set is that
+ * first one (to skip the refused plugin's own package.json read). Such a
+ * root is invisible to every per-path check (they walk
+ * strictly below the root and realpath resolves through it) and would
+ * send the sweep and every write elsewhere, so every later per-plugin
+ * loop skips the names in this set.
+ */
+function symlinkedPluginRoots(pluginOrder, pluginsRoot, result, errors) {
+  const refused = new Set();
+  // plugins/ itself: every per-plugin container is plugins/<name>, so the
+  // ancestor walk never lstat's `plugins`, and both-sides realpath resolves
+  // through it consistently — a committed `plugins -> elsewhere` would send
+  // every write and unlink into the link target with status ok.
+  const dirProblem = pluginRootProblem(pluginsRoot);
+  if (dirProblem !== null) {
+    errors.push(`plugins ${dirProblem}`);
+    for (const name of pluginOrder) {
+      result.results[name] = 'error';
+      refused.add(name);
+    }
+    return refused;
+  }
+  for (const name of pluginOrder) {
+    const rootProblem = pluginRootProblem(join(pluginsRoot, name));
+    if (rootProblem === null) continue;
+    errors.push(`plugins/${name} ${rootProblem}`);
+    result.results[name] = 'error';
+    refused.add(name);
+  }
+  return refused;
+}
+
+/**
+ * Queue for unlinking every stale candidate that is still present, not
+ * expected, lexically under plugins/ (assertWithinRoot) and — the on-disk
+ * half — not reached through a symlink (sweepCandidateProblem). Shared by
+ * the Codex and Cursor sweeps.
+ */
+function queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir) {
+  const pluginRootReal = resolvePluginRootReal(pluginRoot, errors);
+  for (const candidate of staleCandidates) {
+    if (expectedPaths.has(candidate) || !lexistsSync(candidate)) continue;
+    try {
+      assertWithinRoot(candidate, pluginsRoot);
+    } catch (err) {
+      errors.push(err.message);
+      continue;
+    }
+    const problem = sweepCandidateProblem(candidate, pluginRoot, pluginRootReal, rootDir);
+    if (problem !== null) {
+      errors.push(`refusing to sweep ${relative(rootDir, candidate)}: ${problem}`);
+      continue;
+    }
+    targets.push({ path: candidate, bytes: null });
+  }
+}
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -593,6 +660,7 @@ function validateCursorRootConfig(catalog, errors) {
  */
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
+  const pluginsRoot = join(rootDir, 'plugins');
   // `results` is per-plugin reporting only. Attributed error classes:
   // loadPluginSources per-plugin failures (via its `badNames`), source
   // validation, package.json read/shape, target assembly (path containment
@@ -670,15 +738,17 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // Versions come from plugins/<name>/package.json only (R3). Matched by
   // explicit name key: pkg.name must equal the catalog source name.
   const pkgs = {};
+  const refusedRoots = symlinkedPluginRoots(catalog.pluginOrder, pluginsRoot, result, errors);
   for (const name of catalog.pluginOrder) {
+    if (refusedRoots.has(name)) continue;
     const errorsBeforeValidate = errors.length;
     validateSource(name, sources[name], errors, catalog.pluginOrder);
     if (errors.length > errorsBeforeValidate) {
       result.results[name] = 'error';
     }
-    const pkgPath = join(rootDir, 'plugins', name, 'package.json');
+    const pkgPath = join(pluginsRoot, name, 'package.json');
     try {
-      assertWithinRoot(pkgPath, join(rootDir, 'plugins'));
+      assertWithinRoot(pkgPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -745,7 +815,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(targetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(targetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -778,7 +848,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(manifestTargetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -799,7 +869,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         'codex-hooks.json'
       );
       try {
-        assertWithinRoot(hooksTargetPath, join(rootDir, 'plugins'));
+        assertWithinRoot(hooksTargetPath, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -818,7 +888,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     for (const target of skillTreeResult.targets) {
       try {
-        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+        assertWithinRoot(target.path, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -851,7 +921,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(manifestTargetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -869,7 +939,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     for (const target of skillTreeResult.targets) {
       try {
-        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+        assertWithinRoot(target.path, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -889,7 +959,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       path: cursorMarketplacePath,
       bytes: serializeJson(cursorMarketplaceObj),
     });
-  } else if (existsSync(cursorMarketplacePath)) {
+  } else if (lexistsSync(cursorMarketplacePath)) {
     // No-op emission state (root config absent, or zero plugins enabled) but
     // a prior generation left a file behind — stale-sweep it. This candidate
     // lives OUTSIDE plugins/ (unlike every other stale candidate below), so
@@ -917,7 +987,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const codex = sources[name].targets.codex;
     const skillsPath =
       (codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
-    const pluginRoot = join(rootDir, 'plugins', name);
+    const pluginRoot = join(pluginsRoot, name);
     const skillsDir = join(pluginRoot, skillsPath);
     const staleCandidates = [
       join(pluginRoot, '.codex-plugin', 'plugin.json'),
@@ -932,7 +1002,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // (this apply path also runs unattended from sync-manifests.js during
     // `pnpm apply:changesets`).
     const forbiddenHooksJson = join(pluginRoot, 'hooks', 'hooks.json');
-    if (existsSync(forbiddenHooksJson)) {
+    if (lexistsSync(forbiddenHooksJson)) {
       result.diffs.push({
         path: relative(rootDir, forbiddenHooksJson),
         state: 'forbidden',
@@ -1170,18 +1240,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    for (const candidate of staleCandidates) {
-      if (expectedPaths.has(candidate) || !existsSync(candidate)) {
-        continue;
-      }
-      try {
-        assertWithinRoot(candidate, join(rootDir, 'plugins'));
-      } catch (err) {
-        errors.push(err.message);
-        continue;
-      }
-      targets.push({ path: candidate, bytes: null });
-    }
+    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
     }
@@ -1206,7 +1265,6 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // naming it, even without the dedicated per-plugin "ERROR: plugin X:"
   // line main() prints from result.results.
   const catalogedPlugins = new Set(catalog.pluginOrder);
-  const pluginsRoot = join(rootDir, 'plugins');
   let pluginDirEntries = [];
   try {
     pluginDirEntries = readdirSync(pluginsRoot, { withFileTypes: true });
@@ -1216,11 +1274,14 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
   }
   for (const entry of pluginDirEntries) {
-    if (!entry.isDirectory() || catalogedPlugins.has(entry.name)) {
+    // A symlinked plugins/<name> is visited too: the forbidden file is
+    // only reported here (never unlinked), and validate-plugin refuses
+    // the symlinked root itself.
+    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || catalogedPlugins.has(entry.name)) {
       continue;
     }
     const orphanHooksJson = join(pluginsRoot, entry.name, 'hooks', 'hooks.json');
-    if (existsSync(orphanHooksJson)) {
+    if (lexistsSync(orphanHooksJson)) {
       result.diffs.push({
         path: relative(rootDir, orphanHooksJson),
         state: 'forbidden',
@@ -1243,7 +1304,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const skillsPath =
       (cursor.componentPaths && cursor.componentPaths.skills) ||
       './cursor/skills';
-    const pluginRoot = join(rootDir, 'plugins', name);
+    const pluginRoot = join(pluginsRoot, name);
     const skillsDir = join(pluginRoot, skillsPath);
     const staleCandidates = [join(pluginRoot, '.cursor-plugin', 'plugin.json')];
     let skillsDirWithinPlugin = true;
@@ -1396,20 +1457,36 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    for (const candidate of staleCandidates) {
-      if (expectedPaths.has(candidate) || !existsSync(candidate)) {
-        continue;
-      }
-      try {
-        assertWithinRoot(candidate, join(rootDir, 'plugins'));
-      } catch (err) {
-        errors.push(err.message);
-        continue;
-      }
-      targets.push({ path: candidate, bytes: null });
-    }
+    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
+    }
+  }
+
+  // Content writes get the same on-disk containment as stale unlinks: a
+  // generated file must not be written THROUGH a symlinked directory
+  // (`hooks/` -> /shared, or a committed `.agents/plugins` -> /elsewhere)
+  // — mkdirSync + atomicWrite would otherwise create or replace a file the
+  // generator never owned. Targets under plugins/<name> are contained in
+  // that plugin; the root-level marketplaces (.claude-plugin/,
+  // .agents/plugins/, .cursor-plugin/) in the repository root. Stale
+  // unlinks under plugins/ were already checked by queueStaleUnlinks; the
+  // one root-level stale candidate (the Cursor marketplace) is checked
+  // here.
+  const rootRealCache = new Map();
+  const containerRealFor = (container) => {
+    if (!rootRealCache.has(container)) rootRealCache.set(container, resolvePluginRootReal(container, errors));
+    return rootRealCache.get(container);
+  };
+  for (const target of targets) {
+    const underPlugins = target.path.startsWith(pluginsRoot + sep);
+    if (underPlugins && target.bytes === null) continue;
+    const name = underPlugins ? relative(pluginsRoot, target.path).split(sep)[0] : null;
+    const container = name === null ? rootDir : join(pluginsRoot, name);
+    const problem = sweepCandidateProblem(target.path, container, containerRealFor(container), rootDir);
+    if (problem !== null) {
+      errors.push(`refusing to ${target.bytes === null ? 'sweep' : 'write'} ${relative(rootDir, target.path)}: ${problem}`);
+      if (name !== null) result.results[name] = 'error';
     }
   }
 
@@ -1432,8 +1509,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // corresponding target. Report as drift; apply mode deletes it.
     // Existence-only check — readFileSync would throw EISDIR for a stale
     // symlink alias whose entry itself is swept (it may resolve to a
-    // directory), and its content is irrelevant here regardless.
-    if (!existsSync(target.path)) {
+    // directory), and its content is irrelevant here regardless. lstat-
+    // based so a dangling symlink is still reported and unlinked.
+    if (!lexistsSync(target.path)) {
       continue; // already gone
     }
     const rel = relative(rootDir, target.path);
