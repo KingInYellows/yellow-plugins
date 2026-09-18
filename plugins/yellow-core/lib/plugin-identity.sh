@@ -27,11 +27,18 @@ pi_warn() {
   printf '[plugin-identity] Warning: %s\n' "$1" >&2
 }
 
+# Shared read-only git invocation: hooks and fsmonitor disabled, no optional
+# locks. handoff.sh's allowlisted ho_git delegates here so the safety flags
+# have one owner. Callers pass the subcommand and its arguments.
+pi_git_readonly() {
+  command git -c core.hooksPath=/dev/null -c core.fsmonitor=false --no-optional-locks "$@"
+}
+
 # Print the .version of a plugin.json / package.json, or "unknown".
 pi_json_version() {
   local file="$1"
   if command -v jq >/dev/null 2>&1 && [ -f "$file" ]; then
-    jq -r '.version // "unknown"' "$file" 2>/dev/null || printf 'unknown'
+    jq -r 'if (.version // "") == "" then "unknown" else .version end' "$file" 2>/dev/null || printf 'unknown'
   else
     printf 'unknown'
   fi
@@ -78,8 +85,8 @@ pi_report() {
   fi
 
   if [ -z "$checkout" ]; then
-    checkout=$(git -c core.hooksPath=/dev/null -c core.fsmonitor=false --no-optional-locks \
-      rev-parse --show-toplevel 2>/dev/null || printf '')
+    # Only reached when the caller did not pass PI_CHECKOUT_ROOT.
+    checkout=$(pi_git_readonly rev-parse --show-toplevel 2>/dev/null || printf '')
   fi
   if [ -n "$checkout" ] && [ -f "$checkout/plugins/$plugin/package.json" ]; then
     checkout_version=$(pi_json_version "$checkout/plugins/$plugin/package.json")

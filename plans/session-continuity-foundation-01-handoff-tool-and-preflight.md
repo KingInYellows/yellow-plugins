@@ -158,7 +158,7 @@ real evidence.
 - [x] Step 6: Verify read-only behavior with an explicit guard: wrap all git
   calls in `ho_git()` which passes `-c core.hooksPath=/dev/null` and refuses
   any subcommand not in the allowlist (`rev-parse`, `status`, `symbolic-ref`,
-  `remote`, `rev-list`), so a future edit cannot add a mutating call silently.
+  `remote get-url`), so a future edit cannot add a mutating call silently.
 - [x] Step 7: Create `plugins/yellow-core/lib/plugin-identity.sh` (sourced lib,
   load guard `_PLUGIN_IDENTITY_LOADED`, no shell options) with `pi_report()`
   printing JSON `{root, version, cache_commit, checkout_version, identity}`:
@@ -276,6 +276,12 @@ real evidence.
   committed (R23).
 - Manual smoke in this worktree: `handoff.sh write` then `preflight` on the
   produced note -> expected: `ready`, exit 0; `git status` unchanged.
+- After the /review:pr pass on PR #808: front matter uses flat
+  `dirty_staged` / `dirty_unstaged` / `dirty_untracked` keys (spec updated);
+  publish uses a fail-if-exists hard link, not `mv` (spec updated); a `body`
+  subcommand prints the fenced full narrative; `write` refuses an empty body
+  and refuses to run outside a git worktree; every note-derived scalar is
+  shape-validated before it reaches stdout.
 - Not run: installed-host smoke of the skill through the cached plugin copy;
   reported as `not-run`.
 
@@ -292,6 +298,12 @@ real evidence.
   exit 11) rather than crashing mid-command.
 - The task tracker tools were unavailable in the implementing session; the
   plan checkboxes were the only progress surface.
+- After the /review:pr pass on PR #808: front matter uses flat
+  `dirty_staged` / `dirty_unstaged` / `dirty_untracked` keys (spec updated);
+  publish uses a fail-if-exists hard link, not `mv` (spec updated); a `body`
+  subcommand prints the fenced full narrative; `write` refuses an empty body
+  and refuses to run outside a git worktree; every note-derived scalar is
+  shape-validated before it reaches stdout.
 - Not run: installed-host smoke of the skill through the cached plugin copy
   (`~/.claude/plugins/cache/yellow-plugins/yellow-core/2.3.1`); the cache
   lags this branch until a release, so `plugin.identity` will report

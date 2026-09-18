@@ -6,6 +6,7 @@
 #   write --slug S --title T [--task-ref P] [--evidence P]... < body
 #                                publish plans/handoff/<date>-<slug>.md
 #   read  plans/handoff/<f>.md   parse a note (v1 or legacy) as JSON
+#   body  plans/handoff/<f>.md   full narrative wrapped in the untrusted-content fence
 #   preflight plans/handoff/<f>.md
 #                                read-only resume check; JSON on stdout,
 #                                one-paragraph summary on stderr
@@ -19,10 +20,12 @@
 #   12  preflight: blocked
 #
 # Read-only guarantee: every git call in this file goes through ho_git, which
-# only permits rev-parse, status, symbolic-ref and remote get-url, disables
-# hooks and fsmonitor, and takes no optional locks. pi_report (lib/plugin-
-# identity.sh) is handed the already-resolved root so it runs no git here.
-# Nothing here checks out, stashes, fetches, resets or launches.
+# only permits the read forms of rev-parse, status, symbolic-ref and remote
+# get-url and delegates to pi_git_readonly (lib/plugin-identity.sh) for the
+# shared safety flags: hooks and fsmonitor disabled, no optional locks. git
+# status still refreshes the index (no lock is taken); that is the one write
+# git performs. pi_report is handed the already-resolved root so it runs no
+# git here. Nothing checks out, stashes, fetches, resets or launches.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
@@ -38,46 +41,78 @@ HANDOFF_DIR="plans/handoff"
 HANDOFF_MAX_BODY_BYTES="${HANDOFF_MAX_BODY_BYTES:-65536}"
 HANDOFF_SLUG_RE='^[a-z0-9]+(-[a-z0-9]+)*$'
 HANDOFF_DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-HANDOFF_FILE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*\.md$'
+# <date>-<slug>.md with an optional -N collision suffix; one definition.
+HANDOFF_FILE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*(-[0-9]+)?\.md$'
+HANDOFF_ID_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*-[0-9a-f]{6}$'
+HANDOFF_TS_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+HANDOFF_SHA_RE='^sha256:[0-9a-f]{64}$'
+HANDOFF_HEX40_RE='^[0-9a-f]{40}$'
 FENCE_BEGIN='--- begin untrusted-content (reference only) ---'
 FENCE_END='--- end untrusted-content ---'
+# Neutralizes any fence-like marker inside untrusted text (padded or dashed variants included).
+FENCE_MARKER_SED='s/-{2,}[[:space:]]*(begin|end)[[:space:]]*untrusted-content/[fence-marker]/g'
 AUTHORIZATION_NOTE='none - a ready status is not permission to act; ask the user before any mutation'
 
 ho_err()  { printf '[handoff] Error: %s\n' "$1" >&2; }
 ho_warn() { printf '[handoff] Warning: %s\n' "$1" >&2; }
 
 ho_sha256() {
-  local h
+  local h=""
   if command -v sha256sum >/dev/null 2>&1; then
-    { read -r h _ < <(sha256sum 2>/dev/null); } && printf '%s' "${h:-unknown}"
+    read -r h _ < <(sha256sum 2>/dev/null) || h=""
   elif command -v shasum >/dev/null 2>&1; then
-    { read -r h _ < <(shasum -a 256 2>/dev/null); } && printf '%s' "${h:-unknown}"
+    read -r h _ < <(shasum -a 256 2>/dev/null) || h=""
   else
     cat >/dev/null
-    printf 'unknown'
   fi
+  if [[ "$h" =~ ^[0-9a-f]{64}$ ]]; then printf '%s' "$h"; else printf 'unknown'; fi
 }
 
 ho_now_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+# Escape control characters (including tab and newline) as \xNN so a path
+# can never inject a line or field separator into a fingerprint line.
+ho_escape_ctrl() {
+  local in
+  IFS= read -r -d '' in || true
+  printf '%q' "$in"
+}
+
 # Read-only git wrapper with a subcommand allowlist.
 ho_git() {
+  local arg
   case "${1:-}" in
-    rev-parse|status|symbolic-ref) ;;
+    rev-parse|status) ;;
+    symbolic-ref)
+      # Read form only: `symbolic-ref [-q] [--short] HEAD`; a second ref
+      # argument would be a write.
+      for arg in "${@:2}"; do
+        case "$arg" in -q|--short|HEAD) ;; *) ho_err "ho_git: symbolic-ref '$arg' is not allowed"; return 1 ;; esac
+      done ;;
     remote)
       [ "${2:-}" = "get-url" ] || { ho_err "ho_git: 'remote ${2:-}' is not allowed"; return 1; }
       ;;
     *) ho_err "ho_git: '${1:-}' is not in the read-only allowlist"; return 1 ;;
   esac
-  command git -c core.hooksPath=/dev/null -c core.fsmonitor=false --no-optional-locks "$@"
+  pi_git_readonly "$@"
 }
 
+# $1 = subcommand name, used to keep the stdout contract per subcommand:
+# only preflight owns a status envelope; the others report on stderr.
 ho_require_jq() {
   if ! command -v jq >/dev/null 2>&1 || ! jq -n 1 >/dev/null 2>&1; then
     ho_err "a working jq is required"
-    printf '{"status":"unsupported","reasons":[{"code":"jq-missing"}]}\n'
+    if [ "${1:-}" = "preflight" ]; then
+      printf '{"preflight_format":1,"status":"unsupported","reasons":[{"code":"jq-missing"}]}\n'
+    fi
     exit 11
   fi
+}
+
+ho_require_libs() {
+  command -v cs_redact_secrets >/dev/null 2>&1 && command -v validate_file_path >/dev/null 2>&1 \
+    && command -v pi_report >/dev/null 2>&1 && command -v pi_git_readonly >/dev/null 2>&1 \
+    || { ho_err "yellow-core lib/ helpers are missing; refusing to run"; exit 2; }
 }
 
 # Canonical project root: git toplevel or $PWD. Memoized per process.
@@ -134,39 +169,49 @@ ho_measure() {
     branch=$(ho_git symbolic-ref --short -q HEAD 2>/dev/null) || branch=detached
     head=$(ho_git rev-parse HEAD 2>/dev/null) || head=unknown
 
-    # One awk pass over the NUL-separated porcelain stream: emit "XY\tpath"
-    # (renames/copies: "XY\tpath\torig"), count staged / unstaged / untracked,
-    # and skip handoff notes (and the writer's own temp file) so publishing a
-    # note never changes the fingerprint. Counts land on the final line.
-    local parsed
-    if parsed=$(ho_git status --porcelain=v1 -z --untracked-files=all 2>/dev/null \
-        | LC_ALL=C awk -v RS='\0' -v dir="$HANDOFF_DIR/" '
-          BEGIN { s = 0; u = 0; t = 0; want_orig = 0; skip = 0 }
-          want_orig {
-            want_orig = 0
-            if (!skip) printf "%s\t%s\n", rec, $0
-            skip = 0; next
-          }
-          {
-            xy = substr($0, 1, 2); path = substr($0, 4)
-            two = (xy ~ /^[RC]/ || xy ~ /^.[RC]/)
-            if (index(path, dir) == 1) { if (two) { want_orig = 1; skip = 1 }; next }
-            if (xy == "??") { t++ }
-            else {
-              if (substr(xy, 1, 1) != " " && substr(xy, 1, 1) != "?") s++
-              if (substr(xy, 2, 1) != " " && substr(xy, 2, 1) != "?") u++
-            }
-            if (two) { want_orig = 1; rec = xy "\t" path; next }
-            printf "%s\t%s\n", xy, path
-          }
-          END { printf "__COUNTS__\t%d\t%d\t%d\n", s, u, t }'); then
-      local counts
-      counts=$(printf '%s\n' "$parsed" | tail -n 1)
-      IFS=$'\t' read -r _ staged unstaged untracked <<< "$counts"
-      dirty_digest="sha256:$(printf '%s\n' "$parsed" | sed '$d' | LC_ALL=C sort | ho_sha256)"
+    # Parse the NUL-separated porcelain stream in one pass (bash array append
+    # is amortized O(1)). Fingerprint lines are "XY<TAB>path" (renames and
+    # copies: "XY<TAB>path<TAB>orig") with control characters in paths
+    # escaped, so a hostile filename cannot forge extra lines. Untracked
+    # entries under plans/handoff/ (a freshly written note, the writer's own
+    # temp files) are excluded so publishing a note never changes the
+    # fingerprint; tracked modifications there still count.
+    local entry xy path orig statusfile
+    local -a lines=()
+    local s_count=0 u_count=0 t_count=0
+    # NUL-separated output cannot pass through a command substitution (bash
+    # drops NUL bytes), so it is spooled to a private temp file outside the
+    # repository and read back record by record.
+    statusfile=$(mktemp "${TMPDIR:-/tmp}/handoff-status.XXXXXX") || statusfile=""
+    if [ -n "$statusfile" ] && ho_git status --porcelain=v1 -z --untracked-files=all > "$statusfile" 2>/dev/null; then
+      while IFS= read -r -d '' entry; do
+        xy=${entry:0:2}; path=${entry:3}; orig=""
+        case "$xy" in R?|C?|?R|?C) IFS= read -r -d '' orig || orig="" ;; esac
+        if [ "$xy" = "??" ]; then
+          case "$path" in "$HANDOFF_DIR"/*) continue ;; esac
+          t_count=$((t_count + 1))
+        else
+          case "${xy:0:1}" in ' '|'?') ;; *) s_count=$((s_count + 1)) ;; esac
+          case "${xy:1:1}" in ' '|'?') ;; *) u_count=$((u_count + 1)) ;; esac
+        fi
+        path=$(printf '%s' "$path" | ho_escape_ctrl)
+        if [ -n "$orig" ]; then
+          orig=$(printf '%s' "$orig" | ho_escape_ctrl)
+          lines+=("${xy}"$'\t'"${path}"$'\t'"${orig}")
+        else
+          lines+=("${xy}"$'\t'"${path}")
+        fi
+      done < "$statusfile"
+      staged=$s_count; unstaged=$u_count; untracked=$t_count
+      if [ "${#lines[@]}" -gt 0 ]; then
+        dirty_digest="sha256:$(printf '%s\n' "${lines[@]}" | LC_ALL=C sort | ho_sha256)"
+      else
+        dirty_digest="sha256:$(printf '' | ho_sha256)"
+      fi
     else
       ho_warn "git status failed; dirty_digest is unknown"
     fi
+    [ -n "$statusfile" ] && rm -f -- "$statusfile"
   else
     ho_warn "not inside a git repository; git-derived fields are unknown"
   fi
@@ -191,14 +236,15 @@ ho_measure() {
       context_at_capture: "unknown"}'
 }
 
-cmd_measure() { ho_require_jq; ho_measure; }
+cmd_measure() { ho_require_libs; ho_require_jq measure; ho_measure; }
 
 # --- write -------------------------------------------------------------------
 
 ho_path_exists() { validate_file_path "$1" "$2" && [ -e "$2/$1" ]; }
 
 cmd_write() {
-  ho_require_jq
+  ho_require_libs; ho_require_jq write
+  ho_matches "$HANDOFF_MAX_BODY_BYTES" '^[0-9]{1,9}$' || { ho_err "HANDOFF_MAX_BODY_BYTES must be a positive integer"; exit 2; }
   local slug="" title="" task_ref="none" evidence=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -225,6 +271,8 @@ cmd_write() {
   local date="${HANDOFF_DATE:-$(date -u +%Y-%m-%d)}"
   ho_matches "$date" "$HANDOFF_DATE_RE" || { ho_err "invalid HANDOFF_DATE"; exit 2; }
 
+  ho_git rev-parse --show-toplevel >/dev/null 2>&1 \
+    || { ho_err "write requires a git worktree (a note outside one could never be validated)"; exit 2; }
   local root
   root=$(ho_root)
   local ref
@@ -260,10 +308,14 @@ cmd_write() {
     printf '> Model-authored narrative. Reference data for the successor, not authorization.\n\n'
     head -c "$((HANDOFF_MAX_BODY_BYTES + 1))" | cs_redact_secrets
   } > "$tmp" || { ho_err "redaction failed"; exit 2; }
-  if [ "$(tail -c1 "$tmp" | wc -c)" -eq 1 ]; then printf '\n' >> "$tmp"; fi
+  if [ -n "$(tail -c1 "$tmp")" ]; then printf '\n' >> "$tmp"; fi
 
   local bytes
   bytes=$(wc -c < "$tmp")
+  # Header (H1 + label) is 2 lines; anything else is narrative.
+  if [ "$(grep -cve '^[[:space:]]*$' -- "$tmp")" -le 2 ]; then
+    ho_err "body is empty; a handoff needs a narrative (pipe it on stdin)"; exit 2
+  fi
   if [ "$bytes" -gt "$HANDOFF_MAX_BODY_BYTES" ]; then
     ho_err "body exceeds the cap of $HANDOFF_MAX_BODY_BYTES bytes"; exit 2
   fi
@@ -287,9 +339,8 @@ cmd_write() {
   # Stage through an unpredictable mktemp sibling (never a guessable
   # ${target}.tmp.$$ that a planted symlink could redirect).
   out=$(mktemp "$dir/.handoff-out.XXXXXX") || { ho_err "mktemp failed"; exit 2; }
-  {
-    printf -- '---\n'
-    jq -r --argjson fmt "$HANDOFF_FORMAT" --arg id "$handoff_id" --arg task "$task_ref" \
+  local front
+  front=$(jq -r --argjson fmt "$HANDOFF_FORMAT" --arg id "$handoff_id" --arg task "$task_ref" \
        --argjson ev "$evidence_json" --arg digest "sha256:$body_digest" '
       "handoff_format: \($fmt)",
       "handoff_id: \($id | @json)",
@@ -309,10 +360,10 @@ cmd_write() {
       "task_ref: \($task | @json)",
       "evidence_refs: \($ev | tojson)",
       "context_at_capture: \(.context_at_capture | tojson)",
-      "body_digest: \($digest | @json)"' <<< "$measured"
-    printf -- '---\n'
-    cat -- "$tmp"
-  } > "$out" 2>/dev/null || { ho_err "write failed"; exit 2; }
+      "body_digest: \($digest | @json)"' <<< "$measured") \
+    || { ho_err "front matter assembly failed"; exit 2; }
+  { printf -- '---\n%s\n---\n' "$front"; cat -- "$tmp"; } > "$out" \
+    || { ho_err "write failed"; exit 2; }
   if [ -n "${HANDOFF_TEST_SLEEP_BEFORE_MV:-}" ]; then sleep "$HANDOFF_TEST_SLEEP_BEFORE_MV"; fi
 
   # Publish with a fail-if-exists hard link so a concurrent writer that chose
@@ -322,7 +373,11 @@ cmd_write() {
     target="$dir/$name"
     if [ ! -e "$target" ] && [ ! -L "$target" ]; then
       validate_file_path "$HANDOFF_DIR/$name" "$root" || { ho_err "target path rejected"; exit 2; }
-      ln -- "$out" "$target" 2>/dev/null && break
+      if ln -- "$out" "$target" 2>"$out.err"; then rm -f -- "$out.err"; break; fi
+      if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+        ho_err "publish failed: $(tr -d '\n' < "$out.err")"; rm -f -- "$out.err"; exit 2
+      fi
+      rm -f -- "$out.err"
     fi
     n=$((n + 1)); name="${date}-${slug}-${n}.md"
     [ "$n" -le 1000 ] || { ho_err "too many collisions for $slug"; exit 2; }
@@ -345,7 +400,7 @@ ho_resolve_ref() {
   esac
   local base="${ref#"$HANDOFF_DIR"/}"
   case "$base" in */*) return 1 ;; esac
-  ho_matches "$base" "$HANDOFF_FILE_RE" || ho_matches "$base" '^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*-[0-9]+\.md$' || return 1
+  ho_matches "$base" "$HANDOFF_FILE_RE" || return 1
   validate_file_path "$ref" "$root" || return 1
   local full="$root/$ref"
   [ ! -L "$full" ] && [ -f "$full" ] || return 1
@@ -353,7 +408,7 @@ ho_resolve_ref() {
 }
 
 ho_front_matter() { awk 'BEGIN{c=0} /^---\r?$/ && c<2 {c++; next} c==1{print} c>=2{exit}' "$1"; }
-ho_after_front_matter() { awk 'BEGIN{c=0} /^---\r?$/ && c<2 {c++; next} c>=2{print}' "$1"; }
+ho_after_front_matter() { awk 'BEGIN{c=0} /^---\r?$/ && c<2 {c++; next} c>=2{print}' "$1" | tr -d '\r'; }
 
 # Section body under a "## <name>" heading (case-insensitive substring), up to the next heading.
 ho_section() {
@@ -366,9 +421,16 @@ ho_section() {
 
 # Flatten untrusted text to one line, neutralize fence markers, truncate.
 ho_scrub() {
-  printf '%s' "$1" | tr '\n\r' '  ' | tr -d '\000-\010\013-\037\177' \
-    | sed -E 's/--- (begin|end) untrusted-content/[fence-marker]/g; s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+  printf '%s' "$1" | tr '\n\r\t' '   ' | tr -d '\000-\010\013-\037\177' \
+    | sed -E 's/[[:space:]]+/ /g' | sed -E "$FENCE_MARKER_SED" | sed -E 's/^ //; s/ $//' \
     | head -c "${2:-200}"
+}
+
+# Shape-validate a note-derived scalar before it is echoed; anything off
+# pattern becomes "unknown" so a planted note cannot smuggle text to stdout.
+ho_shaped() {
+  local value="$1" re="$2"
+  if [[ "$value" =~ $re ]]; then printf '%s' "$value"; else printf 'unknown'; fi
 }
 
 ho_excerpt() {
@@ -401,7 +463,7 @@ ho_read_json() {
   [ -n "$next_action" ] || next_action=$(grep -v '^[[:space:]]*$' -- "$full" | tail -n 1)
   local status_section complete=false
   status_section=$(ho_section "$full" "workflow status")
-  if printf '%s' "$status_section" | grep -qE 'Status:[[:space:]]*COMPLETE|\bCOMPLETE\b'; then complete=true; fi
+  if printf '%s' "$status_section" | tr -d '\r' | grep -qE '^[[:space:]>*]*(Status|Workflow status):[[:space:]]*\**[[:space:]]*COMPLETE'; then complete=true; fi
 
   local fmt
   fmt=$(printf '%s' "$fm_json" | jq -r '.handoff_format // "legacy"')
@@ -424,20 +486,71 @@ ho_read_json() {
   expected=$(printf '%s' "$fm_json" | jq -r '.body_digest // "unknown"')
   [ "$recomputed" = "$expected" ] && digest_ok=true
 
+  # Every note-derived scalar is shape-validated or scrubbed before it can
+  # reach stdout (a planted note is untrusted input).
+  local m_id m_ts m_sess m_ver m_repo m_wt m_kind m_remote m_branch m_head m_dirty
+  { IFS= read -r m_id; IFS= read -r m_ts; IFS= read -r m_sess; IFS= read -r m_ver; IFS= read -r m_repo
+    IFS= read -r m_wt; IFS= read -r m_kind; IFS= read -r m_remote; IFS= read -r m_branch; IFS= read -r m_head
+    IFS= read -r m_dirty; } < <(printf '%s' "$fm_json" | jq -r '
+      [.handoff_id, .captured_at, .source_session, .plugin_version, .repository_id, .worktree_id,
+       .worktree_kind, .remote_origin, .branch, .head, .dirty_digest]
+      | map(if . == null then "unknown" else (tostring | gsub("[\\r\\n]"; " ")) end) | .[]')
+  m_id=$(ho_shaped "$m_id" "$HANDOFF_ID_RE"); m_ts=$(ho_shaped "$m_ts" "$HANDOFF_TS_RE")
+  m_sess=$(ho_shaped "$m_sess" '^[A-Za-z0-9_-]{1,128}$'); m_ver=$(ho_shaped "$m_ver" '^[0-9A-Za-z.+-]{1,64}$')
+  m_repo=$(ho_shaped "$m_repo" "$HANDOFF_SHA_RE"); m_wt=$(ho_shaped "$m_wt" "$HANDOFF_SHA_RE")
+  m_kind=$(ho_shaped "$m_kind" '^(main|linked)$'); m_remote=$(ho_scrub "$m_remote" 200)
+  m_branch=$(ho_scrub "$m_branch" 200); m_head=$(ho_shaped "$m_head" "$HANDOFF_HEX40_RE")
+  m_dirty=$(ho_shaped "$m_dirty" "$HANDOFF_SHA_RE")
+  local task_ref
+  task_ref=$(printf '%s' "$fm_json" | jq -r '(.task_ref // "none") | tostring' | head -n 1)
+  ho_safe_arg "$task_ref" && [ "${#task_ref}" -le 512 ] || task_ref="invalid"
+  local evidence_json='[]' ev n=0
+  local -a ev_ok=()
+  while IFS= read -r ev; do
+    [ -n "$ev" ] || continue
+    n=$((n + 1)); [ "$n" -le 64 ] || break
+    ho_safe_arg "$ev" && [ "${#ev}" -le 512 ] || continue
+    ev_ok+=("$ev")
+  done < <(printf '%s' "$fm_json" | jq -r '(.evidence_refs // []) | if type == "array" then map(tostring | gsub("[\\r\\n]"; " "))[] else empty end')
+  if [ "${#ev_ok[@]}" -gt 0 ]; then
+    evidence_json=$(printf '%s\n' "${ev_ok[@]}" | jq -Rnc '[inputs]')
+  fi
+
   jq -nc --arg ref "$ref" --argjson fm "$fm_json" --arg heading "$heading" \
     --arg excerpt "$(ho_excerpt "$next_action")" --argjson digest_ok "$digest_ok" \
-    --argjson complete "$complete" '
-    {format: "v1", reference: $ref, handoff_id: ($fm.handoff_id // "unknown"), title: $heading,
-     measured: ($fm | del(.handoff_format, .handoff_id, .task_ref, .evidence_refs, .body_digest)),
+    --argjson complete "$complete" --arg id "$m_id" --arg ts "$m_ts" --arg sess "$m_sess" \
+    --arg ver "$m_ver" --arg repo "$m_repo" --arg wt "$m_wt" --arg kind "$m_kind" --arg remote "$m_remote" \
+    --arg branch "$m_branch" --arg head "$m_head" --arg dirty "$m_dirty" --arg task "$task_ref" \
+    --argjson ev "$evidence_json" '
+    {format: "v1", reference: $ref, handoff_id: $id, title: $heading,
+     measured: {captured_at: $ts, source_session: $sess, plugin_version: $ver, repository_id: $repo,
+                worktree_id: $wt, worktree_kind: $kind, remote_origin: $remote, branch: $branch, head: $head,
+                dirty_digest: $dirty,
+                dirty_staged: ($fm.dirty_staged | if type == "number" then . else "unknown" end),
+                dirty_unstaged: ($fm.dirty_unstaged | if type == "number" then . else "unknown" end),
+                dirty_untracked: ($fm.dirty_untracked | if type == "number" then . else "unknown" end),
+                context_at_capture: ($fm.context_at_capture | if type == "object" then . else "unknown" end)},
      body_digest_ok: $digest_ok,
-     task_ref: (($fm.task_ref // "none") | tostring),
-     evidence_refs: (($fm.evidence_refs // []) | if type == "array" then map(tostring) else [] end),
+     task_ref: $task,
+     evidence_refs: $ev,
      workflow_status_complete: $complete,
      next_action_excerpt: $excerpt}'
 }
 
+# Full narrative, fenced, with fence markers neutralized line by line.
+cmd_body() {
+  ho_require_libs
+  local ref="${1:-}" root full
+  root=$(ho_root)
+  full=$(ho_resolve_ref "$ref" "$root") || { ho_err "invalid reference: $ref"; exit 2; }
+  printf '%s\n' "$FENCE_BEGIN"
+  ho_after_front_matter "$full" | tr -d '\000-\010\013-\037\177' \
+    | sed -E "$FENCE_MARKER_SED" | head -c "$HANDOFF_MAX_BODY_BYTES"
+  printf '\n%s\n' "$FENCE_END"
+}
+
 cmd_read() {
-  ho_require_jq
+  ho_require_libs; ho_require_jq read
   local out rc
   out=$(ho_read_json "${1:-}"); rc=$?
   printf '%s\n' "$out"
@@ -447,7 +560,7 @@ cmd_read() {
 # --- preflight ---------------------------------------------------------------
 
 cmd_preflight() {
-  ho_require_jq
+  ho_require_libs; ho_require_jq preflight
   local ref="${1:-}"
   local note rc root
   root=$(ho_root)
@@ -482,7 +595,9 @@ cmd_preflight() {
   local task_ref task_missing=false complete=false
   local note_complete
   { IFS= read -r task_ref; IFS= read -r note_complete; } < <(printf '%s' "$note" | jq -r '.task_ref, (.workflow_status_complete | tostring)')
-  if [ "$task_ref" != "none" ]; then
+  if [ "$task_ref" = "invalid" ]; then
+    task_missing=true
+  elif [ "$task_ref" != "none" ]; then
     if ! ho_path_exists "$task_ref" "$root"; then
       task_missing=true
     else
@@ -545,9 +660,10 @@ cmd_preflight() {
        note: {handoff_format: 1, handoff_id: $note.handoff_id, captured_at: $m.captured_at,
               source_session: $m.source_session, body_digest_ok: $note.body_digest_ok,
               task_ref: $note.task_ref, evidence_refs: $note.evidence_refs},
-       plugin: $plugin, context: "unknown",
+       plugin: $plugin, context: $live.context_at_capture,
        next_action_excerpt: $note.next_action_excerpt, authorization: $auth}
-    | (tojson), "\(.status)\t\($codes | join(", "))"')
+    | (tojson), "\(.status)\t\($codes | join(", "))"') \
+    || { ho_err "preflight computation failed"; exit 2; }
   local json status codes
   json=$(printf '%s\n' "$result" | sed '$d')
   IFS=$'\t' read -r status codes <<< "$(printf '%s\n' "$result" | tail -n 1)"
@@ -563,13 +679,15 @@ cmd_preflight() {
 }
 
 usage() {
-  cat >&2 <<'__EOF_USAGE__'
+  cat <<'__EOF_USAGE__'
 usage: handoff.sh <subcommand> [args]
   measure                                  measured workspace block as JSON
   write --slug S --title T [--task-ref P] [--evidence P]... < body
                                            publish plans/handoff/<date>-<slug>.md
   read  plans/handoff/<file>.md            parse a note (v1 or legacy) as JSON
+  body  plans/handoff/<file>.md            full narrative inside the untrusted-content fence
   preflight plans/handoff/<file>.md        read-only resume check
+env:  HANDOFF_DATE=YYYY-MM-DD  HANDOFF_MAX_BODY_BYTES=65536
 exit: 0 ready/ok, 2 usage or invalid reference, 10 mismatched, 11 unsupported, 12 blocked
 __EOF_USAGE__
 }
@@ -581,9 +699,10 @@ main() {
     measure) cmd_measure "$@" ;;
     write) cmd_write "$@" ;;
     read) cmd_read "$@" ;;
+    body) cmd_body "$@" ;;
     preflight) cmd_preflight "$@" ;;
     -h|--help|help) usage; exit 0 ;;
-    *) usage; ho_err "unknown subcommand: '$cmd'"; exit 2 ;;
+    *) usage >&2; ho_err "unknown subcommand: '$cmd'"; exit 2 ;;
   esac
 }
 

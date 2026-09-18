@@ -88,7 +88,8 @@ table after this section.
   `worktree_kind` (`main` or `linked`), `remote_origin` (redacted, informational
   only), `branch`, `head`, `dirty_digest` (sha256 over the sorted
   `git status --porcelain=v1 -z --untracked-files=all` entries, statuses and
-  paths only), `dirty_counts` (staged, unstaged, untracked), and
+  paths only, untracked entries under `plans/handoff/` excluded),
+  `dirty_staged`, `dirty_unstaged`, `dirty_untracked`, and
   `task_ref` (an explicit in-repo artifact path, validated, or `none`).
   - Acceptance: two worktrees of one clone on the same branch produce equal
     `repository_id` and different `worktree_id` (T02); no absolute path
@@ -115,7 +116,8 @@ table after this section.
 - **R9.** Publication shall validate the target path (`validate_file_path`,
   slug regex `^[a-z0-9]+(-[a-z0-9]+)*$`, inside `plans/handoff/`), refuse to
   follow or overwrite a symlink, resolve collisions by `-2`, `-3` suffixes, and
-  write via sibling temp file plus `mv` so an interruption leaves either the
+  write via an unpredictable sibling temp file published with a
+  fail-if-exists hard link so an interruption leaves either the
   previous complete note or the new complete note.
   - Acceptance (T04, T05): a killed writer leaves no `*.tmp.*` at the target
     and the target is either absent, the old note, or the new note; traversal,
@@ -165,7 +167,8 @@ table after this section.
     worktree of the same repository each produce the expected status.
 - **R16.** The preflight shall detect existing completion when `task_ref`
   resolves under `plans/complete/`, when a referenced plan has zero unchecked
-  boxes, or when the note's workflow status is marked `COMPLETE`, and shall
+  boxes (and at least one checked box), or when the note's workflow-status
+  section carries an explicit `Status: COMPLETE` marker line, and shall
   report `blocked` with reason `already-complete` rather than `ready`.
   - Acceptance (T08): a fixture note bound to an archived plan is `blocked`.
 - **R17.** A `ready` result shall be presented as "safe to discuss, not
@@ -289,7 +292,7 @@ table after this section.
 
 | Component | Path | Serves | Consumer |
 | --- | --- | --- | --- |
-| Handoff tool | `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh` with subcommands `measure`, `write`, `read`, `preflight` | R1, R4–R17 | `SKILL.md` steps; bats |
+| Handoff tool | `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh` with subcommands `measure`, `write`, `read`, `body` (fenced full narrative), `preflight` | R1, R4–R17 | `SKILL.md` steps; bats |
 | Skill text | `plugins/yellow-core/skills/session-handoff/SKILL.md` (rewritten steps; newest-file resume removed) | R4, R12, R17 | Claude in-session |
 | Context observer | `plugins/yellow-core/lib/context-observer.py` (stdlib only), installed by setup as `~/.claude/yellow-context-observer.py` | R18–R22 | statusline pipeline; `handoff.sh measure` |
 | Observation reader | function `co_read_observation` in `plugins/yellow-core/lib/context-observer.sh` | R20, R21 | `handoff.sh`; bats |
@@ -320,7 +323,9 @@ remote_origin: https://github.com/KingInYellows/yellow-plugins.git   # informati
 branch: agent/feat/session-continuity-01
 head: 3812fc66…
 dirty_digest: sha256:…
-dirty_counts: { staged: 2, unstaged: 1, untracked: 4 }
+dirty_staged: 2
+dirty_unstaged: 1
+dirty_untracked: 4
 task_ref: plans/session-continuity-foundation-01-handoff.md   # or none
 evidence_refs: [tests/…, plans/…]  # paths only, validated in-repo
 context_at_capture: unknown      # or { remaining_percentage: 61, observed_at: … }
@@ -383,7 +388,7 @@ notes have no front matter and are classified by that absence (R1).
 }
 ```
 
-Reason codes: `legacy-note`, `format-newer-than-reader`, `invalid-reference`,
+Reason codes: `jq-missing`, `legacy-note`, `format-newer-than-reader`, `invalid-reference`,
 `repository-mismatch`, `worktree-mismatch`, `branch-mismatch`, `head-moved`,
 `dirty-changed`, `unverifiable`, `task-ref-missing`, `evidence-missing`,
 `already-complete`, `modified-after-capture`, `session-differs` (informational,
@@ -430,7 +435,8 @@ observer is written to be safe under kill at any point (R19) and this remains
 
 1. **Write.** Skill composes narrative → `handoff.sh write --slug <s> [--task-ref <p>] [--evidence <p>…] < body`
    → validate path and slug → redact body → cap size → measure → assemble
-   front matter → temp file → `mv` → print path and `handoff_id`.
+   front matter → temp file → fail-if-exists hard link → print path and
+   `handoff_id`.
 2. **Preflight.** `handoff.sh preflight plans/handoff/<file>.md` → validate
    reference → classify format → verify `body_digest` → re-measure → compare →
    completion check → plugin identity → observation lookup → JSON on stdout,
