@@ -1398,8 +1398,8 @@ jobs:
           exit 0
 
   # ============================================================================
-  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, yellow-council, and
-  # yellow-review; advisory for others
+  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, yellow-council,
+  # yellow-review, and yellow-codex; advisory for others
   # ============================================================================
   plugin-shell-tests:
     name: Plugin Shell Tests
@@ -1460,20 +1460,29 @@ jobs:
         # under the advisory `continue-on-error` loop below.
         run: bats plugins/yellow-review/tests/
 
+      - name: Run yellow-codex redaction bats suite (required)
+        # Required, not advisory, for the same reason as yellow-council's:
+        # redaction.bats pins the redact-before-truncate order at
+        # commands/codex/review.md's two stderr sites and its uncapped
+        # api-error extraction (a key leaking past the 500-byte cap is
+        # exactly the regression the suite exists to catch) and runs the
+        # extractor under both mawk and gawk.
+        run: bats plugins/yellow-codex/tests/
+
       - name: Run other plugins' bats suites (advisory)
         continue-on-error: true
         run: |
           set -uo pipefail
           STATUS=0
           # Both top-level and nested test dirs. yellow-core's suites,
-          # yellow-council's redaction suite, and yellow-review's suite are
-          # run as required steps above;
+          # yellow-council's redaction suite, yellow-review's suite and
+          # yellow-codex's redaction suite are run as required steps above;
           # skip them here to avoid double execution and to keep the advisory
           # status accurate.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             case "$d" in
-              plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests) continue ;;
+              plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests|plugins/yellow-codex/tests) continue ;;
             esac
             echo "::group::bats $d"
             bats "$d" || STATUS=$?
