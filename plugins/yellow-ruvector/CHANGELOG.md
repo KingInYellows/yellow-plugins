@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- [`22be229`](https://github.com/KingInYellows/yellow-plugins/commit/22be229125eae257a8faad89f530d65b14127425)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Detect an
+  embedder-provenance mismatch. A `.ruvector` store stamped by the pre-0.2.34
+  hash embedder (64d) refuses every `hooks_remember` under the default
+  onnx-minilm embedder (384d) while `hooks_recall` keeps working, so the write
+  loss was silent. `session-start.sh` now adds one
+  `[ruvector] store is hash-embedded …` line to the SessionStart `systemMessage`
+  (jq only, silent for unstamped stores and when `RUVECTOR_EMBEDDER=hash` /
+  `RUVECTOR_ONNX=0`), and `/ruvector:status` gains a
+  `PROVENANCE: FRESH | OK | MISMATCH | UNSTAMPED | UNKNOWN` step (verdict
+  computed in the command's bash block from a whole-stamp comparison with
+  `hooks reembed --dry-run`'s `targetProvenance`, bounded at 90 s plus a 5 s
+  kill grace) that prints the reembed + restart remediation. A stamp-less store
+  that already holds vectors is reported too (`ERR_LEGACY_STORE_READONLY`).
+
+### Patch Changes
+
+- [`14a8b21`](https://github.com/KingInYellows/yellow-plugins/commit/14a8b2149167b83ed02725555fba29d8120e5f61)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quote
+  `${CLAUDE_PLUGIN_ROOT}` in every hook command. Claude Code runs shell-form
+  hook commands through `sh -c`, so an unquoted placeholder word-splits when the
+  plugin cache lives under a path with a space and the hook fails open — a
+  PreToolUse guard silently never runs. All commands now use
+  `bash "${CLAUDE_PLUGIN_ROOT}/…"` / `node "${CLAUDE_PLUGIN_ROOT}/…"`, as the
+  hooks reference recommends. `pnpm validate:plugins` (RULE 6) now errors on an
+  unquoted or single-quoted placeholder, tokenises the script argument as one
+  shell word (so `"${CLAUDE_PLUGIN_ROOT}"/x.sh` and interpreter flags parse),
+  and applies its existence and containment checks to `node` entrypoints as well
+  as `bash` scripts.
+
+- [`3812fc6`](https://github.com/KingInYellows/yellow-plugins/commit/3812fc66ed19497a3d3d2fe9c24eefa496fca192)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  `hooks/hooks.json` reference mirrors. Claude Code auto-discovers that file and
+  also loads the inline `hooks` block in `plugin.json`, so every hook in these
+  plugins was registered twice and startup printed
+  `hooks.json: unknown key "_comment" ignored`. The inline `plugin.json` block
+  (generated from `catalog/`) is now the only Claude-side hook source;
+  `hooks/codex-hooks.json` is unchanged. `pnpm validate:plugins` (RULE 7) now
+  errors on any `hooks/hooks.json`, with or without inline hooks.
+
+- [`f0c818d`](https://github.com/KingInYellows/yellow-plugins/commit/f0c818d893721ccdd37b4239872761d3c731ded1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  `yellow-mempalace` plugin. It was deprecated in favor of `yellow-ruvector` as
+  the single standard memory system (see `docs/memory-routing-protocol.md`);
+  this completes that follow-up by deleting `plugins/yellow-mempalace/`, its
+  catalog source, and its marketplace/setup-all references, and drops the
+  now-dead `/mempalace:search` cross-reference from `/ruvector:memory`'s
+  description.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
 ## 1.2.6
 
 ### Patch Changes
