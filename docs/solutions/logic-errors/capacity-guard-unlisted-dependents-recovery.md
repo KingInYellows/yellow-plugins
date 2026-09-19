@@ -50,7 +50,7 @@ loop.
 
 The ring was introduced for counting. The suppression was keyed onto it later.
 Nothing re-derived the cap's consequences when the second consumer arrived, and
-the flag's documented meaning still describes only the first.
+the flag's documented meaning still described only the first.
 
 **Fix shape:** either state in the contract that `dedupWindowExceeded` disables
 the `supervise` act step for that pass — making the degradation fail toward
@@ -58,6 +58,9 @@ doing nothing rather than toward doing it twice — or key the idempotence
 decision on something durable (a stored high-water `(createTime, activityId)`
 pair) rather than on a bounded in-memory set. Bounded structures are acceptable
 for approximations; they are not acceptable as the sole gate on a side effect.
+
+**Resolution (PR #793):** `contract-v1.md` now documents that reaching the cap
+makes `supervise` treat the pass as check-failed and take no act step.
 
 ## Finding 2: A Guard That Blocks the Recovery Path for Its Own Cause
 
@@ -86,14 +89,18 @@ adversarially far in the future permanently silences the walk: every subsequent
 
 ## Finding 4: Three Causes, One Recovery Instruction
 
-A re-fetch that ends before the newest page fails closed with one error code and
-one recovery string, "retry with a larger deadline." Three different causes
-reach it: the time budget expired, a page request failed, and an activity could
-not be mapped. Only the first is fixed by a larger deadline; the second needs a
-retry, and the third will reproduce identically forever. When one recovery
-string covers causes with different remedies, two of the three users who read it
-are sent to do something that cannot work — and the operator learns to ignore
-the field. Carry the cause as an envelope field and branch the recovery on it.
+A re-fetch that ends before the newest page failed closed with one error code
+and one recovery string, "retry with a larger deadline." Three different causes
+reached it: the time budget expired, a page request failed, and an activity
+could not be mapped. Only the first is fixed by a larger deadline; the second
+needs a retry, and the third will reproduce identically forever. When one
+recovery string covers causes with different remedies, two of the three users
+who read it are sent to do something that cannot work — and the operator learns
+to ignore the field. Carry the cause as an envelope field and branch the
+recovery on it.
+
+**Resolution (PR #793):** `contract-v1.md` now splits `recoveryAction` by cause
+(budget/deadline, page failure, `unmappedActivity`).
 
 ## The Shared Check
 

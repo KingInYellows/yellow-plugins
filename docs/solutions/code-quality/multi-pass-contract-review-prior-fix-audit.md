@@ -96,7 +96,7 @@ derived.
 ### 3. The decision is propagated by name
 
 Covered in detail in
-[`phase-boundary-move-orphaned-triggers-and-derived-artifacts.md`](./phase-boundary-move-orphaned-triggers-and-derived-artifacts.md):
+[`phase-boundary-orphaned-triggers-artifacts.md`](./phase-boundary-orphaned-triggers-artifacts.md):
 a decision to move capabilities between phases has sites that never mention the
 moved capability, so a grep-driven propagation commit closes only a fraction of
 them.

@@ -36,8 +36,8 @@ override.
 While planning a new `yellow-jules` remote-agent provider (spec
 `plans/specs/yellow-jules-integration.md`, requirement R55: third-party
 lifecycle scripts must be disabled), a review of the existing `yellow-cursor`
-provider's `installSdk()` (`plugins/yellow-cursor/src/ sdk-resolver.ts`) found
-it runs:
+provider's `installSdk()` (`plugins/yellow-cursor/src/sdk-resolver.ts`) found it
+runs:
 
 ```bash
 npm install --prefix <runtimeDir> @cursor/sdk@1.0.28 --no-save --no-audit --no-fund
@@ -121,7 +121,7 @@ npm install --prefix "$RUNTIME_DIR" @cursor/sdk@1.0.28 --no-save --no-audit --no
 # resolved tree (every transitive package's integrity hash included),
 # captured at vendor time and mirrored into runtime/pin.json
 npm ci --prefix "$RUNTIME_DIR" --no-audit --no-fund --ignore-scripts || {
-  rm -rf "$RUNTIME_DIR/node_modules"   # EINTEGRITY fires at stream completion,
+  rm -rf "$RUNTIME_DIR"                # EINTEGRITY fires at stream completion,
   exit 1                               # so a partial tree may exist; never load it
 }
 # `npm ci` verifies every resolved package's integrity hash against the

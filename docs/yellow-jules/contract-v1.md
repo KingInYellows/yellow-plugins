@@ -218,9 +218,10 @@ remaining unknown until the R53 smoke.
   not `platform.fetch`.
 - The fake server binds `127.0.0.1:0` only and refuses any other address; the
   test bootstrap wraps `globalThis.fetch` to assert every origin contacted is
-  the loopback origin and that the API-key header is present (presence only,
-  never the value or its length). Credentials are dummies; real tools on `PATH`
-  get failing traps (R51).
+  the loopback origin and that the API-key header is present on requests to the
+  pinned `baseUrl` origin only (presence only, never the value or its length;
+  redirect targets remain keyless). Credentials are dummies; real tools on
+  `PATH` get failing traps (R51).
 - Per operation the test asserts the exact ordered path sequence server-side
   (create: `GET sources/…`, `GET sources/…`, `POST sessions`) and that the
   429/500/502/503/504 fixtures never see a replay (R14, R50). A redirect fixture
@@ -305,22 +306,25 @@ them and records `resumePageToken` so the next `status` continues from it before
 starting a fresh watermarked read. A stored `resumePageToken` or
 `artifactResumePageToken` the vendor rejects (`400`/`404`) or that yields no
 progress is discarded and the walk restarts from the watermark (the session
-start for `collect`). "No progress" is a walk that ends with the same
-`lastActivityId` it started from and no activity id outside the dedup ring; the
-journal counts consecutive no-progress restarts per operation, and the second
-one fails the walk with `JULES_NO_PROGRESS` instead of restarting again
-(recovery: run `status` later; if it recurs, re-verify the SDK pin), and a walk
-that makes progress resets the count. Storing the token is a deliberate,
-recorded departure from R18's no-durable-page-tokens rule, and it never survives
-a terminal outcome. The dedup ring holds every id seen by `status` whose
-`createTime` falls within the 5-minute overlap window, capped at 1000 entries;
-if the cap is reached the walk reports `dedupWindowExceeded: true`, counts may
-inflate, and — because ring membership is what suppresses re-acting —
-`supervise` treats that pass as check-failed (R33) and takes no act step on that
-session until a later `status` walk completes without the flag. Ring membership
-suppresses re-counting toward `new` and re-acting under `supervise`; it
-**never** suppresses an activity from being read, parsed, or used to extract
-plan or artifact state by `status`, `approve`, or `collect`.
+start for `collect`). For the restart guard, "no progress" is a walk that
+resumes from a stored `resumePageToken` or `artifactResumePageToken` and ends
+with the same `lastActivityId` it started from and no activity id outside the
+dedup ring; the journal counts consecutive such resume-token restarts per
+operation, and the second one fails the walk with `JULES_NO_PROGRESS` instead of
+restarting again (recovery: run `status` later; if it recurs, re-verify the SDK
+pin). A complete walk that finds no new activities is not a no-progress restart,
+and a walk that makes progress resets the count. Storing the token is a
+deliberate, recorded departure from R18's no-durable-page-tokens rule, and it
+never survives a terminal outcome. The dedup ring holds every id seen by
+`status` whose `createTime` falls within the 5-minute overlap window, capped at
+1000 entries; if the cap is reached the walk reports
+`dedupWindowExceeded: true`, counts may inflate, and — because ring membership
+is what suppresses re-acting — `supervise` treats that pass as check-failed
+(R33) and takes no act step on that session until a later `status` walk
+completes without the flag. Ring membership suppresses re-counting toward `new`
+and re-acting under `supervise`; it **never** suppresses an activity from being
+read, parsed, or used to extract plan or artifact state by `status`, `approve`,
+or `collect`.
 
 `pendingPlan` rule: every walk that observes a `planGenerated` activity with a
 later `(createTime, activityId)` than the journal's stored `pendingPlan`
@@ -392,35 +396,34 @@ runtime has observed, and `approve` compares against the same field.
   whose `sourceContext.source` equals the reservation's validated source
   resource and whose `githubRepoContext.startingBranch` equals the reserved
   branch; more than one candidate is `ambiguous-reconcile`, a repository or
-  branch mismatch is `policy-deviation`, and both leave the operation
-  `unknown-outcome`. A **complete** walk (every page read within the 5-page
-  bound and the deadline) that finds no tagged candidate and no untagged session
-  with the same source resource and starting branch created after the
-  reservation time minus 5 minutes is `released` **only when the journal's
-  `archiveVisibilityConfirmed` flag is `true`**: the reservation is then marked
-  terminal `failed` and the repository and branch are free again. That flag
-  defaults to `false` and is set by the R53 smoke's recorded observation that an
-  archived session appears in an unfiltered `jules.sessions()` walk (the walk
-  applies no archive-state filter, and whether the vendor omits archived
-  sessions from an unfiltered list is the unknown the smoke settles); until it
-  is set, the same complete no-candidate walk is `ambiguous-reconcile` with
-  `reason: "archive-visibility-unverified"` and leaves the reservation in place,
-  so absence of evidence never frees the R36 guard. An untagged same-source,
-  same-branch session in that window is `ambiguous-reconcile` with
-  `reason: "untagged-candidate"` (vendor-side title trimming is a remaining
-  unknown), and a walk stopped by the page cap or the deadline is `not-reached`
-  and leaves the reservation in place. `reply` and `approve` unknown outcomes
-  are resolved on their own session, never by the sessions walk: one `info()`
-  plus the activity walk, looking for a `userMessaged` activity whose message
-  digest equals the reservation's payload digest, or a `planApproved` whose
-  `planId` equals the reservation's observed plan id, in either case with a
-  `createTime` at or after the reservation time minus the 5-minute overlap
-  window — an older match is a prior send, never this one. Exactly one
-  qualifying match binds; more than one is `ambiguous-reconcile` with
-  `reason: "multiple-candidates"`; none after a complete walk leaves
-  `unknown-outcome`, and a partial walk leaves `not-reached`. Operations the
-  deadline prevented from being checked are reported as `not-reached`, never as
-  resolved.
+  branch mismatch is `policy-deviation`, and both leave the reservation in
+  place. A **complete** walk (every page read within the 5-page bound and the
+  deadline) that finds no tagged candidate and no untagged session with the same
+  source resource and starting branch created after the reservation time minus 5
+  minutes is `released` **only when the journal's `archiveVisibilityConfirmed`
+  flag is `true`**: the reservation is then marked terminal `failed` and the
+  repository and branch are free again. That flag defaults to `false` and is set
+  by the R53 smoke's recorded observation that an archived session appears in an
+  unfiltered `jules.sessions()` walk (the walk applies no archive-state filter,
+  and whether the vendor omits archived sessions from an unfiltered list is the
+  unknown the smoke settles); until it is set, the same complete no-candidate
+  walk is `ambiguous-reconcile` with `reason: "archive-visibility-unverified"`
+  and leaves the reservation in place, so absence of evidence never frees the
+  R36 guard. An untagged same-source, same-branch session in that window is
+  `ambiguous-reconcile` with `reason: "untagged-candidate"` (vendor-side title
+  trimming is a remaining unknown), and a walk stopped by the page cap or the
+  deadline is `not-reached` and leaves the reservation in place. `reply` and
+  `approve` unknown outcomes are resolved on their own session, never by the
+  sessions walk: one `info()` plus the activity walk, looking for a
+  `userMessaged` activity whose message digest equals the reservation's payload
+  digest, or a `planApproved` whose `planId` equals the reservation's observed
+  plan id, in either case with a `createTime` at or after the reservation time
+  minus the 5-minute overlap window — an older match is a prior send, never this
+  one. Exactly one qualifying match binds; more than one is
+  `ambiguous-reconcile` with `reason: "multiple-candidates"`; none after a
+  complete walk leaves `unknown-outcome`, and a partial walk leaves
+  `not-reached`. Operations the deadline prevented from being checked are
+  reported as `not-reached`, never as resolved.
 - `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with

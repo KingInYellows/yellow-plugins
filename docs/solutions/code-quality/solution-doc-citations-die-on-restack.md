@@ -40,35 +40,35 @@ prevent.
 
 `layered-contract-fixes-cross-cutting-collision.md` opened by placing its
 findings in history: _"had already been through two prior review-fix passes
-(commits `599c2744`, `865f2f0e`)."_ By the next pass, neither hash was an
-ancestor of the branch head — Graphite's restack had rewritten every commit on
-the branch. The subtle part:
+(commits `<deadhash-a>`, `<deadhash-b>`)." _ By the next pass, neither hash was
+an ancestor of the branch head — Graphite's restack had rewritten every commit
+on the branch. The subtle part:
 
-```
-$ git cat-file -t 599c2744
+```text
+$ git cat-file -t <deadhash-a>
 commit
-$ git merge-base --is-ancestor 599c2744 HEAD && echo IS || echo NOT
+$ git merge-base --is-ancestor <deadhash-a> HEAD && echo IS || echo NOT
 NOT
 ```
 
 The object still exists in the author's local repository as an unreachable
-commit, so `git show 599c2744` prints happily and the citation looks fine to the
-one person who will never need it. For every other reader — and for the author
-after `git gc` — it is a dangling reference. In a workflow where every branch is
-restacked on every trunk sync (this repo mandates Graphite), a commit hash
-written into a tracked file has a short and unpredictable life.
+commit, so `git show <deadhash-a>` prints happily and the citation looks fine to
+the one person who will never need it. For every other reader — and for the
+author after `git gc` — it is a dangling reference. In a workflow where every
+branch is restacked on every trunk sync (this repo mandates Graphite), a commit
+hash written into a tracked file has a short and unpredictable life.
 
-Worse, the hash was also _wrong for the claim_: `599c2744` is the commit that
-added a provenance caveat, not one of the two review-fix passes the sentence
-describes. And the count itself was stale — three fix passes had landed by the
-time the sentence was written, not two, and a fourth followed.
+Worse, the hash was also _wrong for the claim_: `<deadhash-a>` is the commit
+that added a provenance caveat, not one of the two review-fix passes the
+sentence describes. And the count itself was stale — three fix passes had landed
+by the time the sentence was written, not two, and a fourth followed.
 
 **Rules:**
 
-- Cite a **commit subject**
-  (`docs(yellow-jules): apply second review pass to the PR1 contract set`) or a
-  PR number. Both survive rebasing, squashing, and merging; both are greppable
-  in `git log --oneline`.
+- Cite a **PR number** or another durable reference (file path with heading
+  anchor, issue URL). PR numbers survive rebasing, squashing, and merging.
+  Commit subjects can disappear or be reworded in a squash merge, so do not
+  treat them as stable identifiers.
 - Never verify a citation with `git show <hash>` on the machine that wrote it.
   Unreachable objects make that check vacuous. `git merge-base --is-ancestor` is
   the check that actually fails.
@@ -105,9 +105,9 @@ a lesson.
 
 ## Guidance for Compounding Passes
 
-1. **Write docs against stable identifiers.** Commit subjects, PR numbers, file
-   paths with heading anchors — never raw SHAs on a branch that will be
-   restacked, and never line numbers alone.
+1. **Write docs against stable identifiers.** PR numbers, file paths with
+   heading anchors — never raw SHAs on a branch that will be restacked, and
+   never line numbers alone.
 2. **Treat every `Fix:` / **Good** block as a claim under test.** If it names a
    command, the command must be able to do what the surrounding prose says it
    does.
