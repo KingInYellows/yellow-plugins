@@ -135,7 +135,7 @@ reported unsupported.
   before `os.replace(tmp, path)`; on any exception unlink the temp file. Write
   nothing when `session_id`, slug, or `record_path` is `None`, or when the
   payload is malformed (R19).
-- [ ] Step 5: Create `plugins/yellow-core/lib/context-observer.sh` (sourced
+- [x] Step 5: Create `plugins/yellow-core/lib/context-observer.sh` (sourced
   lib, guard `_CONTEXT_OBSERVER_LOADED`, no shell options, prefix `co_`,
   `co_warn` → `[context-observer] Warning: …`). `co_observation_path <session_id> <toplevel_or_cwd>`
   prints `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/$(printf '%s' "$2" | tr '/' '-')/context-observations/$1.json`
