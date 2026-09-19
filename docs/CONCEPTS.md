@@ -64,3 +64,18 @@ written here — keeping the two layers separate is the point of the file.
 
 A council reviewer that shells out to an external LLM CLI (e.g. Gemini or
 OpenCode) via its own Bash tool.
+
+## remote-agent group
+
+The set of remote-agent-provider plugins (Cursor, Devin, and a planned
+Jules provider) governed by the same exactly-one-enabled pattern as the
+stacked-PR provider selection — exactly one member active at a time, with
+a preferred default among them (`yellow-cursor`; Jules joins the group without
+becoming the default).
+
+## not-exercisable outcome
+
+A spec-verification outcome value, distinct from pass or fail, recorded
+explicitly when a cited requirement or vendor API surface cannot yet be
+inspected or tested — used instead of silently defaulting the criterion
+to a passing verdict.
