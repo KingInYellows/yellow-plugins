@@ -1511,4 +1511,36 @@ process.stdout.write('{"continue": true}\\n');
     expect(stderr).not.toMatch(/unquoted|single-quotes/);
     expect(status).toBe(0);
   });
+
+  it('resolves hook script paths when validate-plugin is given a relative pluginDir', () => {
+    // resolveHookScriptPath must substitute against path.resolve(pluginDir),
+    // not the raw relative string, or containment/file checks target a
+    // duplicated path such as plugin/hooks/plugin/hooks/entry.js.
+    const workRoot = mkdtempSync(
+      join(process.cwd(), '.validate-plugin-relative-')
+    );
+    const relativePluginDir = join(workRoot, 'test-plugin');
+    mkdirSync(join(relativePluginDir, 'hooks', 'scripts'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(relativePluginDir, 'hooks', 'scripts', 'entry.js'),
+      NODE_HOOK,
+      'utf8'
+    );
+    writePluginManifest(
+      relativePluginDir,
+      hookManifest(
+        'node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entry.js"'
+      )
+    );
+    const relativeFromCwd = join(
+      workRoot.slice(process.cwd().length + 1),
+      'test-plugin'
+    );
+    const { status, stderr } = runValidator(relativeFromCwd);
+    rmSync(workRoot, { recursive: true, force: true });
+    expect(stderr).not.toMatch(/Hook script not found/);
+    expect(status).toBe(0);
+  });
 });
