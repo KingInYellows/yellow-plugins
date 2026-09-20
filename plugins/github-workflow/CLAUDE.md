@@ -141,4 +141,5 @@ deferral is in the "Documented adjustments" section of
 
 `bats tests/` from the plugin directory — `hooks.bats` (hook behavior) and
 `skill-content.bats` (skill text pins), with fake `gh` / `git` executables in
-`tests/fixtures/bin/`. Both manifest hooks run under a 1-second `timeout`.
+`tests/fixtures/bin/`. Both manifest hooks run under a 5-second `timeout`
+(`catalog/plugins/github-workflow.json`).

@@ -159,8 +159,9 @@ Codex agent.)
 
 ## Testing
 
-`bats tests/redaction.bats` from the plugin directory (the one bats suite CI
-runs as a blocking gate). The awk redaction program is shipped as three
+`bats tests/` from the plugin directory (`redaction.bats` and `extract.bats` —
+the blocking CI gate runs the whole directory). The awk redaction program is
+shipped as three
 synchronized copies (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
 `agents/review/opencode-reviewer.md`, and `skills/council-patterns/SKILL.md`.

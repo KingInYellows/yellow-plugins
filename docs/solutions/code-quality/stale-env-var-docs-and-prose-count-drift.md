@@ -347,7 +347,7 @@ the file class the sweep just wrote fresh counts into. But its regexes
 canonical plugin count. They have no patterns for skills, suites, agents, or
 commands, and would not match word-number counts like "eight" or "eleven"
 even if written as digits. Covering these counts needs both a widened glob
-*and* new patterns with word-number support (or rewriting counts as digits
+_and_ new patterns with word-number support (or rewriting counts as digits
 first) — widening the glob alone would give a false sense of coverage.
 
 #### Why This Is Worse Than a Missing Check
@@ -372,14 +372,14 @@ commands:
    canonical count — it has no rule for skills/suites/agents/commands and
    no word-number support ("eight", "eleven"). Widening the glob alone
    does not make those counts checked.
-2. Either add the glob widening *and* a matching pattern (with word-number
+2. Either add the glob widening _and_ a matching pattern (with word-number
    support, or require digit form so the existing regex style applies) in
    the same PR, or drop the bare count and keep only the non-derivable
    content (what a suite covers, known gotchas) instead of a number that
    will silently drift.
 3. If extending the validator's scope is out of scope for the current PR,
    say so explicitly in the PR description — including that both the glob
-   *and* the patterns need work — rather than leaving the gap implicit,
+   _and_ the patterns need work — rather than leaving the gap implicit,
    matching the "call out the validator gap" rule in
    `docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md`'s
    2026-09-05 update.

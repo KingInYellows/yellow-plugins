@@ -31,13 +31,16 @@ can be installed via `/plugin marketplace add KingInYellows/yellow-plugins`.
    plus `CLAUDE.md` and `README.md` in the plugin root.
 4. Update `plugins/yellow-core/commands/setup/all.md` — the new plugin must
    appear, in matching order, in every marker-delimited section of that file
-   that `validate-setup-all.js` cross-checks; see the script's header comment
-   for the authoritative section list and error codes. The Step 1.6
-   credential-status list is the one section that lives elsewhere: if the
-   plugin's hooks emit credential status, add it there too, between the
+   that `validate-setup-all.js` cross-checks (dashboard loop, classification,
+   delegated command list, plugin-command map, and dashboard example); see the
+   script's header comment for the authoritative section list and error codes.
+   Two sections are conditional: add a Step 1.5 probe entry only when the
+   plugin's classification references an `mcp__plugin_*` tool name; add a
+   Step 1.6 credential-status entry only when the plugin's hooks emit
+   credential status (that list lives between the
    `# setup-all-credential-status-plugins:start/end` markers in
-   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`.
-   Add a `.changeset/*.md` entry.
+   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`,
+   not in `all.md`). Add a `.changeset/*.md` entry.
 5. Run `pnpm validate:schemas` (includes `validate:generated` and
    `validate:setup-all`).
 

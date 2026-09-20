@@ -103,15 +103,15 @@ A currency sweep across `docs/CLAUDE.md` and all 19 plugin `CLAUDE.md` files
 replaced hardcoded "use Graphite" prose with the provider-neutral
 `/stack:status` rule in five plugins — but left the old hardcoded language in
 `plugins/yellow-core/CLAUDE.md` and `plugins/yellow-review/CLAUDE.md`, the two
-plugins that respectively *own* the provider-neutral abstraction
-(`stack-operation-registry.js`) and *consume* it most heavily in review
+plugins that respectively _own_ the provider-neutral abstraction
+(`stack-operation-registry.js`) and _consume_ it most heavily in review
 orchestration. `validate-provider-neutral-commands.js` did not catch the gap
 because it only lints mutating subcommands (`gt submit`, `gt merge`, etc.),
 not bare prose statements like "Use Graphite for this."
 
 This is the same failure mode as pattern #1 above (frontmatter sweep misses
 structurally-equivalent files) with a sharper edge: the two files missed
-were not random stragglers, they were the plugins with the *strongest* claim
+were not random stragglers, they were the plugins with the _strongest_ claim
 to being updated first, because they define and consume the very thing the
 sweep was standardizing on. A sweep's mental model of "which files use this
 convention" can silently exclude the convention's own source and heaviest
