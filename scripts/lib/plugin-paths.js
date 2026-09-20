@@ -718,12 +718,17 @@ function hookScriptWordAt(words, index, withinPlugin) {
   return { index };
 }
 
-function hookScriptOptionStep(interpreter, words, options, root, withinPlugin, i, seenShort) {
-  const w = words[i].word;
-  if (hookOptionTerminator(w, interpreter))
-    return { stop: true, index: i + 1 };
+function hookOptionWordStop(w, interpreter, i) {
+  if (hookOptionTerminator(w, interpreter)) return { stop: true, index: i + 1 };
   if (!(w.startsWith('-') || (interpreter === 'bash' && w.startsWith('+'))))
     return { stop: true, index: i };
+  return null;
+}
+
+function hookScriptOptionStep(interpreter, words, options, root, withinPlugin, i, seenShort) {
+  const w = words[i].word;
+  const stop = hookOptionWordStop(w, interpreter, i);
+  if (stop !== null) return stop;
   const orderProblem = bashHookOptionOrderProblem(interpreter, w, seenShort);
   if (orderProblem !== null) return orderProblem;
   const optionScan = hookOptionWordsProblem(
