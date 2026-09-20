@@ -1098,7 +1098,10 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
   });
 });
 
-function expectSymlinkedGeneratedSkillDirRejected(): void {
+function makeSymlinkedGeneratedSkillDirFixture(): {
+  root: string;
+  generatedSkillDir: string;
+} {
   const root = makeCodexFixtureRoot([
     {
       name: 'plain-plugin',
@@ -1109,9 +1112,7 @@ function expectSymlinkedGeneratedSkillDirRejected(): void {
       },
     },
   ]);
-  const generated = generateManifests({ mode: 'apply', rootDir: root });
-  expect(generated.status).toBe('ok');
-
+  expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
   const external = mkdtempSync(
     join(tmpdir(), 'yellow-generate-codex-external-')
   );
@@ -1131,7 +1132,11 @@ function expectSymlinkedGeneratedSkillDirRejected(): void {
   );
   rmSync(generatedSkillDir, { recursive: true });
   symlinkSync(external, generatedSkillDir);
+  return { root, generatedSkillDir };
+}
 
+function expectSymlinkedGeneratedSkillDirRejected(): void {
+  const { root } = makeSymlinkedGeneratedSkillDirFixture();
   const catalog = loadCatalog(join(root, 'catalog')).data;
   const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder)
     .sources;

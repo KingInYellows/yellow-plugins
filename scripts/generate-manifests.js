@@ -542,6 +542,18 @@ function validateLifecycle(name, lifecycle, errors, pluginOrder) {
   }
 }
 
+function validateCursorRootOwner(owner, errors) {
+  if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
+    errors.push('catalog.json: "targets.cursor.owner" must be an object');
+    return;
+  }
+  if (typeof owner.name !== 'string' || owner.name.length === 0) {
+    errors.push(
+      'catalog.json: "targets.cursor.owner.name" must be a non-empty string'
+    );
+  }
+}
+
 // Root `catalog.targets.cursor` config — OPTIONAL, unlike `catalog.targets.
 // codex` (which catalog-reader.js already validates as required
 // unconditionally; that file is outside this module's ownership). Validated
@@ -571,14 +583,7 @@ function validateCursorRootConfig(catalog, errors) {
     );
   }
   if ('owner' in cursor) {
-    const owner = cursor.owner;
-    if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
-      errors.push('catalog.json: "targets.cursor.owner" must be an object');
-    } else if (typeof owner.name !== 'string' || owner.name.length === 0) {
-      errors.push(
-        'catalog.json: "targets.cursor.owner.name" must be a non-empty string'
-      );
-    }
+    validateCursorRootOwner(cursor.owner, errors);
   }
 }
 
