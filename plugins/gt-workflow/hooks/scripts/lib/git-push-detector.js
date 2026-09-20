@@ -71,6 +71,22 @@ const MAX_SHELL_DEPTH = 3;
 // wrapper-peeling work per segment as well as the reading.
 const MAX_WRAPPER_PEELS = 16;
 
+// Set for the duration of one top-level classify/commandInvokesGitPush call
+// so verified `git push` detections are distinct from fail-closed denials.
+let analysisCtx = null;
+
+/** @returns {true} */
+function denyVerified() {
+  if (analysisCtx) analysisCtx.verifiedPush = true;
+  return true;
+}
+
+/** @returns {true} */
+function denyUnverifiable() {
+  if (analysisCtx) analysisCtx.unverifiable = true;
+  return true;
+}
+
 // Stands in for text decided at runtime inside a word — a `$(…)`/backtick
 // substitution, a brace/pathname expansion, an xargs replacement token.
 // NUL cannot appear in a Bash tool command.
@@ -939,7 +955,7 @@ function gitConfigInvokesGitPush(kv, depth) {
   const value = kv.slice(eq + 1);
   if (key.startsWith('alias.')) {
     // `-c alias.p=push p` / `-c alias.p='!git push' p`
-    if (PUSH_SUBCOMMANDS.has(value.trim().split(/\s+/)[0])) return true;
+    if (PUSH_SUBCOMMANDS.has(value.trim().split(/\s+/)[0])) return denyVerified();
     return value.startsWith('!') && commandInvokesGitPushAtDepth(value.slice(1), depth + 1, null);
   }
   // core.pager, core.fsmonitor, diff.external, core.sshCommand, … are
@@ -960,7 +976,11 @@ function gitConfigInvokesGitPush(kv, depth) {
 function gitSubcommandInvokesGitPush(sub, rest, depth, stdinCtx) {
   const spec = Object.hasOwn(GIT_EXEC_SUBCOMMANDS, sub) ? GIT_EXEC_SUBCOMMANDS[sub] : null;
   if (!spec) return false;
-  if (spec.pushVerb || spec.gitArgs) return rest.some((w) => PUSH_SUBCOMMANDS.has(w) || w.includes(SUBST));
+  if (spec.pushVerb || spec.gitArgs) {
+    if (rest.some((w) => PUSH_SUBCOMMANDS.has(w))) return denyVerified();
+    if (rest.some((w) => w.includes(SUBST))) return denyUnverifiable();
+    return false;
+  }
   if (spec.configWrite) {
     // Operands after the options: `[verb] key value [value-pattern]`.
     const operands = [];
@@ -981,9 +1001,11 @@ function gitSubcommandInvokesGitPush(sub, rest, depth, stdinCtx) {
     if (GIT_CONFIG_WRITE_VERBS.has(operands[0])) operands.shift();
     const [key, value] = operands;
     if (key === undefined || value === undefined) return false; // a read
-    if (key.includes(SUBST)) return true;
+    if (key.includes(SUBST)) return denyUnverifiable();
     // A runtime-built value is only decisive for a key git executes.
-    if (value.includes(SUBST)) return key.toLowerCase().startsWith('alias.') || COMMAND_CONFIG_KEY_RE.test(key);
+    if (value.includes(SUBST)) {
+      return (key.toLowerCase().startsWith('alias.') || COMMAND_CONFIG_KEY_RE.test(key)) ? denyUnverifiable() : false;
+    }
     return gitConfigInvokesGitPush(`${key}=${value}`, depth);
   }
   if (spec.shellOptions) {
@@ -997,7 +1019,8 @@ function gitSubcommandInvokesGitPush(sub, rest, depth, stdinCtx) {
       }
       if (script === undefined) return false; // option at the end: git errors
       if (script === null) continue;
-      if (script.includes(SUBST) || commandInvokesGitPushAtDepth(script, depth + 1, stdinCtx)) return true;
+      if (script.includes(SUBST)) return denyUnverifiable();
+      if (commandInvokesGitPushAtDepth(script, depth + 1, stdinCtx)) return true;
     }
     return false;
   }
@@ -1010,14 +1033,14 @@ function gitSubcommandInvokesGitPush(sub, rest, depth, stdinCtx) {
     // `git submodule foreach [--recursive] [-q] <command…>`: git joins the
     // words and hands them to `sh -c`.
     words = words.filter((w) => !['--recursive', '-q', '--quiet', '--'].includes(w));
-    if (words.some((w) => w.includes(SUBST))) return true;
+    if (words.some((w) => w.includes(SUBST))) return denyUnverifiable();
     return words.length > 0 && commandInvokesGitPushAtDepth(words.join(' '), depth + 1, stdinCtx);
   }
   // `git bisect run <argv…>`: an argv, judged like any simple command.
   // Anything but a clean "no" (a shell reading stdin, xargs) is a deny.
   if (words.length === 0) return false;
   const synthetic = { argv: words, heredocs: [], procsubs: [], pipedFrom: null, inOutputProcsub: false, feeds: -1 };
-  if (depth + 1 > MAX_SHELL_DEPTH) return true;
+  if (depth + 1 > MAX_SHELL_DEPTH) return denyUnverifiable();
   return segmentVerdict(synthetic, depth + 1, stdinCtx) !== false;
 }
 
@@ -1061,11 +1084,11 @@ function segmentVerdict(segment, depth, outerStdin) {
   let bareShell = false;
   for (;;) {
     if (i >= argv.length) return viaXargs ? 'stdin-args' : bareShell ? null : false;
-    if (argv[i].includes(SUBST)) return true; // program name decided at runtime
+    if (argv[i].includes(SUBST)) return denyUnverifiable(); // program name decided at runtime
     const name = programName(argv[i]);
     const wrapper = Object.hasOwn(WRAPPERS, name) ? WRAPPERS[name] : null;
     if (!wrapper) break;
-    if ((peels += 1) > MAX_WRAPPER_PEELS) return true;
+    if ((peels += 1) > MAX_WRAPPER_PEELS) return denyUnverifiable();
     if (name === 'xargs') viaXargs = true;
     bareShell = Boolean(wrapper.shellIfBare);
     i += 1;
@@ -1106,7 +1129,7 @@ function segmentVerdict(segment, depth, outerStdin) {
         const cluster = !opt.startsWith('--') && opt.length > 2 && !opt.includes('=') && wrapper.shellString.has('-' + opt[opt.length - 1]);
         if (wrapper.shellString.has(opt) || cluster) {
           if (i >= argv.length) return viaXargs ? 'stdin-args' : false;
-          if (argv[i].includes(SUBST)) return true;
+          if (argv[i].includes(SUBST)) return denyUnverifiable();
           return commandInvokesGitPushAtDepth(argv[i], depth + 1, stdinCtx);
         }
         const attached = wrapper.shellStringList.find((o) => opt.startsWith(o) && opt.length > o.length && (o.startsWith('--') ? opt[o.length] === '=' : true));
@@ -1141,7 +1164,7 @@ function segmentVerdict(segment, depth, outerStdin) {
       // handed to the target user's shell as one command string; with
       // nothing after it the shell reads stdin.
       if (i >= argv.length) return viaXargs ? 'stdin-args' : null;
-      if (argv.slice(i).some((a) => a.includes(SUBST))) return true;
+      if (argv.slice(i).some((a) => a.includes(SUBST))) return denyUnverifiable();
       return commandInvokesGitPushAtDepth(argv.slice(i).join(' '), depth + 1, stdinCtx);
     }
     if (xargsToken !== null && xargsToken !== '') {
@@ -1155,7 +1178,7 @@ function segmentVerdict(segment, depth, outerStdin) {
   // SUBST.
   const program = programName(argv[i]);
 
-  if (program.startsWith('git-') && PUSH_SUBCOMMANDS.has(program.slice(4))) return true;
+  if (program.startsWith('git-') && PUSH_SUBCOMMANDS.has(program.slice(4))) return denyVerified();
 
   if (program === 'git') {
     i += 1;
@@ -1163,8 +1186,11 @@ function segmentVerdict(segment, depth, outerStdin) {
       const tok = argv[i];
       i += 1;
       if (tok === '--') break; // end of options: the next word is the subcommand
-      if (tok.includes(SUBST)) return true; // `git $(x) push`: subcommand decided at runtime
-      if (!tok.startsWith('-')) return PUSH_SUBCOMMANDS.has(tok) || gitSubcommandInvokesGitPush(tok, argv.slice(i), depth, stdinCtx);
+      if (tok.includes(SUBST)) return denyUnverifiable(); // `git $(x) push`: subcommand decided at runtime
+      if (!tok.startsWith('-')) {
+        if (PUSH_SUBCOMMANDS.has(tok)) return denyVerified();
+        return gitSubcommandInvokesGitPush(tok, argv.slice(i), depth, stdinCtx);
+      }
       if (GIT_OPTION_TAKES_VALUE.has(tok)) {
         // `-c core.pager='git push'`: git runs the value.
         if (tok === '-c' && i < argv.length && gitConfigInvokesGitPush(argv[i], depth)) return true;
@@ -1173,7 +1199,11 @@ function segmentVerdict(segment, depth, outerStdin) {
         return true;
       }
     }
-    if (i < argv.length) return argv[i].includes(SUBST) || PUSH_SUBCOMMANDS.has(argv[i]) || gitSubcommandInvokesGitPush(argv[i], argv.slice(i + 1), depth, stdinCtx);
+    if (i < argv.length) {
+      if (argv[i].includes(SUBST)) return denyUnverifiable();
+      if (PUSH_SUBCOMMANDS.has(argv[i])) return denyVerified();
+      return gitSubcommandInvokesGitPush(argv[i], argv.slice(i + 1), depth, stdinCtx);
+    }
     return viaXargs ? 'stdin-args' : false; // `xargs git -C x`: subcommand still comes from stdin
   }
 
@@ -1208,9 +1238,9 @@ function segmentVerdict(segment, depth, outerStdin) {
       if (opaque && (tok === '-Command' || tok === '--command' || tok === '-e' || tok === '--execute')) sawC = true;
     }
     if (sawC) {
-      if (opaque) return true; // a fish/csh/pwsh string: unreadable
+      if (opaque) return denyUnverifiable(); // a fish/csh/pwsh string: unreadable
       if (i >= argv.length) return viaXargs ? 'stdin-args' : false; // `… | xargs sh -c`
-      if (argv[i].includes(SUBST)) return true; // replacement token / substitution
+      if (argv[i].includes(SUBST)) return denyUnverifiable(); // replacement token / substitution
       return commandInvokesGitPushAtDepth(argv[i], depth + 1, stdinCtx);
     }
     return null; // no -c: caller checks stdin sources
@@ -1266,17 +1296,18 @@ function stdinInvokesGitPush(segment, depth) {
   return memoised(memoised(stdinMemo.stdin, key, () => new Map()), depth, () => computeStdinInvokesGitPush(segment, depth));
 }
 function computeStdinInvokesGitPush(segment, depth) {
-  if (segment.inOutputProcsub) return true; // `tee >(sh)`: reads what the outer wrote
+  if (segment.inOutputProcsub) return denyUnverifiable(); // `tee >(sh)`: reads what the outer wrote
   for (const body of segment.heredocs) {
     if (stdinScriptInvokesGitPush(body, depth + 1)) return true;
   }
   for (const inner of segment.procsubs) {
     const text = producedText(inner);
-    if (text === null || stdinScriptInvokesGitPush(text, depth + 1)) return true;
+    if (text === null) return denyUnverifiable();
+    if (stdinScriptInvokesGitPush(text, depth + 1)) return true;
   }
   if (segment.pipedFrom) {
     const text = producedText(segment.pipedFrom);
-    if (text === null) return true; // `curl … | sh`, `cat file | bash`: opaque script
+    if (text === null) return denyUnverifiable(); // `curl … | sh`, `cat file | bash`: opaque script
     if (stdinScriptInvokesGitPush(text, depth + 1)) return true;
   }
   return false;
@@ -1293,7 +1324,7 @@ function hasOwnStdin(segment) {
  *   this is, so `echo 'git push' | sh -c sh` reaches the inner bare `sh`.
  */
 function commandInvokesGitPushAtDepth(command, depth, outerStdin) {
-  if (depth > MAX_SHELL_DEPTH) return true;
+  if (depth > MAX_SHELL_DEPTH) return denyUnverifiable();
   const segments = lexSegments(command);
   for (const segment of segments) {
     const verdict = segmentVerdict(segment, depth, outerStdin);
@@ -1304,7 +1335,8 @@ function commandInvokesGitPushAtDepth(command, depth, outerStdin) {
       // or `<(…)`), otherwise deny. xargs strips quotes and backslashes
       // from its input, so text containing any is opaque.
       const text = stdinText(segment);
-      if (text === null || stdinWordsInvokeGitPush(text)) return true;
+      if (text === null) return denyUnverifiable();
+      if (stdinWordsInvokeGitPush(text)) return denyVerified();
       continue;
     }
     if (verdict === null) {
@@ -1327,15 +1359,28 @@ function commandInvokesGitPushAtDepth(command, depth, outerStdin) {
  *   the backstop fails closed rather than vouching for input it could not
  *   lex.
  */
-function commandInvokesGitPush(command) {
+/**
+ * @param {string} command Raw Bash tool command string.
+ * @returns {'allow' | 'verified-push' | 'unverifiable'}
+ */
+function classifyGitPushCommand(command) {
+  const ctx = { verifiedPush: false, unverifiable: false };
   stdinMemo = { script: new Map(), words: new Map(), stdin: new Map(), text: new Map() };
+  analysisCtx = ctx;
   try {
-    return commandInvokesGitPushAtDepth(String(command), 0, null);
+    const denied = commandInvokesGitPushAtDepth(String(command), 0, null);
+    if (!denied) return 'allow';
+    return ctx.verifiedPush ? 'verified-push' : 'unverifiable';
   } catch {
-    return true;
+    return 'unverifiable';
   } finally {
+    analysisCtx = null;
     stdinMemo = null;
   }
 }
 
-module.exports = { commandInvokesGitPush, MAX_SHELL_DEPTH, MAX_WRAPPER_PEELS };
+function commandInvokesGitPush(command) {
+  return classifyGitPushCommand(command) !== 'allow';
+}
+
+module.exports = { commandInvokesGitPush, classifyGitPushCommand, MAX_SHELL_DEPTH, MAX_WRAPPER_PEELS };

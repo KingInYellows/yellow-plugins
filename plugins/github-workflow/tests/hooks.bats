@@ -128,6 +128,13 @@ assert_push_allowed() {
   [ -z "$stderr" ]
 }
 
+assert_push_unverifiable() {
+  run --separate-stderr run_entrypoint check-git-push "$1"
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"Hook could not verify this Bash command"* ]]
+}
+
 @test "check-git-push: bash -c \"git push\" is blocked" {
   assert_push_blocked "$(cat <<'JSON'
 {"tool_input":{"command":"bash -c \"git push\""}}
@@ -234,7 +241,7 @@ JSON
 }
 
 @test "check-git-push: git {push,origin,main} is blocked (brace expansion decided at runtime)" {
-  assert_push_blocked '{"tool_input":{"command":"git {push,origin,main}"}}'
+  assert_push_unverifiable '{"tool_input":{"command":"git {push,origin,main}"}}'
 }
 
 @test "check-git-push: git -c core.pager='git push' log is blocked (git runs the config value)" {
@@ -263,8 +270,15 @@ JSON
 }
 
 @test "check-git-push: { echo 'git push'; echo done; } | bash is blocked (pipe from a whole group is opaque)" {
-  assert_push_blocked "$(cat <<'JSON'
+  assert_push_unverifiable "$(cat <<'JSON'
 {"tool_input":{"command":"{ echo 'git push'; echo done; } | bash"}}
+JSON
+)"
+}
+
+@test "check-git-push: shell nested past the depth cap is blocked with an unverifiable message" {
+  assert_push_unverifiable "$(cat <<'JSON'
+{"tool_input":{"command":"bash -c \"bash -c 'bash -c \\\"bash -c \\\\\\\"echo hi\\\\\\\"\\\"'\""}}
 JSON
 )"
 }

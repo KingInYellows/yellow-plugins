@@ -231,8 +231,7 @@ git-push field path was then corrected on 2026-09-16 — see below):
   per-host wrappers (~13 lines) calling `runHook` with the matching
   formatter
 
-Behavior (unchanged from the original bash hooks, except the PreToolUse
-field path):
+Behavior (tokenised detector since 2026-09-17; PostToolUse unchanged):
 
 - **PreToolUse (Bash)** — Backstop that blocks raw `git push` (path-
   qualified, with global options, via `bash -c`, or behind a wrapper) and
@@ -243,7 +242,12 @@ field path):
   `timeout` is 5 s (was 1 s): a cold Node start on a slow disk could exceed
   1 s. The detector itself is bounded by the parity suite's 64 KB
   adversarial inputs (each < 500 ms; < 256 MB RSS over the whole set); a
-  warm run on a real command is tens of milliseconds.
+  warm run on a real command is tens of milliseconds. Shell nesting past the
+  depth cap, opaque pipes, and other unreadable forms fail closed with a
+  distinct unverifiable message rather than the raw-`git push` wording.
+  Documented out-of-scope evasions (`${IFS}`, git aliases, interpreter
+  one-liners, `find -exec`, …) remain possible — this hook is a backstop,
+  not the sole control.
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)

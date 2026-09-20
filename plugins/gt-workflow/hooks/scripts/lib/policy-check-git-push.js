@@ -19,12 +19,17 @@
  * docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md.
  */
 
-const { commandInvokesGitPush } = require('./git-push-detector.js');
+const { classifyGitPushCommand } = require('./git-push-detector.js');
 
 const BLOCK_MESSAGE = [
   '⛔  Raw `git push` is not allowed in this repo.',
   '   Use `gt submit --no-interactive` instead so Graphite keeps the stack in sync.',
   '   If you need to force-push a single branch, use `gt submit` which handles it safely.',
+].join('\n');
+
+const UNVERIFIABLE_MESSAGE = [
+  '⛔  Hook could not verify this Bash command. Blocking as a precaution.',
+  '   If you intended to push, use `gt submit --no-interactive` instead.',
 ].join('\n');
 
 const MALFORMED_MESSAGE =
@@ -51,8 +56,12 @@ function checkGitPush(camelCaseEnvelope) {
     return { decision: 'deny', message: MALFORMED_MESSAGE };
   }
 
-  if (commandInvokesGitPush(command)) {
+  const verdict = classifyGitPushCommand(command);
+  if (verdict === 'verified-push') {
     return { decision: 'deny', message: BLOCK_MESSAGE };
+  }
+  if (verdict === 'unverifiable') {
+    return { decision: 'deny', message: UNVERIFIABLE_MESSAGE };
   }
 
   return { decision: 'allow', message: null };

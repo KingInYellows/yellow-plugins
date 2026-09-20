@@ -37,13 +37,18 @@
 // but a regex over raw text still missed `bash -c "git push"` and tripped
 // on quoted literals. The shared tokenising detector replaces both regexes
 // — see docs/solutions/security-issues/substring-regex-command-denylist-evasion.md.
-const { commandInvokesGitPush } = require('./git-push-detector.js');
+const { classifyGitPushCommand } = require('./git-push-detector.js');
 
 const BLOCK_MESSAGE = [
   '⛔  Raw `git push` is not allowed in this repo.',
   '   Use the `github-stack-submit` skill (or `/github-stack:submit`)',
   '   instead — it stages, commits, and submits via',
   '   github-stack-runtime.js, which pushes safely through `gh stack submit`.',
+].join('\n');
+
+const UNVERIFIABLE_MESSAGE = [
+  '⛔  Hook could not verify this Bash command. Blocking as a precaution.',
+  '   If you intended to push, use `/github-stack:submit` instead.',
 ].join('\n');
 
 const MALFORMED_MESSAGE =
@@ -71,8 +76,12 @@ function checkGitPush(camelCaseEnvelope) {
     return { decision: 'deny', message: MALFORMED_MESSAGE };
   }
 
-  if (commandInvokesGitPush(command)) {
+  const verdict = classifyGitPushCommand(command);
+  if (verdict === 'verified-push') {
     return { decision: 'deny', message: BLOCK_MESSAGE };
+  }
+  if (verdict === 'unverifiable') {
+    return { decision: 'deny', message: UNVERIFIABLE_MESSAGE };
   }
 
   return { decision: 'allow', message: null };
