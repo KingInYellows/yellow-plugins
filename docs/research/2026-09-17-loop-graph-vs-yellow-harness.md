@@ -64,14 +64,17 @@ the control plane.
 
 ### Human plane — yellow-core `/flow:*`
 
-Documented session DAG for shell-based work: `/flow:brainstorm` → `/flow:spec` →
+Documented session DAG for shell-based work: `/flow:brainstorm` → `/flow:plan` →
+`/flow:spec` (when `/flow:plan` escalates multi-subsystem work) →
 `/flow:decompose` → `/flow:pick-next-shell` → `/flow:expand-shell` →
 `/flow:work` → `/flow:review` → `/plan:complete`, then back to
-`/flow:pick-next-shell` for the next shell. `/flow:plan` is the alternate entry
-for non-shell plans that skip decomposition. State lives on disk under `plans/`.
-An operator sits between sessions. `/worktree:cleanup` exists. yellow-council is
-a review join (in-process Claude plus Codex, Antigravity, OpenCode), not a
-planner.
+`/flow:pick-next-shell` for the next shell. Brainstorm saves to
+`docs/brainstorms/` and hands off to `/flow:plan <resolved-path>`; `/flow:spec`
+takes a topic, not a brainstorm file. `/flow:plan` is also the direct entry for
+single-session work that skips brainstorm, spec, and decomposition. State lives
+on disk under `plans/`. An operator sits between sessions. `/worktree:cleanup`
+exists. yellow-council is a review join (in-process Claude plus Codex,
+Antigravity, OpenCode), not a planner.
 
 `/flow:*` writes markdown shells. GOAP writes symbolic `WorldState`. They do not
 share a schema. Merging them would be a new control plane.
