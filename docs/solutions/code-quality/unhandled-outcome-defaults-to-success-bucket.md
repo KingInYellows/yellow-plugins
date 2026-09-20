@@ -372,3 +372,40 @@ all, rather than expecting the schema to represent the absence.
 
 **Components (this Update):**
 `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+---
+
+## Update — 2026-09-10: a spec's pass/fail acceptance criteria is a closed-enumeration consumer too
+
+During `/flow:expand-shell` planning (not code review) for
+`yellow-jules-integration-01-contract-and-sdk-investigation`, requirements
+R3, R12, R14, and R15 of `plans/specs/yellow-jules-integration.md` assume
+several vendor SDK options (`requireApproval`, `rateLimitRetry`/
+`maxRetryTimeMs`, a storage factory) exist "on the inspected surface", and
+R49-R51's fake-server transport tests need a base-URL/fetch override the spec
+never names — but the SDK's public readme documents none of
+them; they exist only in compiled `dist/index.d.ts`/`dist/index.mjs`
+source, not yet inspected at planning time.
+
+This is the same failure mechanism this doc already tracks, one level up:
+a spec's acceptance-criteria checklist is a closed two-state
+(pass/fail) enumeration over each requirement's verification outcome.
+When a requirement's dependency hasn't actually been verified yet (the
+vendor surface hasn't been source-inspected), that requirement's true
+state is a third value — **not exercisable** — which has no slot in a
+pass/fail checklist. Without an explicit slot, an unverified requirement
+silently reads as an implicit pass, the same way an unhandled enum member
+elsewhere in this doc silently lands in "success."
+
+**Added guidance — spec/plan verification checklists need a
+not-exercisable outcome:** when a spec cites vendor API surface that
+hasn't been confirmed against the vendor's actual source (not just its
+docs/readme), don't let the corresponding acceptance criterion default to
+implicit pass. Give it an explicit "not exercisable — pending source
+inspection" state, and sequence the plan so source-level inspection
+happens before dependent design work (e.g. test design) proceeds. See
+[golden-fixture-parity-vs-contract-correctness.md](golden-fixture-parity-vs-contract-correctness.md)
+for the adjacent failure family — verifying against a surface that was
+assumed rather than confirmed from the real primary source.
+
+**Components (this Update):** `plans/specs/yellow-jules-integration.md`.

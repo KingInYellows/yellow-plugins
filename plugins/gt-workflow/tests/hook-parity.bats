@@ -169,6 +169,147 @@ assert_parity() {
   assert_parity check-git-push non-string-command
 }
 
+# --- check-git-push: tokenised detector (2026-09-17) ---
+# These fixtures are Node-contract goldens for hooks/scripts/lib/
+# git-push-detector.js, which replaced the substring regex. Deny cases are
+# the evasions the regex missed; allow cases are the quoted/heredoc
+# literals the regex over-blocked. tests/integration/
+# git-push-detector-parity.test.ts runs the same *.stdin corpus through
+# both plugins' detector copies.
+
+@test "check-git-push: path-qualified /usr/bin/git push is blocked" {
+  assert_parity check-git-push path-qualified-git
+}
+
+@test "check-git-push: git -C dir push is blocked" {
+  assert_parity check-git-push global-option-C
+}
+
+@test "check-git-push: git -c k=v push is blocked" {
+  assert_parity check-git-push global-option-c
+}
+
+@test "check-git-push: git --git-dir=x push is blocked" {
+  assert_parity check-git-push global-option-git-dir
+}
+
+@test "check-git-push: bash -c \"git push\" is blocked" {
+  assert_parity check-git-push bash-c-string
+}
+
+@test "check-git-push: sh -c 'cd x && git push' is blocked" {
+  assert_parity check-git-push sh-c-chain
+}
+
+@test "check-git-push: shell nested two deep is blocked" {
+  assert_parity check-git-push nested-shell-depth-2
+}
+
+@test "check-git-push: shell nested past the depth cap is blocked even without a push" {
+  # Depth > 3 denies unconditionally — the detector will not vouch for a
+  # command it has to unwrap four shells to read.
+  assert_parity check-git-push nested-shell-depth-4-cap
+}
+
+@test "check-git-push: quoted literal echo \"git push\" is allowed" {
+  assert_parity check-git-push quoted-literal
+}
+
+@test "check-git-push: heredoc body containing git push is allowed" {
+  assert_parity check-git-push heredoc-literal
+}
+
+@test "check-git-push: multi-line non-push git commands are allowed" {
+  assert_parity check-git-push multi-line-non-push
+}
+
+@test "check-git-push: gt submit is allowed" {
+  assert_parity check-git-push gt-submit
+}
+
+@test "check-git-push: git -C dir status is allowed" {
+  assert_parity check-git-push global-option-C-status
+}
+
+# Review-found evasions (2026-09-18): one fixture per lexer feature the
+# first tokeniser lacked. The vitest parity corpus holds the full list.
+
+@test "check-git-push: git -C \"\$(pwd)\" push is blocked (substitution inside the outer command)" {
+  assert_parity check-git-push substitution-in-option-value
+}
+
+@test "check-git-push: git 2>&1 push is blocked (redirection before the subcommand)" {
+  assert_parity check-git-push redirection-before-subcommand
+}
+
+@test "check-git-push: bash <<EOF | tee is blocked (heredoc bound to the declaring segment)" {
+  assert_parity check-git-push heredoc-shell-piped
+}
+
+@test "check-git-push: echo 'git push' | bash is blocked (shell fed by a literal pipe)" {
+  assert_parity check-git-push piped-literal-script
+}
+
+@test "check-git-push: { git push; } is blocked (reserved words peeled)" {
+  assert_parity check-git-push reserved-word-group
+}
+
+@test "check-git-push: git \$'push' is blocked (ANSI-C quoting)" {
+  assert_parity check-git-push ansi-c-quoted-subcommand
+}
+
+@test "check-git-push: sudo -s 'git push' is blocked (shell-string wrapper)" {
+  assert_parity check-git-push sudo-shell-string
+}
+
+@test "check-git-push: cat <<EOF with \$(git push) in the body is blocked (expanding heredoc)" {
+  assert_parity check-git-push heredoc-expanding-substitution
+}
+
+@test "check-git-push: cat <<'EOF' with \$(git push) in the body is allowed (quoted delimiter, no expansion)" {
+  assert_parity check-git-push heredoc-quoted-delimiter-substitution
+}
+
+@test "check-git-push: git rebase --exec 'git push' is blocked (git runs the operand)" {
+  assert_parity check-git-push git-rebase-exec
+}
+
+@test "check-git-push: git submodule foreach 'git push' is blocked (git runs the operand)" {
+  assert_parity check-git-push git-submodule-foreach
+}
+
+@test "check-git-push: git subtree push is blocked (a push under another name)" {
+  assert_parity check-git-push git-subtree-push
+}
+
+@test "check-git-push: { echo 'git push'; echo done; } | bash is blocked (pipe from a whole group is opaque)" {
+  assert_parity check-git-push group-piped-into-shell
+}
+
+@test "check-git-push: echo 'git push' | bash -c 'bash -c sh' is blocked (stdin inherited two shells down)" {
+  assert_parity check-git-push stdin-inherited-two-shells-down
+}
+
+@test "check-git-push: git -- push is blocked (git treats -- as end of options and runs push)" {
+  assert_parity check-git-push end-of-options-then-push
+}
+
+@test "check-git-push: bash <(echo git push) is blocked (process substitution as the script)" {
+  assert_parity check-git-push process-substitution-script
+}
+
+@test "check-git-push: echo 'git push' | cat | bash is blocked (cat passes its stdin through)" {
+  assert_parity check-git-push cat-passthrough-pipe
+}
+
+@test "check-git-push: git {push,origin,main} is blocked (brace expansion decided at runtime)" {
+  assert_parity check-git-push brace-expansion-subcommand
+}
+
+@test "check-git-push: git -c core.pager='git push' log is blocked (git runs the config value)" {
+  assert_parity check-git-push git-config-pager-value
+}
+
 # --- check-commit-message ---
 
 @test "check-commit-message: conventional-allow-silent matches golden" {

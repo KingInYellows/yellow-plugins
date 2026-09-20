@@ -41,6 +41,25 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:memory [filter]`     | Browse and search stored memories                      |
 | `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
+## Embedder provenance (`/ruvector:status`)
+
+Step 6 compares the store's `embeddingProvenance` stamp against the active
+embedder reported by `hooks reembed --dry-run`. Verdicts:
+
+- **`FRESH`** — No store file, or no stamp and no vectors yet
+- **`UNSTAMPED`** — Vectors exist but no stamp; writes are refused
+- **`OK`** — The five enforced fields match (`embedderKind`, `modelId`,
+  `dimension`, `normalize`, `prefixPolicy`); extra stamp keys are ignored
+- **`MISMATCH`** — At least one enforced field differs; run the printed
+  `hooks reembed` + restart steps
+- **`UNKNOWN`** — Cannot compare safely (no GNU-compatible `timeout`/`gtimeout`
+  on PATH, dry-run timeout/SIGKILL/nonzero exit, older CLI without object
+  `targetProvenance`, or jq compare failure). Exit 137 is reported as SIGKILL
+  without assuming the 90 s deadline elapsed.
+
+When `hooks_remember` is refused (ADR-210) but recall still works, start
+here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
+
 ## Agents
 
 | Agent                      | Trigger                                                               |
