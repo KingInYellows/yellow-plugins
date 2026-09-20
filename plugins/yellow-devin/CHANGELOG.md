@@ -1,5 +1,47 @@
 # Changelog
 
+## 3.0.1
+
+### Patch Changes
+
+- [`901d917`](https://github.com/KingInYellows/yellow-plugins/commit/901d917f8f3510d7abda2872a8ca0fda2761f725)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The PreToolUse
+  `git push` backstop now reads `tool_input.command`. It previously read a
+  root-level `command` that no host sends (a field path carried over from the
+  deleted `check-git-push.sh`), so a real Claude Code or Codex PreToolUse
+  payload containing `git push` was allowed through. The parity fixtures now use
+  the real nested envelope, and a new fixture pins the old flat shape as
+  non-blocking. A present-but-non-string `tool_input.command` now fails closed
+  instead of being coerced to an allow. github-workflow's sibling policy file
+  changes only in its comments (it already read the nested path).
+  `/devin:review-prs`'s degraded-mode "Fix locally" path (`GT_AVAILABLE` false
+  or PR in `GT_DEGRADED_PRS`) now stops after the local commit instead of
+  running a raw `git push`, since this guard denies that command under
+  `READY_GRAPHITE`; it records the PR as committed-but-unsubmitted in the final
+  summary instead.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 3.0.0
 
 ### Major Changes

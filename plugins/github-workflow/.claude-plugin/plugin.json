@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
@@ -27,7 +27,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\" --hook check-git-push",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }
@@ -39,7 +39,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\" --hook check-commit-message",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }

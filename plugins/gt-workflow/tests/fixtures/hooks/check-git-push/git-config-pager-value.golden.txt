@@ -1,0 +1,6 @@
+EXIT_CODE=2
+--- STDOUT ---
+--- STDERR ---
+⛔  Raw `git push` is not allowed in this repo.
+   Use `gt submit --no-interactive` instead so Graphite keeps the stack in sync.
+   If you need to force-push a single branch, use `gt submit` which handles it safely.

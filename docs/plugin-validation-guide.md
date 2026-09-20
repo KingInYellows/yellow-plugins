@@ -227,9 +227,60 @@ mv plugins/hookify-old plugins/hookify
 > commands, existence and containment of the script (both interpreters,
 > leading interpreter flags allowed), plus shebang, `set -e`, and decision
 > output for `bash` scripts only; an unquoted or single-quoted
-> `${CLAUDE_PLUGIN_ROOT}` in the script argument is an error (`hook command
-> has unquoted …` / `single-quotes …`) and any other interpreter is a
-> warning with no path check (RULES 6 + 8); `hooks/hooks.json`
+> `${CLAUDE_PLUGIN_ROOT}` in ANY word of the command is an error (`hook
+> command has unquoted …` / `single-quotes …`) and any other interpreter
+> (`sh`, `nodejs`, `/usr/bin/node`, `env node`, a leading assignment, a
+> bare placeholder) is an error with no path check — RULE 6 checks
+> `bash`/`node` only (RULES 6 + 8). Interpreter options are an
+> allowlist: every option a hook command carries must appear in exactly
+> one of the per-interpreter tables in `HOOK_OPTIONS`
+> (`scripts/lib/plugin-paths.js` — `flag`, `takesValue`, `fileOperand`,
+> `pathOperand`, `valueShape`, `noExecValues`, `attachedOnly`, `inline`,
+> `noExec`; the table's comment block is the authoritative list and the
+> reasoning behind each exclusion), and an option in none is itself an
+> error (`passes an interpreter option RULE 6 does not recognise`) so an
+> unknown option can never swallow the entrypoint word. What the tables
+> enforce: inline-code options (`bash -c`, `node -e`/`-pe`) and no-exec
+> options (`bash -n`/`-o noexec`/`-o onecmd`, `node --check`, help /
+> version) are errors because there is no script, or it never runs;
+> attached-only V8 flags written bare are an error; an operand that is
+> empty, is really the next option, or fails the interpreter's own shape
+> (`set -o` / `shopt` names, `--input-type` / `--unhandled-rejections`
+> modes, numeric V8 values) is an error; bash short flags bundle and are
+> looked up letter by letter with a value-taking letter allowed only
+> last; bash has no `--opt=value` form and reads its long options before
+> any single-character one (`bash -x --norc …` is "invalid option"); `--`
+> (and bash's `-`) ends the options. The script word and every path
+> operand must start with `${CLAUDE_PLUGIN_ROOT}/`, continue with plain
+> path characters only (`[A-Za-z0-9._/-]` — node resolves `--import` as
+> an ESM URL, where `%2e%2e`, `#` and `?` would make it load a different
+> file than the one the validator checked), contain no `..`, not end in
+> `/` or `/.`, and stay inside the plugin — hooks run with the project's
+> cwd, so `bash hooks/x.sh` would name a file in whatever repository is
+> open; a `fileOperand` (files node loads before the entrypoint:
+> `-r`/`--require`, `--import`, the loaders, `--env-file`,
+> `--openssl-config`) must also exist as a regular, non-symlink file whose
+> real path stays inside the plugin's real path (no symlinked directory on
+> the way), exactly like the script word, and its contents are trusted
+> like the script's. Options with no script word
+> after them are an error too. Quoting rule: every character of every
+> `${CLAUDE_PLUGIN_ROOT}` occurrence must sit inside double quotes as the
+> shell-word splitter sees it, so `""${CLAUDE_PLUGIN_ROOT}/x` (empty
+> quotes quote nothing), a placeholder in a separated option operand, and
+> `"$"{CLAUDE_PLUGIN_ROOT}/x` (a quote boundary inside the placeholder)
+> are all errors. Anything else the splitter does not model is rejected
+> outright: a backslash; a newline anywhere — between words too, `sh -c`
+> treats it as a separator so `… x.sh` + newline + `curl … | sh` would
+> run unchecked — or any other control character or non-shell whitespace
+> (`\r`, `\v`, `\f`, NBSP, U+2028, BOM: the shell keeps them inside the
+> word); an unquoted control operator or redirection; a `$(…)`/backtick
+> substitution outside single quotes; any `$`/`~` expansion other than
+> the exact placeholder (`$HOME/x`, `${CLAUDE_PLUGIN_ROOT:-x}`, unbraced
+> `$CLAUDE_PLUGIN_ROOT`); and an unquoted glob or brace character. Only
+> space and tab separate words, as in the shell. Verdicts are checked in
+> that order — unterminated quote, placeholder quoting, unmodelled
+> syntax, options, script — and the first hit is the one
+> error reported; `hooks/hooks.json`
 > presence (RULE 7) — an error whenever the file exists, with or without
 > inline `hooks` in the manifest, because Claude Code auto-loads it as a
 > second hook source and hook config in this repo lives only in `catalog/`

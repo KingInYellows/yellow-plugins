@@ -4,23 +4,32 @@
  * Host-agnostic policy for the PreToolUse "block raw git push" hook.
  *
  * Pure — no I/O, no console.*, no timestamps — so both entrypoints and the
- * parity harness can call it directly. Reproduces the deleted
- * plugins/gt-workflow/hooks/check-git-push.sh's blocking regex; the field
- * path is NOT reproduced: that script (and this file until 2026-09-16) read
- * `command` at the envelope root, a field no host sends. Real PreToolUse
- * envelopes on Claude Code and Codex nest it under `tool_input.command`
- * (-> toolInput after snake->camel), the same shape check-commit-message
- * reads — so the backstop allowed every raw `git push`. See
+ * parity harness can call it directly. Detection is delegated to
+ * ./git-push-detector.js, which tokenises the command instead of the
+ * deleted plugins/gt-workflow/hooks/check-git-push.sh's substring regex
+ * (`(^|[;&()|$`]|\s)git\s+push`, evadable by `/usr/bin/git push`,
+ * `git -C dir push`, `bash -c "git push"` — see
+ * docs/solutions/security-issues/substring-regex-command-denylist-evasion.md).
+ * The field path is NOT the bash script's either: that script (and this
+ * file until 2026-09-16) read `command` at the envelope root, a field no
+ * host sends. Real PreToolUse envelopes on Claude Code and Codex nest it
+ * under `tool_input.command` (-> toolInput after snake->camel), the same
+ * shape check-commit-message reads — so the backstop allowed every raw
+ * `git push`. See
  * docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md.
  */
 
-// Mirrors the bash script's POSIX ERE: (^|[;&()|$`]|[[:space:]])git[[:space:]]+push
-const GIT_PUSH_RE = /(^|[;&()|$`]|\s)git\s+push/m;
+const { classifyGitPushCommand } = require('./git-push-detector.js');
 
 const BLOCK_MESSAGE = [
   '⛔  Raw `git push` is not allowed in this repo.',
   '   Use `gt submit --no-interactive` instead so Graphite keeps the stack in sync.',
   '   If you need to force-push a single branch, use `gt submit` which handles it safely.',
+].join('\n');
+
+const UNVERIFIABLE_MESSAGE = [
+  '⛔  Hook could not verify this Bash command. Blocking as a precaution.',
+  '   If you intended to push, use `gt submit --no-interactive` instead.',
 ].join('\n');
 
 const MALFORMED_MESSAGE =
@@ -38,8 +47,8 @@ function checkGitPush(camelCaseEnvelope) {
   // Absent command (non-Bash tool_input, or no tool_input at all): nothing
   // to check, allow. Present but not a string (object, array, number, null):
   // a shape this hook cannot verify, so it fails closed the same way
-  // run-hook.js treats truncated stdin, rather than being coerced by the
-  // regex test — `RegExp.test` stringifies its argument.
+  // run-hook.js treats truncated stdin, rather than being stringified by
+  // the detector.
   if (command === undefined) {
     return { decision: 'allow', message: null };
   }
@@ -47,8 +56,12 @@ function checkGitPush(camelCaseEnvelope) {
     return { decision: 'deny', message: MALFORMED_MESSAGE };
   }
 
-  if (GIT_PUSH_RE.test(command)) {
+  const verdict = classifyGitPushCommand(command);
+  if (verdict === 'verified-push') {
     return { decision: 'deny', message: BLOCK_MESSAGE };
+  }
+  if (verdict === 'unverifiable') {
+    return { decision: 'deny', message: UNVERIFIABLE_MESSAGE };
   }
 
   return { decision: 'allow', message: null };

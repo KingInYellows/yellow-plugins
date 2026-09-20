@@ -25,3 +25,6 @@ exclude_paths:
   - "plans/**"
   - "docs/brainstorms/**"
   - "RESEARCH/**"
+  # Hand-rolled shell lexer for the PreToolUse git-push backstop — high
+  # cyclomatic complexity is inherent; parity tests gate behaviour instead.
+  - "plugins/*/hooks/scripts/lib/git-push-detector.js"
