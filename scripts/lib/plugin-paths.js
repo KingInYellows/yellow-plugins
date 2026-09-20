@@ -12,6 +12,13 @@ const fs = require('fs');
 const path = require('path');
 
 const { addError, logSuccess, logWarning } = require('./logging');
+const {
+  pluginRootProblem,
+  resolvePluginRootReal,
+  sweepCandidateProblem,
+  symlinkedAncestorProblem,
+  validateHookScriptSymlinkPolicy,
+} = require('./plugin-symlink-policy');
 
 // Canonical Claude Code hook events. Module-scope so VALID_HOOK_EVENTS.has()
 // is O(1) and the membership test is shared across rules.
@@ -832,6 +839,10 @@ function resolveHookScriptPath(command, pluginDir) {
  * within the plugin directory boundary; null otherwise.
  */
 function resolvePluginPath(inputPath, pluginDir) {
+  // `..` is folded lexically here but resolved component-by-component by
+  // the kernel, so `docs/../agents` with `docs` a symlink escapes every
+  // later check. No catalog path needs it: reject outright.
+  if (inputPath.split(/[\\/]+/).includes('..')) return null;
   const normalized = path.resolve(pluginDir, inputPath);
   const pluginRoot = path.resolve(pluginDir);
   if (
@@ -910,6 +921,11 @@ function validatePathFile(fieldName, filePath, pluginDir, errors) {
     );
     return;
   }
+  const ancestor = symlinkedAncestorProblem(resolved, pluginDir);
+  if (ancestor !== null) {
+    addError(errors, `${fieldName} path ${ancestor}: ${filePath}`);
+    return;
+  }
   if (stat.isDirectory()) {
     addError(
       errors,
@@ -951,6 +967,11 @@ function validateSinglePath(fieldName, p, pluginDir, errors, directoryOnly) {
       errors,
       `${fieldName} path is a symlink which is not permitted: ${p}`
     );
+    return;
+  }
+  const ancestor = symlinkedAncestorProblem(resolved, pluginDir);
+  if (ancestor !== null) {
+    addError(errors, `${fieldName} path ${ancestor}: ${p}`);
     return;
   }
   if (stat.isFile()) {
@@ -1061,6 +1082,71 @@ function collectInlineHooks(hooks) {
   return merged;
 }
 
+function hookScriptDecisionOutputProblem(content, relPath, eventName) {
+  if (!DECISION_PROTOCOL_EVENTS.has(eventName)) return null;
+  const hasJsonOutput =
+    /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
+  const hasExitCodeProtocol =
+    /exit\s+0/.test(content) && /exit\s+2/.test(content);
+  if (hasJsonOutput || hasExitCodeProtocol) return null;
+  return `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`;
+}
+
+function hookScriptSetEProblem(content, relPath) {
+  if (
+    !/^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+      content
+    )
+  ) {
+    return null;
+  }
+  return (
+    `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+    'use "set -uo pipefail" instead'
+  );
+}
+
+/**
+ * RULE 8 bash-only checks for a hook script that already passed RULE 6
+ * existence, symlink, and containment gates.
+ */
+function validateHookScriptBashRules(
+  scriptPath,
+  eventName,
+  pluginDir,
+  lstat
+) {
+  if ((lstat.mode & 0o111) === 0) {
+    logWarning(
+      `Hook script not executable: ${scriptPath} (check file permissions)`
+    );
+  }
+
+  let content;
+  try {
+    content = fs.readFileSync(scriptPath, 'utf-8');
+  } catch (readErr) {
+    logWarning(`Cannot read hook script: ${scriptPath} (${readErr.message})`);
+    return;
+  }
+
+  const relPath = path.relative(pluginDir, scriptPath);
+
+  if (!content.startsWith('#!/')) {
+    logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
+  }
+
+  const decisionProblem = hookScriptDecisionOutputProblem(
+    content,
+    relPath,
+    eventName
+  );
+  if (decisionProblem !== null) logWarning(decisionProblem);
+
+  const setEProblem = hookScriptSetEProblem(content, relPath);
+  if (setEProblem !== null) logWarning(setEProblem);
+}
+
 /**
  * Apply RULE 6 (existence / readability / executable mode) and RULE 8
  * (shebang / decision-output / set -e) to a single hook script path.
@@ -1113,6 +1199,13 @@ function validateHookScriptPath(
     );
     return;
   }
+  // The lstat above only inspects the final component. The caller's
+  // resolveHookScriptPath containment is lexical, so a symlinked directory
+  // between the plugin root and the script (`hooks/` -> /elsewhere) still
+  // passes it and would let the command run a file outside the plugin.
+  if (!validateHookScriptSymlinkPolicy(scriptPath, eventName, pluginDir, errors)) {
+    return;
+  }
   try {
     fs.accessSync(scriptPath, fs.constants.R_OK);
   } catch (accessErr) {
@@ -1130,53 +1223,15 @@ function validateHookScriptPath(
   // in the file the command names.
   if (interpreter === 'node') return;
 
-  if ((lstat.mode & 0o111) === 0) {
-    logWarning(
-      `Hook script not executable: ${scriptPath} (check file permissions)`
-    );
-  }
-
-  let content;
-  try {
-    content = fs.readFileSync(scriptPath, 'utf-8');
-  } catch (readErr) {
-    logWarning(`Cannot read hook script: ${scriptPath} (${readErr.message})`);
-    return;
-  }
-
-  const relPath = path.relative(pluginDir, scriptPath);
-
-  if (!content.startsWith('#!/')) {
-    logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
-  }
-
-  if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
-    const hasJsonOutput =
-      /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
-    const hasExitCodeProtocol =
-      /exit\s+0/.test(content) && /exit\s+2/.test(content);
-    if (!hasJsonOutput && !hasExitCodeProtocol) {
-      logWarning(
-        `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
-      );
-    }
-  }
-
-  if (
-    /^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
-      content
-    )
-  ) {
-    logWarning(
-      `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
-        'use "set -uo pipefail" instead'
-    );
-  }
+  validateHookScriptBashRules(scriptPath, eventName, pluginDir, lstat);
 }
 
 module.exports = {
   VALID_HOOK_EVENTS,
   DECISION_PROTOCOL_EVENTS,
+  pluginRootProblem,
+  resolvePluginRootReal,
+  sweepCandidateProblem,
   resolveHookScriptPath,
   resolvePluginPath,
   countMarkdownRecursive,

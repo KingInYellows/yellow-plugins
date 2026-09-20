@@ -35,7 +35,22 @@ function assertWithinRoot(filePath, rootDir) {
 
 function atomicWrite(filePath, content) {
   const tmp = filePath + '.tmp';
-  writeFileSync(tmp, content, 'utf8');
+  // `wx` (O_CREAT|O_EXCL): never write THROUGH a pre-existing `.tmp`
+  // entry — a planted `plugin.json.tmp -> /elsewhere` symlink would
+  // otherwise receive the bytes (and O_EXCL refuses a dangling link too).
+  // A leftover from an interrupted run is unlinked (the entry itself,
+  // never a target) and the create retried once.
+  try {
+    writeFileSync(tmp, content, { encoding: 'utf8', flag: 'wx' });
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw new Error(`[atomicWrite] create ${tmp} failed: ${e.message}`);
+    try {
+      unlinkSync(tmp); // EISDIR/EPERM when the leftover is a directory: reported, never recursed into
+      writeFileSync(tmp, content, { encoding: 'utf8', flag: 'wx' });
+    } catch (retryErr) {
+      throw new Error(`[atomicWrite] ${tmp} already exists and could not be replaced: ${retryErr.message}`);
+    }
+  }
   try {
     renameSync(tmp, filePath); // atomic on Linux when on same filesystem
   } catch (e) {

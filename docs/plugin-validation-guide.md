@@ -295,6 +295,52 @@ mv plugins/hookify-old plugins/hookify
 > path fields in the same pass (RULES 5b/5c), directory-only. Numbering
 > resumes at 12 so existing error-message references stay stable.
 
+> **Symlink policy — `validate-plugin`.** Symlinks are rejected outright,
+> never followed. The validator refuses a plugin whose root is itself a
+> symlink before reading anything (`Plugin directory is a symlink`), and
+> auto-discovery (no argument) refuses a symlinked `plugins/` — dangling or
+> not — with exit 2 before reading its entries (`discoverPlugins()` visits
+> symlinked entries so they hit the root error instead of being skipped).
+> Every path field (`commands`, `agents`, `skills`, `outputStyles`,
+> `lspServers`, …) and every RULE 6 hook script rejects a `..` component
+> (the kernel resolves a symlinked `docs/` before applying `docs/..`, which
+> no lexical check can see), `lstat`s the final entry (a symlinked file or
+> directory is an error) and walks every directory between the plugin
+> root and the entry, erroring on the first symlink (`passes through a
+> symlinked directory (hooks)`). RULE 6 additionally compares
+> `realpath(script)` against `realpath(pluginDir)` — defence in depth,
+> both sides resolved, so a plugin reached through a symlinked parent
+> (macOS `/var` → `/private/var` cache roots) still passes. RULE 7 and the
+> generator's forbidden-file check share one `lstat`-based existence
+> helper (`lexistsSync` in `scripts/lib/plugin-symlink-policy.js`): a _dangling_
+> `hooks/hooks.json` symlink is still an error (`existsSync` would report
+> it absent while Claude Code can still try to load it), `hooks` being a
+> plain file counts as absent, and an entry that cannot be inspected
+> (ELOOP, EACCES) counts as present.
+
+> **Symlink policy — `generate-manifests`.** One up-front pass refuses a
+> symlinked `plugins/` (every plugin errors: `plugins is a symlink`) or a
+> symlinked `plugins/<name>` root (`plugins/<name> is a symlink`), and the
+> run aborts before any target is assembled. Every write and every stale
+> unlink then gets the same on-disk check (`sweepCandidateProblem`): a
+> target under `plugins/<name>` is contained in that plugin, a root-level
+> marketplace (`.claude-plugin/`, `.agents/plugins/`, `.cursor-plugin/`) in
+> the repository root; it is refused (`refusing to sweep|write …: … is a
+> symlink …`) when any directory between the container and the path is a
+> symlink or when the path's real target escapes the container's real
+> path; a path that is itself a symlink is unlinked or renamed over only
+> as the link (never through it), and a dangling one the same way.
+> `atomicWrite` creates its `<target>.tmp` sibling with `O_EXCL`, so a
+> planted `plugin.json.tmp` symlink is never written through (a leftover
+> regular `.tmp` from an interrupted run is unlinked and recreated; a
+> directory there is a labeled error). A trailing `/` on a plugin path
+> does not defeat the root check (the path is resolved before `lstat`).
+>
+> Accepted residual: the on-disk checks run once before the apply pass, so
+> a local process racing the generator between check and write could
+> still swap a directory for a symlink (Node has no directory-relative
+> `openat` writes); nothing in the repository can trigger that.
+
 ### Rule 12: Credential-userConfig Env-Var Fallback (warning)
 
 For each `mcpServers.<server>.env.<KEY>: "${user_config.X}"` interpolation,

@@ -64,10 +64,19 @@ const {
   buildCursorSkillTree,
 } = require('./lib/generate/emit-cursor');
 const {
+  queueStaleUnlinks,
+  symlinkedPluginRoots,
+} = require('./lib/generate/symlink-sweep');
+const {
   assertWithinRoot,
   atomicWrite,
   serializeJson,
 } = require('./lib/generate/write');
+const {
+  lexistsSync,
+  resolvePluginRootReal,
+  sweepCandidateProblem,
+} = require('./lib/plugin-symlink-policy');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -533,6 +542,18 @@ function validateLifecycle(name, lifecycle, errors, pluginOrder) {
   }
 }
 
+function validateCursorRootOwner(owner, errors) {
+  if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
+    errors.push('catalog.json: "targets.cursor.owner" must be an object');
+    return;
+  }
+  if (typeof owner.name !== 'string' || owner.name.length === 0) {
+    errors.push(
+      'catalog.json: "targets.cursor.owner.name" must be a non-empty string'
+    );
+  }
+}
+
 // Root `catalog.targets.cursor` config — OPTIONAL, unlike `catalog.targets.
 // codex` (which catalog-reader.js already validates as required
 // unconditionally; that file is outside this module's ownership). Validated
@@ -562,14 +583,7 @@ function validateCursorRootConfig(catalog, errors) {
     );
   }
   if ('owner' in cursor) {
-    const owner = cursor.owner;
-    if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
-      errors.push('catalog.json: "targets.cursor.owner" must be an object');
-    } else if (typeof owner.name !== 'string' || owner.name.length === 0) {
-      errors.push(
-        'catalog.json: "targets.cursor.owner.name" must be a non-empty string'
-      );
-    }
+    validateCursorRootOwner(cursor.owner, errors);
   }
 }
 
@@ -593,6 +607,7 @@ function validateCursorRootConfig(catalog, errors) {
  */
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
+  const pluginsRoot = join(rootDir, 'plugins');
   // `results` is per-plugin reporting only. Attributed error classes:
   // loadPluginSources per-plugin failures (via its `badNames`), source
   // validation, package.json read/shape, target assembly (path containment
@@ -670,15 +685,17 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // Versions come from plugins/<name>/package.json only (R3). Matched by
   // explicit name key: pkg.name must equal the catalog source name.
   const pkgs = {};
+  const refusedRoots = symlinkedPluginRoots(catalog.pluginOrder, pluginsRoot, result, errors);
   for (const name of catalog.pluginOrder) {
+    if (refusedRoots.has(name)) continue;
     const errorsBeforeValidate = errors.length;
     validateSource(name, sources[name], errors, catalog.pluginOrder);
     if (errors.length > errorsBeforeValidate) {
       result.results[name] = 'error';
     }
-    const pkgPath = join(rootDir, 'plugins', name, 'package.json');
+    const pkgPath = join(pluginsRoot, name, 'package.json');
     try {
-      assertWithinRoot(pkgPath, join(rootDir, 'plugins'));
+      assertWithinRoot(pkgPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -745,7 +762,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(targetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(targetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -778,7 +795,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(manifestTargetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -799,7 +816,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         'codex-hooks.json'
       );
       try {
-        assertWithinRoot(hooksTargetPath, join(rootDir, 'plugins'));
+        assertWithinRoot(hooksTargetPath, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -818,7 +835,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     for (const target of skillTreeResult.targets) {
       try {
-        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+        assertWithinRoot(target.path, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -851,7 +868,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'plugin.json'
     );
     try {
-      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+      assertWithinRoot(manifestTargetPath, pluginsRoot);
     } catch (err) {
       errors.push(err.message);
       result.results[name] = 'error';
@@ -869,7 +886,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     for (const target of skillTreeResult.targets) {
       try {
-        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+        assertWithinRoot(target.path, pluginsRoot);
       } catch (err) {
         errors.push(err.message);
         result.results[name] = 'error';
@@ -889,7 +906,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       path: cursorMarketplacePath,
       bytes: serializeJson(cursorMarketplaceObj),
     });
-  } else if (existsSync(cursorMarketplacePath)) {
+  } else if (lexistsSync(cursorMarketplacePath)) {
     // No-op emission state (root config absent, or zero plugins enabled) but
     // a prior generation left a file behind — stale-sweep it. This candidate
     // lives OUTSIDE plugins/ (unlike every other stale candidate below), so
@@ -917,7 +934,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const codex = sources[name].targets.codex;
     const skillsPath =
       (codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
-    const pluginRoot = join(rootDir, 'plugins', name);
+    const pluginRoot = join(pluginsRoot, name);
     const skillsDir = join(pluginRoot, skillsPath);
     const staleCandidates = [
       join(pluginRoot, '.codex-plugin', 'plugin.json'),
@@ -932,7 +949,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // (this apply path also runs unattended from sync-manifests.js during
     // `pnpm apply:changesets`).
     const forbiddenHooksJson = join(pluginRoot, 'hooks', 'hooks.json');
-    if (existsSync(forbiddenHooksJson)) {
+    if (lexistsSync(forbiddenHooksJson)) {
       result.diffs.push({
         path: relative(rootDir, forbiddenHooksJson),
         state: 'forbidden',
@@ -1170,18 +1187,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    for (const candidate of staleCandidates) {
-      if (expectedPaths.has(candidate) || !existsSync(candidate)) {
-        continue;
-      }
-      try {
-        assertWithinRoot(candidate, join(rootDir, 'plugins'));
-      } catch (err) {
-        errors.push(err.message);
-        continue;
-      }
-      targets.push({ path: candidate, bytes: null });
-    }
+    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
     }
@@ -1206,7 +1212,6 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // naming it, even without the dedicated per-plugin "ERROR: plugin X:"
   // line main() prints from result.results.
   const catalogedPlugins = new Set(catalog.pluginOrder);
-  const pluginsRoot = join(rootDir, 'plugins');
   let pluginDirEntries = [];
   try {
     pluginDirEntries = readdirSync(pluginsRoot, { withFileTypes: true });
@@ -1216,11 +1221,14 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
   }
   for (const entry of pluginDirEntries) {
-    if (!entry.isDirectory() || catalogedPlugins.has(entry.name)) {
+    // A symlinked plugins/<name> is visited too: the forbidden file is
+    // only reported here (never unlinked), and validate-plugin refuses
+    // the symlinked root itself.
+    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || catalogedPlugins.has(entry.name)) {
       continue;
     }
     const orphanHooksJson = join(pluginsRoot, entry.name, 'hooks', 'hooks.json');
-    if (existsSync(orphanHooksJson)) {
+    if (lexistsSync(orphanHooksJson)) {
       result.diffs.push({
         path: relative(rootDir, orphanHooksJson),
         state: 'forbidden',
@@ -1243,7 +1251,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const skillsPath =
       (cursor.componentPaths && cursor.componentPaths.skills) ||
       './cursor/skills';
-    const pluginRoot = join(rootDir, 'plugins', name);
+    const pluginRoot = join(pluginsRoot, name);
     const skillsDir = join(pluginRoot, skillsPath);
     const staleCandidates = [join(pluginRoot, '.cursor-plugin', 'plugin.json')];
     let skillsDirWithinPlugin = true;
@@ -1396,20 +1404,36 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    for (const candidate of staleCandidates) {
-      if (expectedPaths.has(candidate) || !existsSync(candidate)) {
-        continue;
-      }
-      try {
-        assertWithinRoot(candidate, join(rootDir, 'plugins'));
-      } catch (err) {
-        errors.push(err.message);
-        continue;
-      }
-      targets.push({ path: candidate, bytes: null });
-    }
+    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
+    }
+  }
+
+  // Content writes get the same on-disk containment as stale unlinks: a
+  // generated file must not be written THROUGH a symlinked directory
+  // (`hooks/` -> /shared, or a committed `.agents/plugins` -> /elsewhere)
+  // — mkdirSync + atomicWrite would otherwise create or replace a file the
+  // generator never owned. Targets under plugins/<name> are contained in
+  // that plugin; the root-level marketplaces (.claude-plugin/,
+  // .agents/plugins/, .cursor-plugin/) in the repository root. Stale
+  // unlinks under plugins/ were already checked by queueStaleUnlinks; the
+  // one root-level stale candidate (the Cursor marketplace) is checked
+  // here.
+  const rootRealCache = new Map();
+  const containerRealFor = (container) => {
+    if (!rootRealCache.has(container)) rootRealCache.set(container, resolvePluginRootReal(container, errors));
+    return rootRealCache.get(container);
+  };
+  for (const target of targets) {
+    const underPlugins = target.path.startsWith(pluginsRoot + sep);
+    if (underPlugins && target.bytes === null) continue;
+    const name = underPlugins ? relative(pluginsRoot, target.path).split(sep)[0] : null;
+    const container = name === null ? rootDir : join(pluginsRoot, name);
+    const problem = sweepCandidateProblem(target.path, container, containerRealFor(container), rootDir);
+    if (problem !== null) {
+      errors.push(`refusing to ${target.bytes === null ? 'sweep' : 'write'} ${relative(rootDir, target.path)}: ${problem}`);
+      if (name !== null) result.results[name] = 'error';
     }
   }
 
@@ -1432,8 +1456,9 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // corresponding target. Report as drift; apply mode deletes it.
     // Existence-only check — readFileSync would throw EISDIR for a stale
     // symlink alias whose entry itself is swept (it may resolve to a
-    // directory), and its content is irrelevant here regardless.
-    if (!existsSync(target.path)) {
+    // directory), and its content is irrelevant here regardless. lstat-
+    // based so a dangling symlink is still reported and unlinked.
+    if (!lexistsSync(target.path)) {
       continue; // already gone
     }
     const rel = relative(rootDir, target.path);
