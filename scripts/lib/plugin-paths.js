@@ -536,6 +536,18 @@ function expandHookOption(interpreter, w) {
  * loaded — it must exist as a regular, non-symlink file, the same policy
  * validateHookScriptPath applies to the script word — or null.
  */
+function fileOperandRealpathProblem(resolved, pluginDir) {
+  try {
+    const real = fs.realpathSync(resolved);
+    const rootReal = fs.realpathSync(pluginDir);
+    if (real !== rootReal && !real.startsWith(rootReal + path.sep))
+      return 'resolves outside the plugin directory through a symlink';
+  } catch (err) {
+    return `cannot be inspected (${err.message})`;
+  }
+  return null;
+}
+
 function fileOperandProblem(resolved, pluginDir) {
   let lstat;
   try {
@@ -550,15 +562,7 @@ function fileOperandProblem(resolved, pluginDir) {
   // Lexical containment is not enough when a directory between the
   // plugin root and the file is a symlink (`hooks -> /outside`): compare
   // real paths, both sides resolved so a symlinked plugin parent passes.
-  try {
-    const real = fs.realpathSync(resolved);
-    const rootReal = fs.realpathSync(pluginDir);
-    if (real !== rootReal && !real.startsWith(rootReal + path.sep))
-      return 'resolves outside the plugin directory through a symlink';
-  } catch (err) {
-    return `cannot be inspected (${err.message})`;
-  }
-  return null;
+  return fileOperandRealpathProblem(resolved, pluginDir);
 }
 
 /** Map a `${CLAUDE_PLUGIN_ROOT}` word to an absolute path under `root`. */
@@ -631,17 +635,9 @@ function hookOptionKindProblem(options, w, name, attachedValue, last) {
   return null;
 }
 
-function hookOptionOperandProblem(
-  interpreter,
-  options,
-  root,
-  withinPlugin,
-  w,
-  name,
-  attachedValue,
-  last,
-  operand
-) {
+function hookOptionOperandProblem(ctx) {
+  const { interpreter, options, root, withinPlugin, w, name, attachedValue, last, operand } =
+    ctx;
   const kindProblem = hookOptionKindProblem(
     options,
     w,
@@ -688,7 +684,7 @@ function hookOptionWordsProblem(interpreter, options, root, withinPlugin, w, wor
       if (i >= words.length) return { problem: 'empty-operand', detail: name };
       operand = words[i].word;
     }
-    const optionProblem = hookOptionOperandProblem(
+    const optionProblem = hookOptionOperandProblem({
       interpreter,
       options,
       root,
@@ -697,8 +693,8 @@ function hookOptionWordsProblem(interpreter, options, root, withinPlugin, w, wor
       name,
       attachedValue,
       last,
-      operand
-    );
+      operand,
+    });
     if (optionProblem !== null)
       return {
         problem: optionProblem.code,
@@ -722,36 +718,57 @@ function hookScriptWordAt(words, index, withinPlugin) {
   return { index };
 }
 
+function hookScriptOptionStep(interpreter, words, options, root, withinPlugin, i, seenShort) {
+  const w = words[i].word;
+  if (hookOptionTerminator(w, interpreter))
+    return { stop: true, index: i + 1 };
+  if (!(w.startsWith('-') || (interpreter === 'bash' && w.startsWith('+'))))
+    return { stop: true, index: i };
+  const orderProblem = bashHookOptionOrderProblem(interpreter, w, seenShort);
+  if (orderProblem !== null) return orderProblem;
+  const optionScan = hookOptionWordsProblem(
+    interpreter,
+    options,
+    root,
+    withinPlugin,
+    w,
+    words,
+    i
+  );
+  if (optionScan.problem)
+    return {
+      problem: optionScan.problem,
+      detail: optionScan.detail,
+    };
+  return {
+    stop: false,
+    index: optionScan.index,
+    seenShort:
+      interpreter === 'bash' && !w.startsWith('--') ? true : seenShort,
+  };
+}
+
 function hookScriptWordIndex(interpreter, words, options, root) {
   const withinPlugin = (w) => hookPathWithinPlugin(w, root);
   let i = 0;
   let seenShort = false; // bash: a `--long` option after any short one is "invalid option"
   for (; i < words.length; i += 1) {
-    const w = words[i].word;
-    if (hookOptionTerminator(w, interpreter)) {
-      i += 1; // end of options: the next word is the script
-      break;
-    }
-    if (!(w.startsWith('-') || (interpreter === 'bash' && w.startsWith('+'))))
-      break;
-    const orderProblem = bashHookOptionOrderProblem(interpreter, w, seenShort);
-    if (orderProblem !== null) return orderProblem;
-    if (interpreter === 'bash' && !w.startsWith('--')) seenShort = true;
-    const optionScan = hookOptionWordsProblem(
+    const step = hookScriptOptionStep(
       interpreter,
+      words,
       options,
       root,
       withinPlugin,
-      w,
-      words,
-      i
+      i,
+      seenShort
     );
-    if (optionScan.problem)
-      return {
-        problem: optionScan.problem,
-        detail: optionScan.detail,
-      };
-    i = optionScan.index;
+    if (step.problem) return step;
+    if (step.stop) {
+      i = step.index;
+      break;
+    }
+    seenShort = step.seenShort;
+    i = step.index;
   }
   return hookScriptWordAt(words, i, withinPlugin);
 }
