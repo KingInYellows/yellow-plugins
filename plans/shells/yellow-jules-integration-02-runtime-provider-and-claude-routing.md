@@ -9,8 +9,10 @@ depends_on: [yellow-jules-integration-01-contract-and-sdk-investigation]
 ## Context
 
 This shell ships the plugin as one atomic release boundary: the typed runtime
-behind the adapter chosen by shell 01, the seven v0 commands with interactive
-confirmation, the provider-local journal, artifact staging, and every consumer
+behind the adapter chosen by shell 01, the four read-only v0 commands
+(`setup`, `list`, `status`, `collect`; `delegate`, `reply`, and `approve`
+moved to shell 03 per the Open Question 6 decision, 2026-09-10), the
+provider-local journal, artifact staging, and every consumer
 that must recognize a third remote-agent provider (catalog, provider router,
 setup coverage, Linear delegate route, root script filters, CI drift gates,
 fixtures, changesets). The spec forbids shipping `READY_JULES` while any
@@ -18,9 +20,7 @@ consumer lacks handling for it, so this work lands and reverts as one PR even
 though it will take more than one session; plan for continuity on a single
 branch.
 
-It also produces the human-authorized smoke procedure that must run after this
-PR merges and before supervision work starts. The smoke itself is a manual,
-owner-approved activity, not CI.
+The human-authorized R53 smoke moved to after shell 03 (Open Question 6 decision, 2026-09-10); shell 03 produces its procedure and result template, and this shell produces only the fake-server test layers.
 
 ## Produces
 
@@ -28,7 +28,7 @@ owner-approved activity, not CI.
   SDK resolver with consented data-dir install, config and data-dir
   resolution, input validation, journal state store, error codes, redaction,
   committed compiled output
-- v0 command wrappers: setup, delegate, list, status, reply, approve, collect
+- v0 command wrappers: setup, list, status, collect (`delegate`, `reply`, `approve` moved to shell 03 (Open Question 6 decision, 2026-09-10))
 - Provider-local journal with operation, artifact, and deviation records,
   reservation-first atomic writes, directory lock, corrupt-journal block
 - Artifact staging directory layout under the data dir
@@ -37,7 +37,8 @@ owner-approved activity, not CI.
   probe flag, corrected diagnostics and docstring
 - Setup-all coverage for Jules at every enumerated site
 - Linear delegate route accepting the third provider with a third tooling
-  argv slot and preserved conflict semantics
+  argv slot and preserved conflict semantics; its `jules` dispatch branch is
+  a fail-closed stub naming shell 03 (Open Question 6 decision, 2026-09-10)
 - Provider-groups validator fixtures for a three-member group, corrected header
 - Root typecheck and unit-test filters, main-workflow dist drift step,
   fork-mirror matrix arm
@@ -46,8 +47,7 @@ owner-approved activity, not CI.
 - Refreshed characterization snapshots, plugin-count doc updates, changesets
   for yellow-jules, yellow-core, yellow-linear, README and CLAUDE.md for the
   plugin
-- Human smoke procedure checklist and the `docs/yellow-jules/smoke-result.md`
-  record template (R53)
+
 
 ## Consumes
 
@@ -83,12 +83,11 @@ owner-approved activity, not CI.
 - R21
 - R22
 - R23
-- R24
+- R24 (partial: stub-dispatch-branch)
 - R25
 - R26
 - R27
 - R28 (partial: pr2-changesets-counts-docs)
-- R29
 - R35
 - R36
 - R37
@@ -97,8 +96,8 @@ owner-approved activity, not CI.
 - R49 (partial: test-layers)
 - R50
 - R51
-- R52 (partial: pr2-scenarios)
-- R53 (partial: procedure-and-checklist)
+- R52 (partial: pr2-read-only-scenarios-and-zero-mutating-request-test)
+
 
 ## Implementation Steps (High-Level)
 
@@ -115,17 +114,22 @@ owner-approved activity, not CI.
    recorded-integrity-hash tarball verification and a fail-closed
    `JULES_SDK_INTEGRITY` abort on mismatch; post-acceptance failure
    classification to unknown-outcome on either branch.
-4. **Implement runtime operations** — setup probe, source discovery, session
-   create, fresh status with activity paging and dedup, reply, approve with
-   plan re-fetch, collect with base recording and artifact kinds, policy
-   deviation on unexpected vendor PR, unsupported-capability errors.
+4. **Implement the read-only runtime operations** — setup probe, source
+   discovery, fresh status with activity paging and dedup, collect with base
+   recording and artifact kinds, policy deviation on unexpected vendor PR,
+   unsupported-capability errors. Session create, reply, and approve with
+   plan re-fetch move to shell 03 with their wrappers (Open Question 6
+   decision, 2026-09-10), so this PR compiles no vendor-mutating path; the
+   fake-server suite asserts zero mutating requests across every shipped
+   subcommand (R52).
 5. **Implement the CLI and v0 command wrappers** — JSON envelope, exit codes,
-   redaction on every path, seven thin Bash wrappers with confirmation gates.
+   redaction on every path, four thin Bash wrappers (`setup`, `list`, `status`, `collect`); the three mutating wrappers and their confirmation gates ship in shell 03 (Open Question 6 decision, 2026-09-10).
 6. **Register the provider and update every consumer** — catalog entry and
    order, provider-router row and state, its own test suite and six
    fixtures for a seventh state, setup-all sites including the Step 2.5
    acceptable-state enumeration, Linear delegate sites including the tooling
-   argv slot, provider-groups validator fixtures, a consumer-site validator
+   argv slot (the `jules` dispatch branch fails closed with an error-table
+   row naming shell 03, R24), provider-groups validator fixtures, a consumer-site validator
    that enumerates provider ids against each consumer (R25), stale-comment
    fixes.
 7. **Wire root scripts and CI** — typecheck and unit-test filters, main build
@@ -134,7 +138,7 @@ owner-approved activity, not CI.
    the offline list, packed-SDK transport suite with call-count assertions
    and loopback-only guard, trap real tools on PATH.
 9. **Document and release** — plugin README and CLAUDE.md, changesets for all
-   three plugins, smoke checklist and result template, full validator run
+   three plugins, full validator run
    including `validate:agents` and `lint:plugins` for the new command
    Markdown, stack-provider-routed submission.
 
@@ -151,6 +155,4 @@ owner-approved activity, not CI.
   replaced by R3's HTTPS-only, origin-pinned, fail-closed checks, and the
   verdict must name the label for REST-tested matrix rows since R49
   defines none.
-- Smoke execution (R53) is a human gate after merge; this shell produces
-  only the procedure and result template. Shell 03 claims the outcome-gate
-  slice and must not start until the record exists.
+- Open Question 6 decision, 2026-09-10: the R53 smoke runs after shell 03 under a grant; shell 03 produces the procedure and result template, and shell 04 holds the outcome gate. The runtime operations for delegate, reply, and approve move to shell 03 together with their wrappers (amended 2026-09-11), so the controlled path and its authority gate ship in one PR; this shell's fake-server suite proves the absence of any mutating request instead.
