@@ -29,3 +29,10 @@ It never selects a real executor, never invokes `analyze` or `claude -p`, and
 never imports yellow-goal source. Every request probes the pinned artifact
 version before proceeding. The plugin version and engine version are independent
 release identities.
+
+## See also
+
+- [Loop/graph lineage note](../../docs/research/2026-09-17-loop-graph-vs-yellow-harness.md)
+  — community Loop Engineering, ADK 2, and goal-gen GOAP are three lineages.
+  Mappings are analogous, not identity. This plugin remains a process bridge
+  (`/goal:setup`, `/goal:request`, `/goal:run-stub`).
