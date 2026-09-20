@@ -34,8 +34,9 @@ not identity.
    outer cycle.
 
 A fourth use, **knowledge graph** (entities/relations; ruvector today), is not
-control flow. `yellow-mempalace` is not a live marketplace plugin (see
-`.changeset/remove-yellow-mempalace.md`).
+control flow. `yellow-mempalace` is not a live marketplace plugin (absent from
+`.claude-plugin/marketplace.json`; removal in
+`plugins/yellow-ruvector/CHANGELOG.md`, commit `f0c818d`).
 
 Slogan to keep rejecting: "graphs replaced Loop Engineering." A graph can
 contain loops. Loop Engineering is the ops layer around whatever control plane
