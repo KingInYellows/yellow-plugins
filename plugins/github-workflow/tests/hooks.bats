@@ -159,7 +159,7 @@ JSON
 @test "check-git-push: shell nested past the depth cap is blocked even without a push" {
   # Depth > 3 denies unconditionally — the detector will not vouch for a
   # command it has to unwrap four shells to read.
-  assert_push_blocked "$(cat <<'JSON'
+  assert_push_unverifiable "$(cat <<'JSON'
 {"tool_input":{"command":"bash -c \"bash -c 'bash -c \\\"bash -c \\\\\\\"echo hi\\\\\\\"\\\"'\""}}
 JSON
 )"
@@ -272,13 +272,6 @@ JSON
 @test "check-git-push: { echo 'git push'; echo done; } | bash is blocked (pipe from a whole group is opaque)" {
   assert_push_unverifiable "$(cat <<'JSON'
 {"tool_input":{"command":"{ echo 'git push'; echo done; } | bash"}}
-JSON
-)"
-}
-
-@test "check-git-push: shell nested past the depth cap is blocked with an unverifiable message" {
-  assert_push_unverifiable "$(cat <<'JSON'
-{"tool_input":{"command":"bash -c \"bash -c 'bash -c \\\"bash -c \\\\\\\"echo hi\\\\\\\"\\\"'\""}}
 JSON
 )"
 }
