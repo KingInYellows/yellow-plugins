@@ -7,24 +7,42 @@ can be installed via `/plugin marketplace add KingInYellows/yellow-plugins`.
 
 ## Key Files
 
+- `catalog/` — Neutral source of truth (`catalog.json` +
+  `catalog/plugins/<name>.json`) from which the manifests below are generated
+  (`pnpm generate:manifests`). See `catalog/README.md`.
 - `.claude-plugin/marketplace.json` — The catalog file Claude Code reads to
-  discover plugins (create this file in the repository root if it does not yet
-  exist). Uses the official Anthropic marketplace format.
-- `plugins/*/` — Individual plugin directories. Each contains
-  `.claude-plugin/plugin.json`.
+  discover plugins. **Generated** from `catalog/`; never hand-edit. Uses the
+  official Anthropic marketplace format.
+- `plugins/*/` — Individual plugin directories. Each contains a generated
+  `.claude-plugin/plugin.json` and a `package.json` (version source of truth).
 - `schemas/` — JSON schemas for validation (official + extended custom schemas).
 - `scripts/validate-marketplace.js` — Validates the marketplace catalog.
 - `scripts/validate-plugin.js` — Validates all plugin manifests.
 
 ## Adding a Plugin
 
-1. Create `plugins/<name>/.claude-plugin/plugin.json` with at minimum `name`,
-   `description`, `author`.
-2. Add commands in `plugins/<name>/commands/*.md` and/or other entrypoints.
-3. Add a `CLAUDE.md` in the plugin root for context.
-4. Register the plugin in `.claude-plugin/marketplace.json` under the `plugins`
-   array.
-5. Run `pnpm validate:schemas` to verify.
+1. Create `plugins/<name>/package.json` (version source of truth) and
+   `catalog/plugins/<name>.json` (fields per `catalog/README.md`); add the
+   name to `pluginOrder` in `catalog/catalog.json`.
+2. Run `pnpm generate:manifests` — it emits
+   `plugins/<name>/.claude-plugin/plugin.json` and the
+   `.claude-plugin/marketplace.json` entry. Never hand-edit those.
+3. Add commands in `plugins/<name>/commands/*.md` and/or other entrypoints,
+   plus `CLAUDE.md` and `README.md` in the plugin root.
+4. Update `plugins/yellow-core/commands/setup/all.md` — the new plugin must
+   appear, in matching order, in every marker-delimited section of that file
+   that `validate-setup-all.js` cross-checks (dashboard loop, classification,
+   delegated command list, plugin-command map, and dashboard example); see the
+   script's header comment for the authoritative section list and error codes.
+   Two sections are conditional: add a Step 1.5 probe entry only when the
+   plugin's classification references an `mcp__plugin_*` tool name; add a
+   Step 1.6 credential-status entry only when the plugin's hooks emit
+   credential status (that list lives between the
+   `# setup-all-credential-status-plugins:start/end` markers in
+   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`,
+   not in `all.md`). Add a `.changeset/*.md` entry.
+5. Run `pnpm validate:schemas` (includes `validate:generated` and
+   `validate:setup-all`).
 
 ## Validation
 

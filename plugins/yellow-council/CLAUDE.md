@@ -157,6 +157,19 @@ Codex agent.)
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
 
+## Testing
+
+`bats tests/` from the plugin directory (`redaction.bats` and `extract.bats` —
+the blocking CI gate runs the whole directory). The awk redaction program is
+shipped as four synchronized carrier files (`REDACTION_SOURCES` in
+`tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
+`agents/review/opencode-reviewer.md`, `skills/council-patterns/SKILL.md`, and
+`commands/council/council.md` (two independent sites — Step 4 `local
+redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
+runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
+across every carrier — edit the patterns in all four files together, never
+just one. There is no fresh-machine install CI (see Known Limitations).
+
 ## Known Limitations
 
 - **OpenCode persistent sessions.** Every `opencode run` creates a SQLite

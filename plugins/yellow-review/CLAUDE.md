@@ -5,8 +5,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Conventions
 
-- Use Graphite (`gt`) for all branch management and PR creation — never raw
-  `git push` or `gh pr create`
+- Use the active stacked-PR provider (see `/stack:status`) for all branch
+  management and PR creation — never raw `git push` or `gh pr create`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
 - Agents report findings — they do NOT edit project files directly. The
@@ -157,6 +157,9 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
   mutation
 
+Both live at `skills/pr-review-workflow/scripts/` and are invoked as
+`${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
+
 ## When to Use What
 
 - **`/review:setup`** — First install, after auth issues, or when review
@@ -273,6 +276,14 @@ frontmatter normalised to `name` + `description`; edit
 copies. Because neither host applies the agent's `tools:` restriction or
 `user-invocable: false`, the rails, the input contract, and the
 explicit-invocation wording live in the skill body and description.
+
+## Testing
+
+`bats tests/` from the plugin directory — `get-pr-comments.bats`,
+`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
+`tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
+invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`), and
+`skill-content.bats`.
 
 ## Known Limitations
 
