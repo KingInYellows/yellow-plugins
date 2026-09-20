@@ -1,0 +1,5 @@
+## In-flight changes
+diff --git a/src/a.sh b/src/a.sh
+@@ -1,2 +1,2 @@
+-old
++new

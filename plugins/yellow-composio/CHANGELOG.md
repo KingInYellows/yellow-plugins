@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.6
+
+### Patch Changes
+
+- [`14a8b21`](https://github.com/KingInYellows/yellow-plugins/commit/14a8b2149167b83ed02725555fba29d8120e5f61)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quote
+  `${CLAUDE_PLUGIN_ROOT}` in every hook command. Claude Code runs shell-form
+  hook commands through `sh -c`, so an unquoted placeholder word-splits when the
+  plugin cache lives under a path with a space and the hook fails open — a
+  PreToolUse guard silently never runs. All commands now use
+  `bash "${CLAUDE_PLUGIN_ROOT}/…"` / `node "${CLAUDE_PLUGIN_ROOT}/…"`, as the
+  hooks reference recommends. `pnpm validate:plugins` (RULE 6) now errors on an
+  unquoted or single-quoted placeholder, tokenises the script argument as one
+  shell word (so `"${CLAUDE_PLUGIN_ROOT}"/x.sh` and interpreter flags parse),
+  and applies its existence and containment checks to `node` entrypoints as well
+  as `bash` scripts.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
 ## 2.0.5
 
 ### Patch Changes

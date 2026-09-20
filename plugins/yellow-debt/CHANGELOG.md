@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.7.2
+
+### Patch Changes
+
+- [`14a8b21`](https://github.com/KingInYellows/yellow-plugins/commit/14a8b2149167b83ed02725555fba29d8120e5f61)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quote
+  `${CLAUDE_PLUGIN_ROOT}` in every hook command. Claude Code runs shell-form
+  hook commands through `sh -c`, so an unquoted placeholder word-splits when the
+  plugin cache lives under a path with a space and the hook fails open — a
+  PreToolUse guard silently never runs. All commands now use
+  `bash "${CLAUDE_PLUGIN_ROOT}/…"` / `node "${CLAUDE_PLUGIN_ROOT}/…"`, as the
+  hooks reference recommends. `pnpm validate:plugins` (RULE 6) now errors on an
+  unquoted or single-quoted placeholder, tokenises the script argument as one
+  shell word (so `"${CLAUDE_PLUGIN_ROOT}"/x.sh` and interpreter flags parse),
+  and applies its existence and containment checks to `node` entrypoints as well
+  as `bash` scripts.
+
+- [`3812fc6`](https://github.com/KingInYellows/yellow-plugins/commit/3812fc66ed19497a3d3d2fe9c24eefa496fca192)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  `hooks/hooks.json` reference mirrors. Claude Code auto-discovers that file and
+  also loads the inline `hooks` block in `plugin.json`, so every hook in these
+  plugins was registered twice and startup printed
+  `hooks.json: unknown key "_comment" ignored`. The inline `plugin.json` block
+  (generated from `catalog/`) is now the only Claude-side hook source;
+  `hooks/codex-hooks.json` is unchanged. `pnpm validate:plugins` (RULE 7) now
+  errors on any `hooks/hooks.json`, with or without inline hooks.
+
+- [`e239b34`](https://github.com/KingInYellows/yellow-plugins/commit/e239b3462d7c65e866d87dc27197b0167dc0e0d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rename the
+  skill frontmatter key `user-invokable` to `user-invocable` in every SKILL.md.
+  Claude Code (verified against 2.1.259) parses only `user-invocable`; the `k`
+  spelling this repo standardised on was silently ignored, so every internal
+  skill declared `user-invokable: false` still appeared in the `/` menu. The
+  validator gains RULE 20 (error tier) rejecting the old key so it cannot creep
+  back through stale templates.
+
+- [`2f39283`](https://github.com/KingInYellows/yellow-plugins/commit/2f39283d69689e9d03c00db8094c058765df1621)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Modernise the
+  authoring surface for current Claude Code and the Claude 5 generation. The
+  agent-authoring validator now accepts the `fable` model alias and full
+  `claude-*` model IDs (V2), understands the post-2.1.63 `Agent` tool name in
+  `Agent(bareword):` shorthand checks, and adds RULE 21 — a warning-tier line
+  ceiling for commands (500) and agents (300) so the next progressive-disclosure
+  pass has a scoreboard. The `tools:` / `allowed-tools:` lists, the `Task(` call
+  sites and the tool name in prose are renamed from the legacy `Task` to `Agent`
+  (the alias still works), and the pseudo-YAML `Task:` dispatch labels are swept
+  as well. The `debt-conventions` scanner template now matches the shipped
+  scanners (`model: sonnet`, `effort: low`).
+
 ## 1.7.1
 
 ### Patch Changes

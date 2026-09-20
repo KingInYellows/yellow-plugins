@@ -1,0 +1,9 @@
+#!/bin/sh
+# Forbidden-command shim for yellow-core bats tests. The session-continuity
+# foundation must never launch, stop, message or bill anything (spec R2), so
+# any invocation of this command during a test is a failure: it is logged to
+# $MOCK_FORBIDDEN_LOG (asserted empty in teardown) and exits 97.
+set -eu
+printf '%s %s\n' "$(basename -- "$0")" "$*" >>"${MOCK_FORBIDDEN_LOG:-/dev/null}"
+printf '[mock] forbidden invocation: %s %s\n' "$(basename -- "$0")" "$*" >&2
+exit 97
