@@ -1,13 +1,12 @@
 # Loop and graph lineages vs the yellow harness
 
-**Date:** 2026-09-17
-**Status:** research note (docs-only). No command, pin, or marketplace change.
-**Verified against:** KingInYellows/yellow-plugins main `80f125dd`;
-plugins/yellow-goal README SHA `9ff5eeb1`; plugins/yellow-goal/CLAUDE.md forbid
-list; KingInYellows/yellow-goal / `goal-gen` 0.2.0 consumer contract as
-previously inspected. Native Claude Code `/goal` `/loop` presence on any given
-operator binary is **unverified**. Engine unit tests were **not** re-run in the
-session that produced this note.
+**Date:** 2026-09-17 **Status:** research note (docs-only). No command, pin, or
+marketplace change. **Verified against:** KingInYellows/yellow-plugins main
+`80f125dd`; plugins/yellow-goal README SHA `9ff5eeb1`;
+plugins/yellow-goal/CLAUDE.md forbid list; KingInYellows/yellow-goal /
+`goal-gen` 0.2.0 consumer contract as previously inspected. Native Claude Code
+`/goal` `/loop` presence on any given operator binary is **unverified**. Engine
+unit tests were **not** re-run in the session that produced this note.
 
 **Scope:** name three control-plane lineages, map them onto the harness this org
 actually operates, and record what must not be imported. Mappings are analogous,
@@ -15,8 +14,8 @@ not identity.
 
 ## Three lineages (keep separate)
 
-1. **Community Loop Engineering** (method, not a library). Design the system that
-   prompts the agent instead of prompting it yourself. Claude Code session
+1. **Community Loop Engineering** (method, not a library). Design the system
+   that prompts the agent instead of prompting it yourself. Claude Code session
    primitives `/goal` (until a model-judge done-condition or turn cap) and
    `/loop` (interval bursts until cancelled) are session controls if present on
    the installed `claude` binary. The native `/goal` evaluator is another model,
@@ -28,7 +27,7 @@ not identity.
    not this org's runtime. ADK is out of scope unless the primary runtime
    becomes ADK Runner and Provider Protocol v1 is retired.
 3. **yellow-goal / `goal-gen` GOAP** (owned third lineage). An LLM authors an
-   action graph; a deterministic A* planner with no LLM inside orders it; an
+   action graph; a deterministic A\* planner with no LLM inside orders it; an
    orchestrator runs extract → plan → confirm definition of done → execute →
    ground-truth verify → bounded replan. Closest ADK analog is "graph for plan
    shape." Closest Loop Engineering analog is "execute-verify-repeat" as the
@@ -38,8 +37,9 @@ A fourth use, **knowledge graph** (entities/relations; ruvector today), is not
 control flow. `yellow-mempalace` is not a live marketplace plugin (see
 `.changeset/remove-yellow-mempalace.md`).
 
-Slogan to keep rejecting: "graphs replaced Loop Engineering." A graph can contain
-loops. Loop Engineering is the ops layer around whatever control plane you pick.
+Slogan to keep rejecting: "graphs replaced Loop Engineering." A graph can
+contain loops. Loop Engineering is the ops layer around whatever control plane
+you pick.
 
 This marketplace must **never import ADK 2**. This plugin must **never run
 `--executor claude-code`**.
@@ -65,9 +65,10 @@ the control plane.
 
 Documented session DAG: `/flow:brainstorm` → `/flow:spec` → `/flow:decompose` →
 `/flow:pick-next-shell` → `/flow:expand-shell` → `/flow:plan` → `/flow:work` →
-`/flow:review` → `/plan:complete`. State lives on disk under `plans/`. An operator
-sits between sessions. `/worktree:cleanup` exists. yellow-council is a review
-join (in-process Claude plus Codex, Antigravity, OpenCode), not a planner.
+`/flow:review` → `/plan:complete`. State lives on disk under `plans/`. An
+operator sits between sessions. `/worktree:cleanup` exists. yellow-council is a
+review join (in-process Claude plus Codex, Antigravity, OpenCode), not a
+planner.
 
 `/flow:*` writes markdown shells. GOAP writes symbolic `WorldState`. They do not
 share a schema. Merging them would be a new control plane.
@@ -91,26 +92,26 @@ plugin commands.
 
 Repository claim for the engine: M0 planner + M1 single-executor core are
 implemented. Treat "tests green" as repo-asserted; this note did not rerun
-`npm test`. Specified defaults previously read from engine `guardrails.ts`: $20/run,
-5 replans, ≤2 re-extractions, 60-minute wall clock, 3 retries/action, same
-subgoal failing the same way twice → stop and escalate, concurrency 1. Worktrees
-on the engine are collision-avoidance, not a sandbox. M2 (Codex + Antigravity,
-dependency-graph parallelism, containers, dashboard) remains future in the engine
-PRD.
+`npm test`. Specified defaults previously read from engine `guardrails.ts`:
+$20/run, 5 replans, ≤2 re-extractions, 60-minute wall clock, 3 retries/action,
+same subgoal failing the same way twice → stop and escalate, concurrency 1.
+Worktrees on the engine are collision-avoidance, not a sandbox. M2 (Codex +
+Antigravity, dependency-graph parallelism, containers, dashboard) remains future
+in the engine PRD.
 
 ## Correspondence table (analogous, not identity)
 
-| Pattern | Already in this stack | Missing / blocked |
-|---|---|---|
-| Sequential pipeline | `/flow:*`; A* plan order | — |
-| Fan-out / join | yellow-council; `/flow:pick-next-shell` depends_on | GOAP parallelism (M2) |
-| Evaluator-optimizer loop | goal-gen verify + replan | Plugin cannot start a live until-done run |
-| Human gate | `/flow:*` session breaks; engine confirm / sign-off | — |
-| Worktrees | engine per-action; `/worktree:cleanup` | Containers (M2) |
-| Durable harness state | `plans/` + MEMORY.md + ruvector | Unified flow + GOAP view |
-| Scheduled outer loop | hooks, CI | No unattended `/loop` scheduler |
-| ADK-style persisted graph runtime | — | Intentionally absent |
-| Native `/goal` `/loop` | Session controls if present | Unverified; no marketplace wrap |
+| Pattern                           | Already in this stack                               | Missing / blocked                         |
+| --------------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| Sequential pipeline               | `/flow:*`; A\* plan order                           | —                                         |
+| Fan-out / join                    | yellow-council; `/flow:pick-next-shell` depends_on  | GOAP parallelism (M2)                     |
+| Evaluator-optimizer loop          | goal-gen verify + replan                            | Plugin cannot start a live until-done run |
+| Human gate                        | `/flow:*` session breaks; engine confirm / sign-off | —                                         |
+| Worktrees                         | engine per-action; `/worktree:cleanup`              | Containers (M2)                           |
+| Durable harness state             | `plans/` + MEMORY.md + ruvector                     | Unified flow + GOAP view                  |
+| Scheduled outer loop              | hooks, CI                                           | No unattended `/loop` scheduler           |
+| ADK-style persisted graph runtime | —                                                   | Intentionally absent                      |
+| Native `/goal` `/loop`            | Session controls if present                         | Unverified; no marketplace wrap           |
 
 ## What to do / not do
 
@@ -150,13 +151,13 @@ PRD.
 Stay on this recommendation unless one of these changes:
 
 - Claude Code is no longer the operator surface and ADK Runner is.
-- `goal-gen capabilities --json` on the **pinned tarball** grows a read-only GOAP
-  dump that does not call extract/analyze/executors.
+- `goal-gen capabilities --json` on the **pinned tarball** grows a read-only
+  GOAP dump that does not call extract/analyze/executors.
 - Native `/goal` swallows the `/goal:` plugin prefix — then freeze new `/goal:*`
   commands and pick another namespace.
-- The requirement is unattended multi-hour execution with durable process resume.
-  That is durable execution (Temporal-class), which neither ADK graphs nor a
-  LangGraph checkpointer nor `/loop` on a laptop gives you by itself.
+- The requirement is unattended multi-hour execution with durable process
+  resume. That is durable execution (Temporal-class), which neither ADK graphs
+  nor a LangGraph checkpointer nor `/loop` on a laptop gives you by itself.
 
 ## Open probes
 
