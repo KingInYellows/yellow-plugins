@@ -18,7 +18,15 @@ STATUS_MD="$BATS_TEST_DIRNAME/../commands/ruvector/status.md"
 
 setup() {
   command -v jq >/dev/null || skip "jq not installed"
-  command -v timeout >/dev/null || command -v gtimeout >/dev/null || skip "no GNU timeout"
+  gnu_timeout_available() {
+    local name tcmd
+    for name in timeout gtimeout; do
+      tcmd="$(command -v "$name" || true)"
+      [ -n "$tcmd" ] && "$tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1 && return 0
+    done
+    return 1
+  }
+  gnu_timeout_available || skip "no GNU-compatible timeout/gtimeout (--kill-after); dry-run block would report UNKNOWN"
   WORK="$BATS_TEST_TMPDIR/work"
   mkdir -p "$WORK/.ruvector" "$BATS_TEST_TMPDIR/bin"
   BLOCK="$BATS_TEST_TMPDIR/block.sh"

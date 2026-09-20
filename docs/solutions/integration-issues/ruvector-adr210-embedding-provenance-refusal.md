@@ -149,11 +149,12 @@ fresh store, not restore the lost one.
 MCP server has unsaved writes (a burst of `hooks_remember` calls followed
 immediately by a parallel resolver fan-out is the exact shape). Keep the
 `.corrupt-*` file until `/ruvector:status` reports `OK` on the restored
-store. A `rename()`-based write alone would not fully close the window — a
-reader that opened the file before the rename still reads the old inode,
-and `npm/write-file-atomic#64` documents the same partial-protection
-caveat — so the upstream fix also needs a parse-retry (or quarantine that
-never overwrites) on the reader side.
+store. A temp-file + `rename()` write (as in 0.2.41+ `cli.js`) prevents
+readers from seeing a partial file — each open sees either the complete old
+snapshot or the complete new one. The race remains reachable because
+`mcp-server.js` still uses plain `writeFileSync` at line 396, where a
+concurrent reader can observe torn JSON mid-write; upstream also needs the
+reader-side quarantine/retry path that 0.2.41+ ships for the CLI.
 
 **Upstream.** Filed as [RuVector#995](https://github.com/ruvnet/RuVector/issues/995)
 (follow-up to #634 / #698, which fixed `cli.js` only).
