@@ -110,7 +110,7 @@ PRD.
 | Durable harness state | `plans/` + MEMORY.md + ruvector | One view across flow shells and GOAP runs |
 | Scheduled outer loop | hooks, CI | No marketplace `/loop` scheduler that discovers work unattended |
 | ADK-style persisted graph runtime | — | Intentionally absent |
-| Native `/goal` `/loop` | Session controls if the binary has them | Unverified here; do not wrap as marketplace commands |
+| Native `/goal` `/loop` | Session controls if the binary has them | Unverified; do not wrap as commands |
 
 ## What to do / not do
 
