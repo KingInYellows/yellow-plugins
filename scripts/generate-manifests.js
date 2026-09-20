@@ -73,7 +73,7 @@ const {
   pluginRootProblem,
   resolvePluginRootReal,
   sweepCandidateProblem,
-} = require('./lib/plugin-paths');
+} = require('./lib/plugin-symlink-policy');
 
 /**
  * The catalog plugins whose plugins/<name> root — or plugins/ itself — is
