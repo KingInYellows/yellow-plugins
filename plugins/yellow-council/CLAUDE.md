@@ -161,14 +161,14 @@ Codex agent.)
 
 `bats tests/` from the plugin directory (`redaction.bats` and `extract.bats` —
 the blocking CI gate runs the whole directory). The awk redaction program is
-shipped as three
-synchronized copies (`REDACTION_SOURCES` in
+shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
-`agents/review/opencode-reviewer.md`, and `skills/council-patterns/SKILL.md`.
-The bats suite extracts and runs the first entry, `gemini-reviewer.md`, and
-also asserts byte-identity across all three — edit the patterns in all three
-files together, never just one. There is no fresh-machine install CI (see
-Known Limitations).
+`agents/review/opencode-reviewer.md`, `skills/council-patterns/SKILL.md`, and
+`commands/council/council.md` (two independent sites — Step 4 `local
+redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
+runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
+across every carrier — edit the patterns in all four files together, never
+just one. There is no fresh-machine install CI (see Known Limitations).
 
 ## Known Limitations
 
