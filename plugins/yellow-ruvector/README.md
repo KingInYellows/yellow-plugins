@@ -46,13 +46,16 @@ Persistent vector memory and semantic code search for Claude Code agents via
 Step 6 compares the store's `embeddingProvenance` stamp against the active
 embedder reported by `hooks reembed --dry-run`. Verdicts:
 
-| Verdict     | Meaning |
-| ----------- | ------- |
-| `FRESH`     | No store file, or no stamp and no vectors yet |
-| `UNSTAMPED` | Vectors exist but no stamp — writes are refused |
-| `OK`        | The five enforced fields match (`embedderKind`, `modelId`, `dimension`, `normalize`, `prefixPolicy`); extra stamp keys are ignored |
-| `MISMATCH`  | At least one enforced field differs — run the printed `hooks reembed` + restart steps |
-| `UNKNOWN`   | Cannot compare safely — e.g. no GNU-compatible `timeout`/`gtimeout` on PATH (dry-run skipped), dry-run timed out or was SIGKILLed (exit 137; may be the 5 s `--kill-after` grace or an external kill such as OOM), dry-run exited nonzero, older CLI with no object `targetProvenance`, or jq compare failure |
+- **`FRESH`** — No store file, or no stamp and no vectors yet
+- **`UNSTAMPED`** — Vectors exist but no stamp; writes are refused
+- **`OK`** — The five enforced fields match (`embedderKind`, `modelId`,
+  `dimension`, `normalize`, `prefixPolicy`); extra stamp keys are ignored
+- **`MISMATCH`** — At least one enforced field differs; run the printed
+  `hooks reembed` + restart steps
+- **`UNKNOWN`** — Cannot compare safely (no GNU-compatible `timeout`/`gtimeout`
+  on PATH, dry-run timeout/SIGKILL/nonzero exit, older CLI without object
+  `targetProvenance`, or jq compare failure). Exit 137 is reported as SIGKILL
+  without assuming the 90 s deadline elapsed.
 
 When `hooks_remember` is refused (ADR-210) but recall still works, start
 here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
