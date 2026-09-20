@@ -76,8 +76,10 @@ Each is a thin wrapper over a same-named skill, matching the
 
 Two safety hooks, mirroring `gt-workflow`'s (independent implementations,
 not a shared runtime dependency): `check-git-push` blocks raw `git push`
-(PreToolUse), `check-commit-message` warns on a non-conventional commit
-message (PostToolUse). See `CLAUDE.md` for detail.
+(PreToolUse) — tokenised, so path-qualified, `-C`/`--git-dir`, `bash -c`
+and wrapper forms are caught while quoted literals are not —
+`check-commit-message` warns on a non-conventional commit message
+(PostToolUse). See `CLAUDE.md` for detail.
 
 ## What this plugin does not do
 

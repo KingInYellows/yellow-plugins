@@ -263,7 +263,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
           {
             "type": "command",
             "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-git-push",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }
@@ -275,7 +275,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
           {
             "type": "command",
             "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-commit-message",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }
@@ -323,7 +323,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
           {
             "type": "command",
             "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-git-push",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }
@@ -335,7 +335,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
           {
             "type": "command",
             "command": "node \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js\\" --hook check-commit-message",
-            "timeout": 1
+            "timeout": 5
           }
         ]
       }

@@ -12,12 +12,17 @@
  * malformed JSON or a null/non-object envelope fails OPEN for this hook
  * specifically (`runHook` returns with no output, i.e. no PreToolUse
  * decision, which Claude Code/Codex both treat as allow — see
- * tests/hooks.bats's "malformed JSON fails open" case). NOT the same
- * detection regex (this file's is deliberately broader, see below) or
- * block message (a provider-appropriate one). Both files read the same
- * envelope field path (`tool_input.command` -> `toolInput.command`) since
- * 2026-09-16 — see the field-path comment on `checkGitPush` below for
- * gt-workflow's history there. Kept as an
+ * tests/hooks.bats's "malformed JSON fails open" case). Two distinct
+ * shapes, two distinct outcomes: an ABSENT `tool_input`/`command` or an
+ * unparseable envelope fails OPEN (nothing to verify, defensive); a PRESENT
+ * but non-string `tool_input.command` fails CLOSED (a shape the policy
+ * cannot verify, denied like gt-workflow's sibling rather than coerced to
+ * `''` and allowed, which this file did until 2026-09-17). Same detection
+ * (./git-push-detector.js, a byte-identical copy of gt-workflow's — see
+ * that file's header) but a provider-appropriate block message. Both files
+ * read the same envelope field path (`tool_input.command` ->
+ * `toolInput.command`) since 2026-09-16 — see the field-path comment on
+ * `checkGitPush` below for gt-workflow's history there. Kept as an
  * independent file rather than a cross-plugin require so github-workflow
  * has no runtime dependency on
  * gt-workflow being installed — this repo's "never fall back to the other
@@ -27,39 +32,12 @@
  * Pure — no I/O, no console.*, no timestamps.
  */
 
-// gt-workflow's regex is `(^|[;&()|$`]|\s)git\s+push`, which only catches the
-// bare `git push` form. Two ordinary Git invocations slip past it:
-//
-//   /usr/bin/git push          — the char before `git` is `/`, not a listed
-//                                separator, so the leading alternation fails
-//   git -C repo push           — global options sit between `git` and `push`,
-//   git --git-dir=... push       so `git\s+push` never matches
-//
-// Both are normal usage, not exotic evasion, so the advertised
-// "provider-only submission path" was not actually enforced. This version
-// allows an optional absolute/relative path prefix on the binary and any run
-// of global options (`-C <dir>`, `--git-dir=...`, `-c k=v`, …) before the
-// subcommand. Kept deliberately broad: over-blocking a `git push` variant is
-// a recoverable annoyance, under-blocking silently defeats the hook.
-//
-// A second bypass class: `--git-dir`, `--work-tree`, and `--namespace` also
-// accept their value as a SEPARATE token (`git --git-dir /repo push`), not
-// just `--opt=value`. The generic `--[^\s]+(?:=[^\s]+)?` alternative only
-// absorbs the attached-`=value` form; a space-separated value leaves the
-// value token unconsumed, so the required `\s+push` literal never lines up
-// and the whole match fails. The extra alternative below handles the
-// space-separated form the same way the existing `-C\s+[^\s]+`/`-c\s+[^\s]+`
-// alternatives already handle `-C`/`-c`.
-const GIT_PUSH_RE = new RegExp(
-  [
-    '(^|[;&()|$`]|\\s)', // command start or shell separator
-    '(?:[\\w./\\\\-]*/)?', // optional path prefix: /usr/bin/, ./bin/, ../
-    'git(?:\\.exe)?', // the binary (Windows-friendly)
-    '(?:\\s+(?:-[^\\s]+|--[^\\s]+(?:=[^\\s]+)?|-C\\s+[^\\s]+|-c\\s+[^\\s]+|--(?:git-dir|work-tree|namespace)\\s+[^\\s]+))*', // global options
-    '\\s+push', // the subcommand
-  ].join(''),
-  'm'
-);
+// History: this file's regex was deliberately broader than gt-workflow's
+// (`/usr/bin/git push`, `git -C repo push`, space-separated `--git-dir`),
+// but a regex over raw text still missed `bash -c "git push"` and tripped
+// on quoted literals. The shared tokenising detector replaces both regexes
+// — see docs/solutions/security-issues/substring-regex-command-denylist-evasion.md.
+const { classifyGitPushCommand } = require('./git-push-detector.js');
 
 const BLOCK_MESSAGE = [
   '⛔  Raw `git push` is not allowed in this repo.',
@@ -68,8 +46,16 @@ const BLOCK_MESSAGE = [
   '   github-stack-runtime.js, which pushes safely through `gh stack submit`.',
 ].join('\n');
 
+const UNVERIFIABLE_MESSAGE = [
+  '⛔  Hook could not verify this Bash command. Blocking as a precaution.',
+  '   If you intended to push, use `/github-stack:submit` instead.',
+].join('\n');
+
+const MALFORMED_MESSAGE =
+  '⛔  Hook input has a non-string tool_input.command. Cannot verify command safety.';
+
 /**
- * @param {{toolInput?: {command?: string}}} camelCaseEnvelope
+ * @param {{toolInput?: {command?: unknown}}} camelCaseEnvelope
  * @returns {{decision: 'allow'|'deny', message: string|null}}
  */
 function checkGitPush(camelCaseEnvelope) {
@@ -78,10 +64,24 @@ function checkGitPush(camelCaseEnvelope) {
   // a root-level `.command`. See docs/solutions/code-quality/
   // posttooluse-hook-input-schema-field-paths.md; gt-workflow's sibling
   // reads the same path since 2026-09-16.
-  const command = typeof camelCaseEnvelope.toolInput?.command === 'string' ? camelCaseEnvelope.toolInput.command : '';
+  const command = camelCaseEnvelope.toolInput?.command;
 
-  if (GIT_PUSH_RE.test(command)) {
+  // Absent: nothing to check (non-Bash tool_input, or no tool_input at all)
+  // — the documented fail-open. Present but not a string (object, array,
+  // number, null): fail closed, mirroring gt-workflow.
+  if (command === undefined) {
+    return { decision: 'allow', message: null };
+  }
+  if (typeof command !== 'string') {
+    return { decision: 'deny', message: MALFORMED_MESSAGE };
+  }
+
+  const verdict = classifyGitPushCommand(command);
+  if (verdict === 'verified-push') {
     return { decision: 'deny', message: BLOCK_MESSAGE };
+  }
+  if (verdict === 'unverifiable') {
+    return { decision: 'deny', message: UNVERIFIABLE_MESSAGE };
   }
 
   return { decision: 'allow', message: null };
