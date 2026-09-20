@@ -2,13 +2,14 @@
 
 const { join, relative } = require('path');
 
-const { assertWithinRoot } = require('./write');
 const {
   lexistsSync,
   pluginRootProblem,
   resolvePluginRootReal,
   sweepCandidateProblem,
 } = require('../plugin-symlink-policy');
+
+const { assertWithinRoot } = require('./write');
 
 /**
  * The catalog plugins whose plugins/<name> root — or plugins/ itself — is

@@ -64,17 +64,16 @@ const {
   buildCursorSkillTree,
 } = require('./lib/generate/emit-cursor');
 const {
+  queueStaleUnlinks,
+  symlinkedPluginRoots,
+} = require('./lib/generate/symlink-sweep');
+const {
   assertWithinRoot,
   atomicWrite,
   serializeJson,
 } = require('./lib/generate/write');
 const {
-  queueStaleUnlinks,
-  symlinkedPluginRoots,
-} = require('./lib/generate/symlink-sweep');
-const {
   lexistsSync,
-  pluginRootProblem,
   resolvePluginRootReal,
   sweepCandidateProblem,
 } = require('./lib/plugin-symlink-policy');
