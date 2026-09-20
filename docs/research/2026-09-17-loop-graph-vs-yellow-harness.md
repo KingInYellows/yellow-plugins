@@ -34,8 +34,9 @@ not identity.
    outer cycle.
 
 A fourth use, **knowledge graph** (entities/relations; ruvector today), is not
-control flow. `yellow-mempalace` is not a live marketplace plugin (see
-`.changeset/remove-yellow-mempalace.md`).
+control flow. `yellow-mempalace` is not in `.claude-plugin/marketplace.json`
+(removed in favor of `yellow-ruvector`; see
+`plugins/yellow-ruvector/CHANGELOG.md` commit `f0c818d`).
 
 Slogan to keep rejecting: "graphs replaced Loop Engineering." A graph can
 contain loops. Loop Engineering is the ops layer around whatever control plane
@@ -63,11 +64,13 @@ the control plane.
 
 ### Human plane — yellow-core `/flow:*`
 
-Documented session DAG: `/flow:brainstorm` → `/flow:spec` → `/flow:decompose` →
-`/flow:pick-next-shell` → `/flow:expand-shell` → `/flow:plan` → `/flow:work` →
-`/flow:review` → `/plan:complete`. State lives on disk under `plans/`. An
-operator sits between sessions. `/worktree:cleanup` exists. yellow-council is a
-review join (in-process Claude plus Codex, Antigravity, OpenCode), not a
+Documented session DAG for shell-based work: `/flow:brainstorm` → `/flow:spec` →
+`/flow:decompose` → `/flow:pick-next-shell` → `/flow:expand-shell` →
+`/flow:work` → `/flow:review` → `/plan:complete`, then back to
+`/flow:pick-next-shell` for the next shell. `/flow:plan` is the alternate entry
+for non-shell plans that skip decomposition. State lives on disk under `plans/`.
+An operator sits between sessions. `/worktree:cleanup` exists. yellow-council is
+a review join (in-process Claude plus Codex, Antigravity, OpenCode), not a
 planner.
 
 `/flow:*` writes markdown shells. GOAP writes symbolic `WorldState`. They do not
