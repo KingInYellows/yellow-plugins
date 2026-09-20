@@ -36,26 +36,26 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:setup`               | Install ruvector and initialize `.ruvector/` directory |
 | `/ruvector:index [path]`        | Index codebase for semantic search (always repo-wide; `path` only narrows the preview) |
 | `/ruvector:search <query>`      | Search codebase by meaning using vector similarity     |
-| `/ruvector:status`              | Show health, DB stats, queue, and embedder provenance (`PROVENANCE:` verdict) |
+| `/ruvector:status`              | Show health, DB stats, queue, and embedder provenance  |
+| `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
+| `/ruvector:memory [filter]`     | Browse and search stored memories                      |
+| `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
 ## Embedder provenance (`/ruvector:status`)
 
 Step 6 compares the store's `embeddingProvenance` stamp against the active
 embedder reported by `hooks reembed --dry-run`. Verdicts:
 
-| Verdict | Meaning |
-| ------- | ------- |
-| `FRESH` | No store file, or no stamp and no vectors yet |
+| Verdict     | Meaning |
+| ----------- | ------- |
+| `FRESH`     | No store file, or no stamp and no vectors yet |
 | `UNSTAMPED` | Vectors exist but no stamp — writes are refused |
-| `OK` | The five enforced fields match (`embedderKind`, `modelId`, `dimension`, `normalize`, `prefixPolicy`); extra stamp keys are ignored |
-| `MISMATCH` | At least one enforced field differs — run the printed `hooks reembed` + restart steps |
-| `UNKNOWN` | Cannot compare safely — e.g. no GNU-compatible `timeout`/`gtimeout` on PATH (dry-run skipped), dry-run timed out or was SIGKILLed (exit 137; may be the 5 s `--kill-after` grace or an external kill such as OOM), dry-run exited nonzero, older CLI with no object `targetProvenance`, or jq compare failure |
+| `OK`        | The five enforced fields match (`embedderKind`, `modelId`, `dimension`, `normalize`, `prefixPolicy`); extra stamp keys are ignored |
+| `MISMATCH`  | At least one enforced field differs — run the printed `hooks reembed` + restart steps |
+| `UNKNOWN`   | Cannot compare safely — e.g. no GNU-compatible `timeout`/`gtimeout` on PATH (dry-run skipped), dry-run timed out or was SIGKILLed (exit 137; may be the 5 s `--kill-after` grace or an external kill such as OOM), dry-run exited nonzero, older CLI with no object `targetProvenance`, or jq compare failure |
 
 When `hooks_remember` is refused (ADR-210) but recall still works, start
 here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
-| `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
-| `/ruvector:memory [filter]`     | Browse and search stored memories                      |
-| `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
 ## Agents
 
