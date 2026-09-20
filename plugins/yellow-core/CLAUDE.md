@@ -4,8 +4,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Conventions
 
-- Use Graphite (`gt`) for all branch management and PR creation — never raw
-  `git push` or `gh pr create`
+- Use the active stacked-PR provider (see `/stack:status`) for all branch
+  management and PR creation — never raw `git push` or `gh pr create`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
 - Keep code simple and direct. No premature abstractions
@@ -433,7 +433,8 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `compound-staging`, `compound-stop-hook`, `credential-status`, `handoff`,
 `plan-commands`, `plan-status-parity`, `plugin-identity`, `pre-compact-hook`,
 `repo-profile`, `validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
-Manifest hook budgets: Stop 5s, SessionStart 3s.
+Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
+(`catalog/plugins/yellow-core.json`).
 
 ## Known Limitations
 

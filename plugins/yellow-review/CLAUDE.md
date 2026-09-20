@@ -5,8 +5,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Conventions
 
-- Use Graphite (`gt`) for all branch management and PR creation — never raw
-  `git push` or `gh pr create`
+- Use the active stacked-PR provider (see `/stack:status`) for all branch
+  management and PR creation — never raw `git push` or `gh pr create`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
 - Agents report findings — they do NOT edit project files directly. The
@@ -279,9 +279,11 @@ explicit-invocation wording live in the skill body and description.
 
 ## Testing
 
-`bats tests/` from the plugin directory — `get-pr-comments.bats` and
+`bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
-`tests/mocks/gh`) plus `skill-content.bats`.
+`tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
+invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`), and
+`skill-content.bats`.
 
 ## Known Limitations
 

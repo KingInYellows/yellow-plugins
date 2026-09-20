@@ -184,15 +184,6 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
    /ruvector:status for the reembed + restart steps` and continue. For any
    other failure (timeout, connection refused, unavailable), skip silently.
 
-## Testing
-
-`bats tests/` from the plugin directory — one suite per hook
-(`session-start`, `user-prompt-submit`, `pre-tool-use`, `post-tool-use`,
-`stop`, `repair-cursor-pretooluse`) plus `validate.bats`. Hook config is
-sourced from `catalog/plugins/yellow-ruvector.json` and generated into
-`plugin.json` by `pnpm generate:manifests`; hook scripts emit JSON through
-`hooks/scripts/lib/hook-json.sh`. Do not add `hooks/hooks.json`.
-
 ## Known Limitations
 
 - First stdio MCP server in this repo — less battle-tested than HTTP pattern
@@ -256,13 +247,15 @@ sourced from `catalog/plugins/yellow-ruvector.json` and generated into
 
 ## Testing
 
-Bats shell tests live in `tests/` — run `bats tests/` from inside this
-plugin directory. One suite per hook script (`session-start.bats`,
-`pre-tool-use.bats`, `post-tool-use.bats`, `user-prompt-submit.bats`,
-`stop.bats`), `validate.bats` for `hooks/scripts/lib/validate.sh`,
-`repair-cursor-pretooluse.bats` for the repair script, and
-`status-provenance.bats`, which extracts the provenance bash block from
+`bats tests/` from the plugin directory — one suite per hook
+(`session-start`, `user-prompt-submit`, `pre-tool-use`, `post-tool-use`,
+`stop`, `repair-cursor-pretooluse`) plus `validate.bats` and
+`status-provenance.bats` (extracts the provenance bash block from
 `commands/ruvector/status.md` at run time and drives it with a stubbed
-`npx` (five-field compare, missing `targetProvenance`, rc=137 wording).
-Edit the block's first line (`INTEL=.ruvector/intelligence.json`) or its
-closing fence and that suite's extractor stops matching — keep them.
+`npx` — five-field compare, missing `targetProvenance`, rc=137 wording).
+Hook config is sourced from `catalog/plugins/yellow-ruvector.json` and
+generated into `plugin.json` by `pnpm generate:manifests`; hook scripts emit
+JSON through `hooks/scripts/lib/hook-json.sh`. Do not add `hooks/hooks.json`.
+Edit the status block's first line (`INTEL=.ruvector/intelligence.json`) or
+its closing fence and `status-provenance.bats`'s extractor stops matching —
+keep them.
