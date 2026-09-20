@@ -466,11 +466,7 @@ function placeholderQuoteState({ word, quotes }) {
  * or brace character (`"${X}/hooks/"a?.sh` runs whatever matches).
  * Returns the offending construct's description, or null.
  */
-function unmodelledShellWord({ word, quotes }) {
-  let expandable = '';
-  for (let i = 0; i < word.length; i += 1)
-    if (quotes[i] !== "'") expandable += word[i];
-  const stripped = expandable.replaceAll(PLUGIN_ROOT_PLACEHOLDER, '');
+function unmodelledShellExpansion(stripped, word, quotes) {
   if (stripped.includes('`') || stripped.includes('$('))
     return 'a command substitution — RULE 6 checks one simple command';
   if (stripped.includes('$') || (word.startsWith('~') && quotes[0] !== "'"))
@@ -479,6 +475,19 @@ function unmodelledShellWord({ word, quotes }) {
       PLUGIN_ROOT_PLACEHOLDER +
       ' — the validator cannot resolve it'
     );
+  return null;
+}
+
+function unmodelledShellWord({ word, quotes }) {
+  let expandable = '';
+  for (let i = 0; i < word.length; i += 1)
+    if (quotes[i] !== "'") expandable += word[i];
+  const expansionProblem = unmodelledShellExpansion(
+    expandable.replaceAll(PLUGIN_ROOT_PLACEHOLDER, ''),
+    word,
+    quotes
+  );
+  if (expansionProblem !== null) return expansionProblem;
   for (let i = 0; i < word.length; i += 1) {
     if (quotes[i] === null && /[*?{}]/.test(word[i]))
       return 'an unquoted glob or brace character — the shell may expand it to a different file';
@@ -610,6 +619,18 @@ function hookOperandPathProblem(options, root, withinPlugin, name, operand) {
  * Validate one expanded hook-option name and its operand. Returns a
  * `{ code, detail }` problem descriptor, or null when the option is fine.
  */
+function hookOptionKindProblem(options, w, name, attachedValue, last) {
+  if (options.inline.has(name)) return { code: 'inline', detail: name };
+  if (options.noExec.has(name)) return { code: 'no-exec', detail: name };
+  if (options.attachedOnly.has(name) && attachedValue === null)
+    return { code: 'attached-only', detail: name };
+  if (!options.takesValue.has(name) && !options.attachedOnly.has(name))
+    return { code: 'unrecognised-option', detail: w };
+  if (!last)
+    return { code: 'unrecognised-option', detail: w }; // `-oxe`: only the last letter of a bundle may take a value
+  return null;
+}
+
 function hookOptionOperandProblem(
   interpreter,
   options,
@@ -621,14 +642,14 @@ function hookOptionOperandProblem(
   last,
   operand
 ) {
-  if (options.inline.has(name)) return { code: 'inline', detail: name };
-  if (options.noExec.has(name)) return { code: 'no-exec', detail: name };
-  if (options.attachedOnly.has(name) && attachedValue === null)
-    return { code: 'attached-only', detail: name };
-  if (!options.takesValue.has(name) && !options.attachedOnly.has(name))
-    return { code: 'unrecognised-option', detail: w };
-  if (!last)
-    return { code: 'unrecognised-option', detail: w }; // `-oxe`: only the last letter of a bundle may take a value
+  const kindProblem = hookOptionKindProblem(
+    options,
+    w,
+    name,
+    attachedValue,
+    last
+  );
+  if (kindProblem !== null) return kindProblem;
   if (hookOperandEmpty(interpreter, operand))
     return { code: 'empty-operand', detail: name };
   const shapeProblem = hookOperandShapeProblem(options, name, operand);
@@ -688,13 +709,26 @@ function hookOptionWordsProblem(interpreter, options, root, withinPlugin, w, wor
   return { index: i };
 }
 
+function hookOptionTerminator(w, interpreter) {
+  return w === '--' || (interpreter === 'bash' && w === '-');
+}
+
+function hookScriptWordAt(words, index, withinPlugin) {
+  if (index >= words.length || words[index].word === '')
+    return { problem: 'no-script', detail: undefined };
+  const script = words[index].word;
+  if (!withinPlugin(script))
+    return { problem: 'escapes', detail: script };
+  return { index };
+}
+
 function hookScriptWordIndex(interpreter, words, options, root) {
   const withinPlugin = (w) => hookPathWithinPlugin(w, root);
   let i = 0;
   let seenShort = false; // bash: a `--long` option after any short one is "invalid option"
   for (; i < words.length; i += 1) {
     const w = words[i].word;
-    if (w === '--' || (interpreter === 'bash' && w === '-')) {
+    if (hookOptionTerminator(w, interpreter)) {
       i += 1; // end of options: the next word is the script
       break;
     }
@@ -719,12 +753,7 @@ function hookScriptWordIndex(interpreter, words, options, root) {
       };
     i = optionScan.index;
   }
-  if (i >= words.length || words[i].word === '')
-    return { problem: 'no-script', detail: undefined };
-  const script = words[i].word;
-  if (!withinPlugin(script))
-    return { problem: 'escapes', detail: script };
-  return { index: i };
+  return hookScriptWordAt(words, i, withinPlugin);
 }
 
 /**
