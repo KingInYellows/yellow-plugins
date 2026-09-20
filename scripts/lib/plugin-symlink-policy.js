@@ -129,6 +129,36 @@ function pluginRootProblem(pluginDir) {
   return null;
 }
 
+function sweepCandidateSymlinkProblem(candidate, pluginRoot, rootDir) {
+  try {
+    const symlinkedAncestor = findSymlinkedAncestor(candidate, pluginRoot);
+    if (symlinkedAncestor === null) return null;
+    return `${path.relative(rootDir, symlinkedAncestor)} is a symlink — generated artifacts must not live behind a symlinked directory`;
+  } catch (err) {
+    return `cannot inspect (${err.message})`;
+  }
+}
+
+function sweepCandidateRealpathProblem(candidate, pluginRootReal) {
+  let candidateReal = null;
+  try {
+    candidateReal = fs.realpathSync(candidate);
+  } catch (err) {
+    if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') {
+      return `cannot resolve real path (${err.message})`;
+    }
+    return null;
+  }
+  if (
+    candidateReal !== null &&
+    pluginRootReal !== null &&
+    !isWithinRealRoot(candidateReal, pluginRootReal)
+  ) {
+    return 'it resolves outside the plugin directory through a symlink';
+  }
+  return null;
+}
+
 /**
  * Why `candidate` (a path under `pluginRoot` that a sweep is about to
  * unlink, or a generated file it is about to write) must NOT be touched,
@@ -144,34 +174,13 @@ function pluginRootProblem(pluginDir) {
  * `rootDir` only shortens the path in the message.
  */
 function sweepCandidateProblem(candidate, pluginRoot, pluginRootReal, rootDir) {
-  let symlinkedAncestor;
-  try {
-    symlinkedAncestor = findSymlinkedAncestor(candidate, pluginRoot);
-  } catch (err) {
-    return `cannot inspect (${err.message})`;
-  }
-  if (symlinkedAncestor !== null) {
-    return `${path.relative(rootDir, symlinkedAncestor)} is a symlink — generated artifacts must not live behind a symlinked directory`;
-  }
-  let candidateReal = null;
-  try {
-    candidateReal = fs.realpathSync(candidate);
-  } catch (err) {
-    if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') {
-      return `cannot resolve real path (${err.message})`;
-    }
-    // ENOENT: a dangling symlink (safe to unlink) or a file not written
-    // yet; ENOTDIR: an ancestor is a stale plain file the apply pass
-    // removes first. Neither has a target to protect.
-  }
-  if (
-    candidateReal !== null &&
-    pluginRootReal !== null &&
-    !isWithinRealRoot(candidateReal, pluginRootReal)
-  ) {
-    return 'it resolves outside the plugin directory through a symlink';
-  }
-  return null;
+  const symlinkProblem = sweepCandidateSymlinkProblem(
+    candidate,
+    pluginRoot,
+    rootDir
+  );
+  if (symlinkProblem !== null) return symlinkProblem;
+  return sweepCandidateRealpathProblem(candidate, pluginRootReal);
 }
 
 /**

@@ -312,7 +312,7 @@ mv plugins/hookify-old plugins/hookify
 > both sides resolved, so a plugin reached through a symlinked parent
 > (macOS `/var` → `/private/var` cache roots) still passes. RULE 7 and the
 > generator's forbidden-file check share one `lstat`-based existence
-> helper (`lexistsSync` in `scripts/lib/plugin-symlink-policy.js`): a *dangling*
+> helper (`lexistsSync` in `scripts/lib/plugin-symlink-policy.js`): a _dangling_
 > `hooks/hooks.json` symlink is still an error (`existsSync` would report
 > it absent while Claude Code can still try to load it), `hooks` being a
 > plain file counts as absent, and an entry that cannot be inspected

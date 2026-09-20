@@ -1082,6 +1082,30 @@ function collectInlineHooks(hooks) {
   return merged;
 }
 
+function hookScriptDecisionOutputProblem(content, relPath, eventName) {
+  if (!DECISION_PROTOCOL_EVENTS.has(eventName)) return null;
+  const hasJsonOutput =
+    /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
+  const hasExitCodeProtocol =
+    /exit\s+0/.test(content) && /exit\s+2/.test(content);
+  if (hasJsonOutput || hasExitCodeProtocol) return null;
+  return `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`;
+}
+
+function hookScriptSetEProblem(content, relPath) {
+  if (
+    !/^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+      content
+    )
+  ) {
+    return null;
+  }
+  return (
+    `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+    'use "set -uo pipefail" instead'
+  );
+}
+
 /**
  * RULE 8 bash-only checks for a hook script that already passed RULE 6
  * existence, symlink, and containment gates.
@@ -1112,28 +1136,15 @@ function validateHookScriptBashRules(
     logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
   }
 
-  if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
-    const hasJsonOutput =
-      /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
-    const hasExitCodeProtocol =
-      /exit\s+0/.test(content) && /exit\s+2/.test(content);
-    if (!hasJsonOutput && !hasExitCodeProtocol) {
-      logWarning(
-        `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
-      );
-    }
-  }
+  const decisionProblem = hookScriptDecisionOutputProblem(
+    content,
+    relPath,
+    eventName
+  );
+  if (decisionProblem !== null) logWarning(decisionProblem);
 
-  if (
-    /^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
-      content
-    )
-  ) {
-    logWarning(
-      `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
-        'use "set -uo pipefail" instead'
-    );
-  }
+  const setEProblem = hookScriptSetEProblem(content, relPath);
+  if (setEProblem !== null) logWarning(setEProblem);
 }
 
 /**
