@@ -64,11 +64,14 @@ the control plane.
 
 ### Human plane — yellow-core `/flow:*`
 
-Documented session DAG for shell-based work: `/flow:brainstorm` → `/flow:spec` →
-`/flow:decompose` → `/flow:pick-next-shell` → `/flow:expand-shell` →
-`/flow:work` → `/flow:review` → `/plan:complete`, then back to
-`/flow:pick-next-shell` for the next shell. `/flow:plan` is the alternate entry
-for non-shell plans that skip decomposition. State lives on disk under `plans/`.
+Documented session DAG for shell-based work: `/flow:brainstorm` → `/flow:plan` →
+`/flow:spec` (spec-tier escalation only) → `/flow:decompose` →
+`/flow:pick-next-shell` → `/flow:expand-shell` → `/flow:work` → `/flow:review` →
+`/plan:complete`, then back to `/flow:pick-next-shell` for the next shell.
+`/flow:brainstorm` hands off to `/flow:plan <resolved-path>`; `/flow:spec` takes
+a topic, not a brainstorm file. `/flow:plan` is also the alternate entry for
+non-shell plans that skip decomposition when brainstorm is skipped. State lives
+on disk under `plans/`.
 An operator sits between sessions. `/worktree:cleanup` exists. yellow-council is
 a review join (in-process Claude plus Codex, Antigravity, OpenCode), not a
 planner.
