@@ -129,6 +129,22 @@ one diagnostics file and reads only those events (`codex-patterns`
 | Check Codex state | `/codex:status` | — | Monitor processes, verify configuration |
 | Codebase analysis | — | `codex-analyst` | Architecture questions, pattern analysis |
 
+## Testing
+
+Bats shell tests live in `tests/` — run `bats tests/` from inside this
+plugin directory. CI runs the suite as a required `plugin-shell-tests`
+step (not the advisory `plugins/*/tests` loop): a credential leaking past
+the byte cap is exactly the regression it exists to catch, so it must be
+able to fail the build. `tests/redaction.bats` pins the
+redact-then-cap order in `commands/codex/review.md` so a credential can
+never straddle the byte cap unredacted; the mechanics live in that file's
+header. The redaction block itself is the canonical program from
+`council-patterns`, inlined wherever a command or agent prints captured
+Codex output — `rg -c 'gsub\(/AKIA' plugins/yellow-codex` lists every
+copy (commands/codex/{review,rescue,setup}.md and agents/{review,research,
+workflow}/*.md; `status.md` carries an older, shorter variant). Keep them
+in step with it.
+
 ## Known Limitations
 
 - **Codex CLI is actively evolving** (v0.140.0+) — flags and behavior may change
