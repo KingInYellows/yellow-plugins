@@ -429,10 +429,10 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 
 ## Testing
 
-`bats tests/` from the plugin directory — eight suites
-(`compound-session-start-hook`, `compound-staging`, `compound-stop-hook`,
-`credential-status`, `plan-commands`, `plan-status-parity`, `repo-profile`,
-`validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
+`bats tests/` from the plugin directory (`compound-session-start-hook`,
+`compound-staging`, `compound-stop-hook`, `credential-status`, `handoff`,
+`plan-commands`, `plan-status-parity`, `plugin-identity`, `pre-compact-hook`,
+`repo-profile`, `validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
 Manifest hook budgets: Stop 5s, SessionStart 3s.
 
 ## Known Limitations

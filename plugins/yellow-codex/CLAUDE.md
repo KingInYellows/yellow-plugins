@@ -98,13 +98,6 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 - `scripts/install-codex.sh` — invoked by `/codex:setup`
 
-## Testing
-
-No bats suite. Validate with `pnpm validate:codex` (artifact + exposure lint)
-and `pnpm validate:schemas`. The review schema resolves through
-`${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json`; plain `codex exec`
-runs under a 300-second `timeout` (`commands/codex/review.md`).
-
 ## Model Selection
 
 No `-m` by default: every `codex exec` site passes
@@ -142,17 +135,18 @@ one diagnostics file and reads only those events (`codex-patterns`
 
 ## Testing
 
-Bats shell tests live in `tests/` — run `bats tests/` from inside this
-plugin directory. CI runs the suite as a required `plugin-shell-tests`
-step (not the advisory `plugins/*/tests` loop): a credential leaking past
-the byte cap is exactly the regression it exists to catch, so it must be
-able to fail the build. `tests/redaction.bats` pins the
-redact-then-cap order in `commands/codex/review.md` so a credential can
-never straddle the byte cap unredacted; the mechanics live in that file's
-header. The redaction block itself is the canonical program from
-`council-patterns`, inlined wherever a command or agent prints captured
-Codex output — `rg -c 'gsub\(/AKIA' plugins/yellow-codex` lists every
-copy (commands/codex/{review,rescue,setup}.md and agents/{review,research,
+`bats tests/` from the plugin directory (`redaction.bats` — the blocking CI
+gate runs the whole directory). `redaction.bats` pins the redact-then-cap order
+in `commands/codex/review.md` so a credential can never straddle the byte cap
+unredacted; the mechanics live in that file's header. Also validate with
+`pnpm validate:codex` (artifact + exposure lint) and `pnpm validate:schemas`.
+The review schema resolves through
+`${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json`; plain `codex exec`
+runs under a 300-second `timeout` (`commands/codex/review.md`). The redaction
+block itself is the canonical program from `council-patterns`, inlined
+wherever a command or agent prints captured Codex output —
+`rg -c 'gsub\(/AKIA' plugins/yellow-codex` lists every copy
+(commands/codex/{review,rescue,setup}.md and agents/{review,research,
 workflow}/*.md; `status.md` carries an older, shorter variant). Keep them
 in step with it.
 
