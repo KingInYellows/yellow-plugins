@@ -492,6 +492,60 @@ function collectInlineHooks(hooks) {
 }
 
 /**
+ * RULE 8 bash-only checks for a hook script that already passed RULE 6
+ * existence, symlink, and containment gates.
+ */
+function validateHookScriptBashRules(
+  scriptPath,
+  eventName,
+  pluginDir,
+  lstat
+) {
+  if ((lstat.mode & 0o111) === 0) {
+    logWarning(
+      `Hook script not executable: ${scriptPath} (check file permissions)`
+    );
+  }
+
+  let content;
+  try {
+    content = fs.readFileSync(scriptPath, 'utf-8');
+  } catch (readErr) {
+    logWarning(`Cannot read hook script: ${scriptPath} (${readErr.message})`);
+    return;
+  }
+
+  const relPath = path.relative(pluginDir, scriptPath);
+
+  if (!content.startsWith('#!/')) {
+    logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
+  }
+
+  if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
+    const hasJsonOutput =
+      /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
+    const hasExitCodeProtocol =
+      /exit\s+0/.test(content) && /exit\s+2/.test(content);
+    if (!hasJsonOutput && !hasExitCodeProtocol) {
+      logWarning(
+        `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
+      );
+    }
+  }
+
+  if (
+    /^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+      content
+    )
+  ) {
+    logWarning(
+      `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+        'use "set -uo pipefail" instead'
+    );
+  }
+}
+
+/**
  * Apply RULE 6 (existence / readability / executable mode) and RULE 8
  * (shebang / decision-output / set -e) to a single hook script path.
  * Centralizes per-script-path checks so RULE 6 and RULE 8 cannot drift.
@@ -567,48 +621,7 @@ function validateHookScriptPath(
   // in the file the command names.
   if (interpreter === 'node') return;
 
-  if ((lstat.mode & 0o111) === 0) {
-    logWarning(
-      `Hook script not executable: ${scriptPath} (check file permissions)`
-    );
-  }
-
-  let content;
-  try {
-    content = fs.readFileSync(scriptPath, 'utf-8');
-  } catch (readErr) {
-    logWarning(`Cannot read hook script: ${scriptPath} (${readErr.message})`);
-    return;
-  }
-
-  const relPath = path.relative(pluginDir, scriptPath);
-
-  if (!content.startsWith('#!/')) {
-    logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
-  }
-
-  if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
-    const hasJsonOutput =
-      /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
-    const hasExitCodeProtocol =
-      /exit\s+0/.test(content) && /exit\s+2/.test(content);
-    if (!hasJsonOutput && !hasExitCodeProtocol) {
-      logWarning(
-        `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
-      );
-    }
-  }
-
-  if (
-    /^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
-      content
-    )
-  ) {
-    logWarning(
-      `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
-        'use "set -uo pipefail" instead'
-    );
-  }
+  validateHookScriptBashRules(scriptPath, eventName, pluginDir, lstat);
 }
 
 module.exports = {
