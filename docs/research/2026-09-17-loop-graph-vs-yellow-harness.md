@@ -107,10 +107,10 @@ PRD.
 | Evaluator-optimizer loop | goal-gen verify + replan | Plugin cannot start a live until-done run |
 | Human gate | `/flow:*` session breaks; engine confirm / sign-off | — |
 | Worktrees | engine per-action; `/worktree:cleanup` | Containers (M2) |
-| Durable harness state | `plans/` + MEMORY.md + ruvector | One view across flow shells and GOAP runs |
-| Scheduled outer loop | hooks, CI | No marketplace `/loop` scheduler that discovers work unattended |
+| Durable harness state | `plans/` + MEMORY.md + ruvector | Unified flow + GOAP view |
+| Scheduled outer loop | hooks, CI | No unattended `/loop` scheduler |
 | ADK-style persisted graph runtime | — | Intentionally absent |
-| Native `/goal` `/loop` | Session controls if the binary has them | Unverified; do not wrap as commands |
+| Native `/goal` `/loop` | Session controls if present | Unverified; no marketplace wrap |
 
 ## What to do / not do
 
