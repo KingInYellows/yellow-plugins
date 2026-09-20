@@ -92,8 +92,11 @@ created earlier keeps its hash stamp until reembedded.
   `OK` / `MISMATCH` (equality of the five enforced stamp fields —
   `embedderKind`, `modelId`, `dimension`, `normalize`, `prefixPolicy` —
   against the dry-run's `targetProvenance`, both sides projected so an
-  informational extra key is ignored and a missing enforced field is a
-  mismatch, naming the differing fields), or `UNKNOWN` (the store
+  informational extra key is ignored and a missing enforced field whose
+  projected value differs from the other side is a mismatch (missing vs
+  explicit `null` on optional fields such as `modelId` compares equal,
+  matching upstream `(a.modelId ?? null)`), naming the differing fields),
+  or `UNKNOWN` (the store
   file is not parseable by `jq`; no GNU-compatible `timeout`/`gtimeout` is on
   PATH, so the dry-run is skipped; the dry-run failed, timed out, or was
   SIGKILLed — exit 137 may be the 5 s `--kill-after` grace or an external
@@ -152,7 +155,7 @@ and `npm/write-file-atomic#64` documents the same partial-protection
 caveat — so the upstream fix also needs a parse-retry (or quarantine that
 never overwrites) on the reader side.
 
-**Upstream.** Filed as https://github.com/ruvnet/RuVector/issues/995
+**Upstream.** Filed as [RuVector#995](https://github.com/ruvnet/RuVector/issues/995)
 (follow-up to #634 / #698, which fixed `cli.js` only).
 
 ## Related

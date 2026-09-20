@@ -96,8 +96,10 @@ server resolves, or every `hooks_remember` is refused (ADR-210) while
 `compareProvenance` refuses on any of the five stamp fields (`embedderKind`,
 `modelId`, `dimension`, `normalize`, `prefixPolicy`), so the block projects
 both stamps onto exactly those five fields before comparing — an extra
-informational key on either side is ignored; an enforced field missing on
-one side is a mismatch. It also computes the verdict, so the `PROVENANCE:`
+informational key on either side is ignored; an enforced field whose
+projected value differs from the other side is a mismatch (missing vs
+explicit `null` on optional fields such as `modelId` compares equal,
+matching upstream `(a.modelId ?? null)`). It also computes the verdict, so the `PROVENANCE:`
 line never depends on a by-eye JSON comparison.
 
 ```bash
@@ -241,7 +243,7 @@ Print exactly one line from the fenced `verdict=` / `detail=` values:
   `hooks_capabilities` output (the running server can predate a reembed).
   Includes the no-compatible-timeout case, where the dry-run never ran;
   the timed-out (124) case; the SIGKILLed (137) case — which may be the
-  5 s `--kill-after` grace firing after TERM was ignored *or* an external
+  5 s `--kill-after` grace firing after TERM was ignored _or_ an external
   signal such as the OOM killer, so the detail names both rather than
   asserting the deadline elapsed; other nonzero-exit dry-run cases, where
   a successful-looking JSON line is never trusted unless the dry-run

@@ -112,6 +112,16 @@ STORE_STAMP='{"embedderKind":"onnx-minilm","modelId":"Xenova/all-MiniLM-L6-v2","
   [ "$(fenced drop)" = "0" ]
 }
 
+@test "modelId:null on the store vs a missing modelId key on the target compares OK (upstream ?? null)" {
+  local stamp target
+  stamp='{"embedderKind":"hash","modelId":null,"dimension":64,"normalize":true,"prefixPolicy":"none"}'
+  target=$(printf '%s' "$stamp" | jq -c 'del(.modelId)')
+  write_store "{\"embeddingProvenance\":$stamp,\"memories\":[]}"
+  stub_npx 0 "{\"success\":true,\"targetProvenance\":$target,\"wouldReembed\":3}"
+  run_block
+  [ "$(fenced verdict)" = "OK" ]
+}
+
 @test "an enforced field missing outright on the target side is MISMATCH, naming that field only" {
   write_store "{\"embeddingProvenance\":$STORE_STAMP,\"memories\":[]}"
   local target
