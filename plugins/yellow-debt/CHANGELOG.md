@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.3
+
+### Patch Changes
+
+- [`ac9831f`](https://github.com/KingInYellows/yellow-plugins/commit/ac9831f647b322c83d16db8489e028b5d3ffba6b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(CLAUDE.md): currency sweep across all plugin CLAUDE.md files — fix stale
+  counts and archived-plan paths, replace hardcoded Graphite conventions with
+  the `/stack:status` provider rule, correct MCP tool namespaces and dependency
+  tables, and add per-plugin Testing sections.
+
 ## 1.7.2
 
 ### Patch Changes

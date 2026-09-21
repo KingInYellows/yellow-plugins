@@ -1,5 +1,15 @@
 # yellow-goal
 
+## 0.2.1
+
+### Patch Changes
+
+- [`4909e5b`](https://github.com/KingInYellows/yellow-plugins/commit/4909e5be96eb02532880d7808287a02042fa59f4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # Summary
+
+  Docs-only: link yellow-goal README to the loop/graph lineage research note. No
+  command, pin, or marketplace change.
+
 ## 0.2.0
 
 ### Minor Changes
