@@ -48,7 +48,7 @@ Byte-identity drift is gated by `pnpm validate:generated`.
 
 ### The 19 plugins
 
-**Orchestration / host toolkit**
+#### Orchestration / host toolkit
 
 - **yellow-core** — Hub. `/setup:all`, `/flow:*`, `/stack:*`, `/plan:*`,
   worktrees, statusline. Owns `lib/stack-provider-state.js`,
@@ -60,7 +60,7 @@ Byte-identity drift is gated by `pnpm validate:generated`.
   `lib/github-stack-runtime.js`). Same nine `/stack:*` operations via an
   adapter.
 
-**Review / quality**
+#### Review / quality
 
 - **yellow-review** — Multi-agent PR review, comment resolution, stack review.
   Second Cursor-enabled plugin (read-only skill only).
@@ -72,7 +72,7 @@ Byte-identity drift is gated by `pnpm validate:generated`.
 - **yellow-docs** — Doc audit/generation/Mermaid.
 - **yellow-browser-test** — Autonomous web testing via `agent-browser`.
 
-**Integrations**
+#### Integrations
 
 - **yellow-linear** — Linear MCP + PM workflows (OAuth).
 - **yellow-research** — Multi-source research MCPs (Ceramic, DeepWiki,
@@ -168,7 +168,7 @@ flowchart LR
   Cmd --> GH
 ```
 
-**Typical user action**
+### Typical user action
 
 1. Install marketplace, then `/plugin install <name>@yellow-plugins`.
 2. Claude Code copies the plugin into `~/.claude/plugins/cache/` and injects
@@ -180,7 +180,7 @@ flowchart LR
 5. `/setup:all` is the cross-plugin dashboard: one Bash probe, then reads
    per-plugin `credential-status.json` (no keychain probing).
 
-**Interfaces**
+### Interfaces
 
 - Manifests: JSON Schema, `additionalProperties: false`.
 - Credential status protocol:
