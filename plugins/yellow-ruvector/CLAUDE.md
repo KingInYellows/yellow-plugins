@@ -31,7 +31,13 @@ ruvector.
 - `RUVECTOR_STORAGE_PATH` in plugin.json is **inert at 0.2.34** — the env
   var appears nowhere in the installed package (full-source grep); store
   resolution is `getIntelPath()`'s cwd-based logic. Kept as
-  documentation-of-intent in case upstream honors it later
+  documentation-of-intent in case upstream honors it later. It does not
+  stop an unknown cwd from selecting `~/.ruvector`
+- MCP launch sets `RUVECTOR_MCP_ALLOW` to the five tools this plugin
+  calls (`hooks_capabilities`, `hooks_pretrain`, `hooks_recall`,
+  `hooks_remember`, `hooks_stats`) and does not set
+  `RUVECTOR_MCP_PROFILE`. On 0.2.34 an empty or misspelled policy
+  exposes every tool, and a profile unions with the allowlist
 - First call after session start may be slow (300-1500ms cold start)
 
 ## Conventions
@@ -47,7 +53,9 @@ ruvector.
   `hooks post-command`) as **side effects** — their stdout is discarded and the
   hook always prints dual-client allow JSON. `hooks recall` is the exception:
   `session-start.sh` and `user-prompt-submit.sh` capture its stdout on purpose
-  and return it in `systemMessage`. Never run `ruvector hooks init` to
+  and return it in `hookSpecificOutput.additionalContext` (event name set
+  to the hook that fired). Operator warnings stay on `systemMessage`.
+  Never run `ruvector hooks init` to
   register hooks — even `--minimal` writes empty-stdout PreToolUse commands
   into `.claude/settings.json` that Cursor rejects as invalid JSON. Use
   `scripts/repair-cursor-pretooluse.sh` to wrap leftovers. No manual queue
@@ -97,10 +105,13 @@ ruvector.
   before acting; canonical home of the ruvector protocol constants (RULE 16
   drift lint enforces its sentinel line across the yellow-core replicas)
 
-### Hooks (5)
+### Hooks (6 events, 5 scripts)
 
 - `user-prompt-submit.sh` — Inject relevant memories before Claude processes each
-  user prompt via `hooks recall` (1s budget)
+  user prompt via `hooks recall` (1s budget). Reads the string field
+  `prompt` only. Recalled text is `hookSpecificOutput.additionalContext`
+  for `UserPromptSubmit`, fenced as untrusted reference. It is not executed
+  and it is not a permission decision. A failed recall still allows the prompt.
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
   via `hooks recall` (3s budget: 0.2s provenance parse + 0.9s resume +
   2×0.65s recall = 2.4s, plus four `--kill-after=0.1` escalations (0.4s) =
@@ -110,13 +121,19 @@ ruvector.
   embedder-provenance check: a `hash`-stamped store with the default
   (onnx-minilm) embedder, or a stamp-less store that already holds vectors
   (`ERR_LEGACY_STORE_READONLY`), adds one `[ruvector] …` line to
-  `systemMessage`; silent for fresh stores and when the env selects hash the
+  `systemMessage` (operator warning; recalled learnings are a separate
+  `additionalContext` and are not concatenated into that warning); silent for fresh stores and when the env selects hash the
   way upstream resolves it (`RUVECTOR_EMBEDDER=hash`, or `RUVECTOR_ONNX=0`
   with `RUVECTOR_EMBEDDER` unset). The gate reads the hook shell's env, not
   the MCP server's — `/ruvector:status` is the definitive check
 - `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/MultiEdit/Bash tools (1s budget). Stdout is dual-client allow JSON (`continue` + `permission`) so Cursor's Claude-plugin bridge does not block the tool.
 - `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
-  `hooks post-edit` and `hooks post-command` (<50ms)
+  `hooks post-edit` and `hooks post-command` (1s budget). Registered for
+  both `PostToolUse` and `PostToolUseFailure`. A Bash success is a
+  `tool_response` object whose `interrupted` field is not true
+  (`--success`). A failure whose `error` first line is `Exit code N` is
+  `--error` with that N. An interrupt, a missing status, or an edit
+  failure is not submitted. `tool_result.exit_code` is not read.
 - `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
 
 ### Scripts (2)
@@ -240,8 +257,11 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 
 - **Uninstall:** Delete `.ruvector/` directory, remove from `.gitignore`, run
   `npm uninstall -g ruvector`
-- **Upgrade:** `npm update -g ruvector` — ruvector handles DB migration
-  internally
+- **Upgrade:** reinstall the pinned CLI,
+  `npm install -g ruvector@0.2.34 --ignore-scripts`.
+  Do not `npm update -g ruvector`; an unpinned update skews the global
+  binary from the MCP pin. A newer release is a separate change after
+  its gates pass.
 - **Team usage:** `.ruvector/` should be gitignored (per-developer data). Team
   learnings can be exported via `/ruvector:memory` and shared manually.
 

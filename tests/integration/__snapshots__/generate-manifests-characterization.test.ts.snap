@@ -1032,7 +1032,8 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
         "start"
       ],
       "env": {
-        "RUVECTOR_STORAGE_PATH": "\${PWD}/.ruvector/"
+        "RUVECTOR_STORAGE_PATH": "\${PWD}/.ruvector/",
+        "RUVECTOR_MCP_ALLOW": "hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
       }
     }
   },
@@ -1074,6 +1075,18 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-use.sh\\"",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
       {
         "matcher": "Edit|Write|MultiEdit|Bash",
         "hooks": [

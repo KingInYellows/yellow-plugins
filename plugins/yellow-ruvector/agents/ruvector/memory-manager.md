@@ -58,7 +58,7 @@ When asked to record a learning:
    per the `memory-query` skill's canonical constants)
 5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
-If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Output `**Stored**: false — <error summary>` so callers can detect the failure. Do not retry.
+If `hooks_remember` returns an error, log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Output `**Stored**: false — <error summary>`. If it returns an empty or non-acknowledging result, log '[memory-manager] Failed to store entry: persistence not acknowledged. Entry not saved.' Output `**Stored**: false — persistence not acknowledged`. Do not retry.
 
 ## Retrieval Mode
 
@@ -92,7 +92,11 @@ When called to flush `pending-updates.jsonl`:
    command — this agent has no way to run a slash command and check its
    result. The call is batch-level (no per-file result): if it errors, mark
    every `file_change` entry it covered as failed so step 8 retains them
-   for the next flush; if it succeeds, treat them all as processed
+   for the next flush. For `ruvector@0.2.34`, treat a result with
+   `success: true` as an acknowledged write. The response has the shape
+   `{success: true, output, new_stats}` and has no separate `persisted`
+   field. Retain entries when the call errors, returns `success: false`,
+   or returns an empty or malformed result
 7. For `bash_result` entries with non-zero exit codes: store as `context`
    entries via `hooks_remember` when they pass the step 3 quality gate;
    otherwise count them as skipped

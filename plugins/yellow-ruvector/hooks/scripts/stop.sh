@@ -25,13 +25,12 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
-# Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
+# Require the direct binary. `npx --no ruvector` is unpinned and selects
+# whatever global is installed, which skews this CLI call from the MCP pin.
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
-elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD=(npx --no ruvector)
 else
-  json_exit "Warning: neither ruvector nor npx found"
+  json_exit
 fi
 
 # Use ruvector's built-in session-end hook

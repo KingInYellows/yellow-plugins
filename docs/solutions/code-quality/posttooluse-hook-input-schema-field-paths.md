@@ -48,6 +48,19 @@ tags:
 > the field path (breaking the characterization-testing charter) or keep it
 > as documented, deliberately-preserved bash-parity behavior.
 
+> **Update (2026-09-21): yellow-ruvector no longer reads
+> `tool_result.exit_code`.** Official hooks docs
+> (code.claude.com/docs/en/hooks, fetched 2026-09-21) put a successful
+> tool result on `tool_response` and a failure on the separate
+> `PostToolUseFailure` event (`error`, `is_interrupt`). Bash success
+> shape in that doc has `stdout`, `stderr`, `interrupted`, and `isImage`,
+> not an exit code. `plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh`
+> records `--success` only for a `PostToolUse` Bash `tool_response` that
+> is not interrupted, and `--error` only when a failure's first line is
+> `Exit code N`. A missing status is not turned into exit code 1.
+> The table below is the historical mistake this doc first corrected
+> (root-level fields); it is not the current host contract.
+
 > **Update (2026-09-16): resolved — field path fixed.** The decision went
 > to correctness: `policy-check-git-push.js` now reads
 > `toolInput?.command` (string-typed), the same read
@@ -99,16 +112,19 @@ The "PreToolUse path" column is historical: it records what the deleted
 the 2026-09-16 update above). Real PreToolUse envelopes use the same
 `.tool_input.*` paths as the PostToolUse column.
 
-Correct PostToolUse field extraction:
+PostToolUse field extraction (the exit-code extraction below is historical):
 
 ```bash
 # PostToolUse: command is nested under .tool_input
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)
 
+# Historical legacy-host contract only. Current yellow-ruvector uses
+# `tool_response` for success and `PostToolUseFailure.error` for failure.
 # PostToolUse: exit code is nested under .tool_result
 EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0' 2>/dev/null)
 ```
 
+Historical legacy-host example; do not use for current yellow-ruvector.
 For efficiency, parse all fields in a single jq invocation:
 
 ```bash
@@ -120,8 +136,9 @@ eval "$(printf '%s' "$INPUT" | jq -r '
 ')" 2>/dev/null || { printf '"'"'{"continue": true}\n'"'"'; exit 0; }
 ```
 
-Confirmed against `plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh`
-line 36 and `plugins/gt-workflow/hooks/check-commit-message.sh` lines 19 and 34.
+The yellow-ruvector confirmation above is historical. The 2026-09-21
+update is the current contract for that script. `plugins/gt-workflow`
+is a separate hook and is not changed by that update.
 
 ## Prevention
 
@@ -129,5 +146,6 @@ line 36 and `plugins/gt-workflow/hooks/check-commit-message.sh` lines 19 and 34.
   script in a comment
 - When writing a new PostToolUse hook, start by copying the field-extraction
   block from an existing PostToolUse hook (not a PreToolUse hook)
-- Code review checklist: if hook type is `PostToolUse`, verify `.tool_input.*`
-  and `.tool_result.*` nesting — never root-level `.command` or `.exit_code`
+- Code review checklist: for current hooks, verify `.tool_input.*` for command
+  input, `.tool_response` for successful `PostToolUse`, and `.error` /
+  `.is_interrupt` for `PostToolUseFailure`; do not use `.tool_result.exit_code`

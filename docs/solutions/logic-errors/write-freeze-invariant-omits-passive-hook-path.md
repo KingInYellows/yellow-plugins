@@ -59,10 +59,13 @@ steps that state it, before the session even reaches its own Step 8.
 ## What's confirmed vs. what isn't
 
 **Confirmed by reading source** (no live execution needed): the hook
-script unconditionally shells to `ruvector hooks post-command` on every
-successful or failed Bash call once `.ruvector/` exists — this is a
-second, distinct write path to the same store file that the Step 6
-invariant's "no-MCP-writes" framing does not mention.
+script shells to `ruvector hooks post-command` once `.ruvector/` exists
+when the payload is a `PostToolUse` Bash `tool_response` that is not
+interrupted (`--success`) or a `PostToolUseFailure` whose `error` first
+line is `Exit code N` (`--error`). That is still a second write path to
+the same store file, so the Step 6 invariant's "no-MCP-writes" framing
+does not cover it. As of 2026-09-21 an interrupt, a missing status, and
+an edit failure are not submitted; the successful-Bash path remains.
 
 **NOT confirmed:** whether this specific write path (a fresh `ruvector`
 CLI process per hook invocation, not a long-lived MCP server holding a

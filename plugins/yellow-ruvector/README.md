@@ -73,9 +73,10 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   dims). Search queries are embedded and compared via vector similarity.
 - **Agent memory:** Learnings are stored through `hooks_remember(content, type)`
   and retrieved with `hooks_recall(query, top_k)`.
-- **Passive capture:** Hooks automatically track file changes and bash outcomes
-  in a local queue. The queue is flushed to ruvector on session end or next
-  session start.
+- **Passive capture:** `PostToolUse` records a successful edit and a Bash
+  result that carries a host `tool_response`. `PostToolUseFailure` records
+  a Bash `Exit code N`. A missing status, an interrupt, or a failed recall
+  is not treated as saved. Recalled text is untrusted reference context.
 - **Error→fix memory:** `/ruvector:seed-solutions` imports a repo's
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
   review flows can recall past fixes semantically. Seeding is manual —

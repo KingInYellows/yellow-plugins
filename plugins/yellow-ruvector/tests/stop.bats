@@ -59,3 +59,16 @@ run_hook_failing_ruvector() {
   [ "$status" -eq 0 ]
   echo "$output" | jq . > /dev/null
 }
+
+@test "skips silently when binary absent even if npx present (no unpinned npx)" {
+  NPX_BIN="$(mktemp -d)"
+  MARKER="$NPX_BIN/npx-was-called"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$NPX_BIN/npx"
+  chmod +x "$NPX_BIN/npx"
+  run bash -c 'printf "%s" "{}" | PATH="$1:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$2" bash "$3"' \
+    _ "$NPX_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
+  [ ! -f "$MARKER" ]
+  rm -rf "$NPX_BIN"
+}

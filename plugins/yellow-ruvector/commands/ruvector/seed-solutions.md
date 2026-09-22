@@ -42,8 +42,9 @@ re-run after new solution docs land.
 3. **Version gate (before any store write; runs first to minimize
    pre-gate exposure):** run `ruvector --version` and compare it against
    the pinned version (0.2.34). A stale global binary's passive-capture
-   hooks (`pre-tool-use.sh` / `post-tool-use.sh`) fire unconditionally on
-   every Bash tool call this command makes — including sub-step 4's
+   hooks (`pre-tool-use.sh` / `post-tool-use.sh`) still run on a successful
+   Bash tool call (`PostToolUse` with a `tool_response`) and that path
+   records `hooks post-command --success` — including sub-step 4's
    `cd`/`pwd`/`git` calls below and Step 5's store-write loop — and can
    rewrite the store or reset provenance before a later check catches the
    mismatch (a mismatch caught only in Step 6, after Step 5's loop
