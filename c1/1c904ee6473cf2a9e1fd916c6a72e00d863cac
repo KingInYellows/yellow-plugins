@@ -1,0 +1,14 @@
+docs/architecture-overview.md
+  h_6000354274ce50 1-478
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c11c904ee6473cf2a9e1fd916c6a72e00d863cac",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
