@@ -82,11 +82,8 @@ if [ -n "$TIMEOUT_CMD" ]; then
     RECALL_OUTPUT=""
   }
 else
-  RECALL_OUTPUT=$("${RUVECTOR_CMD[@]}" hooks recall \
-    --top-k 3 -- "$PROMPT" 2>/dev/null) || {
-    printf '[ruvector] recall failed\n' >&2
-    RECALL_OUTPUT=""
-  }
+  printf '[ruvector] no GNU-compatible timeout found; skipping recall\n' >&2
+  json_exit
 fi
 
 # Construct output — use jq -n --arg to handle quotes and backslashes in memories.

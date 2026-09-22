@@ -112,16 +112,19 @@ The "PreToolUse path" column is historical: it records what the deleted
 the 2026-09-16 update above). Real PreToolUse envelopes use the same
 `.tool_input.*` paths as the PostToolUse column.
 
-Correct PostToolUse field extraction:
+PostToolUse field extraction (the exit-code extraction below is historical):
 
 ```bash
 # PostToolUse: command is nested under .tool_input
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)
 
+# Historical legacy-host contract only. Current yellow-ruvector uses
+# `tool_response` for success and `PostToolUseFailure.error` for failure.
 # PostToolUse: exit code is nested under .tool_result
 EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0' 2>/dev/null)
 ```
 
+Historical legacy-host example; do not use for current yellow-ruvector.
 For efficiency, parse all fields in a single jq invocation:
 
 ```bash
@@ -143,5 +146,6 @@ is a separate hook and is not changed by that update.
   script in a comment
 - When writing a new PostToolUse hook, start by copying the field-extraction
   block from an existing PostToolUse hook (not a PreToolUse hook)
-- Code review checklist: if hook type is `PostToolUse`, verify `.tool_input.*`
-  and `.tool_result.*` nesting — never root-level `.command` or `.exit_code`
+- Code review checklist: for current hooks, verify `.tool_input.*` for command
+  input, `.tool_response` for successful `PostToolUse`, and `.error` /
+  `.is_interrupt` for `PostToolUseFailure`; do not use `.tool_result.exit_code`

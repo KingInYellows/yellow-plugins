@@ -276,6 +276,37 @@ assert_allow_only() {
   rm -rf "$NPX_BIN"
 }
 
+@test "skips recall when no GNU-compatible timeout is available" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  RECALL_MARKER="$MOCK_BIN/recall-called"
+  cat > "$MOCK_BIN/ruvector" << EOF
+#!/bin/sh
+touch "$RECALL_MARKER"
+exit 0
+EOF
+  chmod +x "$MOCK_BIN/ruvector"
+  NO_TIMEOUT_BIN="$(mktemp -d)"
+  ln -s "$(command -v jq)" "$NO_TIMEOUT_BIN/jq"
+  # BusyBox-style timeout: present but no --kill-after, so the hook must skip recall.
+  cat > "$NO_TIMEOUT_BIN/timeout" << 'EOF'
+#!/bin/sh
+if [ "$1" = "--help" ]; then
+  printf '%s\n' 'Usage: timeout DURATION COMMAND'
+  exit 0
+fi
+exec /bin/timeout "$@"
+EOF
+  chmod +x "$NO_TIMEOUT_BIN/timeout"
+  input=$(make_input "implement a new feature using the ruvector plugin")
+  run --separate-stderr /bin/bash -c 'printf "%s" "$1" | PATH="$2:$3:/bin" CLAUDE_PROJECT_DIR="$4" /bin/bash "$5"' \
+    _ "$input" "$NO_TIMEOUT_BIN" "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  [ "$status" -eq 0 ]
+  assert_allow_only
+  [ ! -f "$RECALL_MARKER" ]
+  [[ "$stderr" == *"no GNU-compatible timeout"* ]]
+  rm -rf "$NO_TIMEOUT_BIN"
+}
+
 @test "hanging recall still emits allow JSON within the 1s budget" {
   command -v timeout >/dev/null 2>&1 && timeout --help 2>&1 | grep -q -- '--kill-after' || \
     skip "no GNU-compatible timeout available"
