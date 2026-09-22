@@ -115,9 +115,16 @@ Hooks delegate to ruvector's built-in CLI hooks. There is no manual queue
 management inside the plugin:
 
 - `session-start.sh` → `ruvector hooks session-start --resume` plus
-  `ruvector hooks recall --top-k N "query"` when the global binary is in PATH
-- `post-tool-use.sh` → `ruvector hooks post-edit --success <path>` or
-  `ruvector hooks post-command --success|--error <cmd>`
+  `ruvector hooks recall --top-k N "query"` when the global binary is in PATH.
+  Recall is `hookSpecificOutput.additionalContext` for `SessionStart`. The
+  embedder-provenance warning stays on `systemMessage`
+- `user-prompt-submit.sh` reads the string field `prompt` and returns
+  recall as `hookSpecificOutput.additionalContext` for `UserPromptSubmit`
+- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) →
+  `ruvector hooks post-edit --success <path>` only for a PostToolUse
+  success, or `ruvector hooks post-command --success|--error <cmd>` only
+  for a Bash `tool_response` success or an `Exit code N` failure. Unknown
+  and interrupt are not submitted
 - `stop.sh` → `ruvector hooks session-end`
 
 ruvector manages its own internal queue and dedup. Plugin hooks are thin
