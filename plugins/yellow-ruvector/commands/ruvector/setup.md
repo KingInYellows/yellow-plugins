@@ -16,7 +16,7 @@ Install the ruvector CLI and initialize `.ruvector/` for the current project.
 ## CLI Reference (verified against v0.1.96+)
 
 - `mkdir -p .ruvector` — Initialize `.ruvector/` directory (plugin-owned)
-- `npx ruvector mcp start` — Start the MCP server (stdio transport)
+- `npx -y --ignore-scripts ruvector@0.2.34 mcp start` — Start the MCP server (stdio transport; same pin as `plugin.json`)
 - `ruvector doctor` — System health check
 
 **Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`.
@@ -86,7 +86,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install.sh"
 ```
 
 If install fails, report the error and suggest:
-`npm install -g ruvector --ignore-scripts`
+`npm install -g ruvector@0.2.34 --ignore-scripts`
 
 If Step 2a's output includes `Installed to ~/.local prefix`, it only
 exported `~/.local/bin` into that child script's own process — this
@@ -163,7 +163,7 @@ else \
   printf 'FAILED: ruvector NOT in PATH.\n'; \
   printf 'Global binary is REQUIRED — hooks with 1s budgets will not function without it.\n'; \
   printf 'npx adds ~1900ms overhead, exceeding hook timeouts.\n'; \
-  printf 'Fix: npm install -g ruvector --ignore-scripts\n'; \
+  printf 'Fix: npm install -g ruvector@0.2.34 --ignore-scripts\n'; \
   printf 'If using nvm/fnm: binary is per-Node-version.\n'; \
 fi
 ```
@@ -189,7 +189,7 @@ Summarize results in a table:
 | .ruvector/ directory | Initialized |
 | .gitignore entry     | Present     |
 | Health check         | Passing     |
-| Hooks (5)            | Active via plugin.json |
+| Hook events (6)      | Active via plugin.json |
 | Cursor PreToolUse    | Repaired / already safe / skipped |
 | Global binary        | REQUIRED: In PATH / FAILED: Not found |
 | Smoke test (<1s)     | Passed / Failed / Skipped |
@@ -203,7 +203,7 @@ If global binary is not found, **stop setup and report failure:**
 >
 > Remediation:
 >
-> 1. `npm install -g ruvector --ignore-scripts`
+> 1. `npm install -g ruvector@0.2.34 --ignore-scripts`
 > 2. Verify: `command -v ruvector` (should print a path)
 > 3. Re-run `/ruvector:setup`
 >
