@@ -52,11 +52,11 @@ gt modify -c -m "chore(release): bump catalog to v1.x.x"
 # 6. Run pre-flight checks
 pnpm release:check
 
-# 7. Tag and push (for release tracking — tags do NOT trigger the workflow)
-git tag v1.x.x && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
-# → Normal path: merge the "Version Packages" PR; its push to `main` runs
-#   version-packages.yml, which builds and creates the GitHub Release.
-#   Recovery: gh workflow run version-packages.yml -f force_publish=true
+# 7. Do not tag by hand. Merge the "Version Packages" PR. Its push to `main`
+#    runs version-packages.yml, which creates per-plugin tags (`<name>@<version>`),
+#    the root catalog tag (`v<catalog-version>`), and the GitHub Release.
+#    A tag push does not trigger that workflow.
+#    Recovery: gh workflow run version-packages.yml -f force_publish=true
 ```
 
 ## Semver Bump Rules
@@ -142,15 +142,25 @@ a timestamp of the marketplace snapshot, not a semantic compatibility signal.
 
 ## Validate Version Consistency
 
-At any time you can check that `package.json`, `plugin.json`, and
-`marketplace.json` are in sync:
+At any time you can check version sync. `scripts/validate-versions.js` always
+checks the Claude three-way set: `plugins/<name>/package.json`,
+`plugins/<name>/.claude-plugin/plugin.json`, and the
+`.claude-plugin/marketplace.json` entry.
+
+When `catalog/plugins/<name>.json` has `targets.codex.enabled` true, it also
+requires `package.json` to match `.codex-plugin/plugin.json`, and checks
+`.agents/plugins/marketplace.json` for membership, name, order, and path
+(those entries have no version field). When `targets.cursor.enabled` is true,
+it requires `package.json` to match `.cursor-plugin/plugin.json`, and checks
+`.cursor-plugin/marketplace.json` the same way.
 
 ```sh
 pnpm validate:versions        # fails on drift
 pnpm validate:versions:dry    # reports drift without failing
 ```
 
-This runs automatically in CI on every PR.
+This runs automatically in CI on every PR. The success line reports
+`pluginNames.length` plugins, not a fixed three-manifest count.
 
 ## Troubleshooting
 

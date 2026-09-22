@@ -167,20 +167,28 @@ subprocess context and dashboard context — every credential-bearing
 plugin emits one identical-shape file so `/setup:all` can render an
 accurate dashboard without per-plugin special-casing.
 
-Plugins planned to emit this file (per the
-`plans/plugin-install-resilience.md` stack — adopters land in follow-up
-PRs after this foundation merges):
+Plugins that emit this file, and that `/setup:all` lists in its
+credential-status loop:
 
-- yellow-research (perplexity/tavily/exa userConfig keys; ceramic/parallel
-  are OAuth-managed and have no userConfig field, so they are intentionally
-  omitted from the credentials array)
+- yellow-research (`credential_hook_scaffold` in
+  `plugins/yellow-research/hooks/write-credential-status.sh`;
+  perplexity/tavily/exa userConfig keys; ceramic/parallel are OAuth-managed
+  and have no userConfig field, so they are omitted from the credentials array)
+- yellow-semgrep (`credential_hook_scaffold` in
+  `plugins/yellow-semgrep/hooks/write-credential-status.sh`)
+- yellow-composio (`write_credential_status` in
+  `plugins/yellow-composio/hooks/check-mcp-url.sh`)
+
+Still planned, with no credential-status hook yet:
+
 - yellow-morph (morph key)
-- yellow-semgrep (semgrep token)
-- yellow-composio (URL + API key)
 
 Plugins that intentionally do NOT emit this file:
 
 - yellow-devin (uses shell env only; setup:all probes `DEVIN_*` env vars
   directly)
-- yellow-linear, yellow-chatprd, yellow-codex (OAuth flows — status is
-  ToolSearch-visibility, not credential-presence)
+- yellow-linear, yellow-codex (OAuth flows — status is ToolSearch-visibility,
+  not credential-presence)
+
+yellow-chatprd is not a current plugin. It was removed from the marketplace
+in yellow-core 1.20.2 and is not in `catalog/catalog.json` `pluginOrder`.

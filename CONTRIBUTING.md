@@ -76,11 +76,14 @@ plugins/<name>/
 
 ### Adding a Plugin
 
-1. Create the directory structure above
-2. Add `.claude-plugin/plugin.json` with at minimum `name`, `description`,
-   `version`, and `author`
-3. Register it in `.claude-plugin/marketplace.json` under the top-level
-   `plugins` array with a `source` like `./plugins/<name>`
+1. Create the directory structure above, plus `plugins/<name>/package.json`
+   (version source of truth)
+2. Add `catalog/plugins/<name>.json` and append `<name>` to `pluginOrder` in
+   `catalog/catalog.json`. Do not hand-edit `.claude-plugin/plugin.json` or
+   `.claude-plugin/marketplace.json`
+3. Run `pnpm generate:manifests`. It emits
+   `plugins/<name>/.claude-plugin/plugin.json` and the marketplace entry
+   (`source` `./plugins/<name>`). See `catalog/README.md`
 4. Add a README with install command, prerequisites, and component tables
 5. Validate: `pnpm validate:schemas`
 
@@ -221,7 +224,7 @@ pnpm apply:changesets         # bumps plugin versions + syncs manifests
 node scripts/catalog-version.js patch   # bumps root catalog version
 git add -A
 git commit -m "chore: version packages"
-gt submit --no-interactive    # push via Graphite (triggers the workflow automatically)
+gt submit --no-interactive    # submits this branch; does not start version-packages.yml unless the push is to main
 pnpm tag                      # creates per-plugin git tags for tracking
 git tag v<catalog-version>    # e.g. v1.1.2
 git push --tags               # push tags for tracking (tag push — not managed by Graphite)

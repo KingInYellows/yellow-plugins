@@ -23,7 +23,7 @@ Add the marketplace, then install individual plugins:
 | Plugin                | Description                                                                                                                            | Components                                     |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 7 commands, 2 hooks, 1 MCP                     |
-| `github-workflow`     | GitHub-native stacked-PR provider skeleton — setup and status only; no stack operations yet                                            | 2 commands, 2 skills                           |
+| `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 1 skill                  |
@@ -55,7 +55,7 @@ for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                                                              |
 | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -139,9 +139,10 @@ health and tool availability.
 
 ### yellow-research (API keys)
 
-Bundles six MCP servers for multi-source deep research. Three search providers
-require API keys. Ceramic and the Parallel Task MCP use OAuth, and `ast-grep`
-requires a local binary instead of a key.
+Bundles seven MCP servers for multi-source deep research. Three search providers
+require API keys. Ceramic uses OAuth, Parallel is auto-authenticated with no
+API key, DeepWiki needs none, and `ast-grep` requires a local binary instead of
+a key.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -236,35 +237,23 @@ installs copy plugins to `~/.claude/plugins/cache/`.
      CLAUDE.md
    ```
 
-2. Add a minimal plugin manifest at `.claude-plugin/plugin.json`:
+2. Add `plugins/my-plugin/package.json` (the version source of truth) and
+   `catalog/plugins/my-plugin.json` (description, author, and
+   `marketplace.source` of `./plugins/my-plugin`). Append the name to
+   `pluginOrder` in `catalog/catalog.json`. Field rules are in
+   `catalog/README.md`. Do not hand-edit `plugins/my-plugin/.claude-plugin/plugin.json`
+   or `.claude-plugin/marketplace.json`.
 
-   ```json
-   {
-     "name": "my-plugin",
-     "description": "What the plugin does",
-     "version": "1.0.0",
-     "author": { "name": "Your Name" }
-   }
-   ```
-
-3. Register the plugin in `.claude-plugin/marketplace.json`:
-
-   ```json
-   {
-     "name": "my-plugin",
-     "description": "What the plugin does",
-     "version": "1.0.0",
-     "author": { "name": "Your Name" },
-     "source": "./plugins/my-plugin",
-     "category": "development"
-   }
-   ```
-
-4. Validate:
+3. Regenerate, then validate:
 
    ```bash
+   pnpm generate:manifests
    pnpm validate:schemas
    ```
+
+   `pnpm generate:manifests` emits the plugin manifest and the marketplace
+   entry. The `plugin.json` shown in the directory tree above is that
+   generated file.
 
 See each plugin's `CLAUDE.md` for conventions, component details, and usage
 guides.
@@ -277,7 +266,7 @@ yellow-plugins/
 │   └── marketplace.json       # Plugin catalog
 ├── plugins/
 │   ├── gt-workflow/           # Graphite workflow (7 commands, 2 hooks, 1 MCP)
-│   ├── github-workflow/       # GitHub-native stacked-PR provider skeleton (2 commands, 2 skills)
+│   ├── github-workflow/       # GitHub-native stacked-PR provider (9 commands, 9 skills, 2 hooks)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
