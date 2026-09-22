@@ -1,0 +1,32 @@
+docs/plugin-validation-guide.md
+  s_9faf0dc507d8cf::t_d204aa7c7393e8 230-242,244
+  s_9faf0dc507d8cf::t_960d8ca3f24162 243,245-257
+scripts/lib/plugin-rules.js
+  s_9faf0dc507d8cf::t_21841baf848da9 24,192-197,200,202,230-243,260-266
+  s_9faf0dc507d8cf::t_6159dfdbc9df20 173-184,189-191,198-199,201,203,229,244,251
+  s_9faf0dc507d8cf::t_1c5bcef42eddbe 26-27
+tests/integration/validate-plugin.test.ts
+  s_9faf0dc507d8cf::t_3553ec39d69e81 775-847,855-860,937-938,940-942,944-1008
+  s_9faf0dc507d8cf::t_295b492333156c 848-854,861-936,939,943
+scripts/lib/plugin-paths.js
+  s_9faf0dc507d8cf::t_21841baf848da9 135-140
+  s_9faf0dc507d8cf::t_6159dfdbc9df20 61-67,76-94,141-147,151,157-162,171,173-174,177-178,180-186,188-193,196-205,213-214,639-640,644-645
+  s_9faf0dc507d8cf::t_9d486e079b28f9 96,104-111,121-123,206-212,215-224,226,231-246,249-251,253-281,283-286,642
+  s_9faf0dc507d8cf::t_0233cd9b513149 252,282
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6492ef9e66b82aa1f65e53d11f4c8b0d2468ca4f",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

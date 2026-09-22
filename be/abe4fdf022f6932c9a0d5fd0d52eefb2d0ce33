@@ -1,0 +1,36 @@
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_e72e14f6bafd18::t_d31f826b997e75 1-198
+plugins/yellow-core/.claude-plugin/plugin.json
+  s_e72e14f6bafd18::t_1c30c989bb4ba6 20-46
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_e72e14f6bafd18::t_aeacf8003f70bc 1-201
+.changeset/yellow-core-compound-staging-hooks.md
+  s_e72e14f6bafd18::t_35a42ec413f653 1-66
+plugins/yellow-core/hooks/scripts/stop.sh
+  s_e72e14f6bafd18::t_798fc78fbf1cde 1-68,73,75-78,80-83
+  s_e72e14f6bafd18::t_ceb93848ecd4d6 69-72,74,79
+plugins/yellow-core/lib/compound-staging.sh
+  s_e72e14f6bafd18::t_00930438d1c459 1-221
+plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh
+  s_e72e14f6bafd18::t_6853497fa60eb3 1-81
+plugins/yellow-core/tests/compound-staging.bats
+  s_e72e14f6bafd18::t_d500a470e58c42 1-190
+plugins/yellow-core/tests/compound-stop-hook.bats
+  s_e72e14f6bafd18::t_50f962f3763521 1-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "beabe4fdf022f6932c9a0d5fd0d52eefb2d0ce33",
+  "prompts": {},
+  "sessions": {
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

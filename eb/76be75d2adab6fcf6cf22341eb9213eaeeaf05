@@ -1,0 +1,19 @@
+plugins/yellow-research/hooks/lib/context7-cache.sh
+  s_05960c317066bb::t_dbcb095b99cdcf 29,217,226,229-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "eb76be75d2adab6fcf6cf22341eb9213eaeeaf05",
+  "prompts": {},
+  "sessions": {
+    "s_05960c317066bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4fcb893-17e7-497d-9c12-67bdd3390e46",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

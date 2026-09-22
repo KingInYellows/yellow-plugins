@@ -1,0 +1,55 @@
+plugins/yellow-codex/CLAUDE.md
+  s_2db87cc7495315::t_7e8f2f3888f02c 113
+  s_2db87cc7495315::t_27d5098a2b8ae6 104
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_2db87cc7495315::t_cc0faa84bd2d5e 237,243
+  s_2db87cc7495315::t_b223856af4cb32 263,274
+  s_2db87cc7495315::t_4fcf2fdfb0e830 228-231,233-234,236,238-240
+  s_2db87cc7495315::t_ce29aeb7be83dc 244-245,247-261,264-272
+  s_2db87cc7495315::t_3ec7d5fc69831c 262
+  s_2db87cc7495315::t_98298d25215579 273
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2db87cc7495315::t_80788ef5e94634 449-450,453-454,465-466
+  s_2db87cc7495315::t_bdada38db7bd96 513-520,522
+  s_2db87cc7495315::t_dfef9e353eda7b 265-267
+  s_2db87cc7495315::t_1496fe00696a43 595-605,608
+  s_2db87cc7495315::t_54bfd8799aa6f6 367-383,389-391,399-407,414-418
+  s_2db87cc7495315::t_d8ef78cbbc1afb 562
+  s_2db87cc7495315::t_ccfd3abc6914c8 52-53
+  s_2db87cc7495315::t_c567015ddf8cec 54
+  s_63cb31fb8b9a68::t_b9a5cf4ddbafa8 424-428
+plugins/yellow-codex/README.md
+  s_e2317a5b7701f3::t_b10e55ce09fa4e 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d2216b708a93859300b7610a65458f3e4d85d987",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_63cb31fb8b9a68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-B-94914e4ed61ccb10",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e2317a5b7701f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-A-48fc4de63650f472",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+docs/solutions/workflow/background-agent-repo-writes-during-batch.md
+  s_43cc4f730492cc::t_3390b19fe2666b 1-57,63-106
+  s_43cc4f730492cc::t_f66ceef404ac94 58-62
+docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md
+  s_43cc4f730492cc::t_850414d12a049a 191-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "064c8686aab5fd8b2c239e7ee696b4796724d41c",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

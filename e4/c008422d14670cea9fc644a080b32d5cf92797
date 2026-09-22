@@ -1,0 +1,43 @@
+plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh
+  s_642adca30f38f6::t_b1206d49c79388 301-302,305-306
+  s_642adca30f38f6::t_d9cd4d407d05d7 58-60
+  s_642adca30f38f6::t_53f4d912ce6dfc 290-291
+  s_642adca30f38f6::t_57a9bcf40314bd 321-323,326-327
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_642adca30f38f6::t_16e4cf17530dde 105
+  s_642adca30f38f6::t_4f9f1c268dd169 106-109
+  s_642adca30f38f6::t_9f4088528daedc 85,88-90,93-99,102-104,110-115
+  s_642adca30f38f6::t_e31739ff7e0ef3 40
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_642adca30f38f6::t_64f8920c9d0d69 66-68
+  s_642adca30f38f6::t_768d3a6ac09c3e 56-59
+plugins/yellow-ci/commands/ci/setup-self-hosted.md
+  s_642adca30f38f6::t_0ab2d54ca73822 279-282
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_642adca30f38f6::t_2909475b53ed12 55-58,65-67
+docs/CONCEPTS.md
+  s_642adca30f38f6::t_fa541c36c34ee4 21-31
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_642adca30f38f6::t_2909475b53ed12 39,84,87-89,92-98,101-104,109-114
+  s_642adca30f38f6::t_faccee50a79a9e 105-108
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_642adca30f38f6::t_408384565e4be9 28-29
+plugins/yellow-ci/hooks/scripts/lib/run-hook.js
+  s_642adca30f38f6::t_c48bde8847a7f9 36-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e4c008422d14670cea9fc644a080b32d5cf92797",
+  "prompts": {},
+  "sessions": {
+    "s_642adca30f38f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5f725868-2803-4bdd-907d-96d6bb809354",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

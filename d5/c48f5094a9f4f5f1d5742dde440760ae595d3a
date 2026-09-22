@@ -1,0 +1,24 @@
+plugins/yellow-core/skills/ideation/SKILL.md
+  s_c1e3326aa9a6ae::t_1cb5a4f9cd06e7 3,58,64,245,316
+.github/workflows/validate-schemas-fork.yml
+  s_c1e3326aa9a6ae::t_baa7b7c716f841 25-39
+.github/workflows/validate-schemas.yml
+  s_c1e3326aa9a6ae::t_00a05c53435435 21-37
+  s_c1e3326aa9a6ae::t_a56fa8ddcc5aa8 58-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d5c48f5094a9f4f5f1d5742dde440760ae595d3a",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

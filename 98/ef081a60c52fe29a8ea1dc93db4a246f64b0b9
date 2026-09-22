@@ -1,0 +1,38 @@
+tests/integration/github-stack-runtime.test.ts
+  s_fd5d688b6eb948::t_b371faa6ac8da2 433-452
+plugins/github-workflow/tests/hooks.bats
+  s_fd5d688b6eb948::t_1bbde80ca0eb87 42-71
+plugins/github-workflow/commands/github-stack/merge.md
+  s_fd5d688b6eb948::t_a8ad67b8f641ba 4
+plugins/yellow-core/lib/stack-tooling-probe.js
+  s_fd5d688b6eb948::t_b8cb8a150e62ef 78-83,86-87
+  s_fd5d688b6eb948::t_b4ab9b8cdb4541 107-116,179-186
+plugins/github-workflow/lib/github-stack-runtime.js
+  s_fd5d688b6eb948::t_c91950fdba1841 338-344,347,350
+  s_fd5d688b6eb948::t_a26366f072c61a 362-365,384-386
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_fd5d688b6eb948::t_8102dd979ad57f 20-43
+plugins/github-workflow/skills/github-stack-merge/SKILL.md
+  s_fd5d688b6eb948::t_47498ddffbeebf 27-34,39-40,42-44
+  s_fd5d688b6eb948::t_a8ad67b8f641ba 119-122
+  s_fd5d688b6eb948::t_73d1fc7740e7cb 61-66
+tests/integration/stack-tooling-probe.test.ts
+  s_fd5d688b6eb948::t_729329307318c7 11,85-102
+  s_fd5d688b6eb948::t_d6b89fcad74477 103-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "98ef081a60c52fe29a8ea1dc93db4a246f64b0b9",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

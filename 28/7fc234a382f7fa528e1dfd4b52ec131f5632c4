@@ -1,0 +1,60 @@
+plugins/gt-workflow/skills/gt-sync/SKILL.md
+  s_5b2f0f27df2bce::t_59b45e8e6ead2a 61
+  s_5b2f0f27df2bce::t_9b1a006a40918f 23-25
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_5b2f0f27df2bce::t_df3171a802a728 110-112
+plugins/gt-workflow/codex/skills/smart-submit/SKILL.md
+  s_5b2f0f27df2bce::t_90f296d26109c0 149-155,158
+plugins/gt-workflow/tests/hook-parity.bats
+  s_5b2f0f27df2bce::t_fe1497b17fe55b 165-171
+  s_5b2f0f27df2bce::t_d26dd8ad339a68 81
+  s_5b2f0f27df2bce::t_d868017b90ef12 94,98,102,106,110,129,135,139,143,147,151,155,159,163
+  s_5b2f0f27df2bce::t_8580b3e130b2a2 164
+plugins/gt-workflow/tests/gt-cleanup.bats
+  s_5b2f0f27df2bce::t_3f4615750dc8ca 160-161
+scripts/validate-agent-authoring.js
+  s_5b2f0f27df2bce::t_578b9c8371fdf7 1032-1035,1037
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_5b2f0f27df2bce::t_456fe4409549f4 85,217,234-240
+plugins/gt-workflow/tests/mocks/git
+  s_5b2f0f27df2bce::t_f837137452e319 37
+plugins/gt-workflow/codex/skills/gt-sync/SKILL.md
+  s_5b2f0f27df2bce::t_255ec1f2f73ff4 22-24,60
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_5b2f0f27df2bce::t_0e283c90e9a0d4 86
+  s_5b2f0f27df2bce::t_33f430d6548efd 235-241
+  s_5b2f0f27df2bce::t_dd4f8e0d32edd1 218
+plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js
+  s_5b2f0f27df2bce::t_bd955fb754db84 59-65
+  s_5b2f0f27df2bce::t_6c81d1da52fc2e 44-49
+  s_5b2f0f27df2bce::t_86c34db8c42da8 25-30,33
+  s_5b2f0f27df2bce::t_fbefb065a317db 40
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_5b2f0f27df2bce::t_8245777cb64b86 150-156,159
+plugins/gt-workflow/hooks/scripts/lib/run-hook.js
+  s_5b2f0f27df2bce::t_14f7fc2c73e837 29-33,37-44
+plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.stdin
+  s_5b2f0f27df2bce::t_aeb84d3da3a2ba 1
+plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt
+  s_5b2f0f27df2bce::t_59f88ded124fc7 1-4
+plugins/gt-workflow/tests/mocks/gt
+  s_5b2f0f27df2bce::t_038516ef225f0a 66
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_5b2f0f27df2bce::t_c589f4e9a0e32b 109-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "287fc234a382f7fa528e1dfd4b52ec131f5632c4",
+  "prompts": {},
+  "sessions": {
+    "s_5b2f0f27df2bce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ff24ef3b-32f8-4a70-8362-caddc660ad44",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

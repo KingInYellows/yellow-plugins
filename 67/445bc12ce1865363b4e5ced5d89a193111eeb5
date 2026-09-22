@@ -1,0 +1,30 @@
+plugins/yellow-core/agents/research/best-practices-researcher.md
+  3a0683ba92e20415 65-73,91-97
+.changeset/best-practices-researcher-library-context.md
+  3a0683ba92e20415 18-21
+docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md
+  3a0683ba92e20415 53
+plugins/yellow-research/skills/library-context/SKILL.md
+  3a0683ba92e20415 3,57-64,140-151
+docs/brainstorms/2026-05-17-library-context-skill-brainstorm.md
+  3a0683ba92e20415 136-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "67445bc12ce1865363b4e5ced5d89a193111eeb5",
+  "prompts": {
+    "3a0683ba92e20415": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "058aaa37-cd00-4e37-92f8-fc57ca8caf02",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>",
+      "total_additions": 46,
+      "total_deletions": 29,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

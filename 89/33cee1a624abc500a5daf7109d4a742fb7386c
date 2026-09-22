@@ -1,0 +1,24 @@
+scripts/validate-agent-authoring.js
+  s_20a9c2bc8059f0::t_034129648fb961 129-151
+  s_20a9c2bc8059f0::t_d1426c7e969a57 736-811
+  s_20a9c2bc8059f0::t_a9b18553925118 871
+  s_20a9c2bc8059f0::t_3190127f9a26d6 842-849
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_20a9c2bc8059f0::t_c773bd09469e3e 1-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "8933cee1a624abc500a5daf7109d4a742fb7386c",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

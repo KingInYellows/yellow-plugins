@@ -1,0 +1,34 @@
+docs/codex-distribution.md
+  s_17bd29452ea753::t_945d85906a79b1 1-109
+docs/research/2026-07-16-codex-plugin-contract-spike.md
+  s_17bd29452ea753::t_77f2fb8b15ccc7 3-5
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_17bd29452ea753::t_47ee55b4a6d0d4 21-23
+docs/solutions/integration-issues/codex-skill-exposure-validator-blind-spots.md
+  s_17bd29452ea753::t_0d409c4e5e4f16 23-25
+docs/solutions/integration-issues/codex-config-retention-exposure-lint-conflict.md
+  s_17bd29452ea753::t_91b61a1c72831b 21-23
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_a3470241a2a6d8 424
+  s_17bd29452ea753::t_4a77f159466ccd 430
+docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md
+  s_17bd29452ea753::t_ee8511487cd8fd 29-31
+docs/solutions/integration-issues/cross-host-hook-envelope-node-runtime.md
+  s_17bd29452ea753::t_6ae2aeb3720ca3 1-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b814bf9fd5088c2a5e65571f743b3e2a278e5e28",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

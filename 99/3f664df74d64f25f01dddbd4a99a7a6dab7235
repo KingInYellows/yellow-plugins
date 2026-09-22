@@ -1,0 +1,21 @@
+tests/integration/generate-manifests-codex.test.ts
+  s_3d62316ec95b77::t_d1fd2ba15dee85 984-1024
+scripts/validate-codex.js
+  s_3d62316ec95b77::t_cb6d36543faca6 426-433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "993f664df74d64f25f01dddbd4a99a7a6dab7235",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

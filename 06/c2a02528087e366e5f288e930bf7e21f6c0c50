@@ -1,0 +1,27 @@
+plugins/yellow-debt/commands/debt/fix.md
+  s_e0beaba782ec4e::t_45f96b8f95b111 116-122
+plugins/yellow-debt/.claude-plugin/plugin.json
+  s_e0beaba782ec4e::t_9154b32d385725 43
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e0beaba782ec4e::t_d6f8f25c0f7a4a 70-72,75-78,80,96-102,107-109
+  s_e0beaba782ec4e::t_1c20893c862e5b 84-88,104
+plugins/yellow-debt/commands/debt/sync.md
+  s_e0beaba782ec4e::t_23e0fd3ddef916 192-193
+  s_e0beaba782ec4e::t_4c910ef80e0115 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "06c2a02528087e366e5f288e930bf7e21f6c0c50",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

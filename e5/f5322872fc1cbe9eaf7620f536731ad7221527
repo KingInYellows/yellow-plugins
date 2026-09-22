@@ -1,0 +1,79 @@
+plugins/yellow-core/agents/workflow/staging-promoter.md
+  s_e72e14f6bafd18::t_45479ce0617cf0 1-4,6-32,36-47,54-57,62-63,67-87,89-102,136-140,155-188,209,212-223,226,261-263,265-266,272-278,280-297,299-316,322-368,148,152,249,253,259,53,103,109,111,116,122,124,133,135,228,235,246-247,257,208
+  s_e7078f78719364::t_a028b93cea6f9e 141-142,143-147,149-151,153-154,117-118
+  s_6d2ef1322cfec1::t_fdaac5a1522f4c 189,241,204-205,210-211
+  s_f188cf7e3ae96a::t_c5e750d26f195b 224-225,237,110,123,134,227,229,238-240,244-245,248,255-256,258,203,207
+  s_6d2ef1322cfec1::t_9c37aff32b4252 298
+  s_c1ce70ba5b1295::t_669b2338465d83 5
+  s_c1ce70ba5b1295::t_a35bcb3ce7c208 88
+  s_e7078f78719364::t_4da52c40cab422 64-66
+  s_e7078f78719364::t_88f4ca14742f2f 250-251,254,260,264,267-268,270-271
+  s_e7078f78719364::t_fdd6b1ffd29d61 317-321
+  s_f188cf7e3ae96a::t_edcbefe156d605 33-35
+  s_f188cf7e3ae96a::t_50831d4466963f 48-52,58-61
+  s_f188cf7e3ae96a::t_d4ab7057fe5ce1 104-108,112-115,119-121,125-132
+  s_6d2ef1322cfec1::t_046101aa8ffbf8 191,199
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e72e14f6bafd18::t_7bb84ce0c0b7e1 1-4,6-13,15-84,86-106,108,110-116,122-129,133-147,152-155,161,166-175,177-179,182-200,202,207-209,215-244,246-323,325-364,213
+  s_6d2ef1322cfec1::t_4b6d0a04232020 180-181
+  s_c1ce70ba5b1295::t_7330bb14c38a8a 5
+  s_e7078f78719364::t_26e08e75098432 14
+  s_e7078f78719364::t_387985e90990e6 85
+  s_e7078f78719364::t_4dc98305eaf61d 109
+  s_e7078f78719364::t_cef06630bfb821 117-121
+  s_e7078f78719364::t_afb08f3518aa70 130,132
+  s_e7078f78719364::t_51c80c57930e78 131
+  s_e7078f78719364::t_fc763a633e41a3 156-160
+  s_e7078f78719364::t_fc95a03ba45ae0 245
+  s_e7078f78719364::t_8906aa998390fa 324
+  s_6d2ef1322cfec1::t_6f0b2731bdd5f9 162-165
+  s_6d2ef1322cfec1::t_8adcf93304882b 201,203-206,210-212,214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "e5f5322872fc1cbe9eaf7620f536731ad7221527",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e7078f78719364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a4284f8-c99a-4dff-98b8-1db0f132a811",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    },
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

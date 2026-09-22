@@ -1,0 +1,42 @@
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_3d62316ec95b77::t_f4aa51cd2249d7 69-75
+  s_3d62316ec95b77::t_051a0366e1f941 157
+  s_3d62316ec95b77::t_d9a1a2014a3ee5 141
+plugins/yellow-core/commands/workflows/decompose.md
+  s_3d62316ec95b77::t_f634ccd4b008be 134-135
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_3d62316ec95b77::t_cac7886fee36c2 246
+  s_3d62316ec95b77::t_6846575bff40c9 263
+  s_3d62316ec95b77::t_2e10ffaba49123 208
+plugins/yellow-semgrep/agents/semgrep/scan-verifier.md
+  s_3d62316ec95b77::t_a374d25c568e7f 3
+  s_3d62316ec95b77::t_0647640f02bab2 76
+  s_3d62316ec95b77::t_e66294ffe8c9fa 29-30
+  s_3d62316ec95b77::t_e675919dcc0b25 37-38
+  s_3d62316ec95b77::t_0cfa4dd8030c31 19-20
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_3d62316ec95b77::t_339ec08a80ae2f 87-94
+  s_3d62316ec95b77::t_755f4ab902425b 105-107
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_3d62316ec95b77::t_af8fcdb1fb711c 123
+plugins/yellow-debt/commands/debt/triage.md
+  s_3d62316ec95b77::t_d984b39b1cafa7 73
+plugins/yellow-linear/commands/linear/delegate.md
+  s_3d62316ec95b77::t_0ccfe3b41432e9 268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "dae6470f31474fd1239337579a4e0e175e457240",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

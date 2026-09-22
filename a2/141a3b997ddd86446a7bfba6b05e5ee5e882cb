@@ -1,0 +1,24 @@
+plugins/yellow-ci/tests/resolve-runner-targets.bats
+  s_17bd29452ea753::t_76ff6bdeead099 17-18,24-25,28-29
+plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh
+  s_17bd29452ea753::t_cf56da230db975 267-269
+  s_17bd29452ea753::t_81319f11e359fd 46-50,53-60
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_e94d32673d579f 363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a2141a3b997ddd86446a7bfba6b05e5ee5e882cb",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

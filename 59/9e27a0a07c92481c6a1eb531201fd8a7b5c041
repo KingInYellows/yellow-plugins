@@ -1,0 +1,22 @@
+.changeset/plan-phase5-spec-route.md
+  s_b7de9b75b99767::t_e98888fbd12af3 1-13
+plugins/yellow-core/commands/workflows/plan.md
+  s_b7de9b75b99767::t_f3b173e8744e2f 401-411
+  s_b7de9b75b99767::t_d858f1e0a83c3b 433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "599e27a0a07c92481c6a1eb531201fd8a7b5c041",
+  "prompts": {},
+  "sessions": {
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

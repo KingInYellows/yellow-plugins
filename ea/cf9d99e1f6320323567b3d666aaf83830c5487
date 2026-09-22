@@ -1,0 +1,55 @@
+scripts/lib/generate/emit-claude.js
+  s_7d4f7a1773f734::t_c581c68e68de24 28-35
+  s_7d4f7a1773f734::t_0976f75a0911ef 76
+  s_7d4f7a1773f734::t_b286ca50347083 101
+  s_7d4f7a1773f734::t_9f5a959e2bb340 27
+scripts/catalog-version.js
+  s_7d4f7a1773f734::t_8e9cbcf154e9c9 30
+  s_7d4f7a1773f734::t_48d80233e79658 70
+tests/integration/generate-manifests.test.ts
+  s_7d4f7a1773f734::t_fcd022ba969715 134-269
+scripts/lib/generate/write.js
+  s_7d4f7a1773f734::t_a63cc4a0d0dadb 17-20
+  s_7d4f7a1773f734::t_060ce82e759a8e 51
+  s_7d4f7a1773f734::t_a93f82ce648318 7-11,16,26
+  s_7d4f7a1773f734::t_ca83a5e8182a5e 27
+scripts/validate-catalog-track.js
+  s_7d4f7a1773f734::t_218fc0aebe3e7b 111-119
+  s_7d4f7a1773f734::t_e39b471076a5b6 142,144-155
+  s_7d4f7a1773f734::t_7aaed77cdfa03c 30-31
+scripts/generate-manifests.js
+  s_7d4f7a1773f734::t_62bc93cb378d55 159
+  s_7d4f7a1773f734::t_8b768e840412c4 56-77
+  s_7d4f7a1773f734::t_3cfd04a310ab0c 224-228
+  s_7d4f7a1773f734::t_462401490140c7 29
+scripts/sync-manifests.js
+  s_7d4f7a1773f734::t_4de9cb9a1e243c 182
+  s_7d4f7a1773f734::t_1090ef38da3c7b 34
+  s_7d4f7a1773f734::t_0247c280937cab 36-40
+  s_7d4f7a1773f734::t_d527da88e529c7 73
+docs/maintenance/catalog-release-gap.md
+  s_7d4f7a1773f734::t_00c08491a3c0ba 3
+  s_7d4f7a1773f734::t_a15582a7d83eee 22-29
+scripts/lib/generate/catalog-reader.js
+  s_7d4f7a1773f734::t_9feb27b92d75ae 25,27-30
+  s_7d4f7a1773f734::t_1a820fca2c515f 67-79
+  s_7d4f7a1773f734::t_f2707a12502af5 171
+tests/integration/sync-manifests.test.ts
+  s_7d4f7a1773f734::t_6edc51c26718d3 1-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "eacf9d99e1f6320323567b3d666aaf83830c5487",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

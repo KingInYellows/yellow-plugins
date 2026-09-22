@@ -1,0 +1,71 @@
+plugins/yellow-ci/codex/skills/ci-status/SKILL.md
+  s_fc81472ff4a623::t_a678afef7c9046 39-43,75,80
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_fc81472ff4a623::t_b2c73e9f6c37e8 85-86,88
+  s_fc81472ff4a623::t_e716003f070ae0 235
+  s_fc81472ff4a623::t_47c0b3b8f3288c 283
+  s_fc81472ff4a623::t_5e20291d700984 166-178
+  s_fc81472ff4a623::t_00a50b585cd5b8 42-47
+  s_fc81472ff4a623::t_8d0d75daed5511 209
+  s_fc81472ff4a623::t_78ea0570c78929 188
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_fc81472ff4a623::t_f7482cf12df955 52-57
+  s_fc81472ff4a623::t_4e040fd56f80b9 97-100
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_a678afef7c9046 38-43,140-144,147-155
+plugins/yellow-ci/tests/fixtures/hooks/malformed-gh-json.golden.txt
+  s_fc81472ff4a623::t_4ec7ee4c818381 4
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_fc81472ff4a623::t_a678afef7c9046 51-56,96-99
+plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.golden.txt
+  s_fc81472ff4a623::t_6b43d27fee1580 4
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_fc81472ff4a623::t_cc2e88a7db0194 57-63
+  s_fc81472ff4a623::t_bbaf521276918c 172-174
+  s_fc81472ff4a623::t_f0d97f03f3fff1 94-101,103,108-122
+  s_fc81472ff4a623::t_12c019ba9a2998 297-298
+  s_fc81472ff4a623::t_114aaf8bf032b0 148-157
+plugins/yellow-ci/tests/fixtures/hooks/rate-limited-gh.golden.txt
+  s_fc81472ff4a623::t_4ec7ee4c818381 4
+plugins/yellow-ci/skills/ci-status/SKILL.md
+  s_fc81472ff4a623::t_a727dfddb25a6a 40-44
+  s_fc81472ff4a623::t_94238da5e2fdd9 76,81
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_9659ff886ae47c 39
+  s_fc81472ff4a623::t_f0bd2fd4d35da8 42
+  s_fc81472ff4a623::t_56d3899b4ec182 43-44
+  s_fc81472ff4a623::t_9ca21144c33c51 40-41
+  s_fc81472ff4a623::t_1f9d2e77fe835d 141-145,148-156
+plugins/yellow-ci/tests/fixtures/hooks/gh-missing.golden.txt
+  s_fc81472ff4a623::t_4ec7ee4c818381 4
+plugins/yellow-ci/tests/fixtures/hooks/gh-unauthed.golden.txt
+  s_fc81472ff4a623::t_4ec7ee4c818381 4
+plugins/yellow-ci/tests/hook-parity.bats
+  s_fc81472ff4a623::t_e10f4a7640cf37 19-26
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_fc81472ff4a623::t_a678afef7c9046 41-46,84-85,87,165-177,187,208,234,282
+plugins/yellow-ci/tests/fixtures/hooks/routing-summary-present.golden.txt
+  s_fc81472ff4a623::t_4ec7ee4c818381 4
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_fc81472ff4a623::t_9b592b95f5c094 111-116,131-152,155-160
+  s_fc81472ff4a623::t_ab37a644e3db19 119-130
+  s_fc81472ff4a623::t_6d331032e0cb8d 80-86,94-105
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_fc81472ff4a623::t_a678afef7c9046 79-85,93-104,110-115,118-151,154-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c4b1e27450ed0c85526126b29f56788258ec84ab",
+  "prompts": {},
+  "sessions": {
+    "s_fc81472ff4a623": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eae8d790-ad2e-4367-a38b-24a76ce18c74",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

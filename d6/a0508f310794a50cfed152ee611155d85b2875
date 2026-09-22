@@ -1,0 +1,47 @@
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_ecdc1fcec127ee::t_f8a8b106ad698a 341-343
+  s_ecdc1fcec127ee::t_394ecd24348f36 200-211,213,215-217
+  s_ecdc1fcec127ee::t_c55f6c3d35df95 30-32,34-37,44-46,49-53,55-73
+plugins/yellow-codex/README.md
+  s_ecdc1fcec127ee::t_7c3959ea92bb84 62-63
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_ecdc1fcec127ee::t_e1be50ee49bd52 197-207
+  s_ecdc1fcec127ee::t_6358ec3c8d016b 212-216,218-219,221,223
+  s_ecdc1fcec127ee::t_716d9fff33e9d9 25-26
+  s_ecdc1fcec127ee::t_10e1f3c390ba8c 37-40
+  s_ecdc1fcec127ee::t_889c19f3eb4861 328
+  s_ecdc1fcec127ee::t_cbe4de654062f4 555-560,569
+  s_ecdc1fcec127ee::t_7c52a36619a048 177-196,208-211,217,220,222,224-225,227-242,249,251
+  s_ecdc1fcec127ee::t_8d7ba1535de18e 561-565
+  s_ecdc1fcec127ee::t_58710c32403541 304
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_ecdc1fcec127ee::t_12ad8c8733ed73 142-181
+  s_ecdc1fcec127ee::t_3849cec6729687 182-184
+plugins/yellow-codex/schemas/review-findings.json
+  s_ecdc1fcec127ee::t_acb3d1e3bc24dd 4,6,10,13,17,25,28-29,32-33,36-38,42,45-47,49-50,55,58-65,78-79,82-87
+plugins/yellow-codex/CLAUDE.md
+  s_ecdc1fcec127ee::t_9fa88a699a0034 34-36
+  s_ecdc1fcec127ee::t_5700edc185f07a 42-44
+  s_ecdc1fcec127ee::t_cd4fa0d2f131c4 51-53
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_ecdc1fcec127ee::t_83ac28b73cf641 343-344
+.changeset/codex-reviewer-exec-output-schema.md
+  s_ecdc1fcec127ee::t_f2e53d07938671 1-32,35-37
+  s_ecdc1fcec127ee::t_833863c11b6a64 33-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "d6a0508f310794a50cfed152ee611155d85b2875",
+  "prompts": {},
+  "sessions": {
+    "s_ecdc1fcec127ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cb28b25-265b-4193-bb99-9e2500680d71",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

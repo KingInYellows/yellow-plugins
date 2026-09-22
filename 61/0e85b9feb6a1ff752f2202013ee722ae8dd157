@@ -1,0 +1,28 @@
+plugins/yellow-core/codex/skills/plan-status/SKILL.md
+  s_f72a80507cb29d::t_17eaba47941cab 1-89
+.agents/plugins/marketplace.json
+  s_f72a80507cb29d::t_17eaba47941cab 6-20
+plugins/yellow-core/.codex-plugin/plugin.json
+  s_f72a80507cb29d::t_17eaba47941cab 1-8,10
+  s_f72a80507cb29d::t_4116ca9aa24926 9
+plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md
+  s_f72a80507cb29d::t_17eaba47941cab 1-118
+plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md
+  s_f72a80507cb29d::t_17eaba47941cab 1-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "610e85b9feb6a1ff752f2202013ee722ae8dd157",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

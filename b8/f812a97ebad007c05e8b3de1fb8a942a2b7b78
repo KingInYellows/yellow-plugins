@@ -1,0 +1,30 @@
+plugins/yellow-codex/CLAUDE.md
+  s_9faf0dc507d8cf::t_07f064beb215a2 132-143
+plugins/yellow-codex/commands/codex/review.md
+  s_9faf0dc507d8cf::t_8c5cac9a5e013d 189-191,210,252-255,257,259-260,265,302-305,307,336
+plugins/yellow-codex/README.md
+  s_9faf0dc507d8cf::t_ec5ac2b5ef02ce 26-43
+.changeset/codex-model-selection-redact-order.md
+  s_9faf0dc507d8cf::t_07f064beb215a2 1-14
+CLAUDE.md
+  s_9faf0dc507d8cf::t_07f064beb215a2 48-51
+plugins/yellow-codex/tests/redaction.bats
+  s_9faf0dc507d8cf::t_f73215b15b4e1c 69-70
+  s_9faf0dc507d8cf::t_ec5ac2b5ef02ce 1-68,71-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b8f812a97ebad007c05e8b3de1fb8a942a2b7b78",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

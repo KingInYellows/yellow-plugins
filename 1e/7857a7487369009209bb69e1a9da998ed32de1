@@ -1,0 +1,21 @@
+plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1e7857a7487369009209bb69e1a9da998ed32de1",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

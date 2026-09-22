@@ -1,0 +1,22 @@
+plugins/yellow-review/commands/review/review-all.md
+  s_ecffdbc39c3a6a::t_d99c76ed6cc32b 173-175,179-180
+plugins/yellow-review/commands/review/review-pr.md
+  s_ecffdbc39c3a6a::t_3bfba3a7a1123f 569-571
+  s_ecffdbc39c3a6a::t_209fd6a9d805dd 533-537
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "39ff6b95e8958193c5513e066b294c1f7568d878",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

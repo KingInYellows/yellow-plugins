@@ -1,0 +1,33 @@
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_ecffdbc39c3a6a::t_07a95d79621579 92-96
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_ecffdbc39c3a6a::t_c1ac5dce49276f 72-73
+plugins/yellow-devin/commands/devin/wiki.md
+  s_ecffdbc39c3a6a::t_94598756400a60 38
+  s_ecffdbc39c3a6a::t_1d711f477f958b 64,68,70-74
+docs/research/best-practices/gpt-claude-latest-model-prompting-guidance.md
+  s_ecffdbc39c3a6a::t_ff9809b5b03e97 107-111
+  s_ecffdbc39c3a6a::t_2066eb8738fdf6 204-205
+plugins/yellow-semgrep/agents/semgrep/scan-verifier.md
+  s_ecffdbc39c3a6a::t_1752c21276eaec 61-66
+plugins/yellow-semgrep/commands/semgrep/scan.md
+  s_ecffdbc39c3a6a::t_886a39901619fd 79-80
+plugins/yellow-docs/agents/analysis/doc-auditor.md
+  s_ecffdbc39c3a6a::t_23e9fecf330a73 147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "01c2e8fa68b9f3a9395374d529c8cdd36902d1e7",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

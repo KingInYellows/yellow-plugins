@@ -1,0 +1,22 @@
+plugins/yellow-ci/hooks/scripts/entrypoint-codex.js
+  s_6476068b869a82::t_7a56ad8a910354 8
+  s_6476068b869a82::t_913b62d37ceba9 9-11
+scripts/validate-plugin.js
+  s_6476068b869a82::t_7a56ad8a910354 27-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "904634bd1188f7c542c9458aed9b695e5b2b968c",
+  "prompts": {},
+  "sessions": {
+    "s_6476068b869a82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb99cbb0-34fd-4434-9fc8-3e13aa1ba3e7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

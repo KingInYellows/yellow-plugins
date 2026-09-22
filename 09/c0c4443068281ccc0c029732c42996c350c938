@@ -1,0 +1,23 @@
+plugins/github-workflow/skills/github-stack-setup/SKILL.md
+  s_fd5d688b6eb948::t_9cc99fad54bbcb 75-78,80-81,87-89,99-100
+  s_fd5d688b6eb948::t_15603572b71f3d 33-35,40-43,46,51-54,56-57,60-62,64-66,68-71
+plugins/github-workflow/skills/github-stack-status/SKILL.md
+  s_fd5d688b6eb948::t_649631f8717d97 33-36,40-43,45-46
+  s_fd5d688b6eb948::t_cb68be47b7548e 69,77,79-84,86-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "09c0c4443068281ccc0c029732c42996c350c938",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

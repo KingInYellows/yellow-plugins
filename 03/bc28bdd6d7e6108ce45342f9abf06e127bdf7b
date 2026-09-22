@@ -1,0 +1,91 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_fd5d688b6eb948::t_24ebcc5247ecaa 471-483,510-532
+  s_fd5d688b6eb948::t_4481b52b7d8668 538,598-601,609-622
+  s_fd5d688b6eb948::t_9cf34773a37290 533-537,539,623
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_fd5d688b6eb948::t_43ace169af8d21 162,177,180
+  s_fd5d688b6eb948::t_0b97b6b114991a 144-148,161,163-176,178-179,181-184
+  s_fd5d688b6eb948::t_5467d2bab3d260 185
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_fd5d688b6eb948::t_fc7e01b1696636 78-81
+  s_fd5d688b6eb948::t_e27561d54bcd80 350-363,372-382
+  s_fd5d688b6eb948::t_a739224c3a1731 386-391
+  s_fd5d688b6eb948::t_e9f77544632fb2 383
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_fd5d688b6eb948::t_1a16fed8092037 276-282
+  s_fd5d688b6eb948::t_4126f4a8c866aa 301-308,329-342
+  s_fd5d688b6eb948::t_f83ad289fad6e6 343
+plugins/yellow-linear/commands/linear/sync.md
+  s_fd5d688b6eb948::t_0d852bc33e3fa7 88-89
+scripts/provider-neutral-commands-allowlist.json
+  s_fd5d688b6eb948::t_da5aa32e9517c9 4-17
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_fd5d688b6eb948::t_bfbd772f2e2e1c 435-436,455-464
+  s_fd5d688b6eb948::t_c7d636cd600b2c 615-616,624-634
+  s_fd5d688b6eb948::t_fee9df4ed3deb9 264-265,274-284
+  s_fd5d688b6eb948::t_20b429bf2720e0 76-90
+  s_fd5d688b6eb948::t_c4a087b57bade2 285,465,635
+plugins/yellow-review/commands/review/sweep-all.md
+  s_fd5d688b6eb948::t_b2f263676daf7d 180
+  s_fd5d688b6eb948::t_b711ad098850c9 238-239
+plugins/yellow-review/commands/review/review-pr.md
+  s_fd5d688b6eb948::t_0bb27e61c14846 803-804,806-826
+  s_fd5d688b6eb948::t_54653044dfd452 827
+plugins/yellow-debt/commands/debt/fix.md
+  s_fd5d688b6eb948::t_846c3e0fcbfca6 153-154
+  s_fd5d688b6eb948::t_4cdf79a0287c43 171-174
+plugins/yellow-linear/skills/linear-workflows/SKILL.md
+  s_fd5d688b6eb948::t_a7ea68c8b5974e 215-217
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_fd5d688b6eb948::t_40db8fcdee4372 206,212-249
+plugins/yellow-linear/commands/linear/work.md
+  s_fd5d688b6eb948::t_ed1916a69dfbf8 198-199
+plugins/yellow-review/skills/stack-traversal/SKILL.md
+  s_fd5d688b6eb948::t_afcf56101cbac4 96-104,107-109,119-128,132-134,146-159
+  s_fd5d688b6eb948::t_8f03853479e3af 160
+plugins/yellow-review/commands/review/review-all.md
+  s_fd5d688b6eb948::t_0bbf5eca5cbb52 250-252,254-275,283-295,297-299,301-304
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_fd5d688b6eb948::t_98838d7510ad42 244-247
+  s_fd5d688b6eb948::t_8132c4cc957fda 292-299,307-312
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_fd5d688b6eb948::t_5bbcb5f70df86c 223-224
+  s_fd5d688b6eb948::t_34d14148237297 125-138,187-203
+  s_fd5d688b6eb948::t_6f87d3f6e3ac61 244-248,252-255
+  s_fd5d688b6eb948::t_934945b2b2d882 204-206
+  s_6222bd2808418b::t_cfd974d95adae1 207-210
+plugins/yellow-core/commands/flow/review.md
+  s_fd5d688b6eb948::t_7abc430f9e6059 413-426,448-471
+  s_fd5d688b6eb948::t_e1441f33262d4d 472
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_fd5d688b6eb948::t_48915bc1dae967 123-124
+  s_fd5d688b6eb948::t_96a620cb6f037a 20,23,30
+  s_fd5d688b6eb948::t_1d80b1d48b9f86 3
+  s_fd5d688b6eb948::t_b9c799219a2a0d 81
+plugins/yellow-review/commands/review/sweep.md
+  s_fd5d688b6eb948::t_274b8d4dba3089 98-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "03bc28bdd6d7e6108ce45342f9abf06e127bdf7b",
+  "prompts": {},
+  "sessions": {
+    "s_6222bd2808418b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aprovider-neutral-sweep-95eb9d3e9537927f",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

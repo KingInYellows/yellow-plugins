@@ -1,0 +1,42 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_95e18d4ed456ab::t_20ce1898375463 141-143
+  s_95e18d4ed456ab::t_b726b5037e9697 223-224
+  s_95e18d4ed456ab::t_65ba468d04b881 138-140
+  s_95e18d4ed456ab::t_4e30b1f03fcb80 51-54
+  s_95e18d4ed456ab::t_56cba3f4c71eed 194-195
+  s_95e18d4ed456ab::t_106bbea4e25cf0 285-292
+  s_95e18d4ed456ab::t_79620d02e9c5c8 346-347
+  s_95e18d4ed456ab::t_17298ca4b7391a 124-125
+  s_95e18d4ed456ab::t_3b07f133ab59a7 203-204
+plugins/yellow-codex/commands/codex/rescue.md
+  s_95e18d4ed456ab::t_92fb0a353c2888 178-179
+  s_95e18d4ed456ab::t_24ad1bf1154868 222-226
+  s_95e18d4ed456ab::t_dabfae3d5841b2 241-242
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_95e18d4ed456ab::t_7b1986f4c2961e 365-372
+  s_95e18d4ed456ab::t_e68a0f8287b257 137-142
+  s_95e18d4ed456ab::t_bc6ec5ac96606c 260-261
+  s_95e18d4ed456ab::t_56b939f19779f4 252-253
+  s_95e18d4ed456ab::t_8629b7c1492285 123-124
+  s_95e18d4ed456ab::t_728669891175c3 279-280
+  s_95e18d4ed456ab::t_882e63adf32e26 431-432
+  s_95e18d4ed456ab::t_d3859a938e67bb 319-320
+  s_95e18d4ed456ab::t_7d1de549fa8248 52-55
+  s_95e18d4ed456ab::t_a4d9e70d55c233 202-203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "08f335e104cfdbd1817464192bc240a63b2536f9",
+  "prompts": {},
+  "sessions": {
+    "s_95e18d4ed456ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46fd3ff8-0589-4324-aeeb-a38b796fd7bc",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+plugins/yellow-composio/commands/composio/setup.md
+  s_6ac7f33c0e6e54::t_2dbd2ec21733cb 56-68
+scripts/check-upstream-pins.js
+  s_6ac7f33c0e6e54::t_4968c03f641525 5-9
+  s_6ac7f33c0e6e54::t_ec37d712d4bde2 233-258
+  s_6ac7f33c0e6e54::t_8d735c4f44976f 106-122
+package.json
+  s_6ac7f33c0e6e54::t_fd63a1de0ba27f 32
+tests/integration/smoke-plugin-install.test.ts
+  s_6ac7f33c0e6e54::t_d5c06627ea62fd 1-11,13-99
+  s_6ac7f33c0e6e54::t_475533e78cc6f2 12
+.changeset/runtime-install-smoke-hook-exec-and-composio-docs.md
+  s_6ac7f33c0e6e54::t_d64b50d3982eca 1-22
+tests/integration/validate-agent-authoring-w15b.test.ts
+  s_6ac7f33c0e6e54::t_7d37fc39b2ef7f 394-408
+  s_6ac7f33c0e6e54::t_5e316ed2942de3 62-79
+docs/runtime-install-smoke.md
+  s_6ac7f33c0e6e54::t_124a1919c673a4 1-120
+docs/maintenance/issue-reconciliation-2026-06-02.md
+  s_6ac7f33c0e6e54::t_008548f3623143 1-84
+scripts/smoke-plugin-install.sh
+  s_6ac7f33c0e6e54::t_6cfdb0c0ae1da2 1-77,98-108,112-219,221-264,266-340
+  s_6ac7f33c0e6e54::t_157933ef8caeda 220
+  s_6ac7f33c0e6e54::t_bcd842fa4d0d59 265
+  s_6ac7f33c0e6e54::t_b74915616e13ac 109-111
+  s_6ac7f33c0e6e54::t_261db223e01295 78-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cce5277c368734d9c9a32ce7ea4f9e0fc075d0da",
+  "prompts": {},
+  "sessions": {
+    "s_6ac7f33c0e6e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a2468d9-3d51-4c10-ad8d-460bbc7acc88",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

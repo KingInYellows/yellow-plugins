@@ -1,0 +1,25 @@
+docs/solutions/logic-errors/machine-generated-text-shell-gotchas.md
+  s_9edda907bb366b::t_a188bc51dafab4 202
+  s_9edda907bb366b::t_cdb508f176f83a 143
+  s_9edda907bb366b::t_43ce5112de6580 129-133
+docs/solutions/logic-errors/sentinel-mv-ordering-and-drain-classification.md
+  s_9edda907bb366b::t_a30d1d25e2f065 6-8
+  s_9edda907bb366b::t_7019e26986fae8 38
+  s_9edda907bb366b::t_27e2657a09d8d9 158-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "d3c628c33ff6db9d481579fcb759bc42f7330a4b",
+  "prompts": {},
+  "sessions": {
+    "s_9edda907bb366b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "301fb299-9d55-4c26-a7da-a0b63fc7ead6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

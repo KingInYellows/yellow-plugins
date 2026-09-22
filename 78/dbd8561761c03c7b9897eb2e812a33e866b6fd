@@ -1,0 +1,31 @@
+plugins/yellow-codex/commands/codex/rescue.md
+  s_6aa8fc918111f8::t_703ff9adc0ffc2 152-162
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_6aa8fc918111f8::t_1f6ed512965d12 161
+  s_6aa8fc918111f8::t_ca1eb1169262c8 142
+plugins/yellow-codex/commands/codex/setup.md
+  s_6aa8fc918111f8::t_e21f225550e175 273
+  s_6aa8fc918111f8::t_f0b764358adcf0 205-212,222
+  s_6aa8fc918111f8::t_dedc04014b189d 318-321
+  s_6aa8fc918111f8::t_86815a0774078b 244-249
+  s_6aa8fc918111f8::t_7e9a237b5ed08f 254
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_6aa8fc918111f8::t_0d6996ce4bad38 137
+  s_6aa8fc918111f8::t_95d5567bc8377c 156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "78dbd8561761c03c7b9897eb2e812a33e866b6fd",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

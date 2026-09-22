@@ -1,0 +1,35 @@
+plugins/yellow-research/tests/context7-cache.bats
+  s_6cdb4ed3aab017::t_c89a54156630f7 173-196,228,233,235-280,300-339,343-369
+  s_6cdb4ed3aab017::t_54edeafc83c612 372-452
+  s_6cdb4ed3aab017::t_cf7efc52d3124e 281-282
+  s_6cdb4ed3aab017::t_cd73776cb9dc31 340-342
+  s_6cdb4ed3aab017::t_88b1c609d38b9c 1-172,197-227,229-232,234,283-299,453-462
+plugins/yellow-research/bin/lc-cache-lookup
+  s_6cdb4ed3aab017::t_f28e27ce8ead3d 1-29
+.changeset/library-context-cache-hook.md
+  s_6cdb4ed3aab017::t_89a56d72cd4ab4 1-43
+plugins/yellow-research/hooks/write-credential-status.sh
+  s_6cdb4ed3aab017::t_57f2accfe74349 2-5,20-22,35
+  s_6cdb4ed3aab017::t_5663138be66ea6 23-34
+plugins/yellow-research/hooks/lib/context7-cache.sh
+  s_6cdb4ed3aab017::t_c1a7c66b1da7e8 112-114
+  s_6cdb4ed3aab017::t_0754f6338eadb5 1-37,47-58,89-95,102-103,109-111,115-116,128-130,134-144,153,155-179,181-238
+  s_6cdb4ed3aab017::t_c89a54156630f7 38-46,86-88,96-101,104-108,117-127,131-133,145-152,154,180
+  s_6cdb4ed3aab017::t_3c3fe8bfb33967 59-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "590b3a3ca097ba190dc7656a35317309cb872af6",
+  "prompts": {},
+  "sessions": {
+    "s_6cdb4ed3aab017": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b91ed7a6-9689-4084-89ad-60b90b5f456c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

@@ -1,0 +1,21 @@
+docs/solutions/workflow/skill-split-caveat-and-claude-md-drift.md
+  s_ecffdbc39c3a6a::t_795ef9c9a32885 1-117
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_ecffdbc39c3a6a::t_0bad0eb15a219c 1320-1387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "ff43f63c5f757870e81e6ae39d3bcb47ad22851e",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+plans/complete/library-context-followups.md
+  s_2ce1db4e09a1cf::t_2e2e07654c2c89 3-16,118-127,131-139,268-277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "6cd57d5a0aae322f6b9c9d472087c37d5ad42569",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

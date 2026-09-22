@@ -1,0 +1,20 @@
+plans/background-compounding-triggers.md
+  s_6d2ef1322cfec1::t_989761ec58a054 302-304,307,310-321
+  s_6d2ef1322cfec1::t_243ee4e1e3a270 347,350-352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "25e9bae95147f07620747e4a41a0cd17604793c5",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

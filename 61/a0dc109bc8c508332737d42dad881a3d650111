@@ -1,0 +1,24 @@
+.changeset/c8-scope-mode-protocol-crossrefs.md
+  s_d5d2c44e4908a4::t_6246e3f2e8f219 6
+docs/plugin-scope-mode-protocol.md
+  s_d5d2c44e4908a4::t_3e21cfa1da7e35 40-47
+  s_d5d2c44e4908a4::t_cfbc1edeccefc5 89-94
+  s_d5d2c44e4908a4::t_4e2722c37003a6 162-166
+  s_d5d2c44e4908a4::t_6c69718d5432b8 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "61a0dc109bc8c508332737d42dad881a3d650111",
+  "prompts": {},
+  "sessions": {
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

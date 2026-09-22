@@ -1,0 +1,26 @@
+.github/workflows/validate-schemas.yml
+  s_7d4f7a1773f734::t_3af9166b06162b 28
+  s_7d4f7a1773f734::t_00e870b41d2f8a 9
+package.json
+  s_7d4f7a1773f734::t_f4d0e4f0b8432f 39
+.github/workflows/version-packages.yml
+  s_7d4f7a1773f734::t_3cd3fce52cb3a2 114-119
+scripts/validate-catalog-track.js
+  s_7d4f7a1773f734::t_30e1e5fb6db237 1-184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a04f1a588773846df331d08e1cf9ee3eed4d7dbc",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

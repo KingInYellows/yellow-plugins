@@ -1,0 +1,47 @@
+plugins/yellow-research/skills/library-context/reference.md
+  s_b7de9b75b99767::t_b6055c31ec821a 59-75
+  s_b7de9b75b99767::t_d3dfbdac001c91 87-102
+scripts/validate-agent-authoring.js
+  s_b7de9b75b99767::t_40b97603aec253 449-450,458-460
+  s_1c74ba9d6245f4::t_8241cb6bd5ea45 451-457,461-468,470-485,487-488
+  s_b7de9b75b99767::t_15fe472d19fd06 446-448,469,486,489-492
+  s_b7de9b75b99767::t_dca3148908a961 43-65
+.changeset/rule-13-context7-drift-lint.md
+  s_b7de9b75b99767::t_6c0bdee41181c3 1-5
+tests/integration/validate-agent-authoring-context7-rule.test.ts
+  s_b7de9b75b99767::t_cd431edeff3d32 1-19,28-108,140,145-153,157-158,166,181-182,184-191,195-205,207,223
+  s_1c74ba9d6245f4::t_7588eff42fdd1a 154-156
+  s_1c74ba9d6245f4::t_24a459387aaa14 179,212-222
+  s_1c74ba9d6245f4::t_ae72d2a1710fb3 163-164,167-178
+  s_b7de9b75b99767::t_41824090989869 159-162,165,183
+  s_b7de9b75b99767::t_90a6333aad75ae 192-194
+  s_1c74ba9d6245f4::t_a75fe19482ed4a 20-27
+  s_b7de9b75b99767::t_35eab7a509b273 109-121
+  s_1c74ba9d6245f4::t_2392fc07763a97 122-139,141-144
+  s_b7de9b75b99767::t_23bbb99c8972f8 206,208-211
+  s_1c74ba9d6245f4::t_4768bd73ebb2b6 180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "3c8f6962b9ff8aa21a1941766609a40a9e1e7edc",
+  "prompts": {},
+  "sessions": {
+    "s_1c74ba9d6245f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c39a8589-09cd-45b0-a129-94ae92a2cb42",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

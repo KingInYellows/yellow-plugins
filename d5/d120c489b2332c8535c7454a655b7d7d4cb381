@@ -1,0 +1,23 @@
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_43cc4f730492cc::t_fbe1f850c438bc 1463-1464
+docs/solutions/logic-errors/stale-ok-status-not-corrected-on-abort.md
+  s_43cc4f730492cc::t_af8b3cea5d2cf7 1-207
+docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md
+  s_43cc4f730492cc::t_f59aa47e3d4e7b 320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "d5d120c489b2332c8535c7454a655b7d7d4cb381",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

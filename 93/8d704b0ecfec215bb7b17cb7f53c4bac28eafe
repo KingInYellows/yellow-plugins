@@ -1,0 +1,28 @@
+docs/solutions/build-errors/claude-code-plugin-manifest-validation-errors.md
+  s_6476068b869a82::t_b65eadee302c10 140-141,184-207
+AUDIT_REPORT.md
+  s_6476068b869a82::t_6f0f2bae33ac62 142
+docs/optimization/analysis.md
+  s_6476068b869a82::t_6f0f2bae33ac62 162-165
+docs/security.md
+  s_6476068b869a82::t_b65eadee302c10 213-215
+plans/fix-hooks-json-mirror-double-registration.md
+  s_6476068b869a82::t_6f0f2bae33ac62 145,148,154
+  s_6476068b869a82::t_11b3a78949c59e 157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "938d704b0ecfec215bb7b17cb7f53c4bac28eafe",
+  "prompts": {},
+  "sessions": {
+    "s_6476068b869a82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb99cbb0-34fd-4434-9fc8-3e13aa1ba3e7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

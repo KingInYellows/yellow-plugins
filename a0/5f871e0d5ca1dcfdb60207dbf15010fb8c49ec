@@ -1,0 +1,26 @@
+plans/library-context-cache-loop-closure.md
+  s_6cdb4ed3aab017::t_e68e88eecd21c9 10-20
+  s_6cdb4ed3aab017::t_e9b19c7ec34638 173-180
+  s_6cdb4ed3aab017::t_9e98351e16829a 113-125
+  s_6cdb4ed3aab017::t_465541e91d7709 143-153
+  s_6cdb4ed3aab017::t_bb07dfcb502a57 266-281
+  s_6cdb4ed3aab017::t_48978d6c58ddc4 302-306
+  s_6cdb4ed3aab017::t_e9490131f09d6e 1-9,21-112,126-142,154-172,181-265,282,296-301,307-319
+  s_6cdb4ed3aab017::t_af5a54bb2f29cb 283-295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "a05f871e0d5ca1dcfdb60207dbf15010fb8c49ec",
+  "prompts": {},
+  "sessions": {
+    "s_6cdb4ed3aab017": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b91ed7a6-9689-4084-89ad-60b90b5f456c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

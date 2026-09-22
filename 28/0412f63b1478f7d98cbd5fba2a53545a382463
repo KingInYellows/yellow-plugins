@@ -1,0 +1,25 @@
+plugins/yellow-devin/commands/devin/delegate.md
+  s_e0beaba782ec4e::t_282262d74fe41a 3
+plugins/yellow-devin/commands/devin/wiki.md
+  s_e0beaba782ec4e::t_282262d74fe41a 3,47-48,67-69
+.changeset/devin-trigger-followups.md
+  s_e0beaba782ec4e::t_9c9c5dbf357095 1-5
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_e0beaba782ec4e::t_282262d74fe41a 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "280412f63b1478f7d98cbd5fba2a53545a382463",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+plugins/yellow-ci/references/linter-rules.md
+  s_3c47fcc8a84b34::t_6c9e0c50b806fe 138-141
+  s_3c47fcc8a84b34::t_6668e42393d6d2 35-39
+docs/CONCEPTS.md
+  s_3c47fcc8a84b34::t_013724cb132630 22-30
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_3c47fcc8a84b34::t_fe9ed71b996927 52-54
+  s_3c47fcc8a84b34::t_c455d9645665b5 15-34,40
+plugins/yellow-ci/codex/skills/ci-status/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 33,35-55
+plugins/yellow-ci/tests/redaction.bats
+  s_3c47fcc8a84b34::t_9ea74cc3ac1334 184,186-193,195-196
+  s_3c47fcc8a84b34::t_62f7d5ef248b99 23-28
+plugins/yellow-ci/skills/ci-conventions/SKILL.md
+  s_3c47fcc8a84b34::t_854763f20ef935 117-129
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_3c47fcc8a84b34::t_23f22159568d5e 77-82
+  s_3c47fcc8a84b34::t_f827ceee2d2e49 169,175
+  s_3c47fcc8a84b34::t_a4b84fd3c1d2e8 226-228
+  s_3c47fcc8a84b34::t_9f96e6991419a7 214
+  s_3c47fcc8a84b34::t_8ed8023c2bce9d 85-112,114-115,123-124,128,138-140,159
+  s_3c47fcc8a84b34::t_6823587aa0e9ad 25-33
+  s_3c47fcc8a84b34::t_08b93f500786af 262-264,266-275
+  s_3c47fcc8a84b34::t_0d175ec1048f92 180-183,199-213,215-225,229-238
+  s_3c47fcc8a84b34::t_61fc4fc1d3a215 42-68,72-73,75
+  s_3c47fcc8a84b34::t_eaab670944908c 116-118,121-122,125-127,129-137
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_3c47fcc8a84b34::t_5abbcc75e3a1d2 152,164-166
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 36-38,41-50,53-61,73-91,96,105,121-124,129-151,153-163,167-194,198
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 35-37,55-59
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 41-43,47-56,148-151
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_3c47fcc8a84b34::t_2683bb0df1f59e 36-38
+  s_3c47fcc8a84b34::t_298284e7fd5766 56-60
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_3c47fcc8a84b34::t_4508e7948b7d91 78-92,97
+  s_3c47fcc8a84b34::t_a46467833cece3 140-152,154-164,168-191
+  s_3c47fcc8a84b34::t_feee12801def8b 37-39,42-51,54-62
+  s_3c47fcc8a84b34::t_b3263a736396db 122-125,130-138
+  s_3c47fcc8a84b34::t_e535a30266a20d 74-76
+  s_3c47fcc8a84b34::t_0b3ef223bb729b 193-195,199
+  s_3c47fcc8a84b34::t_31e76ea4cf5219 165-167
+  s_3c47fcc8a84b34::t_ea4fb28fd2c5d6 153
+  s_3c47fcc8a84b34::t_d3b6c8933daf27 106
+  s_3c47fcc8a84b34::t_c7fdec875fcbab 77
+  s_3c47fcc8a84b34::t_c1a32d1d93ff0d 139
+  s_3c47fcc8a84b34::t_57b2f50d6b2d1b 192
+plugins/yellow-ci/skills/ci-status/SKILL.md
+  s_3c47fcc8a84b34::t_f09bb60e450c83 34,36-56
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_3c47fcc8a84b34::t_03605d336c1ad3 42-44,48-57
+  s_3c47fcc8a84b34::t_e76b9a65d8596d 149-152
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 41-67,71-72,74,76-81,84-111,113-117,120-139,158,168,174,179-182,198-212,214-224,228-237,261-263,265-274
+  s_3c47fcc8a84b34::t_5abbcc75e3a1d2 24-32,213,225-227
+plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 116-128
+plugins/yellow-ci/codex/skills/ci-setup/SKILL.md
+  s_3c47fcc8a84b34::t_71bfca0185c6c2 23-27,158-163
+plugins/yellow-ci/skills/ci-setup/SKILL.md
+  s_3c47fcc8a84b34::t_b6b2383cd227fd 24-28
+  s_3c47fcc8a84b34::t_0ef4d03b0b60c9 159-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f2602d5512b1d0688d3c927b7f2dfea4b95e3f36",
+  "prompts": {},
+  "sessions": {
+    "s_3c47fcc8a84b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3350f9-732c-413a-b730-a60b1c74be10",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

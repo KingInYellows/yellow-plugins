@@ -1,0 +1,48 @@
+plugins/github-workflow/commands/github-stack/merge.md
+  s_fd5d688b6eb948::t_e79ae66d2b14f5 1-21
+plugins/github-workflow/commands/github-stack/sync.md
+  s_fd5d688b6eb948::t_6b64ccc8b8c1f7 1-21
+plugins/github-workflow/skills/github-stack-submit/SKILL.md
+  s_fd5d688b6eb948::t_1e49d29037f1c4 1-120
+plugins/github-workflow/commands/github-stack/plan.md
+  s_fd5d688b6eb948::t_576feefa8ec720 1-18
+plugins/github-workflow/commands/github-stack/amend.md
+  s_fd5d688b6eb948::t_9908799ffb3cb2 1-20
+plugins/github-workflow/skills/github-stack-amend/SKILL.md
+  s_fd5d688b6eb948::t_a7f3faada6d0cb 1-104
+plugins/github-workflow/skills/github-stack-merge/SKILL.md
+  s_fd5d688b6eb948::t_34b915a0a83e93 1-105
+plugins/github-workflow/skills/github-stack-cleanup/SKILL.md
+  s_fd5d688b6eb948::t_db0d3e84dfb781 1-83
+plugins/github-workflow/skills/github-stack-nav/SKILL.md
+  s_fd5d688b6eb948::t_ad9f92b12b0de0 1-68
+plugins/github-workflow/commands/github-stack/submit.md
+  s_fd5d688b6eb948::t_df71882ff8fcaf 1-20
+plugins/github-workflow/commands/github-stack/nav.md
+  s_fd5d688b6eb948::t_dc46b229faddf2 1-20
+plugins/github-workflow/skills/github-stack-sync/SKILL.md
+  s_fd5d688b6eb948::t_e90300dca05c81 1-79
+plugins/github-workflow/skills/github-stack-plan/SKILL.md
+  s_fd5d688b6eb948::t_179b8e12b04c5b 1-55
+plugins/github-workflow/CLAUDE.md
+  s_fd5d688b6eb948::t_805c32da0ed810 3-4,11-17
+  s_fd5d688b6eb948::t_451c109f074810 29,35-48,50,58-75,79-81
+plugins/github-workflow/commands/github-stack/cleanup.md
+  s_fd5d688b6eb948::t_8e6148375ef33c 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f65fe2560aab727fbe4803d7b2eb759d2d792f04",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

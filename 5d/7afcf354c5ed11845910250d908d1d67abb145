@@ -1,0 +1,27 @@
+plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md
+  s_fd5d688b6eb948::t_929b43fa95546d 1-11
+docs/research/2026-08-18-github-stack-provider-operations-revalidation.md
+  s_fd5d688b6eb948::t_3fbce3e1275943 20-21
+tests/integration/stack-operation-registry.test.ts
+  s_fd5d688b6eb948::t_bfce1edb4f955b 8-9
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_fd5d688b6eb948::t_ee3745b78c86ca 6-8
+docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md
+  s_fd5d688b6eb948::t_38b89bf37ce36e 14-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5d7afcf354c5ed11845910250d908d1d67abb145",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

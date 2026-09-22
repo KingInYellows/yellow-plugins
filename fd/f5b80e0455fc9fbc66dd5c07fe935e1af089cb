@@ -1,0 +1,19 @@
+plans/complete/review-resolve-branch-correctness-guard.md
+  s_2ce1db4e09a1cf::t_84e009ceea055d 140,144-149,153-157,161-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "fdf5b80e0455fc9fbc66dd5c07fe935e1af089cb",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

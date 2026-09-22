@@ -1,0 +1,27 @@
+plugins/yellow-core/README.md
+  ai_agent 27,57,65-67
+scripts/validate-agent-authoring.js
+  ai_agent 389-466,533-534
+plugins/yellow-core/commands/compound/review-staged.md
+  ai_agent 1-186
+.changeset/yellow-core-compound-staging-surface.md
+  s_e72e14f6bafd18::t_f0c458f36be62f 1-76
+plugins/yellow-core/CLAUDE.md
+  ai_agent 26,59-72,74,83-85,138-142,199-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "b79ffc1f7efec6e3045f6e91570271a25527d86a",
+  "prompts": {},
+  "sessions": {
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

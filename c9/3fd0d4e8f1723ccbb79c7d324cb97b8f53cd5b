@@ -1,0 +1,19 @@
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_4191430a7ce279 488-491
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c93fd0d4e8f1723ccbb79c7d324cb97b8f53cd5b",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

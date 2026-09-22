@@ -1,0 +1,19 @@
+docs/maintenance/plugin-audit-2026-06-10.md
+  s_e0beaba782ec4e::t_f9ce77272146af 88,96,104,114,122,129,137,143,146-147,151,160,165,170,175,182,187,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9ad12f7687e5232d37519ee6a43cbf8caa96b30a",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

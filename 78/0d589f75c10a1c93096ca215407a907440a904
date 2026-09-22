@@ -1,0 +1,28 @@
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_e88a9e9b03bbc7::t_52081a36d4cae1 150-156
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_e88a9e9b03bbc7::t_a087100e9faaba 139-145
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_e88a9e9b03bbc7::t_5f82cdfcf1e84a 133-148,161-168,177-184
+README.md
+  s_e88a9e9b03bbc7::t_76363d8928d0f5 40
+  s_e88a9e9b03bbc7::t_a8c38e114f98ac 282
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e88a9e9b03bbc7::t_e3dcc5e0d18e46 54-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "780d589f75c10a1c93096ca215407a907440a904",
+  "prompts": {},
+  "sessions": {
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

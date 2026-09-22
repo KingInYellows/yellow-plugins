@@ -1,0 +1,29 @@
+docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md
+  s_6aa8fc918111f8::t_f6e5d0a013b230 55-64
+docs/solutions/code-quality/golden-fixture-parity-vs-contract-correctness.md
+  s_6aa8fc918111f8::t_ef78dad6cec0f0 110-114
+.changeset/gt-push-guard-tool-input.md
+  s_6aa8fc918111f8::t_b9b73ce2ef8d9c 4,15-19
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_6aa8fc918111f8::t_2fcccc388d4200 451-456,469-470
+  s_6aa8fc918111f8::t_6566034de264ef 660
+  s_6aa8fc918111f8::t_89c37d9b502732 662
+docs/solutions/security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md
+  s_6aa8fc918111f8::t_7dc6119b041f54 83-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dd7ddde3ab6a0b4f1c288f04ef6be8d345e5c9aa",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

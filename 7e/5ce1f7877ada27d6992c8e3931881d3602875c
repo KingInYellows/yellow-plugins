@@ -1,0 +1,23 @@
+plugins/yellow-council/commands/council/council.md
+  s_3bb494324db8bc::t_271e509a824382 185,188
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_3bb494324db8bc::t_271e509a824382 375-378
+.changeset/yellow-council-base-flag-rest-rederive.md
+  s_3bb494324db8bc::t_d34ecf851910be 62-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7e5ce1f7877ada27d6992c8e3931881d3602875c",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

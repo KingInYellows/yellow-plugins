@@ -1,0 +1,27 @@
+plugins/yellow-core/commands/workflows/plan.md
+  s_b7de9b75b99767::t_e774f693982550 412
+  s_b7de9b75b99767::t_505dd0ee8cc431 405-410
+  s_b7de9b75b99767::t_f3b173e8744e2f 401-404,411,413-416
+  s_b7de9b75b99767::t_2a8982eeae7f93 417-418
+  s_b7de9b75b99767::t_6fad415bc9b056 438
+.changeset/plan-phase5-spec-route.md
+  s_b7de9b75b99767::t_d5f7f56ca9f658 2
+  s_b7de9b75b99767::t_e98888fbd12af3 1,3-4,6-13
+  s_b7de9b75b99767::t_f112a62c565a91 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "ebe93088472bda7ba97ce2013941d3ed8e13750d",
+  "prompts": {},
+  "sessions": {
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}

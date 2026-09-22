@@ -1,0 +1,38 @@
+plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md
+  s_20a9c2bc8059f0::t_0a2346490bf8d7 3
+  s_20a9c2bc8059f0::t_aa59a76dff476b 11
+  s_20a9c2bc8059f0::t_5ac9e034bcdf16 27-41
+plugins/yellow-core/skills/memory-recall-pattern/SKILL.md
+  s_20a9c2bc8059f0::t_e8a8da8d373216 28-40,45-46,49-51,53-58
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_20a9c2bc8059f0::t_63fd2d9ccedc57 9-23
+tests/integration/validate-agent-authoring-memory-protocol-rule.test.ts
+  s_20a9c2bc8059f0::t_a8bee24e42ca09 1-168
+plugins/yellow-core/CLAUDE.md
+  s_20a9c2bc8059f0::t_90652f64d86fcf 167
+plugins/yellow-core/skills/memory-remember-pattern/SKILL.md
+  s_20a9c2bc8059f0::t_783116dfcbaab0 59
+  s_20a9c2bc8059f0::t_c7ea90fbbf76d9 28-40,45-46,49-52,57-58
+scripts/validate-agent-authoring.js
+  s_20a9c2bc8059f0::t_bf64395101f2d1 129-177,129-131,133-177
+  s_20a9c2bc8059f0::t_92c390bfb903d8 1034
+  s_20a9c2bc8059f0::t_6801bcd4ea18b1 799-851
+.changeset/c7-memory-protocol-drift-lint.md
+  s_20a9c2bc8059f0::t_8c4a848e7ad875 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "2ff6451809c00ebb8946bca89786d17bc6311c38",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

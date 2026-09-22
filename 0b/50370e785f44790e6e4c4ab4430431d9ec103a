@@ -1,0 +1,21 @@
+scripts/check-upstream-pins.js
+  s_1d7ebad06623ea::t_8de08c7e681932 120-127,130,136-139,141-146
+tests/integration/check-upstream-pins.test.ts
+  s_1d7ebad06623ea::t_ea297c952deaa9 140-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b50370e785f44790e6e4c4ab4430431d9ec103a",
+  "prompts": {},
+  "sessions": {
+    "s_1d7ebad06623ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc70cc1c-2283-4107-9064-4fbf78bb603f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

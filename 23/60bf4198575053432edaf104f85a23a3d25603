@@ -1,0 +1,36 @@
+plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md
+  s_f5fa4421099f37::t_461685d8b6974c 1-74
+.changeset/tier3-c18-concepts-vocabulary.md
+  s_f5fa4421099f37::t_2681134ed90f92 1-13
+docs/CONCEPTS.md
+  s_f5fa4421099f37::t_d85d87c7b72a94 1-6
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_f5fa4421099f37::t_405852f0c278c9 35
+  s_f5fa4421099f37::t_d4524df510d6e6 140,144-146
+  s_f5fa4421099f37::t_e23f28bb5d25cb 147
+  s_f5fa4421099f37::t_e595093e0c9287 67
+  s_f5fa4421099f37::t_88ca3cea569edb 289-295
+  s_f5fa4421099f37::t_5a744a82a34a2d 317-337
+  s_f5fa4421099f37::t_35378a5bb09aef 220-221
+  s_f5fa4421099f37::t_ef5063b93e4c20 22-23
+  s_f5fa4421099f37::t_41f098018d1141 203-210,214
+  s_f5fa4421099f37::t_57db6771c3b8a3 56
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_099b61b059c112 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "2360bf4198575053432edaf104f85a23a3d25603",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

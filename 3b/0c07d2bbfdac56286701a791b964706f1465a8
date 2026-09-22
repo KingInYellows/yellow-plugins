@@ -1,0 +1,23 @@
+docs/solutions/workflow/gt-modify-no-c-flag-silent-unstaged-miss.md
+  s_0fddd6f60100d2::t_6e9b6d6fc77732 1-86
+docs/solutions/integration-issues/codex-cli-401-non-tty-task-spawn-degradation.md
+  s_0fddd6f60100d2::t_452e0d8f485727 1-63
+docs/solutions/code-quality/skill-tool-no-exit-code-wrapper-workaround.md
+  s_0fddd6f60100d2::t_534844fd0d275e 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "3b0c07d2bbfdac56286701a791b964706f1465a8",
+  "prompts": {},
+  "sessions": {
+    "s_0fddd6f60100d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39cf8a7f-5a65-4f04-a3d5-0b48a951c0c1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

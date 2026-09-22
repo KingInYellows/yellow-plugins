@@ -1,0 +1,41 @@
+tests/integration/validate-agent-authoring-rule18.test.ts
+  s_0c38a1b007fa25::t_0ed3dbf3ef6cff 1-30,42-111,113-115,117-142,144-150
+  s_0c38a1b007fa25::t_0151b59f9dbcb8 31-41
+  s_0c38a1b007fa25::t_cd24d6e43a679f 143
+  s_0c38a1b007fa25::t_edfb0c9bea26f7 112,116
+scripts/validate-agent-authoring.js
+  s_0c38a1b007fa25::t_4265f0117a384a 1346
+  s_0c38a1b007fa25::t_a69d2c9f9f394c 1098-1109
+  s_0c38a1b007fa25::t_5eadd45179c231 1150
+  s_0c38a1b007fa25::t_2ab066c36c2a19 1120-1121,1123-1124
+  s_0c38a1b007fa25::t_957ed404399162 1071-1097,1110-1119,1122,1125-1149,1151-1160
+plans/workflows-to-flow-namespace-migration.md
+  s_0c38a1b007fa25::t_4b3ec0a38d4882 415-447
+  s_0c38a1b007fa25::t_c0aa8364cd857a 480-484
+  s_0c38a1b007fa25::t_11755507bd7092 585-586
+  s_c1e3326aa9a6ae::t_a71c660f79fd25 409,411-414
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d9d4a38558667f760be66be23bfe2b56243602e2",
+  "prompts": {},
+  "sessions": {
+    "s_0c38a1b007fa25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

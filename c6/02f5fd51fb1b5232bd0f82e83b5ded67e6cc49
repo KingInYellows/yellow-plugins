@@ -1,0 +1,43 @@
+plugins/yellow-codex/commands/codex/review.md
+  s_2feb58e848d20d::t_81da4e21402617 275,277,281,283,287,289,291
+  s_2feb58e848d20d::t_6f785b38140cd8 308-315
+  s_2feb58e848d20d::t_04b067625ec73d 61-73,80-82,85
+  s_2feb58e848d20d::t_737653647a3e07 333-345,348-356
+  s_2feb58e848d20d::t_c11e85e2908d13 138-146,149
+  s_2feb58e848d20d::t_f15652bfe4d027 198-199,201-202,204-206
+  s_2feb58e848d20d::t_68d2a119ae40e6 360-361,363-364,366-368
+docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md
+  s_2feb58e848d20d::t_959a68c3878339 213-221
+  s_2feb58e848d20d::t_6120baac97c58a 139-143
+  s_2feb58e848d20d::t_c210fdb84c6cbb 169-178,183
+docs/solutions/logic-errors/diagnostic-printf-leaks-into-command-substitution.md
+  s_2feb58e848d20d::t_354619c6d2a1e6 89
+  s_2feb58e848d20d::t_eb679cfc2513ab 91
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_2feb58e848d20d::t_9a0f287e7c9616 421,423
+plugins/yellow-council/commands/council/council.md
+  s_2feb58e848d20d::t_58656b3aa20a7e 288
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2feb58e848d20d::t_4da379f08a8938 384-385,387-388,390-392
+  s_2feb58e848d20d::t_88eb7e4c204ffe 675-676
+  s_2feb58e848d20d::t_0f73aa1003bf10 668-674,679-684,701-703,705-715,721,723,727,729,731
+  s_2feb58e848d20d::t_6fa99bcfd1d5cf 292-293,295-296,298-300
+  s_2feb58e848d20d::t_df24fa466313fd 704
+  s_2feb58e848d20d::t_8d3dfc07fbdb2b 677-678
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "c602f5fd51fb1b5232bd0f82e83b5ded67e6cc49",
+  "prompts": {},
+  "sessions": {
+    "s_2feb58e848d20d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46cf0ad5-c154-44fd-a3d8-19281f5dd794",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+plans/audit-remediation-stack.md
+  s_fa9988b4873e85::t_c99a2e880ca1a2 55-63
+docs/solutions/security-issues/codex-sandbox-mode-does-not-fence-mcp-tools.md
+  s_fa9988b4873e85::t_2d2812f43ee0ff 23-26
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_fa9988b4873e85::t_ee99d017405145 11-12
+docs/brainstorms/2026-07-09-audit-resolution-brainstorm.md
+  s_fa9988b4873e85::t_de468a16e56c1d 94-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "dc63c5a1b53afe8d346ef2f734639df218af44a0",
+  "prompts": {},
+  "sessions": {
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

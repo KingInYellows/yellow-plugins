@@ -1,0 +1,22 @@
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_fd5d688b6eb948::t_b51dacf550e208 214,216-221,223,225-226,228-233,235,237-247,249-250
+plugins/yellow-review/commands/review/review-all.md
+  s_fd5d688b6eb948::t_7c14f915d7fb32 298-300,302-305
+  s_fd5d688b6eb948::t_faaa4ba6828450 251,253-258,260,262-265,267,269-273,275-276,287,289-291,293-294,296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "aa2db4e0180168c994eef9b5e834013d636d3bfa",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

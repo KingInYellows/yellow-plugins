@@ -1,0 +1,22 @@
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_2ce1db4e09a1cf::t_8acb279cbceba6 161
+  s_2ce1db4e09a1cf::t_978805c2b9d386 382,384-392
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_2ce1db4e09a1cf::t_c6e5149f505528 287,289-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "81afd16e7a4afe20118c8ce39f6e9ee30d9ab34b",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

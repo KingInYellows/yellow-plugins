@@ -1,0 +1,30 @@
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_c1ce70ba5b1295::t_deca74b0480bd4 497-498
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_c1ce70ba5b1295::t_c06404f4fe1306 572
+  s_c1ce70ba5b1295::t_560a1f1f1a7259 404
+  s_c1ce70ba5b1295::t_4be6f32b0af479 618
+  s_c1ce70ba5b1295::t_973fe08d80b584 610
+  s_c1ce70ba5b1295::t_22ae5ed1a559d9 601
+plans/background-compounding-triggers.md
+  s_c1ce70ba5b1295::t_bfae9a7415bf26 129
+  s_c1ce70ba5b1295::t_029ef07b96a8a1 327
+  s_c1ce70ba5b1295::t_2d949a5685eb2d 662
+  s_c1ce70ba5b1295::t_072f582e6d6cf3 719
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "c2f5168b4e53520a58494dc0d2bae745bf5c25fd",
+  "prompts": {},
+  "sessions": {
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

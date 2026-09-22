@@ -1,0 +1,26 @@
+tests/integration/generate-manifests.test.ts
+  s_2d24882eac6a53::t_f4e60daa0d3fe8 211-234
+docs/solutions/build-errors/ci-schema-drift-hooks-inline-vs-string.md
+  s_2d24882eac6a53::t_67ba4bdf94a19e 51-54
+  s_2d24882eac6a53::t_db504eec536eb2 238-251,254
+scripts/generate-manifests.js
+  s_2d24882eac6a53::t_9c7fde0bce3e8f 49,55-56
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_2d24882eac6a53::t_e2b90cafbcff80 92,94-96,98-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "16d830dcd10b7ec7228ce2110d3a15b7338e54ab",
+  "prompts": {},
+  "sessions": {
+    "s_2d24882eac6a53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef2da5c3-f774-442b-abf7-0bae6a1c34c9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

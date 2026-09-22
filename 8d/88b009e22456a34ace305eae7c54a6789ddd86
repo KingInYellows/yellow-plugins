@@ -1,0 +1,27 @@
+docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md
+  s_f5fa4421099f37::t_087f5fcf865333 149
+.changeset/tier3-c15-learnings-pre-pass.md
+  s_f5fa4421099f37::t_9fd1957baa5441 1-11
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_f5fa4421099f37::t_3767354b1534fb 41-71,74
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_2d9b7fed5400a1 69-164
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_f5fa4421099f37::t_a5ea9f077baa03 300-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8d88b009e22456a34ace305eae7c54a6789ddd86",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

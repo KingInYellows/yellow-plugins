@@ -1,0 +1,24 @@
+scripts/lib/generate/catalog-reader.js
+  s_5387a65d8fcd13::t_3e3928be87a990 91-98,103-117,119-134
+scripts/generate-manifests.js
+  s_5387a65d8fcd13::t_015b7534f60591 85-97,99
+tests/integration/generate-manifests.test.ts
+  s_5387a65d8fcd13::t_01a1aec482c8ae 268,284-294
+  s_5387a65d8fcd13::t_88a480d16cfd5b 295,375,387-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ea44ce5ed198d7c72ad5e972f23fcb9558783664",
+  "prompts": {},
+  "sessions": {
+    "s_5387a65d8fcd13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46aa1a85-7fb3-4437-9fbd-75381f85b1c4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

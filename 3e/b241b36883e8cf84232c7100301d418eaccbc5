@@ -1,0 +1,35 @@
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_ecffdbc39c3a6a::t_57ed0d95e89529 260-262
+  s_ecffdbc39c3a6a::t_3dacb9fad0f437 251-254
+  s_ecffdbc39c3a6a::t_76722b5b832f0f 356-357
+  s_ecffdbc39c3a6a::t_a29da11b76ff3b 336-338,340
+  s_ecffdbc39c3a6a::t_ab67ca4be2cf93 164-171
+  s_ecffdbc39c3a6a::t_d10b3714da1cc0 331-332
+  s_ecffdbc39c3a6a::t_2a63d9a3edd38d 280-286
+  s_ecffdbc39c3a6a::t_472ebc774984f6 275-276
+  s_ecffdbc39c3a6a::t_9f0428d2031dfb 339
+plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_e55b5608f20817 1-38,41-45,53
+  s_ecffdbc39c3a6a::t_c7653eba50afd8 39-40,46-50
+  s_ecffdbc39c3a6a::t_95965b22261170 51-52
+plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md
+  s_ecffdbc39c3a6a::t_70fd4c00594924 1-84
+plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md
+  s_ecffdbc39c3a6a::t_b4bf5fe26d4924 1-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3eb241b36883e8cf84232c7100301d418eaccbc5",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

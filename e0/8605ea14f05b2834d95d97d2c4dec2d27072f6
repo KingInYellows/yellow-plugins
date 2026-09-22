@@ -1,0 +1,59 @@
+.agents/plugins/marketplace.json
+  s_25ce909db53e22::t_89e1e847339a38 34-45
+  s_25ce909db53e22::t_698c2944a4f7ec 33
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_25ce909db53e22::t_89e1e847339a38 1-117,119-140,142-300
+  s_25ce909db53e22::t_cad8d89e004946 118,141
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_25ce909db53e22::t_89e1e847339a38 1-117,119-140,142-300
+  s_25ce909db53e22::t_cad8d89e004946 118,141
+catalog/plugins/yellow-review.json
+  s_25ce909db53e22::t_7765e2037a78e8 25-50
+tests/integration/thermonuclear-reviewer.test.ts
+  s_25ce909db53e22::t_cf912e3ce0fc57 21,352-405
+  s_25ce909db53e22::t_4e5bc9be0384d9 406-407
+  s_25ce909db53e22::t_f734a2fcf238dc 285,319-320
+  s_25ce909db53e22::t_c52e84a704e781 173-180,292-298,313-318
+  s_25ce909db53e22::t_3d63a93ba500a4 139-141,145,299-312
+plans/thermonuclear-review-integration.md
+  s_25ce909db53e22::t_cabc419b7d44b7 464,701-707
+  s_25ce909db53e22::t_08f2f1b7aafade 444,449,452,454,457-458
+  s_25ce909db53e22::t_7ec59ab664aec9 696-699
+  s_25ce909db53e22::t_4003b8dc08fcdb 700
+  s_25ce909db53e22::t_92a27d752097b3 460-463
+.cursor-plugin/marketplace.json
+  s_25ce909db53e22::t_89e1e847339a38 11-15
+plugins/yellow-review/.cursor-plugin/plugin.json
+  s_25ce909db53e22::t_89e1e847339a38 1-19
+.changeset/thermonuclear-cross-host.md
+  s_25ce909db53e22::t_08f2f1b7aafade 1-22
+plugins/yellow-review/.codex-plugin/plugin.json
+  s_25ce909db53e22::t_89e1e847339a38 1-10
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_25ce909db53e22::t_16cf562aa15ac2 32-33,38-39
+  s_25ce909db53e22::t_43c62116cf0d95 34-37
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_25ce909db53e22::t_9320ed40737a18 81,85,95-99
+plugins/yellow-review/commands/review/review-pr.md
+  s_25ce909db53e22::t_10da7f35a9fca1 522-530,532-536,579-580,583,587,590-599
+  s_25ce909db53e22::t_217a8d882a7e7a 502-509,514,516,531,537-550,553,555-565
+.changeset/thermonuclear-line-counts.md
+  s_25ce909db53e22::t_5812a3399b08e1 34-42
+  s_25ce909db53e22::t_3d63a93ba500a4 23-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e08605ea14f05b2834d95d97d2c4dec2d27072f6",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

@@ -1,0 +1,168 @@
+plugins/yellow-docs/agents/analysis/doc-auditor.md
+  s_566fcceda11127::t_26e50548c16640 146-147
+plugins/yellow-semgrep/agents/semgrep/scan-verifier.md
+  s_566fcceda11127::t_286c0cef0fcd27 61-63
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_566fcceda11127::t_8ad98d788afa3c 217-220
+plugins/gt-workflow/codex/skills/smart-submit/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 166-168,182-184
+plugins/yellow-docs/commands/docs/review.md
+  s_566fcceda11127::t_75dbcfa11ccc5e 205-207
+plugins/yellow-core/agents/review/security-sentinel.md
+  s_566fcceda11127::t_86b2d75584d7c4 180
+plugins/yellow-core/commands/workflows/decompose.md
+  s_566fcceda11127::t_c3b3b7fff6978a 133-135
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 216-219
+plugins/gt-workflow/codex/skills/gt-sync/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 26-28
+plugins/yellow-core/commands/workflows/expand-shell.md
+  s_566fcceda11127::t_af3cff0c9b6f3d 66-68
+plugins/yellow-council/commands/council/council.md
+  s_566fcceda11127::t_dc7f2a502bbb28 396-397
+plugins/yellow-mempalace/commands/mempalace/kg.md
+  s_566fcceda11127::t_5db2ac5e8f379c 103
+plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 42-44,210-213,228-232
+plugins/yellow-core/commands/workflows/spec.md
+  s_566fcceda11127::t_45c9291bdf12bd 86-89
+.changeset/prompting-quality-pass.md
+  s_566fcceda11127::t_99b92e18025387 1-32
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_566fcceda11127::t_c1149eb5603f84 43-44
+plugins/yellow-core/skills/optimize/SKILL.md
+  s_566fcceda11127::t_ea0490e0b434cd 59-60
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_566fcceda11127::t_6d67be251d5fd2 105-107
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_566fcceda11127::t_7891e8c0452c8a 142-143
+plugins/gt-workflow/skills/audit-review/SKILL.md
+  s_566fcceda11127::t_7a36f4cafc6a5e 122-124
+  s_566fcceda11127::t_071ac2e46ae457 140
+  s_566fcceda11127::t_782ae5289a4fde 115-116
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_566fcceda11127::t_c23f67e3062d52 141-142,145-149
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_566fcceda11127::t_3c9c9975d0ed70 205
+  s_566fcceda11127::t_08ce15065795ce 20-21
+plugins/yellow-ci/commands/ci/report-linear.md
+  s_566fcceda11127::t_1108534738aa32 145
+plugins/gt-workflow/codex/skills/gt-nav/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 75-77
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_566fcceda11127::t_97777885c0fc7e 72-73
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_566fcceda11127::t_ce1e0e021d9ff4 105-115
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 321-323,338-343
+  s_566fcceda11127::t_353d571aff211a 344
+plugins/yellow-ruvector/commands/ruvector/index.md
+  s_566fcceda11127::t_5063b09bf9ae6a 62-66
+plugins/yellow-debt/agents/scanners/architecture-scanner.md
+  s_566fcceda11127::t_09bb478c23edba 93
+plugins/yellow-devin/commands/devin/wiki.md
+  s_566fcceda11127::t_e030254bc1fbcd 62-70
+plugins/yellow-core/skills/morph-discovery-pattern/SKILL.md
+  s_566fcceda11127::t_b9dfd7710932f1 47
+docs/research/best-practices/gpt-claude-latest-model-prompting-guidance.md
+  s_566fcceda11127::t_02297dd427f16a 111-265
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_566fcceda11127::t_5d74eaa877b313 167-169
+  s_566fcceda11127::t_f41b41c24aed78 183-185
+plugins/yellow-core/skills/ideation/SKILL.md
+  s_566fcceda11127::t_1dc50e4d9eda2c 328-329
+plugins/yellow-core/skills/session-history/SKILL.md
+  s_566fcceda11127::t_616daeca7c320a 106-109
+plugins/yellow-research/commands/workflows/deepen-plan.md
+  s_566fcceda11127::t_b0adbd02d61f16 291
+  s_566fcceda11127::t_d2481b125d25d5 249
+plugins/yellow-mempalace/agents/mempalace/memory-archivist.md
+  s_566fcceda11127::t_72ef4c1bd7c4ce 121-122
+plugins/yellow-codex/commands/codex/rescue.md
+  s_566fcceda11127::t_59fae908fc6e43 46-49
+plugins/gt-workflow/skills/gt-sync/SKILL.md
+  s_566fcceda11127::t_2edeac58e83079 27-29
+plugins/yellow-core/agents/review/test-coverage-analyst.md
+  s_566fcceda11127::t_c01f87a66250a6 113-116
+plugins/gt-workflow/skills/gt-nav/SKILL.md
+  s_566fcceda11127::t_770894b4db0a84 76-78
+plugins/yellow-devin/commands/devin/tag.md
+  s_566fcceda11127::t_22fd1cf1a2a529 72-74,77
+plugins/yellow-mempalace/CLAUDE.md
+  s_566fcceda11127::t_d03d32f55adeac 102-104
+plugins/yellow-ruvector/commands/ruvector/learn.md
+  s_566fcceda11127::t_103623af49a778 45
+  s_566fcceda11127::t_f67b70277766bd 64-65,67-71
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_566fcceda11127::t_5fad518e1c6b89 264
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_566fcceda11127::t_f8af734c8499bd 187-190
+plugins/yellow-ruvector/skills/agent-learning/SKILL.md
+  s_566fcceda11127::t_f7e2f6cd273e8a 99-102
+  s_566fcceda11127::t_9d27b4f0a4895e 112-113
+plugins/yellow-semgrep/commands/semgrep/status.md
+  s_566fcceda11127::t_cac3417da12d60 88
+plugins/gt-workflow/codex/skills/gt-amend/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 93-97
+plugins/yellow-docs/CLAUDE.md
+  s_566fcceda11127::t_a0d34d2f0c7502 12-15
+plugins/yellow-ci/agents/maintenance/runner-diagnostics.md
+  s_566fcceda11127::t_af1f6ed7a27305 44
+plugins/yellow-review/CLAUDE.md
+  s_566fcceda11127::t_1e979c5c522809 102
+plugins/gt-workflow/codex/skills/audit-review/SKILL.md
+  s_566fcceda11127::t_8078f6e2ebdbc2 114-115,121-123,139
+plugins/yellow-core/commands/workflows/work.md
+  s_566fcceda11127::t_f71658db851cb7 225-228
+plugins/yellow-core/agents/workflow/staging-promoter.md
+  s_566fcceda11127::t_3b62afb781fc71 26,329,436
+  s_566fcceda11127::t_64b400ce612ad8 128-136
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_566fcceda11127::t_3b62afb781fc71 573
+plugins/yellow-linear/commands/linear/status.md
+  s_566fcceda11127::t_ec21295fc04905 101
+plugins/gt-workflow/skills/gt-amend/SKILL.md
+  s_566fcceda11127::t_d74d44bbd38126 94-98
+plugins/yellow-debt/commands/debt/fix.md
+  s_566fcceda11127::t_58570efcfc6d5d 161-164
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_566fcceda11127::t_221c2965258b68 185-188
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_566fcceda11127::t_4602964da7f0e0 229-233
+  s_566fcceda11127::t_69b27b70c560da 211-214
+  s_566fcceda11127::t_f4ef32805764e4 43-45
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_566fcceda11127::t_deea3df67d5d17 322-324
+  s_566fcceda11127::t_ecf8369f79fbe6 339-345
+plugins/yellow-debt/skills/debt-conventions/SKILL.md
+  s_566fcceda11127::t_3b3c5fc9910008 313-314
+plugins/yellow-semgrep/commands/semgrep/scan.md
+  s_566fcceda11127::t_d98f13479bbc77 77-78,83-84
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_566fcceda11127::t_2802e8fa64071f 59-62
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_566fcceda11127::t_2b34ba4c06bdcf 66-69
+  s_566fcceda11127::t_a66ec8f230159c 170-173
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_566fcceda11127::t_e82cbe2f238cd8 89-91
+  s_566fcceda11127::t_d00a67b7fc3099 8
+  s_566fcceda11127::t_4ece5c2d0f7e16 56-57
+plugins/yellow-core/skills/compound-lifecycle/SKILL.md
+  s_566fcceda11127::t_5c088a511cfb18 55-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "80032aa4604a02090018b8c0f772c97cdb25f436",
+  "prompts": {},
+  "sessions": {
+    "s_566fcceda11127": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "657d2744-fd9c-4470-b427-974a487a466a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

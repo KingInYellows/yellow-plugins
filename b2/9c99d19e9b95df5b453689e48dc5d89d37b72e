@@ -1,0 +1,38 @@
+docs/solutions/code-quality/stale-env-var-docs-and-prose-count-drift.md
+  s_aa2a8cf97f9dcd::t_f3799de3eb02fe 363-383
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 334-351
+docs/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 33-40
+  s_aa2a8cf97f9dcd::t_8b5b698caf05a9 32
+docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 133-158
+plugins/yellow-devin/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 68-69,71-76
+plugins/yellow-browser-test/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 47-54
+  s_aa2a8cf97f9dcd::t_450a3471d282d5 57-59
+plugins/yellow-ruvector/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_14c5504f97b4bb 9-11
+plugins/yellow-codex/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_79b685b463a076 102
+plugins/yellow-council/CLAUDE.md
+  s_aa2a8cf97f9dcd::t_a7dba8bc1eec38 157-164
+plugins/yellow-morph/README.md
+  s_aa2a8cf97f9dcd::t_40075b20416919 48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b29c99d19e9b95df5b453689e48dc5d89d37b72e",
+  "prompts": {},
+  "sessions": {
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

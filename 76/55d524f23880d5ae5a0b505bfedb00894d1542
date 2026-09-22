@@ -1,0 +1,29 @@
+plugins/gt-workflow/skills/gt-sync/SKILL.md
+  s_4febf2cbaf48e8::t_6e4cf85a5881ba 1-157
+plugins/gt-workflow/skills/gt-nav/SKILL.md
+  s_4febf2cbaf48e8::t_8e35b6b6f7f9ef 1-137
+plugins/gt-workflow/commands/gt-stack-plan.md
+  s_4febf2cbaf48e8::t_3b501f12db3c6b 14,23,25
+plugins/gt-workflow/commands/gt-sync.md
+  s_4febf2cbaf48e8::t_3ab5daefaf1407 7,15,17
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_4febf2cbaf48e8::t_9e2fe762eea8db 1-247
+plugins/gt-workflow/commands/gt-nav.md
+  s_4febf2cbaf48e8::t_4ca444877f5c80 8,15,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7655d524f23880d5ae5a0b505bfedb00894d1542",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

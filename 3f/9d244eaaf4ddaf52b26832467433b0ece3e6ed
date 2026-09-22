@@ -1,0 +1,76 @@
+plugins/yellow-core/tests/repo-profile.bats
+  s_3bb4e0b0f759d9::t_0a7e56d8add1f2 140-152
+  s_f5fa4421099f37::t_95f50bcc33f463 59
+  s_f5fa4421099f37::t_456883b9125a75 58,153-154
+plugins/yellow-core/lib/repo-profile.sh
+  s_f5fa4421099f37::t_a3d235d00b4683 147
+  s_3bb4e0b0f759d9::t_effef527d3a315 157,169
+  s_3bb4e0b0f759d9::t_b8d3cd39e4d1dc 164,167
+  s_f5fa4421099f37::t_7f9c09b338e5f1 10-13,23-25,109,124,142-144
+  s_f5fa4421099f37::t_c0e834cac17d03 93-98
+  s_f5fa4421099f37::t_9d18ca67999ece 145-146,148-155
+  s_3bb4e0b0f759d9::t_1069ee1c5cc465 118-121
+  s_eb2d9121a0b763::t_5c20db8245153b 50
+  s_3bb4e0b0f759d9::t_74b19939299239 99-100
+  s_3bb4e0b0f759d9::t_2bcd7a6b5962b6 42-43,47-48
+plugins/yellow-core/commands/workflows/plan.md
+  s_3bb4e0b0f759d9::t_e805fb3058a733 207-213,215-220
+CONTRIBUTING.md
+  s_f5fa4421099f37::t_c8996c64f9b579 413
+plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md
+  s_f5fa4421099f37::t_d7bfdacd6e73ce 23-26
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_3bb4e0b0f759d9::t_c291e9a4bf09f4 216
+  s_f5fa4421099f37::t_98e749a7e1da86 203,205-215
+  s_f5fa4421099f37::t_88ca3cea569edb 299-300
+  s_f5fa4421099f37::t_35378a5bb09aef 228
+  s_f5fa4421099f37::t_143411522051b3 329,332-334
+  s_f5fa4421099f37::t_5a744a82a34a2d 330-331,337-341,354
+  s_f5fa4421099f37::t_721394dc468e77 353
+  s_f5fa4421099f37::t_7820ecee400da5 229
+  s_f5fa4421099f37::t_5b618c0c2b2ce5 301
+  s_f5fa4421099f37::t_590c1bb22289c1 355-357
+  s_69e4fd95eb796c::t_a32c35a1ea541a 358
+docs/guides/common-workflows.md
+  s_f5fa4421099f37::t_bde04626741d9e 191-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3f9d244eaaf4ddaf52b26832467433b0ece3e6ed",
+  "prompts": {},
+  "sessions": {
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_69e4fd95eb796c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a0941ceaa69c3cedb",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_eb2d9121a0b763": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2897e03bc4409f16",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

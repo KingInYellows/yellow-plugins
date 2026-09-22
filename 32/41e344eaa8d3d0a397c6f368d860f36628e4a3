@@ -1,0 +1,37 @@
+plugins/yellow-core/commands/setup/claude-web.md
+  s_19979c8b3bd013::t_e4bd9dd1c236d7 1-86,91-445,448,461-562,565-681,686-688,690-694,699-790
+  s_19979c8b3bd013::t_3865a0d026e3d5 87-90
+  s_19979c8b3bd013::t_42509dfc078b9f 563-564
+  s_19979c8b3bd013::t_91be521e80e6ef 682-685,689,695-698
+  s_19979c8b3bd013::t_b25a1a24f932e7 446-447,449-460
+docs/research/how-claude-code-web-works-and-repository.md
+  s_19979c8b3bd013::t_7f656b7265fcc1 1-583
+plugins/yellow-core/README.md
+  s_19979c8b3bd013::t_ee34f9e0e59c80 29
+.changeset/setup-claude-web-command.md
+  s_19979c8b3bd013::t_d2b65f48056aa4 1-37
+docs/brainstorms/2026-05-18-setup-claude-web-command-brainstorm.md
+  s_19979c8b3bd013::t_2ade6ae65319c1 1-501
+plans/setup-claude-web-command.md
+  s_19979c8b3bd013::t_427116257164f4 1-503,534-816
+  s_19979c8b3bd013::t_6e85d1af9c8c27 504-533
+  s_19979c8b3bd013::t_0b991ca00466a1 817-847
+plugins/yellow-core/CLAUDE.md
+  s_19979c8b3bd013::t_dd961054a49926 60,71-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "3241e344eaa8d3d0a397c6f368d860f36628e4a3",
+  "prompts": {},
+  "sessions": {
+    "s_19979c8b3bd013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edc4e67e-0c98-446e-a621-08982add35a2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

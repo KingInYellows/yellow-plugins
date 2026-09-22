@@ -1,0 +1,29 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_64c4dcbed64f98::t_c8bb5275320217 71
+  s_64c4dcbed64f98::t_d40507a1e883d5 156-217,226-228
+  s_64c4dcbed64f98::t_ad4eebabb93b96 21-27,29-33
+  s_64c4dcbed64f98::t_0ad8b7343a278b 486-490,501-505,516,519-522
+  s_64c4dcbed64f98::t_5a79998b03d100 3
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_64c4dcbed64f98::t_486d5ef39d9791 169-227
+.changeset/plan-complete-file-provenance-tier.md
+  s_64c4dcbed64f98::t_35a2eea3a673db 1-5
+plugins/yellow-core/CLAUDE.md
+  s_64c4dcbed64f98::t_99894cfe8fc538 115-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4fc734f567c43e6674396427552b065ac052bfeb",
+  "prompts": {},
+  "sessions": {
+    "s_64c4dcbed64f98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18682327-1c4b-407d-9b31-41d6125aacc8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}

@@ -1,0 +1,19 @@
+.github/workflows/validate-schemas.yml
+  s_1d7ebad06623ea::t_8909facb34d490 23-25,30-34,36-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c4f0e97fc7ee9d65cf4aab8a5e3f577270d68c76",
+  "prompts": {},
+  "sessions": {
+    "s_1d7ebad06623ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc70cc1c-2283-4107-9064-4fbf78bb603f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

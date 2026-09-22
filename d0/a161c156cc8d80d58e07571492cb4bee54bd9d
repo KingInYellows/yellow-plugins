@@ -1,0 +1,37 @@
+scripts/validate-codex.js
+  s_f4074862689008::t_4e52335121d308 635
+  s_f4074862689008::t_459684e710ed6a 227-252
+  s_f4074862689008::t_73039b6c6b9495 226
+scripts/lib/generate/emit-codex.js
+  s_f4074862689008::t_281c052ac9445b 362-370
+.changeset/polish-line-placeholder.md
+  s_f4074862689008::t_29be3d40ea4ad7 7-8
+tests/integration/generate-manifests-codex.test.ts
+  s_f4074862689008::t_c97718b6f36c37 1054,1060-1061,1063,1066,1067,1155,1158-1159,1160-1162,1179,1189-1190
+docs/solutions/logic-errors/stale-ok-status-not-corrected-on-abort.md
+  s_43cc4f730492cc::t_af8b3cea5d2cf7 1-5,7-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "d0a161c156cc8d80d58e07571492cb4bee54bd9d",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

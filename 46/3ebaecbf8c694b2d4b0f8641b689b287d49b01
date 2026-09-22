@@ -1,0 +1,21 @@
+plugins/yellow-core/commands/workflows/work.md
+  s_d0528420615001::t_144a17a4fb55c9 564-600
+plugins/yellow-core/CLAUDE.md
+  s_d0528420615001::t_5649d07ee2b144 220-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "463ebaecbf8c694b2d4b0f8641b689b287d49b01",
+  "prompts": {},
+  "sessions": {
+    "s_d0528420615001": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0e6dcfb-cc20-4b42-83d6-7b0f2ab5c59c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

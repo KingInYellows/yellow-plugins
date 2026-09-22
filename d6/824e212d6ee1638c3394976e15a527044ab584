@@ -1,0 +1,45 @@
+plans/shells/yellow-jules-integration-05-goal-engine-milestone.md
+  s_92dcda3176fc7c::t_38a570fa9c4d90 73-77
+  s_92dcda3176fc7c::t_06c9ecb71456ab 35-41
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_92dcda3176fc7c::t_4fbeb779beb0e7 54
+plans/shells/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_92dcda3176fc7c::t_b0038bf8c02659 35-37
+  s_92dcda3176fc7c::t_4818d81b4c2aa5 66-67
+plans/shells/yellow-jules-integration-04-integrate-and-verification-handoff.md
+  s_92dcda3176fc7c::t_d96686708d3414 23-24
+  s_92dcda3176fc7c::t_2daa695801f0d4 42
+docs/solutions/security-issues/pre-implementation-spec-review-authority-gaps.md
+  s_92dcda3176fc7c::t_81a2a9bd0d7106 170,172
+  s_92dcda3176fc7c::t_ec3e1233d70126 38-40,46-47,49,51,54,56,59,63,65,68,70,73-75
+  s_92dcda3176fc7c::t_cb517dbdc085c2 81-82,84
+plans/specs/yellow-jules-integration.md
+  s_92dcda3176fc7c::t_3c3b1d0be3ff34 473-475
+  s_92dcda3176fc7c::t_cd2578caca7264 73-78
+  s_92dcda3176fc7c::t_bb1cee60edab8b 272-277
+  s_92dcda3176fc7c::t_18193ce81e7f7e 112-114
+  s_92dcda3176fc7c::t_c271bb1aa5304a 362-370
+  s_92dcda3176fc7c::t_a248cffbb34424 290-293
+  s_92dcda3176fc7c::t_0ef8b145d65b05 253-256
+  s_92dcda3176fc7c::t_092f1ac16e7238 381-384
+  s_92dcda3176fc7c::t_cc1e6193105512 609-611
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_92dcda3176fc7c::t_f0bf54d5f85449 113-116
+  s_92dcda3176fc7c::t_3a741bd9194aec 144-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d6824e212d6ee1638c3394976e15a527044ab584",
+  "prompts": {},
+  "sessions": {
+    "s_92dcda3176fc7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76fc52aa-a6a6-4527-a247-50fd6aea7d36",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

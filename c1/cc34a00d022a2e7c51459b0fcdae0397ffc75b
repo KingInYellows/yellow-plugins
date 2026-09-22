@@ -1,0 +1,33 @@
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_6aa8fc918111f8::t_61b68fdc55bab7 137-163
+  s_6aa8fc918111f8::t_9c31a22a570ac6 27-29
+  s_6aa8fc918111f8::t_91a1e83bf10892 103-111
+plugins/yellow-codex/commands/codex/setup.md
+  s_6aa8fc918111f8::t_64a3558c84ba7a 196-207,209-214,218
+  s_6aa8fc918111f8::t_99e7d0a9d3f9c5 228,230
+  s_6aa8fc918111f8::t_7d509408edd290 235-236,242-264
+  s_6aa8fc918111f8::t_a004de1c2a4ba3 307
+  s_6aa8fc918111f8::t_d72abf39830455 309
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_6aa8fc918111f8::t_6fca5870ed2a01 29-31
+  s_6aa8fc918111f8::t_f37c1144e86fdb 99-107
+  s_6aa8fc918111f8::t_4df5cb9cca4a59 137
+plugins/yellow-codex/commands/codex/review.md
+  s_6aa8fc918111f8::t_f140480a7e30e0 245-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c1cc34a00d022a2e7c51459b0fcdae0397ffc75b",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_3c47fcc8a84b34::t_b93a68cc23ab4f 262
+  s_3c47fcc8a84b34::t_32c3788a36d4a0 238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b9629e56b64629974f11b19d5385315aa1509267",
+  "prompts": {},
+  "sessions": {
+    "s_3c47fcc8a84b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3350f9-732c-413a-b730-a60b1c74be10",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,75 @@
+plugins/yellow-review/CLAUDE.md
+  s_25ce909db53e22::t_61665e3bf278e3 74,115-124
+  s_25ce909db53e22::t_e6f226df8eae93 137,144-147
+plugins/yellow-review/tests/fixtures/thermonuclear/spaghetti-branching.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-43
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_25ce909db53e22::t_9e55db301732f2 128-136,149-150
+plugins/yellow-core/skills/local-config/SKILL.md
+  s_25ce909db53e22::t_5d9b486d9b5b73 95
+plugins/yellow-review/tests/fixtures/thermonuclear/crosses-1000-lines.diff
+  s_25ce909db53e22::t_1feb26fcdd664e 1-45
+plugins/yellow-review/tests/fixtures/thermonuclear/crosses-1000-lines.linecounts
+  s_25ce909db53e22::t_1feb26fcdd664e 1-3
+plugins/yellow-review/tests/fixtures/thermonuclear/generated-file.diff
+  s_25ce909db53e22::t_1feb26fcdd664e 1-13
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_25ce909db53e22::t_98ff3c941c734a 1-189
+plugins/yellow-review/tests/fixtures/thermonuclear/already-large-file.diff
+  s_25ce909db53e22::t_1feb26fcdd664e 1-14
+plugins/yellow-review/tests/fixtures/thermonuclear/generated-file.linecounts
+  s_25ce909db53e22::t_1feb26fcdd664e 1-3
+plans/thermonuclear-review-integration.md
+  s_25ce909db53e22::t_3c4c5b3fd6f2a2 231,235,237,240,243,270,273,280,284,287,289,291,294,328,331,336,359,362,366,392,394,396,398,406,432
+  s_25ce909db53e22::t_d7997544fa452c 594
+  s_25ce909db53e22::t_7ec59ab664aec9 689-700
+plugins/yellow-review/tests/fixtures/thermonuclear/README.md
+  s_25ce909db53e22::t_1feb26fcdd664e 1-44
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_25ce909db53e22::t_549845026c2cdc 1-301
+plugins/yellow-review/tests/fixtures/thermonuclear/missing-linecounts.diff
+  s_25ce909db53e22::t_1feb26fcdd664e 1-25
+plugins/yellow-review/tests/fixtures/thermonuclear/canonical-helper-reuse.context
+  s_25ce909db53e22::t_702a7bd26622d2 1-11
+plugins/yellow-review/tests/fixtures/thermonuclear/prompt-injection.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-22
+tests/integration/thermonuclear-reviewer.test.ts
+  s_25ce909db53e22::t_6cc1c1993339b0 1-79,90-166,169-172,174-206,209-213,215-275,279-295
+  s_25ce909db53e22::t_c3ff9dbd06aaf6 80-89,167-168,173,207-208,214,276-278
+.changeset/thermonuclear-reviewer.md
+  s_25ce909db53e22::t_c65c521cd5ab53 1-35
+plugins/yellow-review/tests/fixtures/thermonuclear/justified-domain-complexity.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-25
+plugins/yellow-review/tests/fixtures/thermonuclear/canonical-helper-reuse.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-17
+plugins/yellow-review/tests/fixtures/thermonuclear/clean-implementation.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-20
+plugins/yellow-review/tests/fixtures/thermonuclear/wrapper-indirection.diff
+  s_25ce909db53e22::t_702a7bd26622d2 1-24
+plugins/yellow-review/references/review-pr/legacy-fallback.md
+  s_25ce909db53e22::t_ff51166c09d869 29-39
+plugins/yellow-review/tests/fixtures/thermonuclear/already-large-file.linecounts
+  s_25ce909db53e22::t_1feb26fcdd664e 1-3
+plugins/yellow-review/README.md
+  s_25ce909db53e22::t_1a9e63ac256a5a 37,56,70
+  s_25ce909db53e22::t_a209ce1f1cae2c 72-97
+  s_25ce909db53e22::t_7d408549543e30 71
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_25ce909db53e22::t_77e15bfcf0c902 130-134,136-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e8279a3a045eb237e5bb2336f6a29ee6932552db",
+  "prompts": {},
+  "sessions": {
+    "s_25ce909db53e22": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d95d8df-9460-4357-a064-5e1bec89c59b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_f5fa4421099f37::t_106be5e6c6d6d9 16-28,31-38
+  s_f5fa4421099f37::t_1d9d662d204ecf 111-115
+plugins/yellow-research/agents/research/research-conductor.md
+  s_f5fa4421099f37::t_d74fa87001b366 11
+  s_f5fa4421099f37::t_edeb2591236d6b 216-230
+plugins/yellow-research/commands/research/deep.md
+  s_f5fa4421099f37::t_f7d2191c8eab71 119-120,123-127
+  s_f5fa4421099f37::t_683c9e749f5a8e 81-95,99-102,106-118,121-122,128
+.changeset/tier3-c16-research-run-artifact.md
+  s_f5fa4421099f37::t_fb86f1096332dd 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "2ec86405e354cf0bba7a3b7b05b5b01c8610fe33",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

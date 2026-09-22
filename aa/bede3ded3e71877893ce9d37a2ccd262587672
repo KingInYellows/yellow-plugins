@@ -1,0 +1,36 @@
+scripts/validate-solutions.js
+  s_0083c2dbdafe0e::t_64afd498bdb933 93-99
+  s_0083c2dbdafe0e::t_322bfa2cc7c213 389-394
+  s_0083c2dbdafe0e::t_3b2cf9c00a5e42 293
+  s_0083c2dbdafe0e::t_cd513d8ff3bc3a 198-202,204-211
+docs/solutions/integration-issues/gh-api-graphql-plugin-command-template.md
+  s_0083c2dbdafe0e::t_4c65e375fe8f9d 205
+.github/workflows/validate-schemas.yml
+  s_0083c2dbdafe0e::t_111f9d589228c5 923
+  s_0083c2dbdafe0e::t_cbea213ffb6606 843
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_0083c2dbdafe0e::t_14019483f2cec6 65-66
+  s_0083c2dbdafe0e::t_4afa34c70c8f12 114
+tests/integration/validate-solutions.test.ts
+  s_0083c2dbdafe0e::t_722d82ff5c10d1 384-415
+plugins/yellow-core/commands/workflows/compound.md
+  s_0083c2dbdafe0e::t_45b777a648caf6 131,135-136,138
+  s_0083c2dbdafe0e::t_d3219f8c6f3e34 152,156-157,159
+  s_0083c2dbdafe0e::t_df3d0afbc16a8f 110,119-120,123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "aabede3ded3e71877893ce9d37a2ccd262587672",
+  "prompts": {},
+  "sessions": {
+    "s_0083c2dbdafe0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d37ed401-fd4a-4d85-b1d8-48bb4ce94b8d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

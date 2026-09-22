@@ -1,0 +1,38 @@
+plugins/yellow-core/lib/compound-staging.sh
+  s_20a7be2c72b16c::t_101ccd8088a60c 89,98,122
+  s_20a7be2c72b16c::t_56dc2fce731a5d 63-66
+  s_20a7be2c72b16c::t_e38e3d2ae24f14 219-231
+plugins/yellow-core/tests/compound-staging.bats
+  s_20a7be2c72b16c::t_2fa2e1c7420e70 199-202,207-215
+plugins/yellow-core/hooks/scripts/stop.sh
+  s_20a7be2c72b16c::t_71c77247010311 44-47,50
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_20a7be2c72b16c::t_862dd95e0dbcfe 121-124,129-138
+  s_20a7be2c72b16c::t_f0c7e46d9665e7 215-219
+  s_20a7be2c72b16c::t_a6fe6d922911d7 210-214,220-224,226-229,235,238
+  s_20a7be2c72b16c::t_0c620bcb5e3408 265-266
+plugins/yellow-core/tests/compound-stop-hook.bats
+  s_20a7be2c72b16c::t_751ea0f86515a8 128-144
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_20a7be2c72b16c::t_b57a0b71324bd0 50
+  s_20a7be2c72b16c::t_447340c4bd4248 131-145
+  s_20a7be2c72b16c::t_113ada3ecc7750 30-36
+.changeset/yellow-core-compound-staging-hooks.md
+  s_20a7be2c72b16c::t_e4c6758e02b3de 62-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "bb44c507ffcdbfba052b7380fbe16f8a509f85da",
+  "prompts": {},
+  "sessions": {
+    "s_20a7be2c72b16c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "541a3199-2f01-485d-96ea-ef238fbef991",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

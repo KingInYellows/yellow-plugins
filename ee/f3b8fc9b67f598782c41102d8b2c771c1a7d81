@@ -1,0 +1,21 @@
+docs/solutions/code-quality/automated-bot-review-false-positives.md
+  s_3923eeae7a5598::t_ceb90714f1dcda 276-277,279-289
+docs/solutions/workflow/compounder-m3-gate-non-interactive.md
+  s_3923eeae7a5598::t_f7f01027cbdc68 2,20,24-53,57-59,61-72,74-77,81-86,88-94,98-101,103,107-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "eef3b8fc9b67f598782c41102d8b2c771c1a7d81",
+  "prompts": {},
+  "sessions": {
+    "s_3923eeae7a5598": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "58bb4232-8737-4c58-8d3f-dd28f327f91f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

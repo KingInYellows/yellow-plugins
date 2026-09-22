@@ -1,0 +1,26 @@
+.github/workflows/claude-code-review.yml
+  h_6000354274ce50 13-16
+.github/workflows/lint-plugins.yml
+  h_6000354274ce50 28-29
+.github/workflows/validate-schemas-fork.yml
+  h_6000354274ce50 43
+.github/workflows/validate-schemas.yml
+  h_6000354274ce50 82-83,85-86
+docs/operations/ci-pipeline.md
+  h_6000354274ce50 73-74,77-80
+docs/operations/ci.md
+  h_6000354274ce50 140-141,144-146
+tests/integration/workflow-concurrency.test.ts
+  h_6000354274ce50 1-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "90c20f8595d8b1e8d3a0d447c0bc28b5e6355fcc",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

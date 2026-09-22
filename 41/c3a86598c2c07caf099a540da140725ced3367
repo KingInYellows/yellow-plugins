@@ -1,0 +1,26 @@
+plans/tier-3-capability-additions.md
+  s_f5fa4421099f37::t_5b18a5cbfc3c44 42-53,86-94,118-125,134-141,158-168,173-181,188-195,212-226,231-242,255-271,281-300,310-325,356-363,439-447,460-467,477-487,495-503
+CLAUDE.md
+  s_f5fa4421099f37::t_294085e9a94983 220-252
+  s_f5fa4421099f37::t_3ce2ee82c0362b 305
+  s_f5fa4421099f37::t_101d4651af1d5c 267
+  s_f5fa4421099f37::t_b020059215063a 261
+  s_f5fa4421099f37::t_835e1d3b24a908 289
+  s_f5fa4421099f37::t_035ac8322021e8 277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "41c3a86598c2c07caf099a540da140725ced3367",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+tests/integration/sync-manifests.test.ts
+  s_f72a80507cb29d::t_7424fc2edc7dc4 54-66
+tests/integration/generate-manifests.test.ts
+  s_f72a80507cb29d::t_ff48e1dd6c3242 187
+  s_f72a80507cb29d::t_a8470dff87ede6 32-35,42-62
+  s_f72a80507cb29d::t_23f0352485e982 63-67,73-78
+  s_f72a80507cb29d::t_9ff4215d4dc18d 108-121,123-137
+  s_f72a80507cb29d::t_85dd83b7cc1708 79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6dc72d7311be334132ff8ed26824d472d12ece29",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

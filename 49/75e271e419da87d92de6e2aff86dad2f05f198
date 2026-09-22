@@ -1,0 +1,41 @@
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_ecffdbc39c3a6a::t_9037383e2d4cdd 167-176
+plans/review-schema-and-codex-references-followups.md
+  s_566fcceda11127::t_1c6cabc7f0d4b9 1-54,81-97,104-126,142-146,159-172,181-183,192-195,209-214,221-231,251-259,271-287,294-331
+  s_566fcceda11127::t_a5b4090ca1e85b 196-208
+  s_566fcceda11127::t_d541afa25485eb 332-344
+  s_566fcceda11127::t_2337527e8a0036 215-220
+  s_566fcceda11127::t_23f9d1855bc560 232-250
+  s_566fcceda11127::t_b53a8f0a762ed0 184-191
+  s_566fcceda11127::t_c7d1147089ec35 98-103
+  s_566fcceda11127::t_0ea4a3d183d754 260-270
+  s_566fcceda11127::t_79a99c051bcc77 55-80
+  s_566fcceda11127::t_711a1e332a44c9 127-141
+  s_566fcceda11127::t_7549a7cf64426d 147-158
+  s_566fcceda11127::t_b9e27f859d8422 173-180
+  s_566fcceda11127::t_8284e8840bb7d6 288-293
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4975e271e419da87d92de6e2aff86dad2f05f198",
+  "prompts": {},
+  "sessions": {
+    "s_566fcceda11127": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "657d2744-fd9c-4470-b427-974a487a466a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

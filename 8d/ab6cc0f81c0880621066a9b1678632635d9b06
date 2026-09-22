@@ -1,0 +1,20 @@
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_6aa8fc918111f8::t_7ed0c5025edaec 458-463
+  s_6aa8fc918111f8::t_02233970bf3962 409-416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8dab6cc0f81c0880621066a9b1678632635d9b06",
+  "prompts": {},
+  "sessions": {
+    "s_6aa8fc918111f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce17c8ce-2cbd-46db-9eb0-6d1d3451aaec",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

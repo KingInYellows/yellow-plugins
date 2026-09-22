@@ -1,0 +1,21 @@
+.changeset/council-state-lifetime.md
+  s_e0beaba782ec4e::t_3021ecbe119d77 1-5
+plugins/yellow-council/commands/council/council.md
+  s_e0beaba782ec4e::t_a253dc6b085194 215-223,226-229,247,351-359,403,405,409,437-438,442
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "086a21f368e8e90a701b35a690a58bc45c251ff4",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

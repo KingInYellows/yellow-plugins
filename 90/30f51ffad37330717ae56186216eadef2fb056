@@ -1,0 +1,22 @@
+docs/solutions/code-quality/stale-plan-docs-committed-after-implementation.md
+  s_43cc4f730492cc::t_eeb953aa4a428a 178-246
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_43cc4f730492cc::t_3ee4bb43f4d23e 1473-1484
+  s_43cc4f730492cc::t_40390e3bef7c9b 1458-1472,1485-1509
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "9030f51ffad37330717ae56186216eadef2fb056",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

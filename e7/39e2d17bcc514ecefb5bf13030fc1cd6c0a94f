@@ -1,0 +1,23 @@
+plans/spec-shells-decomposition-plan.md
+  s_21cfa79e862cb2::t_de5a385133f67d 346
+plugins/yellow-core/commands/workflows/work.md
+  s_21cfa79e862cb2::t_2e91829b9fb898 564-583
+.changeset/work-polish-loop.md
+  s_21cfa79e862cb2::t_4d9099b3622397 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "e739e2d17bcc514ecefb5bf13030fc1cd6c0a94f",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

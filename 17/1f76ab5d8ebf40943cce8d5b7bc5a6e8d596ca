@@ -1,0 +1,60 @@
+.changeset/c7-memory-protocol-drift-lint.md
+  s_d5d2c44e4908a4::t_b41c9bfdf3bc38 10
+plugins/yellow-core/skills/memory-remember-pattern/SKILL.md
+  s_d5d2c44e4908a4::t_831d184d7ae41c 35-43,46-49,54,59-63,66
+plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md
+  s_06f6e84be5c507::t_f407b859516f04 41-42
+  s_d5d2c44e4908a4::t_f3c90bb95a67da 30-39,47
+  s_06f6e84be5c507::t_3601b5f67c383d 43
+  s_d5d2c44e4908a4::t_47af3821bd8d5d 3
+  s_06f6e84be5c507::t_bfe3d264d349ab 40
+plugins/yellow-core/CLAUDE.md
+  s_d5d2c44e4908a4::t_c3b08b8aa2c410 167
+plugins/yellow-ruvector/CLAUDE.md
+  s_d5d2c44e4908a4::t_22c1ab3be2899a 57-58
+scripts/validate-agent-authoring.js
+  s_06f6e84be5c507::t_f5b34417739806 153-154
+  s_d5d2c44e4908a4::t_b926a33b71fc92 148-150,157-164,167-175
+  s_06f6e84be5c507::t_a99c98916f36a6 152
+  s_06f6e84be5c507::t_a35e85a29707cb 155
+  s_d5d2c44e4908a4::t_f659bba973b4c1 180-185,187
+  s_d5d2c44e4908a4::t_718d5f2a87edda 825-828,830-839,841-849,856-864,877-880
+  s_d5d2c44e4908a4::t_7c4a6642224b6a 140-142
+tests/integration/validate-agent-authoring-memory-protocol-rule.test.ts
+  s_d5d2c44e4908a4::t_32b178fe950e8f 7-8,13-16
+  s_d5d2c44e4908a4::t_9ffce5ef42e273 167,169-191
+plugins/yellow-core/README.md
+  s_d5d2c44e4908a4::t_779fb8e3426b51 91
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_d5d2c44e4908a4::t_a855118f20e59f 16-25,28
+plugins/yellow-core/skills/memory-recall-pattern/SKILL.md
+  s_d5d2c44e4908a4::t_bdd98b961e0bdc 34-42,46-48,51-52,58,60,69
+  s_06f6e84be5c507::t_16a32e3529ff1e 59
+tests/integration/helpers/validator-harness.ts
+  s_06f6e84be5c507::t_851b5ab74ea80b 37
+  s_d5d2c44e4908a4::t_dc2d69ba637c18 31-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "171f76ab5d8ebf40943cce8d5b7bc5a6e8d596ca",
+  "prompts": {},
+  "sessions": {
+    "s_06f6e84be5c507": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a19a1858-879b-4543-aca3-325f7151d1ca",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

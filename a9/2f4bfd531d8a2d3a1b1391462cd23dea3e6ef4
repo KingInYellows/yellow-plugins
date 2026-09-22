@@ -1,0 +1,36 @@
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_fc81472ff4a623::t_b0fe1aabd186bb 135-145
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_fc81472ff4a623::t_fffa8b579602f4 29-83,93-99
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_fc81472ff4a623::t_fffa8b579602f4 134-144
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_fc81472ff4a623::t_eda609e08e8c13 233,236-255,257-258
+plugins/yellow-ci/tests/lib/hook-scenario.bash
+  s_fc81472ff4a623::t_66605d98ef4146 84-95,102-107
+plugins/yellow-ci/tests/fixtures/hooks/legacy-cache-not-trusted.golden.txt
+  s_fc81472ff4a623::t_4d8694c7fa40ac 1-7
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_fc81472ff4a623::t_aac76da0c66547 30-84,94-100
+plugins/yellow-ci/tests/fixtures/hooks/legacy-cache-not-trusted.stdin
+  s_fc81472ff4a623::t_d79b5624e192c7 1
+plugins/yellow-ci/tests/hook-parity.bats
+  s_fc81472ff4a623::t_562f2f532ea6f9 27-39
+  s_fc81472ff4a623::t_f2a6d543d31140 101-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a92f4bfd531d8a2d3a1b1391462cd23dea3e6ef4",
+  "prompts": {},
+  "sessions": {
+    "s_fc81472ff4a623": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eae8d790-ad2e-4367-a38b-24a76ce18c74",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_c1e3326aa9a6ae::t_67470c8f3bb651 543
+  s_c1e3326aa9a6ae::t_3a6cceb1db3c92 603
+RESEARCH/01-plugin-inventory.md
+  s_c1e3326aa9a6ae::t_1b424df9d44eb0 9-12
+  s_c1e3326aa9a6ae::t_fc3c84ab9642cb 108
+  s_c1e3326aa9a6ae::t_06a77e1a51b8ef 120
+docs/optimization/analysis.md
+  s_c1e3326aa9a6ae::t_3a8e3d77caa3c1 376
+  s_c1e3326aa9a6ae::t_e622cf4242fd8a 397
+  s_c1e3326aa9a6ae::t_f9dbdbfeafefd6 135
+  s_c1e3326aa9a6ae::t_0f29e401cbbe65 433
+  s_c1e3326aa9a6ae::t_566a2b04fa8c27 131
+RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md
+  s_c1e3326aa9a6ae::t_ba35762df983f4 7
+plans/workflows-to-flow-namespace-migration.md
+  s_c1e3326aa9a6ae::t_034fdee6b98aa9 444-447
+  s_c1e3326aa9a6ae::t_1366f514ee53d7 388-390
+RESEARCH/MERGE_PLAN.md
+  s_c1e3326aa9a6ae::t_7d40c4cd0cd820 192
+  s_c1e3326aa9a6ae::t_d7940cb8fbc042 312
+docs/plugin-scope-mode-protocol.md
+  s_c1e3326aa9a6ae::t_a455a2d26a8f32 81
+  s_c1e3326aa9a6ae::t_3cd5f5bd8d5239 123
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_2702c63112062d 230-232,236-254,261-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "deff52aabb1e34a53471622d83c8012e974f2a6a",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

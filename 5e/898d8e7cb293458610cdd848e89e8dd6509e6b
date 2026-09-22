@@ -1,0 +1,37 @@
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_ecffdbc39c3a6a::t_093b276caca211 121
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_ecffdbc39c3a6a::t_4a378bb50e815f 150
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_ecffdbc39c3a6a::t_2a93c4b92a7023 211
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_ecffdbc39c3a6a::t_2690d751602ad6 115
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_5a46d1fe01b1a1 142
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_ecffdbc39c3a6a::t_a1776d6a4323a3 177
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_7451b5e4cdf841 263
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_ecffdbc39c3a6a::t_3b4a18aec66558 205
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_ecffdbc39c3a6a::t_2b6300c064ad64 205
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_ecffdbc39c3a6a::t_8b8ed30b0646d4 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "5e898d8e7cb293458610cdd848e89e8dd6509e6b",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

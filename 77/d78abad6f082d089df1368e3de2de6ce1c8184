@@ -1,0 +1,23 @@
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_17bd29452ea753::t_1ee75ada564385 1-175
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_2d5b1b81480550 241
+plugins/yellow-ci/commands/ci/diagnose.md
+  s_17bd29452ea753::t_5e8c5236798394 12,18-19,21,23-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "77d78abad6f082d089df1368e3de2de6ce1c8184",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

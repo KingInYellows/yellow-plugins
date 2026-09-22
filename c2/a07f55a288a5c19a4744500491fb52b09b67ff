@@ -1,0 +1,23 @@
+docs/research-connector-overlap.md
+  s_90cee544007013::t_616edd17269981 1-64
+.changeset/post-stack-research-connector-overlap.md
+  s_90cee544007013::t_2fc8eeed8ff363 1-7
+plugins/yellow-research/README.md
+  s_90cee544007013::t_500e284d8bb8e1 159-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c2a07f55a288a5c19a4744500491fb52b09b67ff",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_281a1e30ad5c89::t_eefb0b36e22d6c 654
+  s_281a1e30ad5c89::t_8fa8471eb6040e 640-642
+  s_281a1e30ad5c89::t_61a79a61545add 236-239,241-246,251,257
+  s_281a1e30ad5c89::t_4783911b0104c9 662-687
+  s_281a1e30ad5c89::t_6c1d380831a47d 755-764,768-780,782
+  s_281a1e30ad5c89::t_cc306d2e72797a 622-628,631
+  s_281a1e30ad5c89::t_fa415f8a57bf8d 329-331,333-338,341,343,349
+.changeset/yellow-codex-parity-hardening.md
+  s_281a1e30ad5c89::t_3368eef32573e4 1-6
+plugins/yellow-council/commands/council/council.md
+  s_281a1e30ad5c89::t_90930baad2c489 262-288
+  s_281a1e30ad5c89::t_e75769209f3516 223-224
+tests/integration/codex-reviewer-step6-extraction.test.ts
+  s_281a1e30ad5c89::t_c8d5183a8cdc91 1-311
+plugins/yellow-codex/commands/codex/review.md
+  s_281a1e30ad5c89::t_0eef82edef73dc 65-68,70-78
+  s_281a1e30ad5c89::t_415fcdd27bf267 289-300,302-345
+  s_281a1e30ad5c89::t_2df16c33986420 45-60
+  s_281a1e30ad5c89::t_8ee0a69ce0e888 121-125,130-138
+  s_281a1e30ad5c89::t_6117c77881ea94 166-169,171-176,179,181,187
+  s_281a1e30ad5c89::t_509362cd2b56c8 241-244,246-251,255-256,259-260,268,271-272
+  s_281a1e30ad5c89::t_f1fd36b67ef19f 414
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_281a1e30ad5c89::t_7f04e6a282db12 62-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "c8c40716a585910d689f7fe9fda4c7f8afd91112",
+  "prompts": {},
+  "sessions": {
+    "s_281a1e30ad5c89": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec87ad1-4440-44be-9a9e-c0020a34589f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+docs/solutions/workflow/spec-shells-dependency-oracle-plans-complete.md
+  s_21cfa79e862cb2::t_aaa1736b3d607b 1-86
+docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md
+  s_21cfa79e862cb2::t_efc166dc614d53 1-81
+docs/solutions/logic-errors/iterate-until-clean-loop-stop-condition.md
+  s_21cfa79e862cb2::t_9d6a18c4a55213 1-75
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_21cfa79e862cb2::t_9c6e9f8d867cfd 907-949
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0439dfb160a177a8cbc00fec3265c88eb809a295",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_c1e3326aa9a6ae::t_cb3accdac778e2 551,565
+  s_c1e3326aa9a6ae::t_2797e5d870ce78 255,259
+  s_69313f122f35b8::t_c28d0a0b9e49d9 260,566
+docs/research/yellow-council-v2-revalidation-2026-08-01.md
+  s_c1e3326aa9a6ae::t_7e4f55284d95cf 789
+  s_c1e3326aa9a6ae::t_14da376da31e0d 3
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_cc7b122d549695 324-340
+  s_c1e3326aa9a6ae::t_994d108ee6bebe 305-307
+RESEARCH/MERGE_PLAN.md
+  s_c1e3326aa9a6ae::t_79aa834157014d 305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3cd0ec72b517fccd0cce75a2b6582972c9ad9148",
+  "prompts": {},
+  "sessions": {
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

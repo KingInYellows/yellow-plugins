@@ -1,0 +1,19 @@
+plans/complete/spec-shells-decomposition-plan.md
+  s_b7de9b75b99767::t_3317e3e8804edd 152-155,158-159,164,167-174,177-185,188-194,197-202,205-207,210,213,347-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "f5c93c21c3114baab64f4c2497fd1f66258e3181",
+  "prompts": {},
+  "sessions": {
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

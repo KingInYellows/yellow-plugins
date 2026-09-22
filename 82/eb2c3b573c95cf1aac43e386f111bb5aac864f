@@ -1,0 +1,23 @@
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_f4074862689008::t_29b3a93817beaf 182-185
+  s_f4074862689008::t_1b1a468bf124f3 67-97
+  s_f4074862689008::t_85a75701c28bfc 163-166
+.changeset/devin-orchestrator-cap-safety.md
+  s_f4074862689008::t_6e5cc017ec9499 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "82eb2c3b573c95cf1aac43e386f111bb5aac864f",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

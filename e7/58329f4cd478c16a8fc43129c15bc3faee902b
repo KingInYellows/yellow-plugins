@@ -1,0 +1,61 @@
+tests/integration/codex-schema-examples.test.ts
+  s_76944981fdcfae::t_1ea2f34db46713 139-140
+  s_64c4dcbed64f98::t_036a5fc9d5d9f2 132,136-138
+schemas/codex-marketplace.schema.json
+  s_64c4dcbed64f98::t_bf94b6dc1c37c8 6,9,15-24
+scripts/generate-manifests.js
+  s_64c4dcbed64f98::t_c6589b547e0c9f 477-488
+examples/codex-marketplace.example.json
+  s_64c4dcbed64f98::t_7b2a4975e236da 3
+.agents/plugins/marketplace.json
+  s_64c4dcbed64f98::t_c6e4161b690d7a 3-5
+scripts/lib/generate/emit-codex.js
+  s_64c4dcbed64f98::t_e2c5c14a47bb98 324-333
+  s_64c4dcbed64f98::t_985abd0734223b 236-246,253-254
+  s_64c4dcbed64f98::t_9e0c52d92e825c 24
+  s_64c4dcbed64f98::t_18de23de987763 68
+scripts/validate-codex.js
+  s_64c4dcbed64f98::t_4ae47c6e74d721 194-204
+  s_64c4dcbed64f98::t_15b0c842596422 423
+  s_76944981fdcfae::t_c5568848b9f4c2 433-434
+  s_64c4dcbed64f98::t_1787da98029b5f 402-409,417,427-432
+tests/integration/generate-manifests-codex.test.ts
+  s_64c4dcbed64f98::t_ca432b851b5929 292-324
+  s_9b59ddf8ef5762::t_9319db152a11a7 326
+  s_9b59ddf8ef5762::t_5e1fbbe7846622 325
+  s_64c4dcbed64f98::t_3a1a09d8651259 327-348
+packages/cli/src/index.ts
+  s_64c4dcbed64f98::t_0b5b45b321cd4a 29,47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e758329f4cd478c16a8fc43129c15bc3faee902b",
+  "prompts": {},
+  "sessions": {
+    "s_64c4dcbed64f98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18682327-1c4b-407d-9b31-41d6125aacc8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_76944981fdcfae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ea2e22-178b-47c9-ac16-a3fc091bd7f0",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_9b59ddf8ef5762": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "625727e4-3050-4be8-b76d-8fcb6aa7602e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}

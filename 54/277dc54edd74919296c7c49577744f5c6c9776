@@ -1,0 +1,19 @@
+plugins/yellow-ruvector/tests/session-start.bats
+  s_bce9caa9d04820::t_4d4f1173028cd8 32-43,85-86,100-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "54277dc54edd74919296c7c49577744f5c6c9776",
+  "prompts": {},
+  "sessions": {
+    "s_bce9caa9d04820": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2991ed48-9331-4c18-839f-d3a6cbfcee71",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+plugins/yellow-debt/commands/debt/fix.md
+  s_e0beaba782ec4e::t_d2a961e9aa45b3 101,105,116
+.changeset/debt-audit-followups.md
+  s_e0beaba782ec4e::t_e8ab92041dc6de 1-5
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e0beaba782ec4e::t_310ece7ae3336f 67-96
+plugins/yellow-debt/commands/debt/sync.md
+  s_e0beaba782ec4e::t_92493137583c05 13-14,220-221,225-227,236,240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "213cc58e50a7664c9b4144707b5154e91114aa75",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

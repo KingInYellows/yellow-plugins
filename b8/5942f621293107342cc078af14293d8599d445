@@ -1,0 +1,14 @@
+plugins/yellow-council/commands/council/council.md
+  h_6000354274ce50 441-446,1176-1181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b85942f621293107342cc078af14293d8599d445",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

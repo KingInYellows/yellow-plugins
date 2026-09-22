@@ -1,0 +1,20 @@
+plugins/yellow-review/commands/review/review-pr.md
+  s_fd5d688b6eb948::t_0bb27e61c14846 805-810,812,814-817,819,821-825,827-828
+  s_fd5d688b6eb948::t_b605d3ff0a0431 803-804
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "01d4d6d580114a42a3a40c9f875973400301a28b",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_f59b3ac4f7341f 244
+  s_fc81472ff4a623::t_258e1b2d5643b5 243
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_fc81472ff4a623::t_1c7a808d7cd34b 392
+  s_fc81472ff4a623::t_9a82f9b31282e6 391
+plugins/yellow-ci/tests/redaction.bats
+  s_fc81472ff4a623::t_89982a7b1f10bd 54-71
+  s_fc81472ff4a623::t_b33befe9b4579d 78-89
+  s_fc81472ff4a623::t_aa989d8ea0a5a8 72-77
+plugins/yellow-ci/references/security-patterns.md
+  s_fc81472ff4a623::t_e39914c4f7a331 16
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_9beb1f0f6afb06 242-243
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_fc81472ff4a623::t_9beb1f0f6afb06 390-391
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_fc81472ff4a623::t_3cd7481d9b44be 69
+  s_fc81472ff4a623::t_ee727de9a36f6e 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "16e5bc8bb9c1c819154da8f1feb341a194c44f72",
+  "prompts": {},
+  "sessions": {
+    "s_fc81472ff4a623": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eae8d790-ad2e-4367-a38b-24a76ce18c74",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

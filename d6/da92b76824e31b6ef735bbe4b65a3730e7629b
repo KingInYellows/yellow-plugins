@@ -1,0 +1,23 @@
+plugins/yellow-composio/commands/composio/setup.md
+  s_8c0b4886545c65::t_8e7a3ed5ebc3f7 139-143,146-152,166,173
+  s_8c0b4886545c65::t_740039e790a99f 94-97,99-105
+  s_8c0b4886545c65::t_1498e607aa1144 115-116
+  s_8c0b4886545c65::t_b2093f8822612a 35-44,48-49
+  s_8c0b4886545c65::t_59884dd8d1dd04 53-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d6da92b76824e31b6ef735bbe4b65a3730e7629b",
+  "prompts": {},
+  "sessions": {
+    "s_8c0b4886545c65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5641b84-6ce4-4b8a-a230-6cd60544e2b0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

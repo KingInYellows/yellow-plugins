@@ -1,0 +1,19 @@
+plugins/yellow-devin/commands/devin/wiki.md
+  s_e0beaba782ec4e::t_4b2f8c2e2dfc70 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "2ca05535a98aecb1ee2e402165c7308eedd886d0",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

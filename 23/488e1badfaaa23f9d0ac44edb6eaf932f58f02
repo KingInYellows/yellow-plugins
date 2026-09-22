@@ -1,0 +1,25 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_44086bc4cefe03::t_7553784609557d 413-425
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_44086bc4cefe03::t_3cb0975e20d57e 428-440
+plugins/yellow-council/tests/redaction.bats
+  s_44086bc4cefe03::t_2af3f5f84ff7c3 78-83,86-88
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_44086bc4cefe03::t_3cb0975e20d57e 231-243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "23488e1badfaaa23f9d0ac44edb6eaf932f58f02",
+  "prompts": {},
+  "sessions": {
+    "s_44086bc4cefe03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c892ae64-321b-4803-8573-afdef91d0406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

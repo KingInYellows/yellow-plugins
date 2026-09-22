@@ -1,0 +1,42 @@
+docs/brainstorms/2026-05-18-background-compounding-triggers-brainstorm.md
+  s_0f11ccca6994a8::t_b7b6b77be85a0a 1-367
+docs/research/repo/background-compounding-triggers-deepen-validation.md
+  s_0f11ccca6994a8::t_788efd25878e23 1-365
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_0f11ccca6994a8::t_8d652da3fbe1c9 1-621
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_0f11ccca6994a8::t_0d4e289508884b 1-545
+plans/background-compounding-triggers.md
+  s_0f11ccca6994a8::t_2f9b0300ed67fb 143,221
+  s_0f11ccca6994a8::t_ded26bb13e566c 1-4,12-17,22-24,28,30,35-37,39-40,96-97,102-105,142,222-223,240-242,260-261,264,274,276,283,300-303,310-311,313,315-317,320-321,323-324,451,472,475,520-522,531-538,540,547,553-555,560-562,586-588,613-615,624-626,640-643,667-669,695-700,707,736-740
+  s_0f11ccca6994a8::t_b2ad6b777cac7b 201,203-220
+  s_0f11ccca6994a8::t_0e70d45bce2636 448-450
+  s_0f11ccca6994a8::t_bd9032a817df2d 602-605
+  s_0f11ccca6994a8::t_053b492f6d394a 284
+  s_0f11ccca6994a8::t_d7f81f2ee5df0c 5-11,18-21,25-27,29,31-34,38,41-95,98-101,106-141,144-200,202,224-239,243-251,257-259,263,265-273,275,277-282,285-299,304-309,312,314,318-319,322,325-447,452-471,473-474,478-486,490-508,512-519,523-530,539,541-546,548-552,556-559,563-585,589-601,606-612,616-618,627-639,644-649,659-666,670-685,689-694,701-706,741-750
+  s_0f11ccca6994a8::t_cc541d8f482973 708-735
+  s_0f11ccca6994a8::t_03a5e590d4fa9b 686-688
+  s_0f11ccca6994a8::t_94740163053723 619-623
+  s_0f11ccca6994a8::t_db2f7acec44a62 509-511
+  s_0f11ccca6994a8::t_97912648a954e2 650-658
+  s_0f11ccca6994a8::t_f2d3e8f81d478f 252-256
+  s_0f11ccca6994a8::t_e69140539d59be 476-477
+  s_0f11ccca6994a8::t_0e7c01080bd573 262
+  s_0f11ccca6994a8::t_a0d2714f0497d5 487-489
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "cd80866d8513af188b7c827260310487e00a2d84",
+  "prompts": {},
+  "sessions": {
+    "s_0f11ccca6994a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f80b64ec-53af-40c4-83ab-1abccdeff5be",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

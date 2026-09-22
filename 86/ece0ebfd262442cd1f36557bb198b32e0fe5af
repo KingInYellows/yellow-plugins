@@ -1,0 +1,37 @@
+.changeset/ruvector-provenance-check.md
+  s_2544e3a9ffcf50::t_9d86f182f4107a 2,12-16
+plugins/yellow-ruvector/tests/session-start.bats
+  s_2544e3a9ffcf50::t_6788d0eab75263 100
+  s_2544e3a9ffcf50::t_00cd3b5d017003 99,101-102,306-308,358-412
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_2544e3a9ffcf50::t_83de37a2fc6ab8 96,98-99,139-154,157-161,165,169-171,175,177-187,189
+  s_2544e3a9ffcf50::t_6788d0eab75263 97,100,166-168,173,229,234
+plugins/yellow-ruvector/README.md
+  s_2544e3a9ffcf50::t_9d86f182f4107a 87
+docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md
+  s_2544e3a9ffcf50::t_9d86f182f4107a 26-30,43-49,90-98
+plugins/yellow-ruvector/CLAUDE.md
+  s_2544e3a9ffcf50::t_9d86f182f4107a 67-70,99-107,171-176
+plugins/yellow-ruvector/skills/ruvector-conventions/SKILL.md
+  s_2544e3a9ffcf50::t_9d86f182f4107a 212
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_2544e3a9ffcf50::t_46233e9ce6f982 3,7,93-99,102,104-107,111-119,124-128,133-147,150-151,156,160-162,164,166-174,178-180,182-185,189-190,192,195-196,199-202,204-210,242,252-255
+  s_2544e3a9ffcf50::t_8ce4c2ab41a97d 148-149
+  s_2544e3a9ffcf50::t_d11a3e630b3d05 103,108-110,129-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "86ece0ebfd262442cd1f36557bb198b32e0fe5af",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

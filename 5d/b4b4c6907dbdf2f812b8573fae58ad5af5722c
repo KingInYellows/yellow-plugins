@@ -1,0 +1,65 @@
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e72e14f6bafd18::t_7bb84ce0c0b7e1 1-4,6-13,15-84,86-96,102-103,107-114,119,121-127,133-140,144-158,181-184,190,195-204,206-208,217-233,239-240,242,247-249,255-284,286-363,365-404,253,101,118,160,170,172,180,212-213,215-216,238
+  s_6d2ef1322cfec1::t_4b6d0a04232020 209-210,205,211,214,234-237
+  s_c1ce70ba5b1295::t_7330bb14c38a8a 5
+  s_e7078f78719364::t_26e08e75098432 14
+  s_e7078f78719364::t_387985e90990e6 85
+  s_e7078f78719364::t_4dc98305eaf61d 120
+  s_e7078f78719364::t_cef06630bfb821 128-132
+  s_e7078f78719364::t_afb08f3518aa70 141,143
+  s_e7078f78719364::t_51c80c57930e78 142
+  s_e7078f78719364::t_fc763a633e41a3 185-189
+  s_e7078f78719364::t_fc95a03ba45ae0 285
+  s_e7078f78719364::t_8906aa998390fa 364
+  s_6d2ef1322cfec1::t_6f0b2731bdd5f9 191-194
+  s_6d2ef1322cfec1::t_8adcf93304882b 241,243-246,250-252,254
+  s_6d2ef1322cfec1::t_c358235f45361f 97-100,104-106,115-117
+  s_6d2ef1322cfec1::t_3bb53edcc4935f 159,161-169,171,173-179
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_e72e14f6bafd18::t_3154302df98673 1-4,7-18,22-40,47-80,82,84-88,97-115,119-222,92-93,95-96
+  s_e72e14f6bafd18::t_f68c621a0d0379 5-6
+  s_e72e14f6bafd18::t_54220849c210bb 19-21
+  s_e7078f78719364::t_4ca0cb4f51d7ce 116-118
+  s_6d2ef1322cfec1::t_1c987db96479d4 41-46
+  s_6d2ef1322cfec1::t_5fefb1e9e67843 81,83,89-91,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "5db4b4c6907dbdf2f812b8573fae58ad5af5722c",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e7078f78719364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a4284f8-c99a-4dff-98b8-1db0f132a811",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

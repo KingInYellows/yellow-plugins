@@ -1,0 +1,35 @@
+plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md
+  s_5b2f0f27df2bce::t_70e02ef6ba9bec 24-29
+plugins/gt-workflow/skills/stack-plan-style/SKILL.md
+  s_5b2f0f27df2bce::t_010ef223e32fe5 25-30
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_5b2f0f27df2bce::t_279e10ea2dbab3 244-248
+plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md
+  s_5b2f0f27df2bce::t_70e02ef6ba9bec 243-247
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_05c60fcab49fa9::t_bbeb6ef608b28e 240,248,260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "38df845fbbb717c64b04167dc21dc8e19fce6878",
+  "prompts": {},
+  "sessions": {
+    "s_05c60fcab49fa9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-workflowswork-e045b31f503150f3",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_5b2f0f27df2bce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ff24ef3b-32f8-4a70-8362-caddc660ad44",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

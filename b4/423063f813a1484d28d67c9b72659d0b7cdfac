@@ -1,0 +1,21 @@
+plugins/yellow-core/commands/compound/review-staged.md
+  s_bb05a4e31d3513::t_af85f2feb19467 203-211
+scripts/validate-agent-authoring.js
+  s_bb05a4e31d3513::t_d36224add5502a 427-435
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "b4423063f813a1484d28d67c9b72659d0b7cdfac",
+  "prompts": {},
+  "sessions": {
+    "s_bb05a4e31d3513": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7359f15c-f7a1-453b-a3e4-191910d60901",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

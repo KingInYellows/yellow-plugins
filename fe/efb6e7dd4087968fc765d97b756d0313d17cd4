@@ -1,0 +1,20 @@
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_2db87cc7495315::t_92e83164170b62 41-47
+  s_2db87cc7495315::t_93eee28a8d25d9 60,65-66,68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "feefb6e7dd4087968fc765d97b756d0313d17cd4",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

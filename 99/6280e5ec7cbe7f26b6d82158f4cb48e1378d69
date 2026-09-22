@@ -1,0 +1,31 @@
+packages/domain/src/validation/errorCatalog.ts
+  s_0c38a1b007fa25::t_8d1e2a551918a6 141-162
+scripts/validate-flow-namespace.js
+  s_0c38a1b007fa25::t_b8ddc98bbada63 1-390
+CLAUDE.md
+  s_0c38a1b007fa25::t_a1e65ffc2b9658 33,44
+scripts/flow-namespace-allowlist.json
+  s_0c38a1b007fa25::t_b8ddc98bbada63 1-62
+scripts/exercise-flow-namespace-gate.sh
+  s_0c38a1b007fa25::t_b8ddc98bbada63 1-131
+package.json
+  s_0c38a1b007fa25::t_808f9cc5434787 20,31
+packages/domain/src/validation/types.ts
+  s_0c38a1b007fa25::t_52eb31816c0912 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "996280e5ec7cbe7f26b6d82158f4cb48e1378d69",
+  "prompts": {},
+  "sessions": {
+    "s_0c38a1b007fa25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

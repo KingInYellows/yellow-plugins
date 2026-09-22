@@ -1,0 +1,44 @@
+tests/integration/validate-solutions.test.ts
+  s_3d732359543504::t_20d47ebd9c9a79 355-356,358-362,373-374,377-378,381-383,385-386,388-392,400-401,404-406
+  s_3d732359543504::t_4068e0dfe3d54e 393-397,399
+  s_3d732359543504::t_9e8213c1d94666 354,357,363-372,375-376,379-380,384,387,398,402-403
+scripts/validate-solutions.js
+  s_3d732359543504::t_a8d286b9ea3d11 170-181,186,188
+  s_3d732359543504::t_099a8499dca8ea 197-201
+  s_11b1eb62169ee8::t_5938c9b0014c31 297-298
+  s_3d732359543504::t_19a5b3a8aa9ce8 43
+  s_3d732359543504::t_6e628a11446619 119-125,128-142
+  s_3d732359543504::t_1688878a15d127 143,182-184
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_11b1eb62169ee8::t_99b62ca9aba72a 90
+.github/workflows/validate-schemas-fork.yml
+  s_3d732359543504::t_0d249da313a5b4 16
+  s_3d732359543504::t_38bdf32ccfd805 44,49-50
+  s_3d732359543504::t_2c45adfdc8eb76 126-133
+packages/domain/src/validation/errorCatalog.ts
+  s_3d732359543504::t_619aaa81623707 76-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "22a97a0c21e66235e5eedc0d32f426e01eb0d1f3",
+  "prompts": {},
+  "sessions": {
+    "s_11b1eb62169ee8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1f120e4-a6b9-41d4-8741-f86d99ac4549",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    },
+    "s_3d732359543504": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cdbf3a-f938-4393-b0f3-29245d9b53b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

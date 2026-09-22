@@ -1,0 +1,36 @@
+plugins/yellow-ci/tests/hook-parity.bats
+  s_fc81472ff4a623::t_ee8bcc14374ddb 33-51
+plugins/yellow-ci/tests/lib/hook-scenario.bash
+  s_fc81472ff4a623::t_a643c9e9c84900 92-97,102
+  s_fc81472ff4a623::t_a2fe7af5cff8b7 20-27
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_fc81472ff4a623::t_b5f6f0cbfc2ca9 265-320
+  s_fc81472ff4a623::t_1643e105d9afbf 353-358,362-375,379-389
+  s_fc81472ff4a623::t_e19cb8bcf3366f 401-405,407,418-420,428-430,432-436,440-441
+plugins/yellow-ci/tests/fixtures/hooks/cache-hit.golden.txt
+  s_fc81472ff4a623::t_a975f67b29bd9c 4
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_4cee7fcb067e0e 210-217,222-232,264-269,284-297,326-327,329,334-339,342-370,374
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_51a50ae24bc489 209-216,221-231,263-268,283-296,325-326,328,333-338,341-369,373
+plugins/yellow-ci/codex/skills/ci-status/SKILL.md
+  s_fc81472ff4a623::t_51a50ae24bc489 26-30,32-35,37,47-50,54-58,62-69,71,74-88
+plugins/yellow-ci/skills/ci-status/SKILL.md
+  s_fc81472ff4a623::t_de75bbf5d6453a 27-31,33-36,38,48-51,55-59,63-70,72,75-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "049c0b813e09b3c662a8f31f88f84a052edf6e77",
+  "prompts": {},
+  "sessions": {
+    "s_fc81472ff4a623": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eae8d790-ad2e-4367-a38b-24a76ce18c74",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

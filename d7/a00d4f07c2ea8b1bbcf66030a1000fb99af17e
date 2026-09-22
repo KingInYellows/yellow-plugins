@@ -1,0 +1,26 @@
+docs/security.md
+  s_17bd29452ea753::t_36556e75e0588e 122-123,128,132-140
+  s_17bd29452ea753::t_437ad80be08298 141
+plugins/yellow-ci/CLAUDE.md
+  s_17bd29452ea753::t_962584318ca460 195-247
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_f8ee23708e1c6c 436
+AGENTS.md
+  s_17bd29452ea753::t_93f88c536ec4f5 278-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d7a00d4f07c2ea8b1bbcf66030a1000fb99af17e",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

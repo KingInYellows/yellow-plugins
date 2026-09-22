@@ -1,0 +1,42 @@
+plugins/github-workflow/README.md
+  s_fd5d688b6eb948::t_6de52740bdfcf6 75-81
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_fd5d688b6eb948::t_8c3a98ca892af1 1-44
+plugins/github-workflow/hooks/scripts/lib/run-hook.js
+  s_fd5d688b6eb948::t_2bc48851503894 1-107
+plugins/github-workflow/hooks/scripts/lib/envelope.js
+  s_fd5d688b6eb948::t_c557ae69cbb6d5 1-92
+plugins/github-workflow/hooks/hooks.json
+  s_fd5d688b6eb948::t_ce3edbed85e67a 1-29
+plugins/github-workflow/CLAUDE.md
+  s_fd5d688b6eb948::t_6d4ca7aaedb647 77,79,83-97
+  s_fd5d688b6eb948::t_999f3ea0259f1c 98
+plugins/github-workflow/hooks/scripts/lib/policy-check-commit-message.js
+  s_fd5d688b6eb948::t_825939724e2637 1-73
+catalog/plugins/github-workflow.json
+  s_fd5d688b6eb948::t_6dcf4eee436d29 21-46
+plugins/github-workflow/hooks/scripts/entrypoint-claude.js
+  s_fd5d688b6eb948::t_c557ae69cbb6d5 1-16
+plugins/github-workflow/.claude-plugin/plugin.json
+  s_fd5d688b6eb948::t_7de89e4666f817 22-47
+plugins/github-workflow/tests/hooks.bats
+  s_fd5d688b6eb948::t_2e8dbcf26440b5 1-115
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_fd5d688b6eb948::t_d3778f707497d0 247-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "34b98b8bfd2e2be6853e00b9151e04ea987bc618",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

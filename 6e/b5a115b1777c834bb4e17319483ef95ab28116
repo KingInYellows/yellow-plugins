@@ -1,0 +1,33 @@
+.changeset/yellow-council-base-flag-rest-rederive.md
+  s_6c2a352ad27053::t_dcd641880a3936 1-18
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_dbe8034b0f3e9c::t_dc53e79e0a9300 452-497
+plugins/yellow-council/commands/council/council.md
+  s_dbe8034b0f3e9c::t_ffae6248433498 174
+  s_dbe8034b0f3e9c::t_e867a5024a3837 165-172,175-180,182
+  s_6c2a352ad27053::t_0c7e460b781cb8 122-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6eb5a115b1777c834bb4e17319483ef95ab28116",
+  "prompts": {},
+  "sessions": {
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_dbe8034b0f3e9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7641ec5c-3b7e-4580-9864-e17959d2a2f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

@@ -1,0 +1,45 @@
+docs/solutions/code-quality/markdown-table-pipe-escape-prettier-blind-spot.md
+  s_bfaae59535a9fa::t_bae0f00d211444 1,14-30,41-43,51,59-62,66-69,80-82,91-93,97
+  s_bfaae59535a9fa::t_c03f16184f4c07 2-13,31-40,44-50,52-58,63-65,70-79,83-90,94-96,98-99
+docs/yellow-jules/integration-plan.md
+  s_bfaae59535a9fa::t_c03f16184f4c07 36-40,135-146,148-149,234-246,249-250
+  s_bfaae59535a9fa::t_9b350e9fb029a1 251
+  s_bfaae59535a9fa::t_c26826605d10f1 232-233
+docs/yellow-jules/sdk-investigation.md
+  s_bfaae59535a9fa::t_c03f16184f4c07 547-550
+plans/specs/yellow-jules-integration.md
+  s_bfaae59535a9fa::t_c03f16184f4c07 117-118,484,706-711,717
+  s_bfaae59535a9fa::t_27e45560b55d91 119,485,488-491,496,718,757-766
+  s_bfaae59535a9fa::t_54bc668366a5bd 116
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_bfaae59535a9fa::t_27e45560b55d91 384-386,395
+docs/CONCEPTS.md
+  s_bfaae59535a9fa::t_27e45560b55d91 73-74
+plans/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_bfaae59535a9fa::t_27e45560b55d91 333,340-342
+docs/solutions/code-quality/layered-contract-fixes-cross-cutting-collision.md
+  s_bfaae59535a9fa::t_b4483d34f64041 1,16-32,39-40,49-51,59,67-69,74-75,93,105-106,116-119,128-129,132-133
+  s_bfaae59535a9fa::t_c03f16184f4c07 2-15,33-38,41-48,52-58,60-66,70-73,76-92,94-104,107-115,120-127,130-131
+docs/yellow-jules/contract-v1.md
+  s_bfaae59535a9fa::t_c03f16184f4c07 23-32,105-114,245,248-249,255-258,273-285,295-305,322-327,333-344,369-384,389-390,399-417,434-438,477-479,533-555,594-607,619-626,636-637,644-651,669-686,743,756-764,771-774,786-789,797-803
+  s_bfaae59535a9fa::t_c26826605d10f1 345,352,419,446-450,452-472,641
+docs/yellow-jules/fixtures.md
+  s_bfaae59535a9fa::t_c26826605d10f1 196
+  s_bfaae59535a9fa::t_c03f16184f4c07 17-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "77e2ebfab9eb767aa41e7126c2c1d518966978bf",
+  "prompts": {},
+  "sessions": {
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

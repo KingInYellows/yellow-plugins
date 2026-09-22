@@ -1,0 +1,57 @@
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_90cee544007013::t_cb585fa74d863e 10-11,15-23
+  s_90cee544007013::t_b81efdd3dac184 24
+plugins/yellow-research/skills/research-patterns/SKILL.md
+  s_90cee544007013::t_f73b2e880d42b3 9-23
+plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md
+  s_90cee544007013::t_6c24b470867d95 9-24
+.claude-plugin/marketplace.json
+  s_90cee544007013::t_7f24a31e2beb25 116
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_90cee544007013::t_56bba3e4ffee55 23
+  s_90cee544007013::t_197a6751ec3e6e 9-10,14-22
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_90cee544007013::t_7b8904b262837d 9-10,14-22
+  s_90cee544007013::t_945cac36cfd3a0 23
+plugins/yellow-docs/skills/docs-conventions/SKILL.md
+  s_90cee544007013::t_be6484f81c56bc 9-22
+.changeset/w4-audit-doc-drift-sweep.md
+  s_90cee544007013::t_4d1b01f9d995b1 1-21
+plugins/yellow-ci/skills/ci-conventions/SKILL.md
+  s_90cee544007013::t_3b16245658072b 9-10,12-22
+  s_90cee544007013::t_7438eadce7de8e 23-25
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_9bdf1ee478a73d 327,336,338,340,344,347
+  s_072e2f16815af1::t_bfe1d099c8c1f7 364,372
+README.md
+  s_90cee544007013::t_21f94f64648d9d 45
+  s_90cee544007013::t_b39b64e990b6c9 130-132
+  s_90cee544007013::t_67e64155b13974 64-66
+  s_90cee544007013::t_f54712fc593e28 148-149
+plugins/yellow-ci/skills/diagnose-ci/SKILL.md
+  s_90cee544007013::t_4f88b1c870a1a2 9-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a36dae64bd72992e29ba3f5e43d135d159c141df",
+  "prompts": {},
+  "sessions": {
+    "s_072e2f16815af1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e7d9a9b5-3d75-4ff8-a531-0685f196dab3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

@@ -1,0 +1,30 @@
+AGENTS.md
+  s_4febf2cbaf48e8::t_79e5729c008381 279-288
+plugins/gt-workflow/CLAUDE.md
+  s_4febf2cbaf48e8::t_384997b5470a1d 266-268
+  s_4febf2cbaf48e8::t_f9ce397a56d9c0 175-198,205-210
+  s_4febf2cbaf48e8::t_086ca9013c7f01 283-286
+  s_4febf2cbaf48e8::t_0111acb3afc55a 77-84,94-104
+  s_4febf2cbaf48e8::t_9abcb530717c67 242-265,269
+  s_4febf2cbaf48e8::t_f0db7ce7f622ae 8-10
+  s_4febf2cbaf48e8::t_b34c0d8714514b 105
+  s_4febf2cbaf48e8::t_44c6ed311a2a16 211
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_03e692acdb226f 416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4967fa2d2f68b2864eedb47b293ff09f4ad5f4d3",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

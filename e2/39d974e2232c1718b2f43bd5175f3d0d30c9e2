@@ -1,0 +1,22 @@
+docs/solutions/code-quality/automated-bot-review-false-positives.md
+  s_1c74ba9d6245f4::t_717ce6706d8cd8 173-208
+docs/solutions/code-quality/session-level-review-command-patterns.md
+  s_1c74ba9d6245f4::t_3211b3629702b1 13
+  s_1c74ba9d6245f4::t_493c9fbe490fbd 212-280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "e239d974e2232c1718b2f43bd5175f3d0d30c9e2",
+  "prompts": {},
+  "sessions": {
+    "s_1c74ba9d6245f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c39a8589-09cd-45b0-a129-94ae92a2cb42",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,245 @@
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+tests/integration/git-push-detector-parity.test.ts
+  s_9faf0dc507d8cf::t_4f00b720b8245f 23,25,182-251,371-391,441,444-445,496-506
+  s_9faf0dc507d8cf::t_ead5bbb7ff9385 556
+  s_9faf0dc507d8cf::t_fde603d5f7bf05 1-22,24,26-55,58-93,322-342,344-350,434-440,442-443,446-484,550-555,557-560
+  s_9faf0dc507d8cf::t_966acf9d6f79fc 94-181,343,351-370,485-495,536
+  s_9faf0dc507d8cf::t_fd1d60f2732d7d 252-289,392-406,507-514
+  s_9faf0dc507d8cf::t_2c898816b72b16 290-301,407-410,515-526,542-546,548-549
+  s_9faf0dc507d8cf::t_ceb2319abc66c2 302-321,411-425,527-532,537-541,547
+  s_9faf0dc507d8cf::t_cd037b801fe6c3 56-57
+  s_9faf0dc507d8cf::t_c1033048a5c803 426-433,533-535
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1-6
+plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js
+  s_9faf0dc507d8cf::t_128f376c57cb60 32-39,43-47,50-53
+  s_9faf0dc507d8cf::t_bcaf35615126c8 1074,1080-1083,1086,1095
+  s_9faf0dc507d8cf::t_ba62304acf5bc4 209-211
+  s_9faf0dc507d8cf::t_51735f38b0f506 225,265,350,364,379-383,402,405-408,413-416,449,457-461,503-504,528-529,557,559,692-693,834,849-852,857-860,866-867,877,1015-1017,1263-1264,1327
+  s_9faf0dc507d8cf::t_494192b3af02dd 116-119,257,340,352-355,696-698,948-949,980,1250-1252,1331
+  s_9faf0dc507d8cf::t_7703ede402633a 644,788,1304-1305
+  s_9faf0dc507d8cf::t_ba0d5b3df7f912 1218-1227,1229-1230,1235-1238,1257-1260,1267,1271,1276,1303,1332-1333
+  s_9faf0dc507d8cf::t_8458e36415c6b8 94-96,481-482,485,490,505,530,694,806,808,853-856,861-865,876,909,1154,1231-1234,1239-1249,1253-1256,1298-1302
+  s_9faf0dc507d8cf::t_3b74f9d31cc779 11-14,18-20,41,54,73,91-93,97,104-107,113,115,120-121,124,132,134-138,143,161,163-164,170-171,190,201-208,217-218,220,270-274,276-284,335,337-339,365-367,387-388,430,433-434,436-448,454-455,463-467,574-590,617,622,646-652,667-668,761,765-766,774-777,779-782,787,791,798,800,809-811,816-820,822-824,827-828,880,905,940,1021-1022,1024-1025,1043,1051,1062,1065,1072,1096-1099,1110,1135,1142,1153,1161,1182-1183,1212,1294,1322
+  s_9faf0dc507d8cf::t_87dd7bd6c86cbc 111-112,123,125-126,144,146,148-151,167-169,1054-1057,1059,1066,1111,1113-1128,1131-1133,1137-1139
+  s_9faf0dc507d8cf::t_d6d5ab29def1bf 254
+  s_9faf0dc507d8cf::t_9190ee23861eb9 886,889-894,942-947,950-959,985-1014,1032-1034,1036,1038-1041,1106,1109,1141,1163,1172,1179,1210,1228,1295
+  s_9faf0dc507d8cf::t_448d50392c876c 1338-1341
+  s_9faf0dc507d8cf::t_1dda47b3af6e74 122
+  s_9faf0dc507d8cf::t_d6122dc74b6a35 222-224,226-242,246,285-331
+  s_9faf0dc507d8cf::t_e07d476cbc77fd 243-245,247-253,960-979,981-984
+  s_9faf0dc507d8cf::t_3dd7ee5926a6b2 713-717,719-720,723
+  s_9faf0dc507d8cf::t_bbd2ae1a30d810 1076,1155
+  s_9faf0dc507d8cf::t_14597fc821528a 193-194
+  s_9faf0dc507d8cf::t_16108e7bfd2d9b 1-10,16-17,40,55-65,74-90,103,114,133,139-140,142,145,152,156-160,175,189,199-200,216,258-259,262-263,332-334,349,351,356,358-359,386,389-390,429,546,563-573,591-616,618-621,623-643,645,653-666,670-683,703-706,708-712,721-722,728-736,738-747,749-753,755-760,789-790,792-797,799,801-805,807,814-815,830-831,833,840-843,845-848,875,878,1018-1020,1035,1042,1049-1050,1058,1061,1063,1067,1094,1134,1147-1149,1152,1156-1160,1171,1174-1176,1180-1181,1189,1191-1192,1198-1202,1205,1213-1216,1283-1284,1292-1293,1296,1313-1321,1323-1326,1328,1330,1334-1336
+  s_9faf0dc507d8cf::t_8ebf18aede1ad8 221,1217
+  s_9faf0dc507d8cf::t_c91f829da14c06 374-378,417-419,450-453,456,468-478,502,527,537-542,669,684-691,695,699-702,718,724-727,737,748,754,764,778,813,825,829
+  s_9faf0dc507d8cf::t_2d57e6c4c41582 15,21-31,42,48-49,66-72,98-102,108-110,127,147,153-155,162,172-174,186-188,191-192,195-198,212-215,219,255-256,260-261,264,266-267,269,275,336,341-348,357,360-363,368-373,384-385,391-401,403-404,409-412,420-428,431-432,435,462,479-480,483-484,486-489,491-501,506-526,531-536,543-545,547-556,558,560-562,707,767-773,783-786,812,821,826,832,835-839,844,879,881-885,887-888,895-904,906-908,910-939,941,1023,1026-1031,1037,1044-1048,1052-1053,1060,1064,1068-1071,1073,1075,1077-1079,1084-1085,1087-1093,1100-1105,1107-1108,1112,1129-1130,1140,1143-1146,1150-1151,1164-1170,1173,1177-1178,1184-1188,1190,1193-1197,1203-1204,1206-1209,1211,1265-1266,1268-1270,1273-1275,1277-1282,1285-1291,1297,1306-1312,1329,1337
+  s_9faf0dc507d8cf::t_afd7451a034caf 176-185
+  s_9faf0dc507d8cf::t_c6ff5885c5793d 868-874,1261-1262
+  s_9faf0dc507d8cf::t_cb1e700e770763 762-763,1136,1162,1272
+  s_9faf0dc507d8cf::t_1ce8cb2eea904f 268
+  s_9faf0dc507d8cf::t_9803e4de038750 128-131,141,165-166
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/hook-parity.bats
+  s_9faf0dc507d8cf::t_eb0631b79b0991 265-292
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 172-233
+  s_9faf0dc507d8cf::t_e39c0426854a0a 234-264,293-296
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 297-312
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.stdin
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/hooks/codex-hooks.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 11,24
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_9faf0dc507d8cf::t_61d8279c910a60 15-25,35-40,49-51,53,62-72,74
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+catalog/plugins/gt-workflow.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 34,46
+plugins/gt-workflow/.claude-plugin/plugin.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 35,47
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/github-workflow/README.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 79-82
+plugins/gt-workflow/README.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 124-129
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.stdin
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/github-workflow/CLAUDE.md
+  s_9faf0dc507d8cf::t_5b137745b905ea 99-103
+  s_9faf0dc507d8cf::t_444bcee2fb929a 93-98
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+.changeset/git-push-guard-tokenised-detector.md
+  s_9faf0dc507d8cf::t_a5a5e26a1e6eaf 1-8
+  s_9faf0dc507d8cf::t_fe275154bfce24 9-10,26-31
+  s_9faf0dc507d8cf::t_5b137745b905ea 11-25
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.stdin
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_9faf0dc507d8cf::t_bf25669c702273 266,278,326,338
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/github-workflow/.claude-plugin/plugin.json
+  s_9faf0dc507d8cf::t_4218d04a2351bb 30,42
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.stdin
+  s_9faf0dc507d8cf::t_e39c0426854a0a 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+plugins/github-workflow/hooks/scripts/lib/git-push-detector.js
+  s_9faf0dc507d8cf::t_807d62d81a1067 128-131,141,165-166,176-185,193-194,209-211,221-224,226-242,246,268,285-331,374-378,417-419,450-453,456,468-478,502,527,537-542,669,684-691,695-702,718,724-727,737,748,754,764,778,813,825,829,886,889-894,942-959,985-1014,1032-1034,1036,1038-1041,1074,1080-1083,1086,1095,1106,1109,1141,1163,1172,1179,1210,1216-1230,1235-1238,1267,1271,1276,1295,1303,1332-1333
+  s_9faf0dc507d8cf::t_ceb2319abc66c2 94-96,111-112,123,125-126,144,146,148-151,167-169,243-245,247-253,481-482,485,490,505,530,694,806,808,853-856,861-865,868-876,909,960-984,1054-1057,1059,1066,1111,1113-1128,1131-1133,1137-1139,1154,1231-1234,1239-1256,1261-1262,1298-1302
+  s_9faf0dc507d8cf::t_b236d2183271c0 1338-1341
+  s_9faf0dc507d8cf::t_128f376c57cb60 32-39,43-47,50-53
+  s_9faf0dc507d8cf::t_966acf9d6f79fc 11-14,18-20,41,54,73,91-93,97,104-107,113,115-121,124,132,134-138,143,161,163-164,170-171,190,201-206,208,217-218,220,254,270-274,276-284,335,337-339,365-367,387-388,430,433-434,436-443,445-448,454-455,463-467,574-590,617,622,644-650,667-668,762-763,774-777,779-782,787-789,791,798,800,809-811,816-820,822-824,827-828,880,905,940,1021-1022,1024-1025,1043,1051,1062,1065,1072,1076,1096-1099,1110,1134-1136,1155,1161-1162,1182-1183,1212,1257-1258,1272,1294,1304-1305,1322
+  s_9faf0dc507d8cf::t_61d8279c910a60 1-10,16-17,40,55-65,74-90,103,114,133,139-140,142,145,152,156-160,175,189,199-200,207,216,258-259,262-263,332-334,349,351-356,358-359,386,389-390,429,444,546,563-573,591-616,618-621,623-643,651-666,670-683,703-706,708-717,719-723,728-736,738-747,749-753,755-761,765-766,790,792-797,799,801-805,807,814-815,830-831,833,840-843,845-848,878,1018-1020,1035,1042,1049-1050,1058,1061,1063,1067,1094,1142,1147-1149,1152-1153,1156-1160,1171,1174-1176,1180-1181,1189,1191-1192,1198-1202,1205,1213-1215,1283-1284,1292-1293,1296,1313-1321,1323-1326,1328,1330-1331,1334-1336
+  s_9faf0dc507d8cf::t_4f00b720b8245f 15,21-31,42,48-49,66-72,98-102,108-110,127,147,153-155,162,172-174,186-188,191-192,195-198,212-215,219,255-256,260-261,264,266-267,269,275,336,340-348,357,360-363,368-373,384-385,391-401,403-404,409-412,420-428,431-432,435,462,479-480,483-484,486-489,491-501,506-526,531-536,543-545,547-556,558,560-562,707,767-773,783-786,812,821,826,832,835-839,844,879,881-885,887-888,895-904,906-908,910-939,941,1023,1026-1031,1037,1044-1048,1052-1053,1060,1064,1068-1071,1073,1075,1077-1079,1084-1085,1087-1093,1100-1105,1107-1108,1112,1129-1130,1140,1143-1146,1150-1151,1164-1170,1173,1177-1178,1184-1188,1190,1193-1197,1203-1204,1206-1209,1211,1259-1260,1265-1266,1268-1270,1273-1275,1277-1282,1285-1291,1297,1306-1312,1329,1337
+  s_9faf0dc507d8cf::t_1dda47b3af6e74 122
+  s_9faf0dc507d8cf::t_499ccdaa7522f4 225,265,350,364,379-383,402,405-408,413-416,449,457-461,503-504,528-529,557,559,692-693,834,849-852,857-860,866-867,877,1015-1017,1263-1264,1327
+  s_9faf0dc507d8cf::t_ff69c71c512501 257
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.stdin
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1
+plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_9faf0dc507d8cf::t_6242b514a83f18 7-18,22,45-46,54
+docs/solutions/security-issues/substring-regex-command-denylist-evasion.md
+  s_9faf0dc507d8cf::t_5b137745b905ea 63-64,66-67,73-82,90-91,104-107
+  s_9faf0dc507d8cf::t_a5a5e26a1e6eaf 55-59,126
+  s_9faf0dc507d8cf::t_fe275154bfce24 60-62,65,68-72
+  s_9faf0dc507d8cf::t_8da634bf1df6e5 83-89,92-103,108-125
+plugins/github-workflow/tests/hooks.bats
+  s_9faf0dc507d8cf::t_405acb26442d53 114-115,117-119,121-128,131-137,139-142,146-149,155,158,162-165,169-172,176-222
+  s_9faf0dc507d8cf::t_4516b15b425af0 298
+  s_9faf0dc507d8cf::t_eb0631b79b0991 251-278
+  s_9faf0dc507d8cf::t_ff56e66863b274 110-113,116,120,129-130,138,143-145,150-152,159-161,166-168,173-175,223-224,289-297
+  s_9faf0dc507d8cf::t_5d3be2064f8283 153-154,156-157
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 225-250
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt
+  s_9faf0dc507d8cf::t_d58f0900be2f1e 1-6
+plugins/gt-workflow/CLAUDE.md
+  s_9faf0dc507d8cf::t_fe275154bfce24 204,244
+  s_9faf0dc507d8cf::t_5b137745b905ea 205-207,214-215
+  s_9faf0dc507d8cf::t_444bcee2fb929a 203,219,237-239,242-243,267-268
+  s_9faf0dc507d8cf::t_bd01a5df965620 208-213,216-218
+  s_9faf0dc507d8cf::t_e2ce72ac2bf9e1 245-246
+catalog/plugins/github-workflow.json
+  s_9faf0dc507d8cf::t_4218d04a2351bb 29,41
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.stdin
+  s_9faf0dc507d8cf::t_eb0631b79b0991 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "65b8647de9998f33ae173e81076ba402a0ca82f8",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

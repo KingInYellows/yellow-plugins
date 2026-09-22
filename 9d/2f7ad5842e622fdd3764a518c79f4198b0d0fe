@@ -1,0 +1,24 @@
+catalog/plugins/gt-workflow.json
+  s_4febf2cbaf48e8::t_964eb2a84702ab 39
+  s_4febf2cbaf48e8::t_c596a8bd10f212 51
+plugins/gt-workflow/.claude-plugin/plugin.json
+  s_4febf2cbaf48e8::t_01646e17ffc499 41,53
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_adeaef12e6fb93 276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9d2f7ad5842e622fdd3764a518c79f4198b0d0fe",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

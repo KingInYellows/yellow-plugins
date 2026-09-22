@@ -1,0 +1,26 @@
+plugins/yellow-core/lib/stack-provider-state.js
+  s_fd5d688b6eb948::t_4622276ea1bc2f 76-84
+  s_fd5d688b6eb948::t_bb6154d03cd517 739-752,754,782-787,791,793-794
+docs/research/2026-08-18-claude-plugin-scope-precedence-spike.md
+  s_fd5d688b6eb948::t_3c9802e65e4c07 1-158
+tests/integration/stack-provider-state.test.ts
+  s_fd5d688b6eb948::t_1c672f678546b5 826-850,855-923,928-940
+  s_fd5d688b6eb948::t_c47c6661e9364a 851-854
+  s_fd5d688b6eb948::t_6e17cb26df16ca 924-927
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "31e64933059fe705f3ea7832950a338df96c3c93",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+.changeset/yellow-core-compound-staging-surface.md
+  s_e72e14f6bafd18::t_f0c458f36be62f 1-43,46-60,63-77
+  s_f188cf7e3ae96a::t_45f8a00c455278 44-45
+  s_c1ce70ba5b1295::t_f998a2f7b172f3 61-62
+plugins/yellow-core/CLAUDE.md
+  ai_agent 26,59-72,83-85,144-148,205-275
+  s_f188cf7e3ae96a::t_5a9a832122a9de 74
+plugins/yellow-core/README.md
+  ai_agent 27,58,66-68
+scripts/validate-agent-authoring.js
+  ai_agent 389-414,417-418,429-455,533-534,542-543
+  s_6d2ef1322cfec1::t_ad6db7c6e53736 415-416,419,423-428
+  s_c1ce70ba5b1295::t_629f0999895c3a 420-422
+  s_6d2ef1322cfec1::t_b14f31b014f32e 456-493
+plugins/yellow-core/commands/compound/review-staged.md
+  ai_agent 1-68,70-72,89-104,109-110,116-131,137-139,151,153,159,161-174,188,190,194-197,200-206
+  s_f188cf7e3ae96a::t_25557ba57ee0e0 69,73-74
+  s_6d2ef1322cfec1::t_17a6ec23f84674 75-88
+  s_f188cf7e3ae96a::t_ada81220d92bf5 105-108,111-115
+  s_f188cf7e3ae96a::t_ad6953e5bf28ee 132-136
+  s_6d2ef1322cfec1::t_adc25813461102 140-150,152,154-155,175-187,189,191-193,198-199
+  s_f188cf7e3ae96a::t_5ffcfd90b3f5a6 156-158,160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "6f8653a903a162c12cc58149300d16a11f718a4a",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    },
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

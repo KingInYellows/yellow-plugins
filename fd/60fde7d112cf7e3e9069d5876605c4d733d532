@@ -1,0 +1,19 @@
+.codacy.yml
+  s_f4074862689008::t_33edf4bc910a12 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "fd60fde7d112cf7e3e9069d5876605c4d733d532",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_bb05a4e31d3513::t_f079cd53f37b5e 124-125,131-140,143-146
+  s_bb05a4e31d3513::t_2e0df5f2c93676 311-314,316-319
+  s_bb05a4e31d3513::t_71d310b778a8a3 515-524,528-534
+  s_bb05a4e31d3513::t_bcc9d483ebaf4c 195-197,199-202,205-226,231-284
+  s_bb05a4e31d3513::t_384a922a08626b 90-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "b4f61ad8373bc94caca42b8449f134cfdd66618d",
+  "prompts": {},
+  "sessions": {
+    "s_bb05a4e31d3513": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7359f15c-f7a1-453b-a3e4-191910d60901",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

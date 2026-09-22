@@ -1,0 +1,21 @@
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_771eb99196f0ba 251-260
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_7ed434e75cb861::t_23e4e3d5a66257 111-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0a1c0ff56702e367afe7662a58ffa761c865c70c",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

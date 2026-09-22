@@ -1,0 +1,25 @@
+docs/solutions/logic-errors/diagnostic-printf-leaks-into-command-substitution.md
+  s_2feb58e848d20d::t_70e18bf9e28aca 1-132
+docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md
+  s_2feb58e848d20d::t_70e18bf9e28aca 125-206
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_2feb58e848d20d::t_70e18bf9e28aca 372-451
+docs/solutions/security-issues/sandwich-fence-delimiter-forgery.md
+  s_2feb58e848d20d::t_70e18bf9e28aca 254-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2a95b1d82b871273b7309cf2dd19befc9fe94366",
+  "prompts": {},
+  "sessions": {
+    "s_2feb58e848d20d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46cf0ad5-c154-44fd-a3d8-19281f5dd794",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

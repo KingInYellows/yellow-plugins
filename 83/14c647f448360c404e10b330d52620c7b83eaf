@@ -1,0 +1,26 @@
+plugins/yellow-core/commands/workflows/spec.md
+  s_d0528420615001::t_961e982e2aace1 30-34
+README.md
+  s_d0528420615001::t_d4fa78a91f4661 30,267
+plugins/yellow-core/commands/workflows/decompose.md
+  s_d0528420615001::t_821114751c9402 25-29
+  s_d0528420615001::t_408d1fa5f8dc76 114-116
+  s_d0528420615001::t_7308c5a77167a3 133-138
+  s_d0528420615001::t_8f365575fa7201 191-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "8314c647f448360c404e10b330d52620c7b83eaf",
+  "prompts": {},
+  "sessions": {
+    "s_d0528420615001": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0e6dcfb-cc20-4b42-83d6-7b0f2ab5c59c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

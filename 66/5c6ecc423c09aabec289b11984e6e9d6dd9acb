@@ -1,0 +1,28 @@
+plugins/gt-workflow/tests/gt-cleanup.bats
+  s_4febf2cbaf48e8::t_a2fe11d1b7521f 105
+  s_4febf2cbaf48e8::t_5aa4d9e36c2642 230-246
+scripts/lib/generate/emit-codex.js
+  s_4febf2cbaf48e8::t_0d4a9a4aecc16a 168-172,174,178-191,225
+plugins/gt-workflow/skills/audit-review/SKILL.md
+  s_4febf2cbaf48e8::t_d0772a041ce160 105-109
+AGENTS.md
+  s_4febf2cbaf48e8::t_38a0f6042194fd 284-291
+plugins/gt-workflow/codex/skills/audit-review/SKILL.md
+  s_4febf2cbaf48e8::t_adfeab6cf71782 104-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "665c6ecc423c09aabec289b11984e6e9d6dd9acb",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}

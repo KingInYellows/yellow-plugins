@@ -1,0 +1,31 @@
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_17bd29452ea753::t_eb2f65c70c6d58 204-266
+plugins/yellow-ci/agents/maintenance/runner-diagnostics.md
+  s_17bd29452ea753::t_bfbb23fe2cc599 50,60,147
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_23d28a983cd7a6 303-320
+  s_17bd29452ea753::t_b504038587175b 295
+plugins/yellow-ci/skills/ci-conventions/SKILL.md
+  s_17bd29452ea753::t_e13c427c96d40e 111-113
+  s_17bd29452ea753::t_50a1536cb44b57 40-42
+  s_17bd29452ea753::t_95e4ebec0d2e8c 61-63
+plugins/yellow-ci/agents/ci/failure-analyst.md
+  s_17bd29452ea753::t_4d44dcba583682 66
+  s_17bd29452ea753::t_ca626c1450b35a 49,177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7c3b9a2f9989c7751d2e13f2c0acdff55f989a9d",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

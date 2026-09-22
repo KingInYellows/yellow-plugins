@@ -1,0 +1,32 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2db87cc7495315::t_a42c2509e1d737 218-249,253
+  s_2db87cc7495315::t_efb3f0224fa76b 581
+docs/solutions/workflow/gt-modify-no-c-flag-silent-unstaged-miss.md
+  s_2db87cc7495315::t_76ec3a2d81510f 116-118
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_2db87cc7495315::t_3b206407a769d4 294
+  s_2db87cc7495315::t_e41376310bc880 306-307
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_2db87cc7495315::t_288f8283550939 328-330
+  s_2db87cc7495315::t_3b206407a769d4 204,219,232
+  s_2db87cc7495315::t_0be11acb5980ea 290-293
+  s_2db87cc7495315::t_81c92763909466 265-268
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_2db87cc7495315::t_9e603144d49a2e 57-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "e7ed3c99d24f1433af555477b524bf994bae1a34",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

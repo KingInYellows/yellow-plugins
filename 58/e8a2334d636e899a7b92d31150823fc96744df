@@ -1,0 +1,19 @@
+plugins/yellow-review/commands/review/sweep-all.md
+  s_0fddd6f60100d2::t_d49f5229ee72b1 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "58e8a2334d636e899a7b92d31150823fc96744df",
+  "prompts": {},
+  "sessions": {
+    "s_0fddd6f60100d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39cf8a7f-5a65-4f04-a3d5-0b48a951c0c1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

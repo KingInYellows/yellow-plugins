@@ -1,0 +1,26 @@
+tests/integration/github-stack-runtime.test.ts
+  s_fd5d688b6eb948::t_6b0ed76f7a0b25 33
+  s_fd5d688b6eb948::t_228a7bb27a0a5b 388-430
+plugins/github-workflow/CLAUDE.md
+  s_fd5d688b6eb948::t_2e6c9cf6d72302 15-19
+plugins/github-workflow/lib/github-stack-runtime.js
+  s_fd5d688b6eb948::t_746e66fea2f005 39-46
+  s_fd5d688b6eb948::t_aaa0a3d23a73ab 132-177
+  s_fd5d688b6eb948::t_83f6c4fda87cd6 619
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "563034c8fa3b89f95e7394d03055aa72d233154a",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

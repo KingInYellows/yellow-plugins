@@ -1,0 +1,19 @@
+tests/integration/install-morphmcp.test.ts
+  s_f767bca7d385eb::t_6fe1aeec8f6cc7 88-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "106deec94ba34da67ffa59b86b90dbf484427e59",
+  "prompts": {},
+  "sessions": {
+    "s_f767bca7d385eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e42bc1e-42bd-432b-91ef-389ccb09db94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

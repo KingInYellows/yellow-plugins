@@ -1,0 +1,20 @@
+scripts/generate-manifests.js
+  s_ecffdbc39c3a6a::t_f306ffc349ae8d 32
+  s_ecffdbc39c3a6a::t_93065e02a32697 499-543
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a7c0d9e3eba8932238dafa1f49f31d5871ddb64b",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

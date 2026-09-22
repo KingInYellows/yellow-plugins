@@ -1,0 +1,20 @@
+plans/review-schema-and-codex-references-followups.md
+  s_ecffdbc39c3a6a::t_70e56ca7af3478 288
+  s_ecffdbc39c3a6a::t_f3852ae53dfa74 286
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "5687fc460efbeceb310721e1397b59af1dc8a2ed",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

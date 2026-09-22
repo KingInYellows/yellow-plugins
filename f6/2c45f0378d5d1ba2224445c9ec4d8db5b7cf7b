@@ -1,0 +1,32 @@
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_3c47fcc8a84b34::t_e0d5120479ee7c 217-220
+  s_3c47fcc8a84b34::t_90f2e22513a78c 88-101
+  s_3c47fcc8a84b34::t_e01aaf2749683a 230-232,236-240
+plugins/yellow-ci/tests/mocks/gh
+  s_3c47fcc8a84b34::t_126848f7a46704 37-39
+plugins/yellow-ci/tests/lib/hook-scenario.bash
+  s_3c47fcc8a84b34::t_126848f7a46704 79
+plugins/yellow-ci/tests/hook-parity.bats
+  s_3c47fcc8a84b34::t_7afc25ba386023 11-18
+  s_3c47fcc8a84b34::t_584d767d4a12d5 84-87,92,106
+  s_3c47fcc8a84b34::t_2a2900f1e42f49 90,93-105
+  s_3c47fcc8a84b34::t_e61304cb8791df 88-89,91
+plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.golden.txt
+  s_3c47fcc8a84b34::t_a5866114bceb4f 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f62c45f0378d5d1ba2224445c9ec4d8db5b7cf7b",
+  "prompts": {},
+  "sessions": {
+    "s_3c47fcc8a84b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3350f9-732c-413a-b730-a60b1c74be10",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

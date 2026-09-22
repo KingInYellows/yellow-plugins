@@ -1,0 +1,31 @@
+scripts/lib/plugin-rules.js
+  s_9faf0dc507d8cf::t_dd58490f8d8fbb 284-294
+scripts/generate-manifests.js
+  s_9faf0dc507d8cf::t_54b8a003651f06 71-74,79-95,956,1194-1209,1211,1220-1253,1294,1470-1485,1487,1496-1529,1556-1558
+scripts/lib/plugin-paths.js
+  s_9faf0dc507d8cf::t_dd58490f8d8fbb 232-271,558-599,667-668
+tests/integration/validate-plugin.test.ts
+  s_9faf0dc507d8cf::t_59b6621f441647 31,776-877
+  s_9faf0dc507d8cf::t_7e8b1262d1e0ef 878
+tests/integration/generate-manifests-codex.test.ts
+  s_9faf0dc507d8cf::t_9f319ac290232d 1332-1391,1394,1396-1410,1412-1418
+  s_9faf0dc507d8cf::t_3ae134ee9095c9 1392-1393,1395,1411
+docs/plugin-validation-guide.md
+  s_9faf0dc507d8cf::t_7174179531317d 247-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "62cc5d562a26b2dbc4bc397b88b61c1dd7012bc6",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

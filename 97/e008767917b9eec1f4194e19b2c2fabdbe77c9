@@ -1,0 +1,23 @@
+docs/solutions/logic-errors/manifest-generator-value-shape-validation.md
+  s_2d24882eac6a53::t_0ccd1431d5f981 159-214
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_2d24882eac6a53::t_43f51f27e9410d 228-273
+docs/maintenance/catalog-release-gap.md
+  s_2d24882eac6a53::t_3d9254fe0a7ed0 88-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "97e008767917b9eec1f4194e19b2c2fabdbe77c9",
+  "prompts": {},
+  "sessions": {
+    "s_2d24882eac6a53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef2da5c3-f774-442b-abf7-0bae6a1c34c9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

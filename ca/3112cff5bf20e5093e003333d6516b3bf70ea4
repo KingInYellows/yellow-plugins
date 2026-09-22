@@ -1,0 +1,26 @@
+plugins/gt-workflow/tests/hook-parity.bats
+  s_4febf2cbaf48e8::t_7b9d8d651530fb 1-148
+docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md
+  s_4febf2cbaf48e8::t_eb7c20c14e4bca 13-30
+plugins/gt-workflow/hooks/hooks.json
+  s_4febf2cbaf48e8::t_31834f1893f0c8 22
+  s_4febf2cbaf48e8::t_9cf74bcb8fc304 10
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_040992114d7892 294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ca3112cff5bf20e5093e003333d6516b3bf70ea4",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

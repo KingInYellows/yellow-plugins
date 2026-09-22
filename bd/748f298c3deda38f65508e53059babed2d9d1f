@@ -1,0 +1,19 @@
+docs/solutions/logic-errors/reactive-trigger-threshold-blind-spot.md
+  s_7ed434e75cb861::t_810c14f85a70c1 116-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bd748f298c3deda38f65508e53059babed2d9d1f",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

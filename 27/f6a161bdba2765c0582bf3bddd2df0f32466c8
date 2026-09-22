@@ -1,0 +1,40 @@
+plans/setup-claude-web-command.md
+  s_19979c8b3bd013::t_0b991ca00466a1 817-847
+  s_19979c8b3bd013::t_427116257164f4 1-503,534-816
+  s_19979c8b3bd013::t_6e85d1af9c8c27 504-533
+plugins/yellow-core/README.md
+  s_19979c8b3bd013::t_ee34f9e0e59c80 29
+plugins/yellow-core/CLAUDE.md
+  s_19979c8b3bd013::t_dd961054a49926 60,71-76
+docs/brainstorms/2026-05-18-setup-claude-web-command-brainstorm.md
+  s_19979c8b3bd013::t_2ade6ae65319c1 1-501
+plugins/yellow-core/commands/setup/claude-web.md
+  s_19979c8b3bd013::t_b25a1a24f932e7 448-449,451-462
+  s_19979c8b3bd013::t_42509dfc078b9f 565-566
+  s_19979c8b3bd013::t_3865a0d026e3d5 88-91
+  s_19979c8b3bd013::t_7d7aa197b674cb 327
+  s_19979c8b3bd013::t_e4bd9dd1c236d7 1-70,72-87,92-263,265-326,328-447,450,463-564,567-668,670-672,681-689,694-696,698-702,707-798
+  s_19979c8b3bd013::t_cfede70a04091f 676-680
+  s_19979c8b3bd013::t_48cab5711b2692 71,264,669
+  s_19979c8b3bd013::t_91be521e80e6ef 690-693,697,703-706
+docs/research/how-claude-code-web-works-and-repository.md
+  s_19979c8b3bd013::t_7f656b7265fcc1 1-583
+.changeset/setup-claude-web-command.md
+  s_19979c8b3bd013::t_d2b65f48056aa4 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "27f6a161bdba2765c0582bf3bddd2df0f32466c8",
+  "prompts": {},
+  "sessions": {
+    "s_19979c8b3bd013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edc4e67e-0c98-446e-a621-08982add35a2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

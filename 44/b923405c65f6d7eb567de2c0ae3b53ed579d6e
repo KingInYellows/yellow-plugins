@@ -1,0 +1,31 @@
+plans/background-compounding-triggers.md
+  s_7a8660e50e836e::t_2e07a49add8357 336,339
+  s_7a8660e50e836e::t_2eb9c20fb37371 605-609
+  s_7a8660e50e836e::t_0448d9486310a9 680-682
+  s_7a8660e50e836e::t_71ba63116a78c3 738
+  s_7a8660e50e836e::t_301f487318759f 486
+  s_7a8660e50e836e::t_b0a367af7f8f7d 41
+  s_7a8660e50e836e::t_42c8e1a5c370b3 241
+  s_7a8660e50e836e::t_4367a6c168deb1 128-141
+  s_7a8660e50e836e::t_8328908c1bc76e 343
+  s_7a8660e50e836e::t_84b6be9b35af37 57
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_7a8660e50e836e::t_6c4efb8dc7386d 307
+  s_7a8660e50e836e::t_3d8c4c6217f9a3 311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "44b923405c65f6d7eb567de2c0ae3b53ed579d6e",
+  "prompts": {},
+  "sessions": {
+    "s_7a8660e50e836e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0f430e9c-32ae-4f1b-8391-9cfb191f29b0",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

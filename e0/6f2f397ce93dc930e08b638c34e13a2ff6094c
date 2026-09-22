@@ -1,0 +1,19 @@
+plugins/yellow-codex/commands/codex/review.md
+  s_2db87cc7495315::t_c66d466b8da8d5 91-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "e06f2f397ce93dc930e08b638c34e13a2ff6094c",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

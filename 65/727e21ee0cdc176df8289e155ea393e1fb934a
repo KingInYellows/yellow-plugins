@@ -1,0 +1,40 @@
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_3d62316ec95b77::t_cadfdd6b563a0c 163-167
+plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md
+  s_3d62316ec95b77::t_cadfdd6b563a0c 6-9,12-13,29,78-82
+plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md
+  s_3d62316ec95b77::t_9a975e34f00ecd 100-103,105-107,112-113
+  s_3d62316ec95b77::t_2f707bb89fbbf1 52,54,57
+  s_3d62316ec95b77::t_2026dd6dadab59 123-126
+  s_3d62316ec95b77::t_10f94ac0cc4059 37-42
+scripts/lib/generate/emit-codex.js
+  s_3d62316ec95b77::t_12cf2a055e0d30 37
+plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md
+  s_3d62316ec95b77::t_cadfdd6b563a0c 37-42,52,54,57,100-103,105-107,112-113,123-126
+plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md
+  s_3d62316ec95b77::t_80c4982650724d 78-82
+  s_3d62316ec95b77::t_3f9c000223e79e 29
+  s_3d62316ec95b77::t_27281c64fe2d91 6-9,12-13
+docs/codex-distribution.md
+  s_3d62316ec95b77::t_5fb48e88db8ef7 83-88
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_3d62316ec95b77::t_96fb70074c46bf 164-168
+AGENTS.md
+  s_3d62316ec95b77::t_a9b4f1e70d41db 279-285
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "65727e21ee0cdc176df8289e155ea393e1fb934a",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

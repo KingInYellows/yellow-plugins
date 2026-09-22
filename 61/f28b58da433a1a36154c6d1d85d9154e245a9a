@@ -1,0 +1,25 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_3d62316ec95b77::t_e8cbcf5c4de8d4 220-227,232-237
+  s_3d62316ec95b77::t_7f69ed7c859458 124-148,160,163-164
+  s_3d62316ec95b77::t_6cc54f138eb2a1 49-64
+  s_3d62316ec95b77::t_6bb9a6a87965f5 8
+  s_3d62316ec95b77::t_853d64ca2dcc88 78-81
+  s_3d62316ec95b77::t_dfb15336e1d28c 169-175
+  s_3d62316ec95b77::t_500cc75ddbf3c1 165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "61f28b58da433a1a36154c6d1d85d9154e245a9a",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

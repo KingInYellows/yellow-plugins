@@ -1,0 +1,69 @@
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_90cee544007013::t_31a139b0388018 1-10,13-89,94,96-112,122-141
+  s_90cee544007013::t_7b9f4b456cbaaf 113-121
+  s_fa9988b4873e85::t_ee99d017405145 11-12
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_4ddc6ff4d34d40 173
+  s_90cee544007013::t_46df3a213755bf 169
+  s_fa9988b4873e85::t_c99a2e880ca1a2 55-63
+plugins/yellow-core/commands/setup/all.md
+  s_90cee544007013::t_41801220f57500 566,568-569
+  s_90cee544007013::t_8339666321f0e3 619
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_90cee544007013::t_da7287c97aa010 79
+  s_90cee544007013::t_2b1342a694beaa 32-35
+  s_90cee544007013::t_44e845a6283e36 72-78
+  s_fa9988b4873e85::t_bd07bf45d1c86a 63
+  s_fa9988b4873e85::t_9811add5409eed 237
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_90cee544007013::t_5ad56c132b2c9f 81-83,88
+  s_90cee544007013::t_285f142466ca05 100,102
+  s_fa9988b4873e85::t_c34d8206f2aeaf 84-85
+plugins/yellow-codex/commands/codex/setup.md
+  s_90cee544007013::t_36e7a9167a0fd2 199-200,205-207,211
+plugins/yellow-codex/commands/codex/review.md
+  s_90cee544007013::t_0e74be3aa6f6e2 125,127
+  s_90cee544007013::t_37c4263ad2df66 269-270
+  s_90cee544007013::t_0f14ea51777c98 105-107
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_90cee544007013::t_e781ce700495ff 319
+plugins/yellow-codex/CLAUDE.md
+  s_90cee544007013::t_f2328a623880c1 18-20
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_90cee544007013::t_28d8c798733147 96,98
+  s_90cee544007013::t_a939ccd85378c2 81-83
+plugins/yellow-codex/commands/codex/rescue.md
+  s_90cee544007013::t_3b771febac6b28 240-241
+  s_90cee544007013::t_b17d136996efb2 80-83
+  s_90cee544007013::t_e690138581ae63 96,98
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_90cee544007013::t_5ab1783c7f96d1 127-129,141-157
+docs/solutions/security-issues/codex-sandbox-mode-does-not-fence-mcp-tools.md
+  s_fa9988b4873e85::t_2d2812f43ee0ff 23-26
+docs/brainstorms/2026-07-09-audit-resolution-brainstorm.md
+  s_fa9988b4873e85::t_de468a16e56c1d 94-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "56c419ba3602bd5b3c01bd93539cd6e25fd9f59e",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

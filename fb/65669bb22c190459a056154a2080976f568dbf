@@ -1,0 +1,25 @@
+docs/solutions/logic-errors/json-parse-null-envelope-validity-guard.md
+  s_4febf2cbaf48e8::t_6e0f97c19fd09c 1-127
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_4febf2cbaf48e8::t_014d30ae14e407 1259-1319
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_4febf2cbaf48e8::t_a54a9ef1b38ff7 275-288
+docs/solutions/integration-issues/codex-skill-exposure-validator-blind-spots.md
+  s_4febf2cbaf48e8::t_2fbaedfa4341b2 1-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "fb65669bb22c190459a056154a2080976f568dbf",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

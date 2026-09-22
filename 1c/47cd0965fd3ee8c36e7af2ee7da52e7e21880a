@@ -1,0 +1,23 @@
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_2544e3a9ffcf50::t_2a42949e97103d 395-399
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2544e3a9ffcf50::t_2a42949e97103d 352,354-358
+plugins/yellow-codex/commands/codex/review.md
+  s_2544e3a9ffcf50::t_2a42949e97103d 240,255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1c47cd0965fd3ee8c36e7af2ee7da52e7e21880a",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+.changeset/flow-namespace-rename.md
+  s_c1e3326aa9a6ae::t_9978aaf8df8551 40-44
+  s_c1e3326aa9a6ae::t_5288c9894830dc 7
+plugins/yellow-docs/commands/docs/review.md
+  s_c1e3326aa9a6ae::t_f9fd6a53b1f0c3 249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "153c57427ed689934433bdd868e6c885dafc1e86",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

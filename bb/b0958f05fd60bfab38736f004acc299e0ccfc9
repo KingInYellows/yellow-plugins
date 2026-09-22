@@ -1,0 +1,21 @@
+tests/integration/validate-agent-authoring-review-rule.test.ts
+  s_3bb494324db8bc::t_9d5c8ecbedded3 114
+  s_3bb494324db8bc::t_b81c96ec2fa03e 123-144
+  s_3bb494324db8bc::t_42033bf358b8d2 43-51,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "bbb0958f05fd60bfab38736f004acc299e0ccfc9",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

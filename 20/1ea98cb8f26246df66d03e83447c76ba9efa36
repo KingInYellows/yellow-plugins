@@ -1,0 +1,21 @@
+plans/tier-1-optimization-quick-wins.md
+  s_321698acdb7b31::t_20c18f2ffb8009 47,139
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_321698acdb7b31::t_12a28496fa8429 13,34,93,163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "201ea98cb8f26246df66d03e83447c76ba9efa36",
+  "prompts": {},
+  "sessions": {
+    "s_321698acdb7b31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5454cd44-5123-4d44-b4c0-e61d75bc0152",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

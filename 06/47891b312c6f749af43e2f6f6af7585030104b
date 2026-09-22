@@ -1,0 +1,25 @@
+plans/ruvector-error-fix-memory-mvp.md
+  s_7ed434e75cb861::t_27be7f65d6db82 137
+  s_7ed434e75cb861::t_c4c2092a0ba7e2 133
+  s_7ed434e75cb861::t_586474f6264e98 174
+  s_7ed434e75cb861::t_e034b3fcc2c378 179
+  s_7ed434e75cb861::t_a1147b45067ba4 188,206,217,233
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_493113019f928e 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0647891b312c6f749af43e2f6f6af7585030104b",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

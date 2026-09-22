@@ -1,0 +1,25 @@
+plugins/yellow-core/CLAUDE.md
+  s_f188cf7e3ae96a::t_5a9a832122a9de 74
+.changeset/yellow-core-compound-staging-surface.md
+  s_f188cf7e3ae96a::t_45f8a00c455278 44-45
+plugins/yellow-core/commands/compound/review-staged.md
+  s_f188cf7e3ae96a::t_ad6953e5bf28ee 132-136,142-145
+  s_f188cf7e3ae96a::t_25557ba57ee0e0 69,73-77
+  s_f188cf7e3ae96a::t_ada81220d92bf5 105-108,111-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "9ebb1db0408d24512bf219c208daa50bfbc7f386",
+  "prompts": {},
+  "sessions": {
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

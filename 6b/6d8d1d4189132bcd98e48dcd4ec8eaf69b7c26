@@ -1,0 +1,23 @@
+docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md
+  s_3a0683ba92e204::t_9a4ebf916134b9 107
+docs/research/cross-plugin-shared-skill-architecture-f.md
+  s_3a0683ba92e204::t_c0872f393259e7 181
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_3a0683ba92e204::t_a22c3d4d06cf08 70-74,86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "6b6d8d1d4189132bcd98e48dcd4ec8eaf69b7c26",
+  "prompts": {},
+  "sessions": {
+    "s_3a0683ba92e204": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "058aaa37-cd00-4e37-92f8-fc57ca8caf02",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

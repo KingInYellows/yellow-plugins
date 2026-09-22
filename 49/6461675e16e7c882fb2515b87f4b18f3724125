@@ -1,0 +1,68 @@
+plugins/yellow-core/skills/compound-lifecycle/references/report-template.md
+  s_20a9c2bc8059f0::t_7b166126dda9cc 1-40
+plugins/yellow-core/skills/optimize/references/pagination-layouts.md
+  s_20a9c2bc8059f0::t_b33333bc84f07f 1-45
+plugins/yellow-core/skills/optimize/references/design-rationale.md
+  s_20a9c2bc8059f0::t_36c30476187e4f 1-53
+plugins/yellow-council/skills/council-patterns/references/cross-references.md
+  s_20a9c2bc8059f0::t_6f4e92a62f0698 1-18
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_20a9c2bc8059f0::t_ac4168bad83ec3 272
+.changeset/c6-progressive-disclosure.md
+  s_20a9c2bc8059f0::t_e4352f08852396 1-13
+plugins/yellow-review/references/review-pr/knowledge-compounding.md
+  s_20a9c2bc8059f0::t_2a15f47a3c3f82 1-63
+plugins/yellow-core/skills/compound-lifecycle/references/design-rationale.md
+  s_20a9c2bc8059f0::t_8ef14ab561990d 1-29
+docs/testing/c6-progressive-disclosure-stub-firing-checklist.md
+  s_20a9c2bc8059f0::t_2a05f1200b685c 1-99
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_20a9c2bc8059f0::t_fc9d0eb2a61dae 311-313
+plugins/yellow-core/references/workflows-work/graphite-command-reference.md
+  s_20a9c2bc8059f0::t_88dedbb9e76788 1-30
+plugins/yellow-core/commands/workflows/work.md
+  s_20a9c2bc8059f0::t_feba14131a4950 772-777
+plugins/yellow-core/skills/compound-lifecycle/SKILL.md
+  s_20a9c2bc8059f0::t_bacf4cede6fd51 152-160
+  s_20a9c2bc8059f0::t_896a9e55e370bb 268-272
+  s_20a9c2bc8059f0::t_a35917e3503c01 288-291
+  s_20a9c2bc8059f0::t_0de07eee0a1770 251-254
+plugins/yellow-core/commands/setup/all.md
+  s_20a9c2bc8059f0::t_60f26e71274262 312-323
+plugins/yellow-core/skills/optimize/references/failure-modes.md
+  s_20a9c2bc8059f0::t_c4631a07b4af5b 1-23
+plugins/yellow-review/references/review-pr/legacy-fallback.md
+  s_20a9c2bc8059f0::t_b63f4b6b87ede5 1-36
+plugins/yellow-core/skills/optimize/references/judge-protocol.md
+  s_20a9c2bc8059f0::t_0401cfa1503e5c 7-26
+  s_20a9c2bc8059f0::t_4950407e16237a 1-6,27-104
+plugins/yellow-core/skills/optimize/SKILL.md
+  s_20a9c2bc8059f0::t_a4db9b5f07c00a 196-197
+  s_20a9c2bc8059f0::t_21185a19f9405e 250-256
+  s_20a9c2bc8059f0::t_470d727820ae90 194,198-204
+  s_20a9c2bc8059f0::t_500c900bdab88c 275-280,284-290,294-297
+  s_20a9c2bc8059f0::t_ba4bba5701e567 195
+plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md
+  s_20a9c2bc8059f0::t_7834811757298d 1-98
+plugins/yellow-review/commands/review/review-pr.md
+  s_20a9c2bc8059f0::t_b5cbc694acf9b1 727,729-730,732-740
+  s_20a9c2bc8059f0::t_85637bd1b688e2 379-387
+plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md
+  s_20a9c2bc8059f0::t_988fcae694e91b 1-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "496461675e16e7c882fb2515b87f4b18f3724125",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

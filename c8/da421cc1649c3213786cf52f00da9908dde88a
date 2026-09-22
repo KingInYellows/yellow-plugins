@@ -1,0 +1,68 @@
+plugins/yellow-ci/tests/fixtures/hooks/routing-summary-present.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/lib/hook-scenario.bash
+  s_17bd29452ea753::t_2ef05e27340fbd 78-80
+  s_17bd29452ea753::t_9cfb7440561361 11-16
+  s_17bd29452ea753::t_ae2de6a0466853 1-10,17-77,81
+plugins/yellow-ci/tests/fixtures/hooks/routing-summary-absent.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-4
+plugins/yellow-ci/tests/fixtures/hooks/routing-summary-present.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+plugins/yellow-ci/tests/fixtures/hooks/malformed-gh-json.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/no-workflows.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/gh-unauthed.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/gh-unauthed.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+plugins/yellow-ci/tests/fixtures/hooks/rate-limited-gh.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+plugins/yellow-ci/tests/fixtures/hooks/rate-limited-gh.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_3ded590fc28c75 324
+plugins/yellow-ci/tests/fixtures/hooks/no-workflows.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-4
+plugins/yellow-ci/tests/fixtures/hooks/cache-hit.golden.txt
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+plugins/yellow-ci/tests/mocks/gh
+  s_17bd29452ea753::t_d57cba03b398df 1-72
+plugins/yellow-ci/tests/fixtures/hooks/cache-hit.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/gh-missing.golden.txt
+  s_17bd29452ea753::t_e46b804d03dc00 3-6
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+plugins/yellow-ci/tests/fixtures/hooks/gh-missing.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/malformed-gh-json.golden.txt
+  s_17bd29452ea753::t_3c048ca834ac40 1-2,7
+  s_17bd29452ea753::t_e46b804d03dc00 3-6,8
+plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+plugins/yellow-ci/tests/fixtures/hooks/routing-summary-absent.stdin
+  s_17bd29452ea753::t_3c048ca834ac40 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c8da421cc1649c3213786cf52f00da9908dde88a",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

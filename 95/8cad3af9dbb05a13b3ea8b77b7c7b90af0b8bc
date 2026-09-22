@@ -1,0 +1,27 @@
+docs/brainstorms/2026-07-29-sweep-all-close-out-deferred-design-deci-brainstorm.md
+  s_2ce1db4e09a1cf::t_36757a674d83d1 154
+  s_2ce1db4e09a1cf::t_8807d470a4fea2 153,155-158
+  s_2ce1db4e09a1cf::t_68edcda0166f7f 36-41,43-48,51-54
+  s_2ce1db4e09a1cf::t_c185bd00bf5426 183-185
+plans/handoff/2026-07-29-sweep-all-670-672-close-out.md
+  s_2ce1db4e09a1cf::t_dd972cd3335b66 14-19
+  s_2ce1db4e09a1cf::t_e5c589f523063e 75-78
+plans/sweep-670-672-deferred-design-decisions.md
+  s_2ce1db4e09a1cf::t_c4c075a955eee3 167-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "958cad3af9dbb05a13b3ea8b77b7c7b90af0b8bc",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

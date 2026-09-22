@@ -1,0 +1,26 @@
+CLAUDE.md
+  s_212adc2508532d::t_9422140279e4a1 183-191
+plugins/yellow-research/CLAUDE.md
+  s_212adc2508532d::t_ff0dd50b02bc48 115-117
+.changeset/tier-1-optimization-quick-wins.md
+  s_212adc2508532d::t_34c2d6ec30cb58 33-36
+  s_212adc2508532d::t_08b3b53a8becc9 8
+plugins/yellow-review/commands/review/review-pr.md
+  s_212adc2508532d::t_080c3c32bba243 416-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "e622e92f5ea2c629b8e159a9a8d7a180f4b80733",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

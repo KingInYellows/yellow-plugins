@@ -1,0 +1,19 @@
+plugins/yellow-core/README.md
+  s_d3f84f9afbd86a::t_a894192d8dabe5 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "004fdc83aaee90b84ceffc90d8ce37f015c1682d",
+  "prompts": {},
+  "sessions": {
+    "s_d3f84f9afbd86a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad6524dd-c688-4830-8a5d-32937c53578e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}

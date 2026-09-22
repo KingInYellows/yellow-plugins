@@ -1,0 +1,25 @@
+plugins/yellow-browser-test/agents/testing/test-runner.md
+  s_e0beaba782ec4e::t_54f40af85c9e22 70-73
+.changeset/browser-test-followups.md
+  s_e0beaba782ec4e::t_1a8c1855126a98 1-5
+plugins/yellow-browser-test/skills/test-conventions/SKILL.md
+  s_e0beaba782ec4e::t_54f40af85c9e22 92-124
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_e0beaba782ec4e::t_54f40af85c9e22 51-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "d11e9f3353c05c4c9439e5af7c13c6ce20899bd1",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

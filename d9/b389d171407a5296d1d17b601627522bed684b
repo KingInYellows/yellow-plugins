@@ -1,0 +1,163 @@
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,37,162
+plugins/yellow-core/lib/repo-profile.sh
+  s_0c38a1b007fa25::t_9ab8abab304bb7 6
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 36,229,252-253
+plugins/yellow-research/README.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 8,152
+plugins/yellow-review/commands/review/sweep-all.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 18,192,196,206,208,213,234
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 19,28
+plugins/yellow-linear/commands/linear/sync.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 121
+scripts/validate-flow-namespace.js
+  s_0c38a1b007fa25::t_48117bd4ebf0c6 125-132,149,151,153-154,160,162,164,166-167
+  s_0c38a1b007fa25::t_962543d9307fa3 133-139
+  s_0c38a1b007fa25::t_844e2163cad6b6 274-288
+plugins/gt-workflow/output-styles/stack-decomposition.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 9,72,85,100,115,125,130,136
+plugins/yellow-core/CLAUDE.md
+  s_0c38a1b007fa25::t_0130095c1dce89 358
+  s_0c38a1b007fa25::t_9ab8abab304bb7 76-77,81,83-84,86,88,90-93,96,112,254,259,264,267-268,271,273,283,359-360
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 300,302
+  s_c1e3326aa9a6ae::t_cea4b16d20936b 211
+plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 35,228,251-252
+plugins/yellow-core/README.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 22-30
+plugins/yellow-core/commands/plan/status.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 18
+plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,10,18,26,89,102,117,132,142,147,153
+plugins/yellow-core/skills/brainstorming/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,16,95
+plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 241
+plugins/yellow-core/skills/ideation/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,58,64,245,316
+plugins/yellow-docs/commands/docs/review.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 249
+plugins/yellow-linear/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 35,87-88
+plugins/yellow-ruvector/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 120,124,126,133
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,38,40
+plugins/gt-workflow/skills/stack-plan-style/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 25-26,36
+plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,9,17,25,88,101,116,131,141,146,152
+plugins/yellow-codex/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 11,81,110
+plugins/yellow-core/skills/optimize/references/failure-modes.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 23
+plans/workflows-to-flow-namespace-migration.md
+  s_0c38a1b007fa25::t_b9da2ecc6ba99e 327,329-330,334-342
+  s_0c38a1b007fa25::t_c49a44ccdaa8f8 343-348,356
+  s_0c38a1b007fa25::t_b5aca0978e6f4d 538
+  s_0c38a1b007fa25::t_0d473ea371d793 365-373
+  s_0c38a1b007fa25::t_9cae671805bede 539
+  s_0c38a1b007fa25::t_b104b3356f7fa0 375-401
+  s_0c38a1b007fa25::t_ad9e5480a9dad6 374
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 131
+plugins/gt-workflow/output-styles/stack-plan.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 13,18
+plugins/yellow-core/commands/plan/complete.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 44,160
+plugins/yellow-core/skills/memory-remember-pattern/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 150
+plugins/yellow-review/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 60,156,161
+plugins/gt-workflow/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 112,114,294,301,312,322
+plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 24-25,35
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 39
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,66,251,354
+plugins/yellow-core/skills/optimize/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 3,57-58
+plugins/yellow-linear/commands/linear/work.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 24,152,196
+plugins/yellow-review/commands/review/review-pr.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 406,559
+plugins/yellow-research/CLAUDE.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 5,102,104,192,231-232,234
+plugins/gt-workflow/README.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 66
+plugins/yellow-core/skills/multi-host-fleet/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 105
+  s_c1e3326aa9a6ae::t_d1b2481db4217f 112
+.changeset/flow-namespace-sweep-plugins.md
+  s_0c38a1b007fa25::t_9a2a9f5090e29e 1,2-5,6-10,12-14,21-38
+plugins/yellow-core/skills/git-worktree/SKILL.md
+  s_0c38a1b007fa25::t_9ab8abab304bb7 179,185,192,198,203,235,277,279,286
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_c1e3326aa9a6ae::t_9f74222de98a10 3
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_6167c944b05281 134,137,142,147
+  s_c1e3326aa9a6ae::t_878e2ef11ef96a 135-136,138-141,143-146,148-150
+docs/research/2026-05-21-solution-doc-jaccard-calibration.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 141
+docs/guides/common-workflows.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 12-13,28,66,71,75,82,102,187
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 5,255,549,574,586
+docs/plugin-scope-mode-protocol.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 60-61,68,85,110,112,128,131,169
+docs/operations/versioning.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 98
+docs/review-surface-routing-protocol.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 26,29,58
+docs/optimization/analysis.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 328,332,371-375,379,391,394,431,482-483,515,544,569
+docs/research/model-selection-token-context-optimization.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 245
+docs/research/yellow-codex-expansion.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 20,146
+docs/CONCEPTS.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 5,11,14,43,45
+docs/testing/c6-progressive-disclosure-stub-firing-checklist.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 82,96,100,104,107,111
+RESEARCH/01-plugin-inventory.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 104,116
+RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 7
+docs/research/ruvector-latest-featureset-and-plugin-ideation.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 129-130
+docs/guides/advanced-workflows.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 38,42-43,96,103,107,110,132-133,135
+scripts/flow-namespace-allowlist.json
+  s_0c38a1b007fa25::t_e6ae0ddd3ae916 1
+docs/research/yellow-council-v2-revalidation-2026-08-01.md
+  s_0c38a1b007fa25::t_9e14c21dedf810 3-4,789
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d9b389d171407a5296d1d17b601627522bed684b",
+  "prompts": {},
+  "sessions": {
+    "s_0c38a1b007fa25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

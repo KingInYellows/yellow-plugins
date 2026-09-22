@@ -1,0 +1,21 @@
+docs/solutions/workflow/gt-modify-no-c-flag-silent-unstaged-miss.md
+  s_6d2ef1322cfec1::t_cd2e41c5ed29c4 32-51
+  s_6d2ef1322cfec1::t_79957660d5c0b6 74-77
+  s_6d2ef1322cfec1::t_383118c451075f 91-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "07a0cba43e887201c7e3654d7f10112965651d21",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

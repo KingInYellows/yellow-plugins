@@ -1,0 +1,25 @@
+plugins/yellow-core/lib/compound-staging.sh
+  s_6d2ef1322cfec1::t_5060967267e4ca 230-232,235,238-241
+.changeset/pr540-stack-review-fixes.md
+  s_6d2ef1322cfec1::t_8cdfb7d9e1b40e 1-11
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_6d2ef1322cfec1::t_bd54e24d0b2d7c 226-238,245-246
+  s_6d2ef1322cfec1::t_4247025bbf2872 275
+  s_6d2ef1322cfec1::t_8f4cbfaf973479 86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "75d814808d9d065c8ddfb2626c6261df5b4711fc",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

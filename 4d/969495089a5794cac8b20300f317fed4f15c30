@@ -1,0 +1,24 @@
+.changeset/remove-hooks-json-mirrors.md
+  s_6476068b869a82::t_147e2ad14236a1 1-16
+plans/fix-hooks-json-mirror-double-registration.md
+  s_6476068b869a82::t_192509bbf23fb3 87,90
+  s_6476068b869a82::t_6d3bcf939a521e 117,124,127,132,138
+  s_6476068b869a82::t_147e2ad14236a1 96
+  s_6476068b869a82::t_475d51f087b61b 1-86,88-89,91-95,97-116,118-123,125-126,128-131,133-137,139-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d969495089a5794cac8b20300f317fed4f15c30",
+  "prompts": {},
+  "sessions": {
+    "s_6476068b869a82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb99cbb0-34fd-4434-9fc8-3e13aa1ba3e7",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

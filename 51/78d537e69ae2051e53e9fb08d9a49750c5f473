@@ -1,0 +1,27 @@
+scripts/validate-agent-authoring.js
+  s_4febf2cbaf48e8::t_03c06853ded307 991-1011,1013-1045,1053
+  s_4febf2cbaf48e8::t_ff60f4e307a18c 1012
+  s_4febf2cbaf48e8::t_bdc18add88972e 1046-1048,1050-1052
+  s_4febf2cbaf48e8::t_72d18c66a2cbe7 1054-1056
+  s_4febf2cbaf48e8::t_89a06e59449b48 1049,1057-1066,1251
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_f19cb40020cc70 307
+tests/integration/validate-agent-authoring-rule17.test.ts
+  s_4febf2cbaf48e8::t_664647f25b76d5 1-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5178d537e69ae2051e53e9fb08d9a49750c5f473",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

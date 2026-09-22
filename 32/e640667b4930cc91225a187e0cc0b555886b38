@@ -1,0 +1,21 @@
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_3d62316ec95b77::t_1a26eeab44b426 289-355
+docs/solutions/code-quality/multi-doc-schema-rename-drift.md
+  s_3d62316ec95b77::t_c7cebd75fa8bcd 223-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "32e640667b4930cc91225a187e0cc0b555886b38",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

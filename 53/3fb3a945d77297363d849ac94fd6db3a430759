@@ -1,0 +1,56 @@
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_d3d6184d1e92bf::t_f9a4336793acc8 152
+  s_d3d6184d1e92bf::t_46c03913e497db 12-15
+docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md
+  s_d3d6184d1e92bf::t_3872a2c9203c88 54-55
+  s_d3d6184d1e92bf::t_58d034d6c2acb6 53,56-58
+  s_d3d6184d1e92bf::t_7b5367bd7945f9 90-94
+docs/yellow-jules/fixtures.md
+  s_d3d6184d1e92bf::t_242f519c216fbc 180,193
+  s_d3d6184d1e92bf::t_e96d2be93c9789 228
+  s_d3d6184d1e92bf::t_170d1e218269bb 212
+  s_d3d6184d1e92bf::t_86b0650dea5254 107
+docs/yellow-jules/sdk-investigation.md
+  s_d3d6184d1e92bf::t_ac7b18f67e3d8a 406-407
+  s_d3d6184d1e92bf::t_5cb276e92ea723 408-411
+plans/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_d3d6184d1e92bf::t_ae7923c06d41c2 324
+  s_d3d6184d1e92bf::t_b49f51ceff161d 283-286
+  s_d3d6184d1e92bf::t_907d666d014d20 229-230
+  s_d3d6184d1e92bf::t_96b415ba546808 176-180
+plans/specs/yellow-jules-integration.md
+  s_d3d6184d1e92bf::t_28cbd55f24455a 719-721
+  s_d3d6184d1e92bf::t_786641f9520514 497-498
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_d3d6184d1e92bf::t_4535a5fa656608 75-80,83,86,88,91
+docs/yellow-jules/contract-v1.md
+  s_d3d6184d1e92bf::t_5fe492f336a8c3 393
+  s_d3d6184d1e92bf::t_c52cb2291246aa 388-390
+docs/solutions/code-quality/markdown-table-pipe-escape-prettier-blind-spot.md
+  s_d3d6184d1e92bf::t_d19eeccd37c577 56
+  s_d3d6184d1e92bf::t_cc9a092924fe21 47,57-67
+  s_d3d6184d1e92bf::t_6d0b43f1af1779 38-46
+docs/yellow-jules/capability-matrix.md
+  s_d3d6184d1e92bf::t_bb2f3ba7bf92ed 26-45,47-71
+  s_d3d6184d1e92bf::t_e2ffc6e4f8975c 46
+docs/yellow-jules/integration-plan.md
+  s_d3d6184d1e92bf::t_8dd5c99cc1fdf1 113-116
+  s_d3d6184d1e92bf::t_344823e39e082d 150,154-155
+  s_d3d6184d1e92bf::t_5cb276e92ea723 117-132,151-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "533fb3a945d77297363d849ac94fd6db3a430759",
+  "prompts": {},
+  "sessions": {
+    "s_d3d6184d1e92bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2196b7cc-f67f-4f9d-be4d-0c44b840f2aa",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+plugins/yellow-cursor/src/runtime.ts
+  s_ca129cb3ac489c::t_5b6b917a78b489 348-353,357,368
+  s_ca129cb3ac489c::t_79e3bd35289048 399-442
+plugins/yellow-cursor/src/sdk-adapter.ts
+  s_ca129cb3ac489c::t_61d21f3f74de07 245-253
+plugins/yellow-cursor/tests/agent-run-lifecycle.test.ts
+  s_ca129cb3ac489c::t_1309b7993d2886 300-313,317
+  s_ca129cb3ac489c::t_512fd471d4d0b5 221-299,314-316,318-319
+plugins/yellow-cursor/dist/runtime.js
+  s_ca129cb3ac489c::t_704be3c1d03434 230,234,245,275-310
+  s_ca129cb3ac489c::t_037acecc3fccf3 311
+plugins/yellow-cursor/dist/sdk-adapter.js
+  s_ca129cb3ac489c::t_704be3c1d03434 199-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "6e69c8bb79f08d14def69dbd0b10beae5d043890",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

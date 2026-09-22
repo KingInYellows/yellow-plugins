@@ -1,0 +1,45 @@
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_d9258d9fdac8a6 426-452,459,461-466
+  s_c1e3326aa9a6ae::t_9efa8dcaa0ae99 578
+  s_c1e3326aa9a6ae::t_1ee07586f9dcf9 586
+  s_c1e3326aa9a6ae::t_969ee59d2eed5b 765,824-869,871,878-881,891-905,907,909-919,921-928
+  s_c1e3326aa9a6ae::t_3311cebbf42061 1094,1097-1098
+  s_c1e3326aa9a6ae::t_9b19441e882fdf 552
+  s_c1e3326aa9a6ae::t_0485f3373fe09e 519
+  s_c1e3326aa9a6ae::t_9c2deac748bd7a 567
+  s_c1e3326aa9a6ae::t_72ca7ca0201b8e 124-136
+  s_c1e3326aa9a6ae::t_432b9dd8d06dc9 482-484
+  s_c1e3326aa9a6ae::t_41a56aacf627fe 485-486,488-490,492,501-508,517-518,520,540,544-551,565-566,568,576-577,579
+  s_c1e3326aa9a6ae::t_917f781bb0365d 509
+  s_c1e3326aa9a6ae::t_c8e267e3dc8d34 676-682,698,706,709,736-764
+  s_c1e3326aa9a6ae::t_d77251ff8c5984 1046-1059,1061
+  s_c1e3326aa9a6ae::t_cba6087a10991b 541
+  s_c1e3326aa9a6ae::t_7c3c1f35251181 48-55,58-88
+  s_c1e3326aa9a6ae::t_1275240c12c0b8 950,960-961
+  s_c1e3326aa9a6ae::t_c971be54fef2dd 487,491
+  s_c1e3326aa9a6ae::t_f554294c728a44 1001-1019
+  s_c1e3326aa9a6ae::t_f87e1d49d5d9f9 148,152-153,161-172
+  s_c1e3326aa9a6ae::t_d123611cf664a3 533
+  s_c1e3326aa9a6ae::t_08e152d71ad9b3 495
+  s_c1e3326aa9a6ae::t_07e2311c3fbb1e 173
+  s_c1e3326aa9a6ae::t_70eaaf4f762d41 766
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_3d79caf4993932 103-108
+  s_c1e3326aa9a6ae::t_f1374adf58e59d 56-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3294f435a9edab34f2cab1397d81260360a85cbe",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

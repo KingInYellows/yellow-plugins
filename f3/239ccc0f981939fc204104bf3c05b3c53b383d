@@ -1,0 +1,31 @@
+plans/shells/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_1ed65cfba90080::t_2d519eaa1d79a0 40-41,86,99,117-124,131-132,158
+docs/yellow-jules/contract-v1.md
+  s_1ed65cfba90080::t_78ee6640cb7612 229-233,268,308,338-339,342,355-358,367-371,379,399-411,447-449,526-527,534-540,544-553,618
+  s_1ed65cfba90080::t_03fe64d4c97184 227-228,234-236,266-267,309-320,340-341,343-349,359-364,412-421,450-452,541-543,598-617,619-621
+plans/specs/yellow-jules-integration.md
+  s_1ed65cfba90080::t_2d519eaa1d79a0 227-233,243-247,490-504,515-519,679-684,796-799
+plans/shells/yellow-jules-integration-03-authority-supervision-and-codex.md
+  s_1ed65cfba90080::t_2d519eaa1d79a0 20,49,64,76-89
+docs/yellow-jules/integration-plan.md
+  s_1ed65cfba90080::t_03fe64d4c97184 197-199
+docs/yellow-jules/fixtures.md
+  s_1ed65cfba90080::t_78ee6640cb7612 159-173,176-193
+  s_1ed65cfba90080::t_03fe64d4c97184 156-158,174-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f3239ccc0f981939fc204104bf3c05b3c53b383d",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

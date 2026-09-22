@@ -1,0 +1,29 @@
+scripts/validate-codex.js
+  s_95e18d4ed456ab::t_4e3b0d1b9e86ec 430-432
+tests/integration/generate-manifests-codex.test.ts
+  s_95e18d4ed456ab::t_c0d652e4d4518e 991-993,1003-1005,1012-1019,1024-1027,1031-1033,1037-1039,1041-1043
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_95e18d4ed456ab::t_9ace04475a239f 20
+  s_95e18d4ed456ab::t_9fb1cefc20cdc5 291-371
+docs/solutions/security-issues/heredoc-delimiter-collision.md
+  s_95e18d4ed456ab::t_fdaf3ac0b5e3b9 57-71
+docs/solutions/security-issues/prompt-injection-fence-breakout-literal-delimiter.md
+  s_95e18d4ed456ab::t_0911922948b007 8
+  s_95e18d4ed456ab::t_768270ba188919 153-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "cb2cdf510d128d669b4448e6add290dc0e0077f0",
+  "prompts": {},
+  "sessions": {
+    "s_95e18d4ed456ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46fd3ff8-0589-4324-aeeb-a38b796fd7bc",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

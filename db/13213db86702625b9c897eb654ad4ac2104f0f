@@ -1,0 +1,24 @@
+plugins/yellow-core/lib/compound-staging.sh
+  s_f188cf7e3ae96a::t_375cf8604b7a72 60-73,83-88,100,102-104
+  s_f188cf7e3ae96a::t_653d9edac39cf8 244
+  s_f188cf7e3ae96a::t_d93c05641c8874 207
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_f188cf7e3ae96a::t_2ecf921d196023 244-246,248,250-251,258,260
+  s_f188cf7e3ae96a::t_80f86dabecea51 254-257,259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "db13213db86702625b9c897eb654ad4ac2104f0f",
+  "prompts": {},
+  "sessions": {
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

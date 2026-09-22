@@ -1,0 +1,43 @@
+plans/yellow-jules-integration-01-contract-and-sdk-investigation.md
+  s_1ed97ec77c3207::t_d71b3650831db5 150-151
+  s_1ed97ec77c3207::t_5e26f3f7e20ebc 144-146
+  s_1ed97ec77c3207::t_3e493c3dabc27b 1-139,141-143,147-149,152-219,221-230,232-238,240-250,252-263,265-286,288-322,327-338,341-401
+  s_bfaae59535a9fa::t_504c70c19bbb18 140
+  s_bfaae59535a9fa::t_31d7ccc9743055 220,231,239,251,264,287
+  s_1ed97ec77c3207::t_228912138080f5 323-326,339-340
+docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md
+  s_1ed97ec77c3207::t_3cff72cb6ad6a2 1-85
+docs/yellow-jules/sdk-investigation.md
+  s_bfaae59535a9fa::t_d8860213e36f79 1-9,12-19,28-44,49,60,62-68,71-89,93-188,191,196-207,213-219,227-231,234-257,265-268,280-281,287,292-306,312-318,325-326,329-336,345-350,358-373,382-384,387-390,393-395,398,400-401,409-415,429-431,438,441-443,452-456,459-500,505-512,518-521,537-538,556,560-562,565-573,577,584,595-596,606-609,616-618,631,636-638,641-669,678-680,685-687,693,696-701,709,722-728,731-738,746,759,776-783,803-805,825,836-879
+  s_bfaae59535a9fa::t_31d7ccc9743055 10-11,20-27,45-48,50-59,61,69-70,90-92,189-190,192-195,208-212,220-226,232-233,258-264,269-279,282-286,288-291,307-311,319-324,327-328,337-344,351-357,374-381,385-386,391-392,396-397,399,402-408,416-428,432-437,439-440,444-451,457-458,501-504,513-517,522-536,539-555,557-559,563-564,574-576,578-583,585-594,597-605,610-615,619-630,632-635,639-640,670-677,681-684,688-692,694-695,702-708,710-721,729-730,739-745,747-758,760-775,784-802,806-824,826-835
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_1ed97ec77c3207::t_3cff72cb6ad6a2 375-410
+docs/CONCEPTS.md
+  s_1ed97ec77c3207::t_3cff72cb6ad6a2 67-80
+docs/solutions/integration-issues/esm-only-sdk-breaks-cjs-require-resolver.md
+  s_1ed97ec77c3207::t_3cff72cb6ad6a2 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "57f5393fc234b85e0a6fccd6ac67d56331b0eecd",
+  "prompts": {},
+  "sessions": {
+    "s_1ed97ec77c3207": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0a67ba4f-427b-4226-b6f8-cd3ecd9535c1",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_bfaae59535a9fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a6ea5-699f-4069-b8a9-7700f5628283",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

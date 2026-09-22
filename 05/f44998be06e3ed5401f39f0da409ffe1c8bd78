@@ -1,0 +1,19 @@
+plans/claude-code-codex-plugin-pilot-03-yellow-core-pilot.md
+  s_f72a80507cb29d::t_79c5ad6adb0e27 177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "05f44998be06e3ed5401f39f0da409ffe1c8bd78",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

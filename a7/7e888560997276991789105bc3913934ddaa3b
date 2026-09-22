@@ -1,0 +1,22 @@
+docs/solutions/integration-issues/ruvector-worktree-db-symlink.md
+  s_7ed434e75cb861::t_943a0392b50320 115-118
+  s_7ed434e75cb861::t_fd09eec7d72620 177-202
+plugins/yellow-ruvector/CLAUDE.md
+  s_7ed434e75cb861::t_e27a7da727aa4e 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a77e888560997276991789105bc3913934ddaa3b",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

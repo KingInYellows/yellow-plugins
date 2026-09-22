@@ -1,0 +1,28 @@
+plugins/github-workflow/lib/github-stack-runtime.js
+  s_fd5d688b6eb948::t_094f6628bb8667 1-545
+plugins/github-workflow/tests/fixtures/bin/gh
+  s_fd5d688b6eb948::t_6872d223c48f06 1-2,4-10
+  s_fd5d688b6eb948::t_9c73adcc8bab99 3
+tests/integration/github-stack-runtime.test.ts
+  s_fd5d688b6eb948::t_3ad0e653592d13 1-356
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_fd5d688b6eb948::t_bb834a05f8a31b 120-127,130
+plugins/github-workflow/tests/fixtures/bin/git
+  s_fd5d688b6eb948::t_6872d223c48f06 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "279435a185d29c7e6765ba0cff2a4e03a741c697",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

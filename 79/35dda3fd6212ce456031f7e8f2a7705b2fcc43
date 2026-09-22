@@ -1,0 +1,22 @@
+scripts/lib/generate/emit-codex.js
+  s_ecffdbc39c3a6a::t_7e0bd6758c4e99 34-38
+  s_ecffdbc39c3a6a::t_f595e31e547eb9 377-382,389-391,395-477
+  s_ecffdbc39c3a6a::t_ae4dca48e19787 546
+  s_ecffdbc39c3a6a::t_0245daef4390bd 478-479
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7935dda3fd6212ce456031f7e8f2a7705b2fcc43",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

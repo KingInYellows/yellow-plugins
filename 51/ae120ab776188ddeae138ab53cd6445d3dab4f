@@ -1,0 +1,29 @@
+scripts/generate-manifests.js
+  s_64c4dcbed64f98::t_c6589b547e0c9f 477-488
+tests/integration/generate-manifests-codex.test.ts
+  s_64c4dcbed64f98::t_ca432b851b5929 292-324
+packages/cli/src/index.ts
+  s_64c4dcbed64f98::t_0b5b45b321cd4a 29,47
+scripts/lib/generate/emit-codex.js
+  s_64c4dcbed64f98::t_9e0c52d92e825c 24
+  s_64c4dcbed64f98::t_985abd0734223b 236-246,253-254
+scripts/validate-codex.js
+  s_64c4dcbed64f98::t_15b0c842596422 398-402,408-412,414-415
+  s_64c4dcbed64f98::t_fbab6d402dfdef 413,416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "51ae120ab776188ddeae138ab53cd6445d3dab4f",
+  "prompts": {},
+  "sessions": {
+    "s_64c4dcbed64f98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18682327-1c4b-407d-9b31-41d6125aacc8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

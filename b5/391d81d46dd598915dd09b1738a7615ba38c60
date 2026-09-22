@@ -1,0 +1,37 @@
+plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+scripts/validate-codex.js
+  s_2847d51bbefa00::t_ab5a65eaa41405 62
+  s_2847d51bbefa00::t_2d650caeb9c60d 491
+  s_2847d51bbefa00::t_49283ab3e7f483 492-496
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_2847d51bbefa00::t_e5188b7b68e9b6 169-171
+plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+scripts/lib/generate/emit-codex.js
+  s_2847d51bbefa00::t_dce06e5f2d1e9d 561
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b5391d81d46dd598915dd09b1738a7615ba38c60",
+  "prompts": {},
+  "sessions": {
+    "s_2847d51bbefa00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c39ef9b-f26c-48bb-8767-7078c0e278b4",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

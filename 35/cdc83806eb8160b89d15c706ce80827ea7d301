@@ -1,0 +1,20 @@
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_212adc2508532d::t_534b52083657fd 60-61
+  s_212adc2508532d::t_4e5b25855c7c4c 1-59,62-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "35cdc83806eb8160b89d15c706ce80827ea7d301",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+plans/pr-797-review-follow-ups.md
+  s_2544e3a9ffcf50::t_c3fe564faca4ce 378
+  s_2544e3a9ffcf50::t_f55cce725587ec 377
+  s_2544e3a9ffcf50::t_6e1d602ff27f3d 167,173-178,186,194,198,203
+  s_2544e3a9ffcf50::t_99c780595f4225 243,250,258,262,268
+  s_2544e3a9ffcf50::t_9e4968c483f726 241-242,244-249,251-257,259-261,263-267,269-273,287-291,315-318,341-345,407-412
+  s_2544e3a9ffcf50::t_388de6ccc94c47 376
+  s_2544e3a9ffcf50::t_d09f1a5d562fd1 375
+  s_2544e3a9ffcf50::t_cc51910a56b91f 132,137,143,148,153,156,161,339-340
+  s_2544e3a9ffcf50::t_bb06769f5a0755 94,104,109,117,122,126,372-374
+  s_2544e3a9ffcf50::t_d1e85beea1169f 208,215,220,225,230,235
+  s_2544e3a9ffcf50::t_4f81934c3bc8bb 346,379,413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e157be46406fc5b3949d103b7127884dcd687689",
+  "prompts": {},
+  "sessions": {
+    "s_2544e3a9ffcf50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "187a750e-6d4d-484d-86f8-2e7007a045e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

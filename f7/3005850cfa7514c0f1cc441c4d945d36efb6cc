@@ -1,0 +1,29 @@
+docs/solutions/logic-errors/reactive-trigger-threshold-blind-spot.md
+  s_e88a9e9b03bbc7::t_184bb6eaac86f0 148-157,168-170
+docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md
+  s_e88a9e9b03bbc7::t_029909be4c61b4 178-185
+docs/solutions/logic-errors/write-freeze-invariant-omits-passive-hook-path.md
+  s_e88a9e9b03bbc7::t_d5239d2fda0462 1-130
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_e88a9e9b03bbc7::t_a9c33d1d4752fb 1063-1107
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_e88a9e9b03bbc7::t_88fad8cd3ac4c0 293-297
+docs/solutions/logic-errors/append-only-dedup-blocks-correction-propagation.md
+  s_e88a9e9b03bbc7::t_ec71cf9c28fa31 73-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f73005850cfa7514c0f1cc441c4d945d36efb6cc",
+  "prompts": {},
+  "sessions": {
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

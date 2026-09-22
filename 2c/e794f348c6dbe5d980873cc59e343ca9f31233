@@ -1,0 +1,23 @@
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_9930f24284600a::t_a1435343e6ccc4 54-60
+plans/library-context-cache-loop-closure.md
+  s_9930f24284600a::t_17bd278450d7cb 154
+plugins/yellow-core/agents/research/best-practices-researcher.md
+  s_9930f24284600a::t_31629e3b2a8074 88-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2ce794f348c6dbe5d980873cc59e343ca9f31233",
+  "prompts": {},
+  "sessions": {
+    "s_9930f24284600a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "33d8f4d4-9187-4ef9-9d0b-9f301d39bed4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

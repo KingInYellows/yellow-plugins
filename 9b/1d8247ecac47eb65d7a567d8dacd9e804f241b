@@ -1,0 +1,19 @@
+plugins/yellow-core/commands/workflows/decompose.md
+  s_d0528420615001::t_b3fac5dac15a35 41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "9b1d8247ecac47eb65d7a567d8dacd9e804f241b",
+  "prompts": {},
+  "sessions": {
+    "s_d0528420615001": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0e6dcfb-cc20-4b42-83d6-7b0f2ab5c59c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

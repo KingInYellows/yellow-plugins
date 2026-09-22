@@ -1,0 +1,22 @@
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_90cee544007013::t_31a139b0388018 1-132
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_4ddc6ff4d34d40 171
+  s_90cee544007013::t_46df3a213755bf 167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d3c8b60fc9778e11a66171aa16a1f323b04e4ceb",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

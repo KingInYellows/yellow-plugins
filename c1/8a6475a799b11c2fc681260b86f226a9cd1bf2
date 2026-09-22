@@ -1,0 +1,48 @@
+plugins/yellow-review/tests/fixtures/thermonuclear/README.md
+  s_aa2a8cf97f9dcd::t_db09c7bdf40f1c 37-49,51-53
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_aa2a8cf97f9dcd::t_3d570fe5dfbc2c 102,111-115
+plugins/yellow-review/commands/review/review-pr.md
+  s_aa2a8cf97f9dcd::t_927d0418c12d5a 542-546,761-766
+.changeset/thermonuclear-reviewer.md
+  s_aa2a8cf97f9dcd::t_aec3ca2bece408 34,36-41
+plugins/yellow-core/skills/local-config/SKILL.md
+  s_aa2a8cf97f9dcd::t_6f67addaac7fd3 95,146-155,162-164,172
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_aa2a8cf97f9dcd::t_16f8274557b215 244-250
+plugins/yellow-review/commands/review/review-all.md
+  s_aa2a8cf97f9dcd::t_1357026d12b42d 226
+  s_aa2a8cf97f9dcd::t_753c068c5058e3 225,232
+  s_aa2a8cf97f9dcd::t_18effdc359740b 227-231
+  s_aa2a8cf97f9dcd::t_ebda508686a71e 222-224
+  s_a3dc676e26a626::t_2a7aaa53443748 218-221
+plugins/yellow-review/README.md
+  s_aa2a8cf97f9dcd::t_6211168971cbc5 98-102,106-108
+  s_aa2a8cf97f9dcd::t_c5617c5915f412 120
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_aa2a8cf97f9dcd::t_f782d0ea464e7e 32,37-38,134,140,172,174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c18a6475a799b11c2fc681260b86f226a9cd1bf2",
+  "prompts": {},
+  "sessions": {
+    "s_a3dc676e26a626": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares768-c1-2ed2af2ec5d27ac0",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_aa2a8cf97f9dcd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43a9de6f-34f0-433f-b93c-7026950da309",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}

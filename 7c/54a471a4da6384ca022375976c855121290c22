@@ -1,0 +1,22 @@
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_216a9b25ff864a::t_73e8b70de94ebb 1-493
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_216a9b25ff864a::t_be8e66cbd02f91 128-168
+  s_216a9b25ff864a::t_a13de21a103ef2 53-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7c54a471a4da6384ca022375976c855121290c22",
+  "prompts": {},
+  "sessions": {
+    "s_216a9b25ff864a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5f5a4b7c-194c-48c1-a753-3ee1446e2409",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

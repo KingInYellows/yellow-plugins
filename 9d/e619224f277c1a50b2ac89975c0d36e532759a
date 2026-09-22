@@ -1,0 +1,108 @@
+plugins/github-workflow/CLAUDE.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 93-99
+plugins/gt-workflow/CLAUDE.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 203-211,229-231,234-236,257-258
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+docs/solutions/security-issues/substring-regex-command-denylist-evasion.md
+  s_9faf0dc507d8cf::t_a5a5e26a1e6eaf 55-73
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/github-workflow/tests/hooks.bats
+  s_9faf0dc507d8cf::t_ff56e66863b274 110-130,139-157,168-176
+  s_9faf0dc507d8cf::t_5d3be2064f8283 131-138
+  s_9faf0dc507d8cf::t_4516b15b425af0 177
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/github-workflow/hooks/scripts/lib/git-push-detector.js
+  s_9faf0dc507d8cf::t_61d8279c910a60 1-444
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/hook-parity.bats
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 172-233
+plugins/gt-workflow/.claude-plugin/plugin.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 35,47
+plugins/github-workflow/README.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 79-82
+plugins/gt-workflow/README.md
+  s_9faf0dc507d8cf::t_444bcee2fb929a 124-129
+plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_9faf0dc507d8cf::t_6242b514a83f18 7-18,22,45-46,54
+plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js
+  s_9faf0dc507d8cf::t_3dd7ee5926a6b2 114,118-123,220-221,242,248-255,258,395
+  s_9faf0dc507d8cf::t_16108e7bfd2d9b 1-113,115-117,124-219,222-241,243-247,256-257,259-394,396-444
+plugins/gt-workflow/hooks/codex-hooks.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 11,24
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+.changeset/git-push-guard-tokenised-detector.md
+  s_9faf0dc507d8cf::t_a5a5e26a1e6eaf 1-21
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt
+  s_9faf0dc507d8cf::t_0ed036fc985cfe 1-6
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.stdin
+  s_9faf0dc507d8cf::t_5f6c859f9106cf 1
+plugins/github-workflow/hooks/scripts/lib/policy-check-git-push.js
+  s_9faf0dc507d8cf::t_61d8279c910a60 15-25,35-40,49-51,53,62-72,74
+tests/integration/git-push-detector-parity.test.ts
+  s_9faf0dc507d8cf::t_fde603d5f7bf05 1-55,58-179,181-184
+  s_9faf0dc507d8cf::t_ead5bbb7ff9385 180
+  s_9faf0dc507d8cf::t_cd037b801fe6c3 56-57
+catalog/plugins/gt-workflow.json
+  s_9faf0dc507d8cf::t_46a62b651741a5 34,46
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_9faf0dc507d8cf::t_bf25669c702273 326,338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9de619224f277c1a50b2ac89975c0d36e532759a",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

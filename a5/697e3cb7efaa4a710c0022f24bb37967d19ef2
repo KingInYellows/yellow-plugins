@@ -1,0 +1,38 @@
+tests/integration/generate-manifests-codex.test.ts
+  s_9faf0dc507d8cf::t_3ae134ee9095c9 1393-1394,1396,1447
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 20,1403-1437
+  s_9faf0dc507d8cf::t_9f319ac290232d 1333-1392,1395,1397-1402,1438-1446,1448-1454
+tests/integration/validate-plugin.test.ts
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 863-900,915-922
+  s_9faf0dc507d8cf::t_59b6621f441647 31,776-862,901-914,923
+  s_9faf0dc507d8cf::t_7e8b1262d1e0ef 924
+docs/plugin-validation-guide.md
+  s_9faf0dc507d8cf::t_7174179531317d 247,252,260,272
+  s_9faf0dc507d8cf::t_2f06c98e80ce01 248-251,253-259,261-271
+scripts/lib/plugin-paths.js
+  s_9faf0dc507d8cf::t_dd58490f8d8fbb 238-277,637-640,653-686,754-755
+  s_9faf0dc507d8cf::t_11f09f387b14f5 325-326,328,336
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 227-232,278-324,327,329-335,337-350,641-652,756-758
+scripts/lib/plugin-rules.js
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 25,284-289
+scripts/generate-manifests.js
+  s_9faf0dc507d8cf::t_54b8a003651f06 71,75,80,950,1192-1199,1201,1213-1214,1255,1444-1451,1453,1465-1466,1493-1495
+  s_9faf0dc507d8cf::t_7357d5ce6638ad 72-74,927-935,1188-1191,1211-1212,1279-1287,1440-1443,1463-1464
+  s_9faf0dc507d8cf::t_11f09f387b14f5 1210,1462
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a5697e3cb7efaa4a710c0022f24bb37967d19ef2",
+  "prompts": {},
+  "sessions": {
+    "s_9faf0dc507d8cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db286226-1436-4daa-a71e-3315fe9e62a6",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

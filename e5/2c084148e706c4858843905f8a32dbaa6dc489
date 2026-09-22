@@ -1,0 +1,35 @@
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_d13666fe055d57 188-197,205-216
+  s_f5fa4421099f37::t_7b9ebb05e322e3 198-204
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_fe5fd78eda6173 214-221
+plugins/yellow-core/tests/repo-profile.bats
+  s_f5fa4421099f37::t_6ea5d37b13615a 74
+  s_f5fa4421099f37::t_29c95409994013 185,191-198
+  s_f5fa4421099f37::t_456883b9125a75 1-73,75-184,186-190,186-191,199
+plugins/yellow-core/lib/repo-profile.sh
+  s_f5fa4421099f37::t_7f9c09b338e5f1 1-21,26-72,74-84,89-123,125-128,133-139,141-145,147-149,155
+  s_f5fa4421099f37::t_a3d235d00b4683 124
+  s_f5fa4421099f37::t_9d978070e18aaa 22-25
+  s_f5fa4421099f37::t_c0e834cac17d03 85-88
+  s_f5fa4421099f37::t_9d18ca67999ece 129-132,140,146,150-154
+  s_f5fa4421099f37::t_b0c6e9ffc33adf 73
+.changeset/tier3-c17-repo-profile-cache.md
+  s_f5fa4421099f37::t_849b5c9e5b73e4 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "e52c084148e706c4858843905f8a32dbaa6dc489",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}

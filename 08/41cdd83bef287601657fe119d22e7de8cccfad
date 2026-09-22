@@ -1,0 +1,20 @@
+tests/integration/github-stack-runtime.test.ts
+  s_fd5d688b6eb948::t_222b074cabbeac 389-395,398-399,401
+  s_fd5d688b6eb948::t_68880ada97516c 425,427,430,434
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0841cdd83bef287601657fe119d22e7de8cccfad",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

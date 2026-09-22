@@ -1,0 +1,25 @@
+docs/brainstorms/2026-05-13-mixed-topology-parallel-execution-workfl-brainstorm.md
+  s_6d2ef1322cfec1::t_979bbcba69aa67 49-60
+  s_6d2ef1322cfec1::t_2341013733548a 30,138
+  s_6d2ef1322cfec1::t_8c6c13eaf6f1c0 42
+  s_6d2ef1322cfec1::t_3e1376c345533d 84-91
+  s_6d2ef1322cfec1::t_fb96c16bfa699c 112
+  s_6d2ef1322cfec1::t_83f1c69000b016 122
+  s_6d2ef1322cfec1::t_b4a14d3f9d4263 140-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "a12bd1a9e67efa2f5d6e80134b70e3fa880f0c93",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+plugins/yellow-ci/hooks/scripts/lib/run-hook.js
+  s_c416776466e077::t_4d48c612a1cabf 10-15,20,30-54
+plugins/yellow-ci/skills/ci-conventions/SKILL.md
+  s_c416776466e077::t_4babf97c433f37 117-118
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_c416776466e077::t_5cb8fffd32d993 57-59,64
+docs/security.md
+  s_c416776466e077::t_c4b3e10aaca60b 122-124,132-136
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_c416776466e077::t_e362be59e92321 43-46
+  s_c416776466e077::t_4c8f4653f7614f 55-58
+plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md
+  s_c416776466e077::t_62a47647fe71a9 116-117
+plugins/yellow-ci/codex/skills/diagnose-ci/SKILL.md
+  s_c416776466e077::t_62a47647fe71a9 40-43
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_c416776466e077::t_62a47647fe71a9 42-45,54-57
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_c416776466e077::t_62a47647fe71a9 56-58,63
+plugins/yellow-ci/skills/diagnose-ci/SKILL.md
+  s_c416776466e077::t_f1f0b4b45af03c 41-44
+plugins/yellow-ci/codex/skills/ci-setup/SKILL.md
+  s_c416776466e077::t_62a47647fe71a9 69-71,147-150
+plugins/yellow-ci/skills/ci-setup/SKILL.md
+  s_c416776466e077::t_1ac4aefc3f4f61 70-72
+  s_c416776466e077::t_5d7db58b042c14 148-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8a8b74041269cb3870047f93103a9f4243fd6f62",
+  "prompts": {},
+  "sessions": {
+    "s_c416776466e077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f519fa03-eba8-4db6-9c76-84716693ecd9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

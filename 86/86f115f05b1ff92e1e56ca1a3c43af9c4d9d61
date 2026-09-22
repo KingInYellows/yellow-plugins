@@ -1,0 +1,31 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2feb58e848d20d::t_b7316f68f25812 299,391,753
+  s_2feb58e848d20d::t_f33516a1317e88 668-698,701-708
+plugins/yellow-codex/commands/codex/review.md
+  s_2feb58e848d20d::t_a2fa0792d5af26 349
+  s_2feb58e848d20d::t_b7316f68f25812 205,289,327,367
+  s_2feb58e848d20d::t_108f47038a6aaa 460-477,480-482,488-489,492-493
+plugins/yellow-council/commands/council/council.md
+  s_2feb58e848d20d::t_1dfce189762955 364-368
+  s_2feb58e848d20d::t_df1fe8f4471302 343-346
+  s_2feb58e848d20d::t_3c9aececdb444f 369-370
+  s_2feb58e848d20d::t_6531ec8744b20a 295-300
+tests/integration/codex-reviewer-step6-extraction.test.ts
+  s_2feb58e848d20d::t_a5870229fee8d7 343-443
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "8686f115f05b1ff92e1e56ca1a3c43af9c4d9d61",
+  "prompts": {},
+  "sessions": {
+    "s_2feb58e848d20d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46cf0ad5-c154-44fd-a3d8-19281f5dd794",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

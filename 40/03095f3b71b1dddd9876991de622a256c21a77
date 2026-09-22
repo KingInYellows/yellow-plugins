@@ -1,0 +1,38 @@
+plugins/gt-workflow/tests/smart-submit.bats
+  s_4febf2cbaf48e8::t_0c1a62b0bd436a 1-174
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_c4edf437935246 402
+CLAUDE.md
+  s_4febf2cbaf48e8::t_127141c5e3f7a2 54-55
+plugins/gt-workflow/CLAUDE.md
+  s_4febf2cbaf48e8::t_14dfc0f0ad0ddb 158-187
+plugins/gt-workflow/tests/gt-amend.bats
+  s_4febf2cbaf48e8::t_0a9dd8a47b4c99 87
+  s_4febf2cbaf48e8::t_0543f1d2045522 1-86,88-131
+plugins/gt-workflow/tests/gt-cleanup.bats
+  s_4febf2cbaf48e8::t_043905ace224ec 1-153,155-313
+  s_4febf2cbaf48e8::t_4406fd0570835f 154
+plugins/gt-workflow/tests/mocks/git
+  s_4febf2cbaf48e8::t_3cac1bff2f4be0 1-68
+plugins/gt-workflow/tests/fixtures/gt-cleanup/branches-mixed.txt
+  s_4febf2cbaf48e8::t_f8475b59f8820e 6
+  s_4febf2cbaf48e8::t_12042baea69fe7 1-5,7
+plugins/gt-workflow/tests/mocks/gt
+  s_4febf2cbaf48e8::t_4d0af40ddd599f 1-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4003095f3b71b1dddd9876991de622a256c21a77",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

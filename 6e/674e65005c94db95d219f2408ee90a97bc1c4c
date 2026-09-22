@@ -1,0 +1,31 @@
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_d3f84f9afbd86a::t_9a7b9aad6f9e15 206-209,211
+  s_d3f84f9afbd86a::t_7c85c4515c9e00 224-228,231-233
+  s_d3f84f9afbd86a::t_3688023913a4b8 182-187
+plugins/yellow-core/README.md
+  s_d3f84f9afbd86a::t_a894192d8dabe5 33
+.changeset/plan-complete-file-provenance-tier.md
+  s_d3f84f9afbd86a::t_31c7d9356d9ff5 5-7
+plugins/yellow-core/commands/plan/complete.md
+  s_d3f84f9afbd86a::t_f401d3450bfa88 23-24
+  s_d3f84f9afbd86a::t_7b2dcd1a382796 175-185,189-198,203-213,215,224-227
+  s_d3f84f9afbd86a::t_071d2d21295d4d 513-514,516-518,529-533
+plugins/yellow-core/CLAUDE.md
+  s_d3f84f9afbd86a::t_fad48a6e5e0175 116-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6e674e65005c94db95d219f2408ee90a97bc1c4c",
+  "prompts": {},
+  "sessions": {
+    "s_d3f84f9afbd86a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad6524dd-c688-4830-8a5d-32937c53578e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}

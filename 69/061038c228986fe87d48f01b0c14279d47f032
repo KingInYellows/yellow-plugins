@@ -1,0 +1,37 @@
+tests/integration/validate-solutions.test.ts
+  s_3d732359543504::t_20d47ebd9c9a79 1-353,407-440,355-356,358-362,373-374,377-378,381-383,385-386,388-392,400-401,404-406
+  s_3d732359543504::t_9e8213c1d94666 354,357,363-372,375-376,379-380,384,387,398,402-403
+  s_3d732359543504::t_4068e0dfe3d54e 393-397,399
+packages/domain/src/validation/errorCatalog.ts
+  s_3d732359543504::t_aef89f256a7410 71-75,88-89
+  s_3d732359543504::t_8443ac1286dcbf 298-301
+  s_3d732359543504::t_619aaa81623707 76-87
+scripts/validate-solutions.js
+  s_3d732359543504::t_1688878a15d127 1-42,44-118,126-127,144-169,185,187,189-196,202-290,294-309,311,313-319,328,330-332,334-355,362-395,143,182-184
+  s_3d732359543504::t_223baa2cce3f1c 291-293,310,312,320-327,329,333
+  s_3d732359543504::t_a0ef6d53eb796a 356-361
+  s_3d732359543504::t_19a5b3a8aa9ce8 43
+  s_3d732359543504::t_6e628a11446619 119-125,128-142
+  s_3d732359543504::t_a8d286b9ea3d11 170-181,186,188
+  s_3d732359543504::t_099a8499dca8ea 197-201
+.github/workflows/validate-schemas-fork.yml
+  s_3d732359543504::t_0d249da313a5b4 16
+  s_3d732359543504::t_38bdf32ccfd805 44,49-50
+  s_3d732359543504::t_2c45adfdc8eb76 126-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "69061038c228986fe87d48f01b0c14279d47f032",
+  "prompts": {},
+  "sessions": {
+    "s_3d732359543504": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cdbf3a-f938-4393-b0f3-29245d9b53b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

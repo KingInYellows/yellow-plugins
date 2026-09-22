@@ -1,0 +1,36 @@
+plugins/yellow-ci/tests/mocks/ssh
+  s_17bd29452ea753::t_5e1ee29c544f46 1-80
+plugins/yellow-ci/tests/hook-parity.bats
+  s_17bd29452ea753::t_5e8cc1a871d988 1-75
+plugins/yellow-ci/CLAUDE.md
+  s_17bd29452ea753::t_0565c58e843c0c 68-73
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_36fe87840a024c 405,410-418
+  s_17bd29452ea753::t_a197c6b04b212d 396
+  s_17bd29452ea753::t_143adfb58ae73c 352-354
+  s_17bd29452ea753::t_2dfc417cc03f34 419-420
+  s_17bd29452ea753::t_ffab1fd4d16245 401
+plugins/yellow-ci/tests/lib/hook-scenario.bash
+  s_17bd29452ea753::t_60f0657e8feedc 22-26,30-43
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_17bd29452ea753::t_fec4e465554ef1 34
+  s_17bd29452ea753::t_301b5e592c88ab 15-19
+plugins/yellow-ci/tests/fake-exec.bats
+  s_17bd29452ea753::t_d60c9a1b57ca27 1-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "55e74e26bcd45d23fb7e2b3223322611fd41885c",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

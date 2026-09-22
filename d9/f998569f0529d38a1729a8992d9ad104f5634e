@@ -1,0 +1,21 @@
+plugins/yellow-ci/agents/ci/failure-analyst.md
+  s_e0beaba782ec4e::t_8efa8a6ea1b0f2 90
+plugins/yellow-ci/commands/ci/setup.md
+  s_e0beaba782ec4e::t_8efa8a6ea1b0f2 110-113,117-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "d9f998569f0529d38a1729a8992d9ad104f5634e",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

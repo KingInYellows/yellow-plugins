@@ -1,0 +1,24 @@
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_6d2ef1322cfec1::t_c358235f45361f 97-101,104-106,115-118
+  s_6d2ef1322cfec1::t_3bb53edcc4935f 159-180
+  s_6d2ef1322cfec1::t_4b6d0a04232020 205,211-216,234-237
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_6d2ef1322cfec1::t_5fefb1e9e67843 81,83,89-94
+  s_6d2ef1322cfec1::t_1c987db96479d4 41-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "c169b322b2940d3327645fef0abf5a3e60e7160a",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

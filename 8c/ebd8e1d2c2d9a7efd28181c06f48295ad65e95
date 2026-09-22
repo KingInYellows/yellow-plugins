@@ -1,0 +1,33 @@
+plugins/yellow-review/README.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 91-111
+docs/solutions/workflow/graphite-stack-descendant-rebase-onto-procedure.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 61-69
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 86-94,126-127,130,132,135-138
+docs/codex-distribution.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 44,47-48,51-52
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 86-94,126-127,130,132,135-138
+tests/integration/thermonuclear-reviewer.test.ts
+  s_1ed65cfba90080::t_059cdcf3d2ee08 245-249
+docs/security.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 232-239,366-370
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_1ed65cfba90080::t_059cdcf3d2ee08 87-95,127-128,131,133,136-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8cebd8e1d2c2d9a7efd28181c06f48295ad65e95",
+  "prompts": {},
+  "sessions": {
+    "s_1ed65cfba90080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f03237c-3dd0-45ea-802d-c1b79a14dae6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

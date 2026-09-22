@@ -1,0 +1,21 @@
+docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md
+  s_f4074862689008::t_198f868dae3ed6 315-383
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_f4074862689008::t_985d11af4d030b 1455-1534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "3fb2d24a223f577951df71aebe2a98aec465ce93",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

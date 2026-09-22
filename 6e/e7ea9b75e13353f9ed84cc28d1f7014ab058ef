@@ -1,0 +1,30 @@
+plugins/yellow-research/commands/research/setup.md
+  s_f767bca7d385eb::t_6d847ea4378708 599
+.changeset/bump-morphmcp-0-8-181.md
+  s_f767bca7d385eb::t_c981b8b2af4a37 5
+  s_f767bca7d385eb::t_427a1dfa3ca72a 1-4
+docs/upstream-pins.md
+  s_f767bca7d385eb::t_dc6fa818521cc7 27
+plugins/yellow-morph/CLAUDE.md
+  s_f767bca7d385eb::t_2d16dbc99e015a 8
+plugins/yellow-morph/package.json
+  s_f767bca7d385eb::t_b895ef4a589a11 7
+.changeset/research-morphmcp-tool-note.md
+  s_f767bca7d385eb::t_57dd995b3f3870 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6ee7ea9b75e13353f9ed84cc28d1f7014ab058ef",
+  "prompts": {},
+  "sessions": {
+    "s_f767bca7d385eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e42bc1e-42bd-432b-91ef-389ccb09db94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}

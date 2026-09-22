@@ -1,0 +1,24 @@
+.changeset/w1b-linear-delegate-dependency-truth.md
+  s_90cee544007013::t_59b0e752044a9c 1-9
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_3df43885f8309c 187
+plugins/yellow-linear/CLAUDE.md
+  s_90cee544007013::t_4811e3c4531a24 91-95
+  s_90cee544007013::t_b8eca402dbf306 46-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1a16b754758084295939b03c3ce1341d3e626129",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

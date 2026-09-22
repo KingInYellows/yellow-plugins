@@ -1,0 +1,33 @@
+plugins/yellow-semgrep/agents/semgrep/scan-verifier.md
+  s_95e18d4ed456ab::t_6626ea4bcf563e 60
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_95e18d4ed456ab::t_2724845d6cb038 17
+plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md
+  s_95e18d4ed456ab::t_c041150bf9f34b 171-172
+  s_95e18d4ed456ab::t_05dc5dbfa58d53 202,205-207
+  s_95e18d4ed456ab::t_de38d217b18a3d 208
+plugins/yellow-semgrep/skills/semgrep-conventions/references/fix-patterns.md
+  s_95e18d4ed456ab::t_7fd7ec9284426a 37-39
+plugins/yellow-semgrep/README.md
+  s_95e18d4ed456ab::t_217d257012ca9a 57
+plugins/yellow-semgrep/CLAUDE.md
+  s_95e18d4ed456ab::t_46acb6acde0971 128-129
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_95e18d4ed456ab::t_27e24abe7cfd63 246-247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3c3353fe662164d90e91f3ee04a0dcd6276ee2c8",
+  "prompts": {},
+  "sessions": {
+    "s_95e18d4ed456ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46fd3ff8-0589-4324-aeeb-a38b796fd7bc",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

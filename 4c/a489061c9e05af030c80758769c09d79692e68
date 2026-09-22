@@ -1,0 +1,63 @@
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_0f11ccca6994a8::t_0d4e289508884b 1-545
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_6ec1811a519de4::t_52d02b0643d64c 3
+  s_0f11ccca6994a8::t_8d652da3fbe1c9 1-2,4-621
+plans/background-compounding-triggers.md
+  s_6ec1811a519de4::t_3c9f2b564a8ea1 688,693
+  s_0f11ccca6994a8::t_db2f7acec44a62 519-521
+  s_0f11ccca6994a8::t_d7f81f2ee5df0c 5-11,18-21,25-27,29,31-34,38,41-42,49-57,60,63-81,84-91,94-97,100-103,108-114,123-147,150-167,170,173-206,208,234-249,253-261,267-269,273,275-283,285,287-292,295-309,314-319,322,324,328-329,332,335-387,389-392,394-457,462-481,483-484,488-496,500-510,512-515,517-518,522-529,533-540,549,551-552,554-556,558-562,566-569,573-595,599-611,616-622,626-628,637-649,654-659,669-676,680-687,689-692,694-695,699-704,711-716,751,753-755
+  s_6ec1811a519de4::t_cacdb24212af9f 92-93
+  s_0f11ccca6994a8::t_b2ad6b777cac7b 207,209-214,219,224-230
+  s_6ec1811a519de4::t_752f4c06a677f9 168-169,171-172
+  s_0f11ccca6994a8::t_0e70d45bce2636 458-460
+  s_0f11ccca6994a8::t_97912648a954e2 660-668
+  s_0f11ccca6994a8::t_f2d3e8f81d478f 262-266
+  s_0f11ccca6994a8::t_2f9b0300ed67fb 149,231
+  s_6ec1811a519de4::t_efb6f63a472013 82-83
+  s_6ec1811a519de4::t_8ff73e876816fb 215-218,220-223
+  s_0f11ccca6994a8::t_94740163053723 629-633
+  s_6ec1811a519de4::t_fceb358a8900cf 747,752
+  s_6ec1811a519de4::t_70812cc14f5199 43-48,58-59,61-62
+  s_0f11ccca6994a8::t_ded26bb13e566c 1-4,12-17,22-24,28,30,35-37,39-40,98-99,104-107,148,232-233,250-252,270-271,274,284,286,293,310-313,320-321,323,325-327,330-331,333-334,461,482,485,530-532,541-547,550,557,563-565,570-572,596-598,623-625,634-636,650-653,677-679,705-710,717,746,748-750
+  s_6ec1811a519de4::t_97d78ec01fcaa2 115-122
+  s_6ec1811a519de4::t_be2f8fb7474fff 388,393
+  s_0f11ccca6994a8::t_03a5e590d4fa9b 696-698
+  s_0f11ccca6994a8::t_e69140539d59be 486-487
+  s_0f11ccca6994a8::t_cc541d8f482973 718-745
+  s_0f11ccca6994a8::t_a0d2714f0497d5 497-499
+  s_6ec1811a519de4::t_d4eafa366e719e 548,553
+  s_0f11ccca6994a8::t_bd9032a817df2d 612-615
+  s_0f11ccca6994a8::t_0e7c01080bd573 272
+  s_6ec1811a519de4::t_1feee3a1de40f7 511,516
+  s_0f11ccca6994a8::t_053b492f6d394a 294
+docs/brainstorms/2026-05-18-background-compounding-triggers-brainstorm.md
+  s_6ec1811a519de4::t_34b9fdd1fc98f1 6-20
+  s_0f11ccca6994a8::t_b7b6b77be85a0a 1-5,21-382
+docs/research/repo/background-compounding-triggers-deepen-validation.md
+  s_0f11ccca6994a8::t_788efd25878e23 1-365
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "4ca489061c9e05af030c80758769c09d79692e68",
+  "prompts": {},
+  "sessions": {
+    "s_0f11ccca6994a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f80b64ec-53af-40c4-83ab-1abccdeff5be",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_6ec1811a519de4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "24e920a7-1e4d-4573-bf68-a13b8757ca24",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

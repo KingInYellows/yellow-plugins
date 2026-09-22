@@ -1,0 +1,19 @@
+plans/complete/solution-doc-git-workflow.md
+  s_b7de9b75b99767::t_a025096f1df934 150,160,163,175,179,181,184,200,217,220,230,237,241,244,251,253,258,280-281,284,289,294,367,370,373,390,395,406,408,410,412,417,420,422,520,523,525-526,682-712
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "6d82c9c9de5fd51c3028e64b9a61dfae44b2b718",
+  "prompts": {},
+  "sessions": {
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

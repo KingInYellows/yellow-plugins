@@ -1,0 +1,28 @@
+plugins/yellow-ci/skills/ci-setup/SKILL.md
+  s_fc81472ff4a623::t_a77e2710fe06bd 139-142
+  s_fc81472ff4a623::t_00c0688376a5e1 103-109
+  s_fc81472ff4a623::t_2500a8f340e6bc 111-130
+  s_fc81472ff4a623::t_575fa3d8445af0 110
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_135e379cb7c69f 95-107,110-124,127-132
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_fc81472ff4a623::t_d15cfd73ef3ca6 94-106,109-123,126-131
+plugins/yellow-ci/codex/skills/ci-setup/SKILL.md
+  s_fc81472ff4a623::t_d15cfd73ef3ca6 102-129,138-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "850b5780a5ca0809612f5609a48c8bc7436e8683",
+  "prompts": {},
+  "sessions": {
+    "s_fc81472ff4a623": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eae8d790-ad2e-4367-a38b-24a76ce18c74",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

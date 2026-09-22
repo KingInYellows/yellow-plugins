@@ -1,0 +1,84 @@
+plugins/yellow-codex/commands/codex/setup.md
+  s_90cee544007013::t_9981684a186b4c 54
+  s_90cee544007013::t_b65f7d0bba43ea 241
+  s_90cee544007013::t_7501c4b7e04d9b 51
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_90cee544007013::t_968afa5b5e957e 95,97,99-101
+  s_90cee544007013::t_231a41d23ee7a1 85
+plugins/yellow-codex/commands/codex/review.md
+  s_90cee544007013::t_e8b35ac3d656f9 124,126,128-130
+  s_90cee544007013::t_2d085cedcccc4f 103-104,109-111
+.changeset/w0-council-codex-flag-docs.md
+  s_90cee544007013::t_e93dc582a4fb74 1-8
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_90cee544007013::t_3e4916a996b2ce 103-107
+  s_90cee544007013::t_df0d889e37733c 80,88-93
+  s_90cee544007013::t_eebf7876a71d87 62
+  s_90cee544007013::t_6038bf6395b578 21-23,30-31,36
+  s_90cee544007013::t_f737cdf7a94a38 48
+plugins/yellow-council/CLAUDE.md
+  s_90cee544007013::t_5261ecfbce7d5d 47
+.changeset/w0-codex-exec-review-flags.md
+  s_90cee544007013::t_8e8ef3cb169e69 1-12
+docs/brainstorms/2026-07-09-audit-resolution-brainstorm.md
+  s_072e2f16815af1::t_eb800dcf2cc92c 1-93,96-261
+plugins/yellow-codex/CLAUDE.md
+  s_90cee544007013::t_121a616cb7baa6 17,21-23
+  s_90cee544007013::t_6db1b60de1d69d 38-41
+  s_90cee544007013::t_446d33c950b785 110
+plugins/yellow-codex/commands/codex/rescue.md
+  s_90cee544007013::t_95ab1df15681ea 85
+  s_90cee544007013::t_406685ab7cdfca 106
+  s_90cee544007013::t_063ff0d5cc019c 95,97,99-101
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_90cee544007013::t_643a723516bf07 87
+  s_90cee544007013::t_8019bcbb42718d 99,101,103-105
+plugins/yellow-codex/README.md
+  s_90cee544007013::t_f60ad64cfc9254 16
+  s_90cee544007013::t_a0bef8a7e5d2bb 59
+plugins/yellow-codex/scripts/install-codex.sh
+  s_90cee544007013::t_df5ff45ab897ef 32
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_90cee544007013::t_7d0424dc08a3c0 125-126,132-134
+plans/audit-remediation-stack.md
+  s_072e2f16815af1::t_e1b15ca35cbf2d 274-285
+  s_90cee544007013::t_1225e3909fb7c6 84
+  s_90cee544007013::t_73bd9702a5ed0a 137
+  s_072e2f16815af1::t_78e9998c7f399f 355-363
+  s_90cee544007013::t_ab0b942833f6b4 145
+  s_90cee544007013::t_79e7da16390fe0 124
+  s_90cee544007013::t_ef059789c1e1ca 150
+  s_072e2f16815af1::t_9a9c4e5f812662 211-236
+  s_072e2f16815af1::t_bfe1d099c8c1f7 1-54,64-83,85-90,104-107,125-127,138-140,142-144,146-149,151-152,170-172,174-210,237-241,253-273,286-354,364-445
+  s_90cee544007013::t_771f9e3b024875 103
+  s_072e2f16815af1::t_b8c33edfcb1154 128-136
+  s_072e2f16815af1::t_4c1208545fee13 108-123
+  s_90cee544007013::t_0e8ca48f63def7 141
+  s_072e2f16815af1::t_fd08bcbbd5895f 153-168
+  s_072e2f16815af1::t_887d1339b4a4ed 91-102
+  s_072e2f16815af1::t_e055368564c9ac 242-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "811ae114f1bd4eb75cda5c5bb8d40149ceb5b9f5",
+  "prompts": {},
+  "sessions": {
+    "s_072e2f16815af1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e7d9a9b5-3d75-4ff8-a531-0685f196dab3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+tests/integration/generate-manifests.test.ts
+  s_f4074862689008::t_a0eed81029bfec 425-428
+  s_f4074862689008::t_55b8dc05da5204 315-316
+  s_f4074862689008::t_97b57bf7734fbb 253-254
+scripts/generate-manifests.js
+  s_f4074862689008::t_9701a8d21667a1 258-263
+  s_f4074862689008::t_840a2b28d40d7b 334-340
+  s_f4074862689008::t_d2a5f0d5e86b81 416
+  s_f4074862689008::t_46ec451c20ad2b 645,739-756,762
+  s_f4074862689008::t_8c7508bd798097 235,240-243
+  s_f4074862689008::t_3a801573fdb7ae 361-367,374-380,389,393-399
+  s_f4074862689008::t_032d97642d2f5d 635-640,643-644
+  s_f4074862689008::t_eb7add4145980f 276,278-280,286,294,302,309,316
+  s_f4074862689008::t_db1aa7b0f2049d 710,715
+tests/integration/generate-manifests-codex.test.ts
+  s_f4074862689008::t_a930ba7f4efac1 178,183-184
+  s_f4074862689008::t_2c8b09ae8186c3 209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "f5b34b74811112477cb04ab6bcfb26eec4dd663b",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

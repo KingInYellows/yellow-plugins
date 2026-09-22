@@ -1,0 +1,19 @@
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_2ce1db4e09a1cf::t_7f9031e2c91b46 30,40,50,70,90,100,140,160,170,180,298,344,432,483,510,560,632,663,894,995
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "60060625cd215c3ceeee724b214586e12ea21b94",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

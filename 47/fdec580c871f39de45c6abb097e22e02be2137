@@ -1,0 +1,48 @@
+plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  s_dbe8034b0f3e9c::t_25fe3a4cb28d17 164-166
+  s_dbe8034b0f3e9c::t_98c572b9f4929d 161-163
+docs/security.md
+  s_dbe8034b0f3e9c::t_26f0781026dbd2 264-274
+docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md
+  s_dbe8034b0f3e9c::t_4e665e44e3c3e7 58-63
+plugins/yellow-council/commands/council/council.md
+  s_dbe8034b0f3e9c::t_04feace791e141 754-758,770
+  s_dbe8034b0f3e9c::t_9917f97b3e0d43 685,692
+  s_6c2a352ad27053::t_154c1e9db6c97e 331-342,352
+  s_dbe8034b0f3e9c::t_91870a4035afc8 550-554,556
+  s_dbe8034b0f3e9c::t_9d21238bc55d1c 759-767,769,772-785
+  s_dbe8034b0f3e9c::t_490180d67aa2d6 860-864,866,959-963,965
+  s_dbe8034b0f3e9c::t_658b489d7ab1f1 734-753,768,771
+  s_dbe8034b0f3e9c::t_c8bfaae4fcf206 376-384
+  s_dbe8034b0f3e9c::t_8e98d0c2c7de68 291-324
+  s_dbe8034b0f3e9c::t_a49b03ac083fbd 1042
+  s_dbe8034b0f3e9c::t_b1e7f62fb82ea2 614-616,628-629
+  s_dbe8034b0f3e9c::t_66212d55bb8fec 1043
+  s_dbe8034b0f3e9c::t_16e49c9ac6da55 728-733,786-788,786,787-788
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_dbe8034b0f3e9c::t_e421fdb628b513 169,484
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "47fdec580c871f39de45c6abb097e22e02be2137",
+  "prompts": {},
+  "sessions": {
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_dbe8034b0f3e9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7641ec5c-3b7e-4580-9864-e17959d2a2f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}

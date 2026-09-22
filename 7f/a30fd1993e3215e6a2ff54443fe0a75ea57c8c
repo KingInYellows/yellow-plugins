@@ -1,0 +1,24 @@
+plugins/yellow-core/commands/workflows/work.md
+  s_21cfa79e862cb2::t_2e91829b9fb898 564-573,578-581,586
+  s_21cfa79e862cb2::t_6222c687ba0f4a 574-577,582-585
+.changeset/work-polish-loop.md
+  s_21cfa79e862cb2::t_4d9099b3622397 1-13
+plans/spec-shells-decomposition-plan.md
+  s_21cfa79e862cb2::t_de5a385133f67d 346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "7fa30fd1993e3215e6a2ff54443fe0a75ea57c8c",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}

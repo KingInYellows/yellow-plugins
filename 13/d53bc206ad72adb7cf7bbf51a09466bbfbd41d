@@ -1,0 +1,40 @@
+README.md
+  s_212adc2508532d::t_6ff37a732b789b 39
+  s_212adc2508532d::t_e26f91a179bc6d 271
+  s_212adc2508532d::t_b4240eb34f354c 25
+  s_212adc2508532d::t_95eeb9c9385897 27
+  s_212adc2508532d::t_17e58d1d154cb2 31
+  s_212adc2508532d::t_b6d8054a185723 38
+  s_212adc2508532d::t_1c55c8ff242e4e 268
+  s_212adc2508532d::t_afac733cc7f77f 267
+  s_212adc2508532d::t_b65c1fc4c15d93 276
+  s_212adc2508532d::t_d15f3917b3779e 34
+  s_212adc2508532d::t_5bddef0d90e676 262
+  s_212adc2508532d::t_8aead0e15eae6e 264
+  s_212adc2508532d::t_21c8e03172d690 30
+  s_212adc2508532d::t_e15290fc29869b 275
+plugins/yellow-core/CLAUDE.md
+  s_212adc2508532d::t_4f24b99d0684f1 134
+  s_212adc2508532d::t_dbbc3052509e5d 164-166,168-180
+plugins/yellow-core/README.md
+  s_212adc2508532d::t_c9c044589d68ad 89-95,97
+  s_212adc2508532d::t_cfd479896668b0 83
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_212adc2508532d::t_3aeadcba39c234 298-299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "13d53bc206ad72adb7cf7bbf51a09466bbfbd41d",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

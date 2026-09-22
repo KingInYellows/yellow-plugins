@@ -1,0 +1,28 @@
+plugins/yellow-codex/CLAUDE.md
+  s_2db87cc7495315::t_0807d80d99cad4 34-37
+plugins/yellow-codex/commands/codex/review.md
+  s_2db87cc7495315::t_b39d3d24c74c02 196
+  s_2db87cc7495315::t_1209baa1333858 239-245,251-252
+  s_2db87cc7495315::t_5b6e039f702647 91-94,98-107,109,111-121,124-139,146
+  s_2db87cc7495315::t_ddb9c2faf040e2 35-36
+  s_2db87cc7495315::t_4841441523d900 151
+  s_2db87cc7495315::t_866bfb119d5777 304-305
+.changeset/codex-review-command-exec-migration.md
+  s_2db87cc7495315::t_dc7106b5a326cf 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "954f9a37aea964ba8925166fde0d920eb70d4200",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

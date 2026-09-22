@@ -1,0 +1,24 @@
+plugins/yellow-council/tests/lib/extract-redaction-awk.bash
+  s_3bb494324db8bc::t_94d331eb6a4d23 17-18,40,64
+.changeset/council-md-redaction-parity.md
+  s_3bb494324db8bc::t_2c797dac963ffa 11-21
+plugins/yellow-council/commands/council/council.md
+  s_3bb494324db8bc::t_05e56380a69ed0 349-386,400-407,448-460,488-491,524-531,1049-1086,1100-1107,1148-1160,1188-1191,1224-1231
+  s_3bb494324db8bc::t_98f37aa312c3d7 617-625
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "dc48c1a4c93232353b49ea0e99a30f09b7237e68",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

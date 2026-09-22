@@ -1,0 +1,21 @@
+docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md
+  s_fcef036aa1a713::t_e34c13207e99b9 222-264
+docs/solutions/security-issues/tracked-file-as-untrusted-input-channel.md
+  s_fcef036aa1a713::t_ded3ced44bc70a 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7e46f9824b22982e962a30104269fe74883d0e7b",
+  "prompts": {},
+  "sessions": {
+    "s_fcef036aa1a713": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2fa19796-a40a-47b7-a896-398e8d8c1dff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

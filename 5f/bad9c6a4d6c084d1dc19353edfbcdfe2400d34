@@ -1,0 +1,21 @@
+scripts/validate-provider-neutral-commands.js
+  s_fd5d688b6eb948::t_04e5d7fb0978a3 10-12
+  s_fd5d688b6eb948::t_f1de37a82cd57e 116-123
+  s_fd5d688b6eb948::t_8df3251b88e545 22-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5fbad9c6a4d6c084d1dc19353edfbcdfe2400d34",
+  "prompts": {},
+  "sessions": {
+    "s_fd5d688b6eb948": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6cd5365-5b87-413c-b6ed-d4d08c02e1e2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

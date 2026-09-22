@@ -1,0 +1,39 @@
+scripts/validate-plans.js
+  s_aadac9b32eee21::t_3ed8f443db438a 1-297
+plans/plan-lifecycle-management.md
+  s_aadac9b32eee21::t_363d5e89a095d1 31-43
+  s_aadac9b32eee21::t_14bd4d005501c0 370-376
+  s_aadac9b32eee21::t_ce9df2cc4ed674 424-431
+  s_aadac9b32eee21::t_d1de7c934839c9 604-609
+  s_aadac9b32eee21::t_144bae1e46d4f2 5,13-30,62-63,67,70-73,126-167,170-190,192-193,195-203,205-212,214-223,225-229,233-238,242-260,262-281,283-294,384-397,505-510,515-519,590-592,612-645,647-654,656-657,661
+.github/workflows/validate-schemas.yml
+  s_aadac9b32eee21::t_5b001b49d2f7a1 199-207
+  s_aadac9b32eee21::t_a187e1f2287819 91
+  s_aadac9b32eee21::t_986ed5418e71b7 15
+  s_aadac9b32eee21::t_b13efb79155274 57
+tests/integration/validate-plans.test.ts
+  s_aadac9b32eee21::t_8c63f22c3d9f75 1-265
+package.json
+  s_aadac9b32eee21::t_74fbdde2c9a25e 25
+packages/domain/src/validation/types.ts
+  s_aadac9b32eee21::t_381f6d1b855c4f 27
+packages/domain/src/validation/errorCatalog.ts
+  s_aadac9b32eee21::t_76ee9b265177a3 90-105
+  s_aadac9b32eee21::t_b2982dd4571591 319-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "822dd07521c6eab80297df4c59d0d3685652e0f4",
+  "prompts": {},
+  "sessions": {
+    "s_aadac9b32eee21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99d5df0e-018c-4dcc-bcf5-f772b26a22d9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}

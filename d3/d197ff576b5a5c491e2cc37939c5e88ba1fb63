@@ -1,0 +1,31 @@
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_c1e3326aa9a6ae::t_9f74222de98a10 3
+plugins/yellow-core/skills/multi-host-fleet/SKILL.md
+  s_c1e3326aa9a6ae::t_d1b2481db4217f 112
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_6167c944b05281 134,137,142,147
+  s_c1e3326aa9a6ae::t_878e2ef11ef96a 135-136,138-141,143-146,148-150
+  s_c1e3326aa9a6ae::t_b4c45efcc68a61 206
+  s_c1e3326aa9a6ae::t_171697334cc765 220
+  s_c1e3326aa9a6ae::t_6c12fc888a0fc9 172
+  s_c1e3326aa9a6ae::t_a78888f9073738 151
+  s_c1e3326aa9a6ae::t_ba414e294d68dc 192
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_c1e3326aa9a6ae::t_cea4b16d20936b 211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d3d197ff576b5a5c491e2cc37939c5e88ba1fb63",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

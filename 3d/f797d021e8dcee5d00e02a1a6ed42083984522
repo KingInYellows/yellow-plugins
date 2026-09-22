@@ -1,0 +1,52 @@
+plugins/yellow-linear/skills/linear-workflows/SKILL.md
+  s_e0beaba782ec4e::t_460881c10ae993 253
+plugins/yellow-linear/commands/linear/create.md
+  s_e0beaba782ec4e::t_c3477613165389 70,72-73
+  s_e0beaba782ec4e::t_ac6e445472be0d 66
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 11
+plugins/yellow-linear/commands/linear/sync.md
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 12,14,83
+  s_e0beaba782ec4e::t_ac6e445472be0d 117
+plugins/yellow-linear/agents/research/linear-explorer.md
+  s_e0beaba782ec4e::t_c3477613165389 45
+plugins/yellow-linear/commands/linear/sync-all.md
+  s_e0beaba782ec4e::t_c3477613165389 61-62,145
+  s_e0beaba782ec4e::t_ac6e445472be0d 168
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 13
+plugins/yellow-linear/commands/linear/plan-cycle.md
+  s_e0beaba782ec4e::t_ac6e445472be0d 84,93
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 12
+plugins/yellow-linear/commands/linear/delegate.md
+  s_e0beaba782ec4e::t_c3477613165389 246
+  s_e0beaba782ec4e::t_ac6e445472be0d 235,267
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 11-12
+plugins/yellow-linear/commands/linear/work.md
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 18
+  s_e0beaba782ec4e::t_c3477613165389 174-175
+plugins/yellow-linear/commands/linear/status.md
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 14-15,56,98
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 12-13
+  s_e0beaba782ec4e::t_ac6e445472be0d 66,88,106
+.changeset/linear-mcp-tool-rename.md
+  s_e0beaba782ec4e::t_45c0527e06636e 1-5
+plugins/yellow-linear/commands/linear/triage.md
+  s_e0beaba782ec4e::t_a53a8a7ffe47fb 11
+  s_e0beaba782ec4e::t_ac6e445472be0d 75,89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3df797d021e8dcee5d00e02a1a6ed42083984522",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+scripts/validate-agent-authoring.js
+  s_90cee544007013::t_f043bff911cdfb 371-408
+  s_90cee544007013::t_c0541512b842f4 681
+  s_90cee544007013::t_071612e90314ed 709-736
+  s_90cee544007013::t_abb578876eea9e 981-986
+plugins/yellow-browser-test/commands/browser-test/test.md
+  s_90cee544007013::t_326247ed9ad782 158
+  s_90cee544007013::t_b0de845ef7eb6a 150
+plugins/yellow-browser-test/commands/browser-test/report.md
+  s_90cee544007013::t_06c8b7df60e8ce 31
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_90cee544007013::t_22537a2e14931c 157
+  s_90cee544007013::t_71888a4c11ccd3 139
+tests/integration/validate-agent-authoring-subagent-refs.test.ts
+  s_90cee544007013::t_db3070e41135fe 1-151
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_90cee544007013::t_9e8822f486588d 78
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_77f940c5b6cc3e 258,263,267,284,286,291,293,299
+.changeset/w2-yellow-ci-subagent-ref.md
+  s_90cee544007013::t_45d3ed938209ec 1-7
+.changeset/w2-browser-test-subagent-refs.md
+  s_90cee544007013::t_142514d6cb9eab 1-8
+plugins/yellow-ci/commands/ci/setup-self-hosted.md
+  s_90cee544007013::t_66c486604424b2 301-302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d1f79f1afb31f84c05ecdca5d761d5d34c4e0aec",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

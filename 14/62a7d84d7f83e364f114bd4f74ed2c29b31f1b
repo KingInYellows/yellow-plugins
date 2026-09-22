@@ -1,0 +1,21 @@
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_ecffdbc39c3a6a::t_f155c77a15227f 127-128,135,140-145
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_ecffdbc39c3a6a::t_24e3f4ec7c4f31 105-106,113,118-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1462a7d84d7f83e364f114bd4f74ed2c29b31f1b",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

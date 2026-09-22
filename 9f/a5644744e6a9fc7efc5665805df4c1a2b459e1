@@ -1,0 +1,35 @@
+plugins/yellow-core/CLAUDE.md
+  s_550106f167fc82::t_926d6cbb8b841e 114-121
+plugins/yellow-core/commands/plan/complete.md
+  s_550106f167fc82::t_a5e90caa480010 3
+  s_550106f167fc82::t_5d18e9f53931af 181
+  s_550106f167fc82::t_a9597665c28564 170-173
+  s_550106f167fc82::t_c87dd2c2f0b950 202-220,222-279,286-287,289-291
+  s_550106f167fc82::t_5ad29d29e34348 21-30
+  s_550106f167fc82::t_65b55d97a2ea54 440
+  s_550106f167fc82::t_6403fb4698c629 65
+  s_550106f167fc82::t_34d7bc3a46c783 416-419,425-429
+  s_550106f167fc82::t_466f85a22faa57 157-159
+  s_550106f167fc82::t_d50fae88c2ef51 443-445
+  s_550106f167fc82::t_2d8ebe8ffed29e 188
+.changeset/plan-complete-loose-gate-c.md
+  s_550106f167fc82::t_61ab8cd1501d2d 1-5
+plugins/yellow-core/README.md
+  s_550106f167fc82::t_3505541b5cf54c 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9fa5644744e6a9fc7efc5665805df4c1a2b459e1",
+  "prompts": {},
+  "sessions": {
+    "s_550106f167fc82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb05a88a-df3e-4c58-b1c1-713fe009a6f6",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

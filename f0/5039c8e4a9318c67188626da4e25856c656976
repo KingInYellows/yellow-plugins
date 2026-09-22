@@ -1,0 +1,29 @@
+plugins/yellow-council/commands/council/council.md
+  s_3bb494324db8bc::t_2c9090bdd405e2 777-786
+  s_3bb494324db8bc::t_4ec8b48b0e5e62 698-710
+docs/testing/yellow-council-manual-tests.md
+  s_3bb494324db8bc::t_d5d9cea6ba07d7 165,168-171
+  s_3bb494324db8bc::t_d9ef116129b7c3 172
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_3bb494324db8bc::t_2c9090bdd405e2 337-344,352-353
+scripts/validate-agent-authoring.js
+  s_3bb494324db8bc::t_610b09de2c7e36 843-851
+.changeset/council-claude-slot-redaction.md
+  s_3bb494324db8bc::t_e20c46a0d9455f 66-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f05039c8e4a9318c67188626da4e25856c656976",
+  "prompts": {},
+  "sessions": {
+    "s_3bb494324db8bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7256266-555f-4992-8e4e-15f47153f50e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

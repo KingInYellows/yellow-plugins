@@ -1,0 +1,23 @@
+plugins/yellow-browser-test/agents/testing/test-runner.md
+  s_e0beaba782ec4e::t_ec11ee02bc8a0f 85-87
+  s_e0beaba782ec4e::t_52ddef0eb11fd1 73
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_e0beaba782ec4e::t_52ddef0eb11fd1 57-58,62,64-71,74,78-82,87
+  s_e0beaba782ec4e::t_ec11ee02bc8a0f 52-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "7aaa23274028ddbc527620a13da4b62beaa817e1",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

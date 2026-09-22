@@ -1,0 +1,31 @@
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_5387a65d8fcd13::t_a9bee170a93a15 254-257
+scripts/generate-manifests.js
+  s_5387a65d8fcd13::t_442cf7285280e4 43-51,58-72,77-78,81-85,89-91
+  s_5387a65d8fcd13::t_2eb23082f49956 169-175
+plans/claude-code-codex-plugin-pilot-01-neutral-generation.md
+  s_5387a65d8fcd13::t_64d88caeceaa84 122
+.github/workflows/validate-schemas.yml
+  s_5387a65d8fcd13::t_95d0a3458811bb 689
+  s_5387a65d8fcd13::t_e1189f21255a9b 671-677
+tests/integration/generate-manifests.test.ts
+  s_5387a65d8fcd13::t_34790c29f0a5c8 412-425
+  s_5387a65d8fcd13::t_b4e2d2d9c5ad33 235-270
+  s_5387a65d8fcd13::t_52170d18489b09 330-341
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ac52c30c6fff45c13b5c31614a87c8f952c81247",
+  "prompts": {},
+  "sessions": {
+    "s_5387a65d8fcd13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46aa1a85-7fb3-4437-9fbd-75381f85b1c4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

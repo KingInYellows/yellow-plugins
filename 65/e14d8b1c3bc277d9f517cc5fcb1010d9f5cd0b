@@ -1,0 +1,23 @@
+scripts/validate-agent-authoring.js
+  s_bb05a4e31d3513::t_cad72cdd6455f9 473-474,476-504
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_bb05a4e31d3513::t_e1e96e1ff43648 203-205,207-218
+plugins/yellow-core/commands/compound/review-staged.md
+  s_bb05a4e31d3513::t_da75a1dc174e4a 100-105,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "65e14d8b1c3bc277d9f517cc5fcb1010d9f5cd0b",
+  "prompts": {},
+  "sessions": {
+    "s_bb05a4e31d3513": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7359f15c-f7a1-453b-a3e4-191910d60901",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

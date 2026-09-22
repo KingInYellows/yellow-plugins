@@ -1,0 +1,44 @@
+plugins/yellow-cursor/.cursor-plugin/plugin.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 1-22
+.cursor-plugin/marketplace.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 1-13
+plugins/yellow-devin/.claude-plugin/plugin.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 5
+catalog/plugins/yellow-devin.json
+  s_ca129cb3ac489c::t_1b980746ce5c04 3,36-38
+  s_ca129cb3ac489c::t_3075f9b9666512 39
+catalog/plugins/yellow-cursor.json
+  s_ca129cb3ac489c::t_28f8808d446a4e 31-34
+  s_ca129cb3ac489c::t_f405d2e22e6c0b 11
+  s_ca129cb3ac489c::t_5bdb2235a2c36e 1-10,12-30,35-37
+.claude-plugin/marketplace.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 55-63,66,136
+  s_ca129cb3ac489c::t_e0bd1b71c1caf1 54
+plugins/yellow-cursor/.claude-plugin/plugin.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 1-21
+plugins/yellow-cursor/cursor/skills/cursor-delegation/SKILL.md
+  s_ca129cb3ac489c::t_7ad080d45e62fc 1-104
+catalog/catalog.json
+  s_ca129cb3ac489c::t_1b980746ce5c04 17,44-47
+plugins/yellow-research/.claude-plugin/plugin.json
+  s_ca129cb3ac489c::t_7ad080d45e62fc 5,17,79-81
+  s_ca129cb3ac489c::t_e27a87845557a4 82
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_ca129cb3ac489c::t_5240f67f00e0d3 57-66,69,139,222,586-610,666,857,869,931-934
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "603026a1eb0295c60285ffb952a2a7b4e9f406c2",
+  "prompts": {},
+  "sessions": {
+    "s_ca129cb3ac489c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00f5f4fc-c53f-443c-bcd6-e000b4968704",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_d1407dc7c26789::t_7e60a6c00c8ce0 29-31
+  s_d1407dc7c26789::t_4511efc16e8e62 25-28,32-39
+docs/research/yellow-council-multi-agent-code-review-p.md
+  s_d1407dc7c26789::t_2485ec8211aecb 6
+plans/specs/yellow-council-v2-four-cli.md
+  s_d1407dc7c26789::t_4b300a76fae82f 194-197,199-208
+  s_d1407dc7c26789::t_0828da977e1a13 14-15
+  s_d1407dc7c26789::t_2042a525f4c780 73-78
+  s_d1407dc7c26789::t_a751b80df51a44 83-86
+  s_d1407dc7c26789::t_43dd0359052788 101-105
+  s_d1407dc7c26789::t_f8bc5c0d342e90 94-96
+  s_d1407dc7c26789::t_374a8027b570a9 107-115
+  s_d1407dc7c26789::t_4baa0a780f0ede 122-132
+  s_d1407dc7c26789::t_4aa7b85c34a7ca 155-163
+  s_d1407dc7c26789::t_808ae9c077e480 58-70
+  s_d1407dc7c26789::t_9876a2688bab77 172-179
+  s_d1407dc7c26789::t_b0f9cd183b1050 269,271-272
+  s_d1407dc7c26789::t_62092680ec590d 285-298
+plans/shells/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  s_d1407dc7c26789::t_89989101b79f84 62-65
+plans/shells/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_d1407dc7c26789::t_bce7418fb234f6 20-22
+  s_d1407dc7c26789::t_a845cc93c3a2ea 51-55,58-63
+docs/research/yellow-council-v2-revalidation-2026-08-01.md
+  s_d1407dc7c26789::t_057959d592ff2d 239
+  s_d1407dc7c26789::t_3398e1742f20c9 701
+  s_d1407dc7c26789::t_a691b6ea8a40d5 5
+  s_d1407dc7c26789::t_bf11c80b8efe32 676
+  s_d1407dc7c26789::t_51f71108597fb9 285
+  s_d1407dc7c26789::t_ef9e4c77054a2d 313-314
+  s_d1407dc7c26789::t_93cb9731137991 649
+  s_d1407dc7c26789::t_0cc37530bb5819 734
+  s_d1407dc7c26789::t_608be0711a5ade 747
+plans/shells/yellow-council-v2-four-cli-03-synthesis-bias-mitigation.md
+  s_d1407dc7c26789::t_0e18c2ddf04581 27-29
+  s_d1407dc7c26789::t_c353a9eae21178 22-26,30-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "534c4ef407c5565a78d95296636cd33af6cef000",
+  "prompts": {},
+  "sessions": {
+    "s_d1407dc7c26789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f299f8-a143-438f-a4ca-66861862d44e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+docs/research/2026-07-16-codex-plugin-contract-spike.md
+  s_7d4f7a1773f734::t_b979103ad1f712 1-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "12366966d548729ae0b05fc037b311622b60c031",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

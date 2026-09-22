@@ -1,0 +1,21 @@
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_43cc4f730492cc::t_ac9756e1c28745 1-135
+docs/solutions/logic-errors/manifest-generator-value-shape-validation.md
+  s_43cc4f730492cc::t_6b0427ff2d9240 215-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "7e7f5ad1f0fbb54b0b7431891e9791ed5723b323",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

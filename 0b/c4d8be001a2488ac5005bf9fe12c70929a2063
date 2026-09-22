@@ -1,0 +1,22 @@
+.changeset/yellow-core-compound-staging-surface.md
+  s_c1ce70ba5b1295::t_f998a2f7b172f3 60-61
+scripts/validate-agent-authoring.js
+  s_c1ce70ba5b1295::t_35561d38a83398 458-465,467,471
+  s_c1ce70ba5b1295::t_629f0999895c3a 419-422
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "0bc4d8be001a2488ac5005bf9fe12c70929a2063",
+  "prompts": {},
+  "sessions": {
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

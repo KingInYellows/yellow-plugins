@@ -1,0 +1,19 @@
+docs/solutions/logic-errors/git-diff-name-status-nul-safe-parsing.md
+  s_0083c2dbdafe0e::t_983eededf26ede 1-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3f23adcaea4308f1e2f76e56f6dd2869fba15d86",
+  "prompts": {},
+  "sessions": {
+    "s_0083c2dbdafe0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d37ed401-fd4a-4d85-b1d8-48bb4ce94b8d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+plugins/yellow-core/agents/review/test-coverage-analyst.md
+  s_11679bcd4aae34::t_e0c3e9a611925d 11-14
+.changeset/yellow-core-review-readonly-contract.md
+  s_11679bcd4aae34::t_861c42286d401c 14-17
+  s_11679bcd4aae34::t_40c8a29e6b4e55 1-13
+.codacy/codacy.yaml
+  s_11679bcd4aae34::t_4f675136f3445e 15-19
+plugins/yellow-core/agents/review/architecture-strategist.md
+  s_11679bcd4aae34::t_4d3e60d1667d12 11-14
+.markdownlintignore
+  s_11679bcd4aae34::t_658991f5b1d8a0 4
+plugins/yellow-core/agents/review/performance-oracle.md
+  s_11679bcd4aae34::t_13384e5a7d87dc 11-14
+plugins/yellow-core/agents/review/code-simplicity-reviewer.md
+  s_11679bcd4aae34::t_ff24f858ec51b0 11-14
+plugins/yellow-core/agents/review/polyglot-reviewer.md
+  s_11679bcd4aae34::t_fd635f97aa9544 11-14
+plugins/yellow-core/agents/review/pattern-recognition-specialist.md
+  s_11679bcd4aae34::t_64006e7fa2718f 11-14
+tests/integration/validate-agent-authoring-w15b.test.ts
+  s_11679bcd4aae34::t_a2afa3f80dbe9f 1-201
+scripts/validate-agent-authoring.js
+  s_11679bcd4aae34::t_24b8223cf50b23 338,343
+  s_11679bcd4aae34::t_f3da7a954ff63e 22-33
+  s_11679bcd4aae34::t_3a677009b7772e 327-337,339-342,344-356
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_11679bcd4aae34::t_6f0611faf98538 10-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "55dfe3f9f7262674e7a647a349df7030aeadf1ce",
+  "prompts": {},
+  "sessions": {
+    "s_11679bcd4aae34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3271bdc0-a9b0-4216-997d-929f94e40ef5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}

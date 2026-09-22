@@ -1,0 +1,25 @@
+README.md
+  s_e0beaba782ec4e::t_5a4fd5f5a83210 3,101,104
+.changeset/remove-chatprd-setup-coverage.md
+  s_e0beaba782ec4e::t_1c5859f6616655 1-5
+plugins/yellow-core/commands/setup/all.md
+  s_e0beaba782ec4e::t_5a4fd5f5a83210 268,745-754
+package.json
+  s_e0beaba782ec4e::t_e0ca7a5bd8a663 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "a17fcdbe9d2e533ae6900b2ad95140d76b585ba3",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

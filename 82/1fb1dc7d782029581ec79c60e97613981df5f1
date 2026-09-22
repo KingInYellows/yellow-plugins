@@ -1,0 +1,23 @@
+scripts/flow-namespace-allowlist.json
+  s_c1e3326aa9a6ae::t_5471a7bcdc5b27 20,76,82
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_5241a24d5e5a88 398
+  s_c1e3326aa9a6ae::t_2537221bd5bd2c 159
+  s_c1e3326aa9a6ae::t_09a094e2b070d6 170-178,180-190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "821fb1dc7d782029581ec79c60e97613981df5f1",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

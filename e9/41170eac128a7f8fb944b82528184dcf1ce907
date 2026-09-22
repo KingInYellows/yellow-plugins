@@ -1,0 +1,20 @@
+tests/integration/generate-manifests-codex.test.ts
+  s_ecffdbc39c3a6a::t_f85697a6017575 738-862
+  s_ecffdbc39c3a6a::t_a0caa98ce071a7 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e941170eac128a7f8fb944b82528184dcf1ce907",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

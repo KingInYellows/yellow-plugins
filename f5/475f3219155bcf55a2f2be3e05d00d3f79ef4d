@@ -1,0 +1,25 @@
+docs/solutions/logic-errors/reactive-trigger-threshold-blind-spot.md
+  s_7ed434e75cb861::t_8d755ea28cb720 1-125
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_7ed434e75cb861::t_bb786b6ee85eba 950-998
+docs/solutions/integration-issues/ruvector-worktree-db-symlink.md
+  s_7ed434e75cb861::t_8109a2c5daf071 210-249
+docs/solutions/security-issues/sandwich-fence-delimiter-forgery.md
+  s_7ed434e75cb861::t_890b3aca53501b 161-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f5475f3219155bcf55a2f2be3e05d00d3f79ef4d",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
