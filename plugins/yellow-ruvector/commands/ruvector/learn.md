@@ -87,14 +87,19 @@ unavailable: wait approximately 500 milliseconds and retry exactly once.
 If the retry also fails, report the error and suggest checking
 `/ruvector:status`.
 
-### Step 6: Confirm
+### Step 6: Confirm only an acknowledged write
 
-Report the stored entry:
+Do not report the entry as saved, stored, or loaded later unless the
+`hooks_remember` result itself acknowledges persistence (a returned entry
+id, or another field in that result that says the write landed).
 
-- Type
-- Brief summary
-- Entry ID (if returned by MCP)
-- "This learning will be loaded in future sessions via the SessionStart hook."
+- Acknowledged: report type, summary, and the returned id. Future
+  SessionStart recall may surface it as untrusted reference, not as
+  instructions.
+- Tool error, empty result, or a result that does not acknowledge the
+  write: report "not saved" and the reason (the error text, or
+  "persistence not acknowledged"). Do not say the learning will be loaded.
+- A failed or skipped dedup recall is not a saved entry.
 
 ## Error Handling
 
