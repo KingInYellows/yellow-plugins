@@ -51,7 +51,7 @@ MCP server: not responding
 
 Recovery options:
 1. Restart the session (MCP server starts automatically on session start)
-2. Check manually: ruvector mcp start
+2. Check manually: npx -y --ignore-scripts ruvector@0.2.34 mcp start
 3. Re-install: /ruvector:setup
 ```
 
