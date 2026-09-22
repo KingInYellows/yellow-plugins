@@ -5,8 +5,9 @@ plus the validation and release tooling that gates it. There is no published
 application server. Claude Code (and, opt-in, Codex/Cursor) loads the plugins;
 this repository authors, validates, and versions them.
 
-Root catalog version is `2.1.6`. Toolchain: Node `>=22.22.0 <25`, pnpm `>=8`
-(CI pins Node `22.22.0` and pnpm `8.15.0`).
+Root catalog version lives in `package.json` (`pnpm validate:versions` gates
+drift). Toolchain: Node `>=22.22.0 <25`, pnpm `>=8` (CI pins Node `22.22.0` and
+pnpm `8.15.0`).
 
 ---
 
@@ -17,14 +18,14 @@ Root catalog version is `2.1.6`. Toolchain: Node `>=22.22.0 <25`, pnpm `>=8`
 The product users install. Each plugin is a directory Claude Code discovers by
 convention:
 
-| Surface | Role |
-| --- | --- |
-| `commands/*.md` | Slash commands. YAML frontmatter (`name`, `description`, `allowed-tools`) plus an imperative procedure. |
-| `skills/<name>/SKILL.md` | Reusable procedures invoked via the `Skill` tool. Commands often thin-wrap a skill. |
-| `agents/*.md` | Subagent prompts spawned via the `Agent` tool. |
-| `hooks/` | Host-lifecycle scripts (`SessionStart`, `Stop`, `PreCompact`, …) run as bash or Node. |
-| `mcpServers` | Stdio/HTTP MCP servers declared in the generated `plugin.json`. |
-| `.claude-plugin/plugin.json` | Generated manifest. Do not hand-edit. |
+| Surface                      | Role                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `commands/*.md`              | Slash commands. YAML frontmatter (`name`, `description`, `allowed-tools`) plus an imperative procedure. |
+| `skills/<name>/SKILL.md`     | Reusable procedures invoked via the `Skill` tool. Commands often thin-wrap a skill.                     |
+| `agents/*.md`                | Subagent prompts spawned via the `Agent` tool.                                                          |
+| `hooks/`                     | Host-lifecycle scripts (`SessionStart`, `Stop`, `PreCompact`, …) run as bash or Node.                   |
+| `mcpServers`                 | Stdio/HTTP MCP servers declared in the generated `plugin.json`.                                         |
+| `.claude-plugin/plugin.json` | Generated manifest. Do not hand-edit.                                                                   |
 
 `catalog/` is the source of truth for manifests:
 
@@ -76,19 +77,18 @@ Byte-identity drift is gated by `pnpm validate:generated`.
 
 - **yellow-linear** — Linear MCP + PM workflows (OAuth).
 - **yellow-research** — Multi-source research MCPs (Ceramic, DeepWiki,
-  Perplexity, Tavily, EXA, Parallel, ast-grep); missing keys skip that
-  provider.
+  Perplexity, Tavily, EXA, Parallel, ast-grep); missing keys skip that provider.
 - **yellow-morph** — Morph Fast Apply + WarpGrep MCP.
 - **yellow-composio** — Composio MCP with usage/budget guards.
-- **yellow-ruvector** — Local ruvector MCP: persistent vector memory and
-  session hooks.
+- **yellow-ruvector** — Local ruvector MCP: persistent vector memory and session
+  hooks.
 - **yellow-codex** — OpenAI Codex CLI wrapper.
 - **yellow-cursor** — Cursor Cloud Agents via `@cursor/sdk` (preferred
   remote-agent provider; also a native Cursor plugin).
 - **yellow-devin** — Legacy Devin.AI V3 API (same `remote-agent` group as
   cursor; not preferred).
-- **yellow-goal** — Process-spawn bridge to an external `goal-gen` engine
-  (never imports it).
+- **yellow-goal** — Process-spawn bridge to an external `goal-gen` engine (never
+  imports it).
 
 ### Validation stack (`packages/`, `scripts/`, `schemas/`)
 
@@ -183,10 +183,9 @@ flowchart LR
 ### Interfaces
 
 - Manifests: JSON Schema, `additionalProperties: false`.
-- Credential status protocol:
-  `${CLAUDE_PLUGIN_DATA}/credential-status.json` — presence/source only, never
-  secret values. Writer: SessionStart + `credential-status.sh`. Reader:
-  `/setup:all`.
+- Credential status protocol: `${CLAUDE_PLUGIN_DATA}/credential-status.json` —
+  presence/source only, never secret values. Writer: SessionStart +
+  `credential-status.sh`. Reader: `/setup:all`.
 - MCP: stdio (`gt mcp`, ruvector, Morph, Semgrep) or HTTP/OAuth (Linear,
   Ceramic). Credential MCP servers use userConfig + shell env in `plugin.json`
   and a wrapper in `bin/` that prefers userConfig.
@@ -209,14 +208,15 @@ plus generated host artifacts.
 
 ### What is deployed
 
-| Artifact | Consumer | How it lands |
-| --- | --- | --- |
-| Git repo `KingInYellows/yellow-plugins` | Claude Code `/plugin marketplace add` | Git clone; `.claude-plugin/marketplace.json` is the catalog |
-| `plugins/<name>/` tree | `/plugin install <name>@yellow-plugins` | Copied into `~/.claude/plugins/cache/yellow-plugins/<name>/<version>/` |
-| Per-plugin git tags (`yellow-core@2.4.1`) | Claude Code update checks | `scripts/ci/release-tags.sh` after the Version PR merges |
-| Catalog tag + GitHub Release (`v2.1.6`) | Humans / tarball snapshot | Same publish phase; root `package.json` version |
-| `.agents/plugins/` + `.codex-plugin/` | Codex CLI | Generated; `codex plugin marketplace add` |
-| `.cursor-plugin/` | Cursor editor | Generated, fail-closed; only `yellow-cursor` and `yellow-review` |
+| Artifact                                           | Consumer                                | How it lands                                                                        |
+| -------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
+| Git repo `KingInYellows/yellow-plugins`            | Claude Code `/plugin marketplace add`   | Git clone; `.claude-plugin/marketplace.json` is the catalog                         |
+| `plugins/<name>/` tree                             | `/plugin install <name>@yellow-plugins` | Copied into `~/.claude/plugins/cache/yellow-plugins/<name>/<version>/`              |
+| Synced `plugin.json` / `marketplace.json` versions | Claude Code update checks               | `sync-manifests.js` after Changesets; hosts compare manifest versions, not git tags |
+| Per-plugin git tags (`yellow-core@X.Y.Z`)          | Release tracking                        | `scripts/ci/release-tags.sh` after the Version PR merges                            |
+| Catalog tag + GitHub Release (`vX.Y.Z`)            | Humans / tarball snapshot               | Same publish phase; root `package.json` version                                     |
+| `.agents/plugins/` + `.codex-plugin/`              | Codex CLI                               | Generated; `codex plugin marketplace add`                                           |
+| `.cursor-plugin/`                                  | Cursor editor                           | Generated, fail-closed; only `yellow-cursor` and `yellow-review`                    |
 
 Plugins are not published to npm. `plugins/*/package.json` exists for Changesets
 versioning only.
@@ -264,7 +264,7 @@ Primary workflow: `.github/workflows/validate-schemas.yml`.
 - Token: workflow `contents: read`. `GITHUB_TOKEN` is passed into `pnpm install`
   so `@vscode/ripgrep` (via yellow-morph) can download from GitHub Releases.
 
-Blocking jobs include a 10-target `validate-schemas` matrix (2 min SLO),
+Blocking jobs include a 10-target `validate-schemas` matrix with a 60s SLO,
 lint/typecheck, unit/integration tests, versions, changeset-check (PR-only),
 Bats plugin-shell tests, goal-engine-compat, and a `ci-status` aggregator.
 
@@ -295,16 +295,16 @@ Release. Recovery: `gh workflow run version-packages.yml -f force_publish=true`.
 
 ### Host install paths
 
-| Host | Marketplace add | Install root |
-| --- | --- | --- |
-| Claude Code (user) | `/plugin marketplace add KingInYellows/yellow-plugins` | `~/.claude/plugins/cache/` |
-| Claude Code (dev) | `/plugin marketplace add ./` | same cache; `${CLAUDE_PLUGIN_ROOT}` points at the copy |
-| Codex | `codex plugin marketplace add <repo>` | `$CODEX_HOME` |
-| Cursor | `~/.cursor/plugins/local/<name>/` or Customize sidebar | generated `.cursor-plugin/plugin.json` |
+| Host               | Marketplace add                                        | Install root                                           |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------------ |
+| Claude Code (user) | `/plugin marketplace add KingInYellows/yellow-plugins` | `~/.claude/plugins/cache/`                             |
+| Claude Code (dev)  | `/plugin marketplace add ./`                           | same cache; `${CLAUDE_PLUGIN_ROOT}` points at the copy |
+| Codex              | `codex plugin marketplace add <repo>`                  | `$CODEX_HOME`                                          |
+| Cursor             | `~/.cursor/plugins/local/<name>/` or Customize sidebar | generated `.cursor-plugin/plugin.json`                 |
 
 Required host tools vary by plugin (`git`, `node`, `jq`, `gh`, `gt`, plus
-optional CLIs). API keys live in shell env, Claude `userConfig`, or OAuth.
-Never in git.
+optional CLIs). API keys live in shell env, Claude `userConfig`, or OAuth. Never
+in git.
 
 ---
 
@@ -330,20 +330,23 @@ Hook I/O:
   always.
 - Stdin is a JSON envelope (`cwd`, `session_id`, `transcript_path`, …).
 
-| Plugin | SessionStart work |
-| --- | --- |
-| yellow-core | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`. |
-| yellow-ci | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`. |
-| research / morph / semgrep / composio | Write `credential-status.json` (presence/source only). Morph also prewarms morphmcp. |
-| yellow-ruvector | Vector-store / MCP warmup. |
+| Plugin                        | SessionStart work                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| yellow-core                   | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                   |
+| yellow-ci                     | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`. |
+| research / semgrep / composio | Write `credential-status.json` (presence/source only).                                      |
+| yellow-morph                  | SessionStart prewarms morphmcp only; credential-status is a follow-up.                      |
+| yellow-ruvector               | Vector-store / MCP warmup.                                                                  |
 
 Missing credential-status files are “unknown” to `/setup:all`, not a hard
 failure.
 
 ### MCP and credentials
 
-Stdio servers go through wrappers. Pattern: `userConfig` wins, then shell env;
-empty string → that server’s tools are skipped, siblings keep running.
+Credential-bearing stdio MCP servers use `bin/` wrappers: `userConfig` wins,
+then shell env; empty string → that server’s tools are skipped, siblings keep
+running. Non-credential stdio servers launch directly (for example ruvector via
+`npx`, ast-grep via `uvx`, Graphite via `.mcp.json`).
 
 Morph’s wrapper is the install correctness gate (mkdir lock, 20s wait, `exec`
 morphmcp). The SessionStart prewarm is only a race-avoidance hint.
@@ -422,15 +425,15 @@ host). There is no central exception bus.
 Validators emit `ERROR-*` codes from `packages/domain` (scripts assemble the
 same strings; domain is ESM, scripts are CJS).
 
-| Class | Examples | Effect |
-| --- | --- | --- |
-| Schema | `ERROR-SCHEMA-001`… | Invalid marketplace/plugin JSON |
-| Setup coverage | `ERROR-SETUP-001`…`007` | `/setup:all` drifted from marketplace |
-| Providers | `ERROR-PROVIDER-001`… | Capability-group declaration bugs |
+| Class             | Examples                        | Effect                                       |
+| ----------------- | ------------------------------- | -------------------------------------------- |
+| Schema            | `ERROR-SCHEMA-001`…             | Invalid marketplace/plugin JSON              |
+| Setup coverage    | `ERROR-SETUP-001`…`007`         | `/setup:all` drifted from marketplace        |
+| Providers         | `ERROR-PROVIDER-001`…           | Capability-group declaration bugs            |
 | Solutions / plans | `ERROR-SOL-*`, `ERROR-PLAN-001` | Slug/frontmatter; archived plan with `- [ ]` |
-| Namespace | `ERROR-NAMESPACE-*` | Stale `workflows:` references |
-| Cursor | `ERROR-CURSOR-001`…`008` | Generated Cursor artifacts / exposure |
-| Versions | `validate-versions.js` | Three-way (and Codex/Cursor two-way) drift |
+| Namespace         | `ERROR-NAMESPACE-*`             | Stale `workflows:` references                |
+| Cursor            | `ERROR-CURSOR-001`…`008`        | Generated Cursor artifacts / exposure        |
+| Versions          | `validate-versions.js`          | Three-way (and Codex/Cursor two-way) drift   |
 
 CI aggregator (`ci-status`) requires the schema matrix, lint/typecheck,
 unit/integration, versions, changeset-check on plugin PRs, Bats, and related
@@ -442,21 +445,21 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 
 ### Runtime: degrade, don’t block
 
-| Failure | Mechanism |
-| --- | --- |
-| Hook crash / write fail | stderr only; still emit `{"continue": true}` or empty `systemMessage` |
-| `set -e` avoided in hooks | unexpected non-zero cannot skip the continue JSON |
-| Missing MCP key | that server/tools skipped; others continue |
-| Morph install lock timeout (20s) | wrapper exits 1; `/morph:setup`; session continues without Morph |
-| Stack not `READY_*` | stop; print router `detail` inside an untrusted fence |
-| Registry `null` | stop; never try the other provider or raw git/gh |
-| ruvector recall timeout | wait ~500ms, retry once; then continue without memory. No retry on validation errors |
-| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain |
-| `disableAllHooks` | all plugin hooks skipped (dashboard reports it) |
-| Drain recursion | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart |
-| Concurrent drain | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted |
-| Untrusted hook/cache I/O | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence |
-| Compaction | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives |
+| Failure                             | Mechanism                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| Hook crash / write fail             | stderr only; still emit `{"continue": true}` or empty `systemMessage`                    |
+| `set -e` avoided in hooks           | unexpected non-zero cannot skip the continue JSON                                        |
+| Missing MCP key                     | that server/tools skipped; others continue                                               |
+| Morph install lock timeout (20s)    | wrapper exits 1; `/morph:setup`; session continues without Morph                         |
+| Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                    |
+| Registry `null`                     | stop; never try the other provider or raw git/gh                                         |
+| ruvector recall timeout             | wait ~500ms, retry once; then continue without memory. No retry on validation errors     |
+| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain       |
+| `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                          |
+| Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                  |
+| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted |
+| Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence      |
+| Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives  |
 
 ### Retry and timeout policy
 
