@@ -150,7 +150,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, UserPromptSubmit, SessionStart, Stop | Memory recall, edit tracking, session lifecycle                              |
+| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, UserPromptSubmit, SessionStart, Stop | Memory recall, edit tracking, session lifecycle                              |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
@@ -190,9 +190,9 @@ yellow-ruvector has the most hooks. Its shell scripts:
 | ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
 | pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit context and coedit suggestions                |
 | session-start      | SessionStart     | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
-| user-prompt-submit | UserPromptSubmit | `user-prompt-submit.sh` | 50ms        | Recall relevant memories                               |
-| post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 50ms        | Append file changes to queue                           |
-| stop               | Stop             | `stop.sh`               | N/A         | Delegate queue flush to agent                          |
+| user-prompt-submit | UserPromptSubmit | `user-prompt-submit.sh` | 1s          | Recall memories into additionalContext                 |
+| post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | Record explicit edit/bash outcomes; unknown is not saved |
+| stop               | Stop             | `stop.sh`               | 10s         | Run ruvector hooks session-end                         |
 
 **Security properties:**
 
