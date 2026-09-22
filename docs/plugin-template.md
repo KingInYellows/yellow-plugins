@@ -61,7 +61,9 @@ cd plugins/my-plugin
 
 ## Step 2: Create Minimal Manifest
 
-**File**: `.claude-plugin/plugin.json`
+**File**: `.claude-plugin/plugin.json` (generated — author these fields in
+`catalog/plugins/my-plugin.json` and the version in `package.json`, then run
+Step 5; do not hand-edit the generated file)
 
 `name`, `version`, `description`, and `author` are required; every other key
 must be one the local schema (`schemas/plugin.schema.json`,
@@ -137,7 +139,7 @@ Brief description of what the plugin does.
 ## Installation
 
 ```bash
-/plugin install my-plugin@kingin-yellows
+/plugin install my-plugin@yellow-plugins
 ````
 
 ## Usage
@@ -162,36 +164,42 @@ MIT
 
 ---
 
-## Step 5: Add to Marketplace
+## Step 5: Register in the Catalog
 
-**File**: `.claude-plugin/marketplace.json` (at repo root)
+Do not hand-edit `.claude-plugin/marketplace.json` or
+`plugins/my-plugin/.claude-plugin/plugin.json`. Both are generated.
+
+1. Add `plugins/my-plugin/package.json` (version source of truth) and
+   `catalog/plugins/my-plugin.json` (description, author, `marketplace.category`,
+   and `marketplace.source` of `./plugins/my-plugin`). Field rules are in
+   `catalog/README.md`.
+2. Append `"my-plugin"` to `pluginOrder` in `catalog/catalog.json`.
+3. Run `pnpm generate:manifests`.
+
+The generator writes a marketplace root with `$schema`, `name`,
+`description`, `owner`, `metadata`, and `plugins`. There is no
+`schemaVersion`, nested `marketplace` object, or plugin `id`. Each entry
+looks like this (emitted, not hand-written):
 
 ```json
 {
-  "schemaVersion": "1.0.0",
-  "marketplace": {
-    "name": "Your Marketplace",
-    "author": "Your Name",
-    "updatedAt": "2026-01-11T10:00:00Z"
-  },
-  "plugins": [
-    {
-      "id": "my-plugin",
-      "name": "My Plugin",
-      "version": "1.0.0",
-      "source": "plugins/my-plugin",
-      "category": "development",
-      "description": "A brief description"
-    }
-  ]
+  "name": "my-plugin",
+  "description": "A brief description",
+  "version": "1.0.0",
+  "author": { "name": "Your Name" },
+  "source": "./plugins/my-plugin",
+  "category": "development"
 }
-````
+```
+
+Marketplace `name` is `yellow-plugins`. Install with
+`/plugin install my-plugin@yellow-plugins`.
 
 ---
 
 ## Full-Featured Template
 
-**File**: `.claude-plugin/plugin.json`
+**File**: `.claude-plugin/plugin.json` (generated from `catalog/plugins/<name>.json` by `pnpm generate:manifests`; do not hand-edit)
 
 Every key below is accepted by `schemas/plugin.schema.json`. `hooks` is
 inline-only — a `hooks/hooks.json` path is rejected by the local schema, and
@@ -599,10 +607,9 @@ Before publishing:
 - [ ] Create README.md with usage examples (optional but recommended)
 - [ ] Add CHANGELOG.md for version history (optional)
 - [ ] Ensure lifecycle scripts are executable
-- [ ] Test permissions work as expected
-- [ ] Update marketplace.json with plugin entry
-- [ ] Create git tag: `git tag my-plugin-v1.0.0`
-- [ ] Push to GitHub: `gt submit --no-interactive && git push --tags`
+- [ ] Confirm the manifest has no `permissions` key (`schemas/plugin.schema.json` rejects it)
+- [ ] Regenerate from `catalog/` with `pnpm generate:manifests` (do not hand-edit `marketplace.json` or `plugin.json`)
+- [ ] Do not create a `my-plugin-v1.0.0` tag. Per-plugin tags are `<name>@<version>` (for example `yellow-core@1.1.1`) and a root catalog tag is `v<catalog-version>`. `version-packages.yml` creates them when the version PR merges to `main`
 
 ---
 
@@ -632,15 +639,14 @@ cp -r plugins/my-plugin ~/.claude/plugins/
 
 1. **Customize manifest** with your plugin details
 2. **Create entrypoints** (commands, skills, agents)
-3. **Add permissions** if needed
-4. **Write documentation** (CLAUDE.md required, README.md optional)
-5. **Validate** with `validate-plugin.js`
-6. **Test locally** before publishing
-7. **Add to marketplace** and commit
+3. **Write documentation** (CLAUDE.md required, README.md optional)
+4. **Validate** with `validate-plugin.js`
+5. **Test locally** before publishing
+6. **Register in `catalog/`** and run `pnpm generate:manifests` (Step 5), then commit the catalog source and the generated manifests together
 
 **Resources**:
 
 - Plugin Schema: `/schemas/plugin.schema.json`
 - Validation Script: `/scripts/validate-plugin.js`
 - Example Plugin: `/examples/plugin.example.json`
-- Design Docs: `/docs/plugin-schema-design.md`
+- Catalog source of truth: `/catalog/README.md`

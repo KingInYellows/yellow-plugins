@@ -40,8 +40,8 @@ I4.T5 - Release Packaging & Checklist
   - [4.5 API Documentation](#45-api-documentation)
   - [Documentation Updates Sign-Off](#documentation-updates-sign-off)
 - [Section 5: Release Preparation](#section-5-release-preparation)
-  - [5.1 Create Release Tag](#51-create-release-tag)
-  - [5.2 Push Tag to Trigger Workflow](#52-push-tag-to-trigger-workflow)
+  - [5.1 Verify Release Readiness](#51-verify-release-readiness)
+  - [5.2 Manual Tag Creation (Emergency Recovery Only)](#52-manual-tag-creation-emergency-recovery-only)
   - [5.3 Monitor Workflow Execution](#53-monitor-workflow-execution)
   - [5.4 Verify Release Artifacts](#54-verify-release-artifacts)
   - [Release Preparation Sign-Off](#release-preparation-sign-off)
@@ -117,7 +117,8 @@ node scripts/catalog-version.js minor   # or patch / major
 gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
 # 6. Run pre-flight checks
 pnpm release:check
-# 7. Create and push the release tag — see Section 5 (annotated tag step)
+# 7. Merge the Version Packages PR. Tags are created on that push to main.
+#    Manual tagging is emergency-only — see Section 5.2. Do not push a tag to trigger the workflow.
 ```
 
 See `docs/operations/versioning.md` for the complete developer workflow and
@@ -239,7 +240,7 @@ Section 4 security directives.
 
   ```bash
   pnpm validate:versions
-  # Expected: "[validate-versions] OK: 11 plugins — all versions in sync"
+  # Expected: "[validate-versions] OK: 19 plugins — all versions in sync"
   ```
 
 - [ ] Root `package.json` catalog version updated for this release
@@ -734,12 +735,11 @@ Section 4 traceability enforcement.
 
 **Objective**: Regenerate API docs if code changes occurred.
 
-- [ ] Run typedoc to regenerate API documentation
+- [ ] Do not run `pnpm docs:build`
 
-  ```bash
-  pnpm docs:build
-  # Expected: typedoc generates updated API docs
-  ```
+  Root `package.json` has no `docs:build` script. `typedoc` is a devDependency
+  and is not wired to a script, so a missing `docs:build` is not a failed
+  release step.
 
 - [ ] Verify API docs reflect current interfaces and types
 - [ ] Check for broken links in generated docs

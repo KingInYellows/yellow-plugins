@@ -18,7 +18,7 @@ Only **yellow-core** is required. It provides the foundational workflow commands
 /plugin marketplace add KingInYellows/yellow-plugins
 ```
 
-Installs all 11 plugins. Each plugin degrades gracefully when dependencies are
+Installs all 19 plugins. Each plugin degrades gracefully when dependencies are
 missing — commands report what's unavailable rather than failing silently.
 
 ### Plugin Dependencies
@@ -32,6 +32,7 @@ missing — commands report what's unavailable rather than failing silently.
 | yellow-devin | `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` | Delegation commands fail |
 | yellow-linear | Linear OAuth | Issue commands fail |
 | gt-workflow | Graphite CLI | All commands fail |
+| github-workflow | `gh` stack CLI, and `/stack:status` `READY_GITHUB` | `/github-stack:*` commands are unavailable |
 | yellow-ruvector | None | — |
 | yellow-research | None | — |
 | yellow-browser-test | None | — |
@@ -55,16 +56,31 @@ First time setup:
 
 ## Daily Development
 
-**Plugins required:** yellow-core, gt-workflow
+**Plugins required:** yellow-core, and exactly one stacked-PR provider
+(`gt-workflow` or `github-workflow`)
 **Optional:** yellow-review, yellow-linear
 
-The most common workflow chain. Use for any feature implementation.
+The most common workflow chain. Use for any feature implementation. Run
+`/stack:status` before any branch or PR step. Only `READY_GRAPHITE` and
+`READY_GITHUB` continue; every other state stops. Do not hardcode Graphite.
 
 ### Full Chain
+
+`READY_GRAPHITE`:
 
 ```
 /flow:brainstorm → /flow:plan → /gt-stack-plan → /flow:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
 ```
+
+`READY_GITHUB`:
+
+```
+/flow:brainstorm → /flow:plan → /flow:work → /github-stack:submit → /review:pr → /review:resolve → /linear:sync
+```
+
+`/github-stack:plan` only reports the current stack. It does not decompose a
+feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
+`/smart-submit`.
 
 ### Step by Step
 
@@ -76,16 +92,19 @@ The most common workflow chain. Use for any feature implementation.
    `plans/YYYY-MM-DD-<topic>-plan.md`. Creates task breakdown, identifies
    files to modify, and sets acceptance criteria.
 
-3. **`/gt-stack-plan`** — Plan how to split the implementation into stacked PRs.
-   Skip for single-PR features.
+3. **`/gt-stack-plan`** — Graphite only. Plan how to split the implementation
+   into stacked PRs. Skip for single-PR features. On `READY_GITHUB`, skip this
+   step; `/github-stack:plan` is a read-only stack view, not a decomposition.
 
 4. **`/flow:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
-   plan. **Important:** pass the plan file path explicitly. Creates commits via
-   Graphite.
+   plan. **Important:** pass the plan file path explicitly. `/flow:work`
+   uses whichever stacked-PR provider is ready (Graphite or GitHub).
 
-5. **`/smart-submit`** — Audit changes, commit, and push via
-   `gt submit --no-interactive`. Runs parallel code quality agents before
-   pushing.
+5. **Submit.** On `READY_GRAPHITE`, **`/smart-submit`** audits changes, commits,
+   and pushes via `gt submit --no-interactive`, running parallel code quality
+   agents before pushing. On `READY_GITHUB`, **`/github-stack:submit`** stages
+   specific files, commits, and submits with `gh stack submit` (draft by
+   default). It does not run those audit agents.
 
 6. **`/review:pr`** — Multi-agent review of the submitted PR. Applies P1/P2
    fixes; confirms with user before pushing. Requires yellow-review.
@@ -96,10 +115,18 @@ The most common workflow chain. Use for any feature implementation.
 8. **`/linear:sync`** — Link PR to Linear issue and update status. Requires
    yellow-linear.
 
-### Minimum Viable Chain (yellow-core + gt-workflow)
+### Minimum Viable Chain
+
+`READY_GRAPHITE` (yellow-core + gt-workflow):
 
 ```
 /flow:plan → /flow:work <plan-path> → /smart-submit
+```
+
+`READY_GITHUB` (yellow-core + github-workflow):
+
+```
+/flow:plan → /flow:work <plan-path> → /github-stack:submit
 ```
 
 ### Without Linear
@@ -111,7 +138,7 @@ Skip step 8. The rest of the chain works identically.
 ## CI Response
 
 **Plugins required:** yellow-ci
-**Optional:** yellow-linear (for `/ci:report-linear` and `/linear:delegate`), yellow-devin (for `/devin:status` monitoring after delegation)
+**Optional:** yellow-linear (for `/ci:report-linear` and `/linear:delegate`); the enabled `remote-agent` provider (yellow-cursor preferred, yellow-devin legacy) for delegation
 
 Triggered automatically when a session starts and CI failures are detected.
 
@@ -130,9 +157,11 @@ SessionStart auto-detect → /ci:diagnose → /ci:report-linear → /linear:dele
 3. **`/ci:report-linear`** — Create a Linear issue from the diagnosis. Requires
    yellow-linear.
 
-4. **`/linear:delegate`** — Optionally delegate the fix to Devin using the
-   Linear issue created in step 3. Requires yellow-linear + Devin env vars
-   (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`).
+4. **`/linear:delegate`** — Optionally hand the Linear issue from step 3 to the
+   enabled `remote-agent` provider. yellow-cursor is preferred; yellow-devin is
+   the legacy path and is used only when it is the provider that resolves.
+   `--provider` breaks a tie only when both are enabled. Requires yellow-linear.
+   The Devin path also needs `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`.
 
 ### Without Linear
 
@@ -203,18 +232,33 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 
 ## Stack Maintenance
 
-**Plugins required:** gt-workflow
+**Plugins required:** the stacked-PR provider `/stack:status` reports
+(`gt-workflow` on `READY_GRAPHITE`, `github-workflow` on `READY_GITHUB`)
 
 ### Daily Sync
+
+`READY_GRAPHITE`:
 
 ```
 /gt-sync → /gt-nav → /gt-amend or /smart-submit
 ```
 
-1. **`/gt-sync`** — Pull latest from trunk, restack branches, clean up merged
-   PRs.
+`READY_GITHUB`:
 
-2. **`/gt-nav`** — Visualize your stack and navigate between branches.
+```
+/github-stack:sync → /github-stack:nav → /github-stack:amend
+```
 
-3. **`/gt-amend`** — Quick-fix the current branch: audit + amend + re-submit.
-   Use for small fixes. For larger changes, use `/smart-submit`.
+1. **Sync.** **`/gt-sync`** pulls latest from trunk, restacks branches, and
+   cleans up merged PRs. **`/github-stack:sync`** pulls trunk and syncs the
+   local stack with `gh stack sync` (pruning merged branches needs
+   confirmation).
+
+2. **Navigate.** **`/gt-nav`** visualizes the Graphite stack and moves between
+   branches. **`/github-stack:nav`** checks out a stack number, PR, URL, or
+   branch via `gh stack checkout`.
+
+3. **Amend.** **`/gt-amend`** audits, amends, and re-submits the current
+   Graphite branch. Use `/smart-submit` for larger Graphite changes.
+   **`/github-stack:amend`** folds working-tree changes into the current commit
+   and re-submits with `gh stack submit`. There is no GitHub `/smart-submit`.

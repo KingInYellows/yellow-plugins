@@ -157,21 +157,27 @@ subprocess context and dashboard context — every credential-bearing
 plugin emits one identical-shape file so `/setup:all` can render an
 accurate dashboard without per-plugin special-casing.
 
-Plugins planned to emit this file (per the
-`plans/plugin-install-resilience.md` stack — adopters land in follow-up
-PRs after this foundation merges):
+Plugins that emit this file, and that `/setup:all` lists in its
+credential-status loop:
 
-- yellow-research (perplexity/tavily/exa userConfig keys; ceramic/parallel
-  are OAuth-managed and have no userConfig field, so they are intentionally
-  omitted from the credentials array)
+- yellow-research (`credential_hook_scaffold` in
+  `plugins/yellow-research/hooks/write-credential-status.sh`;
+  perplexity/tavily/exa userConfig keys; ceramic/parallel are OAuth-managed
+  and have no userConfig field, so they are omitted from the credentials array)
+- yellow-semgrep (`credential_hook_scaffold` in
+  `plugins/yellow-semgrep/hooks/write-credential-status.sh`)
+
+Still planned, with no credential-status hook yet:
+
 - yellow-morph (morph key)
-- yellow-semgrep (semgrep token)
 
 Plugins that intentionally do NOT emit this file:
 
 - yellow-devin (uses shell env only; setup:all probes `DEVIN_*` env vars
   directly)
-- yellow-linear, yellow-chatprd, yellow-codex, yellow-composio (OAuth
-  flows — status is ToolSearch-visibility, not credential-presence).
-  yellow-composio's bundled server is `https://connect.composio.dev/mcp`
-  and has no userConfig fields.
+- yellow-linear, yellow-codex, yellow-composio (OAuth flows — status is
+  ToolSearch-visibility, not credential-presence). yellow-composio's bundled
+  server is `https://connect.composio.dev/mcp` and has no userConfig fields.
+
+yellow-chatprd is not a current plugin. It was removed from the marketplace
+in yellow-core 1.20.2 and is not in `catalog/catalog.json` `pluginOrder`.

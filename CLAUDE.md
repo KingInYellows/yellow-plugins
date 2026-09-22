@@ -38,7 +38,7 @@ pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-iden
 pnpm generate:manifests       # manifests from catalog/; Codex/Cursor skill copies from plugins/<name>/skills/
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 
-pnpm release:check            # validate:schemas + validate:versions + typecheck
+pnpm release:check            # validate:schemas + validate:versions + validate:doc-counts + typecheck + scripts/validate-catalog-track.js
 pnpm changeset                # create a changeset for plugin file changes
 pnpm apply:changesets         # version + run scripts/sync-manifests.js
 ```
