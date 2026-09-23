@@ -459,7 +459,7 @@ tripping the gate — so this is a trade the gate makes knowingly.
       *teaching that exact syntax*. `buildDispatchTargetIndex` now indexes
       both kinds, with a test asserting a plugin-qualified skill resolves and
       a nonexistent one still fails
-- [ ] 4.3: `/flow` autocomplete check on a clean install — **deferred by
+- [x] 4.3: `/flow` autocomplete check on a clean install — **deferred by
       construction; the only step of this plan an agent cannot perform.**
       Per [Bootstrap Safety](#bootstrap-safety), commands are served from the
       published plugin cache, so `/flow` cannot appear until this stack
@@ -469,7 +469,9 @@ tripping the gate — so this is a trade the gate makes knowingly.
       (Acceptance Criterion 4), and a green CI gate proves the *absence of a
       string*, which is not the same thing. **Owner: the user, post-merge.**
       `/plan:complete` Gate A will correctly refuse to archive this plan
-      until it is verified and ticked
+      until it is verified and ticked.
+      **Verified by the user 2026-09-23** on yellow-core 2.4.1 (marketplace install):
+      `/flow` lists the migrated commands. Installed cache: 9 yellow-core `name: flow:*`, 0 `name: workflows:`.
 
 ## Technical Specifications
 
