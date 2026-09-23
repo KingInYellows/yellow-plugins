@@ -256,16 +256,20 @@ needed `../../docs/...` after the move.
 path string — not just the plan's own prose, and not just `plans/` — since
 a validator config, an error-message string, or an unrelated doc's comment
 can all key off the exact path outside of any content that a plan-focused
-review would think to check. Then check the plan file itself for `../`
-relative links, since moving into `plans/complete/` adds one path segment of
-depth and any link written relative to `plans/` needs an extra `../`.
+review would think to check. Then list every relative link in the plan
+file itself (`../`, `./`, bare `sibling.md`, and reference-style `[id]: path`
+definitions), since moving into `plans/complete/` adds one path segment of
+depth and every target written relative to `plans/` now resolves one
+directory too deep.
 
 ```bash
 # Before `git mv plans/<slug>.md plans/complete/<slug>.md`:
 # git grep searches every tracked file, including hidden paths such as
 # .github/ and .claude-plugin/ that plain rg skips by default.
 git grep -l --fixed-strings "plans/<slug>.md"
-rg -n '\]\(\.\./' plans/<slug>.md
+# Every relative Markdown link target, inline or reference-style (skips
+# URLs, in-page anchors, and root-absolute paths):
+rg -no --pcre2 '\]\((?!https?:|#|/)[^)]+\)|^\[[^\]]+\]:\s*(?!https?:|#|/)\S+' plans/<slug>.md
 ```
 
 ### Graphite-landed PRs are invisible to all three Gate C tiers — reuse the existing trailer, don't invent one

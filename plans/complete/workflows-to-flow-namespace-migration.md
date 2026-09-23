@@ -618,7 +618,7 @@ Both open questions were closed before PR1 began.
 - [x] 2. agent/docs/flow-namespace-sweep-plugins (completed 2026-08-11)
 - [x] 3. agent/docs/flow-namespace-sweep-docs-research (completed 2026-08-11)
 - [x] 4. agent/chore/flow-namespace-terminal-condition (completed 2026-08-11;
-      box 4.3 intentionally open — post-merge user verification, see above)
+      box 4.3 verified by the user 2026-09-23 — post-merge check, see above)
 
 ## References
 
