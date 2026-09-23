@@ -9,9 +9,11 @@ Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 ## Overview
 
 This document provides a comprehensive catalog of all error codes used in the
-Claude Code Plugin Marketplace. Each error code maps directly to specification
-requirements (FR-_ and CRIT-_ identifiers) ensuring traceability and consistent
-error handling across the system.
+Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
+`NET`) map directly to specification requirements (FR-_ and CRIT-_ identifiers).
+Later categories (`SOL` through `CURSOR`) are owned by validator scripts and
+`errorCatalog.ts` without FR/CRIT ids. All categories share the same
+`ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
 
 ### Error Code Format
 

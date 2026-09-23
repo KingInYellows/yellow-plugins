@@ -68,13 +68,13 @@ The most common workflow chain. Use for any feature implementation. Run
 
 `READY_GRAPHITE`:
 
-```
+```bash
 /flow:brainstorm → /flow:plan → /gt-stack-plan → /flow:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
 ```
 
 `READY_GITHUB`:
 
-```
+```bash
 /flow:brainstorm → /flow:plan → /flow:work → /github-stack:submit → /review:pr → /review:resolve → /linear:sync
 ```
 
@@ -119,13 +119,13 @@ feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
 
 `READY_GRAPHITE` (yellow-core + gt-workflow):
 
-```
+```bash
 /flow:plan → /flow:work <plan-path> → /smart-submit
 ```
 
 `READY_GITHUB` (yellow-core + github-workflow):
 
-```
+```bash
 /flow:plan → /flow:work <plan-path> → /github-stack:submit
 ```
 
@@ -239,13 +239,13 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 
 `READY_GRAPHITE`:
 
-```
+```bash
 /gt-sync → /gt-nav → /gt-amend or /smart-submit
 ```
 
 `READY_GITHUB`:
 
-```
+```bash
 /github-stack:sync → /github-stack:nav → /github-stack:amend
 ```
 
