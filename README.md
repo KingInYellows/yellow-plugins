@@ -55,7 +55,7 @@ for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                                                              |
 | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |

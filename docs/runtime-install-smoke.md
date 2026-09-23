@@ -45,7 +45,7 @@ polluting real state.
 ## Usage
 
 ```bash
-pnpm smoke:install                       # T0 validate + T1 install, all 18 plugins
+pnpm smoke:install                       # T0 validate + T1 install, all 19 plugins
 pnpm smoke:install -- --help             # options
 pnpm smoke:install -- --dry-run          # print the plan; no claude, no temp dirs
 pnpm smoke:install -- --plugin yellow-core   # one plugin only
