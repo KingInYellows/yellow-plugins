@@ -252,7 +252,7 @@ the moved plan's own body broke: two `[decision record](../docs/...)`
 relative links depended on the file living one directory shallower, and both
 needed `../../docs/...` after the move.
 
-**Rule:** before archiving a plan, grep the *whole repo* for the pre-archive
+**Rule:** before archiving a plan, grep the _whole repo_ for the pre-archive
 path string — not just the plan's own prose, and not just `plans/` — since
 a validator config, an error-message string, or an unrelated doc's comment
 can all key off the exact path outside of any content that a plan-focused
@@ -266,7 +266,7 @@ rg -l --fixed-strings "plans/<slug>.md" .
 rg -n '\]\(\.\./' plans/<slug>.md
 ```
 
-### Graphite-merge-queue-landed PRs are consistently invisible to all three Gate C tiers — reuse the existing trailer, don't invent a new one
+### Graphite-landed PRs are invisible to all three Gate C tiers — reuse the existing trailer, don't invent one
 
 Confirmed recurring, not a one-off: of the 5 plans archived in PR #846, 4
 hit the same blind spot already recorded by commit `22cfd85b` (PR #812) —
@@ -277,8 +277,8 @@ than merging through GitHub's own merge machinery that would normally link
 a commit back to its PR. Provenance, strict, and loose all come up empty
 for exactly this reason — it isn't a bug in any one tier, it's a class of
 PR that never produces GitHub-visible merge linkage at all. Each of the 4
-archival commits in #846 recorded this explicitly ("Same convention as
-#812") and reused the existing `Plan-Verifier-Override:
+archival commits in #846 recorded this explicitly ("Same convention
+as #812") and reused the existing `Plan-Verifier-Override:
 user-confirmed-no-pr-evidence (pr=#N)` trailer from the Decision §3
 convention above — a PR review on this same batch flagged and fixed a
 draft that had instead invented a new `Plan-Verifier-LandedCommit:`
