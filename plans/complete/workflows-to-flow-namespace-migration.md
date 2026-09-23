@@ -8,7 +8,7 @@ native Claude Code's built-in `/workflows` occupies the prefix and typing
 resolve when typed in full — the defect is ergonomic, not functional.
 
 Decision record:
-[`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md).
+[`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md).
 Approach A was selected: rename immediately, no forwarders (usage is
 author-only), land a machine-checked CI gate in the same PR as the rename,
 then sweep prose across follow-up PRs against a shrinking allowlist.
@@ -459,17 +459,21 @@ tripping the gate — so this is a trade the gate makes knowingly.
       *teaching that exact syntax*. `buildDispatchTargetIndex` now indexes
       both kinds, with a test asserting a plugin-qualified skill resolves and
       a nonexistent one still fails
-- [ ] 4.3: `/flow` autocomplete check on a clean install — **deferred by
+
+- [x] 4.3: `/flow` autocomplete check on a clean install — **deferred by
       construction; the only step of this plan an agent cannot perform.**
       Per [Bootstrap Safety](#bootstrap-safety), commands are served from the
       published plugin cache, so `/flow` cannot appear until this stack
       merges, `version-packages.yml` publishes the bump, and the user runs
       `/plugin marketplace update`. Deliberately left unchecked rather than
       ticked-with-a-caveat: this is the migration's actual success criterion
-      (Acceptance Criterion 4), and a green CI gate proves the *absence of a
-      string*, which is not the same thing. **Owner: the user, post-merge.**
-      `/plan:complete` Gate A will correctly refuse to archive this plan
-      until it is verified and ticked
+      (Acceptance Criterion 4), and a green CI gate proves the _absence of a
+      string_, which is not the same thing. **Owner: the user, post-merge.**
+      `/plan:complete` Gate A will correctly refuse to archive this plan until
+      it is verified and ticked. **Verified by the user 2026-09-23** on
+      yellow-core 2.4.1 (marketplace install): `/flow` lists the migrated
+      commands. Installed cache: 9 yellow-core `name: flow:*`, 0
+      `name: workflows:`.
 
 ## Technical Specifications
 
@@ -616,12 +620,12 @@ Both open questions were closed before PR1 began.
 - [x] 2. agent/docs/flow-namespace-sweep-plugins (completed 2026-08-11)
 - [x] 3. agent/docs/flow-namespace-sweep-docs-research (completed 2026-08-11)
 - [x] 4. agent/chore/flow-namespace-terminal-condition (completed 2026-08-11;
-      box 4.3 intentionally open — post-merge user verification, see above)
+     box 4.3 verified by the user 2026-09-23 — post-merge check, see above)
 
 ## References
 
 - Decision record:
-  [`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md)
+  [`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md)
 - `docs/solutions/code-quality/mcp-tool-rename-prefix-collision.md` — `\b` does
   not stop substring corruption
 - `docs/solutions/code-quality/multi-doc-schema-rename-drift.md` — define the

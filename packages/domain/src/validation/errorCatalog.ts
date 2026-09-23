@@ -172,7 +172,7 @@ export const ERROR_CODES = {
   // Namespace Migration Errors (NAMESPACE) — scripts/validate-flow-namespace.js
   // gates the whole repo against surviving references to the retired
   // `workflows:` command namespace (renamed to `flow:`; see
-  // plans/workflows-to-flow-namespace-migration.md). The sweep runs across
+  // plans/complete/workflows-to-flow-namespace-migration.md). The sweep runs across
   // several PRs, so the gate carries a shrinking allowlist keyed on path PLUS
   // expected occurrence count — a path-only allowlist is non-monotonic and
   // would hide a partially-swept file.

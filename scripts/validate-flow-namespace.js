@@ -4,7 +4,7 @@
  * validate-flow-namespace.js
  *
  * Sweep-completeness gate for the `workflows:` -> `flow:` command namespace
- * migration (plans/workflows-to-flow-namespace-migration.md).
+ * migration (plans/complete/workflows-to-flow-namespace-migration.md).
  *
  * The 10 commands formerly under `workflows:` were renamed to `flow:` because
  * native Claude Code's built-in `/workflows` occupies that autocomplete
@@ -493,21 +493,6 @@ const PINNED_FILES = {
   // Frozen audit snapshot living under a directory whose name suggests
   // living docs — classified per-file, not by directory.
   'docs/maintenance/plugin-audit-2026-06-10.md': { counts: { plan: 1 }, digest: '665a236fffd9d21d' },
-  // This migration's own plan doc — narrates the old namespace by design,
-  // describing the very rename this gate enforces. Every other active plan
-  // under plans/ (and plans/shells/, plans/specs/, plans/handoff/) is a live
-  // instruction and IS scanned against the shrinking allowlist instead.
-  'plans/workflows-to-flow-namespace-migration.md': {
-    counts: {
-      '(glob)': 8,
-      '(placeholder)': 9,
-      plan: 3,
-      work: 4,
-      'deepen-plan': 1,
-      spec: 1,
-    },
-    digest: '68e5cdced31e82c2',
-  },
   // `every-plugin-research.md` is upstream changelog analysis: every
   // `workflows:` reference is a claim about the UPSTREAM EveryInc plugin's
   // own `workflows:*` namespace and its v2.38.0 rename to `ce:*` — a
@@ -1107,7 +1092,7 @@ function main() {
     for (const e of errors) console.error(`  ${e}`);
     console.error(
       `\n[validate-flow-namespace] ${errors.length} error${errors.length === 1 ? '' : 's'}. ` +
-        'See plans/workflows-to-flow-namespace-migration.md for the sweep plan.'
+        'See plans/complete/workflows-to-flow-namespace-migration.md for the sweep plan.'
     );
     process.exit(1);
   }
