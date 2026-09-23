@@ -138,13 +138,15 @@ Skip step 8. The rest of the chain works identically.
 ## CI Response
 
 **Plugins required:** yellow-ci
-**Optional:** yellow-linear (for `/ci:report-linear` and `/linear:delegate`); the enabled `remote-agent` provider (yellow-cursor preferred, yellow-devin legacy) for delegation
+**Optional:** yellow-linear (for `/ci:report-linear` and `/linear:delegate`);
+the enabled `remote-agent` provider (yellow-cursor preferred, yellow-devin
+legacy) for delegation
 
 Triggered automatically when a session starts and CI failures are detected.
 
 ### Chain
 
-```
+```bash
 SessionStart auto-detect → /ci:diagnose → /ci:report-linear → /linear:delegate
 ```
 
@@ -177,7 +179,7 @@ needing Linear.
 
 ### Single PR
 
-```
+```bash
 /review:pr [PR# | URL | branch] → /review:resolve
 ```
 
@@ -189,7 +191,7 @@ needing Linear.
 
 ### Full Stack
 
-```
+```bash
 /review:all stack
 ```
 
@@ -198,7 +200,7 @@ goes through: review (compounding runs inside review:pr) → resolve → restack
 
 ### Batch Review
 
-```
+```bash
 /review:all all
 ```
 
@@ -212,7 +214,7 @@ Reviews all your open non-draft PRs.
 
 ### Manual Capture
 
-```
+```bash
 /flow:compound [brief context]
 ```
 
