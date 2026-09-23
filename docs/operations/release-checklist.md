@@ -87,7 +87,7 @@ obtaining final sign-off.
 
 ```mermaid
 graph TD
-    P[Apply Changesets] --> A[Preflight Checks]
+    P[Version Packages PR merged] --> A[Preflight Checks]
     A --> B[Automated Validation]
     B --> C[Manual Smoke Tests]
     C --> D[Documentation Updates]
@@ -102,24 +102,22 @@ graph TD
     G --> I[Release Complete]
 ```
 
-**Phase 0 — Apply Changesets** (run before Preflight Checks):
+**Phase 0 — Version Packages PR** (standard automated path; run before Preflight
+Checks):
 
 ```sh
-# 1. Apply pending changesets (bumps plugin package.json files)
-pnpm apply:changesets
-# 2. Regenerate lockfile
-pnpm install
-# 3. Commit version bumps
-gt modify -c -m "chore(release): version packages"
-# 4. Bump catalog version
-node scripts/catalog-version.js minor   # or patch / major
-# 5. Commit catalog bump
-gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
-# 6. Run pre-flight checks
-pnpm release:check
-# 7. Merge the Version Packages PR. Tags are created on that push to main.
+# 1. Merge feature PRs to main with their .changeset/*.md files committed.
+# 2. version-packages.yml opens or updates the "chore: version packages" PR.
+# 3. Review bump types, CHANGELOG entries, and three-way version sync.
+# 4. Merge that PR to main. Tags and the GitHub Release are created on that push.
 #    Manual tagging is emergency-only — see Section 5.2. Do not push a tag to trigger the workflow.
 ```
+
+**Emergency manual release** (only when the automated Version Packages PR path
+is unavailable): see `CONTRIBUTING.md` "Emergency manual release". That path
+applies changesets locally, bumps the catalog, merges directly to `main`, and
+uses `workflow_dispatch` with `force_publish=true` for recovery — it does not
+create a separate Version Packages PR to merge afterward.
 
 See `docs/operations/versioning.md` for the complete developer workflow and
 semver bump rules.
