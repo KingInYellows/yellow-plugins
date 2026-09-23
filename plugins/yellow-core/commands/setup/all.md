@@ -351,12 +351,13 @@ fi
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
 <!-- setup-all-toolsearch-probes:start -->
-Run four ToolSearch probes to capture current-session MCP visibility:
+Run five ToolSearch probes to capture current-session MCP visibility:
 
 - `list_teams`
 - `parallel__createDeepResearch`
 - `ast-grep__find_code`
 - `ceramic_search`
+- `COMPOSIO_SEARCH_TOOLS`
 
 Record whether these exact tools are present in the results:
 
@@ -364,6 +365,7 @@ Record whether these exact tools are present in the results:
 - `mcp__plugin_yellow-research_parallel__createDeepResearch`
 - `mcp__plugin_yellow-research_ast-grep__find_code`
 - `mcp__plugin_yellow-research_ceramic__ceramic_search`
+- `mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS`
 <!-- setup-all-toolsearch-probes:end -->
 
 ToolSearch reflects current-session visibility only. If a plugin was installed
@@ -617,12 +619,18 @@ The bundled MCP is native HTTP at `https://connect.composio.dev/mcp`.
 Claude Code authenticates it with browser OAuth. There is no API key and
 no credential-status file.
 
-- READY: Composio MCP tools visible via ToolSearch AND
-  `.claude/composio-usage.json` exists. `jq` missing is degraded usage
-  tracking, not a setup failure.
-- PARTIAL: Composio MCP tools are visible AND the usage counter
+Define `composio_tools_visible` from Step 1.5: the recorded tool
+`mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS` is
+present, OR ToolSearch also returned
+`mcp__claude_ai_composio__COMPOSIO_SEARCH_TOOLS` or
+`mcp__composio-server__COMPOSIO_SEARCH_TOOLS`. The last two are legacy
+prefixes and are not in the recorded probe list.
+
+- READY: `composio_tools_visible` AND `.claude/composio-usage.json` exists.
+  `jq` missing is degraded usage tracking, not a setup failure.
+- PARTIAL: `composio_tools_visible` AND the usage counter
   (`.claude/composio-usage.json`) is missing → run `/composio:setup`.
-- NEEDS SETUP: Composio MCP tools are not visible. Open `/mcp`, select
+- NEEDS SETUP: not `composio_tools_visible`. Open `/mcp`, select
   `composio-server`, and choose Authenticate. Complete the browser login,
   then restart Claude Code if the tools are still missing. Headless hosts
   use the consumer-key `claude mcp add` fallback in `/composio:setup`.

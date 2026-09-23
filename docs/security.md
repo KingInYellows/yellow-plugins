@@ -9,6 +9,7 @@ enterprise deployment.
 | --------------- | ---------- | ------------------------------------------------ | --------- | --------------------------- | ----------------------------- |
 | yellow-core     | context7   | `https://mcp.context7.com/mcp`                   | HTTP      | None                        | Library names, search queries |
 | yellow-linear   | linear     | `https://mcp.linear.app/mcp`                     | HTTP      | OAuth (browser popup)       | Issue data, team info         |
+| yellow-composio | composio-server | `https://connect.composio.dev/mcp`          | HTTP      | OAuth (browser); headless consumer key is plaintext | Connected-app tool calls |
 | yellow-research | deepwiki   | `https://mcp.deepwiki.com/mcp`                   | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`                       | HTTP      | TBD (may require API token) | Code, task prompts            |
 | yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio     | None (local)                | Code embeddings (local only)  |
@@ -38,19 +39,23 @@ the MCP server once while online.
 Plugins use three authentication patterns. No `.env` files are needed — Claude
 Code handles credentials natively through OAuth and shell environment variables.
 
-### OAuth servers (yellow-linear)
+### OAuth servers (yellow-linear, yellow-composio)
 
 These plugins use browser-based OAuth managed entirely by Claude Code:
 
-1. On first MCP tool call, Claude Code opens a browser popup for login
-2. Authenticate with your Linear account
+1. On first MCP tool call, or from `/mcp` → Authenticate, Claude Code opens
+   a browser login
+2. Authenticate with the provider (Linear, or Composio at
+   `https://connect.composio.dev/mcp`)
 3. Token is stored securely in your operating system's credential manager (macOS
    Keychain, Windows Credential Manager, or libsecret on Linux)
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
    authentication"
 
-No API keys or configuration files needed. Will not work in headless SSH
-sessions (browser required for OAuth flow).
+No API keys in the plugin manifest. Will not work in headless SSH sessions
+(browser required for OAuth flow). A headless Composio host can instead
+register a user-level server with a For You consumer key; that stores the
+key in plaintext in `~/.claude.json`. See `/composio:setup`.
 
 ### API token servers (yellow-devin)
 
@@ -110,6 +115,7 @@ mcp.linear.app       — yellow-linear (issue management)
 mcp.context7.com     — yellow-core (library documentation)
 mcp.deepwiki.com     — yellow-research (public repo docs)
 mcp.devin.ai         — yellow-devin (Devin orchestration)
+connect.composio.dev — yellow-composio (connected-app tools)
 ```
 
 ### Selective Plugin Installation
@@ -220,7 +226,7 @@ Before enabling any plugin with hooks:
 
 ## Trust Boundaries
 
-### Remote MCP Servers (yellow-linear, yellow-devin, yellow-core)
+### Remote MCP Servers (yellow-linear, yellow-composio, yellow-devin, yellow-core)
 
 - Data sent over HTTPS to third-party servers
 - Subject to each provider's privacy policy and terms

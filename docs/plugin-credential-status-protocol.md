@@ -166,11 +166,12 @@ PRs after this foundation merges):
   omitted from the credentials array)
 - yellow-morph (morph key)
 - yellow-semgrep (semgrep token)
-- yellow-composio (URL + API key)
 
 Plugins that intentionally do NOT emit this file:
 
 - yellow-devin (uses shell env only; setup:all probes `DEVIN_*` env vars
   directly)
-- yellow-linear, yellow-chatprd, yellow-codex (OAuth flows — status is
-  ToolSearch-visibility, not credential-presence)
+- yellow-linear, yellow-chatprd, yellow-codex, yellow-composio (OAuth
+  flows — status is ToolSearch-visibility, not credential-presence).
+  yellow-composio's bundled server is `https://connect.composio.dev/mcp`
+  and has no userConfig fields.
