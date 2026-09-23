@@ -414,7 +414,7 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       count wiring lands. Do not record those three rows against the
       reviewer PR: 1.3.7 fail-closed-suppresses size findings when the
       block is absent.
-      **Handed off to #774 (2026-09-23):** the fixture sign-off needs the fixture eval, which has not been run; tracked there, not claimed done here.
+      **Handed off to #774 (2026-09-23)** — ticked as handed off, not as done: the fixture sign-off needs the fixture eval, which has not been run; tracked there, not claimed done here.
 - [x] 1.4.2 **Do not** add a row to the always-on table (`review-pr.md:327-337`)
       or the conditional table (`339-358`) — either would auto-trigger it and
       defeat opt-in (F5).
@@ -556,7 +556,7 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
       Non-blocking by the Testing Strategy table above ("No — release gate
       by review"), so #770 merges with this box open rather than ticked;
       it stays unchecked because the tests were never run.
-      **Handed off to #774 (2026-09-23):** still not run (needs Cursor/Codex hosts); ticked only to archive this plan, and the smoke tests stay open in #774.
+      **Handed off to #774 (2026-09-23)** — supersedes "stays unchecked" above: the box is ticked only as handed off so this plan can archive; the smoke tests are still not run (need Cursor/Codex hosts) and stay open in #774.
 
 ## Technical Details
 

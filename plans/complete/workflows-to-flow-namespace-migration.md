@@ -8,7 +8,7 @@ native Claude Code's built-in `/workflows` occupies the prefix and typing
 resolve when typed in full — the defect is ergonomic, not functional.
 
 Decision record:
-[`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md).
+[`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md).
 Approach A was selected: rename immediately, no forwarders (usage is
 author-only), land a machine-checked CI gate in the same PR as the rename,
 then sweep prose across follow-up PRs against a shrinking allowlist.
@@ -623,7 +623,7 @@ Both open questions were closed before PR1 began.
 ## References
 
 - Decision record:
-  [`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md)
+  [`docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md`](../../docs/brainstorms/2026-08-10-workflows-to-flow-namespace-migration-brainstorm.md)
 - `docs/solutions/code-quality/mcp-tool-rename-prefix-collision.md` — `\b` does
   not stop substring corruption
 - `docs/solutions/code-quality/multi-doc-schema-rename-drift.md` — define the
