@@ -1,0 +1,19 @@
+plans/complete/thermonuclear-review-integration.md
+  s_7f8866f2609431::t_59b3228edc7db7 3-4,412,417,430,436-437,443,552,559
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d1ad56c6a2746cfc33fe79cc4f805f25fa4c941d",
+  "prompts": {},
+  "sessions": {
+    "s_7f8866f2609431": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df0b9119-fb83-4a7a-ad63-a4a0e9e2a70c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
