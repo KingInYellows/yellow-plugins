@@ -1,0 +1,23 @@
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_1c6fc0fcc3d347::t_011baf056aec70 242-246,249-253,256-262,269-272,277-279,281-294
+plans/complete/thermonuclear-review-integration.md
+  s_1c6fc0fcc3d347::t_40eca2f633f58e 4-8,437-441,560-568
+plans/complete/workflows-to-flow-namespace-migration.md
+  s_1c6fc0fcc3d347::t_96691b6da378bf 462,470-476,623
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fb01e935a05c4cf314bab00598b764905ff032af",
+  "prompts": {},
+  "sessions": {
+    "s_1c6fc0fcc3d347": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8ba5b03-ba39-4da1-8496-d96367c13312",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
