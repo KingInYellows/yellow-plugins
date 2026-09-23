@@ -1,7 +1,8 @@
 ---
 title: "Schema extension: optional `pattern` regex field on userConfigEntry (REVERTED)"
+date: 2026-05-08
 category: build-errors
-track: feature
+track: knowledge
 status: reverted
 problem: "Plugin authors had no schema-level mechanism to enforce regex constraints on user-supplied userConfig values (URLs, API keys, file paths). The local schema's userConfigEntry used additionalProperties: false and did not list `pattern` as a recognized property, so any plugin that wrote `\"pattern\": \"^https://\"` into plugin.json failed `pnpm validate:plugins` with an additional-property error."
 tags:
