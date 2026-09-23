@@ -1,0 +1,16 @@
+README.md
+  h_6000354274ce50 58
+docs/runtime-install-smoke.md
+  h_6000354274ce50 38,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7950cf0bbd85a33a4a4ccb309c9d3f04ea0b6abb",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
