@@ -266,10 +266,11 @@ written relative to `plans/` now resolves one directory too deep.
 # git grep searches every tracked file, including hidden paths such as
 # .github/ and .claude-plugin/ that plain rg skips by default.
 git grep -l --fixed-strings "plans/<slug>.md"
-# Every relative Markdown link target, inline or reference-style (reference
-# definitions may be indented up to three spaces; skips URLs, in-page
-# anchors, and root-absolute paths):
-rg -no --pcre2 '\]\((?!https?:|#|/)[^)]+\)|^ {0,3}\[[^\]]+\]:\s*(?!https?:|#|/)\S+' plans/<slug>.md
+# Every line holding an inline link or a reference definition (indented or
+# not, and including definitions whose target sits on the next line).
+# Deliberately broad: review each hit by eye rather than trusting a
+# destination filter to know every valid Markdown link form.
+rg -n '\]\(|^ {0,3}\[[^]]+\]:' plans/<slug>.md
 ```
 
 ### Graphite-landed PRs are invisible to all three Gate C tiers — reuse the existing trailer, don't invent one
