@@ -239,57 +239,56 @@ trailers appears per archival commit.
 ### Archiving a plan (`git mv plans/foo.md plans/complete/foo.md`) breaks path-keyed references elsewhere in the repo
 
 PR #846 (5 plans archived in one batch) hit this three separate times on a
-single move: `scripts/validate-flow-namespace.js`'s `PINNED_FILES` map keyed
-an entry on the literal pre-archive path
-(`plans/workflows-to-flow-namespace-migration.md`), so the archive alone
-made `ERROR-NAMESPACE-003` fail (the pinned path no longer existed); the
-same script's own **user-facing failure message** ("See
+single move: `scripts/validate-flow-namespace.js`'s `PINNED_FILES` map keyed an
+entry on the literal pre-archive path
+(`plans/workflows-to-flow-namespace-migration.md`), so the archive alone made
+`ERROR-NAMESPACE-003` fail (the pinned path no longer existed); the same
+script's own **user-facing failure message** ("See
 plans/workflows-to-flow-namespace-migration.md for the sweep plan.") and a
 docblock comment in `packages/domain/src/validation/errorCatalog.ts` both
-hardcoded the same pre-archive path, so the gate's failure output would
-have sent readers to a dead path even after the pin itself was fixed. Separately,
-the moved plan's own body broke: two `[decision record](../docs/...)`
-relative links depended on the file living one directory shallower, and both
-needed `../../docs/...` after the move.
+hardcoded the same pre-archive path, so the gate's failure output would have
+sent readers to a dead path even after the pin itself was fixed. Separately, the
+moved plan's own body broke: two `[decision record](../docs/...)` relative links
+depended on the file living one directory shallower, and both needed
+`../../docs/...` after the move.
 
 **Rule:** before archiving a plan, grep the _whole repo_ for the pre-archive
-path string — not just the plan's own prose, and not just `plans/` — since
-a validator config, an error-message string, or an unrelated doc's comment
-can all key off the exact path outside of any content that a plan-focused
-review would think to check. Then list every relative link in the plan
-file itself (`../`, `./`, bare `sibling.md`, and reference-style `[id]: path`
-definitions), since moving into `plans/complete/` adds one path segment of
-depth and every target written relative to `plans/` now resolves one
-directory too deep.
+path string — not just the plan's own prose, and not just `plans/` — since a
+validator config, an error-message string, or an unrelated doc's comment can all
+key off the exact path outside of any content that a plan-focused review would
+think to check. Then list every relative link in the plan file itself (`../`,
+`./`, bare `sibling.md`, and reference-style `[id]: path` definitions), since
+moving into `plans/complete/` adds one path segment of depth and every target
+written relative to `plans/` now resolves one directory too deep.
 
 ```bash
 # Before `git mv plans/<slug>.md plans/complete/<slug>.md`:
 # git grep searches every tracked file, including hidden paths such as
 # .github/ and .claude-plugin/ that plain rg skips by default.
 git grep -l --fixed-strings "plans/<slug>.md"
-# Every relative Markdown link target, inline or reference-style (skips
-# URLs, in-page anchors, and root-absolute paths):
-rg -no --pcre2 '\]\((?!https?:|#|/)[^)]+\)|^\[[^\]]+\]:\s*(?!https?:|#|/)\S+' plans/<slug>.md
+# Every relative Markdown link target, inline or reference-style (reference
+# definitions may be indented up to three spaces; skips URLs, in-page
+# anchors, and root-absolute paths):
+rg -no --pcre2 '\]\((?!https?:|#|/)[^)]+\)|^ {0,3}\[[^\]]+\]:\s*(?!https?:|#|/)\S+' plans/<slug>.md
 ```
 
 ### Graphite-landed PRs are invisible to all three Gate C tiers — reuse the existing trailer, don't invent one
 
-Confirmed recurring, not a one-off: of the 5 plans archived in PR #846, 4
-hit the same blind spot already recorded by commit `22cfd85b` (PR #812) —
-GitHub shows the delivering PR as **CLOSED with a null `mergedAt`**, and
+Confirmed recurring, not a one-off: of the 5 plans archived in PR #846, 4 hit
+the same blind spot already recorded by commit `22cfd85b` (PR #812) — GitHub
+shows the delivering PR as **CLOSED with a null `mergedAt`**, and
 `commits/<sha>/pulls` returns `[]` for the commit that actually landed on
-`origin/main`, because Graphite pushed the branch to main directly rather
-than merging through GitHub's own merge machinery that would normally link
-a commit back to its PR. Provenance, strict, and loose all come up empty
-for exactly this reason — it isn't a bug in any one tier, it's a class of
-PR that never produces GitHub-visible merge linkage at all. Each of the 4
-archival commits in #846 recorded this explicitly ("Same convention
-as #812") and reused the existing `Plan-Verifier-Override:
-user-confirmed-no-pr-evidence (pr=#N)` trailer from the Decision §3
-convention above — a PR review on this same batch flagged and fixed a
-draft that had instead invented a new `Plan-Verifier-LandedCommit:`
-trailer name for the identical situation. **When Gate C comes up empty
-because a PR shows closed with a null `mergedAt` and no linked commit, that
-is very likely this known Graphite-direct-push case, not a new failure
-mode** — confirm the commit is on `origin/main` and use the existing
-`Plan-Verifier-Override` trailer, not a new one.
+`origin/main`, because Graphite pushed the branch to main directly rather than
+merging through GitHub's own merge machinery that would normally link a commit
+back to its PR. Provenance, strict, and loose all come up empty for exactly this
+reason — it isn't a bug in any one tier, it's a class of PR that never produces
+GitHub-visible merge linkage at all. Each of the 4 archival commits in #846
+recorded this explicitly ("Same convention as #812") and reused the existing
+`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#N)` trailer from the
+Decision §3 convention above — a PR review on this same batch flagged and fixed
+a draft that had instead invented a new `Plan-Verifier-LandedCommit:` trailer
+name for the identical situation. **When Gate C comes up empty because a PR
+shows closed with a null `mergedAt` and no linked commit, that is very likely
+this known Graphite-direct-push case, not a new failure mode** — confirm the
+commit is on `origin/main` and use the existing `Plan-Verifier-Override`
+trailer, not a new one.
