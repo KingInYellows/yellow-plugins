@@ -1,0 +1,69 @@
+plugins/yellow-core/commands/setup/all.md
+  h_6000354274ce50 616-618,621-625,628
+  s_b47e742aa843b1::t_d4689e9f948150 120,619-620,626-627,876
+plugins/yellow-composio/commands/composio/setup.md
+  h_6000354274ce50 48-49,75-77,123
+  s_b47e742aa843b1::t_61d955fd3dc370 22-23,35,51,53,58-60,65-68,71-72,80-85,124-128,218
+catalog/plugins/yellow-composio.json
+  h_6000354274ce50 11
+  h_6000354274ce50 14-15
+plugins/yellow-composio/README.md
+  h_6000354274ce50 34-50,71-72,124
+  s_b47e742aa843b1::t_f7de5db76c101b 7-8,65,86-89,100-104,125-126
+plugins/yellow-composio/CLAUDE.md
+  h_6000354274ce50 16-18,23,27,84-86
+  h_6000354274ce50 7-15,22,95,104-105
+.changeset/composio-default-mcp-url.md
+  h_6000354274ce50 1-6
+  h_6000354274ce50 7-12
+docs/security.md
+  s_6476068b869a82::t_56b125980de34b 146
+  s_6476068b869a82::t_d9ad5348e55eaf 147
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  h_6000354274ce50 33,287,289-293
+  h_6000354274ce50 34,288,294-296
+README.md
+  h_6000354274ce50 63
+plugins/yellow-core/skills/multi-host-fleet/SKILL.md
+  h_6000354274ce50 25,111,200-201,230
+  h_6000354274ce50 19,26,80,199,228-229,231-232
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_b47e742aa843b1::t_35999a607de819 467-468
+CLAUDE.md
+  h_6000354274ce50 48
+docs/plugin-credential-status-protocol.md
+  h_6000354274ce50 23-24,28,79,87
+plugins/yellow-composio/.claude-plugin/plugin.json
+  h_6000354274ce50 22-23
+plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md
+  h_6000354274ce50 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ba5ae0f8d7156dcb8bc646b18d41e27ebd4e165b",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  },
+  "sessions": {
+    "s_6476068b869a82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb99cbb0-34fd-4434-9fc8-3e13aa1ba3e7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_b47e742aa843b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bc0f746-7c00-47cd-8585-93265de49767",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
