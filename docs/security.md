@@ -143,8 +143,8 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Ten plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
-yellow-composio, yellow-morph, yellow-research, and yellow-semgrep are shell;
+Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
+yellow-morph, yellow-research, and yellow-semgrep are shell;
 yellow-ci, gt-workflow, and github-workflow run a dependency-free Node
 runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
@@ -156,7 +156,6 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
 | github-workflow | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages (same Node entrypoint as gt-workflow)         |
 | yellow-core     | SessionStart, Stop, PreCompact                    | Staging-queue drain; transcript-tail capture; compaction-preservation instruction        |
-| yellow-composio | SessionStart                                      | Warn if `composio_mcp_url` is non-HTTPS (advisory only)                                  |
 | yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
 | yellow-research | SessionStart                                      | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`             |
 | yellow-semgrep  | SessionStart                                      | Emit `credential-status.json` for `/setup:all`                                           |

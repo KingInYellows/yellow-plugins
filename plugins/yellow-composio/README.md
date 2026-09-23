@@ -4,7 +4,8 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 
 ## Upgrading from v1.2.x to v1.3.0
 
-v1.3.0 converts the bundled Composio MCP from `type: http` to a `command`-type
+Historical. The current server is native HTTP OAuth, described in the next
+section. v1.3.0 converted the bundled Composio MCP from `type: http` to a `command`-type
 stdio wrapper. This is a transport-level change; tool names and behavior are
 identical. Existing keychain-stored credentials are preserved.
 
@@ -30,6 +31,23 @@ broke `claude doctor` for all other MCPs (`SDK auth failed: "/" cannot be
 parsed as a URL`). The v1.3.0 wrapper now exits non-zero on empty values,
 so only Composio fails to start — other MCPs are unaffected.
 
+## OAuth on the shared Connect URL
+
+The bundled server is native HTTP at `https://connect.composio.dev/mcp`.
+Enable does not ask for a URL or an API key. Claude Code opens a browser
+OAuth flow.
+
+After updating from the stdio wrapper or a saved consumer key:
+
+```text
+/plugin disable yellow-composio
+/plugin enable yellow-composio
+```
+
+Then open `/mcp`, select `composio-server`, and choose Authenticate.
+A headless host that cannot open a browser can still add a user-level
+server with a For You consumer key (`ck_...`). See `/composio:setup`.
+
 ## Installation
 
 ```bash
@@ -44,18 +62,14 @@ Then install the plugin:
 
 ## Quick Start
 
-1. **Enable the plugin and answer the `userConfig` prompts**:
+1. **Enable the plugin**:
 
    ```text
    /plugin enable yellow-composio
    ```
 
-   Two prompts appear on enable:
-   - **Composio MCP URL** -- per-customer endpoint, looks like
-     `https://mcp.composio.dev/<id>`. Generate via the Composio
-     dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`.
-   - **Composio API key** -- from <https://app.composio.dev/settings>
-     (stored in the OS keychain).
+   No URL or API key prompt. Open `/mcp`, select `composio-server`, and
+   choose Authenticate. Finish the browser login.
 
 2. **Run setup**:
 
@@ -69,10 +83,10 @@ Then install the plugin:
    /composio:status
    ```
 
-If you previously ran `claude mcp add --transport http composio-server ...`
-manually, that registration keeps working as a fallback. The bundled path is
-preferred because the API key is keychain-stored. See `/composio:setup` for
-the full migration walk-through.
+If you previously ran `claude mcp add` with an API key, that user-level
+server takes precedence over this plugin. Remove it with
+`claude mcp remove composio-server` once browser OAuth works. See
+`/composio:setup`.
 
 ## Commands
 
@@ -83,14 +97,11 @@ the full migration walk-through.
 
 ## How It Works
 
-This plugin bundles a `command`-type stdio Composio MCP server via
-`plugin.json` — a small wrapper (`bin/start-composio.sh`) resolves the
-credentials and execs a Node.js proxy (`bin/composio-proxy.mjs`) that bridges
-stdio MCP JSON-RPC to Composio's HTTPS endpoint. Node.js 18+ must be on PATH
-for the bundled server to start (the Claude.ai-native and manual
-`claude mcp add` prefixes do not require it). Tools appear under
-`mcp__plugin_yellow-composio_composio-server__*` after the `userConfig`
-prompts are answered. The plugin also provides:
+This plugin bundles a native HTTP Composio MCP server at
+`https://connect.composio.dev/mcp`. Claude Code authenticates it with
+browser OAuth. Tools appear under
+`mcp__plugin_yellow-composio_composio-server__*` after that login. The
+plugin also provides:
 
 - **Setup validation** -- Confirms Composio is configured and reachable
 - **Usage tracking** -- Local counter since Composio has no billing API
@@ -110,11 +121,9 @@ they fall back to existing local approaches with zero user-visible difference.
 ## Prerequisites
 
 - Composio account ([composio.dev](https://composio.dev))
-- A Composio MCP URL and API key (entered via `userConfig` on plugin enable,
-  or via a manual `claude mcp add` fallback)
-- Node.js 18+ on PATH (required for the bundled MCP server, which runs
-  `node bin/composio-proxy.mjs`; not needed for the Claude.ai-native or
-  manual `claude mcp add` prefixes)
+- A browser session for Claude Code's OAuth prompt on
+  `https://connect.composio.dev/mcp`. Headless hosts can use the
+  consumer-key fallback in `/composio:setup`.
 - `jq` (recommended for usage tracking)
 
 ## License

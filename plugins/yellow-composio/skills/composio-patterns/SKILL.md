@@ -30,7 +30,8 @@ discovered via ToolSearch and may appear under one of three prefixes,
 checked in priority order:
 
 1. `mcp__plugin_yellow-composio_composio-server__*` -- bundled by this
-   plugin (preferred, requires both `userConfig` values to be set).
+   plugin (preferred). Native HTTP at `https://connect.composio.dev/mcp`,
+   authenticated by Claude Code's browser OAuth flow.
 2. `mcp__claude_ai_composio__*` -- Claude.ai native Composio integration
    (legacy, still supported).
 3. `mcp__composio-server__*` -- manual `claude mcp add` setup
@@ -283,21 +284,16 @@ Pattern:
   infrastructure. Do not send sensitive file contents, credentials, private
   keys, or proprietary algorithms. Use Workbench for data processing and API
   orchestration, not as a trusted execution environment.
-- **API key stored in system keychain**: When the bundled MCP path is used,
-  the `composio_api_key` `userConfig` value is stored in the OS keychain
-  (`sensitive: true`) and sent as the `X-API-Key` header on every request.
-  Never echo, log, or transmit the value. Legacy `mcp__claude_ai_composio__*`
-  and `mcp__composio-server__*` paths use Claude Code's native or manual
-  credential management instead.
-- **HTTPS-only MCP URL (advisory)**: `composio_mcp_url` MUST start with
-  `https://` — Claude Code sends the API key as the `X-API-Key` header to
-  whatever URL is configured, so a non-HTTPS URL leaks the credential in
-  cleartext. Format is not enforced at the schema level (the Claude Code
-  remote validator does not support `userConfig.<key>.pattern`); the bundled
-  `hooks/check-mcp-url.sh` SessionStart hook prints a warning if the URL is
-  non-HTTPS, but it cannot block the MCP server from attaching first. Treat
-  the warning as a "reconfigure now" signal: open `/plugin`, set the URL to
-  an `https://mcp.composio.dev/*` value, and restart the session.
+- **OAuth for the bundled server**: the plugin manifest declares
+  `https://connect.composio.dev/mcp` with no headers. Claude Code runs
+  the browser OAuth flow and stores the session. Do not paste a Platform
+  project API key into that flow. The headless `claude mcp add` fallback
+  in `/composio:setup` uses a For You consumer key (`ck_...`) as
+  `x-consumer-api-key` and stores it in plaintext in `~/.claude.json`.
+  Never echo, log, or commit that key.
+- **HTTPS endpoint**: the bundled URL is `https://connect.composio.dev/mcp`.
+  Do not point a manual server at an `http://` URL. A consumer key on a
+  non-HTTPS URL would leak in cleartext.
 - **Content fencing**: Wrap all Composio responses in `--- begin/end ---`
   delimiters per repository convention.
 - **Data transmission**: Tool call parameters and Workbench code are sent to

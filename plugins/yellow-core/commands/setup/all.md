@@ -117,8 +117,7 @@ fi
 [ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
 [ -n "${CERAMIC_API_KEY:-}" ] && printf 'CERAMIC_API_KEY:           set\n' || printf 'CERAMIC_API_KEY:           NOT SET\n'
-[ -n "${COMPOSIO_MCP_URL:-}" ] && printf 'COMPOSIO_MCP_URL:          set\n' || printf 'COMPOSIO_MCP_URL:          NOT SET\n'
-[ -n "${COMPOSIO_API_KEY:-}" ] && printf 'COMPOSIO_API_KEY:          set\n' || printf 'COMPOSIO_API_KEY:          NOT SET\n'
+
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -614,40 +613,19 @@ If `web_signal_count` is `0` AND no config file: omit from dashboard.
 
 **yellow-composio:**
 
-The bundled MCP is now `command`-type stdio with a wrapper resolving
-userConfig OR shell env (v1.3.0+). Prefer the credential-status file for
-classification; when it is absent, fall back to the `COMPOSIO_MCP_URL` /
-`COMPOSIO_API_KEY` shell env vars (per Step 1.6's documented fallback rule)
-so a fresh install that has not yet written the status file is not
-mis-classified.
+The bundled MCP is native HTTP at `https://connect.composio.dev/mcp`.
+Claude Code authenticates it with browser OAuth. There is no API key and
+no credential-status file.
 
-Define `composio_creds_present` as: status file shows BOTH `composio_mcp_url`
-and `composio_api_key` `present == true`, OR (status file absent AND both
-`COMPOSIO_MCP_URL` and `COMPOSIO_API_KEY` are set in shell env).
-
-- READY: `jq` OK AND Composio MCP tools visible via ToolSearch AND
-  `composio_creds_present` AND `.claude/composio-usage.json` exists.
-  (No `node` gate here: visible tools already imply either the bundled
-  server started — so node was adequate — or a legacy prefix is serving
-  them, for which node is irrelevant.)
-- PARTIAL: `composio_creds_present` AND one of:
-  - MCP tools not visible yet AND `node18_check` not `ok` (missing, OR
-    present but older than v18), AND you intend to use the bundled prefix →
-    install or upgrade to Node.js 18+ (the bundled wrapper runs
-    `node bin/composio-proxy.mjs`, whose proxy calls the global `fetch()`
-    API that needs Node 18+; a restart or disable/enable cannot fix a
-    missing or too-old binary). Not needed if using the Claude.ai-native or
-    manual `claude mcp add` prefix.
-  - MCP tools not visible yet → Claude Code restart needed to pick up the
-    newly-configured credentials
-  - usage counter (`.claude/composio-usage.json`) missing → run
-    `/composio:setup`
-- NEEDS SETUP: status file shows either credential as `source: absent`, OR
-  status file missing AND at least one of `COMPOSIO_MCP_URL` /
-  `COMPOSIO_API_KEY` is unset. In either case the wrapper will exit
-  non-zero and the bundled MCP won't start — no cascade failure to other
-  MCPs. Remediation: run `/plugin disable yellow-composio && /plugin
-  enable yellow-composio` (or export both env vars for fleet installs).
+- READY: Composio MCP tools visible via ToolSearch AND
+  `.claude/composio-usage.json` exists. `jq` missing is degraded usage
+  tracking, not a setup failure.
+- PARTIAL: Composio MCP tools are visible AND the usage counter
+  (`.claude/composio-usage.json`) is missing → run `/composio:setup`.
+- NEEDS SETUP: Composio MCP tools are not visible. Open `/mcp`, select
+  `composio-server`, and choose Authenticate. Complete the browser login,
+  then restart Claude Code if the tools are still missing. Headless hosts
+  use the consumer-key `claude mcp add` fallback in `/composio:setup`.
 
 **yellow-codex:**
 
@@ -895,7 +873,7 @@ the same ToolSearch probes from Step 1.5, AND the Step 1.6/1.7 probes from
 — a setup run can re-trigger userConfig prompts or restart MCP servers, so
 credential-status files may have changed mid-command; skipping 1.6/1.7 here
 would show stale before/after rows for exactly the plugins most likely to have
-changed (yellow-research, yellow-semgrep, yellow-composio). Re-classify every
+changed (yellow-research, yellow-semgrep). Re-classify every
 plugin using the same rules and show only status changes:
 
 ```text

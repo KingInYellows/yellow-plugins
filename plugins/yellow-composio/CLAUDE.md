@@ -4,50 +4,27 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 
 ## How It Works
 
-This plugin bundles a Composio MCP server via a small `command`-type stdio
-wrapper (`bin/start-composio.sh` + `bin/composio-proxy.mjs`) that resolves
-credentials and proxies stdio MCP JSON-RPC to Composio's HTTPS endpoint.
+This plugin bundles Composio Connect as a native HTTP MCP server at
+`https://connect.composio.dev/mcp` (`type: http`, no headers). Claude Code
+performs browser OAuth. A stdio proxy that injects an API key never
+surfaces that challenge, so `bin/start-composio.sh` is gone. There is no
+`userConfig` and no SessionStart hook. Setup is `/mcp` → `composio-server`
+→ Authenticate. App connections (Gmail, Slack, GitHub, and the rest) stay
+on `COMPOSIO_MANAGE_CONNECTIONS` after the MCP session is authenticated.
 
-**Why stdio + proxy instead of `type: http`?** Claude Code's `${VAR}`
-substitution in HTTP MCP `headers` fields is a confirmed bug
-([anthropics/claude-code#51581](https://github.com/anthropics/claude-code/issues/51581)).
-The wrapper sidesteps this — it runs in a normal shell subprocess where
-both `userConfig` and shell env are visible. Composio's official
-recommendation is `claude mcp add --transport http`, but that path
-cannot honor `COMPOSIO_MCP_URL` / `COMPOSIO_API_KEY` shell env vars,
-which blocks dotfile-managed multi-host fleets.
-
-**Credential resolution precedence** (in `bin/start-composio.sh`):
-1. `userConfig.composio_mcp_url` / `composio_api_key` (keychain — preferred)
-2. Shell env `COMPOSIO_MCP_URL` / `COMPOSIO_API_KEY` (fleet fallback)
-3. Unset → wrapper exits **non-zero**, preventing the bundled MCP from
-   registering with an empty URL (which would cascade-fail `claude doctor`
-   for all other MCPs in the session).
-
-`required: true` was removed from the userConfig fields. Per
-[#39827](https://github.com/anthropics/claude-code/issues/39827) it does
-NOT block install — it merely produces a confusing MCP-startup error. The
-wrapper's hard exit on empty values is the actual safeguard. The
-SessionStart hook (`hooks/check-mcp-url.sh`) also writes a
-`credential-status.json` consumed by `/setup:all` for dashboard
-classification and by `/composio:setup`'s own remediation branch (when no
-Composio tools are visible, setup reads it to distinguish "credentials
-never configured" from "restart needed").
+Headless hosts that cannot open a browser can register a user-level server
+with a For You consumer key (`ck_...`). Claude Code prefers that server
+over the plugin. See `/composio:setup`. That key is not a Platform project
+API key, and `https://mcp.composio.dev/<id>` is not a substitute URL.
 
 The plugin still detects externally-configured Composio MCPs as a
 migration aid (`mcp__claude_ai_composio__*` for the Claude.ai native
-integration, `mcp__composio-server__*` for manual `.mcp.json` setups
-predating this plugin). Detection runs in `/composio:setup` and is
-independent of the bundled MCP. Because `required: true` was removed from
-the bundled `userConfig` (its non-zero wrapper exit is the safeguard, per
-the note above), a fresh enable with empty credentials starts no bundled
-tools at all — while an externally-configured `mcp__claude_ai_composio__*`
-or `mcp__composio-server__*` MCP remains independently detectable and
-usable.
+integration, `mcp__composio-server__*` for manual `claude mcp add`).
+Detection runs in `/composio:setup` and is independent of the bundled MCP.
 
 The plugin provides:
 
-1. Bundled MCP server with `userConfig`-prompt-driven credentials
+1. Bundled HTTP MCP server on the shared Connect URL, authenticated with OAuth
 2. Setup validation to confirm Composio is configured and reachable
 3. Local usage tracking since Composio has no billing/usage API
 4. A patterns skill documenting Workbench, Multi-Execute, and degradation
@@ -104,10 +81,9 @@ Composio has no billing API. This is the only way to monitor execution budget.
 
 ## Security Notes
 
-- **API key stored in system keychain** -- Composio API key is sensitive
-  `userConfig` (`composio_api_key`) and held in the OS keychain. The MCP
-  URL is non-sensitive and held in plain `userConfig` storage. Never
-  echo either value in command output or commits.
+- **OAuth for the bundled server** -- Claude Code stores the MCP OAuth
+  session. The plugin manifest has no API key and no URL field. Never
+  echo a consumer key from the headless `claude mcp add` fallback.
 - **Remote execution** -- Workbench runs on Composio's cloud. Do not send
   secrets, private keys, or proprietary algorithms
 - **Content fencing** -- Wrap all Composio responses in `--- begin/end ---`
@@ -116,9 +92,7 @@ Composio has no billing API. This is the only way to monitor execution budget.
 
 ## Cross-Plugin Dependencies
 
-| Dependency | Purpose | Required? |
-|---|---|---|
-| yellow-core | `hooks/check-mcp-url.sh` sources `../yellow-core/lib/credential-status.sh` to publish credential status for `/setup:all`; skipped silently if absent | Optional (not declared in `plugin.json`) |
+None. The bundled server does not source yellow-core.
 
 ### Consuming Plugins
 
@@ -127,11 +101,8 @@ history mentions earlier yellow-review / yellow-semgrep / yellow-linear plans).
 
 ## Testing
 
-`bats tests/` from the plugin directory (`start-composio.bats`, wrapper
-precedence). The SessionStart hook `hooks/check-mcp-url.sh` (3s budget) must
-print `{"continue": true}` on every path, so it deliberately omits `set -e`.
-The wrapper `exec`s `node bin/composio-proxy.mjs`, so Node is a hard runtime
-requirement.
+No plugin-local shell suite. The bundled server is declarative HTTP.
+`pnpm validate:schemas` covers the generated manifest.
 
 ## Known Limitations
 
