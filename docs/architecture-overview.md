@@ -5,9 +5,11 @@ plus the validation and release tooling that gates it. There is no published
 application server. Claude Code (and, opt-in, Codex/Cursor) loads the plugins;
 this repository authors, validates, and versions them.
 
-Root catalog version lives in `package.json` (`pnpm validate:versions` gates
-drift). Toolchain: Node `>=22.22.0 <25`, pnpm `>=8` (CI pins Node `22.22.0` and
-pnpm `8.15.0`).
+Root catalog version lives in `package.json` (catalog snapshot authority;
+`node scripts/catalog-version.js` bumps it on release). `pnpm validate:versions`
+checks per-plugin `package.json` ↔ generated manifest/marketplace drift only —
+it never reads the root catalog version. Toolchain: Node `>=22.22.0 <25`, pnpm
+`>=8` (CI pins Node `22.22.0` and pnpm `8.15.0`).
 
 ---
 
@@ -196,8 +198,11 @@ flowchart LR
 
 No DI container. The TypeScript validator uses constructor injection
 (`SchemaValidator(factory?)`). Plugins compose by prompt + convention, not
-in-process imports (except yellow-cursor’s SDK CLI and yellow-goal’s process
-spawn).
+in-process Node imports (except yellow-cursor’s SDK CLI and yellow-goal’s
+process spawn). Runtime shell coupling does exist: research, Semgrep, and
+Composio SessionStart hooks source yellow-core’s `credential-status.sh`; debt,
+CI, ruvector, and goal source `validate-fs.sh` (required or best-effort per
+plugin).
 
 ---
 
@@ -347,9 +352,12 @@ failure.
 ### MCP and credentials
 
 Credential-bearing stdio MCP servers use `bin/` wrappers: `userConfig` wins,
-then shell env; empty string → that server’s tools are skipped, siblings keep
-running. Non-credential stdio servers launch directly (for example ruvector via
-`npx`, ast-grep via `uvx`, Graphite via `.mcp.json`).
+then shell env. Missing-key behavior varies by server — do not assume all absent
+credentials skip startup. Perplexity hard-fails at MCP start; Tavily and Exa
+still exec and return runtime errors on tool calls; Semgrep execs
+unconditionally; Morph lets morphmcp emit its own warning and exit. Siblings
+keep running when one server fails. Non-credential stdio servers launch directly
+(for example ruvector via `npx`, ast-grep via `uvx`, Graphite via `.mcp.json`).
 
 Morph’s wrapper is the install correctness gate (mkdir lock, 20s wait, `exec`
 morphmcp). The SessionStart prewarm is only a race-avoidance hint.
@@ -474,7 +482,9 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
   Morph prewarm, 10s ruvector Stop).
 - yellow-ci’s two `gh` calls share one 3s deadline minus a 400ms reserve; if
   budget is gone the call is skipped, not started.
-- ruvector: one transport retry; score < 0.5 discarded.
+- ruvector: one transport retry; the `memory-query` skill’s automatic recall
+  path discards results with score < 0.5 (user-facing `/ruvector:search` and
+  `semantic-search` still show low-score hits with a confidence warning).
 - MCP wrappers: no request retries; fail the child, leave the session up.
 - Compound drain: crashed work is requeued, not retried in-process.
 
