@@ -10,16 +10,17 @@ Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 
 This document provides a comprehensive catalog of all error codes used in the
 Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
-`NET`) map directly to specification requirements (FR-_ and CRIT-_ identifiers).
-Later categories (`SOL` through `CURSOR`) are owned by validator scripts and
-`errorCatalog.ts` without FR/CRIT ids. All categories share the same
+`NET`) map directly to specification requirements (`FR-*`, `CRIT-*`
+identifiers). Later categories (`SOL` through `CURSOR`) are owned by validator
+scripts and `errorCatalog.ts` without FR/CRIT ids. All categories share the same
 `ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
 
 ### Error Code Format
 
 Error codes follow the pattern: `ERROR-{CATEGORY}-{NUMBER}`
 
-- **CATEGORY**: Error domain (`SCHEMA`, `COMPAT`, `INST`, `DISC`, `PERM`, `NET`, `SOL`, `PLAN`, `SETUP`, `PROVIDER`, `NAMESPACE`, `CURSOR`, `DIST`)
+- **CATEGORY**: Error domain (`SCHEMA`, `COMPAT`, `INST`, `DISC`, `PERM`, `NET`,
+  `SOL`, `PLAN`, `SETUP`, `PROVIDER`, `NAMESPACE`, `CURSOR`, `DIST`)
 - **NUMBER**: Sequential identifier within category (001-999)
 
 ### Error Categories
