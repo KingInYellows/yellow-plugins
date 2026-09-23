@@ -255,7 +255,7 @@ for why that opt-out exists.
 
 ### Shared Libraries
 
-`lib/` also carries one Node module, invoked rather than sourced:
+`lib/` also carries four Node modules, invoked rather than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
   Classifies `claude plugin list --json` plus the repository's optional
@@ -267,6 +267,16 @@ for why that opt-out exists.
   cannot read `catalog/` at runtime; `scripts/validate-provider-groups.js`
   fails CI (`ERROR-PROVIDER-006`) when that replica drifts. Fixture coverage
   at `tests/integration/stack-provider-state.test.ts`
+- `stack-operation-registry.js` — maps each neutral `/stack:*` operation to
+  exactly one Graphite and one GitHub implementation, or `null` (unsupported
+  — callers stop, never try the other provider). Dependency-free; verified by
+  `tests/integration/stack-operation-registry.test.ts`
+- `stack-tooling-probe.js` — the single owner of provider CLI readiness (`gt`
+  on PATH; `gh auth status` plus a verified `github/gh-stack` extension).
+  Commands and skills call it instead of inlining readiness bash
+- `remote-agent-provider-state.js` — classifies which `remote-agent` provider
+  (yellow-cursor or yellow-devin) is active for `/linear:delegate`; a smaller
+  sibling of `stack-provider-state.js` with no intent file and no switch plan
 
 `lib/` otherwise contains sourceable shell helpers that consumer plugins
 reach via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`
@@ -293,6 +303,11 @@ cross-plugin pattern:
   `${CLAUDE_PLUGIN_DATA}` → `~/.cache/yellow-plugins/repo-profile/`.
   First consumer: `/flow:plan` Phase 2. Bats coverage at
   `plugins/yellow-core/tests/repo-profile.bats`
+- `plugin-identity.sh` — `pi_report <plugin>` prints JSON saying whether the
+  installed cache under `${CLAUDE_PLUGIN_ROOT}` matches or lags the current
+  checkout; always exits 0 and never installs anything. Used by the
+  `session-handoff` preflight. Bats coverage at
+  `plugins/yellow-core/tests/plugin-identity.bats`
 
 ### Optional Plugin Dependencies
 

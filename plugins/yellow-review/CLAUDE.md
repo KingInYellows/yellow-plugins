@@ -21,7 +21,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   in-scope finding with a confidence anchor and severity — no persona-side
   `< 75` filter. They cap at 40 findings; overflow is dropped silently and
   is not orchestrator-suppressed. Other persona reviewers still apply their
-  own anchor floors before Step 6 (including Wave 3 reviewers such as
+  own anchor floors before Step 6 (including
   `plugin-contract-reviewer`). `/review:pr` Step 6 and `/review:all`
   Step 8 item 9 (the Aggregate-findings confidence gate) are the sole
   gates for those four (suppress below 75 except P0 at 50+; count only
@@ -80,19 +80,18 @@ resolution, and sequential stack review. Graphite-native workflow.
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
 - `project-compliance-reviewer` — CLAUDE.md/AGENTS.md compliance, naming,
-  project-pattern adherence (always selected; renamed from `code-reviewer`
-  in Wave 2)
+  project-pattern adherence (always selected)
 - `correctness-reviewer` — Logic errors, edge cases, state bugs, error
-  propagation (always selected; new in Wave 2)
+  propagation (always selected)
 - `maintainability-reviewer` — Premature abstraction, dead code, coupling,
-  naming (always selected; new in Wave 2)
+  naming (always selected)
 - `reliability-reviewer` — Production reliability: error handling, retries,
-  timeouts, cascades (selected when diff touches I/O/async; new in Wave 2)
+  timeouts, cascades (selected when diff touches I/O/async)
 - `project-standards-reviewer` — Frontmatter, references, cross-platform
-  portability (always selected; new in Wave 2; complements
+  portability (always selected; complements
   `project-compliance-reviewer`)
 - `adversarial-reviewer` — Constructed failure scenarios across boundaries
-  (selected for diffs >200 lines or trust boundaries; new in Wave 2)
+  (selected for diffs >200 lines or trust boundaries)
 - `plugin-contract-reviewer` — Breaking changes to plugin public surface
   (subagent_type renames, command/skill/MCP-tool renames, manifest field
   changes, hook contract changes); selected when diff touches
@@ -100,22 +99,22 @@ resolution, and sequential stack review. Graphite-native workflow.
   `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or
   `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
   (yellow-core) — pattern-rec catches new convention drift,
-  plugin-contract catches breaks to existing surface. New in Wave 3.
+  plugin-contract catches breaks to existing surface.
 - `cli-readiness-reviewer` — Conditional persona that reviews CLI command
   surface for autonomous-agent invocability (interactive prompts without
   bypass, missing structured output, vague errors, unsafe retries, ANSI
   in pipes). Selected on the same plugin-authoring globs as
-  `plugin-contract-reviewer`; concerns are disjoint. New in Wave 3.
+  `plugin-contract-reviewer`; concerns are disjoint.
 - `agent-cli-readiness-reviewer` — Conditional persona using a 7-principle
   Blocker/Friction/Optimization rubric for CLI agent-readiness (non-interactive
   defaults, structured output, actionable errors, safe retries, bounded
   output, composability, discoverability). Adapted from upstream CE
   v3.3.2; deeper than `cli-readiness-reviewer` for design-doc audits and
-  full-CLI evaluations. New in Wave 3.
+  full-CLI evaluations.
 - `agent-native-reviewer` — Conditional persona reviewing agent-native
   parity: every UI action has an agent tool equivalent, agents see the
   same data users see, shared workspace, primitives over workflows,
-  dynamic context injection. Adapted from upstream CE v3.3.2. New in Wave 3.
+  dynamic context injection. Adapted from upstream CE v3.3.2.
 - `thermonuclear-reviewer` — **Opt-in only, never auto-selected.** Strict
   structural-quality lane: code-judo restructurings, spaghetti-condition
   growth, weak type/module boundaries, misplaced ownership, evidence-gated
@@ -150,14 +149,17 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (2)
+### Scripts (3)
 
 - `get-pr-comments` — Fetch unresolved, non-outdated PR review threads via
   GitHub GraphQL API
 - `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
   mutation
+- `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
+  changed file for `thermonuclear-reviewer`'s size-threshold rule; the
+  header and footer rows are its completeness signal
 
-Both live at `skills/pr-review-workflow/scripts/` and are invoked as
+All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
 
 ## When to Use What
@@ -229,7 +231,7 @@ degrade — only yellow-review's own agents run.
 ### Prompt cache TTL
 
 Five always-run `/review:pr` agents set `experimental.cacheTtl: 1h` in
-frontmatter (nested under `experimental:`): the four Wave 2 always-selected
+frontmatter (nested under `experimental:`): the four always-selected
 reviewers (`project-compliance-reviewer`, `correctness-reviewer`,
 `maintainability-reviewer`, `project-standards-reviewer`) and the final-pass
 `code-simplifier`. Conditional personas are intentionally omitted — they

@@ -12,7 +12,8 @@ second source of truth.
   and SHA-256 live there too). `/goal:setup` fail-closes on missing binary
   (`GOAL_ENGINE_MISSING`) or `engineVersion` mismatch
   (`GOAL_ENGINE_VERSION_MISMATCH`). `tests/release-pin.test.ts` keeps
-  `scripts/verify-goal-release.sh` in agreement with the pin.
+  the repo-root `scripts/verify-goal-release.sh` (not this plugin's own
+  `scripts/`) in agreement with the pin.
 - Consumer CLI: `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js` — one JSON object on
   stdout, diagnostics on stderr, exit 0 / 1 / 2.
 - Engine argv is always an array (`spawnSync`, `shell: false`), with a 30-second
