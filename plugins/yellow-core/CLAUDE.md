@@ -303,9 +303,15 @@ cross-plugin pattern:
   `${CLAUDE_PLUGIN_DATA}` → `~/.cache/yellow-plugins/repo-profile/`.
   First consumer: `/flow:plan` Phase 2. Bats coverage at
   `plugins/yellow-core/tests/repo-profile.bats`
-- `plugin-identity.sh` — `pi_report <plugin>` prints JSON saying whether the
-  installed cache under `${CLAUDE_PLUGIN_ROOT}` matches or lags the current
-  checkout; always exits 0 and never installs anything. Used by the
+- `plugin-identity.sh` — `pi_report <plugin>` prints JSON comparing the
+  installed cache's `plugin.json` version (under `${CLAUDE_PLUGIN_ROOT}`)
+  with the checkout's `package.json` version; `identity` is
+  `matches-checkout` (equal versions), `cache-lags-checkout`,
+  `cache-ahead-of-checkout`, `no-checkout` (no checkout tree found), or
+  `unknown`. "Matches" means the version strings agree — not that cached
+  files match the checkout. `cache_commit` comes from
+  `installed_plugins.json` for observability and is not compared with the
+  checkout. Always exits 0 and never installs anything. Used by the
   `session-handoff` preflight. Bats coverage at
   `plugins/yellow-core/tests/plugin-identity.bats`
 
