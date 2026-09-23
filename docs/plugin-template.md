@@ -174,7 +174,8 @@ Do not hand-edit `.claude-plugin/marketplace.json` or
    and `marketplace.source` of `./plugins/my-plugin`). Field rules are in
    `catalog/README.md`.
 2. Append `"my-plugin"` to `pluginOrder` in `catalog/catalog.json`.
-3. Run `pnpm generate:manifests`.
+3. From the workspace root, run `pnpm generate:manifests` (`cd ../..` if you
+   are still in `plugins/my-plugin`, or `pnpm -w run generate:manifests`).
 
 The generator writes a marketplace root with `$schema`, `name`,
 `description`, `owner`, `metadata`, and `plugins`. There is no
