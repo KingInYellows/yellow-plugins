@@ -271,9 +271,12 @@ for why that opt-out exists.
   exactly one Graphite and one GitHub implementation, or `null` (unsupported
   — callers stop, never try the other provider). Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
-- `stack-tooling-probe.js` — the single owner of provider CLI readiness (`gt`
-  on PATH; `gh auth status` plus a verified `github/gh-stack` extension).
-  Commands and skills call it instead of inlining readiness bash
+- `stack-tooling-probe.js` — the shared owner of provider CLI readiness
+  (`gt` on PATH; `gh auth status` plus a verified `github/gh-stack`
+  extension). `/stack:status`, `stack-provider-router`, and github-workflow's
+  `github-stack-status` / `github-stack-setup` call it. Exception:
+  `commands/setup/all.md`'s dashboard still inlines its own `gt` / `gh`
+  checks, so a readiness change must update it too
 - `remote-agent-provider-state.js` — classifies which `remote-agent` provider
   (yellow-cursor or yellow-devin) is active for `/linear:delegate`; a smaller
   sibling of `stack-provider-state.js` with no intent file and no switch plan

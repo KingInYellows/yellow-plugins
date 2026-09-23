@@ -245,8 +245,9 @@ just one. There is no fresh-machine install CI (see Known Limitations).
   `is_narrow_key_line()` in `skills/council-patterns/SKILL.md` (history in
   `CHANGELOG.md`). Still open: bodies wrapped under 12 characters behind a
   prose-sharing BEGIN; runs of equal-width camelCase tokens right after a
-  key-shaped line; a first post-mention slice with no digit or non-hex
-  character; keys over 400 lines; and serializer-wrapped bodies whose lines
+  key-shaped line; a 12–19-character first post-mention slice that lacks
+  either required class — one from `[0-9+/=]` or one from `[G-Zg-z+/=]`
+  (e.g. no digit, or hex letters only); keys over 400 lines; and serializer-wrapped bodies whose lines
   carry quotes or pipes (OpenCode `--format json` strings, markdown table
   cells). Normalizing those wrappers was tried and reverted — it promoted
   ordinary mentions to real keys and swallowed the reviewer's `Verdict:`
