@@ -414,7 +414,9 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       count wiring lands. Do not record those three rows against the
       reviewer PR: 1.3.7 fail-closed-suppresses size findings when the
       block is absent.
-      **Handed off to #774 (2026-09-23)** — ticked as handed off, not as done: the fixture sign-off needs the fixture eval, which has not been run; tracked there, not claimed done here.
+      **Handed off to #774 (2026-09-23)** — ticked as handed off, not as done:
+      the fixture sign-off needs the fixture eval, which has not been run;
+      tracked there, not claimed done here.
 - [x] 1.4.2 **Do not** add a row to the always-on table (`review-pr.md:327-337`)
       or the conditional table (`339-358`) — either would auto-trigger it and
       defeat opt-in (F5).
@@ -433,14 +435,19 @@ Branch `agent/feat/thermonuclear-reviewer`, title
       confidence-gating prose). 1.3.8 forbids a persona-side cutoff, but the
       operational prompt still names only the three #743 recall personas;
       without this task the new agent contradicts that list.
-      **Done, verified 2026-09-23** (paths under `plugins/yellow-review/`): named in the no-prefilter list at `commands/review/review-pr.md:855`, `CLAUDE.md:20`, `README.md:129`; `review-all.md`'s confidence gate (Step 9) carries no persona list, so there is no fifth site.
+      **Done, verified 2026-09-23** (paths under `plugins/yellow-review/`):
+      named in the no-prefilter list at `commands/review/review-pr.md:855`,
+      `CLAUDE.md:20`, `README.md:129`; `review-all.md`'s confidence gate
+      (Step 9) carries no persona list, so there is no fifth site.
 - [x] 1.4.6 **Legacy incompatibility (selected outcome):** do **not** dispatch
       `thermonuclear-reviewer` under `review_pipeline: legacy`. That fallback
       has a fixed persona list and never reads `reviewer_set`. Document the
       incompatibility in 1.5.1/1.5.2 and in Edge Cases: an include naming
       this reviewer is a no-op in legacy mode. Do not add a legacy dispatch
       path.
-      **Done, verified 2026-09-23** (paths under `plugins/yellow-review/`): documented in `references/review-pr/legacy-fallback.md:29-38`, `README.md:116`, `CLAUDE.md:127`; no legacy dispatch path exists.
+      **Done, verified 2026-09-23** (paths under `plugins/yellow-review/`):
+      documented in `references/review-pr/legacy-fallback.md:29-38`,
+      `README.md:116`, `CLAUDE.md:127`; no legacy dispatch path exists.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The four-site checklist is **incomplete — there is a fifth**.
@@ -556,7 +563,9 @@ Kept separate so host compatibility rests on smoke-test evidence, not assertion.
       Non-blocking by the Testing Strategy table above ("No — release gate
       by review"), so #770 merges with this box open rather than ticked;
       it stays unchecked because the tests were never run.
-      **Handed off to #774 (2026-09-23)** — supersedes "stays unchecked" above: the box is ticked only as handed off so this plan can archive; the smoke tests are still not run (need Cursor/Codex hosts) and stay open in #774.
+      **Handed off to #774 (2026-09-23)** — supersedes "stays unchecked" above:
+      the box is ticked only as handed off so this plan can archive; the smoke
+      tests are still not run (need Cursor/Codex hosts) and stay open in #774.
 
 ## Technical Details
 
