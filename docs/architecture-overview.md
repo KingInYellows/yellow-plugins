@@ -218,8 +218,11 @@ plus generated host artifacts.
 | `.agents/plugins/` + `.codex-plugin/`              | Codex CLI                               | Generated; `codex plugin marketplace add`                                           |
 | `.cursor-plugin/`                                  | Cursor editor                           | Generated, fail-closed; only `yellow-cursor` and `yellow-review`                    |
 
-Plugins are not published to npm. `plugins/*/package.json` exists for Changesets
-versioning only.
+Plugins are not published to npm. For most plugins, `plugins/*/package.json` is
+the Changesets version authority only. Exceptions: `yellow-cursor` and
+`yellow-goal` also define workspace `build` / `typecheck` / `test` scripts
+invoked by root CI; yellow-cursor additionally declares its runtime
+`@cursor/sdk` dependency.
 
 ### Authoring → generate → commit
 
@@ -385,17 +388,21 @@ the prompt.
 
 ### In-turn and background hooks
 
-yellow-ruvector: `UserPromptSubmit` (recall), `PreToolUse` / `PostToolUse` on
-Edit/Write/Bash (1s), `Stop` flush (10s).
+yellow-ruvector: `UserPromptSubmit` (recall), `PreToolUse` / `PostToolUse` /
+`PostToolUseFailure` on Edit/Write/MultiEdit/Bash (1s; same post-tool script for
+success and failure), `Stop` flush (10s).
 
 Compound pipeline (yellow-core):
 
 1. Stop (<500ms): if not re-entrant and not a drain session, disown transcript
    capture into `pending/*.jsonl`.
-2. Next SessionStart: threshold (pending ≥5 or oldest >48h, or crashed
-   `processing/` >60 min) → drain lock → async `claude -p`.
-3. Stale `processing/` files requeue under the lock. Interactive path:
-   `/compound:review-staged`.
+2. Next SessionStart, threshold met (pending ≥5 or oldest >48h): acquire drain
+   lock → requeue any crashed `processing/` entries → async `claude -p`.
+3. Next SessionStart, threshold not met but `processing/` has an entry >60 min
+   old: acquire drain lock, requeue that entry back to `pending/`, release the
+   lock, and exit (`REQUEUE_ONLY=1` — no `claude -p` yet). Recovery waits for a
+   later SessionStart that meets the dispatch threshold.
+4. Interactive path: `/compound:review-staged` (skips threshold check).
 
 PreCompact tells the summarizer to keep, verbatim: active plan + unchecked
 tasks, files touched, user decisions, open questions, last failing command,
