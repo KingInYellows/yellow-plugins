@@ -238,43 +238,22 @@ just one. There is no fresh-machine install CI (see Known Limitations).
   enforceable read-only tool policy flag, adopt it here and retire this
   limitation. Treat any unexpected file mutation after a council run as a
   bug report for this plugin.
-- **A key wrapped by a serializer leaks its tail; a key that merely shares
-  its BEGIN line with prose no longer does.** Redaction classifies once, at
-  BEGIN time: a marker that is the whole line (after decoration stripping)
-  is a real key and is redacted unbounded; anything else is treated as a
-  mention and runs under the bounded window, which releases after three
-  non-key-shaped lines. `leaked key: -----BEGIN PRIVATE KEY-----` lands on
-  that bounded path, and until 2026-09-09 a body wrapped narrower than the
-  20-character base64 floor released the window and printed the rest of the
-  key and its END marker (a real 2048-bit key wrapped at 12 characters leaked
-  134 of 136 body lines). The bounded path now counts a 12-to-19 character
-  line as key material when it carries a digit, `+`, `/` or `=` AND a
-  character outside the hex alphabet (`is_narrow_key_line()` in
-  `skills/council-patterns/SKILL.md`, the canonical), and a pure base64 line
-  of the width the last key-shaped line established continues the body
-  unless it reads as a plain word (one optional capital, then lowercase);
-  the same rules re-arm the window after a decoy END, but only while the
-  chain is unbroken, so prose after a genuine END closes it; the span cap
-  is 400 lines. Measured over 25 real 2048-bit keys at every width from 12
-  to 19: 0 leaked lines. What remains open: bodies wrapped under 12
-  characters whose BEGIN shares its line with prose (a bare BEGIN inside a
-  prose-opened window now re-runs the entry test and starts a real block,
-  so that shape is redacted at any width); a run of equal-width mixed-case tokens (camelCase
-  identifiers, not words) directly after a key-shaped line, which keeps the
-  bounded window open until three plain lines follow; the
-  first slice after a mention when it carries no digit or hex characters
-  only, since the width chain has not started yet; keys longer than 400
-  lines; and serializer-wrapped shapes whose body lines carry quotes or
-  pipes — a JSON string (`"-----BEGIN PRIVATE KEY-----",`, which OpenCode's
-  `--format json` can produce) and a markdown table cell — because those
-  lines fail the base64 test at any width. A revision that normalized those
-  shapes was reverted: keying "real key" off matched quote/table wrappers
-  promoted ordinary MENTIONS to real keys, and real mode never resets until
-  END or EOF, so one `- "<marker>"` bullet swallowed `Verdict:`/
-  `Confidence:`/`Summary:` and scored the reviewer UNKNOWN. Both directions
-  are attacker-reachable. Any change to the rule is made in SKILL.md, is
-  re-extracted into the four carriers (see Conventions), and needs a
-  fixture for each direction in `tests/redaction.bats` first.
+- **Private-key redaction has known leak shapes.** Redaction classifies at
+  BEGIN time: a marker that is the whole line is a real key (redacted until
+  END); a marker sharing its line with prose opens a bounded window that
+  closes after three non-key-shaped lines. The canonical rule is
+  `is_narrow_key_line()` in `skills/council-patterns/SKILL.md` (history in
+  `CHANGELOG.md`). Still open: bodies wrapped under 12 characters behind a
+  prose-sharing BEGIN; runs of equal-width camelCase tokens right after a
+  key-shaped line; a 12–19-character first post-mention slice that lacks
+  either required class — one from `[0-9+/=]` or one from `[G-Zg-z+/=]`
+  (e.g. no digit, or hex letters only); keys over 400 lines; and serializer-wrapped bodies whose lines
+  carry quotes or pipes (OpenCode `--format json` strings, markdown table
+  cells). Normalizing those wrappers was tried and reverted — it promoted
+  ordinary mentions to real keys and swallowed the reviewer's `Verdict:`
+  block. Both directions are attacker-reachable: change the rule in SKILL.md,
+  re-extract it into all four carriers (see Testing), and add a
+  `tests/redaction.bats` fixture for each direction first.
 - **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
   tool permission request, including writes (same class as the retired
   gemini `--yolo`). yellow-council MUST NOT use it.
@@ -298,28 +277,9 @@ just one. There is no fresh-machine install CI (see Known Limitations).
   exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run
   `opencode run "test"` once interactively after each upgrade before relying
   on the agent for time-bounded invocations.
-- **Single-shot V1.** No multi-round iterative review. V2 will add `--round 2`
-  for follow-up consultations and `/council fleet *` subcommands for persistent
-  session management.
-
-## V2 Trajectory
-
-V1 is the on-demand single-shot foundation. V2 evolves toward GodModeSkill's
-native model:
-
-1. **XML evidence contract.** Reviewer output schema tightens from markdown
-   `Verdict:` / `Findings:` to GodModeSkill's `<file-path>` / `<line-number>`
-   / `<quoted-line><![CDATA[...]]></quoted-line>` evidence format.
-2. **Lineage-weighted quorum aggregation.** V1's raw count + verbatim
-   presentation gets replaced with quorum logic (agreement requires ≥1
-   reviewer from each enabled lineage; quote-unverified findings are
-   downgraded).
-3. **Multi-round iterative review.** `/council review --round 2` injects V1
-   output as prior context with round-aware trimming.
-4. **Fleet management subcommand surface.** `/council fleet status`,
-   `/council fleet restart`, persistent tmux-style session management.
-5. **`## DONE` event-driven waiting.** `inotifywait`-equivalent waiting for
-   reviewer output instead of subprocess-blocking timeout.
+- **Single-shot V1.** No multi-round iterative review. Deferred V2 features
+  (evidence contract, quorum aggregation, `--round 2`, `/council fleet`) are
+  listed once, in `commands/council/council.md` "V2 Trajectory".
 
 ## Attribution
 

@@ -315,32 +315,13 @@ Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `codex/skills/<name>/references/*.md` (flat reference sidecars copied
 verbatim alongside an allowlisted SKILL.md — currently gt-cleanup's three).
 
-A second live round-trip (2026-07-27, codex-cli 0.144.6, isolated
-`CODEX_HOME`, authenticated gpt-5.4 session) verified reference-stub
-following: all three `codex/skills/gt-cleanup/references/*.md` files were
-byte-identical at the install path, and a live session asked for the
-`CLOSED_NOT_MERGED` jq filter followed the "located in this skill's
-directory" Read stub and quoted content that exists only in
-`references/pr-status-lookups.md`.
-
-A live `codex plugin add` install/inspect/uninstall round-trip (codex-cli
-0.144.6, isolated `CODEX_HOME`) confirmed: the plugin installs cleanly from
-a local marketplace; all eleven `codex/skills/*/SKILL.md` files, the
-`.codex-plugin/plugin.json` manifest, and `.mcp.json` are byte-identical to
-the committed generated artifacts at the installed path;
-`hooks/codex-hooks.json` correctly references `entrypoint-codex.js`; and
-`codex mcp list` shows the `graphite` server as `enabled` — the Codex-side
-`mcpServers` manifest pointer this shell added to `buildCodexPluginManifest`
-does cause Codex to discover the shared `.mcp.json`, resolving that prior
-uncertainty.
-
-One syntax gap remains unverified — no Codex auth credentials were
-available in the environment that ran the round-trip (confirmed via
-`codex doctor`), so a live authenticated model session was out of reach:
-the exact `worker`/`explorer` built-in-agent delegation syntax a skill body
-uses (`audit-review`'s Codex dispatch section). This is called out in the
-PR description's manual Codex-app acceptance checklist rather than assumed
-to work.
+Live `codex plugin add` round-trips (codex-cli 0.144.6, isolated
+`CODEX_HOME`) verified the install: generated artifacts are byte-identical at
+the install path, reference stubs resolve, and the Codex manifest's
+`mcpServers` pointer makes Codex discover the shared `.mcp.json`. Still
+unverified: the `worker`/`explorer` built-in-agent delegation syntax in
+`audit-review`'s Codex dispatch section — treat it as untested until an
+authenticated Codex session exercises it.
 
 ## Stack Decomposition Format
 
