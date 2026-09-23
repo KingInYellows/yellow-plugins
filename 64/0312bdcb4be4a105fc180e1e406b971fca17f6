@@ -1,0 +1,42 @@
+.changeset/composio-default-mcp-url.md
+  h_6000354274ce50 1-11
+README.md
+  h_6000354274ce50 63
+catalog/plugins/yellow-composio.json
+  h_6000354274ce50 11,15-16
+docs/security.md
+  h_6000354274ce50 159
+plugins/yellow-composio/.claude-plugin/plugin.json
+  h_6000354274ce50 23-24
+plugins/yellow-composio/CLAUDE.md
+  h_6000354274ce50 20-32,35-40,43-48,54-58,62,119-123
+plugins/yellow-composio/README.md
+  h_6000354274ce50 33-52,73-76,110-111,131-134
+plugins/yellow-composio/bin/composio-proxy.mjs
+  h_6000354274ce50 8-10,13-14,59
+plugins/yellow-composio/bin/start-composio.sh
+  h_6000354274ce50 3-5,11,14-17,27-29,39
+plugins/yellow-composio/commands/composio/setup.md
+  h_6000354274ce50 68-71,83-84,87-91,130-133,135,157-160,163-178,195-196,201,244-246
+plugins/yellow-composio/hooks/check-mcp-url.sh
+  h_6000354274ce50 5-11,16,34,68,70,75-77,81,86
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  h_6000354274ce50 33-34,287-293,295-302
+plugins/yellow-composio/tests/start-composio.bats
+  h_6000354274ce50 2,5,16,22,25,28,31,34,36-49,54,69
+plugins/yellow-core/commands/setup/all.md
+  h_6000354274ce50 120-124,621-627,629-631,650-657
+plugins/yellow-core/skills/multi-host-fleet/SKILL.md
+  h_6000354274ce50 25-26,62-63,83-84,117-119,208-209,241-243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "640312bdcb4be4a105fc180e1e406b971fca17f6",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
