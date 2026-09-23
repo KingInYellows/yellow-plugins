@@ -35,7 +35,7 @@ Every `claude` invocation runs under a fresh `mktemp -d` with `HOME`,
 - `CLAUDE_CONFIG_DIR` is the **load-bearing** variable — it relocates both the
   config **and** the plugin install cache
   (`<TMP>/.claude/plugins/cache/<marketplace>/<plugin>/<version>`).
-- A full all-19 isolated install leaves the real `claude plugin list` and
+- A full all-18 isolated install leaves the real `claude plugin list` and
   `claude plugin marketplace list` **byte-identical** before and after.
 
 The T1 tier snapshots the real lists before installing and re-checks them
