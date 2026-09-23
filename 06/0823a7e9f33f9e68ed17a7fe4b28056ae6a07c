@@ -1,0 +1,22 @@
+docs/plugin-credential-status-protocol.md
+  h_6000354274ce50 174-177
+docs/security.md
+  h_6000354274ce50 12,42,46-49,55-58,118,229
+docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md
+  h_6000354274ce50 43-46
+plugins/yellow-composio/commands/composio/status.md
+  h_6000354274ce50 136-143
+plugins/yellow-core/commands/setup/all.md
+  h_6000354274ce50 354,360,368,622-631,633
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "060823a7e9f33f9e68ed17a7fe4b28056ae6a07c",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
