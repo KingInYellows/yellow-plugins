@@ -1,0 +1,21 @@
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_1c6fc0fcc3d347::t_23048783c1bd44 259-263,270-272
+plans/complete/workflows-to-flow-namespace-migration.md
+  s_1c6fc0fcc3d347::t_65f95990b10121 621
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "11a6b031c5bb765c882871224c8a17a991fc52c4",
+  "prompts": {},
+  "sessions": {
+    "s_1c6fc0fcc3d347": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8ba5b03-ba39-4da1-8496-d96367c13312",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
