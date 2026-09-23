@@ -262,7 +262,9 @@ depth and any link written relative to `plans/` needs an extra `../`.
 
 ```bash
 # Before `git mv plans/<slug>.md plans/complete/<slug>.md`:
-rg -l --fixed-strings "plans/<slug>.md" .
+# git grep searches every tracked file, including hidden paths such as
+# .github/ and .claude-plugin/ that plain rg skips by default.
+git grep -l --fixed-strings "plans/<slug>.md"
 rg -n '\]\(\.\./' plans/<slug>.md
 ```
 
