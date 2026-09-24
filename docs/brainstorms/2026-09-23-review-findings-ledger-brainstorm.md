@@ -347,13 +347,17 @@ For `/flow:plan` to pick up, in dependency order:
    `report_only`), `applied` transitions after Step 7, and the simplifier's
    findings after Step 8, appending `reopened` when a write step re-observes a
    `fixed`, `stale`, or no-longer-applicable `dismissed` finding, refreshing
-   `<pr>.pending` after each append, and an `applied` transition carrying the
-   fixing SHA right after Step 9 commits, before submission. Making `rule`
-   required means every producer must emit it in the same change: every reviewer
-   that emits the compact-return schema (yellow-review's personas and the
-   yellow-core ones `review-pr.md` dispatches), and Step 6's legacy
-   prose-to-compact converter (which assigns an explicit `unclassified` rule
-   rather than dropping the finding). Otherwise `review-pr.md` drops every
+   `<pr>.pending` after each append, an `applied` transition carrying the fixing
+   SHA right after Step 9 commits, before submission, and, once submission
+   succeeds, a third `applied` carrying the published head SHA followed by
+   `fixed` when the ancestor check against the remote PR head
+   (`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`) passes,
+   so a published fix leaves the pending count without waiting for a manual
+   triage. Making `rule` required means every producer must emit it in the same
+   change: every reviewer that emits the compact-return schema (yellow-review's
+   personas and the yellow-core ones `review-pr.md` dispatches), and Step 6's
+   legacy prose-to-compact converter (which assigns an explicit `unclassified`
+   rule rather than dropping the finding). Otherwise `review-pr.md` drops every
    return that lacks the field. The closed per-category `rule` vocabulary ships
    in this step too. The same producers also emit a required `scope` field (the
    enclosing symbol or AST path the reviewer is looking at, e.g.
