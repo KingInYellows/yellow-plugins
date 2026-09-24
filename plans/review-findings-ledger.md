@@ -546,18 +546,18 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 1: Ledger library and schema
 
-- [ ] 1.1: Create `plugins/yellow-review/lib/review-ledger.sh`: LF endings,
+- [x] 1.1: Create `plugins/yellow-review/lib/review-ledger.sh`: LF endings,
       written via heredoc, `set -uo pipefail`, executable. Set up subcommand
       dispatch, exit codes and the stderr prefix from Technical Specifications.
-- [ ] 1.2: Resolve the ledger dir and validate the PR key. Add `rl_lock` (per-PR
+- [x] 1.2: Resolve the ledger dir and validate the PR key. Add `rl_lock` (per-PR
       `<pr>.lock`, `flock -w 10`), `umask 077`, and single-`printf` appends
       (P5).
-- [ ] 1.3: `rl_repair_tail` runs under the lock before any append or fold. If
+- [x] 1.3: `rl_repair_tail` runs under the lock before any append or fold. If
       the tail is valid JSON, it adds the missing final newline. Otherwise it
       quarantines the tail to `.corrupt-<ts>` and truncates to the last newline.
-- [ ] 1.4: `rl_validate_path` with `anchor|dependency|restore` modes (CLAUDE-44,
+- [x] 1.4: `rl_validate_path` with `anchor|dependency|restore` modes (CLAUDE-44,
       45, 47), using NUL-safe `git ls-tree -z` and mode parsing.
-- [ ] 1.5: `rl_redact` sources yellow-core `compound-staging.sh`, guarded by
+- [x] 1.5: `rl_redact` sources yellow-core `compound-staging.sh`, guarded by
       `command -v cs_redact_secrets`, then runs the fail-closed pass. If the
       source is missing, it withholds everything (P3). A snapshot line that
       fails redaction keeps only its hash and line hint.
@@ -574,11 +574,11 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 1.6: `review-ledger-vocab.json`, `rl_normalize_category` and
+- [x] 1.6: `review-ledger-vocab.json`, `rl_normalize_category` and
       `rl_validate_rule`.
-- [ ] 1.7: `rl_verify_scope` (CLAUDE-49): a markdown awk heading stack, a
+- [x] 1.7: `rl_verify_scope` (CLAUDE-49): a markdown awk heading stack, a
       universal-ctags path with a 2 s timeout, and an `unscoped` fallback.
-- [ ] 1.8: `rl_map_line` (`git diff -U0` hunk arithmetic) and `rl_occurrence`
+- [x] 1.8: `rl_map_line` (`git diff -U0` hunk arithmetic) and `rl_occurrence`
       (CLAUDE-46).
 
 <!-- deepen-plan: external -->
@@ -602,15 +602,15 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 1.9: `rl_fingerprint`, the `finding_id` mint, and the dedup cascade: exact
+- [x] 1.9: `rl_fingerprint`, the `finding_id` mint, and the dedup cascade: exact
       match first, then an occurrence or line-map sibling, then an alias. An
       alias has the same file, category, rule and scope, with similarity ≥ 0.8
       on normalized lines within ±40 lines of the mapped hint.
-- [ ] 1.10: Subcommands `observe`, `transition` (edge table), `fold` (with
+- [x] 1.10: Subcommands `observe`, `transition` (edge table), `fold` (with
       `category_split`), `dismissed-context`, `reverify`, `publication`,
       `prune`, `record-state` and `summary`. Sidecars refresh via tmp+`mv`;
       tombstone and reopen handling.
-- [ ] 1.11: `plugins/yellow-review/tests/review-ledger.bats` plus
+- [x] 1.11: `plugins/yellow-review/tests/review-ledger.bats` plus
       `tests/helpers/ledger-repo.bash`. The helper builds a temp repo with a
       bare "origin" and reuses `tests/mocks/gh`, extended to answer
       `pr view --json state,headRefOid,baseRefOid`. The suite declares
@@ -645,7 +645,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 1.12: Add the non-optional `yellow-core` dependency (P3) to
+- [x] 1.12: Add the non-optional `yellow-core` dependency (P3) to
       `catalog/plugins/yellow-review.json`. Run `pnpm generate:manifests`, then
       refresh the characterization snapshot:
       `pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`.
@@ -661,7 +661,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 1.13: Add a "Library" entry to `plugins/yellow-review/CLAUDE.md`; the
+- [x] 1.13: Add a "Library" entry to `plugins/yellow-review/CLAUDE.md`; the
       library is internal and not user-facing yet. Changeset: `yellow-review`
       patch.
 
@@ -1203,3 +1203,14 @@ behaviour, so every PR passes the CI gate on its own.
   plugins/yellow-review/CLAUDE.md, .changeset/review-ledger-session-hook.md
 - **Tasks:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
 - **Depends on:** #5
+
+## Stack Progress
+
+<!-- Updated by flow:work. Do not edit manually. -->
+
+- [x] 1. agent/feat/review-ledger-lib (completed 2026-09-24)
+- [ ] 2. agent/feat/review-rule-scope-fields
+- [ ] 3. agent/feat/review-ledger-persistence
+- [ ] 4. agent/feat/review-triage-command
+- [ ] 5. agent/feat/review-sweep-ledger
+- [ ] 6. agent/feat/review-ledger-session-hook
