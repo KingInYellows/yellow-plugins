@@ -208,8 +208,9 @@ For `/flow:plan` to pick up, in dependency order:
    function (`file` + `category` + whitespace-normalized code-context hash; line
    kept as a rematch hint, `reviewer` stored but not keyed), dedup/state-check
    function, dismissed-findings reader (for context injection), prune-on-close
-   function, and a per-PR `findings/<pr>.pending` sidecar (single ASCII integer)
-   refreshed after folding the JSONL by `finding_id` to latest state. Include a
+   function, and a per-PR `findings/<pr>.pending` sidecar (`<count> <bytes>` —
+   open count plus the JSONL byte size it was computed from) refreshed after
+   folding the JSONL by `finding_id` to latest state. Include a
    test fixture with two distinct findings anchored to the same code, and one
    that moves lines without changing, to validate collision and rematch behavior
    before shipping. This is the one piece everything else depends on.
