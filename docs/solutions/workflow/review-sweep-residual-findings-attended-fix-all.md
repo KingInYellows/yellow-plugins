@@ -56,20 +56,33 @@ already-actionable guidance** for anyone running a sweep before the ledger and
 
 ## Guidance
 
-When running `/review:sweep-all` (or `/review:pr`) **attended** — a human is
-present and reviewing the transcript in real time — do not stop at `safe_auto`
-findings. Apply every verified finding the review surfaces, regardless of
-`autofix_class`. The `safe_auto`/`gated_auto`/`manual` gate exists to protect
-_unattended_ runs where no human can catch a bad auto-apply; a present human
-already provides that safety function, so gating them too just guarantees the
-finding is lost with no compensating safety benefit.
+For an interactive `/review:pr` run without `--non-interactive`, define an
+attended run as one where a human reviews and explicitly approves each verified
+change before it is applied. This approval bypasses the default P0/P1 `safe_auto`
+gate for approved P2/P3, `gated_auto`, and `manual` findings. Do not use this
+override inside the `--non-interactive` sweep loop that `/review:sweep` and
+`/review:sweep-all` invoke — those commands accept only one initial
+confirmation, then run with no per-change approval.
 
-Concretely, during this sweep: PR #840 had all 10 residual findings applied and
-pushed in a single commit (doc accuracy fixes, `validate-doc-counts.js` hardened
-to fail on missing `SCAN_FILES` entries and to match counts split across wrapped
-lines, plus tests) rather than left as `manual`/`gated_auto` residue. PR #843
-(16 findings, including several release-process hazards) and PR #853
-(doc-accuracy + a stale CI remediation message) followed the same pattern.
+The override applies in two places:
+
+1. **Interactive `/review:pr`** — the default path already gates push (and
+   optional learning saves) through `AskUserQuestion`; extend that to cover
+   each residual P2/P3, `gated_auto`, or `manual` finding the human asks to
+   fix.
+2. **The orchestrating session after a `/review:sweep-all` loop** — once every
+   PR has been swept non-interactively, the human can ask the session to fix
+   verified residuals. The session verifies each finding against current code,
+   shows the diff summary and validation results, and pushes only on the
+   human's go-ahead.
+
+Concretely, during the 2026-09-24 sweep follow-up: PR #840 had 9 of 10
+residual findings applied and pushed in a single commit (doc accuracy fixes,
+`validate-doc-counts.js` hardened to fail on missing `SCAN_FILES` entries and
+to match counts split across wrapped lines, plus tests); one adversarial claim
+verified as a non-issue and was skipped. PR #843 (16 findings, including
+several release-process hazards) and PR #853 (doc-accuracy + a stale CI
+remediation message) followed the same pattern.
 
 ## Why This Matters
 
@@ -86,11 +99,15 @@ design gap).
 
 ## When to Apply
 
-- Any attended `/review:pr` or `/review:sweep`/`/review:sweep-all` run, today,
-  before the ledger + `/review:triage` land.
-- Does not apply to unattended/non-interactive sweep invocations — those should
-  keep the existing `safe_auto`-only gate until the ledger exists to catch what
-  they leave behind.
+- Any interactive `/review:pr` run, today, before the ledger + `/review:triage`
+  land.
+- The post-loop orchestrating session after `/review:sweep-all`, when the human
+  explicitly asks for residual findings to be fixed — with per-finding
+  verification, diff summary, validation, and push approval as above.
+- It does not apply inside the `--non-interactive` sweep loop that
+  `/review:sweep` and `/review:sweep-all` invoke; those keep the existing
+  `safe_auto`-only gate until the ledger exists to catch what they leave
+  behind.
 - Once `/review:triage` ships, re-check this doc against the brainstorm's locked
   decisions — the attended-fix-all behavior is meant to move from "manual
   practice" to the tool's own documented semantics (Key Decision #3), and this
