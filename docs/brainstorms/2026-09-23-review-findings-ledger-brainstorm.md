@@ -153,8 +153,9 @@ That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
 or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
 component that touches the file (read + append other transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
-and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
-end.
+`sweep.md` optionally invoking `/review:triage --non-interactive` at the end, and
+`sweep-all.md` invoking `/review:triage --prune <pr>` for ledgers whose PR is
+absent from the all-open-PR query (triage confirms merged/closed before deleting).
 
 **Pros:**
 
@@ -294,13 +295,20 @@ For `/flow:plan` to pick up, in dependency order:
    characters, and a `realpath` inside the repo root so symlinks cannot escape;
    reject the entry as `stale` otherwise — reviewer paths are model-produced
    from PR content), attended = apply each finding the human approves /
-   `--non-interactive` = apply nothing (re-verify, mark `stale`, prune only),
-   append transition records (`open`→`fixed`/`dismissed`/`stale`; never rewrite
-   finding rows), refresh `<pr>.pending` after each fold, prune when PR is
-   observed merged/closed.
+   `--non-interactive` = apply nothing (re-verify, mark `stale`, prune when the
+   target PR is merged/closed), `--prune <pr>` = skip re-verify and apply; call
+   `gh pr view <pr> --json state` and delete `<pr>.jsonl`, `<pr>.pending`, and
+   `<pr>.state` only when state is `MERGED` or `CLOSED` (the only ledger
+   deletion path — `/review:sweep-all` delegates here), append transition
+   records (`open`→`fixed`/`dismissed`/`stale`; never rewrite finding rows),
+   refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
-   `/review:triage --non-interactive` as a final step.
+   `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
+   all-open-PR query (`gh pr list --state open --limit 1000 --json number`,
+   skipped if the call fails or may be truncated) and invokes
+   `/review:triage --prune <pr>` for each ledger whose PR is absent from that
+   list (triage confirms merged/closed before deleting — no second pruner).
 5. **SessionStart hook** — declared in `catalog/plugins/yellow-review.json`
    (`hooks.SessionStart`, as yellow-debt does) and emitted by
    `pnpm generate:manifests`, never a hand-written `hooks/hooks.json` or
@@ -312,12 +320,9 @@ For `/flow:plan` to pick up, in dependency order:
    cheap-count pattern, not full JSONL parsing) that ignores any sidecar whose
    `<pr>.jsonl` no longer exists. Scanning the directory cannot tell an open PR
    from one closed outside triage, so reconciliation is guaranteed elsewhere:
-   `/review:sweep-all` runs its own failure-checked query of every open PR (all
-   authors, drafts included:
-   `gh pr list --state open --limit 1000 --json number`, skipped entirely if the
-   call fails or may be truncated, instead of its own `--author @me` non-draft
-   sweep list) and prunes only ledgers for PRs absent from it, confirming each
-   with `gh pr view <pr> --json state` before deleting, and every ledger writer
+   `/review:sweep-all` runs that query (stack item 4) and invokes
+   `/review:triage --prune <pr>` for each ledger whose PR is absent — triage is
+   the only pruner and confirms merged/closed before deleting. Every ledger writer
    records `<pr>.state` (last-seen PR state and time). The hook counts a sidecar
    only when that cached state is `OPEN` and under 7 days old; otherwise it
    names the PR as unverified ("run `/review:triage <pr>`") instead of counting
@@ -349,9 +354,10 @@ For `/flow:plan` to pick up, in dependency order:
 - Exact mechanics of "re-verify against current HEAD SHA" — is this a targeted
   re-read of the flagged file region and a heuristic content match, or something
   more structured? Not resolved here; a plan-level implementation detail.
-- How does `sweep.md`/`/review:triage` detect "PR merged/closed" to trigger
-  pruning — a `gh pr view --json state` check at the start of a triage run, or
-  something event-driven?
+- How `/review:triage` detects "PR merged/closed" to trigger pruning —
+  `gh pr view --json state` at the start of a normal or `--non-interactive`
+  run, plus a dedicated `--prune <pr>` mode invoked by `/review:sweep-all` for
+  ledgers whose PR is absent from the all-open-PR list.
 - Should the optional `plugin-contract-reviewer` extension fields
   (`breaking_change_class`, `migration_path`) be persisted in ledger entries, or
   dropped at write time since they're supplementary?
