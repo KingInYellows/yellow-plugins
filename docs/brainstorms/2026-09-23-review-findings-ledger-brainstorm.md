@@ -278,8 +278,14 @@ For `/flow:plan` to pick up, in dependency order:
    `<pr>.jsonl.corrupt-<timestamp>` and the file truncated to the last newline,
    so one interrupted append never becomes permanent mid-file corruption; a path
    validator applied at write and at read (repo-relative, contained after
-   `realpath`) so a model-produced `file` can never point triage outside the
-   repo; credential redaction of every model-authored string (`title`,
+   `realpath`, and on a tracked-file allowlist: `file` and every `depends_on`
+   path must exist in the PR head or base tree, checked with
+   `git cat-file -e <sha>:<path>`, so an untracked or ignored file such as a
+   local `.env` is never read, snapshotted or hashed) so a model-produced `file`
+   can never point triage outside the repo or at local secrets. A path the PR
+   deletes is valid when it exists in the base tree; its anchor is snapshotted
+   from the base blob, so a finding on a deleted file is kept rather than
+   rejected; credential redaction of every model-authored string (`title`,
    `suggested_fix`, dismissal reasons) and every anchor-snapshot line before it
    is appended, with the same patterns as yellow-core's `redact_secrets`
    (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
@@ -344,9 +350,10 @@ For `/flow:plan` to pick up, in dependency order:
    `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or `CLOSED` (the
    only ledger deletion path — `/review:sweep-all` delegates here), append
    transition records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
-   transitions for `report_only` once a human fixes or dismisses one or
-   re-verification finds it stale, without ever making it auto-applicable; never
-   rewrite finding rows), refresh `<pr>.pending` after each fold.
+   transitions for `reopened`, and for `report_only` once a human fixes or
+   dismisses one or re-verification finds it stale, without ever making it
+   auto-applicable; never rewrite finding rows), refresh `<pr>.pending` after
+   each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
