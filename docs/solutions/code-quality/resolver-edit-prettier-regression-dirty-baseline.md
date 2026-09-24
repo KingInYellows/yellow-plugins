@@ -19,8 +19,6 @@ components:
   - plugins/yellow-review/agents/workflow/pr-comment-resolver.md
 ---
 
-# Verifying a Resolver Edit Didn't Introduce a Prettier Regression on a Dirty-Baseline File
-
 ## Context
 
 During `/review:sweep-all` over yellow-plugins PR #840 (2026-09-24), one of the

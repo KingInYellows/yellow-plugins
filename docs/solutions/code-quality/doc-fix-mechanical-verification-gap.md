@@ -447,15 +447,15 @@ fourth actually ran the check.
 
 **Prevention (in addition to the existing checklist):**
 
-8. **"File/module A consumes B" or "A depends on B at runtime"** — grep B's
-   exact export/path for a `require(...)` or `import ... from` in A's
-   actual source, not for a prose mention of B's filename in A's
-   documentation or command markdown. A `.md` command file citing a
-   script in prose (`"see scripts/foo.js"`) is not evidence that any code
-   path invokes that script; only a test, a subprocess call, or a static
-   import is. When the claim spans a command file and its command has no
-   direct code to grep, check whether an associated test or agent file is
-   the actual consumer before asserting the command itself is.
+- **(8) "File/module A consumes B" or "A depends on B at runtime"** — grep B's
+  exact export/path for a `require(...)` or `import ... from` in A's actual
+  source, not for a prose mention of B's filename in A's documentation or
+  command markdown. A `.md` command file citing a script in prose
+  (`"see scripts/foo.js"`) is not evidence that any code path invokes that
+  script; only a test, a subprocess call, or a static import is. When the claim
+  spans a command file and its command has no direct code to grep, check whether
+  an associated test or agent file is the actual consumer before asserting the
+  command itself is.
 
 ## Related Documentation (2026-09-24 addendum)
 

@@ -21,8 +21,6 @@ components:
   - plugins/yellow-review/commands/review/resolve-pr.md
 ---
 
-# Unattended Review Sweeps Drop Non-`safe_auto` Findings
-
 ## Context
 
 `/review:sweep-all` run over yellow-plugins PRs #840, #843, #853 (2026-09-24).

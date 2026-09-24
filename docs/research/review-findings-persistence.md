@@ -265,8 +265,13 @@ dismissed with a reason, reopenable, branch-specific.
 
 ### Fingerprint design
 
-Hash
-`(tool, rule_id/category, normalized_path, enclosing symbol / AST context, normalized message template, normalized code snippet)`.
+Hash this tuple:
+
+```text
+(tool, rule_id/category, normalized_path, enclosing symbol / AST context,
+ normalized message template, normalized code snippet)
+```
+
 Do **not** hash line numbers or LLM prose.
 
 After a rebase or force-push, match in this order:
@@ -662,7 +667,7 @@ sinks, and a zero-human loop that ends in a triage queue.
   e5b397c9). Historical: ce:review wrote durable todos/ items for unresolved
   actionable findings; resolve_todo_parallel consumed them (file-todos skill,
   now legacy). Separates ephemeral run reports
-  (.context/compound-engineering/<skill>/<run-id>/) from durable todos/.
+  (`.context/compound-engineering/<skill>/<run-id>/`) from durable todos/.
   Current: per-run review.json/report.md + stages.jsonl + metadata.json under a
   run dir; skills/ce-code-review/references/findings-schema.json ~= our
   compact-return schema (+ evidence, validation_status/validation_reason).
