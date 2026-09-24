@@ -1,0 +1,19 @@
+docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md
+  s_7dc42093ad5a67::t_88118e081a1af9 283-299,305-308,334-339,355-359
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "38f2a3551476c97bb3c08cd71f2b19994d94566d",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
