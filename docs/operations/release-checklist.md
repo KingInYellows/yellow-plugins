@@ -909,12 +909,16 @@ verifies the dispatched run's `headSha` and cancels a mismatch. The durable fix
 is a `version-packages.yml` input carrying the recovery SHA, used by both
 checkout steps (tracked as a follow-up; it is a workflow change, not a doc one).
 
-**Only if GitHub Actions itself cannot run this workflow** (Actions outage,
-workflow disabled) does manual tagging become necessary. In that case, tag the
-release PR's actual merge commit — not whatever `main` happens to point to
-locally. `git checkout main && git pull` tags the _current_ tip of `main`, which
-may have advanced past the release PR's merge commit if anything else merged
-since (the tag would then point at the wrong, later commit):
+**When `main` has moved past the release merge** (the guard above stopped, or
+the dispatched run was cancelled for building the wrong commit), use this
+pinned-ref path: tag the release PR's actual merge commit and dispatch from that
+tag. It still needs GitHub Actions; during an Actions outage or with the
+workflow disabled nothing can publish, so wait for Actions to return rather than
+tagging by hand. Tag the release PR's actual merge commit — not whatever `main`
+happens to point to locally. `git checkout main && git pull` tags the _current_
+tip of `main`, which may have advanced past the release PR's merge commit if
+anything else merged since (the tag would then point at the wrong, later
+commit):
 
 - [ ] Resolve the release PR's actual merge commit SHA
 

@@ -118,7 +118,10 @@ directory scaffold).
    not in `all.md`). Update the "N plugins" counts in `CLAUDE.md`, `README.md`,
    `CONTRIBUTING.md`, and `AGENTS.md` — `validate-setup-all.js` and
    `validate-doc-counts.js` fail otherwise.
-6. Add a README with install command, prerequisites, and component tables.
+6. Add a README with install command, prerequisites, and component tables, and
+   add the plugin's row to the root `README.md` "Plugins" table (and its MCP
+   table, if it ships an MCP server). `validate-doc-counts.js` only checks the
+   counts, not that the plugin is listed.
 7. Run `pnpm changeset` and commit the `.changeset/*.md` file — CI blocks any PR
    touching `plugins/*/` without one (see [Versioning](#versioning)).
 8. Validate: `pnpm validate:schemas`. If
