@@ -113,11 +113,14 @@ dismissed-findings advisory block injected into reviewer prompts; after Step 8
 Residual Actionable Work plus the report-only queue, not only
 `owner=downstream-resolver`) with dedup applied. The compact-return schema keeps
 only `file` and `line`, and Step 7's auto-fixes can shift lines, so the helper
-snapshots each finding's anchored code (hash plus the normalized lines) right
-after Step 6's aggregation, before Step 7 edits anything. The Step 8 write uses
-those snapshots; simplifier findings, which only exist after Step 8, are
-anchored against the post-fix file. `/review:triage` is the only other component
-that touches the file (read + append transitions + prune).
+snapshots each finding's anchored code right after Step 6's aggregation (a hash
+for identity plus the normalized lines for rematching, with the lines passed
+through the same `redact_secrets` patterns before storage; if a line cannot be
+redacted safely, only the hash and the line hint are kept, so an anchor on a
+hard-coded token never copies it into `.git`), before Step 7 edits anything. The
+Step 8 write uses those snapshots; simplifier findings, which only exist after
+Step 8, are anchored against the post-fix file. `/review:triage` is the only
+other component that touches the file (read + append transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
 and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
 end.
@@ -253,20 +256,23 @@ For `/flow:plan` to pick up, in dependency order:
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step.
-5. **SessionStart hook** — new lightweight hook script (yellow-debt's
-   cheap-count pattern, not full JSONL parsing) that sums each open PR's
-   `findings/<pr>.pending` sidecar (kept current by the ledger write step and
-   `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
-   when the total is > 0. Append-only JSONL stays non-empty after
-   `fixed`/`dismissed`/`stale` transitions — the hook must not treat file
-   non-emptiness as pending findings. Writers hold the per-PR `flock` across
-   append, fold and sidecar replacement, so a sidecar is never older than the
-   JSONL it describes unless a writer was interrupted. The sidecar stores the
-   count and the JSONL byte size it was computed from (`<count> <bytes>`); when
-   the sidecar is missing or its size doesn't match the JSONL's current size
-   (one `stat`, immune to coarse mtime resolution), the hook folds that one file
-   (bounded by its timeout) or reports "pending unknown" instead of trusting the
-   count.
+5. **SessionStart hook** — declared in `catalog/plugins/yellow-review.json`
+   (`hooks.SessionStart`, as yellow-debt does) and emitted by
+   `pnpm generate:manifests`, never a hand-written `hooks/hooks.json`; the plan
+   must pick its Codex and Cursor exposure, since yellow-review targets both. A
+   new lightweight hook script (yellow-debt's cheap-count pattern, not full
+   JSONL parsing) that sums each open PR's `findings/<pr>.pending` sidecar (kept
+   current by the ledger write step and `/review:triage` after folding by
+   `finding_id`) and emits a `systemMessage` when the total is > 0. Append-only
+   JSONL stays non-empty after `fixed`/`dismissed`/`stale` transitions — the
+   hook must not treat file non-emptiness as pending findings. Writers hold the
+   per-PR `flock` across append, fold and sidecar replacement, so a sidecar is
+   never older than the JSONL it describes unless a writer was interrupted. The
+   sidecar stores the count and the JSONL byte size it was computed from
+   (`<count> <bytes>`); when the sidecar is missing or its size doesn't match
+   the JSONL's current size (one `stat`, immune to coarse mtime resolution), the
+   hook folds that one file (bounded by its timeout) or reports "pending
+   unknown" instead of trusting the count.
 
 ## Open Questions
 
