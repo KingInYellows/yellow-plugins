@@ -300,7 +300,9 @@ For `/flow:plan` to pick up, in dependency order:
    observed merged/closed.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
-   `/review:triage --non-interactive` as a final step.
+   `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
+   all-open-PR query and calls `/review:triage --prune <pr>` for each ledger
+   whose PR is absent (a `--prune` mode that step 3 must add).
 5. **SessionStart hook** — declared in `catalog/plugins/yellow-review.json`
    (`hooks.SessionStart`, as yellow-debt does) and emitted by
    `pnpm generate:manifests`, never a hand-written `hooks/hooks.json` or
@@ -316,23 +318,26 @@ For `/flow:plan` to pick up, in dependency order:
    authors, drafts included:
    `gh pr list --state open --limit 1000 --json number`, skipped entirely if the
    call fails or may be truncated, instead of its own `--author @me` non-draft
-   sweep list) and prunes only ledgers for PRs absent from it, confirming each
-   with `gh pr view <pr> --json state` before deleting, and every ledger writer
-   records `<pr>.state` (last-seen PR state and time). The hook counts a sidecar
-   only when that cached state is `OPEN` and under 7 days old; otherwise it
-   names the PR as unverified ("run `/review:triage <pr>`") instead of counting
-   it. It then sums each open PR's `findings/<pr>.pending` sidecar (kept current
-   by the ledger write step and `/review:triage` after folding by `finding_id`)
-   and emits a `systemMessage` when the total is > 0. Append-only JSONL stays
-   non-empty after `fixed`/`dismissed`/`stale` transitions — the hook must not
-   treat file non-emptiness as pending findings. Writers hold the per-PR `flock`
-   across append, fold and sidecar replacement, so a sidecar is never older than
-   the JSONL it describes unless a writer was interrupted. The sidecar stores
-   the count and the JSONL byte size it was computed from (`<count> <bytes>`);
-   when the sidecar is missing or its size doesn't match the JSONL's current
-   size (one `stat`, immune to coarse mtime resolution), the hook folds that one
-   file (bounded by its timeout) or reports "pending unknown" instead of
-   trusting the count.
+   sweep list). For each ledger whose PR is absent from it, sweep-all calls
+   `/review:triage --prune <pr>`, which confirms the PR is closed or merged with
+   `gh pr view <pr> --json state` before deleting, so triage stays the only
+   pruner. Every ledger writer records `<pr>.state` (last-seen PR state and
+   time). The hook counts a sidecar only when that cached state is `OPEN` and
+   under 7 days old; otherwise it names the PR as unverified ("run
+   `/review:triage <pr>`") instead of counting it. It then sums each open PR's
+   `findings/<pr>.pending` sidecar (kept current by the ledger write step and
+   `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
+   when the total is > 0 or at least one pending ledger is unverified, so
+   stale-cache ledgers are still named rather than silently dropped from a zero
+   total. Append-only JSONL stays non-empty after `fixed`/`dismissed`/`stale`
+   transitions — the hook must not treat file non-emptiness as pending findings.
+   Writers hold the per-PR `flock` across append, fold and sidecar replacement,
+   so a sidecar is never older than the JSONL it describes unless a writer was
+   interrupted. The sidecar stores the count and the JSONL byte size it was
+   computed from (`<count> <bytes>`); when the sidecar is missing or its size
+   doesn't match the JSONL's current size (one `stat`, immune to coarse mtime
+   resolution), the hook folds that one file (bounded by its timeout) or reports
+   "pending unknown" instead of trusting the count.
 6. **Setup and docs** — `/review:setup` gains checks for the helper's new
    binaries, `flock` and `realpath` (neither is guaranteed on macOS; `flock`
    comes from util-linux or `brew install flock`), and yellow-review's README

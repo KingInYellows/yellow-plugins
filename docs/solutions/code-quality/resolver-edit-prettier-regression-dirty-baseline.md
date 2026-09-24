@@ -37,10 +37,10 @@ To check whether a specific edit — not the whole file — introduced a Prettie
 regression:
 
 1. Run Prettier against the file's _current_ content through stdin, not in
-   place: `prettier --stdin-filepath <file> < <file>`. This produces Prettier's
-   fully-reformatted version without touching the working tree.
+   place: `pnpm exec prettier --stdin-filepath <file> < <file>`. This produces
+   Prettier's fully-reformatted version without touching the working tree.
 2. Run the same stdin-filepath pass on the `HEAD` blob:
-   `git show HEAD:<file> | prettier --stdin-filepath <file>`.
+   `git show HEAD:<file> | pnpm exec prettier --stdin-filepath <file>`.
 3. Get the edited line ranges with `git diff -U0 HEAD -- <file>` so staged and
    unstaged resolver edits are both included.
 4. Build two formatting deltas: current file vs its stdin-filepath output, and
@@ -92,8 +92,9 @@ trap 'rm -rf "$tmp"' EXIT
 umask "$old_umask"
 
 # 1. What would Prettier produce for current and HEAD content?
-prettier --stdin-filepath "$file" < "$file" > "$tmp/pretty-current.md"
-git show "HEAD:$file" | prettier --stdin-filepath "$file" > "$tmp/pretty-head.md"
+# pnpm exec runs the repo-locked Prettier, not a global or missing one.
+pnpm exec prettier --stdin-filepath "$file" < "$file" > "$tmp/pretty-current.md"
+git show "HEAD:$file" | pnpm exec prettier --stdin-filepath "$file" > "$tmp/pretty-head.md"
 
 # 2. Which lines did the resolver actually touch (staged + unstaged)?
 git diff -U0 HEAD -- "$file"
