@@ -87,7 +87,8 @@ file=plugins/yellow-review/commands/review/sweep-all.md
 # Per-run private scratch dir: parallel resolvers must not share snapshot
 # files, and copied source may contain the very secret a review is removing.
 old_umask=$(umask); umask 077
-tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT
+tmp=$(mktemp -d) || { umask "$old_umask"; echo "mktemp failed" >&2; exit 1; }
+trap 'rm -rf "$tmp"' EXIT
 umask "$old_umask"
 
 # 1. What would Prettier produce for current and HEAD content?

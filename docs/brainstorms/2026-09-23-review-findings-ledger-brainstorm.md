@@ -21,7 +21,9 @@ automatic application) that survives past the end of any `/review:pr`,
 Claude session touches the PR next. Triage never rewrites finding records: it
 appends `transition` records (`{finding_id, state, reason, head_sha, at}`), and
 every reader folds by `finding_id` and takes the latest state, so an earlier
-`open` record never reads as pending.
+`open` record never reads as pending. `finding_id` is the fingerprint itself
+(deterministic, below), never a random per-record ID, so a re-observation and
+every later transition fold under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -67,11 +69,12 @@ the shared clone's git dir, not a per-worktree path):
   dismissal stays applicable only while the anchored code and every `depends_on`
   hash are unchanged, otherwise the new observation reopens it. Beyond that it
   merges repeats of still-`open` entries and appends a `reopened` transition
-  when a `fixed` fingerprint reproduces at a later head (a revert or a removed
-  guard is a real regression, not a duplicate). Fingerprint = deterministic
-  primitives only: `file` + normalized `category` + a hash of the
-  whitespace-normalized code lines the finding anchors to (so the same defect
-  from different reviewers merges). `category` is free-form in the
+  when a `fixed` or `stale` fingerprint reproduces at a later head (a revert or
+  a removed guard is a real regression, not a duplicate; a `stale` entry whose
+  region a rebase moved is still the same defect once it matches again).
+  Fingerprint = deterministic primitives only: `file` + normalized `category` +
+  a hash of the whitespace-normalized code lines the finding anchors to (so the
+  same defect from different reviewers merges). `category` is free-form in the
   compact-return schema, so it is mapped to a closed vocabulary before keying
   (correctness, security, reliability, performance, maintainability, docs,
   testing, contract), and the plan must measure how often one defect still lands
@@ -228,17 +231,16 @@ For `/flow:plan` to pick up, in dependency order:
    patterns as yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when
    a snapshot line cannot be redacted safely, persist only its hash and the line
    hint so a secret echoed from the diff never lands in `.git` or gets
-   re-injected into prompts; fingerprint
-   function (`file` + normalized `category` + whitespace-normalized code-context
-   hash; line kept as a rematch hint, `reviewer` stored but not keyed),
-   dedup/state-check function, dismissed-findings reader (for context
-   injection), prune-on-close function, and a per-PR `findings/<pr>.pending`
-   sidecar in the two-field form `<count> <bytes>` (open-finding count and the
-   JSONL byte size it was computed from) refreshed after folding the JSONL by
-   `finding_id` to latest state. Include a test fixture with two distinct
-   findings anchored to the same code, and one that moves lines without
-   changing, to validate collision and rematch behavior before shipping. This is
-   the one piece everything else depends on.
+   re-injected into prompts; fingerprint function (`file` + normalized
+   `category` + whitespace-normalized code-context hash; line kept as a rematch
+   hint, `reviewer` stored but not keyed), dedup/state-check function,
+   dismissed-findings reader (for context injection), prune-on-close function,
+   and a per-PR `findings/<pr>.pending` sidecar in the two-field form
+   `<count> <bytes>` (open-finding count and the JSONL byte size it was computed
+   from) refreshed after folding the JSONL by `finding_id` to latest state.
+   Include a test fixture with two distinct findings anchored to the same code,
+   and one that moves lines without changing, to validate collision and rematch
+   behavior before shipping. This is the one piece everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read near the top
    of Step 6 (fenced advisory block into reviewer prompts); add the ledger-write
    call after Step 8, for the full residual set (P2/P3 `safe_auto` residue,
