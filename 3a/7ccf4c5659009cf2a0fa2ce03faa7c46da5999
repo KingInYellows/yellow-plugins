@@ -1,0 +1,19 @@
+docs/operations/release-checklist.md
+  s_7dc42093ad5a67::t_3bdafb3c82adde 834-835,838-839,842-843,846-847,930-932,976,983-984,988-989
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3a7ccf4c5659009cf2a0fa2ce03faa7c46da5999",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
