@@ -524,9 +524,11 @@ grep 'yellow_plugins_ci_duration_seconds.*schema_validation' ci-metrics.prom
 # Verify all durations < 60 seconds
 ```
 
-> The `report-metrics` job enforces this budget automatically and fails the
-> workflow when any schema validation sample exceeds 60 seconds, resulting in
-> immediate CRIT-021 alerts.
+> The `report-metrics` job is written to fail the workflow when a schema
+> validation sample exceeds 60 seconds, but the check is currently dormant:
+> `CI_UPLOAD_ARTIFACTS` is `'false'` in `validate-schemas.yml`, so no metrics
+> artifacts are uploaded or downloaded and the job passes on an empty file. Set
+> it to `'true'` to enforce the budget.
 
 ---
 
