@@ -880,8 +880,13 @@ the manual tag path below and dispatch with `--ref "v$VERSION"`.
 
 ```bash
 MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
 git fetch origin main
-if [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
+if gh release view "v$VERSION" >/dev/null 2>&1; then
+  # force_publish would re-run the release step and retry npm publishes that
+  # may already be immutable. Investigate the failed step instead.
+  echo "Release v$VERSION already exists; not dispatching force_publish." >&2
+elif [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
   echo "main has moved past the release merge; use the manual tag path." >&2
 else
   me=$(gh api user -q .login)
@@ -997,6 +1002,8 @@ commit):
   ```bash
   if [ "$TAG_OK" != 1 ]; then
     echo "Tag not verified at $MERGE_SHA; not dispatching." >&2
+  elif gh release view "v$VERSION" >/dev/null 2>&1; then
+    echo "Release v$VERSION already exists; not dispatching force_publish." >&2
   else
     me=$(gh api user -q .login)
     list_ids() {
