@@ -7,8 +7,9 @@
  * plans/complete/2026-08-19-github-stack-end-to-end-authoring-brief.md —
  * "GOAL.md Phase N" citations throughout this file refer to that document.
  *
- * Maps each of the nine neutral `/stack:*` operations, plus the lower-level
- * primitives `flow:work` needs for stack-aware execution, to exactly one
+ * Maps each of the nine neutral stack operations (setup, status, plan,
+ * submit, amend, sync, nav, cleanup, merge), plus the lower-level primitives
+ * `flow:work` needs for stack-aware execution, to exactly one
  * Graphite implementation and one GitHub implementation — or an explicit
  * `null` ("not supported for this provider"). There is no third option and
  * no fallback field: a caller that gets `null` back stops and reports it,
@@ -38,8 +39,11 @@ function shared(detail) {
 const PROVIDER_IDS = Object.freeze(['graphite', 'github']);
 
 /**
- * The nine neutral operations, each exposed as a `/stack:<name>` command in
- * yellow-core. `status` deliberately maps Graphite to the SAME `gt-setup`
+ * The nine neutral operations. yellow-core does not ship a `/stack:<name>`
+ * command per operation (only `/stack:status` and `/stack:select` exist, and
+ * neither reads this registry); each entry resolves to the provider's own
+ * command (gt-workflow's `gt-*` or github-workflow's `/github-stack:*`).
+ * `status` deliberately maps Graphite to the SAME `gt-setup`
  * command as `setup` — Graphite has no separate stack-status surface
  * distinct from its readiness report, and `github-stack-status` (already
  * shipped) genuinely is a distinct readiness command, so collapsing them
