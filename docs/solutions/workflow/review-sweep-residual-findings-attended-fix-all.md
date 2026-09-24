@@ -60,7 +60,8 @@ already-actionable guidance** for anyone running a sweep before the ledger and
 For an interactive `/review:pr` run without `--non-interactive`, define an
 attended run as one where a human reviews and explicitly approves each verified
 change before it is applied. This approval bypasses the default P0/P1
-`safe_auto` gate for approved P2/P3, `gated_auto`, and `manual` findings. Do not
+`safe_auto` gate for approved P2/P3, actionable `advisory`, `gated_auto`, and
+`manual` findings. Do not
 use this override inside the `--non-interactive` sweep loop that `/review:sweep`
 and `/review:sweep-all` invoke — those commands accept only one initial
 confirmation, then run with no per-change approval.
@@ -69,7 +70,8 @@ The override applies in two places:
 
 1. **Interactive `/review:pr`** — the default path already gates push (and
    optional learning saves) through `AskUserQuestion`; extend that to cover each
-   residual P2/P3, `gated_auto`, or `manual` finding the human asks to fix.
+   residual P2/P3, actionable `advisory`, `gated_auto`, or `manual` finding the
+   human asks to fix.
 2. **The orchestrating session after a `/review:sweep-all` loop** — once every
    PR has been swept non-interactively, the human can ask the session to fix
    verified residuals. The session verifies each finding against current code,
