@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "categories": {
+    "correctness": [
+      "logic-error",
+      "wrong-condition",
+      "off-by-one",
+      "null-handling",
+      "state-bug",
+      "wrong-error-path",
+      "race-condition",
+      "type-mismatch",
+      "unreachable-code"
+    ],
+    "security": [
+      "missing-input-validation",
+      "injection",
+      "path-traversal",
+      "auth-bypass",
+      "credential-exposure",
+      "unfenced-untrusted-input",
+      "insecure-permissions",
+      "unsafe-deserialization"
+    ],
+    "reliability": [
+      "missing-error-handling",
+      "swallowed-error",
+      "missing-timeout",
+      "unsafe-retry",
+      "resource-leak",
+      "non-atomic-write",
+      "missing-cleanup"
+    ],
+    "performance": [
+      "n-plus-one",
+      "unbounded-work",
+      "redundant-io",
+      "inefficient-algorithm",
+      "blocking-call"
+    ],
+    "maintainability": [
+      "dead-code",
+      "duplication",
+      "premature-abstraction",
+      "unclear-naming",
+      "excessive-complexity",
+      "tight-coupling",
+      "file-size"
+    ],
+    "docs": [
+      "stale-doc",
+      "wrong-doc",
+      "missing-doc",
+      "broken-reference",
+      "count-drift",
+      "comment-rot"
+    ],
+    "testing": ["missing-test", "weak-assertion", "flaky-test", "untested-edge-case"],
+    "contract": [
+      "breaking-rename",
+      "signature-change",
+      "removal",
+      "semantics-change",
+      "frontmatter-violation",
+      "schema-drift"
+    ]
+  },
+  "category_aliases": {
+    "adversarial": "correctness",
+    "logic": "correctness",
+    "bug": "correctness",
+    "error-handling": "reliability",
+    "perf": "performance",
+    "documentation": "docs",
+    "doc": "docs",
+    "comments": "docs",
+    "test": "testing",
+    "tests": "testing",
+    "test-coverage": "testing",
+    "plugin-contract": "contract",
+    "api": "contract",
+    "breaking-change": "contract",
+    "project-compliance": "maintainability",
+    "project-standards": "maintainability",
+    "cli-readiness": "maintainability",
+    "agent-cli-readiness": "maintainability",
+    "agent-native": "maintainability",
+    "simplicity": "maintainability",
+    "complexity": "maintainability",
+    "readability": "maintainability",
+    "style": "maintainability"
+  }
+}
