@@ -48,12 +48,22 @@ First time setup:
    ```bash
    /plugin marketplace add KingInYellows/yellow-plugins
    ```
-2. Verify hooks are firing: start a new Claude Code session and check for
-   `[yellow-ci]` messages (if you have GitHub Actions workflows)
-3. Configure credentials for optional plugins:
+2. Install the plugins the daily chain needs: yellow-core, exactly one
+   stacked-PR provider, and yellow-ci if you want the hook check in step 3:
+   ```bash
+   /plugin install yellow-core@yellow-plugins
+   /plugin install gt-workflow@yellow-plugins   # or github-workflow, not both
+   /plugin install yellow-ci@yellow-plugins     # optional
+   ```
+   Then run `/stack:status`; continue only on `READY_GRAPHITE` or `READY_GITHUB`
+   (`/stack:select` switches providers).
+3. Verify hooks are firing: start a new Claude Code session and check for
+   `[yellow-ci]` messages (if you installed yellow-ci and have GitHub Actions
+   workflows)
+4. Configure credentials for optional plugins:
    - Linear: OAuth on first use — no env var needed (MCP handles it)
    - Devin: `export DEVIN_SERVICE_USER_TOKEN=cog_...` and `export DEVIN_ORG_ID=...`
-4. Try the daily development chain (below) on a small feature
+5. Try the daily development chain (below) on a small feature
 
 ---
 

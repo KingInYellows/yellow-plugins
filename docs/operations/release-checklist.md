@@ -924,26 +924,37 @@ since (the tag would then point at the wrong, later commit):
   echo "Merge commit: $MERGE_SHA"
   ```
 
-- [ ] Create annotated tag on that exact commit (not local `HEAD`)
+- [ ] Create annotated tag on that exact commit (not local `HEAD`), or reuse one
+      a partial run already pushed
 
   Read `package.json` from `$MERGE_SHA`, not the working tree — the current
   checkout may not be at the merge commit, and a version read from `HEAD` can
-  tag `$MERGE_SHA` with the wrong version string:
+  tag `$MERGE_SHA` with the wrong version string. A partial run may already have
+  pushed `v$VERSION` before `build-and-release` failed: reuse it when it points
+  at `$MERGE_SHA`, stop if it points anywhere else, and create it only when it
+  is absent:
 
   ```bash
   VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
-  CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
-  git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
+  git fetch origin tag "v$VERSION" 2>/dev/null
+  existing=$(git rev-parse -q --verify "v$VERSION^{commit}" 2>/dev/null)
+  if [ -n "$existing" ] && [ "$existing" != "$MERGE_SHA" ]; then
+    echo "v$VERSION already points at $existing, not $MERGE_SHA; stop." >&2
+  elif [ -z "$existing" ]; then
+    CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
+    git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
   "
+  fi
   ```
 
-- [ ] Push tag to remote (reuse `$VERSION` from the previous step — do not
-      re-derive it from the working tree)
+- [ ] Push the tag only if you just created it (reuse `$VERSION` from the
+      previous step — do not re-derive it from the working tree)
 
   ```bash
-  git push origin "v$VERSION"
+  git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null ||
+    git push origin "v$VERSION"
   ```
 
 - [ ] Trigger workflow with force_publish from the tag just pushed (recovery
@@ -956,8 +967,7 @@ since (the tag would then point at the wrong, later commit):
   gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
   ```
 
-- [ ] Confirm the dispatched run started and watch that run, not the newest
-      one
+- [ ] Confirm the dispatched run started and watch that run, not the newest one
 
   ```bash
   run_id=""
