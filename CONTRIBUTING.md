@@ -237,8 +237,14 @@ is pushed straight to `main`.
 > changesets and checks whether `v<catalog-version>` exists. If it already
 > exists, the run logs "nothing to do" and publishes no GitHub Release.
 
+Run `/stack:status` (yellow-core) before creating or submitting a branch.
+Continue only on `READY_GRAPHITE` or `READY_GITHUB`; stop on any other state
+and resolve the provider first (see `AGENTS.md` "Git, Changesets, And Release
+Workflow").
+
 ```bash
-# On a new branch created with the enabled stacked-PR provider:
+# After /stack:status reports READY_GRAPHITE or READY_GITHUB, create a branch
+# with the enabled stacked-PR provider, then:
 pnpm version-packages         # same command the bot runs: apply changesets,
                               # sync manifests, catalog-version.js patch,
                               # refresh the manifest snapshot
