@@ -1,0 +1,21 @@
+docs/research/review-findings-persistence.md
+  s_7dc42093ad5a67::t_16c8ef7dee339e 268-274,670
+docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md
+  s_7dc42093ad5a67::t_9c5624778c812e 450-458
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eea4fb36cd2a7d790a9fdd4fe7bb98d7f290c2b2",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
