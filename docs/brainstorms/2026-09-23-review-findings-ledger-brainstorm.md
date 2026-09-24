@@ -158,19 +158,24 @@ one worktree is never lost from the ledger. As soon as Step 9's commit exists,
 and before submission, a second `applied` transition records the fixing commit's
 SHA, so a commit that fails to submit is still traceable; the record becomes
 `fixed` only when that commit is an ancestor of the remote PR head
-(`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`). Triage
-never marks an `applied` record `stale` because its old anchor no longer matches
-local `HEAD`: a local-only commit is exactly the unpublished case. The
-compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
-shift lines, so the helper snapshots each finding's anchored code right after
-Step 6's aggregation (a hash for identity plus the normalized lines for
-rematching, with the lines passed through the same `redact_secrets` patterns
-before storage; if a line cannot be redacted safely, only the hash and the line
-hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
-before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
-findings, which only exist after Step 8, are anchored against the post-fix file.
-That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
-or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
+(`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`). A restack
+rewrites the SHA (Graphite restacks diverged branches), so after a successful
+submission the writer records the published head SHA too, and triage accepts two
+fallbacks when the recorded SHA is not an ancestor: a commit on the remote PR
+branch with the same `git patch-id`, or a content check showing the finding no
+longer reproduces at the remote head. Either proves publication. Triage never
+marks an `applied` record `stale` because its old anchor no longer matches local
+`HEAD`: a local-only commit is exactly the unpublished case. The compact-return
+schema keeps only `file` and `line`, and Step 7's auto-fixes can shift lines, so
+the helper snapshots each finding's anchored code right after Step 6's
+aggregation (a hash for identity plus the normalized lines for rematching, with
+the lines passed through the same `redact_secrets` patterns before storage; if a
+line cannot be redacted safely, only the hash and the line hint are kept, so an
+anchor on a hard-coded token never copies it into `.git`), before Step 7 edits
+anything. The Step 8 write uses those snapshots; simplifier findings, which only
+exist after Step 8, are anchored against the post-fix file. That write step also
+appends `reopened` when it re-observes a `fixed`, `stale`, or
+no-longer-applicable `dismissed` finding. `/review:triage` is the only other
 component that touches the file (read + append other transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
 `sweep.md` optionally invoking `/review:triage --non-interactive` at the end,
@@ -408,11 +413,13 @@ For `/flow:plan` to pick up, in dependency order:
    `open`→`fixed`/`dismissed`/`stale`, and the same terminal transitions for
    `reopened`; `stale`→`dismissed` when a human confirms an obsolete finding,
    and `stale`→`reopened` when it rematches later; `applied`→`fixed` once the
-   ancestor check shows its fixing SHA is published, or `applied`→`dismissed`
-   for an abandoned or invalid fix; and for `report_only` once a human fixes or
-   dismisses one or re-verification finds it stale, without ever making it
-   auto-applicable; never rewrite finding rows), refresh `<pr>.pending` after
-   each fold.
+   ancestor check (or its patch-id / content fallback) shows the fix is
+   published; `applied`→`reopened` when the fix is abandoned or invalid (the
+   edit was discarded or the commit dropped), because the defect itself is still
+   there; `dismissed` stays reserved for an explicit decision that the finding
+   is not actionable; and for `report_only` once a human fixes or dismisses one
+   or re-verification finds it stale, without ever making it auto-applicable;
+   never rewrite finding rows), refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
