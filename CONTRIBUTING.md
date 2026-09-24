@@ -293,12 +293,24 @@ pnpm install                  # pick up lockfile changes, if any
 # (per-plugin tags + catalog tag) and build-and-release (GitHub Release).
 # --limit 1 right after merging can return the previous run or a still-
 # queued one, so gh release view can fail before publication finishes.
-# Capture the run for the merge commit and wait for it instead.
+# Capture the run for the merge commit and wait for it instead. GitHub can
+# take a few seconds to create the run, so poll until one exists rather than
+# handing gh run watch an empty run_id.
 git fetch origin main && merge_sha=$(git rev-parse origin/main)
-run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
-  --json databaseId -q '.[0].databaseId')
-gh run watch "$run_id" --exit-status
-gh release view "v$(node -p "require('./package.json').version")"
+run_id=""
+for _ in $(seq 1 15); do
+  run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
+    --json databaseId -q '.[0].databaseId')
+  [ -n "$run_id" ] && break
+  sleep 10
+done
+if [ -z "$run_id" ]; then
+  echo "No version-packages.yml run found for $merge_sha after 2.5 minutes." >&2
+  echo "Check the Actions tab before proceeding to force_publish." >&2
+else
+  gh run watch "$run_id" --exit-status &&
+    gh release view "v$(node -p "require('./package.json').version")"
+fi
 
 # Recovery, from main, only if that run failed or logged "nothing to do":
 gh workflow run version-packages.yml -f force_publish=true
