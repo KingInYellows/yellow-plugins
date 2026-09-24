@@ -924,26 +924,47 @@ since (the tag would then point at the wrong, later commit):
   echo "Merge commit: $MERGE_SHA"
   ```
 
-- [ ] Create annotated tag on that exact commit (not local `HEAD`)
+- [ ] Create or reuse the catalog tag on that exact commit (not local `HEAD`)
 
   Read `package.json` from `$MERGE_SHA`, not the working tree — the current
   checkout may not be at the merge commit, and a version read from `HEAD` can
-  tag `$MERGE_SHA` with the wrong version string:
+  tag `$MERGE_SHA` with the wrong version string. A partial publish may already
+  have pushed `v$VERSION` before `build-and-release` failed — fetch the remote
+  tag first, reuse it when it points at `$MERGE_SHA`, and stop if it points
+  anywhere else:
 
   ```bash
   VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+  TAG="v$VERSION"
   CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
-  git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
+
+  if git ls-remote --exit-code origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+    git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
+    tag_sha=$(git rev-parse "${TAG}^{commit}")
+    if [ "$tag_sha" = "$MERGE_SHA" ]; then
+      echo "Reusing existing ${TAG} at ${MERGE_SHA}"
+    else
+      echo "${TAG} points at ${tag_sha}, not ${MERGE_SHA}; stop and investigate." >&2
+      exit 1
+    fi
+  else
+    git tag -a "$TAG" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
   "
+  fi
   ```
 
-- [ ] Push tag to remote (reuse `$VERSION` from the previous step — do not
-      re-derive it from the working tree)
+- [ ] Push tag to remote (reuse `$VERSION` / `$TAG` from the previous step — do
+      not re-derive it from the working tree). Skip the push when the tag is
+      already on the remote:
 
   ```bash
-  git push origin "v$VERSION"
+  if git ls-remote --exit-code origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+    echo "${TAG} already on remote — skipping push"
+  else
+    git push origin "$TAG"
+  fi
   ```
 
 - [ ] Trigger workflow with force_publish from the tag just pushed (recovery
