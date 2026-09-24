@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.3.3
+
+### Patch Changes
+
+- [`60764cb`](https://github.com/KingInYellows/yellow-plugins/commit/60764cb540963ef5c2f4e038e1fd93dbf521fa67)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Read the
+  documented Claude hook payloads and keep the ruvector pin at 0.2.34.
+  UserPromptSubmit uses the string field `prompt` and ignores `user_prompt`;
+  non-string values are not recall queries. Recalled text for UserPromptSubmit
+  and SessionStart is model context in `hookSpecificOutput.additionalContext`.
+  The SessionStart embedder provenance note stays on `systemMessage`.
+  PostToolUse and PostToolUseFailure record a bash or edit outcome only when the
+  event supplies an explicit success or an `Exit code N` failure. A missing
+  status, an interrupt, or a bare error is not submitted upstream. Setup,
+  status, and upgrade instructions stay on `ruvector@0.2.34`.
+
+- [`60764cb`](https://github.com/KingInYellows/yellow-plugins/commit/60764cb540963ef5c2f4e038e1fd93dbf521fa67)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Launch the
+  ruvector MCP server with an explicit `RUVECTOR_MCP_ALLOW` list of the five
+  tools this plugin calls. Do not set `RUVECTOR_MCP_PROFILE`. On ruvector 0.2.34
+  an empty or misspelled policy exposes every tool, and a profile unions extra
+  tools into the allowlist. `hooks_remember` stays allowed. The pin stays
+  `ruvector@0.2.34`.
+
 ## 1.3.2
 
 ### Patch Changes

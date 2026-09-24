@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.4
+
+### Patch Changes
+
+- [`bc2fc8c`](https://github.com/KingInYellows/yellow-plugins/commit/bc2fc8c8b2317c15204d3afb953fae788c6b511b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(claude-md): refresh plugin CLAUDE.md files — document yellow-core's four
+  lib/ Node modules and plugin-identity.sh, yellow-review's third script
+  (file-line-counts), clarify yellow-goal's repo-root verify script path, drop
+  changelog tags and dated round-trip narrative, and condense yellow-council's
+  redaction limitation while removing its duplicate V2 Trajectory section.
+
+- [`e913209`](https://github.com/KingInYellows/yellow-plugins/commit/e9132094c42751343d8e59a8b669dd59fcf0bcca)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: correct
+  stale stack-registry comments — `stack-operation-registry.js`, yellow-core
+  `CLAUDE.md` and gt-workflow `CLAUDE.md` no longer claim a `/stack:<name>`
+  command per neutral operation (only `/stack:status` and `/stack:select` exist;
+  only the registry's test loads it, and `/flow:work` mirrors its entries in
+  prose).
+
 ## 2.0.3
 
 ### Patch Changes
