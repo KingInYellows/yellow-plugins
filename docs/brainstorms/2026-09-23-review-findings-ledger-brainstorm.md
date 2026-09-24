@@ -260,10 +260,13 @@ For `/flow:plan` to pick up, in dependency order:
    PR held across each append or transition, the fold, and the atomic (`mv`)
    sidecar replacement, so overlapping sweeps cannot publish a stale count; each
    record written as one complete line in a single write ending in `\n`, and,
-   under the same lock before any append or fold, a tail check that moves an
-   unparseable final line (short write, full disk, crash) to
-   `<pr>.jsonl.corrupt-<timestamp>` and truncates to the last newline, so one
-   interrupted append never becomes permanent mid-file corruption; a path
+   under the same lock before any append or fold, a tail check that reads the
+   final byte first — when the file does not end in `\n`, a final record that
+   is still valid JSON gets its newline completed, and an unparseable tail
+   (short write, full disk, crash) moves to `<pr>.jsonl.corrupt-<timestamp>`
+   with the ledger truncated to the last newline, so the next append can never
+   land on the same line and one interrupted append never becomes permanent
+   mid-file corruption; a path
    validator applied at write and at read (repo-relative, contained after
    `realpath`) so a model-produced `file` can never point triage outside the
    repo; credential redaction of every model-authored string (`title`,
