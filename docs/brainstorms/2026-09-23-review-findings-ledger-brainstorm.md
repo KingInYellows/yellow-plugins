@@ -21,16 +21,17 @@ automatic application) that survives past the end of any `/review:pr`,
 Claude session touches the PR next. Triage never rewrites finding records: it
 appends `transition` records (`{finding_id, state, reason, head_sha, at}`), and
 every reader folds by `finding_id` and takes the latest state, so an earlier
-`open` record never reads as pending. `reopened` projects to pending exactly
-like `open`: the pending set is latest state ∈ {`open`, `reopened`}, and every
-count, including `<pr>.pending`, uses that one definition. `finding_id` is fixed
-at first observation (the fingerprint at that time, deterministic, never a
-random per-record ID) and never changes. Anchor content is versioned per
-observation instead: a later observation first tries an exact fingerprint match,
-then an alias rematch (same `file` and normalized `category`, anchor near the
-stored line hint and above a similarity threshold on the normalized lines) and
-reuses the original `finding_id`, so an edited anchor or a slightly varied
-recurrence still folds under the same key.
+`open` record never reads as pending. `reopened` and `applied` (fixed locally,
+not yet pushed) project to pending exactly like `open`: the pending set is
+latest state ∈ {`open`, `reopened`, `applied`}, and every count, including
+`<pr>.pending`, uses that one definition. `finding_id` is fixed at first
+observation (the fingerprint at that time, deterministic, never a random
+per-record ID) and never changes. Anchor content is versioned per observation
+instead: a later observation first tries an exact fingerprint match, then an
+alias rematch (same `file` and normalized `category`, anchor near the stored
+line hint and above a similarity threshold on the normalized lines) and reuses
+the original `finding_id`, so an edited anchor or a slightly varied recurrence
+still folds under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -131,20 +132,24 @@ reviewers have already run. The reader re-checks each dismissal's anchor and
 applicable, so a stale rationale never talks reviewers out of a real finding;
 after Step 8 (code simplifier), it appends the final residual set (everything in
 Step 10's Residual Actionable Work plus the report-only queue, not only
-`owner=downstream-resolver`) with dedup applied. The compact-return schema keeps
-only `file` and `line`, and Step 7's auto-fixes can shift lines, so the helper
-snapshots each finding's anchored code right after Step 6's aggregation (a hash
-for identity plus the normalized lines for rematching, with the lines passed
-through the same `redact_secrets` patterns before storage; if a line cannot be
-redacted safely, only the hash and the line hint are kept, so an anchor on a
-hard-coded token never copies it into `.git`), before Step 7 edits anything. The
-Step 8 write uses those snapshots; simplifier findings, which only exist after
-Step 8, are anchored against the post-fix file. That write step also appends
-`reopened` when it re-observes a `fixed`, `stale`, or no-longer-applicable
-`dismissed` finding. `/review:triage` is the only other component that touches
-the file (read + append other transitions + prune). `sweep.md`/`sweep-all.md`
-need only cosmetic changes: the Residual-count column, and `sweep.md` optionally
-invoking `/review:triage --non-interactive` at the end.
+`owner=downstream-resolver`) with dedup applied. Findings Step 7 fixed are
+written too, as `applied`, and only get a `fixed` transition once Step 9's
+commit and push succeed; if the push is declined or fails they stay pending, so
+a fix that exists only as an uncommitted change in one worktree is never lost
+from the ledger. The compact-return schema keeps only `file` and `line`, and
+Step 7's auto-fixes can shift lines, so the helper snapshots each finding's
+anchored code right after Step 6's aggregation (a hash for identity plus the
+normalized lines for rematching, with the lines passed through the same
+`redact_secrets` patterns before storage; if a line cannot be redacted safely,
+only the hash and the line hint are kept, so an anchor on a hard-coded token
+never copies it into `.git`), before Step 7 edits anything. The Step 8 write
+uses those snapshots; simplifier findings, which only exist after Step 8, are
+anchored against the post-fix file. That write step also appends `reopened` when
+it re-observes a `fixed`, `stale`, or no-longer-applicable `dismissed` finding.
+`/review:triage` is the only other component that touches the file (read +
+append other transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
+changes: the Residual-count column, and `sweep.md` optionally invoking
+`/review:triage --non-interactive` at the end.
 
 **Pros:**
 
@@ -241,17 +246,22 @@ For `/flow:plan` to pick up, in dependency order:
 1. **Ledger library + schema** — `plugins/yellow-review/lib/review-ledger.sh`
    (called via `${CLAUDE_PLUGIN_ROOT}`): one `flock` per PR held across each
    append or transition, the fold, and the atomic (`mv`) sidecar replacement, so
-   overlapping sweeps cannot publish a stale count; a path validator applied at
-   write and at read (repo-relative, contained after `realpath`) so a
-   model-produced `file` can never point triage outside the repo; credential
-   redaction of every model-authored string (`title`, `suggested_fix`, dismissal
-   reasons) and every anchor-snapshot line before it is appended, with the same
-   patterns as yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when
-   a snapshot line cannot be redacted safely, persist only its hash and the line
-   hint so a secret echoed from the diff never lands in `.git` or gets
-   re-injected into prompts; fingerprint function (`file` + normalized
-   `category` + whitespace-normalized code-context hash; line kept as a rematch
-   hint, `reviewer` stored but not keyed), dedup/state-check function,
+   overlapping sweeps cannot publish a stale count; each record written as one
+   complete line in a single write ending in `\n`, and, under the same lock
+   before any append or fold, a tail check that moves an unparseable final line
+   (short write, full disk, crash) to `<pr>.jsonl.corrupt-<timestamp>` and
+   truncates to the last newline, so one interrupted append never becomes
+   permanent mid-file corruption; a path validator applied at write and at read
+   (repo-relative, contained after `realpath`) so a model-produced `file` can
+   never point triage outside the repo; credential redaction of every
+   model-authored string (`title`, `suggested_fix`, dismissal reasons) and every
+   anchor-snapshot line before it is appended, with the same patterns as
+   yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when a snapshot
+   line cannot be redacted safely, persist only its hash and the line hint so a
+   secret echoed from the diff never lands in `.git` or gets re-injected into
+   prompts; fingerprint function (`file` + normalized `category` +
+   whitespace-normalized code-context hash; line kept as a rematch hint,
+   `reviewer` stored but not keyed), dedup/state-check function,
    dismissed-findings reader (for context injection), prune-on-close function
    that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock`, and
    a per-PR `findings/<pr>.pending` sidecar in the two-field form
@@ -291,7 +301,13 @@ For `/flow:plan` to pick up, in dependency order:
    hook exposure:** none — the generator has no Cursor hook emission path
    (`docs/cursor-distribution.md`). A new lightweight hook script (yellow-debt's
    cheap-count pattern, not full JSONL parsing) that ignores any sidecar whose
-   `<pr>.jsonl` no longer exists, and sums each open PR's
+   `<pr>.jsonl` no longer exists. Scanning the directory cannot tell an open PR
+   from one closed outside triage, so reconciliation is guaranteed elsewhere:
+   `/review:sweep-all` lists open PRs on every run and prunes ledgers for any PR
+   not in that list, and every ledger writer records `<pr>.state` (last-seen PR
+   state and time). The hook counts a sidecar only when that cached state is
+   `OPEN` and under 7 days old; otherwise it names the PR as unverified ("run
+   `/review:triage <pr>`") instead of counting it. It then sums each open PR's
    `findings/<pr>.pending` sidecar (kept current by the ledger write step and
    `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
    when the total is > 0. Append-only JSONL stays non-empty after
