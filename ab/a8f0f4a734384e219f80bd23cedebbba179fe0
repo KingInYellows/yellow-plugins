@@ -1,0 +1,29 @@
+.changeset/stack-registry-comments.md
+  s_7dc42093ad5a67::t_10d972b73d0ae8 9-10
+packages/domain/src/validation/errorCatalog.ts
+  s_7dc42093ad5a67::t_37d5abe4e5880c 206
+plugins/gt-workflow/CLAUDE.md
+  s_7dc42093ad5a67::t_27edcb7ef2e884 21-25
+plugins/yellow-core/CLAUDE.md
+  s_7dc42093ad5a67::t_2423ea9daed9fa 270-275
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_7dc42093ad5a67::t_b9600e3d4fdf42 10-12,45-48
+scripts/validate-provider-neutral-commands.js
+  s_7dc42093ad5a67::t_16f697dcdff8b7 174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aba8f0f4a734384e219f80bd23cedebbba179fe0",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
