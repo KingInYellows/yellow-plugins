@@ -22,7 +22,7 @@ Run one Bash block to read each plugin's status file:
 printf '\n=== Credential Status Files ===\n'
 PLUGIN_DATA_DIR="$HOME/.claude/plugins/data"
 # setup-all-credential-status-plugins:start
-for plugin in yellow-research yellow-composio yellow-semgrep; do
+for plugin in yellow-research yellow-semgrep; do
   status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
     # Single jq invocation per plugin — extract all fields as TSV.

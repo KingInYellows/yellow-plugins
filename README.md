@@ -60,7 +60,7 @@ Eight plugins connect to MCP servers. Authentication requirements vary by server
 | Plugin            | MCP Server | Auth                                                                                                              |
 | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                                                              |
-| `yellow-composio` | Composio   | User-configured (userConfig or shell env) — bundled stdio wrapper injects `X-API-Key`; `claude mcp add` is legacy |
+| `yellow-composio` | Composio   | Browser OAuth on `https://connect.composio.dev/mcp` (native HTTP, no API key). Headless `claude mcp add` with a consumer key is the fallback |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                                                              |
 | `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                                                                |
 | `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                                                                          |

@@ -133,17 +133,14 @@ is still available. Do NOT execute a Composio tool call -- just verify the tool
 is discoverable (this dashboard deliberately makes no live calls, to conserve
 Composio quota — the very budget this command exists to track).
 
-Classify per the `mcp-health-probe` vocabulary. Because no live probe is run
-here AND the bundled wrapper validates only credential *presence* at startup
-(an invalid key surfaces as a 401 at tool-invocation time, not at startup),
-tool visibility means "loaded but unverified," not "authenticated":
+Classify per the `mcp-health-probe` vocabulary. This dashboard does not
+call Composio, so a visible tool is loaded but not proven authenticated:
 
-- Tools discoverable → **PRESENT (untested)** — the MCP is loaded; validity is
-  unverified until first use. (Run `/composio:setup` for a live HEALTHY /
-  DEGRADED probe.)
-- Tools not discoverable → **OFFLINE** — the MCP server did not start. Run
-  `/composio:setup` to diagnose (missing node, unconfigured credentials, or a
-  restart-needed state).
+- Tools discoverable → **PRESENT (untested)** — the MCP is loaded. Run
+  `/composio:setup` for a live HEALTHY / DEGRADED probe.
+- Tools not discoverable → **OFFLINE**. Run `/composio:setup`. For the
+  bundled server that means browser OAuth is not finished. A headless
+  `claude mcp add` entry can also be missing or can shadow the plugin.
 
 ### Step 5: Display dashboard
 

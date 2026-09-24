@@ -1,7 +1,8 @@
 ---
 title: "Schema extension: optional `pattern` regex field on userConfigEntry (REVERTED)"
+date: 2026-05-08
 category: build-errors
-track: feature
+track: knowledge
 status: reverted
 problem: "Plugin authors had no schema-level mechanism to enforce regex constraints on user-supplied userConfig values (URLs, API keys, file paths). The local schema's userConfigEntry used additionalProperties: false and did not list `pattern` as a recognized property, so any plugin that wrote `\"pattern\": \"^https://\"` into plugin.json failed `pnpm validate:plugins` with an additional-property error."
 tags:
@@ -40,13 +41,10 @@ The schema field, RULE 10 in `validate-plugin.js`, the PR-B describe block in
 `tests/integration/validate-plugin.test.ts`, the PR-C describe block in
 `tests/integration/example-files-schema.test.ts`, and the `pattern` line in
 `examples/plugin-extended.example.json` are all removed. The original
-TLS-enforcement use case (`yellow-composio` `composio_mcp_url`) now relies on:
-
-- A `SessionStart` hook (`plugins/yellow-composio/hooks/check-mcp-url.sh`)
-  that warns the user if the configured URL is not HTTPS (advisory, cannot
-  block MCP attach).
-- Updated `composio_mcp_url.description` and `composio-patterns` SKILL
-  Security section explicitly documenting the HTTPS-only requirement.
+TLS-enforcement use case (`yellow-composio` `composio_mcp_url`) used to
+rely on a SessionStart warning and a `userConfig` description. Both are
+gone: the bundled server is the fixed HTTPS URL
+`https://connect.composio.dev/mcp`, with no URL field and no hook.
 
 This matches the pre-PR409 (PR #396) baseline. **Do not re-attempt schema-level
 `pattern` enforcement** unless the official Claude Code remote validator schema

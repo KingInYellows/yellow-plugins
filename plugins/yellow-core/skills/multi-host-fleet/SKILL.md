@@ -16,14 +16,14 @@ enable` per host.
 
 The yellow-plugins marketplace adopts a 3-element credential resolution
 pattern for credential-bearing plugins that bundle a stdio MCP server
-(yellow-research, yellow-morph, yellow-semgrep, yellow-composio):
+(yellow-research, yellow-morph, yellow-semgrep):
 
 1. `userConfig` value (stored in OS keychain) — **preferred** for single-host
    installs
 2. Shell env var (canonical name, see table below) — **fallback** for fleet
    and CI usage
-3. Unset → MCP server either fails to start (composio) or starts in
-   degraded mode (research, semgrep)
+3. Unset → MCP server either fails to start or starts in degraded mode
+   (research, semgrep)
 
 Plugins with HTTP-only MCPs (yellow-devin) accept the same userConfig OR
 shell env var sources, but commands read shell env directly rather than
@@ -58,8 +58,6 @@ dismissing or skipping it is safe when the shell env var is set.
 | yellow-research | `CERAMIC_API_KEY` | (none) | yes | REST live-probe only; MCP uses OAuth |
 | yellow-morph | `MORPH_API_KEY` | `morph_api_key` | yes | |
 | yellow-semgrep | `SEMGREP_APP_TOKEN` | `semgrep_app_token` | yes | `sgp_` prefix |
-| yellow-composio | `COMPOSIO_MCP_URL` | `composio_mcp_url` | no | Must start with `https://` |
-| yellow-composio | `COMPOSIO_API_KEY` | `composio_api_key` | yes | |
 | yellow-devin | `DEVIN_SERVICE_USER_TOKEN` | `devin_service_user_token` | yes | HTTP MCP; commands read shell env directly |
 | yellow-devin | `DEVIN_ORG_ID` | `devin_org_id` | no | HTTP MCP; commands read shell env directly |
 
@@ -79,8 +77,7 @@ export TAVILY_API_KEY="$(cat ~/.secrets/tavily 2>/dev/null)"
 export EXA_API_KEY="$(cat ~/.secrets/exa 2>/dev/null)"
 export MORPH_API_KEY="$(cat ~/.secrets/morph 2>/dev/null)"
 export SEMGREP_APP_TOKEN="$(cat ~/.secrets/semgrep 2>/dev/null)"
-export COMPOSIO_MCP_URL="https://mcp.composio.dev/your-customer-id"
-export COMPOSIO_API_KEY="$(cat ~/.secrets/composio 2>/dev/null)"
+
 export DEVIN_SERVICE_USER_TOKEN="$(cat ~/.secrets/devin-token 2>/dev/null)"
 export DEVIN_ORG_ID="your-org-id"
 ```
@@ -107,14 +104,11 @@ secrets-manager patterns below.
     PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
     EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
     SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-    COMPOSIO_MCP_URL: ${{ vars.COMPOSIO_MCP_URL }}
-    COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
   run: claude -p "/flow:work ..."
 ```
 
 Add each canonical env var name to **Repository Settings → Secrets and
-variables → Actions**. The `composio_mcp_url` can live in `vars` (not
-secrets) since it's non-sensitive; everything else goes in `secrets`.
+variables → Actions**. Sensitive values go in `secrets`.
 
 **GitLab CI:**
 
@@ -202,9 +196,9 @@ The wrapper scripts inside each plugin will pick them up.
 # yellow-semgrep
 # export SEMGREP_APP_TOKEN="$(cat ~/.secrets/semgrep 2>/dev/null)"
 
-# yellow-composio
-# export COMPOSIO_MCP_URL="https://mcp.composio.dev/your-customer-id"
-# export COMPOSIO_API_KEY="$(cat ~/.secrets/composio 2>/dev/null)"
+# yellow-composio and yellow-linear use browser OAuth. They have no
+# shell env credential. Headless Composio uses `claude mcp add` with a
+# For You consumer key; see /composio:setup.
 
 # yellow-devin
 # export DEVIN_SERVICE_USER_TOKEN="$(cat ~/.secrets/devin 2>/dev/null)"
@@ -231,13 +225,10 @@ userConfig prompt (or unset the keychain entry).
   Do not use a bare `.env*` glob — it also matches `.envrc.template`, which
   this guide recommends committing.
 - Keep `~/.secrets/` at 0700 directory perms and 0600 file perms.
-- For sensitive plugins (semgrep, perplexity, exa, tavily, morph,
-  composio_api_key), prefer keychain (userConfig) over shell env when
-  running on a single host. Shell env is the only practical option for
-  fleets.
-- `COMPOSIO_MCP_URL` is non-sensitive (URL pattern, no secret) and can
-  safely live in committed `.envrc.template` or GitHub Actions `vars`.
-- The wrapper script in yellow-composio (`bin/start-composio.sh`) rejects
-  non-HTTPS URLs to prevent cleartext key transmission.
+- For sensitive plugins (semgrep, perplexity, exa, tavily, morph), prefer
+  keychain (userConfig) over shell env when running on a single host.
+  Shell env is the only practical option for fleets.
+- yellow-composio authenticates with Claude Code's browser OAuth against
+  `https://connect.composio.dev/mcp`. It is not in the env-var table.
 - Env vars are visible to MCP subprocesses spawned by Claude Code. Don't
   store keys with broader scope than needed.

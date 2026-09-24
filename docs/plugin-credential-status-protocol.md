@@ -20,18 +20,12 @@ directories — no cross-plugin write contention.
 
 ```json
 {
-  "plugin": "yellow-composio",
-  "version": "1.3.0",
+  "plugin": "yellow-semgrep",
+  "version": "4.2.2",
   "session_ts": "2026-05-13T18:42:31Z",
   "credentials": [
     {
-      "field": "composio_mcp_url",
-      "source": "userConfig",
-      "present": true,
-      "valid": true
-    },
-    {
-      "field": "composio_api_key",
+      "field": "semgrep_app_token",
       "source": "shell_env",
       "present": true,
       "valid": null
@@ -82,11 +76,7 @@ source "${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
 
 fields_json=$(cat <<'__EOF__'
 [
-  {"field": "composio_mcp_url",
-   "source": "userConfig",
-   "present": true,
-   "valid": null},
-  {"field": "composio_api_key",
+  {"field": "semgrep_app_token",
    "source": "shell_env",
    "present": true,
    "valid": null}
@@ -94,7 +84,7 @@ fields_json=$(cat <<'__EOF__'
 __EOF__
 )
 
-write_credential_status "yellow-composio" "1.3.0" "$fields_json"
+write_credential_status "yellow-semgrep" "4.2.2" "$fields_json"
 ```
 
 The helper:
@@ -176,11 +166,12 @@ PRs after this foundation merges):
   omitted from the credentials array)
 - yellow-morph (morph key)
 - yellow-semgrep (semgrep token)
-- yellow-composio (URL + API key)
 
 Plugins that intentionally do NOT emit this file:
 
 - yellow-devin (uses shell env only; setup:all probes `DEVIN_*` env vars
   directly)
-- yellow-linear, yellow-chatprd, yellow-codex (OAuth flows — status is
-  ToolSearch-visibility, not credential-presence)
+- yellow-linear, yellow-chatprd, yellow-codex, yellow-composio (OAuth
+  flows — status is ToolSearch-visibility, not credential-presence).
+  yellow-composio's bundled server is `https://connect.composio.dev/mcp`
+  and has no userConfig fields.

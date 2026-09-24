@@ -45,7 +45,7 @@ pnpm apply:changesets         # version + run scripts/sync-manifests.js
 
 Run a single Vitest file: `pnpm vitest run path/to/file.test.ts`. Bats shell
 tests live under `plugins/<name>/tests/` for `github-workflow`,
-`gt-workflow`, `yellow-ci`, `yellow-codex`, `yellow-composio`,
+`gt-workflow`, `yellow-ci`, `yellow-codex`,
 `yellow-core`, `yellow-council`, `yellow-debt`, `yellow-linear`,
 `yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`
 — run `bats tests/`
