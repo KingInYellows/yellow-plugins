@@ -203,7 +203,7 @@ export const ERROR_CODES = {
   // version match and marketplace membership/order/path drift but emits
   // plain messages, not codes from this category — so CURSOR_MARKETPLACE_DRIFT,
   // CURSOR_VERSION_DRIFT and CURSOR_LIFECYCLE_INVALID currently have no
-  // emitter (validate-cursor.js builds only 001/002/005/007/008).
+  // emitter (validate-cursor.js's CODES map builds the others).
   //
   // Prefix choice: CURSOR is substring-safe against every existing prefix
   // in both directions (lint-error-codes.js findPrefixCollisions, R14):
