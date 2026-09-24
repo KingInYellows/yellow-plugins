@@ -60,30 +60,33 @@ the shared clone's git dir, not a per-worktree path):
 - **Dedup & false-positive suppression:** write-time fingerprint matching — skip
   re-adding a fingerprint whose latest state is an applicable `dismissed`. A
   dismissal records the paths its reason depends on (`depends_on`, e.g. the
-  caller whose validation made a sink safe) with content hashes; it stays
-  applicable only while the anchored code and every `depends_on` hash are
-  unchanged, otherwise the new observation reopens it. Beyond that it merges
-  repeats of still-`open` entries and appends a `reopened` transition when a
-  `fixed` fingerprint reproduces at a later head (a revert or a removed guard is
-  a real regression, not a duplicate). Fingerprint = deterministic primitives
-  only: `file` + normalized `category` + a hash of the whitespace-normalized
-  code lines the finding anchors to (so the same defect from different reviewers
-  merges). `category` is free-form in the compact-return schema, so it is mapped
-  to a closed vocabulary before keying (correctness, security, reliability,
-  performance, maintainability, docs, testing, contract), and the plan must
-  measure how often one defect still lands in two categories. No line numbers in
-  identity: an unrelated edit above the defect would shift a line bucket and
-  re-raise it. The line number is stored as a search hint for contextual
-  rematching after a rebase (the research doc's "do not hash line numbers").
-  Record `reviewer` on each entry but exclude it from the key. Never use LLM
-  title text as identity — titles get reworded between runs. Two distinct
-  defects anchored to the same code can still collide; `/flow:plan` must test
-  that case and add a rule/condition discriminator if collisions show up in
-  practice. In addition, `/review:pr` injects the PR's dismissed findings +
-  dismissal reasons into reviewer prompts as a fenced advisory block (same
-  pattern as the existing learnings-context block), because fingerprint-only
-  dedup misses reworded re-detections of the same underlying issue — this
-  directly addresses a documented risk in this repo's own history:
+  caller whose validation made a sink safe) with content hashes. Every
+  `depends_on` path gets the same containment check as `file` (repo-relative,
+  `realpath` inside the repo, regular file only — no devices, FIFOs or symlinks
+  out) before it is opened or hashed, since the triage model writes them. The
+  dismissal stays applicable only while the anchored code and every `depends_on`
+  hash are unchanged, otherwise the new observation reopens it. Beyond that it
+  merges repeats of still-`open` entries and appends a `reopened` transition
+  when a `fixed` fingerprint reproduces at a later head (a revert or a removed
+  guard is a real regression, not a duplicate). Fingerprint = deterministic
+  primitives only: `file` + normalized `category` + a hash of the
+  whitespace-normalized code lines the finding anchors to (so the same defect
+  from different reviewers merges). `category` is free-form in the
+  compact-return schema, so it is mapped to a closed vocabulary before keying
+  (correctness, security, reliability, performance, maintainability, docs,
+  testing, contract), and the plan must measure how often one defect still lands
+  in two categories. No line numbers in identity: an unrelated edit above the
+  defect would shift a line bucket and re-raise it. The line number is stored as
+  a search hint for contextual rematching after a rebase (the research doc's "do
+  not hash line numbers"). Record `reviewer` on each entry but exclude it from
+  the key. Never use LLM title text as identity — titles get reworded between
+  runs. Two distinct defects anchored to the same code can still collide;
+  `/flow:plan` must test that case and add a rule/condition discriminator if
+  collisions show up in practice. In addition, `/review:pr` injects the PR's
+  dismissed findings + dismissal reasons into reviewer prompts as a fenced
+  advisory block (same pattern as the existing learnings-context block), because
+  fingerprint-only dedup misses reworded re-detections of the same underlying
+  issue — this directly addresses a documented risk in this repo's own history:
   `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md`
   recorded a 38% false-positive rate in re-review rounds when prior
   fix/dismissal rationale isn't carried forward.
@@ -108,8 +111,13 @@ compound-staging's `cs_atomic_jsonl_write`) is called from two places in
 dismissed-findings advisory block injected into reviewer prompts; after Step 8
 (code simplifier), it appends the final residual set (everything in Step 10's
 Residual Actionable Work plus the report-only queue, not only
-`owner=downstream-resolver`) with dedup applied. `/review:triage` is the only
-other component that touches the file (read + append transitions + prune).
+`owner=downstream-resolver`) with dedup applied. The compact-return schema keeps
+only `file` and `line`, and Step 7's auto-fixes can shift lines, so the helper
+snapshots each finding's anchored code (hash plus the normalized lines) right
+after Step 6's aggregation, before Step 7 edits anything. The Step 8 write uses
+those snapshots; simplifier findings, which only exist after Step 8, are
+anchored against the post-fix file. `/review:triage` is the only other component
+that touches the file (read + append transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
 and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
 end.

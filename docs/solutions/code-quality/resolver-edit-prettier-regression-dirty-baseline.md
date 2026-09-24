@@ -84,17 +84,23 @@ ranges is the only check that is both accurate and minimal.
 ```bash
 file=plugins/yellow-review/commands/review/sweep-all.md
 
+# Per-run private scratch dir: parallel resolvers must not share snapshot
+# files, and copied source may contain the very secret a review is removing.
+old_umask=$(umask); umask 077
+tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT
+umask "$old_umask"
+
 # 1. What would Prettier produce for current and HEAD content?
-prettier --stdin-filepath "$file" < "$file" > /tmp/pretty-current.md
-git show "HEAD:$file" | prettier --stdin-filepath "$file" > /tmp/pretty-head.md
+prettier --stdin-filepath "$file" < "$file" > "$tmp/pretty-current.md"
+git show "HEAD:$file" | prettier --stdin-filepath "$file" > "$tmp/pretty-head.md"
 
 # 2. Which lines did the resolver actually touch (staged + unstaged)?
 git diff -U0 HEAD -- "$file"
 
 # 3. Formatting deltas for current and baseline
-diff "$file" /tmp/pretty-current.md > /tmp/delta-current.diff
-git show "HEAD:$file" > /tmp/head.md
-diff /tmp/head.md /tmp/pretty-head.md > /tmp/delta-head.diff
+diff "$file" "$tmp/pretty-current.md" > "$tmp/delta-current.diff"
+git show "HEAD:$file" > "$tmp/head.md"
+diff "$tmp/head.md" "$tmp/pretty-head.md" > "$tmp/delta-head.diff"
 
 # 4. Inside the edited ranges, only mismatches in delta-current that
 #    delta-head does not already have count as regressions.
