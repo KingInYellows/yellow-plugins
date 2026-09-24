@@ -1,0 +1,32 @@
+scripts/validate-doc-counts.js
+  s_7dc42093ad5a67::t_119c0b7f7e61a7 84-86,88-105,115-127
+  s_7dc42093ad5a67::t_46ae6e3b9bbc88 128
+docs/architecture-overview.md
+  s_7dc42093ad5a67::t_05d43963ac737e 488-493
+  s_7dc42093ad5a67::t_8bcbf99e0ec029 426-428
+  s_7dc42093ad5a67::t_704d16104bec24 439-440
+  s_7dc42093ad5a67::t_cc41e9dd28ef95 441-442
+  s_7dc42093ad5a67::t_d45be0ef778275 74-75,153-155,245-255,307-309,315,317-319,344-349,377-378,585,594-595
+tests/integration/validate-doc-counts.test.ts
+  s_7dc42093ad5a67::t_fdf2670c95558d 24-33
+  s_7dc42093ad5a67::t_95a6d69aa8f216 82-86
+  s_7dc42093ad5a67::t_4573e28ae26977 161-199
+CLAUDE.md
+  s_7dc42093ad5a67::t_148cd4f6eda7f8 201-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cd712a1c783cfe8c638fd6cdd1fd015fad210e6f",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
