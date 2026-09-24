@@ -891,8 +891,12 @@ since (the tag would then point at the wrong, later commit):
 
 - [ ] Create annotated tag on that exact commit (not local `HEAD`)
 
+  Read `package.json` from `$MERGE_SHA`, not the working tree — the current
+  checkout may not be at the merge commit, and a version read from `HEAD` can
+  tag `$MERGE_SHA` with the wrong version string:
+
   ```bash
-  VERSION=$(node -p "require('./package.json').version")
+  VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
   CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
   git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
@@ -900,10 +904,11 @@ since (the tag would then point at the wrong, later commit):
   "
   ```
 
-- [ ] Push tag to remote
+- [ ] Push tag to remote (reuse `$VERSION` from the previous step — do not
+      re-derive it from the working tree)
 
   ```bash
-  git push origin "v$(node -p "require('./package.json').version")"
+  git push origin "v$VERSION"
   ```
 
 - [ ] Trigger workflow with force_publish (recovery mode skips the existing

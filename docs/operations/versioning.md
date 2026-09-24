@@ -133,11 +133,16 @@ pnpm changeset status --since=origin/main
 The catalog version (`root package.json`) represents the overall marketplace
 snapshot bundled into a GitHub Release tarball.
 
-**Bump level:** always patch. `pnpm version-packages` runs
-`node scripts/catalog-version.js patch` once per release batch, whatever bump
-levels the plugins received, and the emergency path runs the same command.
-Pass `minor` or `major` to `catalog-version.js` by hand only as a deliberate,
-out-of-band decision.
+**Bump level:** always patch for both the automated path and `CONTRIBUTING.md`'s
+"Emergency manual release" — that procedure exists only to recover the bot's own
+PR and always mirrors it (`catalog-version.js patch`), never `minor`/`major`.
+
+A `minor` or `major` catalog bump is a separate, standalone maintenance
+decision, unrelated to either of those paths — cut via its own small PR that
+runs `node scripts/catalog-version.js minor` (or `major`) deliberately, out of
+band from any pending plugin release. See
+`docs/maintenance/catalog-release-gap.md` for a worked example (PR #580 bumped
+the catalog to a major version alongside a breaking marketplace change).
 
 The catalog version does NOT need to match any individual plugin version. It is
 a timestamp of the marketplace snapshot, not a semantic compatibility signal.

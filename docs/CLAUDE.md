@@ -83,11 +83,14 @@ syncs `plugin.json`/`marketplace.json`) and
 that PR merges, `pnpm tag` creates per-plugin tags (`yellow-core@1.1.1`) and a
 root catalog tag (`v1.1.2`), and the build-and-release job in the same workflow
 builds artifacts and publishes a GitHub Release. `apply:changesets`,
-`catalog-version.js`, and `tag` are CI-run steps, not developer commands —
-running them by hand is an **emergency-only** recovery procedure (bot cannot
-open the PR); see `CONTRIBUTING.md` "Emergency manual release" and
-`docs/operations/versioning.md` before doing so. Manual recovery when a publish
-run failed or logged "nothing to do":
+`catalog-version.js`, and `tag` are CI-run steps, not developer commands.
+Hand-running `apply:changesets` or `tag` outside CI is an **emergency-only**
+recovery procedure (bot cannot open the PR) that always mirrors the bot's own
+`patch` bump — see `CONTRIBUTING.md` "Emergency manual release". Hand-running
+`catalog-version.js` with `minor` or `major` is a separate, deliberate
+out-of-band catalog-snapshot decision, independent of any plugin release urgency
+— see `docs/operations/versioning.md` "Catalog Version Rules". Manual recovery
+when a publish run failed or logged "nothing to do":
 `gh workflow run version-packages.yml -f force_publish=true` — this is a
 recovery mechanism that can re-publish under a stale tag, not a routine command;
 read the warning in `docs/operations/release-checklist.md` Section 2.2 first.

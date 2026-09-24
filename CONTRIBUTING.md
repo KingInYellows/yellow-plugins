@@ -257,9 +257,13 @@ verification gate before merging.
 
 ### Emergency manual release
 
-Use this only when the bot cannot open the Version Packages PR. It produces
-the same commit by hand, and still releases through a reviewed PR — nothing
-is pushed straight to `main`.
+Use this only when the bot cannot open the Version Packages PR. It produces the
+same commit by hand, and still releases through a reviewed PR — nothing is
+pushed straight to `main`. This procedure always mirrors the bot's own
+`catalog-version.js patch` bump; a deliberate out-of-band `minor`/`major`
+catalog bump is a separate, standalone decision documented in
+`docs/operations/versioning.md` "Catalog Version Rules", not part of this
+recovery path.
 
 > **Note**: Tags do **not** trigger the workflow. `version-packages.yml`
 > triggers on push to `main` or manual `workflow_dispatch`. Do not create or
@@ -276,6 +280,9 @@ is pushed straight to `main`.
 > PR.
 
 ```bash
+# Run /stack:status first; continue only on READY_GRAPHITE or READY_GITHUB —
+# every other state stops here (AGENTS.md "Workflow Conventions"). Do not
+# pick a provider-specific submit command without resolving this first.
 # On a new branch created with the enabled stacked-PR provider:
 pnpm version-packages         # same command the bot runs: apply changesets,
                               # sync manifests, catalog-version.js patch,
@@ -293,12 +300,24 @@ pnpm install                  # pick up lockfile changes, if any
 # (per-plugin tags + catalog tag) and build-and-release (GitHub Release).
 # --limit 1 right after merging can return the previous run or a still-
 # queued one, so gh release view can fail before publication finishes.
-# Capture the run for the merge commit and wait for it instead.
+# Capture the run for the merge commit and wait for it instead. GitHub can
+# take a few seconds to create the run, so poll until one exists rather than
+# handing gh run watch an empty run_id.
 git fetch origin main && merge_sha=$(git rev-parse origin/main)
-run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
-  --json databaseId -q '.[0].databaseId')
-gh run watch "$run_id" --exit-status
-gh release view "v$(node -p "require('./package.json').version")"
+run_id=""
+for _ in $(seq 1 15); do
+  run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
+    --json databaseId -q '.[0].databaseId')
+  [ -n "$run_id" ] && break
+  sleep 10
+done
+if [ -z "$run_id" ]; then
+  echo "No version-packages.yml run found for $merge_sha after 2.5 minutes." >&2
+  echo "Check the Actions tab before proceeding to force_publish." >&2
+else
+  gh run watch "$run_id" --exit-status &&
+    gh release view "v$(node -p "require('./package.json').version")"
+fi
 
 # Recovery, from main, only if that run failed or logged "nothing to do":
 gh workflow run version-packages.yml -f force_publish=true

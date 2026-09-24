@@ -69,20 +69,25 @@ The most common workflow chain. Use for any feature implementation. Run
 
 ### Full Chain
 
-| Step | `READY_GRAPHITE`   | `READY_GITHUB`         |
-| ---- | ------------------ | ---------------------- |
-| 1    | `/flow:brainstorm` | `/flow:brainstorm`     |
-| 2    | `/flow:plan`       | `/flow:plan`           |
-| 3    | `/gt-stack-plan`   | _(skip — see below)_   |
-| 4    | `/flow:work`       | `/flow:work`           |
-| 5    | `/smart-submit`    | `/github-stack:submit` |
-| 6    | `/review:pr`       | `/review:pr`           |
-| 7    | `/review:resolve`  | `/review:resolve`      |
-| 8    | `/linear:sync`     | `/linear:sync`         |
+| Step | `READY_GRAPHITE`   | `READY_GITHUB`           |
+| ---- | ------------------ | ------------------------ |
+| 1    | `/flow:brainstorm` | `/flow:brainstorm`       |
+| 2    | `/flow:plan`       | `/flow:plan`             |
+| 3    | `/gt-stack-plan`   | _(skip — see below)_     |
+| 4    | `/flow:work`       | `/flow:work`             |
+| 5    | `/smart-submit`\*  | `/github-stack:submit`\* |
+| 6    | `/review:pr`       | `/review:pr`             |
+| 7    | `/review:resolve`  | `/review:resolve`        |
+| 8    | `/linear:sync`     | `/linear:sync`           |
 
 `/github-stack:plan` only reports the current stack. It does not decompose a
 feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
 `/smart-submit`.
+
+\* `/flow:work`'s Phase 4 already delegates to this skill internally once its
+work is done — see Step 5 below. Only invoke it again yourself if you make
+further uncommitted changes after `/flow:work` finishes; both skills check for
+uncommitted changes first and exit without submitting if there are none.
 
 ### Step by Step
 
@@ -98,15 +103,21 @@ feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
    into stacked PRs. Skip for single-PR features. On `READY_GITHUB`, skip this
    step; `/github-stack:plan` is a read-only stack view, not a decomposition.
 
-4. **`/flow:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
-   plan. **Important:** pass the plan file path explicitly. `/flow:work`
-   uses whichever stacked-PR provider is ready (Graphite or GitHub).
+4. **`/flow:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the plan.
+   **Important:** pass the plan file path explicitly. `/flow:work` uses
+   whichever stacked-PR provider is ready (Graphite or GitHub), and its Phase 4
+   already commits and submits the work as described in Step 5 below — you do
+   not run a separate submit command unless you make further uncommitted changes
+   afterward.
 
-5. **Submit.** On `READY_GRAPHITE`, **`/smart-submit`** audits changes, commits,
-   and pushes via `gt submit --no-interactive`, running parallel code quality
-   agents before pushing. On `READY_GITHUB`, **`/github-stack:submit`** stages
-   specific files, commits, and submits with `gh stack submit` (draft by
-   default). It does not run those audit agents.
+5. **Submit (already done by `/flow:work` Phase 4).** On `READY_GRAPHITE`,
+   **`/smart-submit`** audits changes, commits, and pushes via
+   `gt submit --no-interactive`, running parallel code quality agents before
+   pushing. On `READY_GITHUB`, **`/github-stack:submit`** stages specific files,
+   commits, and submits with `gh stack submit` (draft by default). It does not
+   run those audit agents. Both skills check for uncommitted changes first and
+   exit without submitting if there are none — running either one again right
+   after `/flow:work` finishes is a no-op.
 
 6. **`/review:pr`** — Multi-agent review of the submitted PR. Applies P1/P2
    fixes; confirms with user before pushing. Requires yellow-review.
@@ -123,7 +134,10 @@ feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
 | ---- | -------------------------------------------- | ---------------------------------------------- |
 | 1    | `/flow:plan`                                 | `/flow:plan`                                   |
 | 2    | `/flow:work <plan-path>`                     | `/flow:work <plan-path>`                       |
-| 3    | `/smart-submit`                              | `/github-stack:submit`                         |
+| 3    | `/smart-submit`\*                            | `/github-stack:submit`\*                       |
+
+\* Same caveat as the Full Chain above: `/flow:work` already runs this step
+internally in its Phase 4.
 
 ### Without Linear
 
@@ -242,9 +256,11 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 | Amend    | `/gt-amend` or `/smart-submit` | `/github-stack:amend` |
 
 1. **Sync.** **`/gt-sync`** pulls latest from trunk, restacks branches, and
-   cleans up merged PRs. **`/github-stack:sync`** pulls trunk and syncs the
-   local stack with `gh stack sync` (pruning merged branches needs
-   confirmation).
+   cleans up merged PRs. **`/github-stack:sync`** pulls trunk, cascade-rebases
+   the local stack onto it, and pushes every stack branch (`gh stack sync`
+   pushes atomically with `--force-with-lease`) before syncing PR state — it
+   updates remote branches, not just the local stack (pruning merged branches
+   needs confirmation).
 
 2. **Navigate.** **`/gt-nav`** visualizes the Graphite stack and moves between
    branches. **`/github-stack:nav`** checks out a stack number, PR, URL, or
