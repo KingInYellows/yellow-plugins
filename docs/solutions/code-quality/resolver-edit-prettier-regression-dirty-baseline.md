@@ -49,14 +49,18 @@ regression:
    raw delta hunks cannot be compared directly: an edit that changes the text of
    an already-drifted line changes both hunks even when it adds no new
    formatting problem. Map each edited line to its `HEAD` origin using the
-   `git diff -U0 HEAD` hunks instead. A line is a regression only if Prettier
-   would change it now and either it is newly added, or its `HEAD` counterpart
-   was already Prettier-clean (no hunk in the `HEAD` delta). Fix those
-   (indentation, wrap width, quote style) without a blanket `prettier --write`
-   that would also rewrite pre-existing drift.
-6. An edited line whose `HEAD` counterpart was already mis-formatted is
-   pre-existing drift, even though its text changed. Leave its formatting as it
-   was; fixing it is a separate, out-of-scope cleanup.
+   `git diff -U0 HEAD` hunks instead, then compare the specific formatter edits
+   on each mapped line rather than whether the line was dirty. The formatter
+   edit is what Prettier changes on a line (a wrap, spacing, quotes). A line has
+   a regression when its current formatter edit contains a change the `HEAD`
+   counterpart's formatter edit does not — for example a new over-width wrap on
+   a line that was only missing spaces before. Newly added lines count any
+   formatter edit. Fix only those new changes (indentation, wrap width, quote
+   style) without a blanket `prettier --write` that would also rewrite
+   pre-existing drift.
+6. Formatter edits that the `HEAD` counterpart already needed are pre-existing
+   drift, even on a line whose text changed. Leave those as they were; fixing
+   them is a separate, out-of-scope cleanup.
 
 This is the file-scoped analogue of a full-file `prettier --check`: it answers
 "did _my_ edit regress formatting" instead of "is this file formatted," which is

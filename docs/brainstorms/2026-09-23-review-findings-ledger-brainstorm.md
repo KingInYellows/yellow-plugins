@@ -111,9 +111,12 @@ the shared clone's git dir, not a per-worktree path):
   (same shape as the existing learnings-context block, but not its sanitization
   alone: stored titles and reasons can echo PR text, so the block's own
   delimiters are substituted out of every interpolated value first, as the
-  pr-context fence already requires, before XML escaping), because
-  fingerprint-only dedup misses reworded re-detections of the same underlying
-  issue — this directly addresses a documented risk in this repo's own history:
+  pr-context fence already requires, before XML escaping; and, like the
+  learnings block, it carries the explicit semantic control that its content is
+  reference data only and reviewers must not follow any instructions inside it),
+  because fingerprint-only dedup misses reworded re-detections of the same
+  underlying issue — this directly addresses a documented risk in this repo's
+  own history:
   `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md`
   recorded a 38% false-positive rate in re-review rounds when prior
   fix/dismissal rationale isn't carried forward.
@@ -335,8 +338,11 @@ For `/flow:plan` to pick up, in dependency order:
    enclosing symbol or AST path the reviewer is looking at, e.g.
    `handlers.createUser`, or the nearest markdown heading), because a generic
    shell helper cannot derive scope reliably across languages; the converter
-   assigns `unscoped`, and the plan tests that two identical handlers with
-   different `scope` stay separate.
+   assigns `unscoped`. An `unscoped` finding has no reliable identity, so its
+   fingerprint also includes the line hint (less stable across edits, but it
+   never merges two separate sites); the plan tests that two identical handlers
+   stay separate both with different `scope` values and through converter
+   output.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
@@ -351,23 +357,29 @@ For `/flow:plan` to pick up, in dependency order:
    allowlist `[A-Za-z0-9._/@+-]` so shell metacharacters such as `$()`,
    backticks, `;` or wildcards are rejected outright; and every command that
    takes a path gets it as a separate argv element after `--`, never
-   interpolated into a shell string; and a `realpath` inside the repo root so
-   symlinks cannot escape; in the read-only fallback the same lexical checks
-   apply, but existence and file type are checked against the target commit tree
-   instead (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
+   interpolated into a shell string; the checked-out worktree entry itself must
+   be a regular file and not a symlink (`test -f` and `! test -L`, checked
+   before `realpath`), because the Git tree mode says nothing about what is on
+   disk; and a `realpath` inside the repo root so symlinks cannot escape; in the
+   read-only fallback the same lexical checks apply, but existence and file type
+   are checked against the target commit tree instead
+   (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
    `git ls-tree`, never a symlink), so a file only the PR adds is not wrongly
-   marked `stale`. A deletion finding is re-verified against its recorded base
-   SHA instead: the base blob must still hold the anchor and the PR diff must
-   still delete the path (`git diff --name-status <base>...<headRefOid>` shows
-   `D`), so it is not marked `stale` just because the head no longer has the
-   file; reject the entry as `stale` otherwise — reviewer paths are
-   model-produced from PR content), attended = apply each finding the human
-   approves / `--non-interactive` = apply nothing (re-verify, mark `stale`,
-   prune when the target PR is merged/closed), `--prune <pr>` = skip re-verify
-   and apply; call `gh pr view <pr> --json state` and delete `<pr>.jsonl`,
-   `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or `CLOSED` (the
-   only ledger deletion path — `/review:sweep-all` delegates here), append
-   transition records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
+   marked `stale`. A deletion finding keeps its recorded base blob only for
+   anchor recovery; whether the PR still deletes the path is decided against the
+   current base (`gh pr view --json baseRefOid`, then
+   `git diff --name-status $(git merge-base <currentBase> <headRefOid>) <headRefOid>`
+   shows `D`), so a rebase onto a base that already lacks the file retires the
+   finding instead of keeping it actionable, and it is not marked `stale` just
+   because the head no longer has the file; reject the entry as `stale`
+   otherwise — reviewer paths are model-produced from PR content), attended =
+   apply each finding the human approves / `--non-interactive` = apply nothing
+   (re-verify, mark `stale`, prune when the target PR is merged/closed),
+   `--prune <pr>` = skip re-verify and apply; call
+   `gh pr view <pr> --json state` and delete `<pr>.jsonl`, `<pr>.pending`, and
+   `<pr>.state` only when state is `MERGED` or `CLOSED` (the only ledger
+   deletion path — `/review:sweep-all` delegates here), append transition
+   records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
    transitions for `reopened`; `applied`→`fixed` once the ancestor check shows
    its fixing SHA is published, or `applied`→`dismissed` for an abandoned or
    invalid fix; and for `report_only` once a human fixes or dismisses one or
@@ -425,6 +437,9 @@ For `/flow:plan` to pick up, in dependency order:
    location and lifecycle states, `/review:pr`'s new persistence behaviour, and
    the SessionStart hook and its message, as the repo's documentation contract
    requires for behaviour changes.
+7. **Changeset** — a `yellow-review` `minor` changeset (`pnpm changeset`) for
+   the new `/review:triage` command and SessionStart hook, as CI's changeset
+   gate requires for any `plugins/` change.
 
 ## Open Questions
 
