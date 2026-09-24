@@ -226,48 +226,26 @@ installs copy plugins to `~/.claude/plugins/cache/`.
 
 ## Create a New Plugin
 
-1. Create a directory under `plugins/`:
+A new plugin lives under `plugins/`:
 
-   ```text
-   plugins/my-plugin/
-     .claude-plugin/
-       plugin.json      # generated in step 5 — do not create by hand
-     commands/
-       my-command.md
-     CLAUDE.md
-     package.json
-   ```
+```text
+plugins/my-plugin/
+  .claude-plugin/
+    plugin.json      # generated — do not create by hand
+  commands/
+    my-command.md
+  CLAUDE.md
+  package.json
+```
 
-2. Add `plugins/my-plugin/package.json` with `"name": "my-plugin"` and a
-   semver `version` (the version source of truth — the generator fails if
-   `name` differs from the catalog name).
-
-3. Add `catalog/plugins/my-plugin.json` with every required key: `$schema`,
-   `description`, `author`, `homepage`, `repository`, `license`, `keywords`,
-   `marketplace` (`category`, and `source` of `./plugins/my-plugin`), and
-   `targets` of `{"claude": true, "codex": {"enabled": false}}` — without
-   `targets.claude: true` no `plugin.json` is emitted. Append the name to
-   `pluginOrder` in `catalog/catalog.json`. Field rules are in
-   `catalog/README.md`; `docs/plugin-template.md` Step 5 has a full example.
-   Do not hand-edit `plugins/my-plugin/.claude-plugin/plugin.json` or
-   `.claude-plugin/marketplace.json`.
-
-4. Add the plugin to `plugins/yellow-core/commands/setup/all.md` (see the
-   header of `scripts/validate-setup-all.js` for the sections it checks), and
-   update the "N plugins" counts in the root `CLAUDE.md`, `README.md`,
-   `CONTRIBUTING.md`, and `AGENTS.md`. `pnpm validate:schemas` fails on either
-   gap.
-
-5. Regenerate, then validate:
-
-   ```bash
-   pnpm generate:manifests
-   pnpm validate:schemas
-   ```
-
-   `pnpm generate:manifests` emits the plugin manifest and the marketplace
-   entry. The `plugin.json` shown in the directory tree above is that
-   generated file.
+`package.json` (`"name"` + semver `version` + `"private": true`) and
+`catalog/plugins/my-plugin.json` are the two files you write by hand;
+`pnpm generate:manifests` emits `plugin.json` and the marketplace entry from
+them. The full numbered procedure (catalog fields, `pluginOrder`, `setup/all.md`
+wiring, the lockfile/changeset/validation steps) lives in
+[CONTRIBUTING.md "Adding a Plugin"](CONTRIBUTING.md#adding-a-plugin) — that is
+the canonical checklist; `docs/plugin-template.md` has the full worked example
+with concrete JSON.
 
 See each plugin's `CLAUDE.md` for conventions, component details, and usage
 guides.

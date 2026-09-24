@@ -33,21 +33,21 @@ Error codes follow the pattern: `ERROR-{CATEGORY}-{NUMBER}`
 
 ### Error Categories
 
-| Category   | `ErrorCategory`        | Description                                              |
-| ---------- | ---------------------- | -------------------------------------------------------- |
-| `SCHEMA`   | `SCHEMA_VALIDATION`    | JSON Schema validation failures                          |
-| `COMPAT`   | `COMPATIBILITY`        | Compatibility and dependency issues                      |
-| `INST`     | `INSTALLATION`         | Installation and lifecycle errors                        |
-| `DISC`     | `DISCOVERY`            | Discovery and marketplace errors                         |
-| `PERM`     | `PERMISSION`           | Permission and security errors                           |
-| `NET`      | `NETWORK`              | Network and connectivity errors                          |
-| `SOL`      | `SOLUTION_DOCS`        | Solution-doc slug and frontmatter checks                 |
-| `PLAN`     | `PLAN_LIFECYCLE`       | Archived-plan checkbox checks                            |
-| `SETUP`    | `SETUP_COVERAGE`       | `setup:all` coverage checks                              |
-| `PROVIDER` | `CAPABILITY_PROVIDER`  | Capability-provider catalog checks                       |
-| `DIST`     | `DISTRIBUTION`         | Codex distribution codes in `error-codes.json`           |
-| `NAMESPACE`| `NAMESPACE_MIGRATION`  | Retired `workflows:` namespace checks                    |
-| `CURSOR`   | (none)                 | Cursor distribution codes; not an `ErrorCategory` member |
+| Category    | `ErrorCategory`       | Description                                              |
+| ----------- | --------------------- | -------------------------------------------------------- |
+| `SCHEMA`    | `SCHEMA_VALIDATION`   | JSON Schema validation failures                          |
+| `COMPAT`    | `COMPATIBILITY`       | Compatibility and dependency issues                      |
+| `INST`      | `INSTALLATION`        | Installation and lifecycle errors                        |
+| `DISC`      | `DISCOVERY`           | Discovery and marketplace errors                         |
+| `PERM`      | `PERMISSION`          | Permission and security errors                           |
+| `NET`       | `NETWORK`             | Network and connectivity errors                          |
+| `SOL`       | `SOLUTION_DOCS`       | Solution-doc slug and frontmatter checks                 |
+| `PLAN`      | `PLAN_LIFECYCLE`      | Archived-plan checkbox checks                            |
+| `SETUP`     | `SETUP_COVERAGE`      | `setup:all` coverage checks                              |
+| `PROVIDER`  | `CAPABILITY_PROVIDER` | Capability-provider catalog checks                       |
+| `DIST`      | `DISTRIBUTION`        | Codex distribution codes in `error-codes.json`           |
+| `NAMESPACE` | `NAMESPACE_MIGRATION` | Retired `workflows:` namespace checks                    |
+| `CURSOR`    | —                     | Cursor distribution codes; not an `ErrorCategory` member |
 
 `ERROR-CURSOR-*` values are `ERROR_CODES` entries. They are not listed in the
 `ErrorCategory` grouping map in `errorCatalog.ts`. The six categories above
@@ -622,7 +622,7 @@ Output: "Error: Missing dependency 'jq'"
 
 ---
 
-### ERROR-INST-008: Lifecycle Consent Required (Uninstall)
+### ERROR-INST-008 (RESERVED, not emitted): Lifecycle Consent Required (Uninstall)
 
 **Severity**: ERROR  
 **Category**: INSTALLATION  
@@ -651,7 +651,7 @@ reviewed or whose digest no longer matches the consented version.
 
 ---
 
-### ERROR-INST-009: Cache Purge Failure (FR-010)
+### ERROR-INST-009 (RESERVED, not emitted): Cache Purge Failure (FR-010)
 
 **Severity**: ERROR  
 **Category**: INSTALLATION  
@@ -923,16 +923,16 @@ Defined on `ERROR_CODES`. Not an `ErrorCategory` enum value.
 `scripts/` at this commit. `scripts/validate-versions.js` checks Cursor
 version and marketplace membership in prose; it does not emit these codes.
 
-| Code               | Constant                   | Meaning                                                                       |
-| ------------------ | -------------------------- | ----------------------------------------------------------------------------- |
-| `ERROR-CURSOR-001` | `CURSOR_ARTIFACT_MISSING`  | Generated Cursor manifest or marketplace file missing                         |
-| `ERROR-CURSOR-002` | `CURSOR_SCHEMA_VIOLATION`  | Cursor artifact failed schema or JSON checks                                  |
-| `ERROR-CURSOR-003` | `CURSOR_MARKETPLACE_DRIFT` | Catalog constant only (see note above)                                        |
-| `ERROR-CURSOR-004` | `CURSOR_VERSION_DRIFT`     | Catalog constant only (see note above)                                        |
-| `ERROR-CURSOR-005` | `CURSOR_EXPOSURE_LEAK`     | Exposure lint found a disallowed construct                                    |
-| `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID` | Catalog constant only (see note above)                                        |
-| `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`  | Generated artifact contains a `lifecycle` key                                 |
-| `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`     | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
+| Code               | Constant                   | Status       | Meaning                                                                       |
+| ------------------ | -------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| `ERROR-CURSOR-001` | `CURSOR_ARTIFACT_MISSING`  | emitted      | Generated Cursor manifest or marketplace file missing                         |
+| `ERROR-CURSOR-002` | `CURSOR_SCHEMA_VIOLATION`  | emitted      | Cursor artifact failed schema or JSON checks                                  |
+| `ERROR-CURSOR-003` | `CURSOR_MARKETPLACE_DRIFT` | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-004` | `CURSOR_VERSION_DRIFT`     | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-005` | `CURSOR_EXPOSURE_LEAK`     | emitted      | Exposure lint found a disallowed construct                                    |
+| `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID` | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`  | emitted      | Generated artifact contains a `lifecycle` key                                 |
+| `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`     | emitted      | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
 
 ## Codex Distribution Errors (DIST)
 
@@ -942,16 +942,19 @@ version and marketplace membership in prose; it does not emit these codes.
 `scripts/validate-codex.js` does not read that registry. Meanings are from
 R14 of `plans/specs/claude-code-codex-plugin-pilot.md`.
 
-| Code             | Constant                                  | Meaning                                  |
-| ---------------- | ----------------------------------------- | ---------------------------------------- |
-| `ERROR-DIST-001` | `DIST_MALFORMED_CATALOG_SOURCE`           | Malformed catalog source                 |
-| `ERROR-DIST-002` | `DIST_INVENTORY_ORDER_MISMATCH`           | Inventory or order mismatch              |
-| `ERROR-DIST-003` | `DIST_GENERATED_ARTIFACT_DRIFT`           | Generated-artifact drift                 |
-| `ERROR-DIST-004` | `DIST_INVALID_GENERATED_MANIFEST`         | Invalid generated manifest               |
-| `ERROR-DIST-005` | `DIST_UNSUPPORTED_SURFACE_EXPOSED`        | Unsupported surface exposed to Codex     |
-| `ERROR-DIST-006` | `DIST_HOOK_CONTRACT_VIOLATION`            | Hook contract violation                  |
-| `ERROR-DIST-007` | `DIST_WINDOWS_PATH_PORTABILITY_FAILURE`   | Windows or path portability failure      |
-| `ERROR-DIST-008` | `DIST_MCP_AUTH_CONFIG_FAILURE`            | MCP or auth configuration failure        |
+All eight are **reserved** — defined in the catalog, not emitted by any
+script yet.
+
+| Code             | Constant                                | Meaning                              |
+| ---------------- | --------------------------------------- | ------------------------------------ |
+| `ERROR-DIST-001` | `DIST_MALFORMED_CATALOG_SOURCE`         | Malformed catalog source             |
+| `ERROR-DIST-002` | `DIST_INVENTORY_ORDER_MISMATCH`         | Inventory or order mismatch          |
+| `ERROR-DIST-003` | `DIST_GENERATED_ARTIFACT_DRIFT`         | Generated-artifact drift             |
+| `ERROR-DIST-004` | `DIST_INVALID_GENERATED_MANIFEST`       | Invalid generated manifest           |
+| `ERROR-DIST-005` | `DIST_UNSUPPORTED_SURFACE_EXPOSED`      | Unsupported surface exposed to Codex |
+| `ERROR-DIST-006` | `DIST_HOOK_CONTRACT_VIOLATION`          | Hook contract violation              |
+| `ERROR-DIST-007` | `DIST_WINDOWS_PATH_PORTABILITY_FAILURE` | Windows or path portability failure  |
+| `ERROR-DIST-008` | `DIST_MCP_AUTH_CONFIG_FAILURE`          | MCP or auth configuration failure    |
 
 ## Error Handling Best Practices
 

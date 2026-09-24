@@ -79,7 +79,9 @@ and sign-offs at each stage.
 mandatory smoke tests across macOS, Linux, and WSL platforms.
 
 **Authority**: No release may proceed without completing all sections and
-obtaining final sign-off.
+obtaining final sign-off — except Section 3.2-3.7, which are non-blocking until
+`docs/contracts/cli-contracts.md` is implemented (see the scope note at the top
+of Section 3).
 
 ---
 
@@ -119,15 +121,13 @@ graph TD
 #    a tag to trigger the workflow.
 ```
 
-**Emergency manual release** (only when the bot cannot open the Version
-Packages PR): see `CONTRIBUTING.md` "Emergency manual release". That path runs
+**Emergency manual release** (only when the bot cannot open the Version Packages
+PR): see `CONTRIBUTING.md` "Emergency manual release" — the canonical procedure,
+including the stale-tag, stale-branch, and `force_publish` overwrite-risk
+cautions (not repeated here). Short version: that path runs
 `pnpm version-packages` on a hand-made branch, submits it through the enabled
 stacked-PR provider, and merges that PR to `main` — it never pushes to `main`
-directly. The merge publishes the same way as Phase 0 step 5. Do not create or
-push tags by hand before the merge: an existing `v<catalog-version>` tag makes
-the run log "nothing to do" and skip the GitHub Release. Run
-`gh workflow run version-packages.yml -f force_publish=true` only if that run
-failed or skipped publishing.
+directly. The merge publishes the same way as Phase 0 step 5.
 
 See `docs/operations/versioning.md` for the complete developer workflow and
 semver bump rules.
@@ -170,6 +170,19 @@ semver bump rules.
   git fetch origin
   git status
   # Expected: "Your branch is up to date with 'origin/<that branch>'"
+  ```
+
+- [ ] Record the branch head SHA now — the bot force-pushes the same "chore:
+      version packages" PR whenever a new changeset lands on `main`, and this
+      checklist runs 2-4 hours. A gate passed against one SHA does not attest to
+      a later one.
+
+  ```bash
+  git rev-parse HEAD
+  # Record this value. Immediately before merging (end of Phase 0 step 5),
+  # `git fetch origin && git rev-parse origin/<branch>` and compare — if it
+  # moved, the PR changed underneath you: re-run Sections 1-4 against the new
+  # head before merging.
   ```
 
 - [ ] `main` CI is green, and the branch passes the Section 2 local run
@@ -265,12 +278,20 @@ Section 4 security directives.
       do not run it again. `catalog-version.js patch` bumps on every run, so a
       second run skips a catalog version
 
-- [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's
-      date
+- [ ] Root `CHANGELOG.md` contains a catalog entry for this version with today's
+      date — **nothing automates this**: `catalog-version.js` only bumps
+      `package.json`, and `generate-release-notes.js` reads whatever is already
+      there (it falls back to a minimal header if the entry is missing, so the
+      Release still publishes with a thin body). If the entry is missing at this
+      point in the checklist, write it by hand now — do not defer to Section
+      4.1, which only re-checks it after the PR merges
 
   ```bash
   grep -A 1 "## \[$(node -p 'require("./package.json").version')\]" CHANGELOG.md
   # Expected: ## [X.Y.Z] - YYYY-MM-DD
+  # If absent: add a heading above the previous entry summarizing the plugin
+  # changes in this release batch (mirror the bumped plugins/CHANGELOG.md
+  # entries), commit it as part of this branch.
   ```
 
 - [ ] No version conflicts in workspace packages
@@ -346,19 +367,18 @@ seconds median.
 > It will create real tags and a real GitHub Release. Use it only after a failed
 > release where tags were already created but the release was not published.
 
-- [ ] Verify the Version Packages PR exists and CI passes on it
+- [ ] Verify the Version Packages PR exists
 
   ```bash
   gh pr list --search "chore: version packages"
   ```
 
-- [ ] Confirm the PR's CI checks are green before merging
-
-- [ ] Review workflow summary
-  ```bash
-  gh run view --log
-  # Confirm validation, build, artifact generation steps all green
-  ```
+  The bot-created PR does **not** trigger `on: pull_request` CI (see Section
+  1.1) — there are no PR checks to wait on. `pnpm release:check`, run locally
+  against this branch in Section 2.1, is the actual gate before merging.
+  `version-packages.yml`'s `build-and-release` job (validation, build, artifact
+  generation) only runs after this PR merges — see Section 5.3 for reviewing
+  that run.
 
 **Reference**: `.github/workflows/version-packages.yml`, Iteration 4 validation
 focus.
@@ -410,6 +430,21 @@ metrics/observability.
 
 ## Section 3: Manual Smoke Tests
 
+> **Scope note**: 3.2-3.7 below test a
+> `pnpm cli install/update/publish/ rollback/uninstall` command surface, a
+> `.claude-plugin/registry.json`, and a `.claude-plugin/cache/` layout. **None
+> of that exists in this repository.** `packages/cli` ships exactly one
+> subcommand (`pnpm cli validate:plugins`); install/update/rollback/uninstall
+> are handled natively by Claude Code (`docs/CLAUDE.md` "Architecture"). 3.2-3.7
+> describe the design-time CLI contract in `docs/contracts/cli-contracts.md` and
+> cannot currently pass — they are **not** part of the blocking release gate.
+> Until that CLI ships, gate the real install path instead: add the marketplace
+> (`/plugin marketplace add <path>` or a clean-machine install per
+> CONTRIBUTING.md "Local vs Remote Validator Divergence"), install a sample
+> plugin with `/plugin install <id>@yellow-plugins`, and run `claude doctor` to
+> confirm zero plugin errors. Track 3.2-3.7 as sign-off criteria only once
+> `cli-contracts.md` is implemented.
+
 ### 3.1 Test Matrix Definition
 
 **Objective**: Define platforms and configurations for smoke testing.
@@ -444,7 +479,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.2 Install Workflow Test
 
-**Objective**: Validate end-to-end plugin installation.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate
+end-to-end plugin installation.
 
 **Prerequisites**: Sample plugin repository or test fixture available.
 
@@ -493,7 +530,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.3 Update Workflow Test
 
-**Objective**: Validate plugin update with changelog awareness.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate plugin
+update with changelog awareness.
 
 **Prerequisites**: Plugin installed from previous test, newer version available.
 
@@ -527,7 +566,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.4 Publish Workflow Test
 
-**Objective**: Validate publish command with git integration (dry-run).
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate publish
+command with git integration (dry-run).
 
 **Prerequisites**: Test plugin repository with valid `plugin.json`.
 
@@ -555,7 +596,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.5 Rollback Workflow Test
 
-**Objective**: Validate instant rollback via symlink swap.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate instant
+rollback via symlink swap.
 
 **Prerequisites**: Plugin with multiple versions installed (from update test).
 
@@ -593,7 +636,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.6 Uninstall Workflow Test
 
-**Objective**: Validate complete plugin removal with lifecycle hooks.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate
+complete plugin removal with lifecycle hooks.
 
 **Prerequisites**: Plugin installed (from previous tests).
 
@@ -672,7 +717,9 @@ targets.
 
 ### 4.1 CHANGELOG.md
 
-**Objective**: Ensure changelog entry is complete and traceable.
+**Objective**: Ensure changelog entry is complete and traceable. This is a
+re-check, not first authorship — Section 1.4 required the entry to already exist
+by hand (nothing writes it automatically) before Sections 2-3 ran.
 
 - [ ] Version heading follows format: `## [X.Y.Z] - YYYY-MM-DD`
 - [ ] All functional changes cited with FR/NFR/CRIT identifiers
@@ -811,28 +858,43 @@ tagging conventions.
 
 ### 5.2 Manual Tag Creation (Emergency Recovery Only)
 
-**Objective**: Create tags manually when automated flow cannot be used.
+**Objective**: Recover a stuck release without hand-tagging the wrong commit.
 
 > **Warning**: This section is for emergency recovery only. In normal releases,  
 > tags are created automatically by the workflow.
 
-**Only perform these steps if you must bypass the normal automated flow.** Tag
-only after the release PR has merged: a `v<catalog-version>` tag that exists
-before the merge makes the merge's workflow run log "nothing to do" and skip
-the GitHub Release (see Phase 0 above).
+**Try this first, alone — no manual git tagging needed.**
+`scripts/ci/release-tags.sh` (invoked by `force_publish=true`) creates and
+pushes any missing catalog/per-plugin tags itself, from the exact commit the
+workflow run checks out — safer than a local tag, which depends on your working
+copy being exactly at the merge commit:
 
-- [ ] Check out `main` at the merged release commit
+```bash
+gh workflow run version-packages.yml -f force_publish=true
+gh run watch
+```
+
+**Only if GitHub Actions itself cannot run this workflow** (Actions outage,
+workflow disabled) does manual tagging become necessary. In that case, tag the
+release PR's actual merge commit — not whatever `main` happens to point to
+locally. `git checkout main && git pull` tags the _current_ tip of `main`, which
+may have advanced past the release PR's merge commit if anything else merged
+since (the tag would then point at the wrong, later commit):
+
+- [ ] Resolve the release PR's actual merge commit SHA
 
   ```bash
-  git checkout main && git pull --ff-only
+  PR_NUMBER=$(gh pr list --search "chore: version packages" --state merged --limit 1 --json number -q '.[0].number')
+  MERGE_SHA=$(gh pr view "$PR_NUMBER" --json mergeCommit -q '.mergeCommit.oid')
+  echo "Merge commit: $MERGE_SHA"
   ```
 
-- [ ] Create annotated tag locally
+- [ ] Create annotated tag on that exact commit (not local `HEAD`)
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
   CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
-  git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
+  git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
   "
@@ -845,8 +907,8 @@ the GitHub Release (see Phase 0 above).
   ```
 
 - [ ] Trigger workflow with force_publish (recovery mode skips the existing
-      catalog tag, creates any missing per-plugin tags, and publishes the
-      GitHub Release)
+      catalog tag, creates any missing per-plugin tags, and publishes the GitHub
+      Release)
 
   ```bash
   gh workflow run version-packages.yml -f force_publish=true
@@ -1212,6 +1274,16 @@ This checklist enforces the following Section 4 directives:
    git tag -d vX.Y.Z
    git push origin :refs/tags/vX.Y.Z
    ```
+
+   > **Pre-existing danger**: deleting the tag re-arms the publish phase.
+   > `version-packages.yml`'s phase detection treats "no pending changesets and
+   > `v<catalog-version>` missing" as "run the publish phase" — so the _next_
+   > push to `main` for any reason (an unrelated docs fix, another merge with no
+   > version bump) will silently recreate the tag and re-publish this same
+   > rolled-back release. Before or immediately after deleting the tag, land a
+   > no-op changeset + version bump (or otherwise advance the catalog version)
+   > so the next automated run targets a new version instead of resurrecting
+   > this one.
 
 3. **Unpublish from npm** (if published, within 72 hours only)
 

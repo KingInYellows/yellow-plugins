@@ -55,14 +55,13 @@ pnpm release:check
 #    Recovery: gh workflow run version-packages.yml -f force_publish=true
 ```
 
-**Emergency manual release** (only when the bot cannot open the Version
-Packages PR): see `CONTRIBUTING.md` "Emergency manual release". That path runs
-`pnpm version-packages` on a hand-made branch and merges it through a normal
-PR; the merge publishes exactly as in step 3. Do not push tags before that
-merge — an existing `v<catalog-version>` tag makes the run log "nothing to do"
-and skip the GitHub Release. If the run fails or skips publishing, run
-`gh workflow run version-packages.yml -f force_publish=true`. It is a recovery
-procedure, never the default.
+**Emergency manual release** (only when the bot cannot open the Version Packages
+PR): see `CONTRIBUTING.md` "Emergency manual release" for the full procedure,
+its stale-tag and stale-branch cautions, and the `force_publish` danger note —
+that section is the canonical explanation; this is a pointer, not a second copy.
+Short version: that path runs `pnpm version-packages` on a hand-made branch and
+merges it through a normal PR; the merge publishes exactly as in step 3 above.
+`force_publish=true` is a recovery procedure, never the default.
 
 ## Semver Bump Rules
 

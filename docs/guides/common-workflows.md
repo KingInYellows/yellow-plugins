@@ -69,17 +69,16 @@ The most common workflow chain. Use for any feature implementation. Run
 
 ### Full Chain
 
-`READY_GRAPHITE`:
-
-```text
-/flow:brainstorm → /flow:plan → /gt-stack-plan → /flow:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
-```
-
-`READY_GITHUB`:
-
-```text
-/flow:brainstorm → /flow:plan → /flow:work → /github-stack:submit → /review:pr → /review:resolve → /linear:sync
-```
+| Step | `READY_GRAPHITE`   | `READY_GITHUB`         |
+| ---- | ------------------ | ---------------------- |
+| 1    | `/flow:brainstorm` | `/flow:brainstorm`     |
+| 2    | `/flow:plan`       | `/flow:plan`           |
+| 3    | `/gt-stack-plan`   | _(skip — see below)_   |
+| 4    | `/flow:work`       | `/flow:work`           |
+| 5    | `/smart-submit`    | `/github-stack:submit` |
+| 6    | `/review:pr`       | `/review:pr`           |
+| 7    | `/review:resolve`  | `/review:resolve`      |
+| 8    | `/linear:sync`     | `/linear:sync`         |
 
 `/github-stack:plan` only reports the current stack. It does not decompose a
 feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
@@ -120,17 +119,11 @@ feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
 
 ### Minimum Viable Chain
 
-`READY_GRAPHITE` (yellow-core + gt-workflow):
-
-```text
-/flow:plan → /flow:work <plan-path> → /smart-submit
-```
-
-`READY_GITHUB` (yellow-core + github-workflow):
-
-```text
-/flow:plan → /flow:work <plan-path> → /github-stack:submit
-```
+| Step | `READY_GRAPHITE` (yellow-core + gt-workflow) | `READY_GITHUB` (yellow-core + github-workflow) |
+| ---- | -------------------------------------------- | ---------------------------------------------- |
+| 1    | `/flow:plan`                                 | `/flow:plan`                                   |
+| 2    | `/flow:work <plan-path>`                     | `/flow:work <plan-path>`                       |
+| 3    | `/smart-submit`                              | `/github-stack:submit`                         |
 
 ### Without Linear
 
@@ -242,17 +235,11 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 
 ### Daily Sync
 
-`READY_GRAPHITE`:
-
-```text
-/gt-sync → /gt-nav → /gt-amend or /smart-submit
-```
-
-`READY_GITHUB`:
-
-```text
-/github-stack:sync → /github-stack:nav → /github-stack:amend
-```
+| Step     | `READY_GRAPHITE`               | `READY_GITHUB`        |
+| -------- | ------------------------------ | --------------------- |
+| Sync     | `/gt-sync`                     | `/github-stack:sync`  |
+| Navigate | `/gt-nav`                      | `/github-stack:nav`   |
+| Amend    | `/gt-amend` or `/smart-submit` | `/github-stack:amend` |
 
 1. **Sync.** **`/gt-sync`** pulls latest from trunk, restacks branches, and
    cleans up merged PRs. **`/github-stack:sync`** pulls trunk and syncs the

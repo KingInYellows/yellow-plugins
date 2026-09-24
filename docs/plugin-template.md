@@ -210,21 +210,23 @@ Do not hand-edit `.claude-plugin/marketplace.json` or
    ```
 
 3. Append `"my-plugin"` to `pluginOrder` in `catalog/catalog.json`.
-4. Add the plugin to `plugins/yellow-core/commands/setup/all.md` (dashboard
-   loop, classification, delegated setup plugins, and the illustrative
-   dashboard example; the header of `scripts/validate-setup-all.js` lists
-   every section it checks). `pnpm validate:schemas` runs that validator,
-   which fails with `ERROR-SETUP-002` or `ERROR-SETUP-007` until every
-   marketplace plugin is covered.
-5. Update the "N plugins" counts in the root `CLAUDE.md`, `README.md`,
-   `CONTRIBUTING.md`, and `AGENTS.md`. `validate-doc-counts.js` fails when they
-   disagree with the marketplace.
-6. From the workspace root, run `pnpm generate:manifests` (if you are still in
+4. From the workspace root, run `pnpm generate:manifests` (if you are still in
    `plugins/my-plugin`, run `cd ../..` first, or use `pnpm -w run
    generate:manifests`).
-7. From `plugins/my-plugin`, run `node ../../scripts/validate-plugin.js .` to
-   confirm the generated manifest is valid, then run `pnpm validate:schemas`
-   from the workspace root.
+5. From `plugins/my-plugin`, run `node ../../scripts/validate-plugin.js .` to
+   confirm the generated manifest is valid.
+
+The remaining steps are not repeated here in full; follow
+[CONTRIBUTING.md "Adding a Plugin"](../CONTRIBUTING.md#adding-a-plugin) steps
+3 and 5-8, in order: `pnpm install` for the lockfile; wiring `setup/all.md`
+(every plugin needs a `<namespace>:setup` command — name ending in `setup` —
+in the delegated command list and plugin-command map, or
+`validate-setup-all.js` fails with `ERROR-SETUP-002`/`-003`); the "N plugins"
+doc counts; `pnpm changeset` (CI's `changeset-check` job blocks any PR
+touching `plugins/**` without one); and refreshing the manifest
+characterization snapshot. Only run `pnpm validate:schemas` from the
+workspace root once those steps are done — it fails on the setup-command and
+doc-count checks otherwise.
 
 The generator writes a marketplace root with `$schema`, `name`,
 `description`, `owner`, `metadata`, and `plugins`. There is no
@@ -665,7 +667,12 @@ Before publishing:
 - [ ] Confirm the catalog source has no `permissions` key (`generate:manifests`
       silently drops it; CI's AJV check against
       `schemas/catalog-plugin.schema.json` rejects it)
+- [ ] Every plugin needs a `<namespace>:setup` command (name ending in
+      `setup`) wired into `plugins/yellow-core/commands/setup/all.md`'s
+      delegated command list and plugin-command map
 - [ ] Run `pnpm validate:schemas` (covers `setup/all.md` coverage and the root doc plugin counts)
+- [ ] Run `pnpm changeset` and commit the `.changeset/*.md` file — CI's
+      `changeset-check` job blocks any PR touching `plugins/**` without one
 - [ ] Test installation locally
 - [ ] Create README.md with usage examples (optional but recommended)
 - [ ] Add CHANGELOG.md for version history (optional)
@@ -708,8 +715,12 @@ cp -r plugins/my-plugin ~/.claude/plugins/
 3. **Write documentation** (CLAUDE.md required, README.md optional)
 4. **Register in `catalog/`** and run `pnpm generate:manifests` (Step 5)
 5. **Validate** with `validate-plugin.js`, now that the manifest exists
-6. **Test locally** before publishing, then commit the catalog source and the
-   generated manifests together
+6. **Wire `setup/all.md`** (every plugin needs a `<namespace>:setup` command)
+   and **run `pnpm changeset`** — see
+   [CONTRIBUTING.md "Adding a Plugin"](../CONTRIBUTING.md#adding-a-plugin)
+   steps 5 and 7
+7. **Test locally** before publishing, then commit the catalog source, the
+   generated manifests, and the changeset together
 
 **Resources**:
 
