@@ -345,8 +345,10 @@ Blocking jobs are exactly the `needs:` list of the `ci-status` aggregator in
 `validate-schemas.yml` — read the list there rather than from any doc. Inside
 `plugin-shell-tests`, only the yellow-core, yellow-council, yellow-review, and
 yellow-codex bats suites are required; other plugins' suites run
-`continue-on-error`. The 60s per-target schema SLO is checked by
-`report-metrics`, which is not in `ci-status` and does not block merge.
+`continue-on-error`. `report-metrics` (not in `ci-status`, never blocks merge)
+is meant to check the 60s per-target schema SLO, but the check is dormant:
+`CI_UPLOAD_ARTIFACTS` is `'false'`, so no metrics are uploaded or downloaded and
+it passes on an empty file.
 
 Advisory: `codex-install-verification` installs the unpinned latest Codex CLI
 and checks named membership of every Codex-enabled plugin.
