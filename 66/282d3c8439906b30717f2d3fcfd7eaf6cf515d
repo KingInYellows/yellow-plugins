@@ -1,0 +1,26 @@
+docs/architecture-overview.md
+  s_a481c3f49a67b8::t_6e8763b9835818 11-15,31,35-36,51-54,60-62,65-69,71-75,80,101-102,119-125,135-147,156-157,176,181-182,200,208-209,218-222,228-231,235-239,256-257,264-265,273,280,282,286-290,294-297,321-329,334-336,340-343,347,353-355,358-360,364-372,396-398,401-417,426-427,439-442,463-464,472-478,497-499,508-509,523-525,529-531,534,537-538,545-560,564-567,576-578
+  s_a481c3f49a67b8::t_7010e281e3bf07 587-591
+CLAUDE.md
+  s_a481c3f49a67b8::t_8600ebe8db4081 201
+scripts/council-roster.json
+  s_a481c3f49a67b8::t_ee2cac88fc20cd 47
+scripts/validate-doc-counts.js
+  s_a481c3f49a67b8::t_1e3ba7392310b0 35-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "66282d3c8439906b30717f2d3fcfd7eaf6cf515d",
+  "prompts": {},
+  "sessions": {
+    "s_a481c3f49a67b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb292ab9-25e7-4864-891a-f7292e15f24d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
