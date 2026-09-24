@@ -46,9 +46,10 @@ material**:
 - `docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md` — the
   locked design: ledger at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`, a new
-  `/review:triage` command as sole owner, attended = fix everything / unattended
-  = safe-only, local-only discovery, deterministic-fingerprint dedup with
-  dismissed-context injection, re-verify + prune on close.
+  `/review:triage` command as the owner of lifecycle transitions, attended = fix
+  each verified finding the human approves / unattended = apply nothing,
+  local-only discovery, deterministic-fingerprint dedup with dismissed-context
+  injection, re-verify + prune on close.
 
 That design is not implemented yet. This doc captures the **interim,
 already-actionable guidance** for anyone running a sweep before the ledger and
