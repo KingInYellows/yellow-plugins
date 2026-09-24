@@ -79,7 +79,8 @@ Byte-identity drift is gated by `pnpm validate:generated`.
 
 - **yellow-linear** — Linear MCP + PM workflows (OAuth).
 - **yellow-research** — Multi-source research MCPs (Ceramic, DeepWiki,
-  Perplexity, Tavily, EXA, Parallel, ast-grep); missing keys skip that provider.
+  Perplexity, Tavily, EXA, Parallel, ast-grep); missing-key behavior varies by
+  server (see MCP and credentials).
 - **yellow-morph** — Morph Fast Apply + WarpGrep MCP.
 - **yellow-composio** — Composio MCP with usage/budget guards.
 - **yellow-ruvector** — Local ruvector MCP: persistent vector memory and session
@@ -338,13 +339,14 @@ Hook I/O:
   always.
 - Stdin is a JSON envelope (`cwd`, `session_id`, `transcript_path`, …).
 
-| Plugin                        | SessionStart work                                                                           |
-| ----------------------------- | ------------------------------------------------------------------------------------------- |
-| yellow-core                   | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                   |
-| yellow-ci                     | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`. |
-| research / semgrep / composio | Write `credential-status.json` (presence/source only).                                      |
-| yellow-morph                  | SessionStart prewarms morphmcp only; credential-status is a follow-up.                      |
-| yellow-ruvector               | Vector-store / MCP warmup.                                                                  |
+| Plugin                        | SessionStart work                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| yellow-core                   | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                                   |
+| yellow-ci                     | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`.                 |
+| yellow-debt                   | Scans `todos/debt/` for pending/ready high/critical findings; emits a `systemMessage` warning if any exist. |
+| research / semgrep / composio | Write `credential-status.json` (presence/source only).                                                      |
+| yellow-morph                  | SessionStart prewarms morphmcp only; credential-status is a follow-up.                                      |
+| yellow-ruvector               | Vector-store / MCP warmup.                                                                                  |
 
 Missing credential-status files are “unknown” to `/setup:all`, not a hard
 failure.
@@ -460,21 +462,21 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 
 ### Runtime: degrade, don’t block
 
-| Failure                             | Mechanism                                                                                |
-| ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| Hook crash / write fail             | stderr only; still emit `{"continue": true}` or empty `systemMessage`                    |
-| `set -e` avoided in hooks           | unexpected non-zero cannot skip the continue JSON                                        |
-| Missing MCP key                     | that server/tools skipped; others continue                                               |
-| Morph install lock timeout (20s)    | wrapper exits 1; `/morph:setup`; session continues without Morph                         |
-| Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                    |
-| Registry `null`                     | stop; never try the other provider or raw git/gh                                         |
-| ruvector recall timeout             | wait ~500ms, retry once; then continue without memory. No retry on validation errors     |
-| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain       |
-| `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                          |
-| Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                  |
-| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted |
-| Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence      |
-| Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives  |
+| Failure                             | Mechanism                                                                                                                                                                           |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hook crash / write fail             | stderr only; still emit `{"continue": true}` or empty `systemMessage`                                                                                                               |
+| `set -e` avoided in hooks           | unexpected non-zero cannot skip the continue JSON                                                                                                                                   |
+| Missing MCP key                     | varies by server (see MCP and credentials): Perplexity hard-fails at MCP start; Tavily/Exa still exec and error on tool calls; Semgrep execs unconditionally; Morph warns and exits |
+| Morph install lock timeout (20s)    | wrapper exits 1; `/morph:setup`; session continues without Morph                                                                                                                    |
+| Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                                                                                                               |
+| Registry `null`                     | stop; never try the other provider or raw git/gh                                                                                                                                    |
+| ruvector recall timeout             | MCP-driven recalls wait ~500ms and retry once; hook recalls get one attempt, no retry; then continue without memory                                                                 |
+| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain                                                                                                  |
+| `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                                                                                                                     |
+| Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                                                                                                             |
+| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                            |
+| Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence                                                                                                 |
+| Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives                                                                                             |
 
 ### Retry and timeout policy
 
@@ -482,9 +484,14 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
   Morph prewarm, 10s ruvector Stop).
 - yellow-ci’s two `gh` calls share one 3s deadline minus a 400ms reserve; if
   budget is gone the call is skipped, not started.
-- ruvector: one transport retry; the `memory-query` skill’s automatic recall
-  path discards results with score < 0.5 (user-facing `/ruvector:search` and
-  `semantic-search` still show low-score hits with a confidence warning).
+- ruvector: MCP-driven recalls (`/ruvector:learn`'s dedup check,
+  `ruvector-semantic-search`) retry once after ~500ms on timeout/connection
+  errors, then fall back (abort storage, or Grep); hook-triggered recalls
+  (`user-prompt-submit.sh`, `session-start.sh`) get one bounded CLI attempt and
+  no retry — on timeout or failure the output is cleared and the hook continues
+  silently. The `memory-query` skill's automatic recall path discards results
+  with score < 0.5 (user-facing `/ruvector:search` and `semantic-search` still
+  show low-score hits with a confidence warning).
 - MCP wrappers: no request retries; fail the child, leave the session up.
 - Compound drain: crashed work is requeued, not retried in-process.
 
