@@ -280,27 +280,32 @@ For `/flow:plan` to pick up, in dependency order:
    validator applied at write and at read (repo-relative, contained after
    `realpath`, and on a tracked-file allowlist: `file` and every `depends_on`
    path must exist in the PR head or base tree, checked with
-   `git cat-file -e <sha>:<path>`, so an untracked or ignored file such as a
-   local `.env` is never read, snapshotted or hashed) so a model-produced `file`
-   can never point triage outside the repo or at local secrets. A path the PR
-   deletes is valid when it exists in the base tree; its anchor is snapshotted
-   from the base blob, so a finding on a deleted file is kept rather than
-   rejected; credential redaction of every model-authored string (`title`,
-   `suggested_fix`, dismissal reasons) and every anchor-snapshot line before it
-   is appended, with the same patterns as yellow-core's `redact_secrets`
-   (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
-   persist only its hash and the line hint so a secret echoed from the diff
-   never lands in `.git` or gets re-injected into prompts; fingerprint function
-   (`file` + normalized `category` + `rule` + enclosing scope +
-   whitespace-normalized code-context hash; line kept as a rematch hint,
-   `reviewer` stored but not keyed), dedup/state-check function,
+   `git cat-file -e <sha>:<path>`, with a regular-file Git mode (`100644` or
+   `100755` from `git ls-tree <sha> -- <path>`; symlinks `120000` and submodules
+   `160000` are rejected before anything is dereferenced), so an untracked or
+   ignored file such as a local `.env`, or a tracked symlink pointing at one, is
+   never read, snapshotted or hashed) so a model-produced `file` can never point
+   triage outside the repo or at local secrets. A path the PR deletes is valid
+   when it exists in the base tree; the observation records the base SHA and its
+   anchor is snapshotted from the base blob, so a finding on a deleted file is
+   kept rather than rejected; credential redaction of every model-authored
+   string (`title`, `suggested_fix`, dismissal reasons) and every
+   anchor-snapshot line before it is appended, with the same patterns as
+   yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when a snapshot
+   line cannot be redacted safely, persist only its hash and the line hint so a
+   secret echoed from the diff never lands in `.git` or gets re-injected into
+   prompts; fingerprint function (`file` + normalized `category` + `rule` +
+   enclosing scope + whitespace-normalized code-context hash; line kept as a
+   rematch hint, `reviewer` stored but not keyed), dedup/state-check function,
    dismissed-findings reader (for context injection), prune-on-close function
    that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock` and
    leaves a `<pr>.closed` tombstone; every writer takes that lock and, before
    appending, checks the tombstone and rechecks the PR state
    (`gh pr view <pr> --json state`), refusing to write for a closed PR, so a
-   `/review:pr` run that outlives its PR cannot recreate a pruned ledger; and a
-   per-PR `findings/<pr>.pending` sidecar in the form
+   `/review:pr` run that outlives its PR cannot recreate a pruned ledger. If the
+   live state is `OPEN` while a tombstone exists (the PR was reopened), the
+   writer removes the tombstone under the same lock and starts a fresh ledger;
+   and a per-PR `findings/<pr>.pending` sidecar in the form
    `<pending> <attention> <bytes>` (pending count, `report_only` attention
    count, and the JSONL byte size they were computed from) refreshed after
    folding the JSONL by `finding_id` to latest state. Include test fixtures for:
@@ -326,7 +331,12 @@ For `/flow:plan` to pick up, in dependency order:
    prose-to-compact converter (which assigns an explicit `unclassified` rule
    rather than dropping the finding). Otherwise `review-pr.md` drops every
    return that lacks the field. The closed per-category `rule` vocabulary ships
-   in this step too.
+   in this step too. The same producers also emit a required `scope` field (the
+   enclosing symbol or AST path the reviewer is looking at, e.g.
+   `handlers.createUser`, or the nearest markdown heading), because a generic
+   shell helper cannot derive scope reliably across languages; the converter
+   assigns `unscoped`, and the plan tests that two identical handlers with
+   different `scope` stay separate.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
@@ -342,7 +352,11 @@ For `/flow:plan` to pick up, in dependency order:
    apply, but existence and file type are checked against the target commit tree
    instead (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
    `git ls-tree`, never a symlink), so a file only the PR adds is not wrongly
-   marked `stale`; reject the entry as `stale` otherwise — reviewer paths are
+   marked `stale`. A deletion finding is re-verified against its recorded base
+   SHA instead: the base blob must still hold the anchor and the PR diff must
+   still delete the path (`git diff --name-status <base>...<headRefOid>` shows
+   `D`), so it is not marked `stale` just because the head no longer has the
+   file; reject the entry as `stale` otherwise — reviewer paths are
    model-produced from PR content), attended = apply each finding the human
    approves / `--non-interactive` = apply nothing (re-verify, mark `stale`,
    prune when the target PR is merged/closed), `--prune <pr>` = skip re-verify
