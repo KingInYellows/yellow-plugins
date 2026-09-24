@@ -270,8 +270,10 @@ for why that opt-out exists.
 - `stack-operation-registry.js` — maps each of the nine neutral stack
   operations (and `/flow:work`'s lower-level stack primitives) to exactly one
   Graphite and one GitHub implementation, or `null` (unsupported — callers
-  stop, never try the other provider). Consumed by `/flow:work`; the
-  `/stack:status` and `/stack:select` commands do not read it. Dependency-free; verified by
+  stop, never try the other provider). `/flow:work` hard-codes the same
+  provider operations and only cites this file in prose — edit both when the
+  contract changes. `/stack:status` and `/stack:select` do not read it.
+  Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
 - `stack-tooling-probe.js` — the shared owner of provider CLI readiness
   (`gt` on PATH; `gh auth status` plus a verified `github/gh-stack`

@@ -171,7 +171,7 @@ function main() {
     );
   }
   console.error(
-    '\nRoute through /stack:status + the provider-neutral registry instead (plugins/yellow-core/lib/stack-operation-registry.js), or, for a genuinely deliberate example, add a narrow, reviewed entry to scripts/provider-neutral-commands-allowlist.json.'
+    '\nRoute through /stack:status and the provider-neutral contract in plugins/yellow-core/lib/stack-operation-registry.js (keep commands/flow/work.md in sync — it mirrors the registry by hand), or, for a genuinely deliberate example, add a narrow, reviewed entry to scripts/provider-neutral-commands-allowlist.json.'
   );
   return 1;
 }
