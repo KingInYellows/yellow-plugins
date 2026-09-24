@@ -12,10 +12,17 @@ This document provides a comprehensive catalog of all error codes used in the
 Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
 `NET`) map directly to specification requirements (`FR-*`, `CRIT-*`
 identifiers). The later categories (`SOL`, `PLAN`, `SETUP`, `PROVIDER`,
-`NAMESPACE`, `CURSOR`, `DIST`) have no FR/CRIT ids. All of them except `DIST`
-are emitted by validator scripts under `scripts/`; nothing under `scripts/`
-emits `ERROR-DIST-*` yet. All categories share the same
-`ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
+`NAMESPACE`, `CURSOR`, `DIST`) have no FR/CRIT ids. Being in the catalog is not
+the same as having an emitter. The `SOL`, `PLAN`, `SETUP`, `PROVIDER`,
+`NAMESPACE`, and `CURSOR` families are assembled by `validate-solutions.js`,
+`validate-plans.js`, `validate-setup-all.js`, `validate-provider-groups.js`,
+`validate-flow-namespace.js`, and `validate-cursor.js` under `scripts/`, and
+even those families have reserved codes nothing emits (for example
+`CURSOR-003`/`004`/`006`, marked below). The original six categories and `DIST`
+are defined in `packages/domain/src/validation/errorCatalog.ts`, but no script
+emits them by code; check a code's status note before assuming something raises
+it. All categories share the same `ERROR-{CATEGORY}-{NUMBER}` format for
+consistent handling.
 
 Every validator script that emits these codes exits `1` when it reports any
 finding, so a single code fails its CI step. Two soft exits:

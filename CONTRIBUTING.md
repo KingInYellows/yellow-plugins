@@ -124,10 +124,12 @@ directory scaffold).
    counts, not that the plugin is listed.
 7. Run `pnpm changeset` and commit the `.changeset/*.md` file — CI blocks any PR
    touching `plugins/*/` without one (see [Versioning](#versioning)).
-8. Validate: `pnpm validate:schemas`, then refresh and commit the manifest
-   snapshot, which `validate:schemas` does not run but the blocking
-   `integration-tests` CI job does. The test snapshots the plugin inventory and
-   every generated manifest's raw bytes, so a new plugin always changes it:
+8. Validate: `pnpm validate:schemas` and `pnpm validate:versions` (the generated
+   manifests and marketplace entry must pass the version-consistency gate too),
+   then refresh and commit the manifest snapshot, which `validate:schemas` does
+   not run but the blocking `integration-tests` CI job does. The test snapshots
+   the plugin inventory and every generated manifest's raw bytes, so a new
+   plugin always changes it:
    `pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`.
    Commit the updated snapshot alongside the new plugin.
 

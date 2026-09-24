@@ -45,16 +45,20 @@ rather than failing silently.
 First time setup:
 
 1. Install the marketplace:
+
    ```bash
    /plugin marketplace add KingInYellows/yellow-plugins
    ```
+
 2. Install the plugins the daily chain needs: yellow-core, exactly one
    stacked-PR provider, and yellow-ci if you want the hook check in step 3:
+
    ```bash
    /plugin install yellow-core@yellow-plugins
    /plugin install gt-workflow@yellow-plugins   # or github-workflow, not both
    /plugin install yellow-ci@yellow-plugins     # optional
    ```
+
    Then run `/stack:status`; continue only on `READY_GRAPHITE` or `READY_GITHUB`
    (`/stack:select` switches providers).
 3. Verify hooks are firing: start a new Claude Code session and check for

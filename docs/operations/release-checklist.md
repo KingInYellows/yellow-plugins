@@ -884,30 +884,32 @@ git fetch origin main
 if [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
   echo "main has moved past the release merge; use the manual tag path." >&2
 else
-  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   me=$(gh api user -q .login)
+  list_ids() {
+    gh run list --workflow=version-packages.yml --event workflow_dispatch \
+      --user "$me" --limit 20 --json databaseId -q '.[].databaseId' | sort
+  }
+  before=$(list_ids)
   gh workflow run version-packages.yml -f force_publish=true
-  # --user limits this to your own dispatches, so another operator's run is
-  # never selected or cancelled; --commit is left off on purpose, because the
+  # Accept exactly one run that did not exist before this dispatch; --user
+  # keeps other operators' runs out. --commit is left off on purpose: the
   # point is to catch a run that built a commit other than $MERGE_SHA.
-  run=""
+  new=""
   for _ in $(seq 1 15); do
-    run=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --user "$me" --json databaseId,headSha,createdAt \
-      -q "([.[] | select(.createdAt >= \"$since\")][0] // empty) | \"\(.databaseId) \(.headSha)\"")
-    [ -n "$run" ] && break
+    new=$(comm -13 <(printf '%s\n' "$before") <(list_ids) | grep .)
+    [ -n "$new" ] && break
     sleep 10
   done
-  run_id=${run%% *} run_sha=${run##* }
-  if [ -z "$run" ]; then
-    echo "No dispatched run found; check the Actions tab." >&2
-  elif [ "$run_sha" != "$MERGE_SHA" ]; then
+  if [ -z "$new" ]; then
+    echo "No new dispatched run found; check the Actions tab." >&2
+  elif [ "$(printf '%s\n' "$new" | wc -l)" -ne 1 ]; then
+    echo "More than one new run ($new); not guessing. Check the Actions tab." >&2
+  elif [ "$(gh run view "$new" --json headSha -q .headSha)" != "$MERGE_SHA" ]; then
     # main moved between the check and the dispatch: stop the wrong build.
-    gh run cancel "$run_id"
-    echo "Dispatched run built $run_sha, not $MERGE_SHA; cancelled it." >&2
-    echo "Use the manual tag path below." >&2
+    gh run cancel "$new"
+    echo "Run $new built the wrong commit; cancelled it. Use the tag path." >&2
   else
-    gh run watch "$run_id" --exit-status
+    gh run watch "$new" --exit-status
   fi
 fi
 ```
@@ -951,14 +953,18 @@ commit):
   VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
   git fetch origin tag "v$VERSION" 2>/dev/null
   existing=$(git rev-parse -q --verify "v$VERSION^{commit}" 2>/dev/null)
+  TAG_OK=""
   if [ -n "$existing" ] && [ "$existing" != "$MERGE_SHA" ]; then
     echo "v$VERSION already points at $existing, not $MERGE_SHA; stop." >&2
-  elif [ -z "$existing" ]; then
+    echo "Do not continue to the push or dispatch steps." >&2
+  elif [ -n "$existing" ]; then
+    TAG_OK=1
+  else
     CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
     git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
-  "
+  " && TAG_OK=1
   fi
   ```
 
@@ -966,8 +972,13 @@ commit):
       previous step — do not re-derive it from the working tree)
 
   ```bash
-  git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null ||
-    git push origin "v$VERSION"
+  # Refuses to run unless the previous step verified or created the tag.
+  if [ "$TAG_OK" != 1 ]; then
+    echo "Tag not verified at $MERGE_SHA; not pushing." >&2
+  else
+    git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null ||
+      git push origin "v$VERSION"
+  fi
   ```
 
 - [ ] Trigger workflow with force_publish from the tag just pushed (recovery
@@ -977,24 +988,35 @@ commit):
       release that does not match the tag.
 
   ```bash
-  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
+  if [ "$TAG_OK" != 1 ]; then
+    echo "Tag not verified at $MERGE_SHA; not dispatching." >&2
+  else
+    me=$(gh api user -q .login)
+    list_ids() {
+      gh run list --workflow=version-packages.yml --event workflow_dispatch \
+        --user "$me" --limit 20 --json databaseId -q '.[].databaseId' | sort
+    }
+    before=$(list_ids)
+    gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
+  fi
   ```
 
 - [ ] Confirm the dispatched run started and watch that run, not the newest one
 
   ```bash
-  # Only runs created after this dispatch ($since, set above), so an earlier
-  # recovery attempt for the same commit is never picked up.
-  run_id=""
+  # Exactly one run that did not exist before the dispatch ($before, above), so
+  # an earlier recovery attempt or a same-second run is never picked up.
+  new=""
   for _ in $(seq 1 15); do
-    run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --commit "$MERGE_SHA" --json databaseId,createdAt \
-      -q "([.[] | select(.createdAt >= \"$since\")][0] // empty) | .databaseId")
-    [ -n "$run_id" ] && break
+    new=$(comm -13 <(printf '%s\n' "$before") <(list_ids) | grep .)
+    [ -n "$new" ] && break
     sleep 10
   done
-  [ -n "$run_id" ] && gh run watch "$run_id" --exit-status
+  if [ -z "$new" ] || [ "$(printf '%s\n' "$new" | wc -l)" -ne 1 ]; then
+    echo "Could not identify exactly one new run ($new); check the Actions tab." >&2
+  else
+    gh run watch "$new" --exit-status
+  fi
   ```
 
 **Reference**: `.github/workflows/version-packages.yml` (workflow_dispatch with
