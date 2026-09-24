@@ -45,14 +45,18 @@ regression:
    unstaged resolver edits are both included.
 4. Build two formatting deltas: current file vs its stdin-filepath output, and
    `HEAD` blob vs its stdin-filepath output.
-5. Inside the edited ranges, **overlap alone is not proof of a regression**.
-   Only mismatches that appear in the current delta but not in the `HEAD` delta
-   count as newly introduced — fix those (indentation, wrap width, quote style)
-   without running a blanket `prettier --write` that would also rewrite
-   pre-existing drift.
-6. Mismatches that already existed at `HEAD` inside the edited region are
-   pre-existing drift, unrelated to the resolver's change — leave them alone.
-   Fixing them is a separate, out-of-scope cleanup.
+5. Inside the edited ranges, **overlap alone is not proof of a regression**, and
+   raw delta hunks cannot be compared directly: an edit that changes the text of
+   an already-drifted line changes both hunks even when it adds no new
+   formatting problem. Map each edited line to its `HEAD` origin using the
+   `git diff -U0 HEAD` hunks instead. A line is a regression only if Prettier
+   would change it now and either it is newly added, or its `HEAD` counterpart
+   was already Prettier-clean (no hunk in the `HEAD` delta). Fix those
+   (indentation, wrap width, quote style) without a blanket `prettier --write`
+   that would also rewrite pre-existing drift.
+6. An edited line whose `HEAD` counterpart was already mis-formatted is
+   pre-existing drift, even though its text changed. Leave its formatting as it
+   was; fixing it is a separate, out-of-scope cleanup.
 
 This is the file-scoped analogue of a full-file `prettier --check`: it answers
 "did _my_ edit regress formatting" instead of "is this file formatted," which is

@@ -347,7 +347,11 @@ For `/flow:plan` to pick up, in dependency order:
    worktree's `HEAD`. Then: read ledger, re-verify against that head SHA, mark
    `stale` on mismatch, validate every stored `file` path before any `Read`,
    `Edit` or shell use (repo-relative, no absolute paths, `..` traversal,
-   leading `-` or control characters, and a `realpath` inside the repo root so
+   leading `-` or control characters; every character in the conservative
+   allowlist `[A-Za-z0-9._/@+-]` so shell metacharacters such as `$()`,
+   backticks, `;` or wildcards are rejected outright; and every command that
+   takes a path gets it as a separate argv element after `--`, never
+   interpolated into a shell string; and a `realpath` inside the repo root so
    symlinks cannot escape; in the read-only fallback the same lexical checks
    apply, but existence and file type are checked against the target commit tree
    instead (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
@@ -364,10 +368,11 @@ For `/flow:plan` to pick up, in dependency order:
    `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or `CLOSED` (the
    only ledger deletion path — `/review:sweep-all` delegates here), append
    transition records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
-   transitions for `reopened`, and for `report_only` once a human fixes or
-   dismisses one or re-verification finds it stale, without ever making it
-   auto-applicable; never rewrite finding rows), refresh `<pr>.pending` after
-   each fold.
+   transitions for `reopened`; `applied`→`fixed` once the ancestor check shows
+   its fixing SHA is published, or `applied`→`dismissed` for an abandoned or
+   invalid fix; and for `report_only` once a human fixes or dismisses one or
+   re-verification finds it stale, without ever making it auto-applicable; never
+   rewrite finding rows), refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
