@@ -260,21 +260,25 @@ For `/flow:plan` to pick up, in dependency order:
    `/review:triage --non-interactive` as a final step.
 5. **SessionStart hook** — declared in `catalog/plugins/yellow-review.json`
    (`hooks.SessionStart`, as yellow-debt does) and emitted by
-   `pnpm generate:manifests`, never a hand-written `hooks/hooks.json`; the plan
-   must pick its Codex and Cursor exposure, since yellow-review targets both. A
-   new lightweight hook script (yellow-debt's cheap-count pattern, not full
-   JSONL parsing) that sums each open PR's `findings/<pr>.pending` sidecar (kept
-   current by the ledger write step and `/review:triage` after folding by
-   `finding_id`) and emits a `systemMessage` when the total is > 0. Append-only
-   JSONL stays non-empty after `fixed`/`dismissed`/`stale` transitions — the
-   hook must not treat file non-emptiness as pending findings. Writers hold the
-   per-PR `flock` across append, fold and sidecar replacement, so a sidecar is
-   never older than the JSONL it describes unless a writer was interrupted. The
-   sidecar stores the count and the JSONL byte size it was computed from
-   (`<count> <bytes>`); when the sidecar is missing or its size doesn't match
-   the JSONL's current size (one `stat`, immune to coarse mtime resolution), the
-   hook folds that one file (bounded by its timeout) or reports "pending
-   unknown" instead of trusting the count.
+   `pnpm generate:manifests`, never a hand-written `hooks/hooks.json` or
+   hand-edited `plugin.json`. **Codex hook exposure:** set
+   `targets.codex.includeHooks: false` (skills-only Codex target; the hook is
+   Claude-session local discovery, matching yellow-core's precedent). **Cursor
+   hook exposure:** none — the generator has no Cursor hook emission path
+   (`docs/cursor-distribution.md`). A new lightweight hook script (yellow-debt's
+   cheap-count pattern, not full JSONL parsing) that sums each open PR's
+   `findings/<pr>.pending` sidecar (kept current by the ledger write step and
+   `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
+   when the total is > 0. Append-only JSONL stays non-empty after
+   `fixed`/`dismissed`/`stale` transitions — the hook must not treat file
+   non-emptiness as pending findings. Writers hold the per-PR `flock` across
+   append, fold and sidecar replacement, so a sidecar is never older than the
+   JSONL it describes unless a writer was interrupted. The sidecar stores the
+   count and the JSONL byte size it was computed from (`<count> <bytes>`); when
+   the sidecar is missing or its size doesn't match the JSONL's current size
+   (one `stat`, immune to coarse mtime resolution), the hook folds that one file
+   (bounded by its timeout) or reports "pending unknown" instead of trusting the
+   count.
 
 ## Open Questions
 
