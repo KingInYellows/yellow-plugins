@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.4.2
+
+### Patch Changes
+
+- [`bc2fc8c`](https://github.com/KingInYellows/yellow-plugins/commit/bc2fc8c8b2317c15204d3afb953fae788c6b511b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(claude-md): refresh plugin CLAUDE.md files — document yellow-core's four
+  lib/ Node modules and plugin-identity.sh, yellow-review's third script
+  (file-line-counts), clarify yellow-goal's repo-root verify script path, drop
+  changelog tags and dated round-trip narrative, and condense yellow-council's
+  redaction limitation while removing its duplicate V2 Trajectory section.
+
 ## 3.4.1
 
 ### Patch Changes

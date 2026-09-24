@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.4.2
+
+### Patch Changes
+
+- [`bc2fc8c`](https://github.com/KingInYellows/yellow-plugins/commit/bc2fc8c8b2317c15204d3afb953fae788c6b511b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(claude-md): refresh plugin CLAUDE.md files — document yellow-core's four
+  lib/ Node modules and plugin-identity.sh, yellow-review's third script
+  (file-line-counts), clarify yellow-goal's repo-root verify script path, drop
+  changelog tags and dated round-trip narrative, and condense yellow-council's
+  redaction limitation while removing its duplicate V2 Trajectory section.
+
+- [`dabe495`](https://github.com/KingInYellows/yellow-plugins/commit/dabe49548edc87fc67f5a93f84ca1101bc90fb1f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - BREAKING: the
+  bundled Composio server no longer reads `composio_mcp_url`,
+  `composio_api_key`, `COMPOSIO_MCP_URL`, or `COMPOSIO_API_KEY`. Existing 2.x
+  installs that authenticated that way must open `/mcp` and complete browser
+  OAuth, or register a user-level server with a For You consumer key.
+
+  The server is native HTTP at `https://connect.composio.dev/mcp` with no
+  headers. The stdio proxy is removed because a proxy that injects a key never
+  starts the OAuth flow. `/setup:all` classifies yellow-composio from MCP tool
+  visibility, not a credential-status file.
+
+- [`e913209`](https://github.com/KingInYellows/yellow-plugins/commit/e9132094c42751343d8e59a8b669dd59fcf0bcca)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: correct
+  stale stack-registry comments — `stack-operation-registry.js`, yellow-core
+  `CLAUDE.md` and gt-workflow `CLAUDE.md` no longer claim a `/stack:<name>`
+  command per neutral operation (only `/stack:status` and `/stack:select` exist;
+  only the registry's test loads it, and `/flow:work` mirrors its entries in
+  prose).
+
 ## 2.4.1
 
 ### Patch Changes
