@@ -87,7 +87,10 @@ the shared clone's git dir, not a per-worktree path):
   `/flow:plan` must test that case and add a rule/condition discriminator if
   collisions show up in practice. In addition, `/review:pr` injects the PR's
   dismissed findings + dismissal reasons into reviewer prompts as a fenced
-  advisory block (same pattern as the existing learnings-context block), because
+  advisory block (same shape as the existing learnings-context block, but not
+  its sanitization alone: stored titles and reasons can echo PR text, so the
+  block's own delimiters are substituted out of every interpolated value first,
+  as the pr-context fence already requires, before XML escaping), because
   fingerprint-only dedup misses reworded re-detections of the same underlying
   issue — this directly addresses a documented risk in this repo's own history:
   `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md`
@@ -110,23 +113,24 @@ A small script shipped inside the plugin (e.g.
 installed plugin), mirroring yellow-debt's `lib/validate.sh` — atomic
 `flock`-guarded append, `umask 077`-style hygiene borrowed from
 compound-staging's `cs_atomic_jsonl_write`) is called from two places in
-`review-pr.md`: near the top of Step 6, it reads the ledger to build the
-dismissed-findings advisory block injected into reviewer prompts; after Step 8
-(code simplifier), it appends the final residual set (everything in Step 10's
-Residual Actionable Work plus the report-only queue, not only
-`owner=downstream-resolver`) with dedup applied. The compact-return schema keeps
-only `file` and `line`, and Step 7's auto-fixes can shift lines, so the helper
-snapshots each finding's anchored code right after Step 6's aggregation (a hash
-for identity plus the normalized lines for rematching, with the lines passed
-through the same `redact_secrets` patterns before storage; if a line cannot be
-redacted safely, only the hash and the line hint are kept, so an anchor on a
-hard-coded token never copies it into `.git`), before Step 7 edits anything. The
-Step 8 write uses those snapshots; simplifier findings, which only exist after
-Step 8, are anchored against the post-fix file. `/review:triage` is the only
-other component that touches the file (read + append transitions + prune).
-`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
-and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
-end.
+`review-pr.md`: before Step 5 dispatches the reviewers (alongside Step 3d's
+learnings pre-pass), it reads the ledger to build the dismissed-findings
+advisory block injected into reviewer prompts — Step 6 would be too late, since
+reviewers have already run; after Step 8 (code simplifier), it appends the final
+residual set (everything in Step 10's Residual Actionable Work plus the
+report-only queue, not only `owner=downstream-resolver`) with dedup applied. The
+compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
+shift lines, so the helper snapshots each finding's anchored code right after
+Step 6's aggregation (a hash for identity plus the normalized lines for
+rematching, with the lines passed through the same `redact_secrets` patterns
+before storage; if a line cannot be redacted safely, only the hash and the line
+hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
+before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
+findings, which only exist after Step 8, are anchored against the post-fix file.
+`/review:triage` is the only other component that touches the file (read +
+append transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
+changes: the Residual-count column, and `sweep.md` optionally invoking
+`/review:triage --non-interactive` at the end.
 
 **Pros:**
 
@@ -241,11 +245,12 @@ For `/flow:plan` to pick up, in dependency order:
    Include a test fixture with two distinct findings anchored to the same code,
    and one that moves lines without changing, to validate collision and rematch
    behavior before shipping. This is the one piece everything else depends on.
-2. **`review-pr.md` integration** — add the dismissed-context read near the top
-   of Step 6 (fenced advisory block into reviewer prompts); add the ledger-write
-   call after Step 8, for the full residual set (P2/P3 `safe_auto` residue,
-   `gated_auto`/`manual`, simplifier findings, and the report-only queue marked
-   `report_only`), refreshing `<pr>.pending` after each append.
+2. **`review-pr.md` integration** — add the dismissed-context read before Step
+   5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
+   prompts, with delimiter substitution on every interpolated value); add the
+   ledger-write call after Step 8, for the full residual set (P2/P3 `safe_auto`
+   residue, `gated_auto`/`manual`, simplifier findings, and the report-only
+   queue marked `report_only`), refreshing `<pr>.pending` after each append.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: read ledger, re-verify against HEAD SHA, mark `stale` on mismatch,
    validate every stored `file` path before any `Read`, `Edit` or shell use
