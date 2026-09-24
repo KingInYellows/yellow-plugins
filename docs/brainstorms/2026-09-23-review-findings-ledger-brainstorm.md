@@ -224,9 +224,11 @@ For `/flow:plan` to pick up, in dependency order:
    write and at read (repo-relative, contained after `realpath`) so a
    model-produced `file` can never point triage outside the repo; credential
    redaction of every model-authored string (`title`, `suggested_fix`, dismissal
-   reasons) before it is appended, with the same patterns as yellow-core's
-   `redact_secrets` (`lib/compound-staging.sh`), so a secret echoed from the
-   diff never lands in `.git` or gets re-injected into prompts; fingerprint
+   reasons) and every anchor-snapshot line before it is appended, with the same
+   patterns as yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when
+   a snapshot line cannot be redacted safely, persist only its hash and the line
+   hint so a secret echoed from the diff never lands in `.git` or gets
+   re-injected into prompts; fingerprint
    function (`file` + normalized `category` + whitespace-normalized code-context
    hash; line kept as a rematch hint, `reviewer` stored but not keyed),
    dedup/state-check function, dismissed-findings reader (for context
