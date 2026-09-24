@@ -9,13 +9,21 @@ Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 ## Overview
 
 This document provides a comprehensive catalog of all error codes used in the
-Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
-`NET`) map directly to specification requirements (`FR-*`, `CRIT-*`
-identifiers). The later categories (`SOL`, `PLAN`, `SETUP`, `PROVIDER`,
-`NAMESPACE`, `CURSOR`, `DIST`) have no FR/CRIT ids. All of them except `DIST`
-are emitted by validator scripts under `scripts/`; nothing under `scripts/`
-emits `ERROR-DIST-*` yet. All categories share the same
-`ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
+Claude Code Plugin Marketplace. Catalog membership and runtime emitters are
+separate concerns: every category below is documented here, but only six
+validator scripts under `scripts/` assemble `ERROR-*` codes today —
+`validate-solutions.js` (`SOL`), `validate-plans.js` (`PLAN`),
+`validate-setup-all.js` (`SETUP`), `validate-provider-groups.js`
+(`PROVIDER`), `validate-flow-namespace.js` (`NAMESPACE`), and
+`validate-cursor.js` (`CURSOR`). Those families may also list reserved codes
+not yet assembled by any script (for example `ERROR-CURSOR-003`, `004`, and
+`006`). The original six categories (`SCHEMA` through `NET`) map directly to
+specification requirements (`FR-*`, `CRIT-*` identifiers) and are defined in
+`errorCatalog.ts`, but nothing in the repository emits them as `ERROR-*` codes
+yet. The later categories (`SOL`, `PLAN`, `SETUP`, `PROVIDER`, `NAMESPACE`,
+`CURSOR`, `DIST`) have no FR/CRIT ids; `DIST` is defined in
+`error-codes.json` and likewise has no assembler. All categories share the
+same `ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
 
 Every validator script that emits these codes exits `1` when it reports any
 finding, so a single code fails its CI step. Two soft exits:
