@@ -39,18 +39,20 @@ regression:
 1. Run Prettier against the file's _current_ content through stdin, not in
    place: `prettier --stdin-filepath <file> < <file>`. This produces Prettier's
    fully-reformatted version without touching the working tree.
-2. Diff that output against the current file content, but only look at the hunks
-   that overlap the lines the resolver actually edited (e.g.
-   `git diff -U0 <file>` to get the edited line ranges, then check whether the
-   stdin-filepath diff has any changes inside those same ranges).
-3. If the stdin-filepath diff has changes **inside** the edited region: the edit
-   introduced a real regression — fix the edit's own formatting (indentation,
-   wrap width, quote style) so it matches what Prettier would produce for that
-   region, without running a blanket `prettier --write` that would also rewrite
-   the pre-existing drift.
-4. If the stdin-filepath diff only has changes **outside** the edited region:
-   that's pre-existing drift, unrelated to the resolver's change — leave it
-   alone. Fixing it is a separate, out-of-scope cleanup.
+2. Run the same stdin-filepath pass on the `HEAD` blob:
+   `git show HEAD:<file> | prettier --stdin-filepath <file>`.
+3. Get the edited line ranges with `git diff -U0 HEAD -- <file>` so staged and
+   unstaged resolver edits are both included.
+4. Build two formatting deltas: current file vs its stdin-filepath output, and
+   `HEAD` blob vs its stdin-filepath output.
+5. Inside the edited ranges, **overlap alone is not proof of a regression**.
+   Only mismatches that appear in the current delta but not in the `HEAD` delta
+   count as newly introduced — fix those (indentation, wrap width, quote style)
+   without running a blanket `prettier --write` that would also rewrite
+   pre-existing drift.
+6. Mismatches that already existed at `HEAD` inside the edited region are
+   pre-existing drift, unrelated to the resolver's change — leave them alone.
+   Fixing them is a separate, out-of-scope cleanup.
 
 This is the file-scoped analogue of a full-file `prettier --check`: it answers
 "did _my_ edit regress formatting" instead of "is this file formatted," which is
@@ -66,8 +68,8 @@ pre-existing drift was itself protecting something (e.g. a
 [public-release-stale-references-and-prettier-formatting.md](./public-release-stale-references-and-prettier-formatting.md)).
 Conversely, skipping verification entirely because `prettier --check` "already
 fails on this file" lets a real regression from the resolver's own edit ship
-unnoticed. Region-scoped diffing is the only check that is both accurate and
-minimal.
+unnoticed. Comparing current and `HEAD` formatting deltas inside the edited
+ranges is the only check that is both accurate and minimal.
 
 ## When to Apply
 
@@ -80,15 +82,20 @@ minimal.
 ## Examples
 
 ```bash
-# 1. What would Prettier produce for the file as it stands now?
-prettier --stdin-filepath plugins/yellow-review/commands/review/sweep-all.md \
-  < plugins/yellow-review/commands/review/sweep-all.md > /tmp/pretty-check.md
+file=plugins/yellow-review/commands/review/sweep-all.md
 
-# 2. Which lines did the resolver actually touch?
-git diff -U0 -- plugins/yellow-review/commands/review/sweep-all.md
+# 1. What would Prettier produce for current and HEAD content?
+prettier --stdin-filepath "$file" < "$file" > /tmp/pretty-current.md
+git show "HEAD:$file" | prettier --stdin-filepath "$file" > /tmp/pretty-head.md
 
-# 3. Does Prettier's output differ from the file inside those same lines?
-diff plugins/yellow-review/commands/review/sweep-all.md /tmp/pretty-check.md
-# -> inspect whether any diff hunk overlaps the resolver's edited ranges;
-#    only those hunks are the resolver's problem to fix.
+# 2. Which lines did the resolver actually touch (staged + unstaged)?
+git diff -U0 HEAD -- "$file"
+
+# 3. Formatting deltas for current and baseline
+diff "$file" /tmp/pretty-current.md > /tmp/delta-current.diff
+git show "HEAD:$file" > /tmp/head.md
+diff /tmp/head.md /tmp/pretty-head.md > /tmp/delta-head.diff
+
+# 4. Inside the edited ranges, only mismatches in delta-current that
+#    delta-head does not already have count as regressions.
 ```
