@@ -174,24 +174,29 @@ For `/flow:plan` to pick up, in dependency order:
 1. **Ledger library + schema** — `scripts/lib/review-ledger.sh` (or equivalent):
    atomic `flock`-guarded JSONL append, fingerprint function (file + category +
    reviewer + line-bucket), dedup/state-check function, dismissed-findings
-   reader (for context injection), prune-on-close function. This is the one
-   piece everything else depends on.
+   reader (for context injection), prune-on-close function, and a per-PR
+   `findings/<pr>.pending` sidecar (single ASCII integer) refreshed after
+   folding the JSONL by `finding_id` to latest state. This is the one piece
+   everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read near the top
    of Step 6 (fenced advisory block into reviewer prompts); add the ledger-write
    call after Step 6.9's partition, for `owner=downstream-resolver` findings
-   only.
+   only, refreshing `<pr>.pending` after each append.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: read ledger, re-verify against HEAD SHA, mark `stale` on mismatch,
    attended = attempt all / `--non-interactive` = safe-only, write back state
-   transitions (`open`→`fixed`/`dismissed`/`stale`), prune when PR is observed
-   merged/closed.
+   transitions (`open`→`fixed`/`dismissed`/`stale`), refresh `<pr>.pending` after
+   each fold, prune when PR is observed merged/closed.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step.
 5. **SessionStart hook** — new lightweight hook script (yellow-debt's
-   filename/count-regex pattern, not full JSON parsing) that checks for
-   non-empty findings files for open PRs in the current repo and emits a
-   `systemMessage`.
+   cheap-count pattern, not full JSONL parsing) that sums each open PR's
+   `findings/<pr>.pending` sidecar (kept current by the ledger write step and
+   `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
+   when the total is > 0. Append-only JSONL stays non-empty after
+   `fixed`/`dismissed`/`stale` transitions — the hook must not treat file
+   non-emptiness as pending findings.
 
 ## Open Questions
 
