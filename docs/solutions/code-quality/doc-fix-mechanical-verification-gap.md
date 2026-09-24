@@ -414,3 +414,52 @@ structural rules.
    for the mirror-image gotcha (`memory:` silently granting *more* than
    the prose claims, rather than prose claiming *more* than the frontmatter
    grants).
+
+---
+
+## Update — 2026-09-24 (PR #853)
+
+**New nuance: "a doc references file X" is not the same claim as "X is a
+runtime consumer of the code being changed," and three independent
+reviewer personas converged on the wrong one.** During `/review:sweep-all`
+on PR #853, the maintainability, comment-analyzer, and standards
+reviewers all asserted that `/flow:work` "consumes"
+`stack-operation-registry.js`, and treated that as accurate — because
+`work.md` cites the file in prose. A Codex-driven thread and the
+correctness reviewer checked the actual runtime dependency and found only
+an **integration test** `require()`s it; `work.md` itself never imports or
+executes it. Citing a file in documentation prose and depending on it at
+runtime are different claims with different verification methods, and
+three reviewers independently substituted the cheaper one (does the doc
+mention the file) for the one that was actually being asserted (does the
+code invoke it).
+
+**Distinct root cause (adds to the shared thesis):** findings 1–7 above
+check whether a prose claim matches the artifact it describes (validator
+scope, pattern completeness, citation resolution, tool authorization).
+This one is about **which artifact answers the claim at all** — "consumes"
+is a runtime-dependency claim, and the only mechanical check that answers
+it is a `require`/`import` grep against the file in question. A prose
+citation (a sentence in `work.md` naming the registry) answers a
+different, weaker claim ("this doc mentions the file exists") and was
+mistaken for the stronger one by three independent reviewers before a
+fourth actually ran the check.
+
+**Prevention (in addition to the existing checklist):**
+
+8. **"File/module A consumes B" or "A depends on B at runtime"** — grep B's
+   exact export/path for a `require(...)` or `import ... from` in A's
+   actual source, not for a prose mention of B's filename in A's
+   documentation or command markdown. A `.md` command file citing a
+   script in prose (`"see scripts/foo.js"`) is not evidence that any code
+   path invokes that script; only a test, a subprocess call, or a static
+   import is. When the claim spans a command file and its command has no
+   direct code to grep, check whether an associated test or agent file is
+   the actual consumer before asserting the command itself is.
+
+## Related Documentation (2026-09-24 addendum)
+
+- `docs/solutions/workflow/review-sweep-residual-findings-attended-fix-all.md` —
+  same review-sweep session (PR #840/#843/#853); a different failure mode
+  (findings lost entirely rather than asserted incorrectly) from the same
+  attended sweep that produced this Update.
