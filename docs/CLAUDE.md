@@ -80,21 +80,22 @@ pnpm changeset               # record bump type (patch/minor/major) for affected
 "chore: version packages" PR by running `pnpm apply:changesets` (bumps versions,
 syncs `plugin.json`/`marketplace.json`) and
 `node scripts/catalog-version.js patch` (bumps the root catalog version). When
-that PR merges, `pnpm tag` creates per-plugin tags (`yellow-core@1.1.1`) and a
-root catalog tag (`v1.1.2`), and the build-and-release job in the same workflow
-builds artifacts and publishes a GitHub Release. `apply:changesets`,
-`catalog-version.js`, and `tag` are CI-run steps, not developer commands.
-Hand-running `apply:changesets` or `tag` outside CI is an **emergency-only**
-recovery procedure (bot cannot open the PR) that always mirrors the bot's own
-`patch` bump — see `CONTRIBUTING.md` "Emergency manual release". Hand-running
-`catalog-version.js` with `minor` or `major` is a separate, deliberate
-out-of-band catalog-snapshot decision, independent of any plugin release urgency
-— see `docs/operations/versioning.md` "Catalog Version Rules". Manual recovery
-when a publish run failed or logged "nothing to do" is a `force_publish=true`
-dispatch, but never copy it bare: without `--ref` it builds the current `main`
-and can re-publish under a stale tag. Follow the guarded procedure in
-`docs/operations/release-checklist.md` Section 5.2, which pins the dispatch to
-the release merge.
+that PR merges, `scripts/ci/release-tags.sh` creates the per-plugin tags
+(`yellow-core@1.1.1`, via `changeset tag`) and the root catalog tag (`v1.1.2`,
+which `changeset tag` does not create), and the build-and-release job in the
+same workflow builds artifacts and publishes a GitHub Release.
+`apply:changesets`, `catalog-version.js`, and `tag` are CI-run steps, not
+developer commands. Hand-running `apply:changesets` outside CI is an
+**emergency-only** recovery procedure (bot cannot open the PR) that always
+mirrors the bot's own `patch` bump — see `CONTRIBUTING.md` "Emergency manual
+release". Hand-running `catalog-version.js` with `minor` or `major` is a
+separate, deliberate out-of-band catalog-snapshot decision, independent of any
+plugin release urgency — see `docs/operations/versioning.md` "Catalog Version
+Rules". Manual recovery when a publish run failed or logged "nothing to do" is a
+`force_publish=true` dispatch, but never copy it bare: without `--ref` it builds
+the current `main` and can re-publish under a stale tag. Follow the guarded
+procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
+dispatch to the release merge.
 
 **Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
 it doesn't prompt users when a new version is available. Users can run

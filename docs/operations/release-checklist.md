@@ -971,9 +971,14 @@ since (the tag would then point at the wrong, later commit):
 
   ```bash
   MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
-  run_id=$(gh run list --workflow=version-packages.yml --commit "$MERGE_SHA" \
-    --json databaseId -q '.[0].databaseId')
-  gh run watch "$run_id" --exit-status
+  run_id=""
+  for _ in $(seq 1 15); do
+    run_id=$(gh run list --workflow=version-packages.yml --commit "$MERGE_SHA" \
+      --json databaseId -q '.[0].databaseId')
+    [ -n "$run_id" ] && break
+    sleep 10
+  done
+  [ -n "$run_id" ] && gh run watch "$run_id" --exit-status
   ```
 
 - [ ] Verify all jobs complete successfully:

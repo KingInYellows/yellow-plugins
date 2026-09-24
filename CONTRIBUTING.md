@@ -303,7 +303,9 @@ pnpm install                  # pick up lockfile changes, if any
 # Capture the run for the merge commit and wait for it instead. GitHub can
 # take a few seconds to create the run, so poll until one exists rather than
 # handing gh run watch an empty run_id.
-git fetch origin main && merge_sha=$(git rev-parse origin/main)
+# Take the SHA from the PR itself, not origin/main: another PR may already
+# have landed on main after the release merge.
+merge_sha=$(gh pr view <emergency-pr-number> --json mergeCommit -q .mergeCommit.oid)
 run_id=""
 for _ in $(seq 1 15); do
   run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
