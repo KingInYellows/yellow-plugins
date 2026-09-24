@@ -831,16 +831,20 @@ generates API docs.
 > (e.g., `v1.2.1`). Manual tag creation is **only** needed for emergency recovery  
 > scenarios where `workflow_dispatch` with `force_publish=true` won't suffice.
 
-- [ ] Verify the Version Packages PR has been merged to `main`
+- [ ] Verify the release PR you are shipping has been merged to `main` (name it
+      by number; a title search can match a different Version Packages PR)
 
   ```bash
-  gh pr list --search "chore: version packages" --state merged --limit 1
+  gh pr view <release-pr-number> --json state,mergedAt,mergeCommit \
+    -q '"\(.state) \(.mergedAt) \(.mergeCommit.oid)"'
   ```
 
-- [ ] Confirm the workflow has started automatically
+- [ ] Confirm the workflow started for that merge commit (`--limit 1` alone can
+      show an older or unrelated run)
 
   ```bash
-  gh run list --workflow=version-packages.yml --limit 1
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+  gh run list --workflow=version-packages.yml --commit "$MERGE_SHA"
   ```
 
 - [ ] Verify the expected catalog version
@@ -923,8 +927,9 @@ commit):
 - [ ] Resolve the release PR's actual merge commit SHA
 
   ```bash
-  PR_NUMBER=$(gh pr list --search "chore: version packages" --state merged --limit 1 --json number -q '.[0].number')
-  MERGE_SHA=$(gh pr view "$PR_NUMBER" --json mergeCommit -q '.mergeCommit.oid')
+  # Use the release PR being recovered, the same <release-pr-number> as above.
+  # A title search can pick a newer "chore: version packages" PR instead.
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q '.mergeCommit.oid')
   echo "Merge commit: $MERGE_SHA"
   ```
 
@@ -968,16 +973,20 @@ commit):
       release that does not match the tag.
 
   ```bash
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
   ```
 
 - [ ] Confirm the dispatched run started and watch that run, not the newest one
 
   ```bash
+  # Only runs created after this dispatch ($since, set above), so an earlier
+  # recovery attempt for the same commit is never picked up.
   run_id=""
   for _ in $(seq 1 15); do
     run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --commit "$MERGE_SHA" --json databaseId -q '.[0].databaseId')
+      --commit "$MERGE_SHA" --json databaseId,createdAt \
+      -q "([.[] | select(.createdAt >= \"$since\")][0] // empty) | .databaseId")
     [ -n "$run_id" ] && break
     sleep 10
   done
