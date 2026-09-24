@@ -136,20 +136,25 @@ Step 10's Residual Actionable Work plus the report-only queue, not only
 written too, as `applied`, and only get a `fixed` transition once Step 9's
 commit and push succeed; if the push is declined or fails they stay pending, so
 a fix that exists only as an uncommitted change in one worktree is never lost
-from the ledger. The compact-return schema keeps only `file` and `line`, and
-Step 7's auto-fixes can shift lines, so the helper snapshots each finding's
-anchored code right after Step 6's aggregation (a hash for identity plus the
-normalized lines for rematching, with the lines passed through the same
-`redact_secrets` patterns before storage; if a line cannot be redacted safely,
-only the hash and the line hint are kept, so an anchor on a hard-coded token
-never copies it into `.git`), before Step 7 edits anything. The Step 8 write
-uses those snapshots; simplifier findings, which only exist after Step 8, are
-anchored against the post-fix file. That write step also appends `reopened` when
-it re-observes a `fixed`, `stale`, or no-longer-applicable `dismissed` finding.
-`/review:triage` is the only other component that touches the file (read +
-append other transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
-changes: the Residual-count column, and `sweep.md` optionally invoking
-`/review:triage --non-interactive` at the end.
+from the ledger. An `applied` record stores the fixing commit's SHA once it
+exists and becomes `fixed` only when that commit is an ancestor of the remote PR
+head (`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`).
+Triage never marks an `applied` record `stale` because its old anchor no longer
+matches local `HEAD`: a local-only commit is exactly the unpublished case. The
+compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
+shift lines, so the helper snapshots each finding's anchored code right after
+Step 6's aggregation (a hash for identity plus the normalized lines for
+rematching, with the lines passed through the same `redact_secrets` patterns
+before storage; if a line cannot be redacted safely, only the hash and the line
+hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
+before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
+findings, which only exist after Step 8, are anchored against the post-fix file.
+That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
+or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
+component that touches the file (read + append other transitions + prune).
+`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
+and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
+end.
 
 **Pros:**
 
@@ -244,32 +249,36 @@ a future maintainer will recognize it immediately.
 For `/flow:plan` to pick up, in dependency order:
 
 1. **Ledger library + schema** — `plugins/yellow-review/lib/review-ledger.sh`
-   (called via `${CLAUDE_PLUGIN_ROOT}`): one `flock` per PR held across each
-   append or transition, the fold, and the atomic (`mv`) sidecar replacement, so
-   overlapping sweeps cannot publish a stale count; each record written as one
-   complete line in a single write ending in `\n`, and, under the same lock
-   before any append or fold, a tail check that moves an unparseable final line
-   (short write, full disk, crash) to `<pr>.jsonl.corrupt-<timestamp>` and
-   truncates to the last newline, so one interrupted append never becomes
-   permanent mid-file corruption; a path validator applied at write and at read
-   (repo-relative, contained after `realpath`) so a model-produced `file` can
-   never point triage outside the repo; credential redaction of every
-   model-authored string (`title`, `suggested_fix`, dismissal reasons) and every
-   anchor-snapshot line before it is appended, with the same patterns as
-   yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when a snapshot
-   line cannot be redacted safely, persist only its hash and the line hint so a
-   secret echoed from the diff never lands in `.git` or gets re-injected into
-   prompts; fingerprint function (`file` + normalized `category` +
-   whitespace-normalized code-context hash; line kept as a rematch hint,
-   `reviewer` stored but not keyed), dedup/state-check function,
-   dismissed-findings reader (for context injection), prune-on-close function
-   that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock`, and
-   a per-PR `findings/<pr>.pending` sidecar in the two-field form
-   `<count> <bytes>` (pending count and the JSONL byte size it was computed
-   from) refreshed after folding the JSONL by `finding_id` to latest state.
-   Include a test fixture with two distinct findings anchored to the same code,
-   and one that moves lines without changing, to validate collision and rematch
-   behavior before shipping. This is the one piece everything else depends on.
+   (called via `${CLAUDE_PLUGIN_ROOT}`): the `<pr>` key accepted only as a
+   canonical positive integer (`^[1-9][0-9]*$`) before it is used in any path
+   (`.jsonl`, `.pending`, `.state`, lock, corrupt-tail, prune), so a malformed
+   `/review:triage` target can never reach outside `findings/`; one `flock` per
+   PR held across each append or transition, the fold, and the atomic (`mv`)
+   sidecar replacement, so overlapping sweeps cannot publish a stale count; each
+   record written as one complete line in a single write ending in `\n`, and,
+   under the same lock before any append or fold, a tail check that moves an
+   unparseable final line (short write, full disk, crash) to
+   `<pr>.jsonl.corrupt-<timestamp>` and truncates to the last newline, so one
+   interrupted append never becomes permanent mid-file corruption; a path
+   validator applied at write and at read (repo-relative, contained after
+   `realpath`) so a model-produced `file` can never point triage outside the
+   repo; credential redaction of every model-authored string (`title`,
+   `suggested_fix`, dismissal reasons) and every anchor-snapshot line before it
+   is appended, with the same patterns as yellow-core's `redact_secrets`
+   (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
+   persist only its hash and the line hint so a secret echoed from the diff
+   never lands in `.git` or gets re-injected into prompts; fingerprint function
+   (`file` + normalized `category` + whitespace-normalized code-context hash;
+   line kept as a rematch hint, `reviewer` stored but not keyed),
+   dedup/state-check function, dismissed-findings reader (for context
+   injection), prune-on-close function that removes both `<pr>.jsonl` and
+   `<pr>.pending` under the PR's `flock`, and a per-PR `findings/<pr>.pending`
+   sidecar in the two-field form `<count> <bytes>` (pending count and the JSONL
+   byte size it was computed from) refreshed after folding the JSONL by
+   `finding_id` to latest state. Include a test fixture with two distinct
+   findings anchored to the same code, and one that moves lines without
+   changing, to validate collision and rematch behavior before shipping. This is
+   the one piece everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read before Step
    5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
    prompts, with delimiter substitution on every interpolated value); add the
@@ -303,23 +312,27 @@ For `/flow:plan` to pick up, in dependency order:
    cheap-count pattern, not full JSONL parsing) that ignores any sidecar whose
    `<pr>.jsonl` no longer exists. Scanning the directory cannot tell an open PR
    from one closed outside triage, so reconciliation is guaranteed elsewhere:
-   `/review:sweep-all` lists open PRs on every run and prunes ledgers for any PR
-   not in that list, and every ledger writer records `<pr>.state` (last-seen PR
-   state and time). The hook counts a sidecar only when that cached state is
-   `OPEN` and under 7 days old; otherwise it names the PR as unverified ("run
-   `/review:triage <pr>`") instead of counting it. It then sums each open PR's
-   `findings/<pr>.pending` sidecar (kept current by the ledger write step and
-   `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
-   when the total is > 0. Append-only JSONL stays non-empty after
-   `fixed`/`dismissed`/`stale` transitions — the hook must not treat file
-   non-emptiness as pending findings. Writers hold the per-PR `flock` across
-   append, fold and sidecar replacement, so a sidecar is never older than the
-   JSONL it describes unless a writer was interrupted. The sidecar stores the
-   count and the JSONL byte size it was computed from (`<count> <bytes>`); when
-   the sidecar is missing or its size doesn't match the JSONL's current size
-   (one `stat`, immune to coarse mtime resolution), the hook folds that one file
-   (bounded by its timeout) or reports "pending unknown" instead of trusting the
-   count.
+   `/review:sweep-all` runs its own failure-checked query of every open PR (all
+   authors, drafts included:
+   `gh pr list --state open --limit 1000 --json number`, skipped entirely if the
+   call fails or may be truncated, instead of its own `--author @me` non-draft
+   sweep list) and prunes only ledgers for PRs absent from it, confirming each
+   with `gh pr view <pr> --json state` before deleting, and every ledger writer
+   records `<pr>.state` (last-seen PR state and time). The hook counts a sidecar
+   only when that cached state is `OPEN` and under 7 days old; otherwise it
+   names the PR as unverified ("run `/review:triage <pr>`") instead of counting
+   it. It then sums each open PR's `findings/<pr>.pending` sidecar (kept current
+   by the ledger write step and `/review:triage` after folding by `finding_id`)
+   and emits a `systemMessage` when the total is > 0. Append-only JSONL stays
+   non-empty after `fixed`/`dismissed`/`stale` transitions — the hook must not
+   treat file non-emptiness as pending findings. Writers hold the per-PR `flock`
+   across append, fold and sidecar replacement, so a sidecar is never older than
+   the JSONL it describes unless a writer was interrupted. The sidecar stores
+   the count and the JSONL byte size it was computed from (`<count> <bytes>`);
+   when the sidecar is missing or its size doesn't match the JSONL's current
+   size (one `stat`, immune to coarse mtime resolution), the hook folds that one
+   file (bounded by its timeout) or reports "pending unknown" instead of
+   trusting the count.
 6. **Setup and docs** — `/review:setup` gains checks for the helper's new
    binaries, `flock` and `realpath` (neither is guaranteed on macOS; `flock`
    comes from util-linux or `brew install flock`), and yellow-review's README
