@@ -885,11 +885,15 @@ if [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
   echo "main has moved past the release merge; use the manual tag path." >&2
 else
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  me=$(gh api user -q .login)
   gh workflow run version-packages.yml -f force_publish=true
+  # --user limits this to your own dispatches, so another operator's run is
+  # never selected or cancelled; --commit is left off on purpose, because the
+  # point is to catch a run that built a commit other than $MERGE_SHA.
   run=""
   for _ in $(seq 1 15); do
     run=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --json databaseId,headSha,createdAt \
+      --user "$me" --json databaseId,headSha,createdAt \
       -q "([.[] | select(.createdAt >= \"$since\")][0] // empty) | \"\(.databaseId) \(.headSha)\"")
     [ -n "$run" ] && break
     sleep 10
