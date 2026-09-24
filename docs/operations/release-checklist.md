@@ -87,11 +87,12 @@ obtaining final sign-off.
 
 ```mermaid
 graph TD
-    P[Version Packages PR merged] --> A[Preflight Checks]
+    P[Version Packages PR opened] --> A[Preflight Checks]
     A --> B[Automated Validation]
     B --> C[Manual Smoke Tests]
     C --> D[Documentation Updates]
-    D --> E[Release Preparation]
+    D --> M[Merge PR to main]
+    M --> E[Release Preparation]
     E --> F[Post-Release Validation]
     F --> G[Final Sign-Off]
 
@@ -102,15 +103,20 @@ graph TD
     G --> I[Release Complete]
 ```
 
-**Phase 0 — Version Packages PR** (standard automated path; run before Preflight
-Checks):
+**Phase 0 — Version Packages PR** (standard automated path):
 
 ```sh
 # 1. Merge feature PRs to main with their .changeset/*.md files committed.
 # 2. version-packages.yml opens or updates the "chore: version packages" PR.
 # 3. Review bump types, CHANGELOG entries, and three-way version sync.
-# 4. Merge that PR to main. Tags and the GitHub Release are created on that push.
-#    Manual tagging is emergency-only — see Section 5.2. Do not push a tag to trigger the workflow.
+# 4. Run Sections 1-4 (Preflight, Automated Validation, Smoke Tests,
+#    Documentation Updates) against this PR's branch. Do not merge until
+#    all four gates pass — a failed smoke test cannot stop the release
+#    once the PR is merged.
+# 5. Merge that PR to main. With no pending changesets left, the same
+#    workflow's publish phase creates tags and the GitHub Release on this
+#    push. Manual tagging is emergency-only — see Section 5.2. Do not push
+#    a tag to trigger the workflow.
 ```
 
 **Emergency manual release** (only when the automated Version Packages PR path
@@ -127,6 +133,9 @@ semver bump rules.
 ---
 
 ## Section 1: Preflight Checks
+
+> On the automated path, Sections 1-4 run against the open "chore: version
+> packages" PR branch, per Phase 0 above — not after it merges.
 
 ### 1.1 Repository Status
 
@@ -225,28 +234,25 @@ Section 4 security directives.
 
 **Objective**: Ensure version numbers are consistent across all artifacts.
 
-- [ ] All pending changesets have been applied
+- [ ] On the automated path, the open Version Packages PR already applied
+      pending changesets and bumped the catalog version — verify, do not
+      re-run `apply:changesets` or `catalog-version.js` against it
+
+  ```bash
+  pnpm validate:versions
+  # Expected: "[validate-versions] OK: 19 plugins — all versions in sync"
+  node -p "require('./package.json').version"
+  # Expected: X.Y.Z matching intended release
+  ```
+
+- [ ] Emergency manual path only (Section 5.2, no automated PR exists): apply
+      changesets and bump the catalog yourself
 
   ```bash
   pnpm apply:changesets
   # Bumps plugins/*/package.json, syncs plugin.json + marketplace.json
   # Run: pnpm install after (lockfile changes)
-  ```
-
-- [ ] Three-way version consistency check passes (package.json == plugin.json ==
-      marketplace.json)
-
-  ```bash
-  pnpm validate:versions
-  # Expected: "[validate-versions] OK: 19 plugins — all versions in sync"
-  ```
-
-- [ ] Root `package.json` catalog version updated for this release
-
-  ```bash
   node scripts/catalog-version.js minor   # or patch / major
-  node -p "require('./package.json').version"
-  # Expected: X.Y.Z matching intended release
   ```
 
 - [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's

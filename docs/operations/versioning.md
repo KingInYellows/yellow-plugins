@@ -30,34 +30,34 @@ gt modify -c -m "feat(yellow-core): add new brainstorm command" -m "chore: add c
 
 ### When cutting a release
 
+The standard path is automated — feature PRs carry changesets, and a bot opens
+the version bump PR for you:
+
 ```sh
-# 1. Apply all pending changesets
-pnpm apply:changesets
-# → Bumps plugins/*/package.json versions
-# → Writes CHANGELOG.md entries for each changed plugin
-# → Syncs plugin.json and marketplace.json versions
+# 1. Merge your feature PR (with its changeset) to main.
+#    version-packages.yml detects the pending changeset and opens/updates a
+#    "chore: version packages" PR, running `pnpm run version-packages`:
+#    → Applies changesets (bumps plugins/*/package.json, writes CHANGELOG.md)
+#    → Syncs plugin.json and marketplace.json versions
+#    → Bumps the catalog version: node scripts/catalog-version.js patch
 
-# 2. Regenerate the lockfile (versions changed)
-pnpm install
-
-# 3. Commit the version bumps
-gt modify -c -m "chore(release): version packages"
-
-# 4. Bump the catalog version
-node scripts/catalog-version.js minor   # or patch / major
-
-# 5. Commit the catalog bump
-gt modify -c -m "chore(release): bump catalog to v1.x.x"
-
-# 6. Run pre-flight checks
+# 2. Review the "Version Packages" PR (bump types, CHANGELOG entries,
+#    three-way version match — see CONTRIBUTING.md "Reviewing the Version
+#    Packages PR"), then run pre-flight checks against it:
 pnpm release:check
 
-# 7. Do not tag by hand. Merge the "Version Packages" PR. Its push to `main`
-#    runs version-packages.yml, which creates per-plugin tags (`<name>@<version>`),
-#    the root catalog tag (`v<catalog-version>`), and the GitHub Release.
-#    A tag push does not trigger that workflow.
+# 3. Do not tag by hand. Merge the "Version Packages" PR. Its push to `main`
+#    runs version-packages.yml again, which creates per-plugin tags
+#    (`<name>@<version>`), the root catalog tag (`v<catalog-version>`), and
+#    the GitHub Release. A manually pushed tag does not trigger that workflow.
 #    Recovery: gh workflow run version-packages.yml -f force_publish=true
 ```
+
+**Emergency direct release** (only when the automated Version Packages PR path
+is unavailable): see `CONTRIBUTING.md` "Emergency manual release" or
+`docs/operations/release-checklist.md` Section 5.2. That path applies changesets
+and bumps the catalog locally, then git-tags directly instead of going through a
+Version Packages PR — it is a recovery procedure, never the default.
 
 ## Semver Bump Rules
 
