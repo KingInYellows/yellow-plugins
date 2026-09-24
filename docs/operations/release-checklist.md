@@ -880,21 +880,34 @@ git fetch origin main
 if [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
   echo "main has moved past the release merge; use the manual tag path." >&2
 else
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   gh workflow run version-packages.yml -f force_publish=true
-  run_id=""
+  run=""
   for _ in $(seq 1 15); do
-    run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --commit "$MERGE_SHA" --json databaseId -q '.[0].databaseId')
-    [ -n "$run_id" ] && break
+    run=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
+      --json databaseId,headSha,createdAt \
+      -q "([.[] | select(.createdAt >= \"$since\")][0] // empty) | \"\(.databaseId) \(.headSha)\"")
+    [ -n "$run" ] && break
     sleep 10
   done
-  if [ -n "$run_id" ]; then
-    gh run watch "$run_id" --exit-status
+  run_id=${run%% *} run_sha=${run##* }
+  if [ -z "$run" ]; then
+    echo "No dispatched run found; check the Actions tab." >&2
+  elif [ "$run_sha" != "$MERGE_SHA" ]; then
+    # main moved between the check and the dispatch: stop the wrong build.
+    gh run cancel "$run_id"
+    echo "Dispatched run built $run_sha, not $MERGE_SHA; cancelled it." >&2
+    echo "Use the manual tag path below." >&2
   else
-    echo "No dispatched run found for $MERGE_SHA; check the Actions tab." >&2
+    gh run watch "$run_id" --exit-status
   fi
 fi
 ```
+
+The check-then-dispatch window is small but real, which is why the snippet
+verifies the dispatched run's `headSha` and cancels a mismatch. The durable fix
+is a `version-packages.yml` input carrying the recovery SHA, used by both
+checkout steps (tracked as a follow-up; it is a workflow change, not a doc one).
 
 **Only if GitHub Actions itself cannot run this workflow** (Actions outage,
 workflow disabled) does manual tagging become necessary. In that case, tag the

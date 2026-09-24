@@ -272,12 +272,13 @@ recovery path.
 > exists, the run logs "nothing to do" and publishes no GitHub Release.
 >
 > **Before merging**: this branch is a point-in-time snapshot, not a
-> self-updating PR like the bot's. If `main` advances (another PR merges with
-> its own changeset) while this branch is out for review, rebase/restack onto
-> the new `main` and re-verify `pnpm validate:versions` and the catalog version
-> before merging — otherwise the newly-landed changeset stays pending and the
-> next `version-packages.yml` run opens a second, overlapping Version Packages
-> PR.
+> self-updating PR like the bot's. If `main` gains another PR's changeset while
+> this branch is out for review, a rebase is not enough: the new `.changeset`
+> file comes along unconsumed, `pnpm validate:versions` does not catch it, and
+> the merge makes `version-packages.yml` open another Version Packages PR
+> instead of publishing. Discard this branch and redo the one-time
+> `pnpm version-packages` cut on a fresh branch from the updated `main` (do not
+> re-run it on this branch — that bumps the catalog twice).
 
 ```bash
 # Run /stack:status first; continue only on READY_GRAPHITE or READY_GITHUB —
@@ -314,24 +315,20 @@ for _ in $(seq 1 15); do
   sleep 10
 done
 if [ -z "$run_id" ]; then
-  echo "No version-packages.yml run found for $merge_sha after 2.5 minutes." >&2
-  echo "Check the Actions tab before proceeding to force_publish." >&2
+  echo "No version-packages.yml run found for $merge_sha; check the Actions tab." >&2
+elif gh run watch "$run_id" --exit-status &&
+  gh release view "v$(git show "$merge_sha:package.json" |
+    node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")" >/dev/null; then
+  echo "Release published. Nothing to recover."
 else
-  gh run watch "$run_id" --exit-status &&
-    gh release view "v$(node -p "require('./package.json').version")"
-fi
-
-# Recovery, only if that run failed or logged "nothing to do". Without --ref
-# the dispatch builds the default branch, so run it only while main is still
-# the release merge; otherwise follow docs/operations/release-checklist.md 5.2
-# (tag $merge_sha, then dispatch with --ref "v<version>").
-git fetch origin main
-if [ "$(git rev-parse origin/main)" = "$merge_sha" ]; then
-  gh workflow run version-packages.yml -f force_publish=true
-else
-  echo "main moved past $merge_sha; use the checklist 5.2 tag path." >&2
+  echo "Run failed or published no Release: recover with the guarded" >&2
+  echo "procedure in docs/operations/release-checklist.md 5.2." >&2
 fi
 ```
+
+Do not dispatch `force_publish=true` after a successful run, and do not copy it
+bare: release-checklist 5.2 pins the dispatch to the release merge and verifies
+the run it started.
 
 `force_publish=true` skips phase detection and runs `release-tags.sh` in
 recovery mode: it tolerates a catalog tag that already exists, and
