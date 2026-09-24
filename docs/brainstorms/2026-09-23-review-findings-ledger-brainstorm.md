@@ -296,19 +296,23 @@ For `/flow:plan` to pick up, in dependency order:
    ignored file such as a local `.env`, or a tracked symlink pointing at one, is
    never read, snapshotted or hashed) so a model-produced `file` can never point
    triage outside the repo or at local secrets. A path the PR deletes is valid
-   when it exists in the base tree; the observation records the base SHA and its
-   anchor is snapshotted from the base blob, so a finding on a deleted file is
-   kept rather than rejected; credential redaction of every model-authored
-   string (`title`, `suggested_fix`, dismissal reasons) and every
-   anchor-snapshot line before it is appended, with the same patterns as
-   yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when a snapshot
-   line cannot be redacted safely, persist only its hash and the line hint so a
-   secret echoed from the diff never lands in `.git` or gets re-injected into
-   prompts. Because `redact_secrets` does not know every credential shape (it
-   misses assignments such as `DEVIN_ORG_ID=...`), a fail-closed pass runs on
-   the model-authored strings after it: any string that still contains an
-   environment-style assignment to a `*_KEY`, `*_TOKEN`, `*_SECRET`, `*_ID` or
-   `*_PASSWORD` name, or a long high-entropy token, is replaced wholesale with
+   when it exists in the base tree; because its parent directory may be gone too
+   (a whole-directory deletion), such a base-only path skips `realpath` and is
+   normalized lexically against the canonical repo root instead (no leading `/`,
+   no `..` after collapsing `./`), then relies on the base-tree mode and blob
+   checks above; the observation records the base SHA and its anchor is
+   snapshotted from the base blob, so a finding on a deleted file is kept rather
+   than rejected; credential redaction of every model-authored string (`title`,
+   `suggested_fix`, dismissal reasons) and every anchor-snapshot line before it
+   is appended, with the same patterns as yellow-core's `redact_secrets`
+   (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
+   persist only its hash and the line hint so a secret echoed from the diff
+   never lands in `.git` or gets re-injected into prompts. Because
+   `redact_secrets` does not know every credential shape (it misses assignments
+   such as `DEVIN_ORG_ID=...`), a fail-closed pass runs on the model-authored
+   strings after it: any string that still contains an environment-style
+   assignment to a `*_KEY`, `*_TOKEN`, `*_SECRET`, `*_ID` or `*_PASSWORD` name,
+   or a long high-entropy token, is replaced wholesale with
    `[withheld: possible credential]`, keeping the finding but not the text;
    fingerprint function (`file` + normalized `category` + `rule` + enclosing
    scope + whitespace-normalized code-context hash; line kept as a rematch hint,

@@ -107,11 +107,17 @@ git show "HEAD:$file" | pnpm exec prettier --stdin-filepath "$file" > "$tmp/pret
 # 2. Which lines did the resolver actually touch (staged + unstaged)?
 git diff -U0 HEAD -- "$file"
 
-# 3. Formatting deltas for current and baseline
-diff "$file" "$tmp/pretty-current.md" > "$tmp/delta-current.diff"
+# 3. Per-line formatter edits for current and baseline
 git show "HEAD:$file" > "$tmp/head.md"
-diff "$tmp/head.md" "$tmp/pretty-head.md" > "$tmp/delta-head.diff"
+git diff --no-index -U0 "$file" "$tmp/pretty-current.md" > "$tmp/fmt-current.diff"
+git diff --no-index -U0 "$tmp/head.md" "$tmp/pretty-head.md" > "$tmp/fmt-head.diff"
 
-# 4. Inside the edited ranges, only mismatches in delta-current that
-#    delta-head does not already have count as regressions.
+# 4. Map and compare (the part a raw diff of the two files cannot do):
+#    - map each edited current line to its HEAD line through step 2's hunks
+#      (purely added lines have no HEAD line);
+#    - for each edited line, take its formatter edit from fmt-current.diff and
+#      its HEAD counterpart's formatter edit from fmt-head.diff;
+#    - a regression is a change present in the current edit but absent from
+#      the HEAD one (e.g. a new wrap on a line that only lacked spaces), or any
+#      formatter edit on a purely added line. Fix only those.
 ```
