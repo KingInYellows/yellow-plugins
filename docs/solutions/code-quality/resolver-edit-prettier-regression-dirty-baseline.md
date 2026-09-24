@@ -41,7 +41,7 @@ regression:
    fully-reformatted version without touching the working tree.
 2. Diff that output against the current file content, but only look at the hunks
    that overlap the lines the resolver actually edited (e.g.
-   `git diff -U0 <file>` to get the edited line ranges, then check whether the
+   `git diff -U0 HEAD -- <file>` to get the edited line ranges, then check whether the
    stdin-filepath diff has any changes inside those same ranges).
 3. If the stdin-filepath diff has changes **inside** the edited region: the edit
    introduced a real regression — fix the edit's own formatting (indentation,
@@ -85,7 +85,7 @@ prettier --stdin-filepath plugins/yellow-review/commands/review/sweep-all.md \
   < plugins/yellow-review/commands/review/sweep-all.md > /tmp/pretty-check.md
 
 # 2. Which lines did the resolver actually touch?
-git diff -U0 -- plugins/yellow-review/commands/review/sweep-all.md
+git diff -U0 HEAD -- plugins/yellow-review/commands/review/sweep-all.md
 
 # 3. Does Prettier's output differ from the file inside those same lines?
 diff plugins/yellow-review/commands/review/sweep-all.md /tmp/pretty-check.md
