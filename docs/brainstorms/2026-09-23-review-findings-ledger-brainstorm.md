@@ -299,9 +299,15 @@ For `/flow:plan` to pick up, in dependency order:
    yellow-core's `redact_secrets` (`lib/compound-staging.sh`); when a snapshot
    line cannot be redacted safely, persist only its hash and the line hint so a
    secret echoed from the diff never lands in `.git` or gets re-injected into
-   prompts; fingerprint function (`file` + normalized `category` + `rule` +
-   enclosing scope + whitespace-normalized code-context hash; line kept as a
-   rematch hint, `reviewer` stored but not keyed), dedup/state-check function,
+   prompts. Because `redact_secrets` does not know every credential shape (it
+   misses assignments such as `DEVIN_ORG_ID=...`), a fail-closed pass runs on
+   the model-authored strings after it: any string that still contains an
+   environment-style assignment to a `*_KEY`, `*_TOKEN`, `*_SECRET`, `*_ID` or
+   `*_PASSWORD` name, or a long high-entropy token, is replaced wholesale with
+   `[withheld: possible credential]`, keeping the finding but not the text;
+   fingerprint function (`file` + normalized `category` + `rule` + enclosing
+   scope + whitespace-normalized code-context hash; line kept as a rematch hint,
+   `reviewer` stored but not keyed), dedup/state-check function,
    dismissed-findings reader (for context injection), prune-on-close function
    that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock` and
    leaves a `<pr>.closed` tombstone; every writer takes that lock and, before
@@ -311,15 +317,16 @@ For `/flow:plan` to pick up, in dependency order:
    live state is `OPEN` while a tombstone exists (the PR was reopened), the
    writer removes the tombstone under the same lock and starts a fresh ledger;
    and a per-PR `findings/<pr>.pending` sidecar in the form
-   `<pending> <attention> <bytes>` (pending count, `report_only` attention
-   count, and the JSONL byte size they were computed from) refreshed after
-   folding the JSONL by `finding_id` to latest state. Include test fixtures for:
-   two distinct defects on the same statement (different `rule`, same
-   `file`/`category`/anchor — must stay separate), one defect raised by two
-   reviewers (same `rule` — must merge), the same `rule` in two different
-   enclosing scopes such as two identical handlers (must stay separate), and a
-   finding whose line hint moves without the anchored code changing (rematch
-   behavior). This is the one piece everything else depends on.
+   `<pending> <attention> <bytes>` (pending count, attention count = latest
+   state ∈ {`report_only`, `stale`}, and the JSONL byte size they were computed
+   from) refreshed after folding the JSONL by `finding_id` to latest state.
+   Include test fixtures for: two distinct defects on the same statement
+   (different `rule`, same `file`/`category`/anchor — must stay separate), one
+   defect raised by two reviewers (same `rule` — must merge), the same `rule` in
+   two different enclosing scopes such as two identical handlers (must stay
+   separate), and a finding whose line hint moves without the anchored code
+   changing (rematch behavior). This is the one piece everything else depends
+   on.
 2. **`review-pr.md` integration** — add the dismissed-context read before Step
    5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
    prompts, with delimiter substitution on every interpolated value); add the
@@ -339,12 +346,16 @@ For `/flow:plan` to pick up, in dependency order:
    in this step too. The same producers also emit a required `scope` field (the
    enclosing symbol or AST path the reviewer is looking at, e.g.
    `handlers.createUser`, or the nearest markdown heading), because a generic
-   shell helper cannot derive scope reliably across languages; the converter
-   assigns `unscoped`. An `unscoped` finding has no reliable identity, so its
-   fingerprint also includes the line hint (less stable across edits, but it
-   never merges two separate sites); the plan tests that two identical handlers
-   stay separate both with different `scope` values and through converter
-   output.
+   shell helper cannot derive scope reliably across languages. The helper
+   canonicalizes it before it enters the key: it keeps only the innermost symbol
+   name (`handlers.createUser` and `createUser` both become `createUser`),
+   accepts it only if that name actually occurs in the anchored file, and maps
+   generic values (`module`, `file`, `global`, `top-level`) and anything it
+   cannot verify to `unscoped`; the converter also assigns `unscoped`. An
+   `unscoped` finding has no reliable identity, so its fingerprint also includes
+   the line hint (less stable across edits, but it never merges two separate
+   sites); the plan tests that two identical handlers stay separate both with
+   different `scope` values and through converter output.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
@@ -393,11 +404,13 @@ For `/flow:plan` to pick up, in dependency order:
    deletion path — `/review:sweep-all` delegates here), append transition
    records (`open`/`reopened`/`report_only`→`applied` for an approved fix,
    `open`→`fixed`/`dismissed`/`stale`, and the same terminal transitions for
-   `reopened`; `applied`→`fixed` once the ancestor check shows its fixing SHA is
-   published, or `applied`→`dismissed` for an abandoned or invalid fix; and for
-   `report_only` once a human fixes or dismisses one or re-verification finds it
-   stale, without ever making it auto-applicable; never rewrite finding rows),
-   refresh `<pr>.pending` after each fold.
+   `reopened`; `stale`→`dismissed` when a human confirms an obsolete finding,
+   and `stale`→`reopened` when it rematches later; `applied`→`fixed` once the
+   ancestor check shows its fixing SHA is published, or `applied`→`dismissed`
+   for an abandoned or invalid fix; and for `report_only` once a human fixes or
+   dismisses one or re-verification finds it stale, without ever making it
+   auto-applicable; never rewrite finding rows), refresh `<pr>.pending` after
+   each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
