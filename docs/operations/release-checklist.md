@@ -968,6 +968,7 @@ commit):
       release that does not match the tag.
 
   ```bash
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
   ```
 
@@ -977,7 +978,8 @@ commit):
   run_id=""
   for _ in $(seq 1 15); do
     run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
-      --commit "$MERGE_SHA" --json databaseId -q '.[0].databaseId')
+      --commit "$MERGE_SHA" --json databaseId,createdAt \
+      -q "([.[] | select(.createdAt >= \"$since\")][0].databaseId // empty)")
     [ -n "$run_id" ] && break
     sleep 10
   done
