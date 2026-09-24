@@ -266,7 +266,15 @@ For `/flow:plan` to pick up, in dependency order:
    the sidecar is missing or its size doesn't match the JSONL's current size
    (one `stat`, immune to coarse mtime resolution), the hook folds that one file
    (bounded by its timeout) or reports "pending unknown" instead of trusting the
-   count.
+   count. **Catalog registration (same step, not optional):** declare
+   `hooks.SessionStart` in `catalog/plugins/yellow-review.json` (mirror
+   `catalog/plugins/yellow-debt.json`), then run `pnpm generate:manifests` to
+   emit `plugins/yellow-review/.claude-plugin/plugin.json` — never hand-write
+   `hooks/hooks.json` or edit the generated manifest. **Codex hook exposure:**
+   set `targets.codex.includeHooks: false` (skills-only Codex target; the hook
+   is Claude-session local discovery, matching yellow-core's precedent). **Cursor
+   hook exposure:** none — the generator has no Cursor hook emission path
+   (`docs/cursor-distribution.md`).
 
 ## Open Questions
 
