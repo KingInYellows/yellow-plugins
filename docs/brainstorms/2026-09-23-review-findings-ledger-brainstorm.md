@@ -84,8 +84,12 @@ the shared clone's git dir, not a per-worktree path):
   a removed guard is a real regression, not a duplicate; a `stale` entry whose
   region a rebase moved is still the same defect once it matches again).
   Fingerprint = deterministic primitives only: `file` + normalized `category` +
-  a hash of the whitespace-normalized code lines the finding anchors to (so the
-  same defect from different reviewers merges). `category` is free-form in the
+  `rule` + a hash of the whitespace-normalized code lines the finding anchors to
+  (so the same defect from different reviewers merges). `rule` is a new required
+  compact-return field: a short kebab-case condition slug from a closed
+  per-category vocabulary (for example `missing-input-validation`,
+  `wrong-error-path`), validated like `category`, so two distinct defects on the
+  same statement get different keys. `category` is free-form in the
   compact-return schema, so it is mapped to a closed vocabulary before keying
   (correctness, security, reliability, performance, maintainability, docs,
   testing, contract), and the plan must measure how often one defect still lands
@@ -94,12 +98,11 @@ the shared clone's git dir, not a per-worktree path):
   a search hint for contextual rematching after a rebase (the research doc's "do
   not hash line numbers"). Record `reviewer` on each entry but exclude it from
   the key. Never use LLM title text as identity — titles get reworded between
-  runs. Two distinct defects anchored to the same code can still collide;
-  `/flow:plan` must test that case and add a rule/condition discriminator if
-  collisions show up in practice. In addition, `/review:pr` injects the PR's
-  dismissed findings + dismissal reasons into reviewer prompts as a fenced
-  advisory block (same shape as the existing learnings-context block, but not
-  its sanitization alone: stored titles and reasons can echo PR text, so the
+  runs. `/flow:plan` must still test two distinct defects on the same statement
+  and define the initial `rule` vocabulary. In addition, `/review:pr` injects
+  the PR's dismissed findings + dismissal reasons into reviewer prompts as a
+  fenced advisory block (same shape as the existing learnings-context block, but
+  not its sanitization alone: stored titles and reasons can echo PR text, so the
   block's own delimiters are substituted out of every interpolated value first,
   as the pr-context fence already requires, before XML escaping), because
   fingerprint-only dedup misses reworded re-detections of the same underlying
@@ -153,9 +156,9 @@ That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
 or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
 component that touches the file (read + append other transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
-`sweep.md` optionally invoking `/review:triage --non-interactive` at the end, and
-`sweep-all.md` invoking `/review:triage --prune <pr>` for ledgers whose PR is
-absent from the all-open-PR query.
+`sweep.md` optionally invoking `/review:triage --non-interactive` at the end,
+and `sweep-all.md` invoking `/review:triage --prune <pr>` for ledgers whose PR
+is absent from the all-open-PR query.
 
 **Pros:**
 
@@ -242,7 +245,7 @@ a future maintainer will recognize it immediately.
 | 2   | New `/review:triage` command owns lifecycle transitions and pruning, except `review-pr.md` appends `reopened` on re-observation (`review-pr.md` still reads and appends findings); `/review:resolve` stays GraphQL-only | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles. A direct `/review:pr` run must not hide reproduced defects when triage is skipped.                                                                                                                                        |
 | 3   | Attended = fix every verified finding the human approves; unattended = apply nothing                                                                                                                                    | The safe/gated/manual gate is a proxy for "is a human reviewing this change." Explicit approval (per finding, or approve-all) provides that review; mere presence does not. Unattended triage applies nothing because every ledger entry is residue `review-pr.md` already held for a human (including P2/P3 `safe_auto`), so applying it would nullify the Step 7 severity gate.                                                                                        |
 | 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                                                                                    | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                                                                                                                                                                        |
-| 5   | Write-time dedup (fingerprint: file, normalized category, code-context hash; line kept as a rematch hint; reviewer recorded but not keyed) + dismissed-findings prompt injection                                        | Code-context hash distinguishes distinct issues and merges cross-reviewer repeats of the same anchored defect; leaving line numbers out keeps identity stable when unrelated edits shift lines. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the fenced-advisory pattern already used for learnings-context. Plan must test same-anchor collisions and add a rule/condition key if needed. |
+| 5   | Write-time dedup (fingerprint: file, normalized category, rule, code-context hash; line kept as a rematch hint; reviewer recorded but not keyed) + dismissed-findings prompt injection                                  | Code-context hash distinguishes distinct issues and merges cross-reviewer repeats of the same anchored defect; leaving line numbers out keeps identity stable when unrelated edits shift lines. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the fenced-advisory pattern already used for learnings-context. Plan must test same-anchor collisions and add a rule/condition key if needed. |
 | 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close                                                                | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                                                                                                                                                                    |
 
 ## Suggested Stack Decomposition
@@ -269,17 +272,20 @@ For `/flow:plan` to pick up, in dependency order:
    (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
    persist only its hash and the line hint so a secret echoed from the diff
    never lands in `.git` or gets re-injected into prompts; fingerprint function
-   (`file` + normalized `category` + whitespace-normalized code-context hash;
-   line kept as a rematch hint, `reviewer` stored but not keyed),
+   (`file` + normalized `category` + `rule` + whitespace-normalized code-context
+   hash; line kept as a rematch hint, `reviewer` stored but not keyed),
    dedup/state-check function, dismissed-findings reader (for context
    injection), prune-on-close function that removes both `<pr>.jsonl` and
-   `<pr>.pending` under the PR's `flock`, and a per-PR `findings/<pr>.pending`
-   sidecar in the two-field form `<count> <bytes>` (pending count and the JSONL
-   byte size it was computed from) refreshed after folding the JSONL by
-   `finding_id` to latest state. Include a test fixture with two distinct
-   findings anchored to the same code, and one that moves lines without
-   changing, to validate collision and rematch behavior before shipping. This is
-   the one piece everything else depends on.
+   `<pr>.pending` under the PR's `flock` and leaves a `<pr>.closed` tombstone;
+   every writer takes that lock and, before appending, checks the tombstone and
+   rechecks the PR state (`gh pr view <pr> --json state`), refusing to write for
+   a closed PR, so a `/review:pr` run that outlives its PR cannot recreate a
+   pruned ledger; and a per-PR `findings/<pr>.pending` sidecar in the two-field
+   form `<count> <bytes>` (pending count and the JSONL byte size it was computed
+   from) refreshed after folding the JSONL by `finding_id` to latest state.
+   Include a test fixture with two distinct findings anchored to the same code,
+   and one that moves lines without changing, to validate collision and rematch
+   behavior before shipping. This is the one piece everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read before Step
    5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
    prompts, with delimiter substitution on every interpolated value); add the
@@ -308,9 +314,10 @@ For `/flow:plan` to pick up, in dependency order:
    all-open-PR query and calls `/review:triage --prune <pr>` for each ledger
    whose PR is absent.
 5. **SessionStart hook** — declared in `catalog/plugins/yellow-review.json`
-   (`hooks.SessionStart`, as yellow-debt does) and emitted by
-   `pnpm generate:manifests`, never a hand-written `hooks/hooks.json` or
-   hand-edited `plugin.json`. **Codex hook exposure:** set
+   (`hooks.SessionStart` with an explicit `"timeout": 3`, as yellow-debt does;
+   when the fold fallback would exceed it the hook reports "pending unknown")
+   and emitted by `pnpm generate:manifests`, never a hand-written
+   `hooks/hooks.json` or hand-edited `plugin.json`. **Codex hook exposure:** set
    `targets.codex.includeHooks: false` (skills-only Codex target; the hook is
    Claude-session local discovery, matching yellow-core's precedent). **Cursor
    hook exposure:** none — the generator has no Cursor hook emission path
@@ -359,8 +366,8 @@ For `/flow:plan` to pick up, in dependency order:
   re-read of the flagged file region and a heuristic content match, or something
   more structured? Not resolved here; a plan-level implementation detail.
 - How `/review:triage` detects "PR merged/closed" to trigger pruning —
-  `gh pr view --json state` at the start of a normal or `--non-interactive`
-  run, plus a dedicated `--prune <pr>` mode invoked by `/review:sweep-all` for
+  `gh pr view --json state` at the start of a normal or `--non-interactive` run,
+  plus a dedicated `--prune <pr>` mode invoked by `/review:sweep-all` for
   ledgers whose PR is absent from the all-open-PR list.
 - Should the optional `plugin-contract-reviewer` extension fields
   (`breaking_change_class`, `migration_path`) be persisted in ledger entries, or
@@ -368,10 +375,9 @@ For `/flow:plan` to pick up, in dependency order:
 - Testing/eval strategy for `/review:triage` itself (it's a new command with
   real filesystem mutation and re-verification logic) — not addressed in this
   brainstorm.
-- Fingerprint collision coverage: two distinct correctness defects sharing
-  `file` and `category` but anchored to different code must remain
-  distinguishable after the code-context hash; if the hash is insufficient, add
-  a stable rule/condition discriminator before implementation ships.
+- Fingerprint collision coverage: the initial per-category `rule` vocabulary,
+  and a test that two distinct defects on the same statement (different `rule`)
+  stay separate while one defect raised by two reviewers (same `rule`) merges.
 - Whether attended `/review:pr`'s Step 10 chat report should visually
   distinguish "just written to the ledger this run" from "carried over from a
   prior sweep" — a UX nicety not resolved here.
