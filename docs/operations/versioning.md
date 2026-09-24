@@ -9,7 +9,7 @@ version namespaces: **per-plugin versions** (tracked by Changesets) and the
 | Level | Source of truth | Who bumps it | When |
 |---|---|---|---|
 | Per-plugin | `plugins/<name>/package.json` | `pnpm apply:changesets` | On every release cut |
-| Catalog | root `package.json` | `node scripts/catalog-version.js` | When ready to tag a release |
+| Catalog | root `package.json` | `node scripts/catalog-version.js patch` (run by `pnpm version-packages`) | Once per release batch |
 
 The catalog version appears on GitHub Releases. Plugin versions appear in
 `marketplace.json` and are what Claude Code checks for updates.
@@ -30,34 +30,40 @@ gt modify -c -m "feat(yellow-core): add new brainstorm command" -m "chore: add c
 
 ### When cutting a release
 
+The standard path is automated — feature PRs carry changesets, and a bot opens
+the version bump PR for you:
+
 ```sh
-# 1. Apply all pending changesets
-pnpm apply:changesets
-# → Bumps plugins/*/package.json versions
-# → Writes CHANGELOG.md entries for each changed plugin
-# → Syncs plugin.json and marketplace.json versions
+# 1. Merge your feature PR (with its changeset) to main.
+#    version-packages.yml detects the pending changeset and opens/updates a
+#    "chore: version packages" PR, running `pnpm run version-packages`:
+#    → Applies changesets (bumps plugins/*/package.json, writes CHANGELOG.md)
+#    → Syncs plugin.json and marketplace.json versions
+#    → Bumps the catalog version: node scripts/catalog-version.js patch
+#    → Refreshes the manifest snapshot test
+#      (tests/integration/generate-manifests-characterization.test.ts, vitest -u)
 
-# 2. Regenerate the lockfile (versions changed)
-pnpm install
-
-# 3. Commit the version bumps
-gt modify -c -m "chore(release): version packages"
-
-# 4. Bump the catalog version
-node scripts/catalog-version.js minor   # or patch / major
-
-# 5. Commit the catalog bump
-gt modify -c -m "chore(release): bump catalog to v1.x.x"
-
-# 6. Run pre-flight checks
+# 2. Review the "Version Packages" PR (bump types, CHANGELOG entries,
+#    three-way version match — see CONTRIBUTING.md "Reviewing the Version
+#    Packages PR"), then run pre-flight checks against it:
 pnpm release:check
 
-# 7. Tag and push (for release tracking — tags do NOT trigger the workflow)
-git tag v1.x.x && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
-# → Normal path: merge the "Version Packages" PR; its push to `main` runs
-#   version-packages.yml, which builds and creates the GitHub Release.
-#   Recovery: gh workflow run version-packages.yml -f force_publish=true
+# 3. Do not tag by hand. Merge the "Version Packages" PR. Its push to `main`
+#    runs version-packages.yml again, which creates per-plugin tags
+#    (`<name>@<version>`), the root catalog tag (`v<catalog-version>`), and
+#    the GitHub Release. A manually pushed tag does not trigger that workflow.
+#    Recovery: follow the guarded procedure in release-checklist.md 5.2 (it
+#    pins the dispatch to the release merge); do not dispatch force_publish
+#    from a moved main.
 ```
+
+**Emergency manual release** (only when the bot cannot open the Version Packages
+PR): see `CONTRIBUTING.md` "Emergency manual release" for the full procedure,
+its stale-tag and stale-branch cautions, and the `force_publish` danger note —
+that section is the canonical explanation; this is a pointer, not a second copy.
+Short version: that path runs `pnpm version-packages` on a hand-made branch and
+merges it through a normal PR; the merge publishes exactly as in step 3 above.
+`force_publish=true` is a recovery procedure, never the default.
 
 ## Semver Bump Rules
 
@@ -129,28 +135,44 @@ pnpm changeset status --since=origin/main
 The catalog version (`root package.json`) represents the overall marketplace
 snapshot bundled into a GitHub Release tarball.
 
-**When to bump the catalog:**
+**Bump level:** always patch for both the automated path and `CONTRIBUTING.md`'s
+"Emergency manual release" — that procedure exists only to recover the bot's own
+PR and always mirrors it (`catalog-version.js patch`), never `minor`/`major`.
 
-| Plugins changed | Suggested catalog bump |
-|---|---|
-| Only patch-level plugin changes | catalog patch |
-| Any minor-level plugin change | catalog minor |
-| Any major-level plugin change | catalog minor (catalog majors are rare) |
+A `minor` or `major` catalog bump is a separate, standalone maintenance
+decision, unrelated to either of those paths — cut via its own small PR that
+runs `node scripts/catalog-version.js minor` (or `major`) deliberately, out of
+band from any pending plugin release. See
+`docs/maintenance/catalog-release-gap.md` for a worked example (PR #580 bumped
+the catalog to a major version alongside a breaking marketplace change).
 
 The catalog version does NOT need to match any individual plugin version. It is
 a timestamp of the marketplace snapshot, not a semantic compatibility signal.
 
 ## Validate Version Consistency
 
-At any time you can check that `package.json`, `plugin.json`, and
-`marketplace.json` are in sync:
+At any time you can check version sync. For every plugin directory with a
+`package.json`, `scripts/validate-versions.js` checks the Claude three-way set:
+`plugins/<name>/package.json`, `plugins/<name>/.claude-plugin/plugin.json`, and
+the `.claude-plugin/marketplace.json` entry. A plugin directory without a
+`package.json` is skipped unless it is Codex- or Cursor-enabled, in which case
+the missing file is reported as drift.
+
+When `catalog/plugins/<name>.json` has `targets.codex.enabled` true, it also
+requires `package.json` to match `.codex-plugin/plugin.json`, and checks
+`.agents/plugins/marketplace.json` for membership, name, order, and path
+(those entries have no version field). When `targets.cursor.enabled` is true,
+it requires `package.json` to match `.cursor-plugin/plugin.json`, and checks
+`.cursor-plugin/marketplace.json` the same way.
 
 ```sh
 pnpm validate:versions        # fails on drift
 pnpm validate:versions:dry    # reports drift without failing
 ```
 
-This runs automatically in CI on every PR.
+This runs automatically in CI on every PR. The success line reports how many
+plugins were checked (`OK: <N> plugins — all versions in sync`), not a fixed
+three-manifest count.
 
 ## Troubleshooting
 

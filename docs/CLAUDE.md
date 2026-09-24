@@ -21,28 +21,16 @@ can be installed via `/plugin marketplace add KingInYellows/yellow-plugins`.
 
 ## Adding a Plugin
 
-1. Create `plugins/<name>/package.json` (version source of truth) and
-   `catalog/plugins/<name>.json` (fields per `catalog/README.md`); add the
-   name to `pluginOrder` in `catalog/catalog.json`.
-2. Run `pnpm generate:manifests` — it emits
-   `plugins/<name>/.claude-plugin/plugin.json` and the
-   `.claude-plugin/marketplace.json` entry. Never hand-edit those.
-3. Add commands in `plugins/<name>/commands/*.md` and/or other entrypoints,
-   plus `CLAUDE.md` and `README.md` in the plugin root.
-4. Update `plugins/yellow-core/commands/setup/all.md` — the new plugin must
-   appear, in matching order, in every marker-delimited section of that file
-   that `validate-setup-all.js` cross-checks (dashboard loop, classification,
-   delegated command list, plugin-command map, and dashboard example); see the
-   script's header comment for the authoritative section list and error codes.
-   Two sections are conditional: add a Step 1.5 probe entry only when the
-   plugin's classification references an `mcp__plugin_*` tool name; add a
-   Step 1.6 credential-status entry only when the plugin's hooks emit
-   credential status (that list lives between the
-   `# setup-all-credential-status-plugins:start/end` markers in
-   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`,
-   not in `all.md`). Add a `.changeset/*.md` entry.
-5. Run `pnpm validate:schemas` (includes `validate:generated` and
-   `validate:setup-all`).
+New plugin: `package.json` (version source of truth, `"private": true`) +
+`catalog/plugins/<name>.json` + a `pluginOrder` entry, then
+`pnpm generate:manifests`, wire it into
+`plugins/yellow-core/commands/setup/all.md`, run `pnpm install` (lockfile),
+`pnpm changeset`, and `pnpm validate:schemas` (refresh the manifest
+characterization snapshot if it fails). The full numbered procedure — including
+the conditional Step 1.5/1.6 `setup/all.md` entries — is the single source of
+truth in
+[CONTRIBUTING.md "Adding a Plugin"](../CONTRIBUTING.md#adding-a-plugin);
+`docs/plugin-template.md` has the full worked example.
 
 ## Validation
 
@@ -74,27 +62,40 @@ plugins/<name>/package.json  →  plugin.json  →  marketplace.json
 `package.json` is the Changesets source of truth. `sync-manifests.js` propagates
 it to the other two. `validate-versions.js` blocks CI if any of the three drift.
 
-**Always run `pnpm changeset` before committing plugin file changes.** CI blocks
-PRs that modify `plugins/*/` without a `.changeset/*.md` file.
+**The only command a plugin author runs is `pnpm changeset`, before
+committing.** CI blocks PRs that modify `plugins/*/` without a `.changeset/*.md`
+file.
 
 ```bash
-pnpm changeset              # record bump type (patch/minor/major) for affected plugins
-pnpm apply:changesets       # apply pending changesets locally (also runs sync-manifests.js)
-node scripts/catalog-version.js patch  # bump root catalog version (required for release tags)
-pnpm tag                    # create per-plugin git tags after version bump
+pnpm changeset               # record bump type (patch/minor/major) for affected plugins
 ```
 
 **Bump type guide:**
+
 - `patch` — bug fix or documentation-only change inside a plugin
 - `minor` — new command, skill, or agent (additive change)
 - `major` — breaking change or removal of a command
 
 **Release flow (automated):** On merge to `main`, `version-packages.yml` opens a
-"chore: version packages" PR. When that PR merges, per-plugin tags
-(`yellow-core@1.1.1`) and a root catalog tag (`v1.1.2`) are created, and the
-build-and-release job in the same workflow builds artifacts and publishes a
-GitHub Release. Manual recovery: trigger `workflow_dispatch` with
-`force_publish=true`.
+"chore: version packages" PR by running `pnpm apply:changesets` (bumps versions,
+syncs `plugin.json`/`marketplace.json`) and
+`node scripts/catalog-version.js patch` (bumps the root catalog version). When
+that PR merges, `scripts/ci/release-tags.sh` creates the per-plugin tags
+(`yellow-core@1.1.1`, via `changeset tag`) and the root catalog tag (`v1.1.2`,
+which `changeset tag` does not create), and the build-and-release job in the
+same workflow builds artifacts and publishes a GitHub Release.
+`apply:changesets`, `catalog-version.js`, and `tag` are CI-run steps, not
+developer commands. Hand-running `apply:changesets` outside CI is an
+**emergency-only** recovery procedure (bot cannot open the PR) that always
+mirrors the bot's own `patch` bump — see `CONTRIBUTING.md` "Emergency manual
+release". Hand-running `catalog-version.js` with `minor` or `major` is a
+separate, deliberate out-of-band catalog-snapshot decision, independent of any
+plugin release urgency — see `docs/operations/versioning.md` "Catalog Version
+Rules". Manual recovery when a publish run failed or logged "nothing to do" is a
+`force_publish=true` dispatch, but never copy it bare: without `--ref` it builds
+the current `main` and can re-publish under a stale tag. Follow the guarded
+procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
+dispatch to the release merge.
 
 **Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
 it doesn't prompt users when a new version is available. Users can run

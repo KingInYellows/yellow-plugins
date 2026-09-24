@@ -66,7 +66,8 @@ Each plugin lives in `plugins/<name>/` and must contain:
 ```
 plugins/<name>/
   .claude-plugin/
-    plugin.json          # Required: name, description, version, author
+    plugin.json          # Generated from catalog/ + package.json; do not hand-edit
+  package.json           # name + version (version source of truth)
   CLAUDE.md              # Plugin context and conventions
   README.md              # User-facing documentation
   commands/              # Slash commands (*.md)
@@ -76,13 +77,61 @@ plugins/<name>/
 
 ### Adding a Plugin
 
-1. Create the directory structure above
-2. Add `.claude-plugin/plugin.json` with at minimum `name`, `description`,
-   `version`, and `author`
-3. Register it in `.claude-plugin/marketplace.json` under the top-level
-   `plugins` array with a `source` like `./plugins/<name>`
-4. Add a README with install command, prerequisites, and component tables
-5. Validate: `pnpm validate:schemas`
+This is the canonical step list — `README.md` "Create a New Plugin" and
+`docs/CLAUDE.md` "Adding a Plugin" both point back here;
+`docs/plugin-template.md` Step 5 has the full worked example (concrete JSON,
+directory scaffold).
+
+1. Create the directory structure above, plus `plugins/<name>/package.json` with
+   `"name": "<name>"`, `"private": true` (it is never published to npm
+   individually — only the catalog root optionally is), and a semver `version`
+   (version source of truth; the generator fails if `name` differs from the
+   catalog name).
+2. Add `catalog/plugins/<name>.json` with every required key (`$schema`,
+   `description`, `author`, `homepage`, `repository`, `license`, `keywords`,
+   `marketplace`, and `targets` of
+   `{"claude": true, "codex": {"enabled": false}}` — without
+   `targets.claude: true` no manifest is emitted), and append `<name>` to
+   `pluginOrder` in `catalog/catalog.json`. Do not hand-edit
+   `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`.
+3. Run `pnpm install` from the workspace root. `plugins/*` is a pnpm workspace
+   glob (`pnpm-workspace.yaml`); a new `plugins/<name>/package.json` changes
+   `pnpm-lock.yaml`, and CI's `pnpm install --frozen-lockfile` fails if the
+   lockfile was not updated and committed.
+4. Run `pnpm generate:manifests`. It emits
+   `plugins/<name>/.claude-plugin/plugin.json` and the marketplace entry
+   (`source` `./plugins/<name>`). See `catalog/README.md`.
+5. Create the plugin's own setup command if it does not have one yet (for
+   example `plugins/<name>/commands/<name>/setup.md` with frontmatter
+   `name: <name>:setup`) — `validate-setup-all.js` requires every marketplace
+   plugin to be delegated to a command whose name ends in `:setup`/`-setup` and
+   that actually lives under that plugin's `commands/`. Then add the plugin to
+   `plugins/yellow-core/commands/setup/all.md` (dashboard loop, classification,
+   delegated command list, plugin-command map, and dashboard example — see the
+   header of `scripts/validate-setup-all.js` for the authoritative section
+   list). Two sections are conditional: a Step 1.5 probe entry only if the
+   plugin's classification references an `mcp__plugin_*` tool name; a Step 1.6
+   credential-status entry only if the plugin's hooks emit credential status
+   (listed between the `# setup-all-credential-status-plugins:start/end` markers
+   in
+   `plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md`,
+   not in `all.md`). Update the "N plugins" counts in `CLAUDE.md`, `README.md`,
+   `CONTRIBUTING.md`, and `AGENTS.md` — `validate-setup-all.js` and
+   `validate-doc-counts.js` fail otherwise.
+6. Add a README with install command, prerequisites, and component tables, and
+   add the plugin's row to the root `README.md` "Plugins" table (and its MCP
+   table, if it ships an MCP server). `validate-doc-counts.js` only checks the
+   counts, not that the plugin is listed.
+7. Run `pnpm changeset` and commit the `.changeset/*.md` file — CI blocks any PR
+   touching `plugins/*/` without one (see [Versioning](#versioning)).
+8. Validate: `pnpm validate:schemas` and `pnpm validate:versions` (the generated
+   manifests and marketplace entry must pass the version-consistency gate too),
+   then refresh and commit the manifest snapshot, which `validate:schemas` does
+   not run but the blocking `integration-tests` CI job does. The test snapshots
+   the plugin inventory and every generated manifest's raw bytes, so a new
+   plugin always changes it:
+   `pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`.
+   Commit the updated snapshot alongside the new plugin.
 
 See `docs/plugin-validation-guide.md` for detailed validation rules.
 
@@ -213,22 +262,99 @@ verification gate before merging.
 
 ### Emergency manual release
 
-> **Note**: Tags are for release tracking only and do **not** trigger the workflow.  
-> The workflow triggers on push to `main` or manual `workflow_dispatch`.
+Use this only when the bot cannot open the Version Packages PR. It produces the
+same commit by hand, and still releases through a reviewed PR — nothing is
+pushed straight to `main`. This procedure always mirrors the bot's own
+`catalog-version.js patch` bump; a deliberate out-of-band `minor`/`major`
+catalog bump is a separate, standalone decision documented in
+`docs/operations/versioning.md` "Catalog Version Rules", not part of this
+recovery path.
+
+> **Note**: Tags do **not** trigger the workflow. `version-packages.yml`
+> triggers on push to `main` or manual `workflow_dispatch`. Do not create or
+> push tags by hand: when the merge lands, the workflow sees no pending
+> changesets and checks whether `v<catalog-version>` exists. If it already
+> exists, the run logs "nothing to do" and publishes no GitHub Release.
+>
+> **Before merging**: this branch is a point-in-time snapshot, not a
+> self-updating PR like the bot's. If `main` gains another PR's changeset while
+> this branch is out for review, a rebase is not enough: the new `.changeset`
+> file comes along unconsumed, `pnpm validate:versions` does not catch it, and
+> the merge makes `version-packages.yml` open another Version Packages PR
+> instead of publishing. Discard this branch and redo the one-time
+> `pnpm version-packages` cut on a fresh branch from the updated `main` (do not
+> re-run it on this branch — that bumps the catalog twice).
 
 ```bash
-pnpm apply:changesets         # bumps plugin versions + syncs manifests
-node scripts/catalog-version.js patch   # bumps root catalog version
-git add -A
-git commit -m "chore: version packages"
-gt submit --no-interactive    # push via Graphite (triggers the workflow automatically)
-pnpm tag                      # creates per-plugin git tags for tracking
-git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # push tags for tracking (tag push — not managed by Graphite)
+# Run /stack:status first; continue only on READY_GRAPHITE or READY_GITHUB —
+# every other state stops here (AGENTS.md "Workflow Conventions"). Do not
+# pick a provider-specific submit command without resolving this first.
+# On a new branch created with the enabled stacked-PR provider:
+pnpm version-packages         # same command the bot runs: apply changesets,
+                              # sync manifests, catalog-version.js patch,
+                              # refresh the manifest snapshot
+pnpm install                  # pick up lockfile changes, if any
+# Run pnpm version-packages exactly once: catalog-version.js patch bumps on
+# every run. Then submit through the enabled provider:
+#   READY_GRAPHITE: commit, then gt submit --no-interactive.
+#   READY_GITHUB: leave the changes uncommitted and run /github-stack:submit;
+#   it stages and commits them itself, and exits if the tree is already clean.
+# Before merging, run Sections 1-4 of docs/operations/release-checklist.md
+# against this branch (they verify this bump; they do not re-run it).
+# Get the PR reviewed and merge it to main.
 
-# If the automated workflow failed and you need manual recovery:
-gh workflow run version-packages.yml -f force_publish=true
+# The merge's push to main runs version-packages.yml. With no pending
+# changesets and no v<catalog-version> tag, it runs scripts/ci/release-tags.sh
+# (per-plugin tags + catalog tag) and build-and-release (GitHub Release).
+# --limit 1 right after merging can return the previous run or a still-
+# queued one, so gh release view can fail before publication finishes.
+# Capture the run for the merge commit and wait for it instead. GitHub can
+# take a few seconds to create the run, so poll until one exists rather than
+# handing gh run watch an empty run_id.
+# Take the SHA from the PR itself, not origin/main: another PR may already
+# have landed on main after the release merge.
+merge_sha=$(gh pr view <emergency-pr-number> --json mergeCommit -q .mergeCommit.oid)
+run_id=""
+for _ in $(seq 1 15); do
+  run_id=$(gh run list --workflow=version-packages.yml --commit "$merge_sha" \
+    --json databaseId -q '.[0].databaseId')
+  [ -n "$run_id" ] && break
+  sleep 10
+done
+if [ -z "$run_id" ]; then
+  echo "No version-packages.yml run found for $merge_sha; check the Actions tab." >&2
+elif gh run watch "$run_id" --exit-status &&
+  gh release view "v$(git show "$merge_sha:package.json" |
+    node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")" >/dev/null; then
+  echo "Release published. Nothing to recover."
+else
+  echo "Run failed or published no Release: recover with the guarded" >&2
+  echo "procedure in docs/operations/release-checklist.md 5.2." >&2
+fi
 ```
+
+Do not dispatch `force_publish=true` after a successful run, and do not copy it
+bare: release-checklist 5.2 pins the dispatch to the release merge and verifies
+the run it started.
+
+`force_publish=true` skips phase detection and runs `release-tags.sh` in
+recovery mode: it tolerates a catalog tag that already exists, and
+`changeset tag` skips per-plugin tags that exist, so it is safe after a
+_partial_ run (tags created, Release missing or failed).
+
+> **Danger**: `force_publish=true` unconditionally sets `should_publish=true` —
+> it does **not** check whether a Release already exists for the current
+> `v<catalog-version>` before running `build-and-release`. If a Release for that
+> version already published successfully and `main` has since moved (e.g. an
+> unrelated docs PR merged, with no version bump), re-running
+> `force_publish=true` still builds from the _current_ `main` HEAD and
+> re-publishes the GitHub Release under the _same, already-existing_ tag —
+> overwriting a working release with artifacts from a commit the tag was never
+> meant to point to. Before running it, confirm with
+> `gh release view "v$(node -p "require('./package.json').version")"` that no
+> release exists yet (404/not-found) or that you specifically intend to replace
+> it, and confirm `package.json`'s catalog version is the one you mean to
+> (re)publish, not a stale value left over from an unrelated merge.
 
 ### Note on auto-updates (GitHub issue #26744)
 

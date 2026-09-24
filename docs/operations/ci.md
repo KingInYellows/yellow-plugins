@@ -14,6 +14,7 @@ procedures.
 **Repo Sources of Truth:**
 
 - `.github/workflows/validate-schemas.yml`
+- `.github/workflows/validate-schemas-fork.yml`
 - `.github/workflows/version-packages.yml`
 - `package.json`
 
@@ -36,7 +37,11 @@ procedures.
 
 ## Workflow Overview
 
-The Yellow Plugins CI/CD system consists of two primary workflows:
+The Yellow Plugins CI/CD system consists of two primary workflows, plus a
+fork-PR variant of the validation workflow. Other files in
+`.github/workflows/` (`lint-plugins.yml`, `claude.yml`,
+`claude-code-review.yml`, `upstream-pins-advisory.yml`) are outside this
+guide.
 
 ### 1. Validation Workflow (`.github/workflows/validate-schemas.yml`)
 
@@ -47,9 +52,14 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 - Pushes to `main` branch
 - Manual workflow dispatch
 
+Every job runs only on non-PR events and same-repo pull requests (the
+job-level `if:`). On a fork pull request every job here is skipped, and
+`validate-schemas-fork.yml` runs instead (see
+[Fork pull requests](#fork-pull-requests-validate-schemas-forkyml)).
+
 **Jobs:**
 
-- `validate-schemas` (matrix: marketplace, plugins, contracts, examples)
+- `validate-schemas` (matrix: marketplace, plugins, contracts, examples, solutions, authoring, plans, codex, cursor, generated)
 - `validate-versions`
 - `changeset-check`
 - `lint-and-typecheck`
@@ -57,7 +67,11 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 - `integration-tests`
 - `contract-drift`
 - `security-audit`
-- `build` (pushes to `main` only)
+- `build`
+- `plugin-shell-tests` (needs `validate-schemas`; required by `ci-status`)
+- `goal-engine-compat` (needs `build`; required by `ci-status`)
+- `codex-install-verification` (advisory; not in `ci-status` `needs`)
+- `validate-solutions-advisory` (pull requests only; advisory; not in `ci-status` `needs`)
 - `report-metrics`
 - `ci-status`
 
@@ -77,6 +91,14 @@ seconds
 - `build-and-release` (validate versions, build artifacts, GitHub Release, optional NPM publish)
 - `notify` (failure notification)
 
+### Fork pull requests (`validate-schemas-fork.yml`)
+
+A lighter workflow for pull requests from forks, on GitHub-hosted runners so
+untrusted code never reaches self-hosted infrastructure. It runs
+`validate-schemas`, `lint-and-typecheck`, `unit-tests`, `validate-versions`,
+`changeset-check`, and its own `ci-status`, and only when the PR head is a
+fork.
+
 ---
 
 ## Validation Workflow
@@ -88,14 +110,18 @@ Parallel start: validate-schemas, lint-and-typecheck, validate-versions, changes
 lint-and-typecheck -> unit-tests -> integration-tests
 validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
-  -> build (pushes to main only)
-all jobs -> report-metrics (parallel)
-all jobs -> ci-status    (parallel)
+  -> build
+validate-schemas -> plugin-shell-tests
+build -> goal-engine-compat
+ci-status needs the blocking jobs above, including plugin-shell-tests and goal-engine-compat
+codex-install-verification and validate-solutions-advisory do not feed ci-status
+report-metrics needs validate-schemas, validate-versions, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build, changeset-check, and plugin-shell-tests
+report-metrics does not need goal-engine-compat, the two advisory jobs, or ci-status
 ```
 
 ### Matrix Strategy: validate-schemas
 
-The `validate-schemas` job uses a matrix to parallelize validation across four
+The `validate-schemas` job uses a matrix to parallelize validation across ten
 targets:
 
 #### Target: `marketplace`
@@ -126,6 +152,43 @@ targets:
 - Validates all `examples/plugin*.json` files
 - Ensures example files stay synchronized with schemas
 
+#### Target: `solutions`
+
+- Runs `scripts/validate-solutions.js`
+- Diff-scoped slug-collision and frontmatter checks for `docs/solutions/`
+
+#### Target: `authoring`
+
+- Runs `scripts/validate-agent-authoring.js`, `scripts/validate-setup-all.js`,
+  `scripts/lint-error-codes.js`, and `scripts/sync-shell-snippets.js --check`
+- Also runs `scripts/validate-flow-namespace.js`,
+  `scripts/validate-provider-neutral-commands.js`,
+  `scripts/validate-council-roster.js`, and `scripts/validate-doc-counts.js`
+
+#### Target: `plans`
+
+- Runs `scripts/validate-plans.js`
+- Diff-scoped check for unchecked task boxes under `plans/complete/`
+
+#### Target: `codex`
+
+- Runs `scripts/validate-codex.js`
+- Codex artifact schema validation and exposure lint
+- Live Codex CLI install checks are the separate `codex-install-verification`
+  job, not this target
+
+#### Target: `cursor`
+
+- Runs `scripts/validate-cursor.js`
+- Cursor artifact schema validation, exposure lint, and lifecycle
+  non-emission scan
+
+#### Target: `generated`
+
+- AJV-validates `catalog/catalog.json` and `catalog/plugins/*.json`
+- Runs `scripts/generate-manifests.js --check` for generated-artifact drift
+- Runs `scripts/validate-provider-groups.js` after that drift check
+
 ### Environment Variables
 
 ```yaml
@@ -152,26 +215,24 @@ dropped from the pending queue and are never automatically cancelled.
 
 ### Version Extraction
 
-The workflow supports two trigger modes:
-
-1. **Tag Push:** Extracts version from tag name (e.g., `v1.2.3` → `1.2.3`)
-2. **Manual Dispatch:** Uses user-provided version input
-
-Pre-release detection:
-
-- Tags with hyphens (e.g., `v1.0.0-beta.1`) are marked as pre-releases
-- Manual dispatch includes `prerelease` boolean input
+`version-packages.yml` does not read a version from a tag push, and
+`workflow_dispatch` has no version or prerelease input. Triggers stay as in
+the overview above: push to `main`, or `workflow_dispatch` with
+`force_publish`. When the publish phase runs, the catalog version is read
+from root `package.json`. A version string that contains `-` sets
+`is_prerelease`; otherwise it does not.
 
 ### Validation Requirements
 
-Before publishing, the release workflow runs:
+Before publishing, the `build-and-release` job runs:
 
-- Schema validation (`pnpm validate:schemas`)
-- Linting (`pnpm lint`)
-- Type checking (`pnpm typecheck`)
-- Unit tests (`pnpm test:unit`)
-- Integration tests (`pnpm test:integration`)
-- Version consistency check (package.json matches release version)
+- Version consistency (`pnpm validate:versions`)
+- Package build (`pnpm build`)
+
+It does not run `pnpm validate:schemas`, `pnpm lint`, `pnpm typecheck`,
+`pnpm test:unit`, or `pnpm test:integration`. Release notes are written by
+`node scripts/generate-release-notes.js` to `release-notes.md` (the catalog
+section of root `CHANGELOG.md`, plus a plugin version table).
 
 ### Artifact Generation
 
@@ -198,9 +259,8 @@ Created via `softprops/action-gh-release@v1`:
 
 - Tag: `v{VERSION}`
 - Name: `Release v{VERSION}`
-- Body: Extracted from `CHANGELOG.md` (version-specific section)
+- Body: `release-notes.md` via `body_path` (not a raw `CHANGELOG.md` slice, and not `generate_release_notes`)
 - Files: All artifacts in `dist-release/`
-- Generate release notes: `true` (auto-generates from commit history)
 
 ### NPM Publishing (Optional)
 
@@ -233,7 +293,7 @@ FROM node:22.22.0-slim@sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51ac
 
 ### Installed Tools
 
-- **Node.js:** 20 LTS (from base image)
+- **Node.js:** 22.22.0 (from the `node:22.22.0-slim` base image)
 - **pnpm:** 8.15.0 (via corepack, matches `packageManager` field)
 - **git:** 1:2.39.\* (for repository operations)
 - **ajv-cli:** 5.0.0 (global, for schema validation)
@@ -464,9 +524,11 @@ grep 'yellow_plugins_ci_duration_seconds.*schema_validation' ci-metrics.prom
 # Verify all durations < 60 seconds
 ```
 
-> The `report-metrics` job enforces this budget automatically and fails the
-> workflow when any schema validation sample exceeds 60 seconds, resulting in
-> immediate CRIT-021 alerts.
+> The `report-metrics` job is written to fail the workflow when a schema
+> validation sample exceeds 60 seconds, but the check is currently dormant:
+> `CI_UPLOAD_ARTIFACTS` is `'false'` in `validate-schemas.yml`, so no metrics
+> artifacts are uploaded or downloaded and the job passes on an empty file. Set
+> it to `'true'` to enforce the budget.
 
 ---
 
@@ -779,8 +841,10 @@ docker run --rm -v $(pwd):/workspace yellow-plugins-ci:latest pnpm test
 # Trigger validation workflow
 gh workflow run validate-schemas.yml
 
-# Trigger release workflow (recovery mode)
-gh workflow run version-packages.yml -f force_publish=true
+# Trigger release workflow (recovery mode): do not run this bare. Without
+# --ref it builds the current main; use the guarded procedure in
+# release-checklist.md 5.2, which dispatches with --ref "v<version>" when main
+# has moved.
 
 # List workflow runs
 gh run list --workflow=validate-schemas.yml
@@ -856,7 +920,6 @@ Add to workflow (temporary debugging only):
 ### Internal Documentation
 
 - Appendix D: CI/CD Workflows
-- [Technology Stack: CI/CD Specification](../technology-stack-complete.md#843-cicd-workflow-specification)
 - [CLI Contracts: Automation Integration](../contracts/cli-contracts.md#6-automation--cicd-integration)
 - [Metrics Guide](./metrics.md)
 

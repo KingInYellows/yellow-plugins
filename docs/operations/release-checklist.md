@@ -20,7 +20,7 @@ I4.T5 - Release Packaging & Checklist
   - [Preflight Sign-Off](#preflight-sign-off)
 - [Section 2: Automated Validation](#section-2-automated-validation)
   - [2.1 Run Release Check Pipeline](#21-run-release-check-pipeline)
-  - [2.2 CI Workflow Dry-Run](#22-ci-workflow-dry-run)
+  - [2.2 CI Workflow Validation](#22-ci-workflow-validation)
   - [2.3 Capture Validation Artifacts](#23-capture-validation-artifacts)
   - [Automated Validation Sign-Off](#automated-validation-sign-off)
 - [Section 3: Manual Smoke Tests](#section-3-manual-smoke-tests)
@@ -40,8 +40,8 @@ I4.T5 - Release Packaging & Checklist
   - [4.5 API Documentation](#45-api-documentation)
   - [Documentation Updates Sign-Off](#documentation-updates-sign-off)
 - [Section 5: Release Preparation](#section-5-release-preparation)
-  - [5.1 Create Release Tag](#51-create-release-tag)
-  - [5.2 Push Tag to Trigger Workflow](#52-push-tag-to-trigger-workflow)
+  - [5.1 Verify Release Readiness](#51-verify-release-readiness)
+  - [5.2 Manual Tag Creation (Emergency Recovery Only)](#52-manual-tag-creation-emergency-recovery-only)
   - [5.3 Monitor Workflow Execution](#53-monitor-workflow-execution)
   - [5.4 Verify Release Artifacts](#54-verify-release-artifacts)
   - [Release Preparation Sign-Off](#release-preparation-sign-off)
@@ -79,7 +79,9 @@ and sign-offs at each stage.
 mandatory smoke tests across macOS, Linux, and WSL platforms.
 
 **Authority**: No release may proceed without completing all sections and
-obtaining final sign-off.
+obtaining final sign-off — except Section 3.2-3.7, which are non-blocking until
+`docs/contracts/cli-contracts.md` is implemented (see the scope note at the top
+of Section 3).
 
 ---
 
@@ -87,11 +89,12 @@ obtaining final sign-off.
 
 ```mermaid
 graph TD
-    P[Apply Changesets] --> A[Preflight Checks]
+    P[Version Packages PR opened] --> A[Preflight Checks]
     A --> B[Automated Validation]
     B --> C[Manual Smoke Tests]
     C --> D[Documentation Updates]
-    D --> E[Release Preparation]
+    D --> M[Merge PR to main]
+    M --> E[Release Preparation]
     E --> F[Post-Release Validation]
     F --> G[Final Sign-Off]
 
@@ -102,23 +105,29 @@ graph TD
     G --> I[Release Complete]
 ```
 
-**Phase 0 — Apply Changesets** (run before Preflight Checks):
+**Phase 0 — Version Packages PR** (standard automated path):
 
 ```sh
-# 1. Apply pending changesets (bumps plugin package.json files)
-pnpm apply:changesets
-# 2. Regenerate lockfile
-pnpm install
-# 3. Commit version bumps
-gt modify -c -m "chore(release): version packages"
-# 4. Bump catalog version
-node scripts/catalog-version.js minor   # or patch / major
-# 5. Commit catalog bump
-gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
-# 6. Run pre-flight checks
-pnpm release:check
-# 7. Create and push the release tag — see Section 5 (annotated tag step)
+# 1. Merge feature PRs to main with their .changeset/*.md files committed.
+# 2. version-packages.yml opens or updates the "chore: version packages" PR.
+# 3. Review bump types, CHANGELOG entries, and three-way version sync.
+# 4. Run Sections 1-4 (Preflight, Automated Validation, Smoke Tests,
+#    Documentation Updates) against this PR's branch. Do not merge until
+#    all four gates pass — a failed smoke test cannot stop the release
+#    once the PR is merged.
+# 5. Merge that PR to main. With no pending changesets left, the same
+#    workflow's publish phase creates tags and the GitHub Release on this
+#    push. Manual tagging is emergency-only — see Section 5.2. Do not push
+#    a tag to trigger the workflow.
 ```
+
+**Emergency manual release** (only when the bot cannot open the Version Packages
+PR): see `CONTRIBUTING.md` "Emergency manual release" — the canonical procedure,
+including the stale-tag, stale-branch, and `force_publish` overwrite-risk
+cautions (not repeated here). Short version: that path runs
+`pnpm version-packages` on a hand-made branch, submits it through the enabled
+stacked-PR provider, and merges that PR to `main` — it never pushes to `main`
+directly. The merge publishes the same way as Phase 0 step 5.
 
 See `docs/operations/versioning.md` for the complete developer workflow and
 semver bump rules.
@@ -128,6 +137,10 @@ semver bump rules.
 ---
 
 ## Section 1: Preflight Checks
+
+> Sections 1-4 run against the release PR branch before it merges: the open
+> "chore: version packages" PR on the automated path (Phase 0 above), or your
+> hand-made release branch on the emergency path.
 
 ### 1.1 Repository Status
 
@@ -140,25 +153,47 @@ semver bump rules.
   # Expected: "nothing to commit, working tree clean"
   ```
 
-- [ ] Current branch is `main` or designated release branch
+- [ ] Current branch is the Version Packages PR branch (automated path) or
+      your emergency release branch
 
   ```bash
+  # Automated path: the bot's PR is titled "chore: version packages"
+  gh pr checkout "$(gh pr list --search 'chore: version packages' --json number -q '.[0].number')"
+  # Emergency path: check out your own release branch instead
+  #   gt checkout <branch>   (Graphite)  |  git switch <branch>   (GitHub)
   git branch --show-current
   ```
 
-- [ ] Local branch is up-to-date with remote
+- [ ] Local branch is up-to-date with its remote branch
 
   ```bash
   git fetch origin
   git status
-  # Expected: "Your branch is up to date with 'origin/main'"
+  # Expected: "Your branch is up to date with 'origin/<that branch>'"
   ```
 
-- [ ] All CI checks on latest commit are passing
+- [ ] Record the branch head SHA now — the bot force-pushes the same "chore:
+      version packages" PR whenever a new changeset lands on `main`, and this
+      checklist runs 2-4 hours. A gate passed against one SHA does not attest to
+      a later one.
+
   ```bash
-  gh run list --limit 1 --branch main
+  git rev-parse HEAD
+  # Record this value. Immediately before merging (end of Phase 0 step 5),
+  # `git fetch origin && git rev-parse origin/<branch>` and compare — if it
+  # moved, the PR changed underneath you: re-run Sections 1-4 against the new
+  # head before merging.
+  ```
+
+- [ ] `main` CI is green, and the branch passes the Section 2 local run
+  ```bash
+  gh run list --limit 1 --branch main --workflow validate-schemas.yml
   # Expected: "completed" status with "success" conclusion
   ```
+
+  `validate-schemas.yml` does not run on the bot-created Version Packages PR
+  (see `CONTRIBUTING.md` "Reviewing the Version Packages PR"), so there is no
+  PR CI run to check — Section 2's `pnpm release:check` is the branch gate.
 
 **Reference**: Section 4 directive - Repository state must be clean before
 tagging.
@@ -226,36 +261,37 @@ Section 4 security directives.
 
 **Objective**: Ensure version numbers are consistent across all artifacts.
 
-- [ ] All pending changesets have been applied
-
-  ```bash
-  pnpm apply:changesets
-  # Bumps plugins/*/package.json, syncs plugin.json + marketplace.json
-  # Run: pnpm install after (lockfile changes)
-  ```
-
-- [ ] Three-way version consistency check passes (package.json == plugin.json ==
-      marketplace.json)
+- [ ] On the automated path, the open Version Packages PR already applied
+      pending changesets and bumped the catalog version — verify, do not
+      re-run `apply:changesets` or `catalog-version.js` against it
 
   ```bash
   pnpm validate:versions
-  # Expected: "[validate-versions] OK: 11 plugins — all versions in sync"
-  ```
-
-- [ ] Root `package.json` catalog version updated for this release
-
-  ```bash
-  node scripts/catalog-version.js minor   # or patch / major
+  # Expected: "[validate-versions] OK: <N> plugins — all versions in sync"
   node -p "require('./package.json').version"
   # Expected: X.Y.Z matching intended release
   ```
 
-- [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's
-      date
+- [ ] Emergency manual path only (no automated PR exists): your release
+      branch already ran `pnpm version-packages` once, per `CONTRIBUTING.md`
+      "Emergency manual release" — verify the result with the checks above;
+      do not run it again. `catalog-version.js patch` bumps on every run, so a
+      second run skips a catalog version
+
+- [ ] Root `CHANGELOG.md` contains a catalog entry for this version with today's
+      date — **nothing automates this**: `catalog-version.js` only bumps
+      `package.json`, and `generate-release-notes.js` reads whatever is already
+      there (it falls back to a minimal header if the entry is missing, so the
+      Release still publishes with a thin body). If the entry is missing at this
+      point in the checklist, write it by hand now — do not defer to Section
+      4.1, which only re-checks it after the PR merges
 
   ```bash
   grep -A 1 "## \[$(node -p 'require("./package.json").version')\]" CHANGELOG.md
   # Expected: ## [X.Y.Z] - YYYY-MM-DD
+  # If absent: add a heading above the previous entry summarizing the plugin
+  # changes in this release batch (mirror the bumped plugins/CHANGELOG.md
+  # entries), commit it as part of this branch.
   ```
 
 - [ ] No version conflicts in workspace packages
@@ -311,9 +347,12 @@ Section 4 security directives.
   - Command: `pnpm validate:schemas`
   - Expected: ✅ 10 marketplace rules + 12 plugin rules all pass
 
-- [ ] **Documentation Linting**: Markdown and TOCs are valid
-  - Command: `pnpm docs:lint`
-  - Expected: ✅ doctoc + markdownlint report no errors
+- [ ] **Documentation Linting**: Markdown in changed docs is valid
+  - There is no `docs:lint` script and CI does not lint Markdown. Run the
+    `markdownlint-cli` devDependency directly on the docs this release
+    changed:
+    `pnpm exec markdownlint --config .markdownlint.json <changed .md files>`
+  - Expected: ✅ no new findings compared with `main`
 
 **Reference**: Section 4 directive - Validation job must complete in < 60
 seconds median.
@@ -328,19 +367,18 @@ seconds median.
 > It will create real tags and a real GitHub Release. Use it only after a failed
 > release where tags were already created but the release was not published.
 
-- [ ] Verify the Version Packages PR exists and CI passes on it
+- [ ] Verify the Version Packages PR exists
 
   ```bash
   gh pr list --search "chore: version packages"
   ```
 
-- [ ] Confirm the PR's CI checks are green before merging
-
-- [ ] Review workflow summary
-  ```bash
-  gh run view --log
-  # Confirm validation, build, artifact generation steps all green
-  ```
+  The bot-created PR does **not** trigger `on: pull_request` CI (see Section
+  1.1) — there are no PR checks to wait on. `pnpm release:check`, run locally
+  against this branch in Section 2.1, is the actual gate before merging.
+  `version-packages.yml`'s `build-and-release` job (validation, build, artifact
+  generation) only runs after this PR merges — see Section 5.3 for reviewing
+  that run.
 
 **Reference**: `.github/workflows/version-packages.yml`, Iteration 4 validation
 focus.
@@ -392,6 +430,21 @@ metrics/observability.
 
 ## Section 3: Manual Smoke Tests
 
+> **Scope note**: 3.2-3.7 below test a
+> `pnpm cli install/update/publish/ rollback/uninstall` command surface, a
+> `.claude-plugin/registry.json`, and a `.claude-plugin/cache/` layout. **None
+> of that exists in this repository.** `packages/cli` ships exactly one
+> subcommand, `validate:plugins` (run it as `pnpm validate:plugins`); install/update/rollback/uninstall
+> are handled natively by Claude Code (`docs/CLAUDE.md` "Architecture"). 3.2-3.7
+> describe the design-time CLI contract in `docs/contracts/cli-contracts.md` and
+> cannot currently pass — they are **not** part of the blocking release gate.
+> Until that CLI ships, gate the real install path instead: add the marketplace
+> (`/plugin marketplace add <path>` or a clean-machine install per
+> CONTRIBUTING.md "Local vs Remote Validator Divergence"), install a sample
+> plugin with `/plugin install <id>@yellow-plugins`, and run `claude doctor` to
+> confirm zero plugin errors. Track 3.2-3.7 as sign-off criteria only once
+> `cli-contracts.md` is implemented.
+
 ### 3.1 Test Matrix Definition
 
 **Objective**: Define platforms and configurations for smoke testing.
@@ -426,7 +479,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.2 Install Workflow Test
 
-**Objective**: Validate end-to-end plugin installation.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate
+end-to-end plugin installation.
 
 **Prerequisites**: Sample plugin repository or test fixture available.
 
@@ -475,7 +530,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.3 Update Workflow Test
 
-**Objective**: Validate plugin update with changelog awareness.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate plugin
+update with changelog awareness.
 
 **Prerequisites**: Plugin installed from previous test, newer version available.
 
@@ -509,7 +566,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.4 Publish Workflow Test
 
-**Objective**: Validate publish command with git integration (dry-run).
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate publish
+command with git integration (dry-run).
 
 **Prerequisites**: Test plugin repository with valid `plugin.json`.
 
@@ -537,7 +596,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.5 Rollback Workflow Test
 
-**Objective**: Validate instant rollback via symlink swap.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate instant
+rollback via symlink swap.
 
 **Prerequisites**: Plugin with multiple versions installed (from update test).
 
@@ -575,7 +636,9 @@ Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 ### 3.6 Uninstall Workflow Test
 
-**Objective**: Validate complete plugin removal with lifecycle hooks.
+**Not implemented in this repository — see the scope note above Section 3.1.**
+**Objective** (design-time, `docs/contracts/cli-contracts.md`): validate
+complete plugin removal with lifecycle hooks.
 
 **Prerequisites**: Plugin installed (from previous tests).
 
@@ -654,7 +717,9 @@ targets.
 
 ### 4.1 CHANGELOG.md
 
-**Objective**: Ensure changelog entry is complete and traceable.
+**Objective**: Ensure changelog entry is complete and traceable. This is a
+re-check, not first authorship — Section 1.4 required the entry to already exist
+by hand (nothing writes it automatically) before Sections 2-3 ran.
 
 - [ ] Version heading follows format: `## [X.Y.Z] - YYYY-MM-DD`
 - [ ] All functional changes cited with FR/NFR/CRIT identifiers
@@ -723,29 +788,24 @@ Section 4 traceability enforcement.
   - `.github/releases.md` → FR-011, operational processes
   - README.md updates → FR-001..FR-013 (user-facing feature summary)
 - [ ] Verify 100% traceability maintained
-- [ ] Run doctoc to update table of contents
+- [ ] Run doctoc to update tables of contents in docs that have one (there is
+      no `docs:lint:toc` script; `doctoc` is a devDependency)
   ```bash
-  pnpm docs:lint:toc
+  pnpm exec doctoc <changed .md files with a doctoc TOC>
   ```
 
 ---
 
 ### 4.5 API Documentation
 
-**Objective**: Regenerate API docs if code changes occurred.
+**Objective**: Confirm no API-doc step is expected. Nothing in the release
+generates API docs.
 
-- [ ] Run typedoc to regenerate API documentation
+- [ ] Do not run `pnpm docs:build`
 
-  ```bash
-  pnpm docs:build
-  # Expected: typedoc generates updated API docs
-  ```
-
-- [ ] Verify API docs reflect current interfaces and types
-- [ ] Check for broken links in generated docs
-  ```bash
-  # Manual review or link checker if available
-  ```
+  Root `package.json` has no `docs:build` script. `typedoc` is a devDependency
+  and is not wired to a script, so a missing `docs:build` is not a failed
+  release step.
 
 **Reference**: Section 4 documentation synchronization directive.
 
@@ -771,16 +831,20 @@ Section 4 traceability enforcement.
 > (e.g., `v1.2.1`). Manual tag creation is **only** needed for emergency recovery  
 > scenarios where `workflow_dispatch` with `force_publish=true` won't suffice.
 
-- [ ] Verify the Version Packages PR has been merged to `main`
+- [ ] Verify the release PR you are shipping has been merged to `main` (name it
+      by number; a title search can match a different Version Packages PR)
 
   ```bash
-  gh pr list --search "chore: version packages" --state merged --limit 1
+  gh pr view <release-pr-number> --json state,mergedAt,mergeCommit \
+    -q '"\(.state) \(.mergedAt) \(.mergeCommit.oid)"'
   ```
 
-- [ ] Confirm the workflow has started automatically
+- [ ] Confirm the workflow started for that merge commit (`--limit 1` alone can
+      show an older or unrelated run)
 
   ```bash
-  gh run list --workflow=version-packages.yml --limit 1
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+  gh run list --workflow=version-packages.yml --commit "$MERGE_SHA"
   ```
 
 - [ ] Verify the expected catalog version
@@ -798,39 +862,175 @@ tagging conventions.
 
 ### 5.2 Manual Tag Creation (Emergency Recovery Only)
 
-**Objective**: Create tags manually when automated flow cannot be used.
+**Objective**: Recover a stuck release without hand-tagging the wrong commit.
 
 > **Warning**: This section is for emergency recovery only. In normal releases,  
 > tags are created automatically by the workflow.
 
-**Only perform these steps if you must bypass the normal automated flow:**
+**Try this first, alone — no manual git tagging needed.**
+`scripts/ci/release-tags.sh` (invoked by `force_publish=true`) creates and
+pushes any missing catalog/per-plugin tags itself, from the exact commit the
+workflow run checks out — safer than a local tag, which depends on your working
+copy being exactly at the merge commit:
 
-- [ ] Create annotated tag locally
+This only builds the right release while `main` still points at the release PR's
+merge commit: `gh workflow run` without `--ref` runs from the default branch,
+and `--ref` takes a branch or tag, not a SHA. If `main` has moved on, skip to
+the manual tag path below and dispatch with `--ref "v$VERSION"`.
+
+```bash
+MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+git fetch origin main
+if gh release view "v$VERSION" >/dev/null 2>&1; then
+  # force_publish would re-run the release step and retry npm publishes that
+  # may already be immutable. Investigate the failed step instead.
+  echo "Release v$VERSION already exists; not dispatching force_publish." >&2
+elif [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
+  echo "main has moved past the release merge; use the manual tag path." >&2
+else
+  me=$(gh api user -q .login)
+  list_ids() {
+    gh run list --workflow=version-packages.yml --event workflow_dispatch \
+      --user "$me" --limit 20 --json databaseId -q '.[].databaseId' | sort
+  }
+  before=$(list_ids)
+  gh workflow run version-packages.yml -f force_publish=true
+  # Accept exactly one run that did not exist before this dispatch; --user
+  # keeps other operators' runs out. --commit is left off on purpose: the
+  # point is to catch a run that built a commit other than $MERGE_SHA.
+  new=""
+  for _ in $(seq 1 15); do
+    new=$(comm -13 <(printf '%s\n' "$before") <(list_ids) | grep .)
+    [ -n "$new" ] && break
+    sleep 10
+  done
+  if [ -z "$new" ]; then
+    echo "No new dispatched run found; check the Actions tab." >&2
+  elif [ "$(printf '%s\n' "$new" | wc -l)" -ne 1 ]; then
+    echo "More than one new run ($new); not guessing. Check the Actions tab." >&2
+  elif [ "$(gh run view "$new" --json headSha -q .headSha)" != "$MERGE_SHA" ]; then
+    # main moved between the check and the dispatch: stop the wrong build.
+    gh run cancel "$new"
+    echo "Run $new built the wrong commit; cancelled it. Use the tag path." >&2
+  else
+    gh run watch "$new" --exit-status
+  fi
+fi
+```
+
+The check-then-dispatch window is small but real, which is why the snippet
+verifies the dispatched run's `headSha` and cancels a mismatch. The durable fix
+is a `version-packages.yml` input carrying the recovery SHA, used by both
+checkout steps (tracked as a follow-up; it is a workflow change, not a doc one).
+
+**When `main` has moved past the release merge** (the guard above stopped, or
+the dispatched run was cancelled for building the wrong commit), use this
+pinned-ref path: tag the release PR's actual merge commit and dispatch from that
+tag. It still needs GitHub Actions; during an Actions outage or with the
+workflow disabled nothing can publish, so wait for Actions to return rather than
+tagging by hand. Tag the release PR's actual merge commit — not whatever `main`
+happens to point to locally. `git checkout main && git pull` tags the _current_
+tip of `main`, which may have advanced past the release PR's merge commit if
+anything else merged since (the tag would then point at the wrong, later
+commit):
+
+- [ ] Resolve the release PR's actual merge commit SHA
 
   ```bash
-  VERSION=$(node -p "require('./package.json').version")
-  CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
-  git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
+  # Use the release PR being recovered, the same <release-pr-number> as above.
+  # A title search can pick a newer "chore: version packages" PR instead.
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q '.mergeCommit.oid')
+  echo "Merge commit: $MERGE_SHA"
+  ```
+
+- [ ] Create annotated tag on that exact commit (not local `HEAD`), or reuse one
+      a partial run already pushed
+
+  Read `package.json` from `$MERGE_SHA`, not the working tree — the current
+  checkout may not be at the merge commit, and a version read from `HEAD` can
+  tag `$MERGE_SHA` with the wrong version string. A partial run may already have
+  pushed `v$VERSION` before `build-and-release` failed: reuse it when it points
+  at `$MERGE_SHA`, stop if it points anywhere else, and create it only when it
+  is absent:
+
+  ```bash
+  VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+  # Ask the remote, not a possibly stale local tag. `^{}` peels an annotated
+  # tag to its commit; fall back to the plain ref for a lightweight tag.
+  remote=$(git ls-remote origin "refs/tags/v$VERSION^{}" | cut -f1)
+  [ -n "$remote" ] || remote=$(git ls-remote origin "refs/tags/v$VERSION" | cut -f1)
+  local_tag=$(git rev-parse -q --verify "refs/tags/v$VERSION^{commit}" 2>/dev/null)
+  TAG_OK=""
+  if [ -n "$remote" ] && [ "$remote" != "$MERGE_SHA" ]; then
+    echo "Remote v$VERSION points at $remote, not $MERGE_SHA; stop." >&2
+    echo "Do not continue to the push or dispatch steps." >&2
+  elif [ -n "$remote" ]; then
+    TAG_OK=1  # the remote tag is already right; nothing to create or push
+  elif [ -n "$local_tag" ] && [ "$local_tag" != "$MERGE_SHA" ]; then
+    echo "Local v$VERSION points at $local_tag; delete it before tagging." >&2
+  elif [ -n "$local_tag" ]; then
+    TAG_OK=1  # correct local tag, not yet pushed
+  else
+    CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
+    git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: $CO_AUTHOR <noreply@anthropic.com>
-  "
+  " && TAG_OK=1
+  fi
   ```
 
-- [ ] Push tag to remote
+- [ ] Push the tag only if you just created it (reuse `$VERSION` from the
+      previous step — do not re-derive it from the working tree)
 
   ```bash
-  git push origin "v$(node -p "require('./package.json').version")"
+  # Refuses to run unless the previous step verified or created the tag.
+  if [ "$TAG_OK" != 1 ]; then
+    echo "Tag not verified at $MERGE_SHA; not pushing." >&2
+  else
+    git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null ||
+      git push origin "v$VERSION"
+  fi
   ```
 
-- [ ] Trigger workflow with force_publish
+- [ ] Trigger workflow with force_publish from the tag just pushed (recovery
+      mode skips the existing catalog tag, creates any missing per-plugin tags,
+      and publishes the GitHub Release). Without `--ref` the run uses the
+      default branch, which may have moved past `$MERGE_SHA` and would build a
+      release that does not match the tag.
 
   ```bash
-  gh workflow run version-packages.yml -f force_publish=true
+  if [ "$TAG_OK" != 1 ]; then
+    echo "Tag not verified at $MERGE_SHA; not dispatching." >&2
+  elif gh release view "v$VERSION" >/dev/null 2>&1; then
+    echo "Release v$VERSION already exists; not dispatching force_publish." >&2
+  else
+    me=$(gh api user -q .login)
+    list_ids() {
+      gh run list --workflow=version-packages.yml --event workflow_dispatch \
+        --user "$me" --limit 20 --json databaseId -q '.[].databaseId' | sort
+    }
+    before=$(list_ids)
+    gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
+  fi
   ```
 
-- [ ] Confirm workflow started
+- [ ] Confirm the dispatched run started and watch that run, not the newest one
+
   ```bash
-  gh run watch
+  # Exactly one run that did not exist before the dispatch ($before, above), so
+  # an earlier recovery attempt or a same-second run is never picked up.
+  new=""
+  for _ in $(seq 1 15); do
+    new=$(comm -13 <(printf '%s\n' "$before") <(list_ids) | grep .)
+    [ -n "$new" ] && break
+    sleep 10
+  done
+  if [ -z "$new" ] || [ "$(printf '%s\n' "$new" | wc -l)" -ne 1 ]; then
+    echo "Could not identify exactly one new run ($new); check the Actions tab." >&2
+  else
+    gh run watch "$new" --exit-status
+  fi
   ```
 
 **Reference**: `.github/workflows/version-packages.yml` (workflow_dispatch with
@@ -842,10 +1042,19 @@ tagging conventions.
 
 **Objective**: Watch automated workflow and intervene if failures occur.
 
-- [ ] Monitor workflow run in real-time
+- [ ] Monitor the run for the release merge commit in real time (a bare
+      `gh run watch` may pick another recent run)
 
   ```bash
-  gh run watch
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+  run_id=""
+  for _ in $(seq 1 15); do
+    run_id=$(gh run list --workflow=version-packages.yml --commit "$MERGE_SHA" \
+      --json databaseId -q '.[0].databaseId')
+    [ -n "$run_id" ] && break
+    sleep 10
+  done
+  [ -n "$run_id" ] && gh run watch "$run_id" --exit-status
   ```
 
 - [ ] Verify all jobs complete successfully:
@@ -1188,6 +1397,16 @@ This checklist enforces the following Section 4 directives:
    git tag -d vX.Y.Z
    git push origin :refs/tags/vX.Y.Z
    ```
+
+   > **Pre-existing danger**: deleting the tag re-arms the publish phase.
+   > `version-packages.yml`'s phase detection treats "no pending changesets and
+   > `v<catalog-version>` missing" as "run the publish phase" — so the _next_
+   > push to `main` for any reason (an unrelated docs fix, another merge with no
+   > version bump) will silently recreate the tag and re-publish this same
+   > rolled-back release. Before or immediately after deleting the tag, land a
+   > no-op changeset + version bump (or otherwise advance the catalog version)
+   > so the next automated run targets a new version instead of resurrecting
+   > this one.
 
 3. **Unpublish from npm** (if published, within 72 hours only)
 

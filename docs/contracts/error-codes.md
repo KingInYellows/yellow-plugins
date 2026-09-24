@@ -1,6 +1,6 @@
 # Error Codes Reference
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Specification
+**Document Version**: 1.1.0 **Last Updated**: 2026-09-23 **Specification
 Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 `packages/domain/src/validation/errorCatalog.ts`
 
@@ -9,27 +9,57 @@ Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 ## Overview
 
 This document provides a comprehensive catalog of all error codes used in the
-Claude Code Plugin Marketplace. Each error code maps directly to specification
-requirements (FR-_ and CRIT-_ identifiers) ensuring traceability and consistent
-error handling across the system.
+Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
+`NET`) map directly to specification requirements (`FR-*`, `CRIT-*`
+identifiers). The later categories (`SOL`, `PLAN`, `SETUP`, `PROVIDER`,
+`NAMESPACE`, `CURSOR`, `DIST`) have no FR/CRIT ids. Being in the catalog is not
+the same as having an emitter. The `SOL`, `PLAN`, `SETUP`, `PROVIDER`,
+`NAMESPACE`, and `CURSOR` families are assembled by `validate-solutions.js`,
+`validate-plans.js`, `validate-setup-all.js`, `validate-provider-groups.js`,
+`validate-flow-namespace.js`, and `validate-cursor.js` under `scripts/`, and
+even those families have reserved codes nothing emits (for example
+`CURSOR-003`/`004`/`006`, marked below). The original six categories and `DIST`
+are defined in `packages/domain/src/validation/errorCatalog.ts`, but no script
+emits them by code; check a code's status note before assuming something raises
+it. All categories share the same `ERROR-{CATEGORY}-{NUMBER}` format for
+consistent handling.
+
+Every validator script that emits these codes exits `1` when it reports any
+finding, so a single code fails its CI step. Two soft exits:
+`scripts/validate-plans.js` (`PLAN`) and `scripts/validate-solutions.js`
+(`SOL`) exit `0` without checking when their diff base ref is unreachable
+(fork PR, shallow clone).
 
 ### Error Code Format
 
 Error codes follow the pattern: `ERROR-{CATEGORY}-{NUMBER}`
 
-- **CATEGORY**: Error domain (SCHEMA, COMPAT, INST, DISC, PERM, NET)
+- **CATEGORY**: Error domain (`SCHEMA`, `COMPAT`, `INST`, `DISC`, `PERM`, `NET`,
+  `SOL`, `PLAN`, `SETUP`, `PROVIDER`, `NAMESPACE`, `CURSOR`, `DIST`)
 - **NUMBER**: Sequential identifier within category (001-999)
 
 ### Error Categories
 
-| Category | Description                         | Specification Reference |
-| -------- | ----------------------------------- | ----------------------- |
-| `SCHEMA` | JSON Schema validation failures     | FR-001, FR-002          |
-| `COMPAT` | Compatibility and dependency issues | CRIT-002b, CRIT-005     |
-| `INST`   | Installation and lifecycle errors   | CRIT-007, CRIT-010      |
-| `DISC`   | Discovery and marketplace errors    | CRIT-008                |
-| `PERM`   | Permission and security errors      | CRIT-012                |
-| `NET`    | Network and connectivity errors     | CRIT-011                |
+| Category    | `ErrorCategory`       | Description                                              |
+| ----------- | --------------------- | -------------------------------------------------------- |
+| `SCHEMA`    | `SCHEMA_VALIDATION`   | JSON Schema validation failures                          |
+| `COMPAT`    | `COMPATIBILITY`       | Compatibility and dependency issues                      |
+| `INST`      | `INSTALLATION`        | Installation and lifecycle errors                        |
+| `DISC`      | `DISCOVERY`           | Discovery and marketplace errors                         |
+| `PERM`      | `PERMISSION`          | Permission and security errors                           |
+| `NET`       | `NETWORK`             | Network and connectivity errors                          |
+| `SOL`       | `SOLUTION_DOCS`       | Solution-doc slug and frontmatter checks                 |
+| `PLAN`      | `PLAN_LIFECYCLE`      | Archived-plan checkbox checks                            |
+| `SETUP`     | `SETUP_COVERAGE`      | `setup:all` coverage checks                              |
+| `PROVIDER`  | `CAPABILITY_PROVIDER` | Capability-provider catalog checks                       |
+| `DIST`      | `DISTRIBUTION`        | Codex distribution codes in `error-codes.json`           |
+| `NAMESPACE` | `NAMESPACE_MIGRATION` | Retired `workflows:` namespace checks                    |
+| `CURSOR`    | —                     | Cursor distribution codes; not an `ErrorCategory` member |
+
+`ERROR-CURSOR-*` values are `ERROR_CODES` entries. They are not listed in the
+`ErrorCategory` grouping map in `errorCatalog.ts`. The six categories above
+`SOL` keep the specification references in the sections below; the later
+categories do not have FR or CRIT ids in that file.
 
 ---
 
@@ -445,6 +475,23 @@ Missing: git-integration
 
 ---
 
+### ERROR-COMPAT-007: Node.js Version Too High
+
+**Severity**: ERROR **Category**: COMPATIBILITY **Spec Reference**: CRIT-019
+
+**Description**: The running Node.js version is above the plugin's maximum
+supported version. `compatibilityError('nodeMax', …)` in `errorCatalog.ts`
+returns this code (constant `COMPAT_NODE_VERSION_HIGH`). It is numbered after
+`006` because it was added later, not in requirement order.
+
+**Resolution**:
+
+- Switch to a Node.js version inside the plugin's supported range
+- Check the maximum Node.js version the plugin declares (reported at
+  `/compatibility/nodeMax`)
+
+---
+
 ## Installation Errors (INST)
 
 ### ERROR-INST-001: Plugin Not Found
@@ -582,12 +629,16 @@ Output: "Error: Missing dependency 'jq'"
 
 ---
 
-### ERROR-INST-008: Lifecycle Consent Required (Uninstall)
+### ERROR-INST-008 (RESERVED, not emitted): Lifecycle Consent Required (Uninstall)
 
 **Severity**: ERROR  
 **Category**: INSTALLATION  
 **Spec Reference**: CRIT-004, CRIT-011  
 **Operational Reference**: `docs/operations/uninstall.md#lifecycle-hooks`
+
+**Status**: Not defined in `errorCatalog.ts` `ERROR_CODES`, and nothing in the
+repository emits it. Kept for the uninstall flow described in
+`docs/operations/uninstall.md`.
 
 **Description**:  
 Uninstall command detected a lifecycle uninstall script that has not been
@@ -607,13 +658,17 @@ reviewed or whose digest no longer matches the consented version.
 
 ---
 
-### ERROR-INST-009: Cache Purge Failure (FR-010)
+### ERROR-INST-009 (RESERVED, not emitted): Cache Purge Failure (FR-010)
 
 **Severity**: ERROR  
 **Category**: INSTALLATION  
 **Spec Reference**: FR-010, CRIT-011  
 **Operational Reference**:
 `docs/operations/uninstall.md#fr-010-cache-purge-errors`
+
+**Status**: Not defined in `errorCatalog.ts` `ERROR_CODES`, and nothing in the
+repository emits it. Kept for the uninstall flow described in
+`docs/operations/uninstall.md`.
 
 **Description**:  
 Cache retention policy failed to remove one or more versions during uninstall
@@ -804,6 +859,110 @@ data).
 
 ---
 
+## Solution-doc Errors (SOL)
+
+`scripts/validate-solutions.js` gates `docs/solutions/` entries. Catalog
+constants: `SOL_SLUG_COLLISION`, `SOL_FRONTMATTER_INVALID`.
+
+| Code            | Meaning                                      |
+| --------------- | -------------------------------------------- |
+| `ERROR-SOL-001` | Slug collision with an existing solution doc |
+| `ERROR-SOL-002` | Missing or invalid required frontmatter      |
+
+## Plan Lifecycle Errors (PLAN)
+
+`scripts/validate-plans.js` gates plans added or modified under
+`plans/complete/`. Catalog constant: `PLAN_STRAY_CHECKBOX`.
+
+| Code             | Meaning                                                |
+| ---------------- | ------------------------------------------------------ |
+| `ERROR-PLAN-001` | Stray unchecked task box (`- [ ]`) in an archived plan |
+
+## Setup Coverage Errors (SETUP)
+
+`scripts/validate-setup-all.js` gates `plugins/yellow-core/commands/setup/all.md`
+and its credential-status reference against the marketplace.
+
+| Code              | Constant                      | Meaning                                                         |
+| ----------------- | ----------------------------- | --------------------------------------------------------------- |
+| `ERROR-SETUP-001` | `SETUP_MISSING_MARKERS`       | Marker-delimited section missing                                |
+| `ERROR-SETUP-002` | `SETUP_COVERAGE_DRIFT`        | Plugin coverage does not match the marketplace                  |
+| `ERROR-SETUP-003` | `SETUP_DELEGATION_DRIFT`      | Delegated command map does not match command files              |
+| `ERROR-SETUP-004` | `SETUP_ORDER_DRIFT`           | Dashboard plugin order does not match the delegated setup order |
+| `ERROR-SETUP-005` | `SETUP_PROBE_LIST_DRIFT`      | Step 1.5 ToolSearch probe list is inconsistent                  |
+| `ERROR-SETUP-006` | `SETUP_CREDENTIAL_LIST_DRIFT` | Credential-status plugin list does not match hooks              |
+| `ERROR-SETUP-007` | `SETUP_EXAMPLE_DRIFT`         | Dashboard example does not list every marketplace plugin        |
+
+## Capability-Provider Errors (PROVIDER)
+
+`scripts/validate-provider-groups.js` gates the catalog-only
+`capabilityProvider` field (static declaration shape, uniqueness, referential
+integrity, and non-emission into generated artifacts). The runtime
+exactly-one-enabled rule is not one of these codes.
+
+| Code                 | Constant                        | Meaning                                                                                        |
+| -------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `ERROR-PROVIDER-001` | `PROVIDER_DUPLICATE_ID`         | Duplicate provider id                                                                          |
+| `ERROR-PROVIDER-002` | `PROVIDER_UNKNOWN_PLUGIN`       | Named plugin is not a Claude-enabled marketplace plugin, or has no `plugins/<name>/` directory |
+| `ERROR-PROVIDER-003` | `PROVIDER_METADATA_LEAKED`      | Provider metadata leaked into a generated artifact                                             |
+| `ERROR-PROVIDER-004` | `PROVIDER_GROUP_UNDERPOPULATED` | Capability group underpopulated                                                                |
+| `ERROR-PROVIDER-005` | `PROVIDER_SETUP_SECTION_DRIFT`  | Setup section drifted from the provider group                                                  |
+| `ERROR-PROVIDER-006` | `PROVIDER_ROUTER_TABLE_DRIFT`   | Router table drifted from the provider group                                                   |
+| `ERROR-PROVIDER-007` | `PROVIDER_ARTIFACT_MISSING`     | Expected generated manifest for a provider plugin is missing                                   |
+
+## Namespace Migration Errors (NAMESPACE)
+
+`scripts/validate-flow-namespace.js` gates surviving references to the retired
+`workflows:` command namespace (renamed to `flow:`), including the shrinking
+allowlist of path plus expected occurrence count.
+
+| Code                   | Constant                            | Meaning                                |
+| ---------------------- | ----------------------------------- | -------------------------------------- |
+| `ERROR-NAMESPACE-001`  | `NAMESPACE_STALE_REFERENCE`         | Stale `workflows:` reference           |
+| `ERROR-NAMESPACE-002`  | `NAMESPACE_ALLOWLIST_COUNT_DRIFT`   | Allowlist occurrence count drifted     |
+| `ERROR-NAMESPACE-003`  | `NAMESPACE_ALLOWLIST_PATH_MISSING`  | Allowlisted path is missing            |
+
+## Cursor Distribution Errors (CURSOR)
+
+Defined on `ERROR_CODES`. Not an `ErrorCategory` enum value.
+`scripts/validate-cursor.js` assembles `001`, `002`, `005`, `007`, and `008`.
+`003`, `004`, and `006` are catalog constants with no assembler under
+`scripts/` at this commit. `scripts/validate-versions.js` checks Cursor
+version and marketplace membership in prose; it does not emit these codes.
+
+| Code               | Constant                   | Status       | Meaning                                                                       |
+| ------------------ | -------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| `ERROR-CURSOR-001` | `CURSOR_ARTIFACT_MISSING`  | emitted      | Generated Cursor manifest or marketplace file missing                         |
+| `ERROR-CURSOR-002` | `CURSOR_SCHEMA_VIOLATION`  | emitted      | Cursor artifact failed schema or JSON checks                                  |
+| `ERROR-CURSOR-003` | `CURSOR_MARKETPLACE_DRIFT` | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-004` | `CURSOR_VERSION_DRIFT`     | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-005` | `CURSOR_EXPOSURE_LEAK`     | emitted      | Exposure lint found a disallowed construct                                    |
+| `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID` | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
+| `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`  | emitted      | Generated artifact contains a `lifecycle` key                                 |
+| `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`     | emitted      | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
+
+## Codex Distribution Errors (DIST)
+
+`ErrorCategory.DISTRIBUTION`. Values live in
+`packages/domain/src/validation/error-codes.json` and are spread into
+`ERROR_CODES`. No script under `scripts/` emits these codes yet —
+`scripts/validate-codex.js` does not read that registry. Meanings are from
+R14 of `plans/specs/claude-code-codex-plugin-pilot.md`.
+
+All eight are **reserved** — defined in the catalog, not emitted by any
+script yet.
+
+| Code             | Constant                                | Meaning                              |
+| ---------------- | --------------------------------------- | ------------------------------------ |
+| `ERROR-DIST-001` | `DIST_MALFORMED_CATALOG_SOURCE`         | Malformed catalog source             |
+| `ERROR-DIST-002` | `DIST_INVENTORY_ORDER_MISMATCH`         | Inventory or order mismatch          |
+| `ERROR-DIST-003` | `DIST_GENERATED_ARTIFACT_DRIFT`         | Generated-artifact drift             |
+| `ERROR-DIST-004` | `DIST_INVALID_GENERATED_MANIFEST`       | Invalid generated manifest           |
+| `ERROR-DIST-005` | `DIST_UNSUPPORTED_SURFACE_EXPOSED`      | Unsupported surface exposed to Codex |
+| `ERROR-DIST-006` | `DIST_HOOK_CONTRACT_VIOLATION`          | Hook contract violation              |
+| `ERROR-DIST-007` | `DIST_WINDOWS_PATH_PORTABILITY_FAILURE` | Windows or path portability failure  |
+| `ERROR-DIST-008` | `DIST_MCP_AUTH_CONFIG_FAILURE`          | MCP or auth configuration failure    |
+
 ## Error Handling Best Practices
 
 ### For CLI Users
@@ -850,6 +1009,7 @@ data).
 | -------------------------------- | -------------- | ------------------------------- |
 | COMPAT-001/002                   | CRIT-002b      | Claude Code version constraints |
 | COMPAT-003/004/005/006           | CRIT-005       | Platform/dependency validation  |
+| COMPAT-007                       | CRIT-019       | Node.js maximum version         |
 | INST-001/002/003/004/005/006/007 | CRIT-007       | Installation error handling     |
 | DISC-004                         | CRIT-008       | Changelog fallback logic        |
 | INST-006                         | CRIT-010       | Lifecycle script execution      |
@@ -902,11 +1062,14 @@ interface DomainValidationError {
 
 ## Version History
 
-| Version | Date       | Changes                                   |
-| ------- | ---------- | ----------------------------------------- |
-| 1.0.0   | 2026-01-11 | Initial error catalog (I1.T3 deliverable) |
+| Version | Date       | Changes                                                                                                                             |
+| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-01-11 | Initial error catalog (I1.T3 deliverable)                                                                                           |
+| 1.1.0   | 2026-09-23 | Add SOL, PLAN, SETUP, PROVIDER, NAMESPACE, CURSOR, and DIST sections; add COMPAT-007; mark INST-008/009 as undefined in the catalog |
 
 ---
 
-**For Updates**: This document is generated from
-`packages/domain/src/validation/errorCatalog.ts`.
+**For Updates**: This document is maintained by hand. The codes themselves are
+defined in `packages/domain/src/validation/errorCatalog.ts` and
+`packages/domain/src/validation/error-codes.json`; update this file when either
+changes.

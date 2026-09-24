@@ -38,7 +38,7 @@ pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-iden
 pnpm generate:manifests       # manifests from catalog/; Codex/Cursor skill copies from plugins/<name>/skills/
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 
-pnpm release:check            # validate:schemas + validate:versions + typecheck
+pnpm release:check            # validate:schemas + validate:versions + validate:doc-counts + typecheck + scripts/validate-catalog-track.js
 pnpm changeset                # create a changeset for plugin file changes
 pnpm apply:changesets         # version + run scripts/sync-manifests.js
 ```
@@ -132,8 +132,9 @@ the colon.
    `lint-plugins.yml` convention lint. See AGENTS.md's Targeted
    Validation Matrix for the rest.
 2. Run `pnpm changeset` and commit the file — CI blocks the PR without it.
-3. Adding or removing a plugin: update `.claude-plugin/marketplace.json` AND
-   `plugins/yellow-core/commands/setup/all.md` together, or
+3. Adding or removing a plugin: update `catalog/` (then
+   `pnpm generate:manifests` regenerates `.claude-plugin/marketplace.json`)
+   AND `plugins/yellow-core/commands/setup/all.md` together, or
    `validate-setup-all.js` fails.
 4. Update the plugin's `README.md` and `CLAUDE.md` if behaviour changed.
 
