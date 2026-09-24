@@ -434,7 +434,7 @@ metrics/observability.
 > `pnpm cli install/update/publish/ rollback/uninstall` command surface, a
 > `.claude-plugin/registry.json`, and a `.claude-plugin/cache/` layout. **None
 > of that exists in this repository.** `packages/cli` ships exactly one
-> subcommand (`pnpm cli validate:plugins`); install/update/rollback/uninstall
+> subcommand, `validate:plugins` (run it as `pnpm validate:plugins`); install/update/rollback/uninstall
 > are handled natively by Claude Code (`docs/CLAUDE.md` "Architecture"). 3.2-3.7
 > describe the design-time CLI contract in `docs/contracts/cli-contracts.md` and
 > cannot currently pass — they are **not** part of the blocking release gate.
@@ -869,9 +869,31 @@ pushes any missing catalog/per-plugin tags itself, from the exact commit the
 workflow run checks out — safer than a local tag, which depends on your working
 copy being exactly at the merge commit:
 
+This only builds the right release while `main` still points at the release PR's
+merge commit: `gh workflow run` without `--ref` runs from the default branch,
+and `--ref` takes a branch or tag, not a SHA. If `main` has moved on, skip to
+the manual tag path below and dispatch with `--ref "v$VERSION"`.
+
 ```bash
-gh workflow run version-packages.yml -f force_publish=true
-gh run watch
+MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+git fetch origin main
+if [ "$(git rev-parse origin/main)" != "$MERGE_SHA" ]; then
+  echo "main has moved past the release merge; use the manual tag path." >&2
+else
+  gh workflow run version-packages.yml -f force_publish=true
+  run_id=""
+  for _ in $(seq 1 15); do
+    run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
+      --commit "$MERGE_SHA" --json databaseId -q '.[0].databaseId')
+    [ -n "$run_id" ] && break
+    sleep 10
+  done
+  if [ -n "$run_id" ]; then
+    gh run watch "$run_id" --exit-status
+  else
+    echo "No dispatched run found for $MERGE_SHA; check the Actions tab." >&2
+  fi
+fi
 ```
 
 **Only if GitHub Actions itself cannot run this workflow** (Actions outage,
@@ -921,9 +943,18 @@ since (the tag would then point at the wrong, later commit):
   gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
   ```
 
-- [ ] Confirm workflow started
+- [ ] Confirm the dispatched run started and watch that run, not the newest
+      one
+
   ```bash
-  gh run watch
+  run_id=""
+  for _ in $(seq 1 15); do
+    run_id=$(gh run list --workflow=version-packages.yml --event workflow_dispatch \
+      --commit "$MERGE_SHA" --json databaseId -q '.[0].databaseId')
+    [ -n "$run_id" ] && break
+    sleep 10
+  done
+  [ -n "$run_id" ] && gh run watch "$run_id" --exit-status
   ```
 
 **Reference**: `.github/workflows/version-packages.yml` (workflow_dispatch with
@@ -935,10 +966,14 @@ since (the tag would then point at the wrong, later commit):
 
 **Objective**: Watch automated workflow and intervene if failures occur.
 
-- [ ] Monitor workflow run in real-time
+- [ ] Monitor the run for the release merge commit in real time (a bare
+      `gh run watch` may pick another recent run)
 
   ```bash
-  gh run watch
+  MERGE_SHA=$(gh pr view <release-pr-number> --json mergeCommit -q .mergeCommit.oid)
+  run_id=$(gh run list --workflow=version-packages.yml --commit "$MERGE_SHA" \
+    --json databaseId -q '.[0].databaseId')
+  gh run watch "$run_id" --exit-status
   ```
 
 - [ ] Verify all jobs complete successfully:
