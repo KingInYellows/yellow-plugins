@@ -295,8 +295,10 @@ pnpm version-packages         # same command the bot runs: apply changesets,
                               # refresh the manifest snapshot
 pnpm install                  # pick up lockfile changes, if any
 # Run pnpm version-packages exactly once: catalog-version.js patch bumps on
-# every run. Commit, then submit through the enabled provider
-# (gt submit --no-interactive on Graphite, /github-stack:submit on GitHub).
+# every run. Then submit through the enabled provider:
+#   READY_GRAPHITE: commit, then gt submit --no-interactive.
+#   READY_GITHUB: leave the changes uncommitted and run /github-stack:submit;
+#   it stages and commits them itself, and exits if the tree is already clean.
 # Before merging, run Sections 1-4 of docs/operations/release-checklist.md
 # against this branch (they verify this bump; they do not re-run it).
 # Get the PR reviewed and merge it to main.

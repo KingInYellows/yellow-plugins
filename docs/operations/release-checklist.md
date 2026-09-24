@@ -951,14 +951,21 @@ commit):
 
   ```bash
   VERSION=$(git show "$MERGE_SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
-  git fetch origin tag "v$VERSION" 2>/dev/null
-  existing=$(git rev-parse -q --verify "v$VERSION^{commit}" 2>/dev/null)
+  # Ask the remote, not a possibly stale local tag. `^{}` peels an annotated
+  # tag to its commit; fall back to the plain ref for a lightweight tag.
+  remote=$(git ls-remote origin "refs/tags/v$VERSION^{}" | cut -f1)
+  [ -n "$remote" ] || remote=$(git ls-remote origin "refs/tags/v$VERSION" | cut -f1)
+  local_tag=$(git rev-parse -q --verify "refs/tags/v$VERSION^{commit}" 2>/dev/null)
   TAG_OK=""
-  if [ -n "$existing" ] && [ "$existing" != "$MERGE_SHA" ]; then
-    echo "v$VERSION already points at $existing, not $MERGE_SHA; stop." >&2
+  if [ -n "$remote" ] && [ "$remote" != "$MERGE_SHA" ]; then
+    echo "Remote v$VERSION points at $remote, not $MERGE_SHA; stop." >&2
     echo "Do not continue to the push or dispatch steps." >&2
-  elif [ -n "$existing" ]; then
-    TAG_OK=1
+  elif [ -n "$remote" ]; then
+    TAG_OK=1  # the remote tag is already right; nothing to create or push
+  elif [ -n "$local_tag" ] && [ "$local_tag" != "$MERGE_SHA" ]; then
+    echo "Local v$VERSION points at $local_tag; delete it before tagging." >&2
+  elif [ -n "$local_tag" ]; then
+    TAG_OK=1  # correct local tag, not yet pushed
   else
     CO_AUTHOR="Claude Fable 5.1"  # set to the model that authored the release
     git tag -a "v$VERSION" "$MERGE_SHA" -m "Release v$VERSION (emergency manual release)
