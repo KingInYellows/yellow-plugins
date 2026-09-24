@@ -1,0 +1,22 @@
+docs/architecture-overview.md
+  s_e1fd7afde28579::t_c8d983aca1d8c8 346
+  s_e1fd7afde28579::t_24ccf922a277f8 469
+  s_e1fd7afde28579::t_5c13c0ca746193 487-491
+  s_e1fd7afde28579::t_aa1302fd514c44 82-83,342-345,347-349,465-468,470-479,492-494
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0529abfd7e70ae40f768dae83af7386fa5bdc2be",
+  "prompts": {},
+  "sessions": {
+    "s_e1fd7afde28579": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "005623dd-036f-42ca-aa19-81b8901771af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
