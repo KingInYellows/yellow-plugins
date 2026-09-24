@@ -4,7 +4,8 @@
  * Narrative Doc Count Validator
  *
  * Reads .claude-plugin/marketplace.json as the canonical plugin count, then
- * scans root-level narrative docs (CLAUDE.md, README.md, etc.) for
+ * scans root-level narrative docs (CLAUDE.md, README.md, etc.) plus
+ * docs/architecture-overview.md for
  * "<N> plugins" / "<N> marketplace plugins" claims and fails if any claim's
  * integer does not match the canonical count.
  *

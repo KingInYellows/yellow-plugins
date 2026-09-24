@@ -10,9 +10,11 @@ Root catalog version lives in `package.json` (catalog snapshot authority;
 checks per-plugin `package.json` ↔ generated manifest/marketplace drift only —
 it never reads the root catalog version. Toolchain ranges live in root
 `package.json` `engines` (Node `>=22.22.0 <25`, pnpm `>=8`); exact CI pins live
-in each workflow's `NODE_VERSION` / `pnpm/action-setup` settings — the primary
-workflow's `goal-engine-compat` job and the fork-PR workflow pin a newer Node
-patch than the rest of CI.
+in the workflows under `.github/workflows/` — a workflow-level `NODE_VERSION`
+env in `validate-schemas.yml` and `validate-schemas-fork.yml`, and literal
+`actions/setup-node` `node-version` values elsewhere (`version-packages.yml`,
+`upstream-pins-advisory.yml`, and the `goal-engine-compat` job). The fork-PR
+workflow and `goal-engine-compat` pin a newer Node patch than the rest of CI.
 
 ---
 
@@ -72,12 +74,14 @@ Source of truth for membership and order: `pluginOrder` in
 - **github-workflow** — GitHub-native stacked-PR provider (`gh stack`). Nine
   `/github-stack:*` commands (the GitHub side of the registry's nine operations)
   plus `lib/github-stack-runtime.js`, the adapter behind `/flow:work`'s
-  lower-level stack primitives. Same Bash hooks as gt-workflow.
+  lower-level stack primitives. Same Bash hook names as gt-workflow, with its
+  own policy files (see In-turn and background hooks).
 
 #### Review / quality
 
 - **yellow-review** — Multi-agent PR review, comment resolution, stack review.
-  One of two Cursor-enabled plugins, with yellow-cursor (read-only skill only).
+  One of two Cursor-enabled plugins (the other is yellow-cursor); its Cursor
+  build ships a single read-only skill, `yellow-thermonuclear-review`.
 - **yellow-council** — Parallel cross-lineage review (in-process Claude +
   Codex/Gemini/OpenCode CLIs).
 - **yellow-debt** — Parallel scanners for AI-generated debt patterns.
@@ -93,7 +97,9 @@ Source of truth for membership and order: `pluginOrder` in
   Perplexity, Tavily, EXA, Parallel, ast-grep); missing-key behavior varies by
   server (see MCP and credentials).
 - **yellow-morph** — Morph Fast Apply + WarpGrep MCP.
-- **yellow-composio** — Composio MCP with usage/budget guards.
+- **yellow-composio** — Composio Connect as a bundled HTTP MCP
+  (`https://connect.composio.dev/mcp`, browser OAuth via `/mcp`) plus local
+  usage tracking; no hooks, no `userConfig`.
 - **yellow-ruvector** — Local ruvector MCP: persistent vector memory and session
   hooks.
 - **yellow-codex** — OpenAI Codex CLI wrapper.
@@ -154,7 +160,7 @@ providers' `PreToolUse` Bash hook (see In-turn and background hooks).
 flowchart LR
   subgraph authoring [Authoring]
     Catalog["catalog/ (metadata, hooks, MCP)"]
-    PluginSrc["plugins/*/skills (Codex/Cursor copies)"]
+    PluginSrc["plugins/*/skills (source for Codex/Cursor copies)"]
     PkgJson["plugins/*/package.json versions"]
   end
   subgraph generate [Generate]
@@ -209,8 +215,10 @@ flowchart LR
    recall, compound drain, CI context).
 4. User runs a namespaced slash command. The command markdown usually tells the
    model to invoke a Skill. Skills spawn Agents, run Bash, or call MCP tools.
-5. `/setup:all` is the cross-plugin dashboard: one Bash probe, then reads
-   per-plugin `credential-status.json` (no keychain probing).
+5. `/setup:all` is the cross-plugin dashboard: one Bash probe, ToolSearch probes
+   for session MCP visibility, then per-plugin `credential-status.json` where a
+   plugin writes one (no keychain probing). OAuth-only plugins such as
+   yellow-composio are classified by MCP tool visibility instead.
 
 ### Interfaces
 
@@ -221,8 +229,8 @@ flowchart LR
   secret values. Writer: SessionStart + `credential-status.sh`. Reader:
   `/setup:all`.
 - MCP: stdio (`gt mcp`, ruvector, Morph, Semgrep) or HTTP/OAuth (Linear,
-  Ceramic). Credential MCP servers use userConfig + shell env in `plugin.json`
-  and a wrapper in `bin/` that prefers userConfig.
+  Ceramic, Composio). Credential-bearing stdio MCP servers use userConfig +
+  shell env in `plugin.json` and a wrapper in `bin/` that prefers userConfig.
 - Stack state: `stack-provider-state.js` classifies `READY_GRAPHITE` /
   `READY_GITHUB` vs blocked states; `/stack:select` switches.
 - CLI contracts (`api/cli-contracts/*.json`): JSON Schemas for install / update
@@ -232,11 +240,12 @@ flowchart LR
 
 No DI container. The TypeScript validator uses constructor injection
 (`SchemaValidator(factory?)`). Plugins compose by prompt + convention, not
-in-process Node imports; the plugins that run Node (yellow-cursor’s SDK CLI,
-yellow-goal’s process spawn) use their own dependencies, not other plugins’
-code. Runtime shell coupling does exist: research, Semgrep, and Composio
-SessionStart hooks source yellow-core’s `credential-status.sh`; debt, CI,
-ruvector, and goal source `validate-fs.sh` (required or best-effort per plugin).
+in-process Node imports; plugins that run Node (e.g. yellow-cursor’s SDK CLI,
+yellow-goal’s process spawn; full list under Subprocesses that are real Node)
+use their own dependencies, not other plugins’ code. Runtime shell coupling does
+exist: research and Semgrep SessionStart hooks source yellow-core’s
+`credential-status.sh`; debt, CI, ruvector, and goal source `validate-fs.sh`
+(required or best-effort per plugin).
 
 ---
 
@@ -283,11 +292,14 @@ pnpm generate:manifests
 ```
 
 Generated files are committed so hosts can install from git without running the
-generator; CI never regenerates them, it only runs
+generator. PR CI never regenerates them; it only runs
 `generate-manifests.js --check` (`pnpm validate:generated`, also part of
-`validate:schemas`) and fails on any byte drift. Separately,
-`pnpm generate:snippets` rewrites install-script blocks from
-`scripts/snippets/*.sh`, and `pnpm validate:snippets` checks them.
+`validate:schemas`) and fails on any byte drift. The release workflow is the
+exception: its Version PR step (`pnpm run version-packages` →
+`apply:changesets`) regenerates manifests via `sync-manifests.js` and commits
+the result to the Version PR. Separately, `pnpm generate:snippets` rewrites
+install-script blocks from `scripts/snippets/*.sh`, and `pnpm validate:snippets`
+checks them.
 
 ### Build steps
 
@@ -412,7 +424,6 @@ Hook I/O:
 | yellow-debt     | Scans `todos/debt/` for pending/ready high/critical findings; emits a `systemMessage` warning if any exist.              |
 | yellow-research | Write `credential-status.json`; disown Context7 `_lc_prewarm` (lockfile scan, HTTP library-ID resolution, cache update). |
 | yellow-semgrep  | Write `credential-status.json` (presence/source only).                                                                   |
-| yellow-composio | Write `credential-status.json` (presence/source only); `systemMessage` warning if `composio_mcp_url` is not HTTPS.       |
 | yellow-morph    | Prewarms morphmcp only; does not write `credential-status.json`.                                                         |
 | yellow-ruvector | Worktree store-heal (`.ruvector` symlink), embedder provenance check, budgeted recalls injected as `additionalContext`.  |
 
@@ -423,8 +434,7 @@ failure.
 
 Credential-bearing stdio MCP servers use `bin/` wrappers: `userConfig` wins,
 then shell env. Missing-key behavior varies by server — do not assume all absent
-credentials skip startup. Perplexity hard-fails at MCP start; Composio exits 1
-when its URL or API key is missing or the URL is not `https://`; Tavily and Exa
+credentials skip startup. Perplexity hard-fails at MCP start; Tavily and Exa
 still exec and return runtime errors on tool calls; Semgrep execs
 unconditionally; Morph lets morphmcp emit its own warning and exit. Siblings
 keep running when one server fails. Non-credential stdio servers launch directly
@@ -433,13 +443,14 @@ keep running when one server fails. Non-credential stdio servers launch directly
 Morph’s wrapper is the install correctness gate (mkdir lock, 20s wait, `exec`
 morphmcp). The SessionStart prewarm is only a race-avoidance hint.
 
-HTTP MCPs (Ceramic, DeepWiki, Parallel) start without keys; OAuth needs a
-browser. Headless SSH cannot complete those flows.
+HTTP MCPs (Linear, Ceramic, DeepWiki, Parallel, Composio) start without keys;
+OAuth needs a browser, so headless SSH cannot complete those flows. Composio’s
+bundled server has no API key at all: authenticate via `/mcp` →
+`composio-server`; headless hosts register a user-level server with a consumer
+key instead (see `/composio:setup`).
 
 yellow-research and yellow-semgrep declare a `yellow-core >= 1.17.1` dependency
-because their hooks source `credential-status.sh`. yellow-composio sources the
-same helper without declaring the dependency and skips the status write when
-yellow-core is absent.
+because their hooks source `credential-status.sh`.
 
 ### A user turn
 
@@ -469,12 +480,16 @@ the prompt.
 
 ### In-turn and background hooks
 
-gt-workflow and github-workflow (whichever is installed; both declare the same
-hooks): `PreToolUse` on Bash runs `check-git-push`, which tokenizes the command
-and denies raw `git push` (including `git -C dir push` and `bash -c` forms),
-pointing at `gt submit` or `gh stack submit` instead. `PostToolUse` on Bash runs
-`check-commit-message`, which warns on non-conventional commit messages. Both
-are Node (`hooks/scripts/entrypoint-claude.js`), 5s timeout.
+gt-workflow and github-workflow (whichever is installed; both declare hooks with
+the same names, each backed by its own policy files): `PreToolUse` on Bash runs
+`check-git-push`, which tokenizes the command and denies raw `git push`
+(including `git -C dir push` and `bash -c` forms). gt-workflow's message points
+at `gt submit --no-interactive`; github-workflow's points at the
+`github-stack-submit` skill / `/github-stack:submit`. `PostToolUse` on Bash runs
+`check-commit-message`, which warns on non-conventional commit messages — on
+`gt modify` / `gt commit` / `gt create` for gt-workflow, on `git commit` for
+github-workflow. Both are Node (`hooks/scripts/entrypoint-claude.js`), 5s
+timeout.
 
 yellow-ruvector: `UserPromptSubmit` (recall), `PreToolUse` / `PostToolUse` /
 `PostToolUseFailure` on Edit/Write/MultiEdit/Bash (1s; same post-tool script for
@@ -494,9 +509,10 @@ Compound pipeline (yellow-core):
 
 PreCompact tells the summarizer to keep, verbatim: active plan + unchecked
 tasks, files touched, user decisions, open questions, last failing command,
-in-flight branch/PR/worktree/stack names. Each preserved item has detected
-secrets replaced with a redaction marker and is wrapped in an untrusted-content
-fence first.
+in-flight branch/PR/worktree/stack names. The same text instructs the summarizer
+to replace detected secrets with a redaction marker and wrap each preserved item
+in an untrusted-content fence; no code redacts — it is a prompt instruction
+only.
 
 ### Subprocesses that are real Node
 
@@ -542,22 +558,22 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 
 ### Runtime: degrade, don’t block
 
-| Failure                             | Mechanism                                                                                                                                                                                             |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hook crash / write fail             | stderr only; still emit `{"continue": true}` or empty `systemMessage`                                                                                                                                 |
-| `set -e` avoided in hooks           | unexpected non-zero cannot skip the continue JSON                                                                                                                                                     |
-| Raw `git push` in Bash              | stacked-PR provider `PreToolUse` hook denies it (exit 2); an unparseable command is denied as a precaution                                                                                            |
-| Missing MCP key                     | varies by server (see MCP and credentials): Perplexity hard-fails at MCP start; Composio exits 1; Tavily/Exa still exec and error on tool calls; Semgrep execs unconditionally; Morph warns and exits |
-| Morph install lock timeout (20s)    | wrapper exits 1; `/morph:setup`; session continues without Morph                                                                                                                                      |
-| Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                                                                                                                                 |
-| Registry `null`                     | stop; never try the other provider or raw git/gh                                                                                                                                                      |
-| ruvector recall timeout             | MCP-driven recalls wait ~500ms and retry once; hook recalls get one attempt, no retry; then continue without memory                                                                                   |
-| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain                                                                                                                    |
-| `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                                                                                                                                       |
-| Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                                                                                                                               |
-| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                                              |
-| Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence                                                                                                                   |
-| Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives                                                                                                               |
+| Failure                             | Mechanism                                                                                                                                                                           |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hook crash / write fail             | stderr only; still emit `{"continue": true}` or empty `systemMessage`                                                                                                               |
+| `set -e` avoided in hooks           | unexpected non-zero cannot skip the continue JSON                                                                                                                                   |
+| Raw `git push` in Bash              | stacked-PR provider `PreToolUse` hook denies it (exit 2); an unparseable command is denied as a precaution                                                                          |
+| Missing MCP key                     | varies by server (see MCP and credentials): Perplexity hard-fails at MCP start; Tavily/Exa still exec and error on tool calls; Semgrep execs unconditionally; Morph warns and exits |
+| Morph install lock timeout (20s)    | wrapper exits 1; `/morph:setup`; session continues without Morph                                                                                                                    |
+| Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                                                                                                               |
+| Registry `null`                     | stop; never try the other provider or raw git/gh                                                                                                                                    |
+| ruvector recall timeout             | MCP-driven recalls wait ~500ms and retry once; hook recalls get one attempt, no retry; then continue without memory                                                                 |
+| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain                                                                                                  |
+| `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                                                                                                                     |
+| Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                                                                                                             |
+| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                            |
+| Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence                                                                                                 |
+| Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives                                                                                             |
 
 ### Retry and timeout policy
 
