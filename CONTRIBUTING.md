@@ -243,8 +243,11 @@ pnpm version-packages         # same command the bot runs: apply changesets,
                               # sync manifests, catalog-version.js patch,
                               # refresh the manifest snapshot
 pnpm install                  # pick up lockfile changes, if any
-# Commit, then submit through the enabled provider
+# Run pnpm version-packages exactly once: catalog-version.js patch bumps on
+# every run. Commit, then submit through the enabled provider
 # (gt submit --no-interactive on Graphite, /github-stack:submit on GitHub).
+# Before merging, run Sections 1-4 of docs/operations/release-checklist.md
+# against this branch (they verify this bump; they do not re-run it).
 # Get the PR reviewed and merge it to main.
 
 # The merge's push to main runs version-packages.yml. With no pending

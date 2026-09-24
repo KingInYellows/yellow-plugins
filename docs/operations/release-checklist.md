@@ -20,7 +20,7 @@ I4.T5 - Release Packaging & Checklist
   - [Preflight Sign-Off](#preflight-sign-off)
 - [Section 2: Automated Validation](#section-2-automated-validation)
   - [2.1 Run Release Check Pipeline](#21-run-release-check-pipeline)
-  - [2.2 CI Workflow Dry-Run](#22-ci-workflow-dry-run)
+  - [2.2 CI Workflow Validation](#22-ci-workflow-validation)
   - [2.3 Capture Validation Artifacts](#23-capture-validation-artifacts)
   - [Automated Validation Sign-Off](#automated-validation-sign-off)
 - [Section 3: Manual Smoke Tests](#section-3-manual-smoke-tests)
@@ -138,8 +138,9 @@ semver bump rules.
 
 ## Section 1: Preflight Checks
 
-> On the automated path, Sections 1-4 run against the open "chore: version
-> packages" PR branch, per Phase 0 above — not after it merges.
+> Sections 1-4 run against the release PR branch before it merges: the open
+> "chore: version packages" PR on the automated path (Phase 0 above), or your
+> hand-made release branch on the emergency path.
 
 ### 1.1 Repository Status
 
@@ -156,7 +157,10 @@ semver bump rules.
       your emergency release branch
 
   ```bash
+  # Automated path: the bot's PR is titled "chore: version packages"
   gh pr checkout "$(gh pr list --search 'chore: version packages' --json number -q '.[0].number')"
+  # Emergency path: check out your own release branch instead
+  #   gt checkout <branch>   (Graphite)  |  git switch <branch>   (GitHub)
   git branch --show-current
   ```
 
@@ -255,15 +259,11 @@ Section 4 security directives.
   # Expected: X.Y.Z matching intended release
   ```
 
-- [ ] Emergency manual path only (no automated PR exists): run the same
-      version command the bot runs, on your release branch
-
-  ```bash
-  pnpm version-packages
-  # apply:changesets (bumps plugins/*/package.json, syncs plugin.json +
-  # marketplace.json) + catalog-version.js patch + manifest snapshot refresh
-  # Run: pnpm install after (lockfile changes)
-  ```
+- [ ] Emergency manual path only (no automated PR exists): your release
+      branch already ran `pnpm version-packages` once, per `CONTRIBUTING.md`
+      "Emergency manual release" — verify the result with the checks above;
+      do not run it again. `catalog-version.js patch` bumps on every run, so a
+      second run skips a catalog version
 
 - [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's
       date

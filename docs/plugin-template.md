@@ -583,9 +583,13 @@ any other value. Real plugins also set `"private": true`.
 ## Common Patterns
 
 Each snippet shows only the keys the pattern adds to the catalog source on top
-of the always-emitted ones. There is no `permissions`, `lifecycle`, or `compatibility` key — the
-schema rejects them. Declare capability and OS requirements in the plugin's
-README, and run setup work from a `SessionStart` hook as shown above.
+of the required ones from Step 5. There is no `permissions` or `compatibility`
+key: CI validates every `catalog/plugins/*.json` against
+`schemas/catalog-plugin.schema.json` (`additionalProperties: false`) and
+rejects them. (`lifecycle` does exist, but it is catalog-only legacy/replacement
+metadata that is never emitted — not a capability declaration.) Declare
+capability and OS requirements in the plugin's README, and run setup work from
+a `SessionStart` hook as shown above.
 
 ### Pattern 1: Configuration File Plugin
 
@@ -640,7 +644,6 @@ state as unknown even after configuration — see
 
 ```json
 {
-  "keywords": ["git", "npm"],
   "dependencies": [
     {
       "name": "yellow-core",
@@ -659,7 +662,7 @@ Before publishing:
 
 - [ ] Regenerate from `catalog/` with `pnpm generate:manifests` (do not hand-edit `marketplace.json` or `plugin.json`)
 - [ ] Validate manifest: `node scripts/validate-plugin.js plugins/my-plugin`
-- [ ] Confirm the catalog source has no `permissions` key (`schemas/plugin.schema.json` rejects it in the generated manifest)
+- [ ] Confirm the catalog source has no `permissions` key (`generate:manifests` silently drops it; CI's AJV check against `schemas/catalog-plugin.schema.json` rejects it)
 - [ ] Run `pnpm validate:schemas` (covers `setup/all.md` coverage and the root doc plugin counts)
 - [ ] Test installation locally
 - [ ] Create README.md with usage examples (optional but recommended)

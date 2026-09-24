@@ -14,7 +14,7 @@ Only **yellow-core** is required. It provides the foundational workflow commands
 
 ### Full Install
 
-```bash
+```text
 /plugin marketplace add KingInYellows/yellow-plugins
 ```
 

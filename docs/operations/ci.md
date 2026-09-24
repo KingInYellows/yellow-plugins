@@ -916,7 +916,6 @@ Add to workflow (temporary debugging only):
 ### Internal Documentation
 
 - Appendix D: CI/CD Workflows
-- [Technology Stack: CI/CD Specification](../technology-stack-complete.md#843-cicd-workflow-specification)
 - [CLI Contracts: Automation Integration](../contracts/cli-contracts.md#6-automation--cicd-integration)
 - [Metrics Guide](./metrics.md)
 

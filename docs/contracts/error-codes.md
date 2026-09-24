@@ -18,9 +18,10 @@ emits `ERROR-DIST-*` yet. All categories share the same
 `ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
 
 Every validator script that emits these codes exits `1` when it reports any
-finding, so a single code fails its CI step. The one soft exit:
-`scripts/validate-plans.js` exits `0` without checking when its diff base ref
-is unreachable.
+finding, so a single code fails its CI step. Two soft exits:
+`scripts/validate-plans.js` (`PLAN`) and `scripts/validate-solutions.js`
+(`SOL`) exit `0` without checking when their diff base ref is unreachable
+(fork PR, shallow clone).
 
 ### Error Code Format
 
