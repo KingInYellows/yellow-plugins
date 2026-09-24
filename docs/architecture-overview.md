@@ -71,8 +71,8 @@ Source of truth for membership and order: `pluginOrder` in
   `credential-status.sh`. Hooks on `SessionStart` / `Stop` / `PreCompact`.
 - **gt-workflow** — Graphite stacked-PR provider (`gt` CLI + Graphite MCP).
   `gt-*` and `smart-submit` commands; Bash hooks block raw `git push`.
-- **github-workflow** — GitHub-native stacked-PR provider (`gh stack`). Nine
-  `/github-stack:*` commands (the GitHub side of the registry's nine operations)
+- **github-workflow** — GitHub-native stacked-PR provider (`gh stack`). 9
+  `/github-stack:*` commands (the GitHub side of the registry's 9 operations)
   plus `lib/github-stack-runtime.js`, the adapter behind `/flow:work`'s
   lower-level stack primitives. Same Bash hook names as gt-workflow, with its
   own policy files (see In-turn and background hooks).
@@ -150,7 +150,9 @@ to the other provider or to raw `git push` / `gh pr create`). No entry is `null`
 today. `/flow:work`'s per-provider steps follow the registry, and
 `tests/integration/stack-operation-registry.test.ts` checks every command entry
 resolves to a real file. The raw-push ban is also enforced at runtime by the
-providers' `PreToolUse` Bash hook (see In-turn and background hooks).
+providers' `PreToolUse` Bash hook (see In-turn and background hooks). The hook
+is a backstop, not the only control: `check-git-push` allows the call when it
+cannot parse the hook envelope (`lib/run-hook.js`).
 
 ---
 
@@ -240,12 +242,17 @@ flowchart LR
 
 No DI container. The TypeScript validator uses constructor injection
 (`SchemaValidator(factory?)`). Plugins compose by prompt + convention, not
-in-process Node imports; plugins that run Node (e.g. yellow-cursor’s SDK CLI,
-yellow-goal’s process spawn; full list under Subprocesses that are real Node)
-use their own dependencies, not other plugins’ code. Runtime shell coupling does
-exist: research and Semgrep SessionStart hooks source yellow-core’s
-`credential-status.sh`; debt, CI, ruvector, and goal source `validate-fs.sh`
-(required or best-effort per plugin).
+in-process Node imports. Cross-plugin runtime coupling does exist, though, so
+changing a yellow-core `lib/` export can break a sibling plugin:
+
+- Node: yellow-linear’s `/linear:delegate` runs yellow-core’s
+  `lib/remote-agent-provider-state.js` (and yellow-cursor’s CLI);
+  github-workflow’s status/setup skills run yellow-core’s
+  `lib/stack-tooling-probe.js`. Each resolves the sibling's path at run time and
+  reports an "is yellow-core installed?" error when it is absent.
+- Shell: research and Semgrep SessionStart hooks source yellow-core’s
+  `credential-status.sh`; debt, CI, ruvector, and goal source `validate-fs.sh`
+  (required or best-effort per plugin).
 
 ---
 
@@ -297,15 +304,19 @@ generator. PR CI never regenerates them; it only runs
 `validate:schemas`) and fails on any byte drift. The release workflow is the
 exception: its Version PR step (`pnpm run version-packages` →
 `apply:changesets`) regenerates manifests via `sync-manifests.js` and commits
-the result to the Version PR. Separately, `pnpm generate:snippets` rewrites
+the result to the Version PR. That bot-created PR does not trigger
+`validate-schemas.yml`, so `ci-status` never gates it: review its version files
+by hand (root `CLAUDE.md` Fact 3). Separately, `pnpm generate:snippets` rewrites
 install-script blocks from `scripts/snippets/*.sh`, and `pnpm validate:snippets`
 checks them.
 
 ### Build steps
 
-Local pre-PR sequence (run `pnpm generate:manifests` first only if you edited
+Local pre-PR baseline (run `pnpm generate:manifests` first only if you edited
 `catalog/`, a plugin `package.json`, or a Codex/Cursor-exported skill, then
-commit the output):
+commit the output). This is not the full CI gate — root `CLAUDE.md` “Common
+Commands” lists what `ci-status` adds (changeset, required bats suites, and
+more):
 
 ```text
 pnpm install --frozen-lockfile
@@ -330,15 +341,12 @@ Primary workflow: `.github/workflows/validate-schemas.yml`.
 - Token: workflow `contents: read`. `GITHUB_TOKEN` is passed into `pnpm install`
   so `@vscode/ripgrep` (via yellow-morph) can download from GitHub Releases.
 
-Blocking jobs are exactly the `needs` of the `ci-status` aggregator:
-`validate-schemas` (10-target matrix, `timeout-minutes: 2`),
-`validate-versions`, `lint-and-typecheck`, `unit-tests`, `integration-tests`,
-`contract-drift`, `security-audit`, `build`, `changeset-check` (PR-only),
-`plugin-shell-tests`, and `goal-engine-compat`. Inside `plugin-shell-tests`,
-only the yellow-core, yellow-council, yellow-review, and yellow-codex bats
-suites are required; other plugins' suites run `continue-on-error`. The 60s
-per-target schema SLO is checked by `report-metrics`, which is not in
-`ci-status` and does not block merge.
+Blocking jobs are exactly the `needs:` list of the `ci-status` aggregator in
+`validate-schemas.yml` — read the list there rather than from any doc. Inside
+`plugin-shell-tests`, only the yellow-core, yellow-council, yellow-review, and
+yellow-codex bats suites are required; other plugins' suites run
+`continue-on-error`. The 60s per-target schema SLO is checked by
+`report-metrics`, which is not in `ci-status` and does not block merge.
 
 Advisory: `codex-install-verification` installs the unpinned latest Codex CLI
 and checks named membership of every Codex-enabled plugin.
@@ -366,10 +374,8 @@ Three independent version numbers:
    emitted into `marketplace.json`. Neither the root `package.json` version nor
    any plugin version (see `catalog/README.md` “Versions”).
 
-Flow: plugin change + `.changeset/*.md` → Version PR (`pnpm version-packages`) →
-merge → `scripts/ci/release-tags.sh` (per-plugin tags + catalog tag) →
-`build-and-release` job (GitHub Release). Recovery:
-`gh workflow run version-packages.yml -f force_publish=true`.
+Release flow (changeset → Version PR → tags → GitHub Release) and recovery are
+documented in `docs/operations/versioning.md` and `docs/CLAUDE.md`.
 
 ### Host install paths
 
@@ -417,6 +423,9 @@ Hook I/O:
 - Stdin is a JSON envelope (`cwd`, `session_id`, `transcript_path`,
   `tool_input`, …).
 
+Summary only; each plugin's `catalog/plugins/<name>.json` hooks block and its
+`CLAUDE.md` are the source of truth.
+
 | Plugin          | SessionStart work                                                                                                        |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | yellow-core     | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                                                |
@@ -427,8 +436,10 @@ Hook I/O:
 | yellow-morph    | Prewarms morphmcp only; does not write `credential-status.json`.                                                         |
 | yellow-ruvector | Worktree store-heal (`.ruvector` symlink), embedder provenance check, budgeted recalls injected as `additionalContext`.  |
 
-Missing credential-status files are “unknown” to `/setup:all`, not a hard
-failure.
+A missing credential-status file is not a hard failure: yellow-research and
+yellow-semgrep classifications fall back to shell-env-only checks, so a fresh
+install with the shell variable already set can still classify as READY before
+its first SessionStart write populates the file.
 
 ### MCP and credentials
 
@@ -474,9 +485,12 @@ Any state other than `READY_GRAPHITE` / `READY_GITHUB` stops the workflow.
 Its per-provider steps are the ones `stack-operation-registry.js` names: one
 implementation per provider, or explicit `null` (stop).
 
-Untrusted data (PR bodies, `gh` JSON, routing cache, recalled memory) is fenced
-as `--- begin/end untrusted-content (reference only) ---` before it re-enters
-the prompt.
+Untrusted data (PR bodies, `gh` JSON, routing cache) is fenced as
+`--- begin/end untrusted-content (reference only) ---` before it re-enters the
+prompt. Recalled memory uses producer-specific fences instead: `/flow:work`'s
+optional `hooks_recall` step wraps findings in `<reflexion_context>` (`work.md`
+lines ~112–120); yellow-ruvector's `UserPromptSubmit` hook wraps recall output
+in `--- begin/end ruvector context ---` (`user-prompt-submit.sh` lines ~95–98).
 
 ### In-turn and background hooks
 
@@ -568,7 +582,7 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 | Stack not `READY_*`                 | stop; print router `detail` inside an untrusted fence                                                                                                                               |
 | Registry `null`                     | stop; never try the other provider or raw git/gh                                                                                                                                    |
 | ruvector recall timeout             | MCP-driven recalls wait ~500ms and retry once; hook recalls get one attempt, no retry; then continue without memory                                                                 |
-| Credential-status missing/malformed | `/setup:all` = unknown; suggest restart or disable/enable. Never read the keychain                                                                                                  |
+| Credential-status missing/malformed | `/setup:all` falls back to shell-env checks where a plugin defines one, else unknown; suggest restart. Never read the keychain                                                      |
 | `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                                                                                                                     |
 | Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                                                                                                             |
 | Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                            |
@@ -577,10 +591,8 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 
 ### Retry and timeout policy
 
-- Host hook timeouts are the hard ceiling. Each hook's timeout is declared in
-  `catalog/plugins/<name>.json`; at the time of writing: 1s ruvector tool and
-  `UserPromptSubmit` hooks, 3s SessionStart and PreCompact, 5s stack-provider
-  Bash hooks, Morph prewarm, and yellow-core Stop, 10s ruvector Stop.
+- Host hook timeouts are the hard ceiling. Each hook's timeout (1–10s) is
+  declared in `catalog/plugins/<name>.json`; read it there.
 - yellow-ci’s two `gh` calls share one 3s deadline minus a 400ms reserve; if
   budget is gone the call is skipped, not started.
 - ruvector: MCP-driven recalls (`/ruvector:learn`'s dedup check,

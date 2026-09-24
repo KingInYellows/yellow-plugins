@@ -198,7 +198,8 @@ command and its error, and in-flight branch, PR, and worktree names.
 
 ## Where to look next
 
-- How the pieces fit (catalog, generator, hooks, CI, release)? `docs/architecture-overview.md`
+- How the pieces fit (catalog, generator, hooks, CI, release)?
+  `docs/architecture-overview.md`
 - New plugin? `CONTRIBUTING.md` "Adding a Plugin" + `docs/plugin-template.md`
 - Plugin manifest issues? `docs/plugin-validation-guide.md`
 - A specific plugin's conventions? `plugins/<name>/CLAUDE.md`

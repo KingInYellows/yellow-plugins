@@ -81,30 +81,28 @@ function expectedFor(_label, canonical) {
   return canonical;
 }
 
+// Scans the whole file rather than line by line: Prettier's proseWrap can
+// split a claim like "19\nplugins" across two lines, and `\s+` spans the
+// newline. The reported line is the one where the number starts.
 function scanFile(filePath, canonical, mismatches) {
-  if (!fs.existsSync(filePath)) {
-    return;
-  }
-  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    for (const { regex, label } of PATTERNS) {
-      // Reset lastIndex per line to avoid stateful regex pitfalls.
-      regex.lastIndex = 0;
-      let match;
-      while ((match = regex.exec(line)) !== null) {
-        const found = parseInt(match[1], 10);
-        const expected = expectedFor(label, canonical);
-        if (found !== expected) {
-          mismatches.push({
-            file: path.relative(ROOT, filePath),
-            line: i + 1,
-            label,
-            found,
-            expected,
-            context: line.trim(),
-          });
-        }
+  const text = fs.readFileSync(filePath, 'utf8');
+  const lines = text.split(/\r?\n/);
+  for (const { regex, label } of PATTERNS) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const found = parseInt(match[1], 10);
+      const expected = expectedFor(label, canonical);
+      if (found !== expected) {
+        const lineIndex = text.slice(0, match.index).split('\n').length - 1;
+        mismatches.push({
+          file: path.relative(ROOT, filePath),
+          line: lineIndex + 1,
+          label,
+          found,
+          expected,
+          context: lines[lineIndex].trim(),
+        });
       }
     }
   }
@@ -113,6 +111,20 @@ function scanFile(filePath, canonical, mismatches) {
 function main() {
   const canonical = readMarketplaceCount();
   const mismatches = [];
+
+  // A missing SCAN_FILES entry is an error, not a skip: a renamed or deleted
+  // doc would otherwise silently drop out of the count check.
+  const missing = SCAN_FILES.filter(
+    (relPath) => !fs.existsSync(path.join(ROOT, relPath))
+  );
+  if (missing.length > 0) {
+    for (const relPath of missing) {
+      console.error(
+        `${colors.red}✗ ERROR:${colors.reset} ${relPath} is listed in SCAN_FILES but does not exist — update SCAN_FILES in scripts/validate-doc-counts.js`
+      );
+    }
+    process.exit(1);
+  }
 
   for (const relPath of SCAN_FILES) {
     scanFile(path.join(ROOT, relPath), canonical, mismatches);
