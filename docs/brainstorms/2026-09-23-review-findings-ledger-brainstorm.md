@@ -27,15 +27,17 @@ latest state ∈ {`open`, `reopened`, `applied`}, and every count, including
 `<pr>.pending`, uses that one definition. `report_only` records (human- or
 release-owned findings, P0s included) are never auto-applied but must not go
 invisible either, so they form a second "attention" count kept beside the
-pending count; the sweep summary and the SessionStart hook show both.
-`finding_id` is fixed at first observation (the fingerprint at that time,
-deterministic, never a random per-record ID) and never changes. Anchor content
-is versioned per observation instead: a later observation first tries an exact
-fingerprint match, then an alias rematch (same `file`, normalized `category`,
-`rule` and enclosing scope, anchor near the stored line hint and above a
-similarity threshold on the normalized lines) and reuses the original
-`finding_id`, so an edited anchor or a slightly varied recurrence still folds
-under the same key.
+pending count: latest state ∈ {`report_only`, `stale`}. `stale` entries are in
+it too, whatever their origin, because a finding whose anchor no longer matches
+needs a human look before it can be closed, and nothing else surfaces it. The
+sweep summary and the SessionStart hook show both counts. `finding_id` is fixed
+at first observation (the fingerprint at that time, deterministic, never a
+random per-record ID) and never changes. Anchor content is versioned per
+observation instead: a later observation first tries an exact fingerprint match,
+then an alias rematch (same `file`, normalized `category`, `rule` and enclosing
+scope, anchor near the stored line hint and above a similarity threshold on the
+normalized lines) and reuses the original `finding_id`, so an edited anchor or a
+slightly varied recurrence still folds under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -346,45 +348,56 @@ For `/flow:plan` to pick up, in dependency order:
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
-   `HEAD` to equal `headRefOid` before any edit (check it out through the
-   stacked-PR provider, as `review-pr.md` does, or refuse). Without that
-   checkout it re-verifies read-only against the PR head
-   (`git show <headRefOid>:<file>` after a fetch), never against an unrelated
-   worktree's `HEAD`. Then: read ledger, re-verify against that head SHA, mark
-   `stale` on mismatch, validate every stored `file` path before any `Read`,
-   `Edit` or shell use (repo-relative, no absolute paths, `..` traversal,
-   leading `-` or control characters; every character in the conservative
-   allowlist `[A-Za-z0-9._/@+-]` so shell metacharacters such as `$()`,
-   backticks, `;` or wildcards are rejected outright; and every command that
-   takes a path gets it as a separate argv element after `--`, never
-   interpolated into a shell string; the checked-out worktree entry itself must
-   be a regular file and not a symlink (`test -f` and `! test -L`, checked
-   before `realpath`), because the Git tree mode says nothing about what is on
-   disk; and a `realpath` inside the repo root so symlinks cannot escape; in the
-   read-only fallback the same lexical checks apply, but existence and file type
-   are checked against the target commit tree instead
-   (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
+   `HEAD` to equal `headRefOid` and a clean tree (`git status --porcelain`
+   empty, the same gate the review commands use) before any re-verification or
+   edit, so it never edits over, or mistakes for a fix, someone's uncommitted
+   work (check it out through the stacked-PR provider, as `review-pr.md` does,
+   or refuse). Without that checkout it re-verifies read-only against the PR
+   head (`git show <headRefOid>:<file>` after a fetch), never against an
+   unrelated worktree's `HEAD`. Every stored model-authored field (titles,
+   reasons, suggested fixes, which derive from an untrusted PR diff) goes
+   through the same delimiter substitution and untrusted-content fence, with the
+   reference-only instruction, before triage interprets it. Then: read ledger,
+   re-verify against that head SHA, mark `stale` on mismatch, validate every
+   stored `file` path before any `Read`, `Edit` or shell use (repo-relative, no
+   absolute paths, `..` traversal, leading `-` or control characters; every
+   character in the conservative allowlist `[A-Za-z0-9._/@+-]` so shell
+   metacharacters such as `$()`, backticks, `;` or wildcards are rejected
+   outright; and every command that takes a path gets it as a separate argv
+   element after `--`, never interpolated into a shell string; the checked-out
+   worktree entry itself must be a regular file and not a symlink (`test -f` and
+   `! test -L`, checked before `realpath`), because the Git tree mode says
+   nothing about what is on disk; and a `realpath` inside the repo root so
+   symlinks cannot escape; in the read-only fallback the same lexical checks
+   apply, but existence and file type are checked against the target commit tree
+   instead (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
    `git ls-tree`, never a symlink), so a file only the PR adds is not wrongly
    marked `stale`. A deletion finding keeps its recorded base blob only for
    anchor recovery; whether the PR still deletes the path is decided against the
-   current base (`gh pr view --json baseRefOid`, then
-   `git diff --name-status $(git merge-base <currentBase> <headRefOid>) <headRefOid>`
-   shows `D`), so a rebase onto a base that already lacks the file retires the
-   finding instead of keeping it actionable, and it is not marked `stale` just
-   because the head no longer has the file; reject the entry as `stale`
-   otherwise — reviewer paths are model-produced from PR content), attended =
-   apply each finding the human approves / `--non-interactive` = apply nothing
+   current base itself, not the merge base: the path must exist in the current
+   base tree (`git cat-file -e <currentBase>:<path>`, with `<currentBase>` from
+   `gh pr view --json baseRefOid`) and be absent at `<headRefOid>`. If the base
+   branch deleted the path on its own after the PR diverged, the merge base
+   would still hold it and wrongly report a deletion, so a base that already
+   lacks the file retires the finding instead of keeping it actionable, and it
+   is not marked `stale` just because the head no longer has the file; reject
+   the entry as `stale` otherwise — reviewer paths are model-produced from PR
+   content), attended = apply each finding the human approves, then the same
+   publication contract as `review-pr.md` (`applied` on edit, a second `applied`
+   carrying the fixing SHA once committed, `fixed` only after the ancestor check
+   confirms it is on the remote PR head) / `--non-interactive` = apply nothing
    (re-verify, mark `stale`, prune when the target PR is merged/closed),
    `--prune <pr>` = skip re-verify and apply; call
    `gh pr view <pr> --json state` and delete `<pr>.jsonl`, `<pr>.pending`, and
    `<pr>.state` only when state is `MERGED` or `CLOSED` (the only ledger
    deletion path — `/review:sweep-all` delegates here), append transition
-   records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
-   transitions for `reopened`; `applied`→`fixed` once the ancestor check shows
-   its fixing SHA is published, or `applied`→`dismissed` for an abandoned or
-   invalid fix; and for `report_only` once a human fixes or dismisses one or
-   re-verification finds it stale, without ever making it auto-applicable; never
-   rewrite finding rows), refresh `<pr>.pending` after each fold.
+   records (`open`/`reopened`/`report_only`→`applied` for an approved fix,
+   `open`→`fixed`/`dismissed`/`stale`, and the same terminal transitions for
+   `reopened`; `applied`→`fixed` once the ancestor check shows its fixing SHA is
+   published, or `applied`→`dismissed` for an abandoned or invalid fix; and for
+   `report_only` once a human fixes or dismisses one or re-verification finds it
+   stale, without ever making it auto-applicable; never rewrite finding rows),
+   refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
@@ -423,7 +436,11 @@ For `/flow:plan` to pick up, in dependency order:
    append, fold and sidecar replacement, so a sidecar is never older than the
    JSONL it describes unless a writer was interrupted. The sidecar stores both
    counts and the JSONL byte size they were computed from
-   (`<pending> <attention> <bytes>`); when the sidecar is missing or its size
+   (`<pending> <attention> <bytes>`). The hook reads that snapshot, the size
+   `stat` and any fallback fold under a shared `flock` on the same per-PR lock
+   with a short wait, so it cannot pair a pre-append size with a pre-append
+   sidecar while a writer is mid-update; if the lock is not free within its
+   budget it reports "pending unknown". When the sidecar is missing or its size
    doesn't match the JSONL's current size (one `stat`, immune to coarse mtime
    resolution), the hook folds that one file (bounded by its timeout) or reports
    "pending unknown" instead of trusting the count.
