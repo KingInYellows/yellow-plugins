@@ -662,7 +662,9 @@ Before publishing:
 
 - [ ] Regenerate from `catalog/` with `pnpm generate:manifests` (do not hand-edit `marketplace.json` or `plugin.json`)
 - [ ] Validate manifest: `node scripts/validate-plugin.js plugins/my-plugin`
-- [ ] Confirm the catalog source has no `permissions` key (`generate:manifests` silently drops it; CI's AJV check against `schemas/catalog-plugin.schema.json` rejects it)
+- [ ] Confirm the catalog source has no `permissions` key (`generate:manifests`
+      silently drops it; CI's AJV check against
+      `schemas/catalog-plugin.schema.json` rejects it)
 - [ ] Run `pnpm validate:schemas` (covers `setup/all.md` coverage and the root doc plugin counts)
 - [ ] Test installation locally
 - [ ] Create README.md with usage examples (optional but recommended)

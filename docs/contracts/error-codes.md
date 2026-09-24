@@ -867,8 +867,8 @@ constants: `SOL_SLUG_COLLISION`, `SOL_FRONTMATTER_INVALID`.
 `scripts/validate-plans.js` gates plans added or modified under
 `plans/complete/`. Catalog constant: `PLAN_STRAY_CHECKBOX`.
 
-| Code             | Meaning                                      |
-| ---------------- | -------------------------------------------- |
+| Code             | Meaning                                                |
+| ---------------- | ------------------------------------------------------ |
 | `ERROR-PLAN-001` | Stray unchecked task box (`- [ ]`) in an archived plan |
 
 ## Setup Coverage Errors (SETUP)
@@ -876,15 +876,15 @@ constants: `SOL_SLUG_COLLISION`, `SOL_FRONTMATTER_INVALID`.
 `scripts/validate-setup-all.js` gates `plugins/yellow-core/commands/setup/all.md`
 and its credential-status reference against the marketplace.
 
-| Code              | Constant                         | Meaning                                              |
-| ----------------- | -------------------------------- | ---------------------------------------------------- |
-| `ERROR-SETUP-001` | `SETUP_MISSING_MARKERS`          | Marker-delimited section missing                     |
-| `ERROR-SETUP-002` | `SETUP_COVERAGE_DRIFT`           | Plugin coverage does not match the marketplace       |
-| `ERROR-SETUP-003` | `SETUP_DELEGATION_DRIFT`         | Delegated command map does not match command files   |
-| `ERROR-SETUP-004` | `SETUP_ORDER_DRIFT`              | Dashboard plugin order does not match the delegated setup order |
-| `ERROR-SETUP-005` | `SETUP_PROBE_LIST_DRIFT`         | Step 1.5 ToolSearch probe list is inconsistent       |
-| `ERROR-SETUP-006` | `SETUP_CREDENTIAL_LIST_DRIFT`    | Credential-status plugin list does not match hooks   |
-| `ERROR-SETUP-007` | `SETUP_EXAMPLE_DRIFT`            | Dashboard example does not list every marketplace plugin |
+| Code              | Constant                      | Meaning                                                         |
+| ----------------- | ----------------------------- | --------------------------------------------------------------- |
+| `ERROR-SETUP-001` | `SETUP_MISSING_MARKERS`       | Marker-delimited section missing                                |
+| `ERROR-SETUP-002` | `SETUP_COVERAGE_DRIFT`        | Plugin coverage does not match the marketplace                  |
+| `ERROR-SETUP-003` | `SETUP_DELEGATION_DRIFT`      | Delegated command map does not match command files              |
+| `ERROR-SETUP-004` | `SETUP_ORDER_DRIFT`           | Dashboard plugin order does not match the delegated setup order |
+| `ERROR-SETUP-005` | `SETUP_PROBE_LIST_DRIFT`      | Step 1.5 ToolSearch probe list is inconsistent                  |
+| `ERROR-SETUP-006` | `SETUP_CREDENTIAL_LIST_DRIFT` | Credential-status plugin list does not match hooks              |
+| `ERROR-SETUP-007` | `SETUP_EXAMPLE_DRIFT`         | Dashboard example does not list every marketplace plugin        |
 
 ## Capability-Provider Errors (PROVIDER)
 
@@ -893,15 +893,15 @@ and its credential-status reference against the marketplace.
 integrity, and non-emission into generated artifacts). The runtime
 exactly-one-enabled rule is not one of these codes.
 
-| Code                 | Constant                          | Meaning                                      |
-| -------------------- | --------------------------------- | -------------------------------------------- |
-| `ERROR-PROVIDER-001` | `PROVIDER_DUPLICATE_ID`           | Duplicate provider id                        |
-| `ERROR-PROVIDER-002` | `PROVIDER_UNKNOWN_PLUGIN`         | Named plugin is not a Claude-enabled marketplace plugin, or has no `plugins/<name>/` directory |
-| `ERROR-PROVIDER-003` | `PROVIDER_METADATA_LEAKED`        | Provider metadata leaked into a generated artifact |
-| `ERROR-PROVIDER-004` | `PROVIDER_GROUP_UNDERPOPULATED`   | Capability group underpopulated              |
-| `ERROR-PROVIDER-005` | `PROVIDER_SETUP_SECTION_DRIFT`    | Setup section drifted from the provider group |
-| `ERROR-PROVIDER-006` | `PROVIDER_ROUTER_TABLE_DRIFT`     | Router table drifted from the provider group |
-| `ERROR-PROVIDER-007` | `PROVIDER_ARTIFACT_MISSING`       | Expected generated manifest for a provider plugin is missing |
+| Code                 | Constant                        | Meaning                                                                                        |
+| -------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `ERROR-PROVIDER-001` | `PROVIDER_DUPLICATE_ID`         | Duplicate provider id                                                                          |
+| `ERROR-PROVIDER-002` | `PROVIDER_UNKNOWN_PLUGIN`       | Named plugin is not a Claude-enabled marketplace plugin, or has no `plugins/<name>/` directory |
+| `ERROR-PROVIDER-003` | `PROVIDER_METADATA_LEAKED`      | Provider metadata leaked into a generated artifact                                             |
+| `ERROR-PROVIDER-004` | `PROVIDER_GROUP_UNDERPOPULATED` | Capability group underpopulated                                                                |
+| `ERROR-PROVIDER-005` | `PROVIDER_SETUP_SECTION_DRIFT`  | Setup section drifted from the provider group                                                  |
+| `ERROR-PROVIDER-006` | `PROVIDER_ROUTER_TABLE_DRIFT`   | Router table drifted from the provider group                                                   |
+| `ERROR-PROVIDER-007` | `PROVIDER_ARTIFACT_MISSING`     | Expected generated manifest for a provider plugin is missing                                   |
 
 ## Namespace Migration Errors (NAMESPACE)
 
@@ -923,16 +923,16 @@ Defined on `ERROR_CODES`. Not an `ErrorCategory` enum value.
 `scripts/` at this commit. `scripts/validate-versions.js` checks Cursor
 version and marketplace membership in prose; it does not emit these codes.
 
-| Code               | Constant                    | Meaning                                              |
-| ------------------ | --------------------------- | ---------------------------------------------------- |
-| `ERROR-CURSOR-001` | `CURSOR_ARTIFACT_MISSING`   | Generated Cursor manifest or marketplace file missing |
-| `ERROR-CURSOR-002` | `CURSOR_SCHEMA_VIOLATION`   | Cursor artifact failed schema or JSON checks         |
-| `ERROR-CURSOR-003` | `CURSOR_MARKETPLACE_DRIFT`  | Catalog constant only (see note above)               |
-| `ERROR-CURSOR-004` | `CURSOR_VERSION_DRIFT`      | Catalog constant only (see note above)               |
-| `ERROR-CURSOR-005` | `CURSOR_EXPOSURE_LEAK`      | Exposure lint found a disallowed construct           |
-| `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID`  | Catalog constant only (see note above)               |
-| `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`   | Generated artifact contains a `lifecycle` key        |
-| `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`      | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
+| Code               | Constant                   | Meaning                                                                       |
+| ------------------ | -------------------------- | ----------------------------------------------------------------------------- |
+| `ERROR-CURSOR-001` | `CURSOR_ARTIFACT_MISSING`  | Generated Cursor manifest or marketplace file missing                         |
+| `ERROR-CURSOR-002` | `CURSOR_SCHEMA_VIOLATION`  | Cursor artifact failed schema or JSON checks                                  |
+| `ERROR-CURSOR-003` | `CURSOR_MARKETPLACE_DRIFT` | Catalog constant only (see note above)                                        |
+| `ERROR-CURSOR-004` | `CURSOR_VERSION_DRIFT`     | Catalog constant only (see note above)                                        |
+| `ERROR-CURSOR-005` | `CURSOR_EXPOSURE_LEAK`     | Exposure lint found a disallowed construct                                    |
+| `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID` | Catalog constant only (see note above)                                        |
+| `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`  | Generated artifact contains a `lifecycle` key                                 |
+| `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`     | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
 
 ## Codex Distribution Errors (DIST)
 
@@ -1052,9 +1052,9 @@ interface DomainValidationError {
 
 ## Version History
 
-| Version | Date       | Changes                                   |
-| ------- | ---------- | ----------------------------------------- |
-| 1.0.0   | 2026-01-11 | Initial error catalog (I1.T3 deliverable) |
+| Version | Date       | Changes                                                                                                                             |
+| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-01-11 | Initial error catalog (I1.T3 deliverable)                                                                                           |
 | 1.1.0   | 2026-09-23 | Add SOL, PLAN, SETUP, PROVIDER, NAMESPACE, CURSOR, and DIST sections; add COMPAT-007; mark INST-008/009 as undefined in the catalog |
 
 ---
