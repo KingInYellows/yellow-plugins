@@ -242,9 +242,11 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 | Amend    | `/gt-amend` or `/smart-submit` | `/github-stack:amend` |
 
 1. **Sync.** **`/gt-sync`** pulls latest from trunk, restacks branches, and
-   cleans up merged PRs. **`/github-stack:sync`** pulls trunk and syncs the
-   local stack with `gh stack sync` (pruning merged branches needs
-   confirmation).
+   cleans up merged PRs. **`/github-stack:sync`** pulls trunk, cascade-rebases
+   the local stack onto it, and pushes every stack branch (`gh stack sync`
+   pushes atomically with `--force-with-lease`) before syncing PR state — it
+   updates remote branches, not just the local stack (pruning merged branches
+   needs confirmation).
 
 2. **Navigate.** **`/gt-nav`** visualizes the Graphite stack and moves between
    branches. **`/github-stack:nav`** checks out a stack number, PR, URL, or
