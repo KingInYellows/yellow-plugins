@@ -429,7 +429,9 @@ For `/flow:plan` to pick up, in dependency order:
    `applied`→`fixed` once the ancestor check (or its patch-id / content
    fallback) shows the fix is published; `applied`→`reopened` when the fix is
    abandoned or invalid (the edit was discarded or the commit dropped), because
-   the defect itself is still there; `dismissed` stays reserved for an explicit
+   the defect itself is still there; `dismissed`→`reopened` when a
+   re-observation shows the dismissal no longer applies (its anchored code or a
+   `depends_on` hash changed); `dismissed` stays reserved for an explicit
    decision that the finding is not actionable; and for `report_only` once a
    human fixes or dismisses one or re-verification finds it stale, without ever
    making it auto-applicable; never rewrite finding rows), refresh
