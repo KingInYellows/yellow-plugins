@@ -347,9 +347,11 @@ For `/flow:plan` to pick up, in dependency order:
    enclosing symbol or AST path the reviewer is looking at, e.g.
    `handlers.createUser`, or the nearest markdown heading), because a generic
    shell helper cannot derive scope reliably across languages. The helper
-   canonicalizes it before it enters the key: it keeps only the innermost symbol
-   name (`handlers.createUser` and `createUser` both become `createUser`),
-   accepts it only if that name actually occurs in the anchored file, and maps
+   canonicalizes it before it enters the key: it keeps the full dotted path of
+   enclosing symbols (`handlers.createUser` and `admin.createUser` stay
+   distinct), accepts a path only if each segment occurs in the anchored file,
+   expands a bare innermost name (`createUser`) to its full path only when that
+   name is unique in the file (otherwise the finding is `unscoped`), and maps
    generic values (`module`, `file`, `global`, `top-level`) and anything it
    cannot verify to `unscoped`; the converter also assigns `unscoped`. An
    `unscoped` finding has no reliable identity, so its fingerprint also includes
@@ -470,6 +472,14 @@ For `/flow:plan` to pick up, in dependency order:
 7. **Changeset** — a `yellow-review` `minor` changeset (`pnpm changeset`) for
    the new `/review:triage` command and SessionStart hook, as CI's changeset
    gate requires for any `plugins/` change.
+8. **Tests** — a Bats suite under `plugins/yellow-review/tests/` for the ledger
+   helper and the hook: concurrent writers under `flock`, fold and pending /
+   attention counts, tail repair (unparseable tail and missing newline), path
+   validation (traversal, metacharacters, symlinks, untracked files, deleted
+   files), every fingerprint fixture from step 1, tombstone and reopen, and the
+   hook's `systemMessage` JSON, stale-sidecar fallback and timeout ("pending
+   unknown"). Per AGENTS.md, the hook is also tested manually in a real session
+   before the PR merges.
 
 ## Open Questions
 
@@ -488,9 +498,10 @@ For `/flow:plan` to pick up, in dependency order:
 - Should the optional `plugin-contract-reviewer` extension fields
   (`breaking_change_class`, `migration_path`) be persisted in ledger entries, or
   dropped at write time since they're supplementary?
-- Testing/eval strategy for `/review:triage` itself (it's a new command with
-  real filesystem mutation and re-verification logic) — not addressed in this
-  brainstorm.
+- Eval coverage for `/review:triage`'s model-driven parts (re-verification
+  judgement, attended approval flow). The deterministic parts are covered by
+  stack step 8's Bats suite; the plan should decide whether the model-driven
+  parts get a `claude plugin eval` suite.
 - Fingerprint collision coverage: the initial per-category `rule` vocabulary,
   and a test that two distinct defects on the same statement (different `rule`)
   stay separate while one defect raised by two reviewers (same `rule`) merges.
