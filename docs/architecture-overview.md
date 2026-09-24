@@ -9,7 +9,8 @@ Root catalog version lives in `package.json` (catalog snapshot authority;
 `node scripts/catalog-version.js` bumps it on release). `pnpm validate:versions`
 checks per-plugin `package.json` ↔ generated manifest/marketplace drift only —
 it never reads the root catalog version. Toolchain: Node `>=22.22.0 <25`, pnpm
-`>=8` (CI pins Node `22.22.0` and pnpm `8.15.0`).
+`>=8` (primary CI pins Node `22.22.0` and pnpm `8.15.0`; the fork-PR workflow
+pins Node `22.22.3`).
 
 ---
 
@@ -226,9 +227,10 @@ plus generated host artifacts.
 
 Plugins are not published to npm. For most plugins, `plugins/*/package.json` is
 the Changesets version authority only. Exceptions: `yellow-cursor` and
-`yellow-goal` also define workspace `build` / `typecheck` / `test` scripts
-invoked by root CI; yellow-cursor additionally declares its runtime
-`@cursor/sdk` dependency.
+`yellow-goal` define workspace `build` / `typecheck` / `test` scripts invoked by
+root CI; yellow-cursor declares runtime `@cursor/sdk`; `yellow-morph` pins
+`@morphllm/morphmcp` for install into `CLAUDE_PLUGIN_DATA` via
+`lib/install-morphmcp.sh`.
 
 ### Authoring → generate → commit
 
@@ -268,8 +270,9 @@ pnpm lint && pnpm typecheck
 Primary workflow: `.github/workflows/validate-schemas.yml`.
 
 - Triggers: PR (path-filtered), push to `main`, `workflow_dispatch`.
-- Runners: GitHub-hosted `ubuntu-latest`. Fork PRs skipped. Codex live-install
-  also uses `windows-latest`.
+- Runners: GitHub-hosted `ubuntu-latest`. The primary workflow skips fork PRs;
+  `.github/workflows/validate-schemas-fork.yml` validates fork PRs on
+  `ubuntu-latest`. Codex live-install also uses `windows-latest`.
 - Token: workflow `contents: read`. `GITHUB_TOKEN` is passed into `pnpm install`
   so `@vscode/ripgrep` (via yellow-morph) can download from GitHub Releases.
 
@@ -280,8 +283,8 @@ Bats plugin-shell tests, goal-engine-compat, and a `ci-status` aggregator.
 Advisory: `codex-install-verification` installs the unpinned latest Codex CLI
 and checks named membership of every Codex-enabled plugin.
 
-Sibling workflows: `lint-plugins.yml`, `version-packages.yml`,
-`claude-code-review.yml`, `upstream-pins-advisory.yml`.
+Sibling workflows: `validate-schemas-fork.yml`, `lint-plugins.yml`,
+`version-packages.yml`, `claude-code-review.yml`, `upstream-pins-advisory.yml`.
 
 ### Containerization
 
@@ -339,14 +342,15 @@ Hook I/O:
   always.
 - Stdin is a JSON envelope (`cwd`, `session_id`, `transcript_path`, …).
 
-| Plugin                        | SessionStart work                                                                                           |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| yellow-core                   | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                                   |
-| yellow-ci                     | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`.                 |
-| yellow-debt                   | Scans `todos/debt/` for pending/ready high/critical findings; emits a `systemMessage` warning if any exist. |
-| research / semgrep / composio | Write `credential-status.json` (presence/source only).                                                      |
-| yellow-morph                  | SessionStart prewarms morphmcp only; credential-status is a follow-up.                                      |
-| yellow-ruvector               | Vector-store / MCP warmup.                                                                                  |
+| Plugin             | SessionStart work                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| yellow-core        | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                                                |
+| yellow-ci          | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`.                              |
+| yellow-debt        | Scans `todos/debt/` for pending/ready high/critical findings; emits a `systemMessage` warning if any exist.              |
+| yellow-research    | Write `credential-status.json`; disown Context7 `_lc_prewarm` (lockfile scan, HTTP library-ID resolution, cache update). |
+| semgrep / composio | Write `credential-status.json` (presence/source only).                                                                   |
+| yellow-morph       | SessionStart prewarms morphmcp only; credential-status is a follow-up.                                                   |
+| yellow-ruvector    | Vector-store / MCP warmup.                                                                                               |
 
 Missing credential-status files are “unknown” to `/setup:all`, not a hard
 failure.
