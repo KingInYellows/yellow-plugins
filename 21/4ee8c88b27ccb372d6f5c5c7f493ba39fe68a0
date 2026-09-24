@@ -1,0 +1,23 @@
+docs/CLAUDE.md
+  s_7dc42093ad5a67::t_2136ccc834b57d 93-97
+docs/operations/ci.md
+  s_7dc42093ad5a67::t_98d33b2bea5dc7 844-847
+docs/operations/versioning.md
+  s_7dc42093ad5a67::t_00f548be1245c3 55-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "214ee8c88b27ccb372d6f5c5c7f493ba39fe68a0",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
