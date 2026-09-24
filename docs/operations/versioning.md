@@ -52,7 +52,9 @@ pnpm release:check
 #    runs version-packages.yml again, which creates per-plugin tags
 #    (`<name>@<version>`), the root catalog tag (`v<catalog-version>`), and
 #    the GitHub Release. A manually pushed tag does not trigger that workflow.
-#    Recovery: gh workflow run version-packages.yml -f force_publish=true
+#    Recovery: follow the guarded procedure in release-checklist.md 5.2 (it
+#    pins the dispatch to the release merge); do not dispatch force_publish
+#    from a moved main.
 ```
 
 **Emergency manual release** (only when the bot cannot open the Version Packages

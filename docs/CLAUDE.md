@@ -90,10 +90,11 @@ recovery procedure (bot cannot open the PR) that always mirrors the bot's own
 `catalog-version.js` with `minor` or `major` is a separate, deliberate
 out-of-band catalog-snapshot decision, independent of any plugin release urgency
 — see `docs/operations/versioning.md` "Catalog Version Rules". Manual recovery
-when a publish run failed or logged "nothing to do":
-`gh workflow run version-packages.yml -f force_publish=true` — this is a
-recovery mechanism that can re-publish under a stale tag, not a routine command;
-read the warning in `docs/operations/release-checklist.md` Section 2.2 first.
+when a publish run failed or logged "nothing to do" is a `force_publish=true`
+dispatch, but never copy it bare: without `--ref` it builds the current `main`
+and can re-publish under a stale tag. Follow the guarded procedure in
+`docs/operations/release-checklist.md` Section 5.2, which pins the dispatch to
+the release merge.
 
 **Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
 it doesn't prompt users when a new version is available. Users can run

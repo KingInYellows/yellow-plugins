@@ -841,8 +841,10 @@ docker run --rm -v $(pwd):/workspace yellow-plugins-ci:latest pnpm test
 # Trigger validation workflow
 gh workflow run validate-schemas.yml
 
-# Trigger release workflow (recovery mode)
-gh workflow run version-packages.yml -f force_publish=true
+# Trigger release workflow (recovery mode): do not run this bare. Without
+# --ref it builds the current main; use the guarded procedure in
+# release-checklist.md 5.2, which dispatches with --ref "v<version>" when main
+# has moved.
 
 # List workflow runs
 gh run list --workflow=validate-schemas.yml
