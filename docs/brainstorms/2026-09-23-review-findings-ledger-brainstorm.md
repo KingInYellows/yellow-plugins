@@ -21,9 +21,14 @@ automatic application) that survives past the end of any `/review:pr`,
 Claude session touches the PR next. Triage never rewrites finding records: it
 appends `transition` records (`{finding_id, state, reason, head_sha, at}`), and
 every reader folds by `finding_id` and takes the latest state, so an earlier
-`open` record never reads as pending. `finding_id` is the fingerprint itself
-(deterministic, below), never a random per-record ID, so a re-observation and
-every later transition fold under the same key.
+`open` record never reads as pending. `finding_id` is fixed at first observation
+(the fingerprint at that time, deterministic, never a random per-record ID) and
+never changes. Anchor content is versioned per observation instead: a later
+observation first tries an exact fingerprint match, then an alias rematch (same
+`file` and normalized `category`, anchor near the stored line hint and above a
+similarity threshold on the normalized lines) and reuses the original
+`finding_id`, so an edited anchor or a slightly varied recurrence still folds
+under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -39,10 +44,13 @@ the shared clone's git dir, not a per-worktree path):
   accepted: lost if the clone is deleted, single-machine only.
 - **Owner & consumer:** a new `/review:triage` command (mirroring
   `/debt:triage`'s pending→ready→fixed lifecycle) is the only writer of
-  lifecycle transitions and the only pruner. It is not the only reader or
-  writer: `review-pr.md` also reads the ledger (dismissed-findings context) and
-  appends new finding records (Approach A). `/review:resolve` stays untouched —
-  GraphQL/GitHub-threads-only, as today.
+  lifecycle transitions and the only pruner, with one exception: when
+  `review-pr.md`'s write step re-observes a `fixed`, `stale`, or no-longer-
+  applicable `dismissed` finding, it appends the `reopened` transition itself,
+  so a direct `/review:pr` run never leaves a reproduced defect hidden. It is
+  also not the only reader or writer: `review-pr.md` reads the ledger
+  (dismissed-findings context) and appends new finding records (Approach A).
+  `/review:resolve` stays untouched — GraphQL/GitHub-threads-only, as today.
 - **Attended vs. unattended semantics:** the `safe_auto`/`gated_auto`/`manual`
   gate exists to protect _unattended_ runs (no human to catch a bad auto-apply).
   Attended `/review:triage` shows each verified finding with its proposed change
@@ -116,21 +124,24 @@ compound-staging's `cs_atomic_jsonl_write`) is called from two places in
 `review-pr.md`: before Step 5 dispatches the reviewers (alongside Step 3d's
 learnings pre-pass), it reads the ledger to build the dismissed-findings
 advisory block injected into reviewer prompts — Step 6 would be too late, since
-reviewers have already run; after Step 8 (code simplifier), it appends the final
-residual set (everything in Step 10's Residual Actionable Work plus the
-report-only queue, not only `owner=downstream-resolver`) with dedup applied. The
-compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
-shift lines, so the helper snapshots each finding's anchored code right after
-Step 6's aggregation (a hash for identity plus the normalized lines for
-rematching, with the lines passed through the same `redact_secrets` patterns
-before storage; if a line cannot be redacted safely, only the hash and the line
-hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
-before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
-findings, which only exist after Step 8, are anchored against the post-fix file.
-`/review:triage` is the only other component that touches the file (read +
-append transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
-changes: the Residual-count column, and `sweep.md` optionally invoking
-`/review:triage --non-interactive` at the end.
+reviewers have already run. The reader re-checks each dismissal's anchor and
+`depends_on` hashes against the current HEAD first and injects only those still
+applicable, so a stale rationale never talks reviewers out of a real finding;
+after Step 8 (code simplifier), it appends the final residual set (everything in
+Step 10's Residual Actionable Work plus the report-only queue, not only
+`owner=downstream-resolver`) with dedup applied. The compact-return schema keeps
+only `file` and `line`, and Step 7's auto-fixes can shift lines, so the helper
+snapshots each finding's anchored code right after Step 6's aggregation (a hash
+for identity plus the normalized lines for rematching, with the lines passed
+through the same `redact_secrets` patterns before storage; if a line cannot be
+redacted safely, only the hash and the line hint are kept, so an anchor on a
+hard-coded token never copies it into `.git`), before Step 7 edits anything. The
+Step 8 write uses those snapshots; simplifier findings, which only exist after
+Step 8, are anchored against the post-fix file. `/review:triage` is the only
+other component that touches the file (read + append transitions + prune).
+`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
+and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
+end.
 
 **Pros:**
 
@@ -286,6 +297,11 @@ For `/flow:plan` to pick up, in dependency order:
    (one `stat`, immune to coarse mtime resolution), the hook folds that one file
    (bounded by its timeout) or reports "pending unknown" instead of trusting the
    count.
+6. **Setup and docs** — `/review:setup` gains checks for the helper's new
+   binaries, `flock` and `realpath` (neither is guaranteed on macOS; `flock`
+   comes from util-linux or `brew install flock`), and yellow-review's README
+   and CLAUDE.md list them as prerequisites, so a missing binary fails at setup
+   rather than during review persistence.
 
 ## Open Questions
 
