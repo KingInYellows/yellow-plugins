@@ -24,14 +24,18 @@ every reader folds by `finding_id` and takes the latest state, so an earlier
 `open` record never reads as pending. `reopened` and `applied` (fixed locally,
 not yet pushed) project to pending exactly like `open`: the pending set is
 latest state ∈ {`open`, `reopened`, `applied`}, and every count, including
-`<pr>.pending`, uses that one definition. `finding_id` is fixed at first
-observation (the fingerprint at that time, deterministic, never a random
-per-record ID) and never changes. Anchor content is versioned per observation
-instead: a later observation first tries an exact fingerprint match, then an
-alias rematch (same `file`, normalized `category`, `rule` and enclosing scope,
-anchor near the stored line hint and above a similarity threshold on the
-normalized lines) and reuses the original `finding_id`, so an edited anchor or a
-slightly varied recurrence still folds under the same key.
+`<pr>.pending`, uses that one definition. `report_only` records (human- or
+release-owned findings, P0s included) are never auto-applied but must not go
+invisible either, so they form a second "attention" count kept beside the
+pending count; the sweep summary and the SessionStart hook show both.
+`finding_id` is fixed at first observation (the fingerprint at that time,
+deterministic, never a random per-record ID) and never changes. Anchor content
+is versioned per observation instead: a later observation first tries an exact
+fingerprint match, then an alias rematch (same `file`, normalized `category`,
+`rule` and enclosing scope, anchor near the stored line hint and above a
+similarity threshold on the normalized lines) and reuses the original
+`finding_id`, so an edited anchor or a slightly varied recurrence still folds
+under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -280,22 +284,25 @@ For `/flow:plan` to pick up, in dependency order:
    (`lib/compound-staging.sh`); when a snapshot line cannot be redacted safely,
    persist only its hash and the line hint so a secret echoed from the diff
    never lands in `.git` or gets re-injected into prompts; fingerprint function
-   (`file` + normalized `category` + `rule` + whitespace-normalized code-context
-   hash; line kept as a rematch hint, `reviewer` stored but not keyed),
-   dedup/state-check function, dismissed-findings reader (for context
-   injection), prune-on-close function that removes both `<pr>.jsonl` and
-   `<pr>.pending` under the PR's `flock` and leaves a `<pr>.closed` tombstone;
-   every writer takes that lock and, before appending, checks the tombstone and
-   rechecks the PR state (`gh pr view <pr> --json state`), refusing to write for
-   a closed PR, so a `/review:pr` run that outlives its PR cannot recreate a
-   pruned ledger; and a per-PR `findings/<pr>.pending` sidecar in the two-field
-   form `<count> <bytes>` (pending count and the JSONL byte size it was computed
-   from) refreshed after folding the JSONL by `finding_id` to latest state.
-   Include test fixtures for: two distinct defects on the same statement
-   (different `rule`, same `file`/`category`/anchor — must stay separate), one
-   defect raised by two reviewers (same `rule` — must merge), and a finding
-   whose line hint moves without the anchored code changing (rematch behavior).
-   This is the one piece everything else depends on.
+   (`file` + normalized `category` + `rule` + enclosing scope +
+   whitespace-normalized code-context hash; line kept as a rematch hint,
+   `reviewer` stored but not keyed), dedup/state-check function,
+   dismissed-findings reader (for context injection), prune-on-close function
+   that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock` and
+   leaves a `<pr>.closed` tombstone; every writer takes that lock and, before
+   appending, checks the tombstone and rechecks the PR state
+   (`gh pr view <pr> --json state`), refusing to write for a closed PR, so a
+   `/review:pr` run that outlives its PR cannot recreate a pruned ledger; and a
+   per-PR `findings/<pr>.pending` sidecar in the form
+   `<pending> <attention> <bytes>` (pending count, `report_only` attention
+   count, and the JSONL byte size they were computed from) refreshed after
+   folding the JSONL by `finding_id` to latest state. Include test fixtures for:
+   two distinct defects on the same statement (different `rule`, same
+   `file`/`category`/anchor — must stay separate), one defect raised by two
+   reviewers (same `rule` — must merge), the same `rule` in two different
+   enclosing scopes such as two identical handlers (must stay separate), and a
+   finding whose line hint moves without the anchored code changing (rematch
+   behavior). This is the one piece everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read before Step
    5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
    prompts, with delimiter substitution on every interpolated value); add the
@@ -359,14 +366,15 @@ For `/flow:plan` to pick up, in dependency order:
    `/review:triage <pr>`") instead of counting it. It then sums each open PR's
    `findings/<pr>.pending` sidecar (kept current by the ledger write step and
    `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
-   when the total is > 0 or at least one pending ledger is unverified, so
-   stale-cache ledgers are still named rather than silently dropped from a zero
-   total. Append-only JSONL stays non-empty after `fixed`/`dismissed`/`stale`
-   transitions — the hook must not treat file non-emptiness as pending findings.
-   Writers hold the per-PR `flock` across append, fold and sidecar replacement,
-   so a sidecar is never older than the JSONL it describes unless a writer was
-   interrupted. The sidecar stores the count and the JSONL byte size it was
-   computed from (`<count> <bytes>`); when the sidecar is missing or its size
+   when the pending or attention total is > 0 or at least one ledger is
+   unverified, so stale-cache ledgers are still named rather than silently
+   dropped from a zero total. Append-only JSONL stays non-empty after
+   `fixed`/`dismissed`/`stale` transitions — the hook must not treat file
+   non-emptiness as pending findings. Writers hold the per-PR `flock` across
+   append, fold and sidecar replacement, so a sidecar is never older than the
+   JSONL it describes unless a writer was interrupted. The sidecar stores both
+   counts and the JSONL byte size they were computed from
+   (`<pending> <attention> <bytes>`); when the sidecar is missing or its size
    doesn't match the JSONL's current size (one `stat`, immune to coarse mtime
    resolution), the hook folds that one file (bounded by its timeout) or reports
    "pending unknown" instead of trusting the count.

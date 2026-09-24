@@ -57,25 +57,28 @@ already-actionable guidance** for anyone running a sweep before the ledger and
 
 ## Guidance
 
-For an interactive `/review:pr` run without `--non-interactive`, define an
-attended run as one where a human reviews and explicitly approves each verified
-change before it is applied. This approval bypasses the default P0/P1
+Define an attended run as one where a human reviews and explicitly approves each
+verified change before it is applied. This approval bypasses the default P0/P1
 `safe_auto` gate for approved P2/P3, `gated_auto`, `manual`, and actionable
 `advisory` findings. Do not use this override inside the `--non-interactive`
 sweep loop that `/review:sweep` and `/review:sweep-all` invoke — those commands
 accept only one initial confirmation, then run with no per-change approval.
 
-The override applies in two places:
+Where it applies today:
 
-1. **Interactive `/review:pr`** — the default path already gates push (and
-   optional learning saves) through `AskUserQuestion`; extend that to cover each
-   residual P2/P3, `gated_auto`, `manual`, or actionable `advisory` finding the
-   human asks to fix.
-2. **The orchestrating session after a `/review:sweep-all` loop** — once every
-   PR has been swept non-interactively, the human can ask the session to fix
-   verified residuals. The session verifies each finding against current code,
-   shows the diff summary and validation results, and pushes only on the human's
-   go-ahead.
+1. **The orchestrating session after a `/review:pr` or `/review:sweep-all` run**
+   — once the review has run (non-interactively in a sweep), the human can ask
+   the session to fix verified residuals of any class. See the details below.
+2. **Not yet inside `/review:pr` itself.** Its Step 7 still auto-applies only
+   P0/P1 `safe_auto` findings and has no per-finding approval step for the other
+   classes. That approval flow is part of the planned `/review:triage` work
+   (brainstorm stack step 3). Until it ships, fix residuals from the
+   orchestrating session, not by expecting `/review:pr` to offer them.
+
+After a sweep: once every PR has been swept non-interactively, the human can ask
+the session to fix verified residuals. The session verifies each finding against
+current code, shows the diff summary and validation results, and pushes only on
+the human's go-ahead.
 
 Concretely, during the 2026-09-24 sweep follow-up: PR #840 had 9 of 10 residual
 findings applied and pushed in a single commit (doc accuracy fixes,
