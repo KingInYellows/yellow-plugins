@@ -119,11 +119,15 @@ graph TD
 #    a tag to trigger the workflow.
 ```
 
-**Emergency manual release** (only when the automated Version Packages PR path
-is unavailable): see `CONTRIBUTING.md` "Emergency manual release". That path
-applies changesets locally, bumps the catalog, merges directly to `main`, and
-uses `workflow_dispatch` with `force_publish=true` for recovery — it does not
-create a separate Version Packages PR to merge afterward.
+**Emergency manual release** (only when the bot cannot open the Version
+Packages PR): see `CONTRIBUTING.md` "Emergency manual release". That path runs
+`pnpm version-packages` on a hand-made branch, submits it through the enabled
+stacked-PR provider, and merges that PR to `main` — it never pushes to `main`
+directly. The merge publishes the same way as Phase 0 step 5. Do not create or
+push tags by hand before the merge: an existing `v<catalog-version>` tag makes
+the run log "nothing to do" and skip the GitHub Release. Run
+`gh workflow run version-packages.yml -f force_publish=true` only if that run
+failed or skipped publishing.
 
 See `docs/operations/versioning.md` for the complete developer workflow and
 semver bump rules.
@@ -148,25 +152,31 @@ semver bump rules.
   # Expected: "nothing to commit, working tree clean"
   ```
 
-- [ ] Current branch is `main` or designated release branch
+- [ ] Current branch is the Version Packages PR branch (automated path) or
+      your emergency release branch
 
   ```bash
+  gh pr checkout "$(gh pr list --search 'chore: version packages' --json number -q '.[0].number')"
   git branch --show-current
   ```
 
-- [ ] Local branch is up-to-date with remote
+- [ ] Local branch is up-to-date with its remote branch
 
   ```bash
   git fetch origin
   git status
-  # Expected: "Your branch is up to date with 'origin/main'"
+  # Expected: "Your branch is up to date with 'origin/<that branch>'"
   ```
 
-- [ ] All CI checks on latest commit are passing
+- [ ] `main` CI is green, and the branch passes the Section 2 local run
   ```bash
-  gh run list --limit 1 --branch main
+  gh run list --limit 1 --branch main --workflow validate-schemas.yml
   # Expected: "completed" status with "success" conclusion
   ```
+
+  `validate-schemas.yml` does not run on the bot-created Version Packages PR
+  (see `CONTRIBUTING.md` "Reviewing the Version Packages PR"), so there is no
+  PR CI run to check — Section 2's `pnpm release:check` is the branch gate.
 
 **Reference**: Section 4 directive - Repository state must be clean before
 tagging.
@@ -240,19 +250,19 @@ Section 4 security directives.
 
   ```bash
   pnpm validate:versions
-  # Expected: "[validate-versions] OK: 19 plugins — all versions in sync"
+  # Expected: "[validate-versions] OK: <N> plugins — all versions in sync"
   node -p "require('./package.json').version"
   # Expected: X.Y.Z matching intended release
   ```
 
-- [ ] Emergency manual path only (Section 5.2, no automated PR exists): apply
-      changesets and bump the catalog yourself
+- [ ] Emergency manual path only (no automated PR exists): run the same
+      version command the bot runs, on your release branch
 
   ```bash
-  pnpm apply:changesets
-  # Bumps plugins/*/package.json, syncs plugin.json + marketplace.json
+  pnpm version-packages
+  # apply:changesets (bumps plugins/*/package.json, syncs plugin.json +
+  # marketplace.json) + catalog-version.js patch + manifest snapshot refresh
   # Run: pnpm install after (lockfile changes)
-  node scripts/catalog-version.js minor   # or patch / major
   ```
 
 - [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's
@@ -316,9 +326,12 @@ Section 4 security directives.
   - Command: `pnpm validate:schemas`
   - Expected: ✅ 10 marketplace rules + 12 plugin rules all pass
 
-- [ ] **Documentation Linting**: Markdown and TOCs are valid
-  - Command: `pnpm docs:lint`
-  - Expected: ✅ doctoc + markdownlint report no errors
+- [ ] **Documentation Linting**: Markdown in changed docs is valid
+  - There is no `docs:lint` script and CI does not lint Markdown. Run the
+    `markdownlint-cli` devDependency directly on the docs this release
+    changed:
+    `pnpm exec markdownlint --config .markdownlint.json <changed .md files>`
+  - Expected: ✅ no new findings compared with `main`
 
 **Reference**: Section 4 directive - Validation job must complete in < 60
 seconds median.
@@ -728,28 +741,24 @@ Section 4 traceability enforcement.
   - `.github/releases.md` → FR-011, operational processes
   - README.md updates → FR-001..FR-013 (user-facing feature summary)
 - [ ] Verify 100% traceability maintained
-- [ ] Run doctoc to update table of contents
+- [ ] Run doctoc to update tables of contents in docs that have one (there is
+      no `docs:lint:toc` script; `doctoc` is a devDependency)
   ```bash
-  pnpm docs:lint:toc
+  pnpm exec doctoc <changed .md files with a doctoc TOC>
   ```
 
 ---
 
 ### 4.5 API Documentation
 
-**Objective**: Regenerate API docs if code changes occurred.
+**Objective**: Confirm no API-doc step is expected. Nothing in the release
+generates API docs.
 
 - [ ] Do not run `pnpm docs:build`
 
   Root `package.json` has no `docs:build` script. `typedoc` is a devDependency
   and is not wired to a script, so a missing `docs:build` is not a failed
   release step.
-
-- [ ] Verify API docs reflect current interfaces and types
-- [ ] Check for broken links in generated docs
-  ```bash
-  # Manual review or link checker if available
-  ```
 
 **Reference**: Section 4 documentation synchronization directive.
 
@@ -807,7 +816,16 @@ tagging conventions.
 > **Warning**: This section is for emergency recovery only. In normal releases,  
 > tags are created automatically by the workflow.
 
-**Only perform these steps if you must bypass the normal automated flow:**
+**Only perform these steps if you must bypass the normal automated flow.** Tag
+only after the release PR has merged: a `v<catalog-version>` tag that exists
+before the merge makes the merge's workflow run log "nothing to do" and skip
+the GitHub Release (see Phase 0 above).
+
+- [ ] Check out `main` at the merged release commit
+
+  ```bash
+  git checkout main && git pull --ff-only
+  ```
 
 - [ ] Create annotated tag locally
 
@@ -826,7 +844,9 @@ tagging conventions.
   git push origin "v$(node -p "require('./package.json').version")"
   ```
 
-- [ ] Trigger workflow with force_publish
+- [ ] Trigger workflow with force_publish (recovery mode skips the existing
+      catalog tag, creates any missing per-plugin tags, and publishes the
+      GitHub Release)
 
   ```bash
   gh workflow run version-packages.yml -f force_publish=true

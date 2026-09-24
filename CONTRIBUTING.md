@@ -66,7 +66,8 @@ Each plugin lives in `plugins/<name>/` and must contain:
 ```
 plugins/<name>/
   .claude-plugin/
-    plugin.json          # Required: name, description, version, author
+    plugin.json          # Generated from catalog/ + package.json; do not hand-edit
+  package.json           # name + version (version source of truth)
   CLAUDE.md              # Plugin context and conventions
   README.md              # User-facing documentation
   commands/              # Slash commands (*.md)
@@ -77,15 +78,25 @@ plugins/<name>/
 ### Adding a Plugin
 
 1. Create the directory structure above, plus `plugins/<name>/package.json`
-   (version source of truth)
-2. Add `catalog/plugins/<name>.json` and append `<name>` to `pluginOrder` in
-   `catalog/catalog.json`. Do not hand-edit `.claude-plugin/plugin.json` or
-   `.claude-plugin/marketplace.json`
+   with `"name": "<name>"` and a semver `version` (version source of truth;
+   the generator fails if `name` differs from the catalog name)
+2. Add `catalog/plugins/<name>.json` with every required key (`$schema`,
+   `description`, `author`, `homepage`, `repository`, `license`, `keywords`,
+   `marketplace`, and `targets` of
+   `{"claude": true, "codex": {"enabled": false}}` — without
+   `targets.claude: true` no manifest is emitted), and append `<name>` to
+   `pluginOrder` in `catalog/catalog.json`. Do not hand-edit
+   `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`
 3. Run `pnpm generate:manifests`. It emits
    `plugins/<name>/.claude-plugin/plugin.json` and the marketplace entry
    (`source` `./plugins/<name>`). See `catalog/README.md`
-4. Add a README with install command, prerequisites, and component tables
-5. Validate: `pnpm validate:schemas`
+4. Add the plugin to `plugins/yellow-core/commands/setup/all.md` (sections
+   listed in the header of `scripts/validate-setup-all.js`) and update the
+   "N plugins" counts in `CLAUDE.md`, `README.md`, `CONTRIBUTING.md`, and
+   `AGENTS.md` — `validate-setup-all.js` and `validate-doc-counts.js` fail
+   otherwise
+5. Add a README with install command, prerequisites, and component tables
+6. Validate: `pnpm validate:schemas`
 
 See `docs/plugin-validation-guide.md` for detailed validation rules.
 
@@ -216,22 +227,40 @@ verification gate before merging.
 
 ### Emergency manual release
 
-> **Note**: Tags are for release tracking only and do **not** trigger the workflow.  
-> The workflow triggers on push to `main` or manual `workflow_dispatch`.
+Use this only when the bot cannot open the Version Packages PR. It produces
+the same commit by hand, and still releases through a reviewed PR — nothing
+is pushed straight to `main`.
+
+> **Note**: Tags do **not** trigger the workflow. `version-packages.yml`
+> triggers on push to `main` or manual `workflow_dispatch`. Do not create or
+> push tags by hand: when the merge lands, the workflow sees no pending
+> changesets and checks whether `v<catalog-version>` exists. If it already
+> exists, the run logs "nothing to do" and publishes no GitHub Release.
 
 ```bash
-pnpm apply:changesets         # bumps plugin versions + syncs manifests
-node scripts/catalog-version.js patch   # bumps root catalog version
-git add -A
-git commit -m "chore: version packages"
-gt submit --no-interactive    # submits this branch; does not start version-packages.yml unless the push is to main
-pnpm tag                      # creates per-plugin git tags for tracking
-git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # push tags for tracking (tag push — not managed by Graphite)
+# On a new branch created with the enabled stacked-PR provider:
+pnpm version-packages         # same command the bot runs: apply changesets,
+                              # sync manifests, catalog-version.js patch,
+                              # refresh the manifest snapshot
+pnpm install                  # pick up lockfile changes, if any
+# Commit, then submit through the enabled provider
+# (gt submit --no-interactive on Graphite, /github-stack:submit on GitHub).
+# Get the PR reviewed and merge it to main.
 
-# If the automated workflow failed and you need manual recovery:
+# The merge's push to main runs version-packages.yml. With no pending
+# changesets and no v<catalog-version> tag, it runs scripts/ci/release-tags.sh
+# (per-plugin tags + catalog tag) and build-and-release (GitHub Release).
+gh run list --workflow=version-packages.yml --limit 1
+gh release view "v$(node -p "require('./package.json').version")"
+
+# Recovery, from main, only if that run failed or logged "nothing to do":
 gh workflow run version-packages.yml -f force_publish=true
 ```
+
+`force_publish=true` skips phase detection and runs `release-tags.sh` in
+recovery mode: it tolerates a catalog tag that already exists, and
+`changeset tag` skips per-plugin tags that exist, so it is safe after a
+partial run.
 
 ### Note on auto-updates (GitHub issue #26744)
 

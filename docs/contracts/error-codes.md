@@ -1,6 +1,6 @@
 # Error Codes Reference
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Specification
+**Document Version**: 1.1.0 **Last Updated**: 2026-09-23 **Specification
 Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 `packages/domain/src/validation/errorCatalog.ts`
 
@@ -11,9 +11,16 @@ Reference**: Section 4.0 Essential Error Handling, Appendix F **Source**:
 This document provides a comprehensive catalog of all error codes used in the
 Claude Code Plugin Marketplace. The original six categories (`SCHEMA` through
 `NET`) map directly to specification requirements (`FR-*`, `CRIT-*`
-identifiers). Later categories (`SOL` through `CURSOR`) are owned by validator
-scripts and `errorCatalog.ts` without FR/CRIT ids. All categories share the same
+identifiers). The later categories (`SOL`, `PLAN`, `SETUP`, `PROVIDER`,
+`NAMESPACE`, `CURSOR`, `DIST`) have no FR/CRIT ids. All of them except `DIST`
+are emitted by validator scripts under `scripts/`; nothing under `scripts/`
+emits `ERROR-DIST-*` yet. All categories share the same
 `ERROR-{CATEGORY}-{NUMBER}` format for consistent handling.
+
+Every validator script that emits these codes exits `1` when it reports any
+finding, so a single code fails its CI step. The one soft exit:
+`scripts/validate-plans.js` exits `0` without checking when its diff base ref
+is unreachable.
 
 ### Error Code Format
 
@@ -460,6 +467,23 @@ Missing: git-integration
 
 ---
 
+### ERROR-COMPAT-007: Node.js Version Too High
+
+**Severity**: ERROR **Category**: COMPATIBILITY **Spec Reference**: CRIT-019
+
+**Description**: The running Node.js version is above the plugin's maximum
+supported version. `compatibilityError('nodeMax', …)` in `errorCatalog.ts`
+returns this code (constant `COMPAT_NODE_VERSION_HIGH`). It is numbered after
+`006` because it was added later, not in requirement order.
+
+**Resolution**:
+
+- Switch to a Node.js version inside the plugin's supported range
+- Check the maximum Node.js version the plugin declares (reported at
+  `/compatibility/nodeMax`)
+
+---
+
 ## Installation Errors (INST)
 
 ### ERROR-INST-001: Plugin Not Found
@@ -604,6 +628,10 @@ Output: "Error: Missing dependency 'jq'"
 **Spec Reference**: CRIT-004, CRIT-011  
 **Operational Reference**: `docs/operations/uninstall.md#lifecycle-hooks`
 
+**Status**: Not defined in `errorCatalog.ts` `ERROR_CODES`, and nothing in the
+repository emits it. Kept for the uninstall flow described in
+`docs/operations/uninstall.md`.
+
 **Description**:  
 Uninstall command detected a lifecycle uninstall script that has not been
 reviewed or whose digest no longer matches the consented version.
@@ -629,6 +657,10 @@ reviewed or whose digest no longer matches the consented version.
 **Spec Reference**: FR-010, CRIT-011  
 **Operational Reference**:
 `docs/operations/uninstall.md#fr-010-cache-purge-errors`
+
+**Status**: Not defined in `errorCatalog.ts` `ERROR_CODES`, and nothing in the
+repository emits it. Kept for the uninstall flow described in
+`docs/operations/uninstall.md`.
 
 **Description**:  
 Cache retention policy failed to remove one or more versions during uninstall
@@ -848,7 +880,7 @@ and its credential-status reference against the marketplace.
 | `ERROR-SETUP-001` | `SETUP_MISSING_MARKERS`          | Marker-delimited section missing                     |
 | `ERROR-SETUP-002` | `SETUP_COVERAGE_DRIFT`           | Plugin coverage does not match the marketplace       |
 | `ERROR-SETUP-003` | `SETUP_DELEGATION_DRIFT`         | Delegated command map does not match command files   |
-| `ERROR-SETUP-004` | `SETUP_ORDER_DRIFT`              | Plugin order does not match the marketplace          |
+| `ERROR-SETUP-004` | `SETUP_ORDER_DRIFT`              | Dashboard plugin order does not match the delegated setup order |
 | `ERROR-SETUP-005` | `SETUP_PROBE_LIST_DRIFT`         | Step 1.5 ToolSearch probe list is inconsistent       |
 | `ERROR-SETUP-006` | `SETUP_CREDENTIAL_LIST_DRIFT`    | Credential-status plugin list does not match hooks   |
 | `ERROR-SETUP-007` | `SETUP_EXAMPLE_DRIFT`            | Dashboard example does not list every marketplace plugin |
@@ -905,18 +937,20 @@ version and marketplace membership in prose; it does not emit these codes.
 
 `ErrorCategory.DISTRIBUTION`. Values live in
 `packages/domain/src/validation/error-codes.json` and are spread into
-`ERROR_CODES`. `scripts/validate-codex.js` does not read that registry.
+`ERROR_CODES`. No script under `scripts/` emits these codes yet —
+`scripts/validate-codex.js` does not read that registry. Meanings are from
+R14 of `plans/specs/claude-code-codex-plugin-pilot.md`.
 
-| Code             | Constant                                  |
-| ---------------- | ----------------------------------------- |
-| `ERROR-DIST-001` | `DIST_MALFORMED_CATALOG_SOURCE`           |
-| `ERROR-DIST-002` | `DIST_INVENTORY_ORDER_MISMATCH`           |
-| `ERROR-DIST-003` | `DIST_GENERATED_ARTIFACT_DRIFT`           |
-| `ERROR-DIST-004` | `DIST_INVALID_GENERATED_MANIFEST`         |
-| `ERROR-DIST-005` | `DIST_UNSUPPORTED_SURFACE_EXPOSED`        |
-| `ERROR-DIST-006` | `DIST_HOOK_CONTRACT_VIOLATION`            |
-| `ERROR-DIST-007` | `DIST_WINDOWS_PATH_PORTABILITY_FAILURE`   |
-| `ERROR-DIST-008` | `DIST_MCP_AUTH_CONFIG_FAILURE`            |
+| Code             | Constant                                  | Meaning                                  |
+| ---------------- | ----------------------------------------- | ---------------------------------------- |
+| `ERROR-DIST-001` | `DIST_MALFORMED_CATALOG_SOURCE`           | Malformed catalog source                 |
+| `ERROR-DIST-002` | `DIST_INVENTORY_ORDER_MISMATCH`           | Inventory or order mismatch              |
+| `ERROR-DIST-003` | `DIST_GENERATED_ARTIFACT_DRIFT`           | Generated-artifact drift                 |
+| `ERROR-DIST-004` | `DIST_INVALID_GENERATED_MANIFEST`         | Invalid generated manifest               |
+| `ERROR-DIST-005` | `DIST_UNSUPPORTED_SURFACE_EXPOSED`        | Unsupported surface exposed to Codex     |
+| `ERROR-DIST-006` | `DIST_HOOK_CONTRACT_VIOLATION`            | Hook contract violation                  |
+| `ERROR-DIST-007` | `DIST_WINDOWS_PATH_PORTABILITY_FAILURE`   | Windows or path portability failure      |
+| `ERROR-DIST-008` | `DIST_MCP_AUTH_CONFIG_FAILURE`            | MCP or auth configuration failure        |
 
 ## Error Handling Best Practices
 
@@ -964,6 +998,7 @@ version and marketplace membership in prose; it does not emit these codes.
 | -------------------------------- | -------------- | ------------------------------- |
 | COMPAT-001/002                   | CRIT-002b      | Claude Code version constraints |
 | COMPAT-003/004/005/006           | CRIT-005       | Platform/dependency validation  |
+| COMPAT-007                       | CRIT-019       | Node.js maximum version         |
 | INST-001/002/003/004/005/006/007 | CRIT-007       | Installation error handling     |
 | DISC-004                         | CRIT-008       | Changelog fallback logic        |
 | INST-006                         | CRIT-010       | Lifecycle script execution      |
@@ -1019,8 +1054,11 @@ interface DomainValidationError {
 | Version | Date       | Changes                                   |
 | ------- | ---------- | ----------------------------------------- |
 | 1.0.0   | 2026-01-11 | Initial error catalog (I1.T3 deliverable) |
+| 1.1.0   | 2026-09-23 | Add SOL, PLAN, SETUP, PROVIDER, NAMESPACE, CURSOR, and DIST sections; add COMPAT-007; mark INST-008/009 as undefined in the catalog |
 
 ---
 
-**For Updates**: This document is generated from
-`packages/domain/src/validation/errorCatalog.ts`.
+**For Updates**: This document is maintained by hand. The codes themselves are
+defined in `packages/domain/src/validation/errorCatalog.ts` and
+`packages/domain/src/validation/error-codes.json`; update this file when either
+changes.

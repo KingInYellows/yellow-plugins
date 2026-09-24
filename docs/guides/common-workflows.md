@@ -18,8 +18,10 @@ Only **yellow-core** is required. It provides the foundational workflow commands
 /plugin marketplace add KingInYellows/yellow-plugins
 ```
 
-Installs all 19 plugins. Each plugin degrades gracefully when dependencies are
-missing — commands report what's unavailable rather than failing silently.
+Makes every marketplace plugin available to install; install the ones you
+want with `/plugin install <name>@yellow-plugins`. Each plugin degrades
+gracefully when dependencies are missing — commands report what's unavailable
+rather than failing silently.
 
 ### Plugin Dependencies
 
@@ -29,10 +31,11 @@ missing — commands report what's unavailable rather than failing silently.
 | yellow-review | yellow-core (cross-plugin agents) | Only yellow-review's own agents run |
 | yellow-debt | yellow-linear (for `/debt:sync`) | Cannot push findings to Linear |
 | yellow-ci | gh CLI | All commands fail with auth error |
-| yellow-devin | `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` | Delegation commands fail |
+| yellow-cursor | `CURSOR_API_KEY` or a stored `cursor auth login` | Cursor delegation commands fail (preferred `remote-agent` provider) |
+| yellow-devin | `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` | Devin delegation commands fail (legacy `remote-agent` provider) |
 | yellow-linear | Linear OAuth | Issue commands fail |
 | gt-workflow | Graphite CLI | All commands fail |
-| github-workflow | `gh` stack CLI, and `/stack:status` `READY_GITHUB` | `/github-stack:*` commands are unavailable |
+| github-workflow | `gh` CLI with the `github/gh-stack` extension (checked by `/github-stack:setup`), and `/stack:status` `READY_GITHUB` | `/github-stack:*` commands are unavailable |
 | yellow-ruvector | None | — |
 | yellow-research | None | — |
 | yellow-browser-test | None | — |
@@ -68,13 +71,13 @@ The most common workflow chain. Use for any feature implementation. Run
 
 `READY_GRAPHITE`:
 
-```bash
+```text
 /flow:brainstorm → /flow:plan → /gt-stack-plan → /flow:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
 ```
 
 `READY_GITHUB`:
 
-```bash
+```text
 /flow:brainstorm → /flow:plan → /flow:work → /github-stack:submit → /review:pr → /review:resolve → /linear:sync
 ```
 
@@ -119,13 +122,13 @@ feature the way `/gt-stack-plan` does, and there is no GitHub equivalent of
 
 `READY_GRAPHITE` (yellow-core + gt-workflow):
 
-```bash
+```text
 /flow:plan → /flow:work <plan-path> → /smart-submit
 ```
 
 `READY_GITHUB` (yellow-core + github-workflow):
 
-```bash
+```text
 /flow:plan → /flow:work <plan-path> → /github-stack:submit
 ```
 
@@ -146,7 +149,7 @@ Triggered automatically when a session starts and CI failures are detected.
 
 ### Chain
 
-```bash
+```text
 SessionStart auto-detect → /ci:diagnose → /ci:report-linear → /linear:delegate
 ```
 
@@ -179,7 +182,7 @@ needing Linear.
 
 ### Single PR
 
-```bash
+```text
 /review:pr [PR# | URL | branch] → /review:resolve
 ```
 
@@ -191,7 +194,7 @@ needing Linear.
 
 ### Full Stack
 
-```bash
+```text
 /review:all stack
 ```
 
@@ -200,7 +203,7 @@ goes through: review (compounding runs inside review:pr) → resolve → restack
 
 ### Batch Review
 
-```bash
+```text
 /review:all all
 ```
 
@@ -214,7 +217,7 @@ Reviews all your open non-draft PRs.
 
 ### Manual Capture
 
-```bash
+```text
 /flow:compound [brief context]
 ```
 
@@ -241,13 +244,13 @@ files in the review. The step is skipped if no P1 or P2 findings were reported.
 
 `READY_GRAPHITE`:
 
-```bash
+```text
 /gt-sync → /gt-nav → /gt-amend or /smart-submit
 ```
 
 `READY_GITHUB`:
 
-```bash
+```text
 /github-stack:sync → /github-stack:nav → /github-stack:amend
 ```
 

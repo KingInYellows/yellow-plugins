@@ -190,5 +190,6 @@ Plugins that intentionally do NOT emit this file:
 - yellow-linear, yellow-codex (OAuth flows — status is ToolSearch-visibility,
   not credential-presence)
 
-yellow-chatprd is not a current plugin. It was removed from the marketplace
-in yellow-core 1.20.2 and is not in `catalog/catalog.json` `pluginOrder`.
+yellow-chatprd is not a current plugin. It had already been removed from the
+marketplace when yellow-core 1.20.2 dropped it from `/setup:all` coverage, and
+it is not in `catalog/catalog.json` `pluginOrder`.

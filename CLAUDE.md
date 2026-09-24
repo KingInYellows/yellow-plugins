@@ -132,8 +132,9 @@ the colon.
    `lint-plugins.yml` convention lint. See AGENTS.md's Targeted
    Validation Matrix for the rest.
 2. Run `pnpm changeset` and commit the file — CI blocks the PR without it.
-3. Adding or removing a plugin: update `.claude-plugin/marketplace.json` AND
-   `plugins/yellow-core/commands/setup/all.md` together, or
+3. Adding or removing a plugin: update `catalog/` (then
+   `pnpm generate:manifests` regenerates `.claude-plugin/marketplace.json`)
+   AND `plugins/yellow-core/commands/setup/all.md` together, or
    `validate-setup-all.js` fails.
 4. Update the plugin's `README.md` and `CLAUDE.md` if behaviour changed.
 
