@@ -1,0 +1,21 @@
+docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md
+  s_7dc42093ad5a67::t_cfbd092d46d299 303-305,321-340
+docs/solutions/code-quality/resolver-edit-prettier-regression-dirty-baseline.md
+  s_7dc42093ad5a67::t_9d41e6f183b39c 40-41,43,95-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "834b568943612b8b3ea3f7cb50df50c79bc5f368",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
