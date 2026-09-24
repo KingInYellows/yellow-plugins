@@ -14,7 +14,11 @@ evaporates with the transcript.
 A durable, append-only JSONL ledger of residual review findings (`autofix_class`
 ∈ `{gated_auto, manual}`, `owner=downstream-resolver`) that survives past the
 end of any `/review:pr`, `/review:sweep`, or `/review:sweep-all` run —
-regardless of which worktree or Claude session touches the PR next.
+regardless of which worktree or Claude session touches the PR next. Triage never
+rewrites finding records: it appends `transition` records
+(`{finding_id, state, reason, head_sha, at}`), and every reader folds by
+`finding_id` and takes the latest state, so an earlier `open` record never reads
+as pending.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -29,8 +33,9 @@ the shared clone's git dir, not a per-worktree path):
   prompt (anthropics/claude-code#41156) blocking unattended writes. Trade-offs
   accepted: lost if the clone is deleted, single-machine only.
 - **Owner & consumer:** a new `/review:triage` command (mirroring
-  `/debt:triage`'s pending→ready→fixed lifecycle) exclusively reads, mutates,
-  and prunes the ledger. `/review:resolve` stays untouched —
+  `/debt:triage`'s pending→ready→fixed lifecycle) exclusively reads the ledger,
+  appends transition records, and prunes closed PR files. `/review:resolve`
+  stays untouched —
   GraphQL/GitHub-threads-only, as today.
 - **Attended vs. unattended semantics:** the `safe_auto`/`gated_auto`/`manual`
   gate exists to protect _unattended_ runs (no human to catch a bad auto-apply).
@@ -80,7 +85,7 @@ yellow-debt's `lib/validate.sh` — atomic `flock`-guarded append,
 top of Step 6, it reads the ledger to build the dismissed-findings advisory
 block injected into reviewer prompts; after Step 6.9's partition, it appends new
 `owner=downstream-resolver` findings with dedup applied. `/review:triage` is the
-only other component that touches the file (read + mutate + prune).
+only other component that touches the file (read + append transitions + prune).
 `sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
 and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
 end.
@@ -193,9 +198,10 @@ For `/flow:plan` to pick up, in dependency order:
    only, refreshing `<pr>.pending` after each append.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: read ledger, re-verify against HEAD SHA, mark `stale` on mismatch,
-   attended = attempt all / `--non-interactive` = safe-only, write back state
-   transitions (`open`→`fixed`/`dismissed`/`stale`), refresh `<pr>.pending` after
-   each fold, prune when PR is observed merged/closed.
+   attended = attempt all / `--non-interactive` = safe-only, append transition
+   records (`open`→`fixed`/`dismissed`/`stale`; never rewrite finding rows),
+   refresh `<pr>.pending` after each fold, prune when PR is observed
+   merged/closed.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step.
