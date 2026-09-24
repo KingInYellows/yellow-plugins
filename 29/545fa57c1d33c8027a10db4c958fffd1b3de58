@@ -1,0 +1,41 @@
+docs/CLAUDE.md
+  s_7dc42093ad5a67::t_4e7c3aaa82817a 86-90
+  s_7dc42093ad5a67::t_0688b3d0085b0e 91-93
+docs/operations/versioning.md
+  s_7dc42093ad5a67::t_14f27d17253fd5 136-138,142-145
+  s_7dc42093ad5a67::t_d6f31541d47430 139-141
+docs/operations/release-checklist.md
+  s_7dc42093ad5a67::t_b3f5e4bea633ca 894,897,899,907-908,911
+  s_7dc42093ad5a67::t_1f3da5b866eb88 895-896
+docs/guides/common-workflows.md
+  s_7dc42093ad5a67::t_b7801c62e3c3df 137-140
+  s_7dc42093ad5a67::t_4586b8f214b16a 113-115
+  s_7dc42093ad5a67::t_9842522de6a59a 259-263
+  s_7dc42093ad5a67::t_47d48dbef92052 106-111,116-120
+  s_7dc42093ad5a67::t_0523d599fa6eb3 89-90
+  s_7dc42093ad5a67::t_4774e4a76899a2 72-77,79-81
+  s_7dc42093ad5a67::t_1a72d8de907844 78,87-88
+  s_7dc42093ad5a67::t_69dcb158a815c5 91,112
+CONTRIBUTING.md
+  s_7dc42093ad5a67::t_a0fcba181f9514 260-262
+  s_7dc42093ad5a67::t_2f20f6c6fa499b 283-285
+  s_7dc42093ad5a67::t_9d91101281bd48 303-305,307-318
+  s_7dc42093ad5a67::t_a7dfd527e4a6c2 263-266
+  s_7dc42093ad5a67::t_100f846d5f572e 319-320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "29545fa57c1d33c8027a10db4c958fffd1b3de58",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
