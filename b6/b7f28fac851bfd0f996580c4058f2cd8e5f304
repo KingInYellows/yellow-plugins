@@ -1,0 +1,23 @@
+docs/architecture-overview.md
+  s_7dc42093ad5a67::t_127b0ca5dcedc1 579
+scripts/validate-doc-counts.js
+  s_7dc42093ad5a67::t_8704147cbd8109 49-52,54-58
+tests/integration/validate-doc-counts.test.ts
+  s_7dc42093ad5a67::t_485cf7e9c584a5 191-203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b6b7f28fac851bfd0f996580c4058f2cd8e5f304",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
