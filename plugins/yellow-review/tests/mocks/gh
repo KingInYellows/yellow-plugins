@@ -52,6 +52,16 @@ case "$ALL_ARGS" in
     printf 'already resolved' >&2
     exit 1
     ;;
+  *"pr view "*)
+    # Review-ledger PR metadata. MOCK_GH_FAIL=1 simulates an unreachable
+    # API; the state and OIDs come from the environment.
+    if [ "${MOCK_GH_FAIL:-0}" = 1 ]; then
+      printf 'mock gh: pr view failed\n' >&2
+      exit 1
+    fi
+    printf '{"state":"%s","headRefOid":"%s","baseRefOid":"%s"}\n' \
+      "${MOCK_GH_PR_STATE:-OPEN}" "${MOCK_GH_HEAD_OID:-}" "${MOCK_GH_BASE_OID:-}"
+    ;;
   *)
     printf 'Mock gh: unhandled arguments: %s\n' "$ALL_ARGS" >&2
     printf 'Available mock patterns:\n' >&2
@@ -64,6 +74,7 @@ case "$ALL_ARGS" in
     printf '  PRRT_valid  → resolve-success-response.json\n' >&2
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
+    printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
     exit 1
     ;;
 esac

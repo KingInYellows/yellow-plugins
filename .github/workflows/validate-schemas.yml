@@ -1405,7 +1405,9 @@ jobs:
     name: Plugin Shell Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The required suites took 3m18s before yellow-review's ledger suite
+    # (~1 min, builds throwaway git repos per case) landed; 5 left no room.
+    timeout-minutes: 10
     needs: [validate-schemas]
 
     steps:

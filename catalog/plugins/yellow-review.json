@@ -19,6 +19,14 @@
     "category": "development",
     "source": "./plugins/yellow-review"
   },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "lib/review-ledger.sh sources cs_redact_secrets from yellow-core/lib/compound-staging.sh; without it the review ledger withholds every model-authored string"
+    }
+  ],
   "targets": {
     "claude": true,
     "codex": {

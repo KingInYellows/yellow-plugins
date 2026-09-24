@@ -162,6 +162,22 @@ resolution, and sequential stack review. Graphite-native workflow.
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
 
+### Library (internal, not yet wired into a command)
+
+- `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
+  (plans/review-findings-ledger.md): an append-only JSONL file per PR at
+  `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
+  shared by every worktree of the clone. Subcommands `observe`, `transition`,
+  `fold`, `dismissed-context`, `reverify`, `publication`, `validate-path`,
+  `prune`, `record-state`, `summary`, `new-run-id`; JSON on stdin/stdout,
+  exit codes 2 usage / 3 invalid / 4 lock timeout / 5 PR closed / 6
+  unverifiable. The rule vocabulary is `lib/review-ledger-vocab.json`.
+- Every model-authored string is redacted with yellow-core's
+  `cs_redact_secrets` (hence the required `yellow-core` dependency) plus a
+  fail-closed credential pass; without yellow-core the library withholds all
+  model-authored text. Requires `jq`, `flock`, `realpath` and git >= 2.31;
+  universal-ctags is optional (code scopes fall back to `unscoped`).
+
 ## When to Use What
 
 - **`/review:setup`** — First install, after auth issues, or when review
@@ -284,8 +300,10 @@ explicit-invocation wording live in the skill body and description.
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
 `tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
-invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`), and
-`skill-content.bats`.
+invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
+`review-ledger.bats` (throwaway repositories with a bare origin, built by
+`tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
+absent), and `skill-content.bats`.
 
 ## Known Limitations
 
