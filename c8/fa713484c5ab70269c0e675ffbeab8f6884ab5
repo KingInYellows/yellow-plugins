@@ -1,0 +1,27 @@
+CONTRIBUTING.md
+  s_a481c3f49a67b8::t_017bd52c45ab61 246-247,249-250
+docs/contracts/error-codes.md
+  s_a481c3f49a67b8::t_d7a6c4303c5f68 21-24
+docs/guides/common-workflows.md
+  s_a481c3f49a67b8::t_8c3813488e73cd 17
+docs/operations/release-checklist.md
+  s_a481c3f49a67b8::t_e4cfef715ba8da 23,141-143,160,162-163,262-266
+docs/plugin-template.md
+  s_a481c3f49a67b8::t_498708423910e6 586-592,665
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c8fa713484c5ab70269c0e675ffbeab8f6884ab5",
+  "prompts": {},
+  "sessions": {
+    "s_a481c3f49a67b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb292ab9-25e7-4864-891a-f7292e15f24d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
