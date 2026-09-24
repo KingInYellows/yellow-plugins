@@ -339,6 +339,9 @@ rules, CLAUDE.md) as a second layer.
     (direct commit) vs `autofix stacked pr`. Graphite and GitHub suggestions
     need a human click. Cursor forum threads report "Bugbot auto-fixes when it
     should not", which argues for conservative defaults.
+  - The `auto-apply` restrictions govern unattended runs. In attended runs, a
+    human may apply any verified finding after review, regardless of
+    `autofix_class`.
   - Pattern: mark each finding `auto_fixable` plus a `risk_class`. Only
     mechanical, low-risk fixes with passing tests and a clean re-review may
     auto-apply, preferably as a **stacked PR** or separate branch rather than a
