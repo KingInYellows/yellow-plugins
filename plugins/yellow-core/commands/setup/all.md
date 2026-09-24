@@ -627,7 +627,12 @@ present, OR ToolSearch also returned
 prefixes and are not in the recorded probe list.
 
 - READY: `composio_tools_visible` AND `.claude/composio-usage.json` exists.
-  `jq` missing is degraded usage tracking, not a setup failure.
+  `jq` missing is degraded usage tracking, not a setup failure. Tool
+  visibility proves registration, not authentication (a rejected OAuth
+  session can still leave a stale usage file behind) — set the Detail
+  column to "tools visible; auth not verified — run `/composio:status` or
+  `/composio:setup` to probe" rather than implying a live health check
+  happened.
 - PARTIAL: `composio_tools_visible` AND the usage counter
   (`.claude/composio-usage.json`) is missing → run `/composio:setup`.
 - NEEDS SETUP: not `composio_tools_visible`. Open `/mcp`, select
