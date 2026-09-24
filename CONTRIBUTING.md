@@ -313,23 +313,15 @@ for _ in $(seq 1 15); do
   [ -n "$run_id" ] && break
   sleep 10
 done
+VERSION=$(node -p "require('./package.json').version")
+release_tag="v$VERSION"
 if [ -z "$run_id" ]; then
   echo "No version-packages.yml run found for $merge_sha after 2.5 minutes." >&2
-  echo "Check the Actions tab before proceeding to force_publish." >&2
+  echo "Check the Actions tab, then follow docs/operations/release-checklist.md Section 5.2 if recovery is needed." >&2
+elif gh run watch "$run_id" --exit-status && gh release view "$release_tag" >/dev/null 2>&1; then
+  echo "Release published. Nothing to recover."
 else
-  gh run watch "$run_id" --exit-status &&
-    gh release view "v$(node -p "require('./package.json').version")"
-fi
-
-# Recovery, only if that run failed or logged "nothing to do". Without --ref
-# the dispatch builds the default branch, so run it only while main is still
-# the release merge; otherwise follow docs/operations/release-checklist.md 5.2
-# (tag $merge_sha, then dispatch with --ref "v<version>").
-git fetch origin main
-if [ "$(git rev-parse origin/main)" = "$merge_sha" ]; then
-  gh workflow run version-packages.yml -f force_publish=true
-else
-  echo "main moved past $merge_sha; use the checklist 5.2 tag path." >&2
+  echo "Run failed or release missing; follow docs/operations/release-checklist.md Section 5.2." >&2
 fi
 ```
 
