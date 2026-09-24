@@ -21,14 +21,16 @@ automatic application) that survives past the end of any `/review:pr`,
 Claude session touches the PR next. Triage never rewrites finding records: it
 appends `transition` records (`{finding_id, state, reason, head_sha, at}`), and
 every reader folds by `finding_id` and takes the latest state, so an earlier
-`open` record never reads as pending. `finding_id` is fixed at first observation
-(the fingerprint at that time, deterministic, never a random per-record ID) and
-never changes. Anchor content is versioned per observation instead: a later
-observation first tries an exact fingerprint match, then an alias rematch (same
-`file` and normalized `category`, anchor near the stored line hint and above a
-similarity threshold on the normalized lines) and reuses the original
-`finding_id`, so an edited anchor or a slightly varied recurrence still folds
-under the same key.
+`open` record never reads as pending. `reopened` projects to pending exactly
+like `open`: the pending set is latest state ∈ {`open`, `reopened`}, and every
+count, including `<pr>.pending`, uses that one definition. `finding_id` is fixed
+at first observation (the fingerprint at that time, deterministic, never a
+random per-record ID) and never changes. Anchor content is versioned per
+observation instead: a later observation first tries an exact fingerprint match,
+then an alias rematch (same `file` and normalized `category`, anchor near the
+stored line hint and above a similarity threshold on the normalized lines) and
+reuses the original `finding_id`, so an edited anchor or a slightly varied
+recurrence still folds under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -140,10 +142,9 @@ Step 8 write uses those snapshots; simplifier findings, which only exist after
 Step 8, are anchored against the post-fix file. That write step also appends
 `reopened` when it re-observes a `fixed`, `stale`, or no-longer-applicable
 `dismissed` finding. `/review:triage` is the only other component that touches
-the file (read + append other transitions + prune).
-`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
-and `sweep.md` optionally invoking `/review:triage --non-interactive` at the
-end.
+the file (read + append other transitions + prune). `sweep.md`/`sweep-all.md`
+need only cosmetic changes: the Residual-count column, and `sweep.md` optionally
+invoking `/review:triage --non-interactive` at the end.
 
 **Pros:**
 
@@ -224,14 +225,14 @@ a future maintainer will recognize it immediately.
 
 ## Key Decisions
 
-| #   | Decision                                                                                                                                                                         | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Ledger at `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`, JSONL, one file per PR                                                                          | Shared across worktrees of the same clone by construction (verified: `git-common-dir` ≠ per-worktree `git-dir`); invisible to git status/PR diff; no protected-dir prompt. Research doc explicitly warns against keying by cwd/worktree path — this sidesteps that failure mode without introducing a new out-of-tree location.                                                                                                                                          |
-| 2   | New `/review:triage` command owns lifecycle transitions and pruning, except `review-pr.md` appends `reopened` on re-observation (`review-pr.md` still reads and appends findings); `/review:resolve` stays GraphQL-only | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles. A direct `/review:pr` run must not hide reproduced defects when triage is skipped.                                                                                                                                          |
-| 3   | Attended = fix every verified finding the human approves; unattended = apply nothing                                                                                             | The safe/gated/manual gate is a proxy for "is a human reviewing this change." Explicit approval (per finding, or approve-all) provides that review; mere presence does not. Unattended triage applies nothing because every ledger entry is residue `review-pr.md` already held for a human (including P2/P3 `safe_auto`), so applying it would nullify the Step 7 severity gate.                                                                                        |
-| 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                                             | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                                                                                                                                                                        |
-| 5   | Write-time dedup (fingerprint: file, normalized category, code-context hash; line kept as a rematch hint; reviewer recorded but not keyed) + dismissed-findings prompt injection | Code-context hash distinguishes distinct issues and merges cross-reviewer repeats of the same anchored defect; leaving line numbers out keeps identity stable when unrelated edits shift lines. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the fenced-advisory pattern already used for learnings-context. Plan must test same-anchor collisions and add a rule/condition key if needed. |
-| 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close                         | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                                                                                                                                                                    |
+| #   | Decision                                                                                                                                                                                                                | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Ledger at `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`, JSONL, one file per PR                                                                                                                 | Shared across worktrees of the same clone by construction (verified: `git-common-dir` ≠ per-worktree `git-dir`); invisible to git status/PR diff; no protected-dir prompt. Research doc explicitly warns against keying by cwd/worktree path — this sidesteps that failure mode without introducing a new out-of-tree location.                                                                                                                                          |
+| 2   | New `/review:triage` command owns lifecycle transitions and pruning, except `review-pr.md` appends `reopened` on re-observation (`review-pr.md` still reads and appends findings); `/review:resolve` stays GraphQL-only | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles. A direct `/review:pr` run must not hide reproduced defects when triage is skipped.                                                                                                                                        |
+| 3   | Attended = fix every verified finding the human approves; unattended = apply nothing                                                                                                                                    | The safe/gated/manual gate is a proxy for "is a human reviewing this change." Explicit approval (per finding, or approve-all) provides that review; mere presence does not. Unattended triage applies nothing because every ledger entry is residue `review-pr.md` already held for a human (including P2/P3 `safe_auto`), so applying it would nullify the Step 7 severity gate.                                                                                        |
+| 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                                                                                    | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                                                                                                                                                                        |
+| 5   | Write-time dedup (fingerprint: file, normalized category, code-context hash; line kept as a rematch hint; reviewer recorded but not keyed) + dismissed-findings prompt injection                                        | Code-context hash distinguishes distinct issues and merges cross-reviewer repeats of the same anchored defect; leaving line numbers out keeps identity stable when unrelated edits shift lines. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the fenced-advisory pattern already used for learnings-context. Plan must test same-anchor collisions and add a rule/condition key if needed. |
+| 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close                                                                | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                                                                                                                                                                    |
 
 ## Suggested Stack Decomposition
 
@@ -251,9 +252,10 @@ For `/flow:plan` to pick up, in dependency order:
    re-injected into prompts; fingerprint function (`file` + normalized
    `category` + whitespace-normalized code-context hash; line kept as a rematch
    hint, `reviewer` stored but not keyed), dedup/state-check function,
-   dismissed-findings reader (for context injection), prune-on-close function,
-   and a per-PR `findings/<pr>.pending` sidecar in the two-field form
-   `<count> <bytes>` (open-finding count and the JSONL byte size it was computed
+   dismissed-findings reader (for context injection), prune-on-close function
+   that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock`, and
+   a per-PR `findings/<pr>.pending` sidecar in the two-field form
+   `<count> <bytes>` (pending count and the JSONL byte size it was computed
    from) refreshed after folding the JSONL by `finding_id` to latest state.
    Include a test fixture with two distinct findings anchored to the same code,
    and one that moves lines without changing, to validate collision and rematch
@@ -288,7 +290,8 @@ For `/flow:plan` to pick up, in dependency order:
    Claude-session local discovery, matching yellow-core's precedent). **Cursor
    hook exposure:** none — the generator has no Cursor hook emission path
    (`docs/cursor-distribution.md`). A new lightweight hook script (yellow-debt's
-   cheap-count pattern, not full JSONL parsing) that sums each open PR's
+   cheap-count pattern, not full JSONL parsing) that ignores any sidecar whose
+   `<pr>.jsonl` no longer exists, and sums each open PR's
    `findings/<pr>.pending` sidecar (kept current by the ledger write step and
    `/review:triage` after folding by `finding_id`) and emits a `systemMessage`
    when the total is > 0. Append-only JSONL stays non-empty after
