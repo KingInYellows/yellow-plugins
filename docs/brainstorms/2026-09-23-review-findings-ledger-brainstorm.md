@@ -149,27 +149,28 @@ holding all of Step 10's Residual Actionable Work plus the report-only queue,
 not only `owner=downstream-resolver`. `applied` findings only get a `fixed`
 transition once Step 9's commit and push succeed; if the push is declined or
 fails they stay pending, so a fix that exists only as an uncommitted change in
-one worktree is never lost from the ledger. An `applied` record stores the
-fixing commit's SHA once it exists and becomes `fixed` only when that commit is
-an ancestor of the remote PR head (`gh pr view --json headRefOid` plus
-`git merge-base --is-ancestor`). Triage never marks an `applied` record `stale`
-because its old anchor no longer matches local `HEAD`: a local-only commit is
-exactly the unpublished case. The compact-return schema keeps only `file` and
-`line`, and Step 7's auto-fixes can shift lines, so the helper snapshots each
-finding's anchored code right after Step 6's aggregation (a hash for identity
-plus the normalized lines for rematching, with the lines passed through the same
-`redact_secrets` patterns before storage; if a line cannot be redacted safely,
-only the hash and the line hint are kept, so an anchor on a hard-coded token
-never copies it into `.git`), before Step 7 edits anything. The Step 8 write
-uses those snapshots; simplifier findings, which only exist after Step 8, are
-anchored against the post-fix file. That write step also appends `reopened` when
-it re-observes a `fixed`, `stale`, or no-longer-applicable `dismissed` finding.
-`/review:triage` is the only other component that touches the file (read +
-append other transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
-changes: the Residual-count column, `sweep.md` optionally invoking
-`/review:triage --non-interactive` at the end, and `sweep-all.md` invoking
-`/review:triage --prune <pr>` for ledgers whose PR is absent from the
-all-open-PR query.
+one worktree is never lost from the ledger. As soon as Step 9's commit exists,
+and before submission, a second `applied` transition records the fixing commit's
+SHA, so a commit that fails to submit is still traceable; the record becomes
+`fixed` only when that commit is an ancestor of the remote PR head
+(`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`). Triage
+never marks an `applied` record `stale` because its old anchor no longer matches
+local `HEAD`: a local-only commit is exactly the unpublished case. The
+compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
+shift lines, so the helper snapshots each finding's anchored code right after
+Step 6's aggregation (a hash for identity plus the normalized lines for
+rematching, with the lines passed through the same `redact_secrets` patterns
+before storage; if a line cannot be redacted safely, only the hash and the line
+hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
+before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
+findings, which only exist after Step 8, are anchored against the post-fix file.
+That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
+or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
+component that touches the file (read + append other transitions + prune).
+`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
+`sweep.md` optionally invoking `/review:triage --non-interactive` at the end,
+and `sweep-all.md` invoking `/review:triage --prune <pr>` for ledgers whose PR
+is absent from the all-open-PR query.
 
 **Pros:**
 
@@ -311,7 +312,15 @@ For `/flow:plan` to pick up, in dependency order:
    `report_only`), `applied` transitions after Step 7, and the simplifier's
    findings after Step 8, appending `reopened` when a write step re-observes a
    `fixed`, `stale`, or no-longer-applicable `dismissed` finding, refreshing
-   `<pr>.pending` after each append.
+   `<pr>.pending` after each append, and an `applied` transition carrying the
+   fixing SHA right after Step 9 commits, before submission. Making `rule`
+   required means every producer must emit it in the same change: every reviewer
+   that emits the compact-return schema (yellow-review's personas and the
+   yellow-core ones `review-pr.md` dispatches), and Step 6's legacy
+   prose-to-compact converter (which assigns an explicit `unclassified` rule
+   rather than dropping the finding). Otherwise `review-pr.md` drops every
+   return that lacks the field. The closed per-category `rule` vocabulary ships
+   in this step too.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
@@ -334,8 +343,10 @@ For `/flow:plan` to pick up, in dependency order:
    and apply; call `gh pr view <pr> --json state` and delete `<pr>.jsonl`,
    `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or `CLOSED` (the
    only ledger deletion path — `/review:sweep-all` delegates here), append
-   transition records (`open`→`fixed`/`dismissed`/`stale`; never rewrite finding
-   rows), refresh `<pr>.pending` after each fold.
+   transition records (`open`→`fixed`/`dismissed`/`stale`, and the same terminal
+   transitions for `report_only` once a human fixes or dismisses one or
+   re-verification finds it stale, without ever making it auto-applicable; never
+   rewrite finding rows), refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
@@ -382,7 +393,12 @@ For `/flow:plan` to pick up, in dependency order:
    binaries, `flock` and `realpath` (neither is guaranteed on macOS; `flock`
    comes from util-linux or `brew install flock`), and yellow-review's README
    and CLAUDE.md list them as prerequisites, so a missing binary fails at setup
-   rather than during review persistence.
+   rather than during review persistence. The same README and CLAUDE.md updates
+   also document everything user-facing in this stack: the new `/review:triage`
+   command and its modes (attended, `--non-interactive`, `--prune`), the ledger
+   location and lifecycle states, `/review:pr`'s new persistence behaviour, and
+   the SessionStart hook and its message, as the repo's documentation contract
+   requires for behaviour changes.
 
 ## Open Questions
 
