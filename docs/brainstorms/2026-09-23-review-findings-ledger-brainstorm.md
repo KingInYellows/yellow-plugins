@@ -46,9 +46,15 @@ the shared clone's git dir, not a per-worktree path):
 - **Dedup & false-positive suppression:** write-time fingerprint matching — skip
   re-adding anything with a terminal (`fixed`/`dismissed`) fingerprint already
   recorded, merge repeats of still-`open` entries. Fingerprint = deterministic
-  primitives only (file, category, reviewer, line bucket — the strix approach
-  from the research doc), never LLM title text, because titles get reworded
-  between runs. In addition, `/review:pr` injects the PR's dismissed findings +
+  primitives only: `file` + `category` + line bucket + a hash of the
+  whitespace-normalized code lines the finding anchors to (strix-style line
+  bucket from the research doc, plus code-context hash so the same defect from
+  different reviewers merges). Record `reviewer` on each entry but exclude it
+  from the fingerprint key. Never use LLM title text as identity — titles get
+  reworded between runs. Two distinct defects in the same bucket can still
+  collide; `/flow:plan` must test that case and add a rule/condition
+  discriminator if collisions show up in practice. In addition, `/review:pr`
+  injects the PR's dismissed findings +
   dismissal reasons into reviewer prompts as a fenced advisory block (same
   pattern as the existing learnings-context block), because fingerprint-only
   dedup misses reworded re-detections of the same underlying issue — this
@@ -164,7 +170,7 @@ a future maintainer will recognize it immediately.
 | 2   | New `/review:triage` command owns the ledger exclusively; `/review:resolve` stays GraphQL-only                                                           | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles.                                                                                  |
 | 3   | Attended = fix everything; unattended = safe-only, leave the rest                                                                                        | The safe/gated/manual gate is a proxy for "is a human watching." A present human already provides the review a gate is meant to simulate — gating them too is pure friction with no safety benefit.                                                                                                                             |
 | 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                     | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                               |
-| 5   | Write-time dedup (deterministic fingerprint: file, category, reviewer, line bucket) + dismissed-findings prompt injection                                | Fingerprint alone misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the same fenced-advisory pattern already used for learnings-context. Directly informed by this repo's own past-learnings record of a 38% re-review false-positive rate without prior-resolution context.   |
+| 5   | Write-time dedup (fingerprint: file, category, line bucket, code-context hash; reviewer recorded but not keyed) + dismissed-findings prompt injection      | Code-context hash distinguishes distinct issues in the same bucket and merges cross-reviewer repeats of the same anchored defect. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the same fenced-advisory pattern already used for learnings-context. Plan must test same-bucket collisions and add a rule/condition key if needed. |
 | 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                           |
 
 ## Suggested Stack Decomposition
@@ -172,12 +178,15 @@ a future maintainer will recognize it immediately.
 For `/flow:plan` to pick up, in dependency order:
 
 1. **Ledger library + schema** — `scripts/lib/review-ledger.sh` (or equivalent):
-   atomic `flock`-guarded JSONL append, fingerprint function (file + category +
-   reviewer + line-bucket), dedup/state-check function, dismissed-findings
-   reader (for context injection), prune-on-close function, and a per-PR
-   `findings/<pr>.pending` sidecar (single ASCII integer) refreshed after
-   folding the JSONL by `finding_id` to latest state. This is the one piece
-   everything else depends on.
+   atomic `flock`-guarded JSONL append, fingerprint function (`file` +
+   `category` + line bucket + whitespace-normalized code-context hash;
+   `reviewer` stored but not keyed), dedup/state-check function,
+   dismissed-findings reader (for context injection), prune-on-close function,
+   and a per-PR `findings/<pr>.pending` sidecar (single ASCII integer)
+   refreshed after folding the JSONL by `finding_id` to latest state. Include
+   a test fixture with two distinct findings in the same bucket to validate
+   collision behavior before shipping. This is the one piece everything else
+   depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read near the top
    of Step 6 (fenced advisory block into reviewer prompts); add the ledger-write
    call after Step 6.9's partition, for `owner=downstream-resolver` findings
@@ -217,6 +226,10 @@ For `/flow:plan` to pick up, in dependency order:
 - Testing/eval strategy for `/review:triage` itself (it's a new command with
   real filesystem mutation and re-verification logic) — not addressed in this
   brainstorm.
+- Fingerprint collision coverage: two distinct correctness defects sharing
+  `file`, `category`, and line bucket but different anchored code must remain
+  distinguishable after the code-context hash; if the hash is insufficient,
+  add a stable rule/condition discriminator before implementation ships.
 - Whether attended `/review:pr`'s Step 10 chat report should visually
   distinguish "just written to the ledger this run" from "carried over from a
   prior sweep" — a UX nicety not resolved here.
