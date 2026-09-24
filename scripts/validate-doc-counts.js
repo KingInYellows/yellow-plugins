@@ -46,10 +46,16 @@ const SCAN_FILES = [
 ];
 
 // Patterns to match. Each pattern captures a single integer (group 1) before
-// the keyword. Use \b around keywords to avoid matching "Nplugins".
+// the keyword. Use \b around keywords to avoid matching "Nplugins". WS allows
+// at most one line break, so a prose-wrapped claim matches but a number and a
+// word in separate paragraphs do not.
+const WS = String.raw`(?:[ \t]+|[ \t]*\r?\n[ \t]*)`;
 const PATTERNS = [
-  { regex: /\b(\d+)\s+plugins\b/gi, label: 'plugins' },
-  { regex: /\b(\d+)\s+marketplace\s+plugins\b/gi, label: 'marketplace plugins' },
+  { regex: new RegExp(String.raw`\b(\d+)${WS}plugins\b`, 'gi'), label: 'plugins' },
+  {
+    regex: new RegExp(String.raw`\b(\d+)${WS}marketplace${WS}plugins\b`, 'gi'),
+    label: 'marketplace plugins',
+  },
 ];
 
 const colors = {

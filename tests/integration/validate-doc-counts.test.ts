@@ -188,6 +188,19 @@ describe('validate-doc-counts', () => {
     expect(stderr).toMatch(/17 plugins/);
   });
 
+  it('does not match a number and "plugins" in separate paragraphs', () => {
+    writeMarketplace(tmpRoot, 18);
+    writeFile(
+      tmpRoot,
+      'README.md',
+      '# Test\n\nSupported runtime version:\n22\n\nplugins are loaded dynamically.\n'
+    );
+
+    const { status } = runValidator(tmpRoot);
+
+    expect(status).toBe(0);
+  });
+
   it.each(SCAN_FILES)('fails when SCAN_FILES entry %s is missing', (relPath) => {
     writeMarketplace(tmpRoot, 3);
     rmSync(join(tmpRoot, relPath));
