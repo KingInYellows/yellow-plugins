@@ -255,10 +255,10 @@ Commit a compact manifest in-repo only when you need an audit trail.
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `open`       | Reproduced on the current head; no disposition yet                                                     |
 | `fixed`      | Not reproduced by a later analysis, ideally confirmed by re-analysis rather than "file touched"        |
-| `dismissed`  | Won't-fix or false positive, with actor and reason. **Suppresses re-raising** of the same fingerprint. |
+| `dismissed`  | Won't-fix or false positive, with actor and reason. **Suppresses re-raising while the anchored code is unchanged.** |
 | `stale`      | The anchor disappeared or couldn't be matched after a rewrite. Keep for audit; don't show as active.   |
 | `superseded` | Replaced by a newer finding (link both ways, as with beads `supersedes`)                               |
-| `reopened`   | A fixed or dismissed fingerprint reproduced again at a new head                                        |
+| `reopened`   | A fixed finding reproduced again at a new head, or a dismissed one whose anchored code changed at a new head |
 
 GitHub code scanning is the reference implementation: fixed → auto-closed,
 dismissed with a reason, reopenable, branch-specific.
