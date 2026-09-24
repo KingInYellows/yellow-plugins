@@ -18,11 +18,11 @@ Graphite-native workflow commands for stacked PR development.
 ## Dependency on yellow-core
 
 `dependencies: ["yellow-core"]` was added to `catalog/plugins/gt-workflow.json`
-once the neutral `stacked-pr` operation surface (`/stack:*` commands,
-`lib/stack-operation-registry.js`) became load-bearing for this plugin —
-per `plans/complete/stacked-pr-provider-abstraction.md`'s "Documented adjustments"
-section, this was deliberately deferred until that surface existed and was
-validated, unlike `github-workflow`, which declared the dependency from
+once the neutral `stacked-pr` operation surface (`/stack:status` /
+`/stack:select`, `lib/stack-operation-registry.js`) became load-bearing for this
+plugin — per `plans/complete/stacked-pr-provider-abstraction.md`'s "Documented
+adjustments" section, this was deliberately deferred until that surface existed
+and was validated, unlike `github-workflow`, which declared the dependency from
 day one because it is new. Claude Code auto-enables a declared dependency
 transitively at the same scope, and `claude plugin enable` fails when the
 dependency is not installed — this IS a breaking change for any existing

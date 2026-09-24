@@ -199,10 +199,11 @@ export const ERROR_CODES = {
   // exposure lint (mirroring validate-codex.js's Claude-only-construct scan)
   // and a lifecycle non-emission scan (the catalog-only "lifecycle" field —
   // see catalog-plugin.schema.json — must never reach a generated artifact
-  // on any target). scripts/validate-versions.js reuses this same category
-  // for the Cursor two-way version check and marketplace membership/order/
-  // path drift, mirroring how the Codex two-way check has no dedicated
-  // category of its own either.
+  // on any target). scripts/validate-versions.js checks the Cursor two-way
+  // version match and marketplace membership/order/path drift but emits
+  // plain messages, not codes from this category — so CURSOR_MARKETPLACE_DRIFT,
+  // CURSOR_VERSION_DRIFT and CURSOR_LIFECYCLE_INVALID currently have no
+  // emitter (validate-cursor.js's CODES map builds the others).
   //
   // Prefix choice: CURSOR is substring-safe against every existing prefix
   // in both directions (lint-error-codes.js findPrefixCollisions, R14):
@@ -211,11 +212,11 @@ export const ERROR_CODES = {
   //
   // Same ESM/CJS bridge constraint as SOL_*/PLAN_*/SETUP_*/PROVIDER_*/
   // NAMESPACE_*: the catalog is ESM, scripts/ is CJS, so
-  // scripts/validate-cursor.js and scripts/validate-versions.js assemble
-  // the same strings via concatenation (`const CURSOR = 'ERROR-' +
+  // scripts/validate-cursor.js assembles the same strings via
+  // concatenation (`const CURSOR = 'ERROR-' +
   // 'CURSOR';`) and `scripts/lint-error-codes.js` (CODE_PATTERN
   // /ERROR-[A-Z]+-\d+/g) does not detect split-string assembly. Any change
-  // to the entries below requires a paired edit in those two scripts.
+  // to the entries below requires a paired edit in that script.
   CURSOR_ARTIFACT_MISSING: 'ERROR-CURSOR-001',
   CURSOR_SCHEMA_VIOLATION: 'ERROR-CURSOR-002',
   CURSOR_MARKETPLACE_DRIFT: 'ERROR-CURSOR-003',

@@ -267,9 +267,12 @@ for why that opt-out exists.
   cannot read `catalog/` at runtime; `scripts/validate-provider-groups.js`
   fails CI (`ERROR-PROVIDER-006`) when that replica drifts. Fixture coverage
   at `tests/integration/stack-provider-state.test.ts`
-- `stack-operation-registry.js` — maps each neutral `/stack:*` operation to
-  exactly one Graphite and one GitHub implementation, or `null` (unsupported
-  — callers stop, never try the other provider). Dependency-free; verified by
+- `stack-operation-registry.js` — maps each of the nine neutral stack operations
+  (and `/flow:work`'s lower-level stack primitives) to exactly one Graphite and
+  one GitHub implementation, or `null` (unsupported — callers stop, never try
+  the other provider). Only its integration test loads it: `/flow:work` mirrors
+  the entries in prose, so change both together, and `/stack:status` /
+  `/stack:select` do not read it. Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
 - `stack-tooling-probe.js` — the shared owner of provider CLI readiness
   (`gt` on PATH; `gh auth status` plus a verified `github/gh-stack`
