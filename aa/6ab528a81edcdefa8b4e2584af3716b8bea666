@@ -1,0 +1,26 @@
+docs/research/review-findings-persistence.md
+  s_7dc42093ad5a67::t_e2146f365a4722 254-261,342-346
+docs/solutions/code-quality/resolver-edit-prettier-regression-dirty-baseline.md
+  s_7dc42093ad5a67::t_69f4095e67cf06 39-54,84,86-91,93-97
+docs/solutions/workflow/review-sweep-residual-findings-attended-fix-all.md
+  s_7dc42093ad5a67::t_dc62f97feda04b 59-60,62-70,75-76
+docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md
+  s_7dc42093ad5a67::t_f4b284f6d3da5a 19-25
+  s_7dc42093ad5a67::t_de8b46b8fa9248 56-67,200-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa6ab528a81edcdefa8b4e2584af3716b8bea666",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
