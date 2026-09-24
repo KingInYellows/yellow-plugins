@@ -1,0 +1,31 @@
+docs/operations/release-checklist.md
+  s_e1fd7afde28579::t_493c8767f3c511 237-239,244-245,248-249,252-254
+  s_e1fd7afde28579::t_d979132e36e42f 90,94-95
+  s_e1fd7afde28579::t_4bfa754f00dd34 106,112-119
+  s_e1fd7afde28579::t_a5ca9f7767a6ae 137-139
+docs/operations/versioning.md
+  s_e1fd7afde28579::t_9a948b32b312b3 56-60
+  s_e1fd7afde28579::t_9452edbac5a387 36-46,49-52
+  s_e1fd7afde28579::t_7a27dd946237f6 33-34
+  s_e1fd7afde28579::t_db34c87e334b00 61
+docs/plugin-template.md
+  s_e1fd7afde28579::t_3e99448f6ea2e0 64-68,75-76,88-89
+  s_e1fd7afde28579::t_b3cc494c5eed08 181-182
+  s_e1fd7afde28579::t_5d28300cec7621 648-651
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4356375e12b9dc85e65e30a63daa5f1314c69c16",
+  "prompts": {},
+  "sessions": {
+    "s_e1fd7afde28579": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "005623dd-036f-42ca-aa19-81b8901771af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

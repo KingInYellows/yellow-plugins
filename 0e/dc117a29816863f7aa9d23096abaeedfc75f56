@@ -1,0 +1,32 @@
+CLAUDE.md
+  h_6000354274ce50 41
+CONTRIBUTING.md
+  h_6000354274ce50 79-86,227
+README.md
+  h_6000354274ce50 26,58,142-145,240-245,247,250,254-257,269
+docs/contracts/error-codes.md
+  h_6000354274ce50 20,25-44,819-917
+docs/guides/common-workflows.md
+  h_6000354274ce50 21,35,59-60,63-65,69-70,75-84,95-97,100-101,103-107,118-120,126-131,141,160-164,235-236,240-241,246-255,257-259,261-264
+docs/operations/ci.md
+  h_6000354274ce50 52,60-64,95-101,106,137-173,200-205,209-212,214-217,244,278
+docs/operations/release-checklist.md
+  h_6000354274ce50 43-44,120-121,243,738,740-742
+docs/operations/versioning.md
+  h_6000354274ce50 55-59,145-155,162-163
+docs/plugin-credential-status-protocol.md
+  h_6000354274ce50 160-168,169-170,181-183
+docs/plugin-template.md
+  h_6000354274ce50 64-66,142,167,169-182,186-191,193-196,202,610-612,642-645,652
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0edc117a29816863f7aa9d23096abaeedfc75f56",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
