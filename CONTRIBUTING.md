@@ -319,8 +319,16 @@ else
     gh release view "v$(node -p "require('./package.json').version")"
 fi
 
-# Recovery, from main, only if that run failed or logged "nothing to do":
-gh workflow run version-packages.yml -f force_publish=true
+# Recovery, only if that run failed or logged "nothing to do". Without --ref
+# the dispatch builds the default branch, so run it only while main is still
+# the release merge; otherwise follow docs/operations/release-checklist.md 5.2
+# (tag $merge_sha, then dispatch with --ref "v<version>").
+git fetch origin main
+if [ "$(git rev-parse origin/main)" = "$merge_sha" ]; then
+  gh workflow run version-packages.yml -f force_publish=true
+else
+  echo "main moved past $merge_sha; use the checklist 5.2 tag path." >&2
+fi
 ```
 
 `force_publish=true` skips phase detection and runs `release-tags.sh` in
