@@ -58,31 +58,30 @@ already-actionable guidance** for anyone running a sweep before the ledger and
 
 For an interactive `/review:pr` run without `--non-interactive`, define an
 attended run as one where a human reviews and explicitly approves each verified
-change before it is applied. This approval bypasses the default P0/P1 `safe_auto`
-gate for approved P2/P3, `gated_auto`, and `manual` findings. Do not use this
-override inside the `--non-interactive` sweep loop that `/review:sweep` and
-`/review:sweep-all` invoke — those commands accept only one initial
+change before it is applied. This approval bypasses the default P0/P1
+`safe_auto` gate for approved P2/P3, `gated_auto`, and `manual` findings. Do not
+use this override inside the `--non-interactive` sweep loop that `/review:sweep`
+and `/review:sweep-all` invoke — those commands accept only one initial
 confirmation, then run with no per-change approval.
 
 The override applies in two places:
 
 1. **Interactive `/review:pr`** — the default path already gates push (and
-   optional learning saves) through `AskUserQuestion`; extend that to cover
-   each residual P2/P3, `gated_auto`, or `manual` finding the human asks to
-   fix.
+   optional learning saves) through `AskUserQuestion`; extend that to cover each
+   residual P2/P3, `gated_auto`, or `manual` finding the human asks to fix.
 2. **The orchestrating session after a `/review:sweep-all` loop** — once every
    PR has been swept non-interactively, the human can ask the session to fix
    verified residuals. The session verifies each finding against current code,
-   shows the diff summary and validation results, and pushes only on the
-   human's go-ahead.
+   shows the diff summary and validation results, and pushes only on the human's
+   go-ahead.
 
-Concretely, during the 2026-09-24 sweep follow-up: PR #840 had 9 of 10
-residual findings applied and pushed in a single commit (doc accuracy fixes,
-`validate-doc-counts.js` hardened to fail on missing `SCAN_FILES` entries and
-to match counts split across wrapped lines, plus tests); one adversarial claim
-verified as a non-issue and was skipped. PR #843 (16 findings, including
-several release-process hazards) and PR #853 (doc-accuracy + a stale CI
-remediation message) followed the same pattern.
+Concretely, during the 2026-09-24 sweep follow-up: PR #840 had 9 of 10 residual
+findings applied and pushed in a single commit (doc accuracy fixes,
+`validate-doc-counts.js` hardened to fail on missing `SCAN_FILES` entries and to
+match counts split across wrapped lines, plus tests); one adversarial claim
+verified as a non-issue and was skipped. PR #843 (16 findings, including several
+release-process hazards) and PR #853 (doc-accuracy + a stale CI remediation
+message) followed the same pattern.
 
 ## Why This Matters
 
@@ -106,8 +105,7 @@ design gap).
   verification, diff summary, validation, and push approval as above.
 - It does not apply inside the `--non-interactive` sweep loop that
   `/review:sweep` and `/review:sweep-all` invoke; those keep the existing
-  `safe_auto`-only gate until the ledger exists to catch what they leave
-  behind.
+  `safe_auto`-only gate until the ledger exists to catch what they leave behind.
 - Once `/review:triage` ships, re-check this doc against the brainstorm's locked
   decisions — the attended-fix-all behavior is meant to move from "manual
   practice" to the tool's own documented semantics (Key Decision #3), and this

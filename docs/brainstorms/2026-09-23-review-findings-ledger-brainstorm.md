@@ -35,8 +35,7 @@ the shared clone's git dir, not a per-worktree path):
 - **Owner & consumer:** a new `/review:triage` command (mirroring
   `/debt:triage`'s pending→ready→fixed lifecycle) exclusively reads the ledger,
   appends transition records, and prunes closed PR files. `/review:resolve`
-  stays untouched —
-  GraphQL/GitHub-threads-only, as today.
+  stays untouched — GraphQL/GitHub-threads-only, as today.
 - **Attended vs. unattended semantics:** the `safe_auto`/`gated_auto`/`manual`
   gate exists to protect _unattended_ runs (no human to catch a bad auto-apply).
   When `/review:triage` runs attended, the human _is_ the safety mechanism, so
@@ -59,11 +58,11 @@ the shared clone's git dir, not a per-worktree path):
   reworded between runs. Two distinct defects in the same bucket can still
   collide; `/flow:plan` must test that case and add a rule/condition
   discriminator if collisions show up in practice. In addition, `/review:pr`
-  injects the PR's dismissed findings +
-  dismissal reasons into reviewer prompts as a fenced advisory block (same
-  pattern as the existing learnings-context block), because fingerprint-only
-  dedup misses reworded re-detections of the same underlying issue — this
-  directly addresses a documented risk in this repo's own history:
+  injects the PR's dismissed findings + dismissal reasons into reviewer prompts
+  as a fenced advisory block (same pattern as the existing learnings-context
+  block), because fingerprint-only dedup misses reworded re-detections of the
+  same underlying issue — this directly addresses a documented risk in this
+  repo's own history:
   `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md`
   recorded a 38% false-positive rate in re-review rounds when prior
   fix/dismissal rationale isn't carried forward.
@@ -169,14 +168,14 @@ a future maintainer will recognize it immediately.
 
 ## Key Decisions
 
-| #   | Decision                                                                                                                                                 | Rationale                                                                                                                                                                                                                                                                                                                       |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Ledger at `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`, JSONL, one file per PR                                                  | Shared across worktrees of the same clone by construction (verified: `git-common-dir` ≠ per-worktree `git-dir`); invisible to git status/PR diff; no protected-dir prompt. Research doc explicitly warns against keying by cwd/worktree path — this sidesteps that failure mode without introducing a new out-of-tree location. |
-| 2   | New `/review:triage` command owns the ledger exclusively; `/review:resolve` stays GraphQL-only                                                           | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles.                                                                                  |
-| 3   | Attended = fix everything; unattended = safe-only, leave the rest                                                                                        | The safe/gated/manual gate is a proxy for "is a human watching." A present human already provides the review a gate is meant to simulate — gating them too is pure friction with no safety benefit.                                                                                                                             |
-| 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                     | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                               |
-| 5   | Write-time dedup (fingerprint: file, category, line bucket, code-context hash; reviewer recorded but not keyed) + dismissed-findings prompt injection      | Code-context hash distinguishes distinct issues in the same bucket and merges cross-reviewer repeats of the same anchored defect. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the same fenced-advisory pattern already used for learnings-context. Plan must test same-bucket collisions and add a rule/condition key if needed. |
-| 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                           |
+| #   | Decision                                                                                                                                                 | Rationale                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Ledger at `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`, JSONL, one file per PR                                                  | Shared across worktrees of the same clone by construction (verified: `git-common-dir` ≠ per-worktree `git-dir`); invisible to git status/PR diff; no protected-dir prompt. Research doc explicitly warns against keying by cwd/worktree path — this sidesteps that failure mode without introducing a new out-of-tree location.                                                                                 |
+| 2   | New `/review:triage` command owns the ledger exclusively; `/review:resolve` stays GraphQL-only                                                           | Keeps `resolve-pr.md`'s existing, working GitHub-thread contract stable; avoids conflating "GitHub-visible unresolved threads" with "locally-tracked residual findings," which are genuinely different data sources with different lifecycles.                                                                                                                                                                  |
+| 3   | Attended = fix everything; unattended = safe-only, leave the rest                                                                                        | The safe/gated/manual gate is a proxy for "is a human watching." A present human already provides the review a gate is meant to simulate — gating them too is pure friction with no safety benefit.                                                                                                                                                                                                             |
+| 4   | No GitHub-visible surface; local-only discovery (sweep-all Residual column + SessionStart one-liner)                                                     | Matches yellow-debt's own discovery pattern; avoids Codex/Cursor bot reply-loop triggers entirely by never posting anything for them to react to.                                                                                                                                                                                                                                                               |
+| 5   | Write-time dedup (fingerprint: file, category, line bucket, code-context hash; reviewer recorded but not keyed) + dismissed-findings prompt injection    | Code-context hash distinguishes distinct issues in the same bucket and merges cross-reviewer repeats of the same anchored defect. Fingerprint alone still misses reworded re-detections (LLM titles vary run to run); prompt injection closes that gap using the same fenced-advisory pattern already used for learnings-context. Plan must test same-bucket collisions and add a rule/condition key if needed. |
+| 6   | Re-verify against current HEAD SHA before acting; mark non-matching entries `stale` (visible, not silently dropped); prune ledger file on PR merge/close | Force-pushes are tolerated (PR number is stable, fingerprint ignores exact line), but code can drift enough that a fix no longer applies cleanly — silently forcing it or silently dropping it both recreate the "findings vanish" problem this whole effort targets.                                                                                                                                           |
 
 ## Suggested Stack Decomposition
 
@@ -187,11 +186,10 @@ For `/flow:plan` to pick up, in dependency order:
    `category` + line bucket + whitespace-normalized code-context hash;
    `reviewer` stored but not keyed), dedup/state-check function,
    dismissed-findings reader (for context injection), prune-on-close function,
-   and a per-PR `findings/<pr>.pending` sidecar (single ASCII integer)
-   refreshed after folding the JSONL by `finding_id` to latest state. Include
-   a test fixture with two distinct findings in the same bucket to validate
-   collision behavior before shipping. This is the one piece everything else
-   depends on.
+   and a per-PR `findings/<pr>.pending` sidecar (single ASCII integer) refreshed
+   after folding the JSONL by `finding_id` to latest state. Include a test
+   fixture with two distinct findings in the same bucket to validate collision
+   behavior before shipping. This is the one piece everything else depends on.
 2. **`review-pr.md` integration** — add the dismissed-context read near the top
    of Step 6 (fenced advisory block into reviewer prompts); add the ledger-write
    call after Step 6.9's partition, for `owner=downstream-resolver` findings
@@ -234,8 +232,8 @@ For `/flow:plan` to pick up, in dependency order:
   brainstorm.
 - Fingerprint collision coverage: two distinct correctness defects sharing
   `file`, `category`, and line bucket but different anchored code must remain
-  distinguishable after the code-context hash; if the hash is insufficient,
-  add a stable rule/condition discriminator before implementation ships.
+  distinguishable after the code-context hash; if the hash is insufficient, add
+  a stable rule/condition discriminator before implementation ships.
 - Whether attended `/review:pr`'s Step 10 chat report should visually
   distinguish "just written to the ledger this run" from "carried over from a
   prior sweep" — a UX nicety not resolved here.
