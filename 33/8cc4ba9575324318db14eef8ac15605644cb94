@@ -1,0 +1,21 @@
+CONTRIBUTING.md
+  s_7dc42093ad5a67::t_60ac05d8e8f31f 275-281,318-322,324-325,329-332
+docs/operations/release-checklist.md
+  s_7dc42093ad5a67::t_ad0fd649c8af35 883,885,887-890,893-900,902,907-911
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "338cc4ba9575324318db14eef8ac15605644cb94",
+  "prompts": {},
+  "sessions": {
+    "s_7dc42093ad5a67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61038a3e-9171-47e0-a8db-fb8c46b9559b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
