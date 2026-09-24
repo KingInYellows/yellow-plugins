@@ -28,10 +28,10 @@ latest state ∈ {`open`, `reopened`, `applied`}, and every count, including
 observation (the fingerprint at that time, deterministic, never a random
 per-record ID) and never changes. Anchor content is versioned per observation
 instead: a later observation first tries an exact fingerprint match, then an
-alias rematch (same `file` and normalized `category`, anchor near the stored
-line hint and above a similarity threshold on the normalized lines) and reuses
-the original `finding_id`, so an edited anchor or a slightly varied recurrence
-still folds under the same key.
+alias rematch (same `file`, normalized `category`, `rule` and enclosing scope,
+anchor near the stored line hint and above a similarity threshold on the
+normalized lines) and reuses the original `finding_id`, so an edited anchor or a
+slightly varied recurrence still folds under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
 to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
@@ -84,27 +84,30 @@ the shared clone's git dir, not a per-worktree path):
   a removed guard is a real regression, not a duplicate; a `stale` entry whose
   region a rebase moved is still the same defect once it matches again).
   Fingerprint = deterministic primitives only: `file` + normalized `category` +
-  `rule` + a hash of the whitespace-normalized code lines the finding anchors to
-  (so the same defect from different reviewers merges). `rule` is a new required
-  compact-return field: a short kebab-case condition slug from a closed
-  per-category vocabulary (for example `missing-input-validation`,
-  `wrong-error-path`), validated like `category`, so two distinct defects on the
-  same statement get different keys. `category` is free-form in the
-  compact-return schema, so it is mapped to a closed vocabulary before keying
-  (correctness, security, reliability, performance, maintainability, docs,
-  testing, contract), and the plan must measure how often one defect still lands
-  in two categories. No line numbers in identity: an unrelated edit above the
-  defect would shift a line bucket and re-raise it. The line number is stored as
-  a search hint for contextual rematching after a rebase (the research doc's "do
-  not hash line numbers"). Record `reviewer` on each entry but exclude it from
-  the key. Never use LLM title text as identity — titles get reworded between
-  runs. `/flow:plan` must still test two distinct defects on the same statement
-  and define the initial `rule` vocabulary. In addition, `/review:pr` injects
-  the PR's dismissed findings + dismissal reasons into reviewer prompts as a
-  fenced advisory block (same shape as the existing learnings-context block, but
-  not its sanitization alone: stored titles and reasons can echo PR text, so the
-  block's own delimiters are substituted out of every interpolated value first,
-  as the pr-context fence already requires, before XML escaping), because
+  `rule` + enclosing scope (the position-independent enclosing symbol or AST
+  path, e.g. `handlers.createUser`, or the nearest heading for markdown, so two
+  identical handlers with the same defect stay separate) + a hash of the
+  whitespace-normalized code lines the finding anchors to (so the same defect
+  from different reviewers merges). `rule` is a new required compact-return
+  field: a short kebab-case condition slug from a closed per-category vocabulary
+  (for example `missing-input-validation`, `wrong-error-path`), validated like
+  `category`, so two distinct defects on the same statement get different keys.
+  `category` is free-form in the compact-return schema, so it is mapped to a
+  closed vocabulary before keying (correctness, security, reliability,
+  performance, maintainability, docs, testing, contract), and the plan must
+  measure how often one defect still lands in two categories. No line numbers in
+  identity: an unrelated edit above the defect would shift a line bucket and
+  re-raise it. The line number is stored as a search hint for contextual
+  rematching after a rebase (the research doc's "do not hash line numbers").
+  Record `reviewer` on each entry but exclude it from the key. Never use LLM
+  title text as identity — titles get reworded between runs. `/flow:plan` must
+  still test two distinct defects on the same statement and define the initial
+  `rule` vocabulary. In addition, `/review:pr` injects the PR's dismissed
+  findings + dismissal reasons into reviewer prompts as a fenced advisory block
+  (same shape as the existing learnings-context block, but not its sanitization
+  alone: stored titles and reasons can echo PR text, so the block's own
+  delimiters are substituted out of every interpolated value first, as the
+  pr-context fence already requires, before XML escaping), because
   fingerprint-only dedup misses reworded re-detections of the same underlying
   issue — this directly addresses a documented risk in this repo's own history:
   `docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md`
@@ -132,33 +135,37 @@ learnings pre-pass), it reads the ledger to build the dismissed-findings
 advisory block injected into reviewer prompts — Step 6 would be too late, since
 reviewers have already run. The reader re-checks each dismissal's anchor and
 `depends_on` hashes against the current HEAD first and injects only those still
-applicable, so a stale rationale never talks reviewers out of a real finding;
-after Step 8 (code simplifier), it appends the final residual set (everything in
-Step 10's Residual Actionable Work plus the report-only queue, not only
-`owner=downstream-resolver`) with dedup applied. Findings Step 7 fixed are
-written too, as `applied`, and only get a `fixed` transition once Step 9's
-commit and push succeed; if the push is declined or fails they stay pending, so
-a fix that exists only as an uncommitted change in one worktree is never lost
-from the ledger. An `applied` record stores the fixing commit's SHA once it
-exists and becomes `fixed` only when that commit is an ancestor of the remote PR
-head (`gh pr view --json headRefOid` plus `git merge-base --is-ancestor`).
-Triage never marks an `applied` record `stale` because its old anchor no longer
-matches local `HEAD`: a local-only commit is exactly the unpublished case. The
-compact-return schema keeps only `file` and `line`, and Step 7's auto-fixes can
-shift lines, so the helper snapshots each finding's anchored code right after
-Step 6's aggregation (a hash for identity plus the normalized lines for
-rematching, with the lines passed through the same `redact_secrets` patterns
-before storage; if a line cannot be redacted safely, only the hash and the line
-hint are kept, so an anchor on a hard-coded token never copies it into `.git`),
-before Step 7 edits anything. The Step 8 write uses those snapshots; simplifier
-findings, which only exist after Step 8, are anchored against the post-fix file.
-That write step also appends `reopened` when it re-observes a `fixed`, `stale`,
-or no-longer-applicable `dismissed` finding. `/review:triage` is the only other
-component that touches the file (read + append other transitions + prune).
-`sweep.md`/`sweep-all.md` need only cosmetic changes: the Residual-count column,
-`sweep.md` optionally invoking `/review:triage --non-interactive` at the end,
-and `sweep-all.md` invoking `/review:triage --prune <pr>` for ledgers whose PR
-is absent from the all-open-PR query.
+applicable, so a stale rationale never talks reviewers out of a real finding.
+Writes happen as early as possible so an interrupted run loses nothing: right
+after Step 6's aggregation, before any stage that edits files, it appends every
+aggregated finding (`open`, or `report_only` for the report-only queue) with
+dedup applied; Step 7 then appends an `applied` transition for each finding it
+fixed, and Step 8 appends the code-simplifier's new findings. The ledger ends up
+holding all of Step 10's Residual Actionable Work plus the report-only queue,
+not only `owner=downstream-resolver`. `applied` findings only get a `fixed`
+transition once Step 9's commit and push succeed; if the push is declined or
+fails they stay pending, so a fix that exists only as an uncommitted change in
+one worktree is never lost from the ledger. An `applied` record stores the
+fixing commit's SHA once it exists and becomes `fixed` only when that commit is
+an ancestor of the remote PR head (`gh pr view --json headRefOid` plus
+`git merge-base --is-ancestor`). Triage never marks an `applied` record `stale`
+because its old anchor no longer matches local `HEAD`: a local-only commit is
+exactly the unpublished case. The compact-return schema keeps only `file` and
+`line`, and Step 7's auto-fixes can shift lines, so the helper snapshots each
+finding's anchored code right after Step 6's aggregation (a hash for identity
+plus the normalized lines for rematching, with the lines passed through the same
+`redact_secrets` patterns before storage; if a line cannot be redacted safely,
+only the hash and the line hint are kept, so an anchor on a hard-coded token
+never copies it into `.git`), before Step 7 edits anything. The Step 8 write
+uses those snapshots; simplifier findings, which only exist after Step 8, are
+anchored against the post-fix file. That write step also appends `reopened` when
+it re-observes a `fixed`, `stale`, or no-longer-applicable `dismissed` finding.
+`/review:triage` is the only other component that touches the file (read +
+append other transitions + prune). `sweep.md`/`sweep-all.md` need only cosmetic
+changes: the Residual-count column, `sweep.md` optionally invoking
+`/review:triage --non-interactive` at the end, and `sweep-all.md` invoking
+`/review:triage --prune <pr>` for ledgers whose PR is absent from the
+all-open-PR query.
 
 **Pros:**
 
@@ -260,10 +267,11 @@ For `/flow:plan` to pick up, in dependency order:
    PR held across each append or transition, the fold, and the atomic (`mv`)
    sidecar replacement, so overlapping sweeps cannot publish a stale count; each
    record written as one complete line in a single write ending in `\n`, and,
-   under the same lock before any append or fold, a tail check that moves an
-   unparseable final line (short write, full disk, crash) to
-   `<pr>.jsonl.corrupt-<timestamp>` and truncates to the last newline, so one
-   interrupted append never becomes permanent mid-file corruption; a path
+   under the same lock before any append or fold, a tail check: if the file does
+   not end in `\n`, a final record that is still valid JSON gets its newline
+   completed, and an unparseable one (short write, full disk, crash) is moved to
+   `<pr>.jsonl.corrupt-<timestamp>` and the file truncated to the last newline,
+   so one interrupted append never becomes permanent mid-file corruption; a path
    validator applied at write and at read (repo-relative, contained after
    `realpath`) so a model-produced `file` can never point triage outside the
    repo; credential redaction of every model-authored string (`title`,
@@ -291,11 +299,12 @@ For `/flow:plan` to pick up, in dependency order:
 2. **`review-pr.md` integration** — add the dismissed-context read before Step
    5's reviewer dispatch, next to Step 3d (fenced advisory block into reviewer
    prompts, with delimiter substitution on every interpolated value); add the
-   ledger-write call after Step 8, for the full residual set (P2/P3 `safe_auto`
-   residue, `gated_auto`/`manual`, simplifier findings, and the report-only
-   queue marked `report_only`), appending `reopened` when that write step
-   re-observes a `fixed`, `stale`, or no-longer-applicable `dismissed` finding,
-   refreshing `<pr>.pending` after each append.
+   ledger writes at three points: every aggregated finding right after Step 6
+   (before any stage that edits files; the report-only queue marked
+   `report_only`), `applied` transitions after Step 7, and the simplifier's
+   findings after Step 8, appending `reopened` when a write step re-observes a
+   `fixed`, `stale`, or no-longer-applicable `dismissed` finding, refreshing
+   `<pr>.pending` after each append.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
    (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
@@ -307,15 +316,19 @@ For `/flow:plan` to pick up, in dependency order:
    `stale` on mismatch, validate every stored `file` path before any `Read`,
    `Edit` or shell use (repo-relative, no absolute paths, `..` traversal,
    leading `-` or control characters, and a `realpath` inside the repo root so
-   symlinks cannot escape; reject the entry as `stale` otherwise — reviewer
-   paths are model-produced from PR content), attended = apply each finding the
-   human approves / `--non-interactive` = apply nothing (re-verify, mark
-   `stale`, prune when the target PR is merged/closed), `--prune <pr>` = skip
-   re-verify and apply; call `gh pr view <pr> --json state` and delete
-   `<pr>.jsonl`, `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or
-   `CLOSED` (the only ledger deletion path — `/review:sweep-all` delegates
-   here), append transition records (`open`→`fixed`/`dismissed`/`stale`; never
-   rewrite finding rows), refresh `<pr>.pending` after each fold.
+   symlinks cannot escape; in the read-only fallback the same lexical checks
+   apply, but existence and file type are checked against the target commit tree
+   instead (`git cat-file -e <headRefOid>:<file>` and a regular-file mode from
+   `git ls-tree`, never a symlink), so a file only the PR adds is not wrongly
+   marked `stale`; reject the entry as `stale` otherwise — reviewer paths are
+   model-produced from PR content), attended = apply each finding the human
+   approves / `--non-interactive` = apply nothing (re-verify, mark `stale`,
+   prune when the target PR is merged/closed), `--prune <pr>` = skip re-verify
+   and apply; call `gh pr view <pr> --json state` and delete `<pr>.jsonl`,
+   `<pr>.pending`, and `<pr>.state` only when state is `MERGED` or `CLOSED` (the
+   only ledger deletion path — `/review:sweep-all` delegates here), append
+   transition records (`open`→`fixed`/`dismissed`/`stale`; never rewrite finding
+   rows), refresh `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
