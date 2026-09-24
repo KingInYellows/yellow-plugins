@@ -900,8 +900,11 @@ default is human review.
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
 
-For `advisory` findings: do not apply. Surface in the Coverage / Residual
-Risks section.
+For `advisory` findings: do not apply by default. Surface in the Coverage /
+Residual Risks section. In interactive mode (non-interactive flag absent),
+when the human explicitly approves an actionable fix for a verified advisory
+finding, apply it like any other attended residual — still one approval per
+finding, never inside `--non-interactive` sweep loops.
 
 ### Step 8: Pass 2 — Code Simplifier
 
