@@ -32,10 +32,17 @@ const path = require('path');
 const ROOT = process.env.VALIDATE_DOC_COUNTS_ROOT || process.cwd();
 const MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.json');
 
-// Files to scan. Root-level narrative docs only — plugins/<name>/CLAUDE.md
-// and docs/solutions/ are NOT scanned (per-plugin counts may legitimately
-// differ from the canonical marketplace count).
-const SCAN_FILES = ['CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'AGENTS.md'];
+// Files to scan. Root-level narrative docs plus the marketplace-wide
+// architecture overview — plugins/<name>/CLAUDE.md and docs/solutions/ are NOT
+// scanned (per-plugin counts may legitimately differ from the canonical
+// marketplace count).
+const SCAN_FILES = [
+  'CLAUDE.md',
+  'README.md',
+  'CONTRIBUTING.md',
+  'AGENTS.md',
+  'docs/architecture-overview.md',
+];
 
 // Patterns to match. Each pattern captures a single integer (group 1) before
 // the keyword. Use \b around keywords to avoid matching "Nplugins".
