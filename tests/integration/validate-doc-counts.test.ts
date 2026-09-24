@@ -21,6 +21,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const VALIDATOR = resolve(__dirname, '..', '..', 'scripts', 'validate-doc-counts.js');
 
+// Mirrors SCAN_FILES in the validator (it runs main() on load, so it cannot
+// be imported). The missing-file test below fails if the two drift apart.
+const SCAN_FILES = [
+  'CLAUDE.md',
+  'README.md',
+  'CONTRIBUTING.md',
+  'AGENTS.md',
+  'docs/architecture-overview.md',
+];
+
 interface ValidatorRun {
   status: number;
   stdout: string;
@@ -69,6 +79,11 @@ describe('validate-doc-counts', () => {
 
   beforeEach(() => {
     tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-validate-doc-counts-'));
+    // Every SCAN_FILES entry must exist; stub them with count-free content so
+    // each test only writes the file it exercises.
+    for (const relPath of SCAN_FILES) {
+      writeFile(tmpRoot, relPath, '# Stub\n');
+    }
   });
 
   afterEach(() => {
@@ -142,5 +157,57 @@ describe('validate-doc-counts', () => {
 
     expect(status).toBe(1);
     expect(stderr).toMatch(/17 marketplace plugins/);
+  });
+
+  it('scans the nested docs/architecture-overview.md entry', () => {
+    writeMarketplace(tmpRoot, 18);
+    writeFile(
+      tmpRoot,
+      'docs/architecture-overview.md',
+      '# Overview\n\nThe marketplace (17 plugins) ships from one repo.\n'
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/docs\/architecture-overview\.md:3/);
+  });
+
+  it('catches a claim that prose wrapping split across two lines', () => {
+    writeMarketplace(tmpRoot, 18);
+    writeFile(
+      tmpRoot,
+      'README.md',
+      '# Test\n\nThe marketplace ships 17\nplugins to consumers.\n'
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/README\.md:3/);
+    expect(stderr).toMatch(/17 plugins/);
+  });
+
+  it('does not match a number and "plugins" in separate paragraphs', () => {
+    writeMarketplace(tmpRoot, 18);
+    writeFile(
+      tmpRoot,
+      'README.md',
+      '# Test\n\nSupported runtime version:\n22\n\nplugins are loaded dynamically.\n'
+    );
+
+    const { status } = runValidator(tmpRoot);
+
+    expect(status).toBe(0);
+  });
+
+  it.each(SCAN_FILES)('fails when SCAN_FILES entry %s is missing', (relPath) => {
+    writeMarketplace(tmpRoot, 3);
+    rmSync(join(tmpRoot, relPath));
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBe(1);
+    expect(stderr).toContain(`${relPath} is listed in SCAN_FILES but does not exist`);
   });
 });

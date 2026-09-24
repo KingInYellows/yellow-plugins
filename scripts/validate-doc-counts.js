@@ -4,7 +4,8 @@
  * Narrative Doc Count Validator
  *
  * Reads .claude-plugin/marketplace.json as the canonical plugin count, then
- * scans root-level narrative docs (CLAUDE.md, README.md, etc.) for
+ * scans root-level narrative docs (CLAUDE.md, README.md, etc.) plus
+ * docs/architecture-overview.md for
  * "<N> plugins" / "<N> marketplace plugins" claims and fails if any claim's
  * integer does not match the canonical count.
  *
@@ -32,16 +33,29 @@ const path = require('path');
 const ROOT = process.env.VALIDATE_DOC_COUNTS_ROOT || process.cwd();
 const MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.json');
 
-// Files to scan. Root-level narrative docs only — plugins/<name>/CLAUDE.md
-// and docs/solutions/ are NOT scanned (per-plugin counts may legitimately
-// differ from the canonical marketplace count).
-const SCAN_FILES = ['CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'AGENTS.md'];
+// Files to scan. Root-level narrative docs plus the marketplace-wide
+// architecture overview — plugins/<name>/CLAUDE.md and docs/solutions/ are NOT
+// scanned (per-plugin counts may legitimately differ from the canonical
+// marketplace count).
+const SCAN_FILES = [
+  'CLAUDE.md',
+  'README.md',
+  'CONTRIBUTING.md',
+  'AGENTS.md',
+  'docs/architecture-overview.md',
+];
 
 // Patterns to match. Each pattern captures a single integer (group 1) before
-// the keyword. Use \b around keywords to avoid matching "Nplugins".
+// the keyword. Use \b around keywords to avoid matching "Nplugins". WS allows
+// at most one line break, so a prose-wrapped claim matches but a number and a
+// word in separate paragraphs do not.
+const WS = String.raw`(?:[ \t]+|[ \t]*\r?\n[ \t]*)`;
 const PATTERNS = [
-  { regex: /\b(\d+)\s+plugins\b/gi, label: 'plugins' },
-  { regex: /\b(\d+)\s+marketplace\s+plugins\b/gi, label: 'marketplace plugins' },
+  { regex: new RegExp(String.raw`\b(\d+)${WS}plugins\b`, 'gi'), label: 'plugins' },
+  {
+    regex: new RegExp(String.raw`\b(\d+)${WS}marketplace${WS}plugins\b`, 'gi'),
+    label: 'marketplace plugins',
+  },
 ];
 
 const colors = {
@@ -73,30 +87,28 @@ function expectedFor(_label, canonical) {
   return canonical;
 }
 
+// Scans the whole file rather than line by line: Prettier's proseWrap can
+// split a claim like "19\nplugins" across two lines, and `\s+` spans the
+// newline. The reported line is the one where the number starts.
 function scanFile(filePath, canonical, mismatches) {
-  if (!fs.existsSync(filePath)) {
-    return;
-  }
-  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    for (const { regex, label } of PATTERNS) {
-      // Reset lastIndex per line to avoid stateful regex pitfalls.
-      regex.lastIndex = 0;
-      let match;
-      while ((match = regex.exec(line)) !== null) {
-        const found = parseInt(match[1], 10);
-        const expected = expectedFor(label, canonical);
-        if (found !== expected) {
-          mismatches.push({
-            file: path.relative(ROOT, filePath),
-            line: i + 1,
-            label,
-            found,
-            expected,
-            context: line.trim(),
-          });
-        }
+  const text = fs.readFileSync(filePath, 'utf8');
+  const lines = text.split(/\r?\n/);
+  for (const { regex, label } of PATTERNS) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const found = parseInt(match[1], 10);
+      const expected = expectedFor(label, canonical);
+      if (found !== expected) {
+        const lineIndex = text.slice(0, match.index).split('\n').length - 1;
+        mismatches.push({
+          file: path.relative(ROOT, filePath),
+          line: lineIndex + 1,
+          label,
+          found,
+          expected,
+          context: lines[lineIndex].trim(),
+        });
       }
     }
   }
@@ -105,6 +117,20 @@ function scanFile(filePath, canonical, mismatches) {
 function main() {
   const canonical = readMarketplaceCount();
   const mismatches = [];
+
+  // A missing SCAN_FILES entry is an error, not a skip: a renamed or deleted
+  // doc would otherwise silently drop out of the count check.
+  const missing = SCAN_FILES.filter(
+    (relPath) => !fs.existsSync(path.join(ROOT, relPath))
+  );
+  if (missing.length > 0) {
+    for (const relPath of missing) {
+      console.error(
+        `${colors.red}✗ ERROR:${colors.reset} ${relPath} is listed in SCAN_FILES but does not exist — update SCAN_FILES in scripts/validate-doc-counts.js`
+      );
+    }
+    process.exit(1);
+  }
 
   for (const relPath of SCAN_FILES) {
     scanFile(path.join(ROOT, relPath), canonical, mismatches);
