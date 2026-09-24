@@ -911,12 +911,13 @@ since (the tag would then point at the wrong, later commit):
   git push origin "v$VERSION"
   ```
 
-- [ ] Trigger workflow with force_publish (recovery mode skips the existing
-      catalog tag, creates any missing per-plugin tags, and publishes the GitHub
-      Release)
+- [ ] Trigger workflow with force_publish pinned to the tag you just pushed
+      (recovery mode skips the existing catalog tag, creates any missing
+      per-plugin tags, and publishes the GitHub Release). Omitting `--ref`
+      runs from whatever `main` is now, which may not match `$MERGE_SHA`.
 
   ```bash
-  gh workflow run version-packages.yml -f force_publish=true
+  gh workflow run version-packages.yml --ref "v$VERSION" -f force_publish=true
   ```
 
 - [ ] Confirm workflow started
