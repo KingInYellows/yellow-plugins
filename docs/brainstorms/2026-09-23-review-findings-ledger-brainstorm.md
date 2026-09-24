@@ -309,13 +309,15 @@ For `/flow:plan` to pick up, in dependency order:
    persist only its hash and the line hint so a secret echoed from the diff
    never lands in `.git` or gets re-injected into prompts. Because
    `redact_secrets` does not know every credential shape (it misses assignments
-   such as `DEVIN_ORG_ID=...`), a fail-closed pass runs on the model-authored
-   strings after it: any string that still contains an environment-style
-   assignment to a `*_KEY`, `*_TOKEN`, `*_SECRET`, `*_ID` or `*_PASSWORD` name,
-   or a long high-entropy token, is replaced wholesale with
-   `[withheld: possible credential]`, keeping the finding but not the text;
-   fingerprint function (`file` + normalized `category` + `rule` + enclosing
-   scope + whitespace-normalized code-context hash; line kept as a rematch hint,
+   such as `DEVIN_ORG_ID=...`), a fail-closed pass runs after it on the
+   model-authored strings and on every anchor-snapshot line: anything that still
+   contains an environment-style assignment to a `*_KEY`, `*_TOKEN`, `*_SECRET`,
+   `*_ID` or `*_PASSWORD` name, or a long high-entropy token, is withheld — a
+   model-authored string is replaced wholesale with
+   `[withheld: possible credential]`, and a snapshot line falls back to its hash
+   and line hint only — keeping the finding but not the text; fingerprint
+   function (`file` + normalized `category` + `rule` + enclosing scope +
+   whitespace-normalized code-context hash; line kept as a rematch hint,
    `reviewer` stored but not keyed), dedup/state-check function,
    dismissed-findings reader (for context injection), prune-on-close function
    that removes both `<pr>.jsonl` and `<pr>.pending` under the PR's `flock` and
@@ -369,16 +371,17 @@ For `/flow:plan` to pick up, in dependency order:
    different `scope` values and through converter output.
 3. **`/review:triage` command** — new command file mirroring `/debt:triage`'s
    structure: first resolve the target PR
-   (`gh pr view <pr> --json headRefName,headRefOid`) and require the checked-out
-   `HEAD` to equal `headRefOid` and a clean tree (`git status --porcelain`
-   empty, the same gate the review commands use) before any re-verification or
-   edit, so it never edits over, or mistakes for a fix, someone's uncommitted
-   work (check it out through the stacked-PR provider, as `review-pr.md` does,
-   or refuse). Without that checkout it re-verifies read-only against the PR
-   head (`git show <headRefOid>:<file>` after a fetch), never against an
-   unrelated worktree's `HEAD`. Every stored model-authored field (titles,
-   reasons, suggested fixes, which derive from an untrusted PR diff) goes
-   through the same delimiter substitution and untrusted-content fence, with the
+   (`gh pr view <pr> --json headRefName,headRefOid`). Re-verification reads the
+   worktree only when the checked-out `HEAD` equals `headRefOid` and the tree is
+   clean (`git status --porcelain` empty, the same gate the review commands
+   use), so it never mistakes someone's uncommitted work for a fix; otherwise it
+   re-verifies read-only against the PR head (`git show <headRefOid>:<file>`
+   after a fetch), never against an unrelated worktree's `HEAD`. Any edit
+   requires that gate to pass first (check the PR out through the stacked-PR
+   provider, as `review-pr.md` does, or refuse to edit), so triage never edits
+   over uncommitted work. Every stored model-authored field (titles, reasons,
+   suggested fixes, which derive from an untrusted PR diff) goes through the
+   same delimiter substitution and untrusted-content fence, with the
    reference-only instruction, before triage interprets it. Then: read ledger,
    re-verify against that head SHA, mark `stale` on mismatch, validate every
    stored `file` path before any `Read`, `Edit` or shell use (repo-relative, no
@@ -414,16 +417,18 @@ For `/flow:plan` to pick up, in dependency order:
    `<pr>.state` only when state is `MERGED` or `CLOSED` (the only ledger
    deletion path — `/review:sweep-all` delegates here), append transition
    records (`open`/`reopened`/`report_only`→`applied` for an approved fix,
-   `open`→`fixed`/`dismissed`/`stale`, and the same terminal transitions for
-   `reopened`; `stale`→`dismissed` when a human confirms an obsolete finding,
-   and `stale`→`reopened` when it rematches later; `applied`→`fixed` once the
-   ancestor check (or its patch-id / content fallback) shows the fix is
-   published; `applied`→`reopened` when the fix is abandoned or invalid (the
-   edit was discarded or the commit dropped), because the defect itself is still
-   there; `dismissed` stays reserved for an explicit decision that the finding
-   is not actionable; and for `report_only` once a human fixes or dismisses one
-   or re-verification finds it stale, without ever making it auto-applicable;
-   never rewrite finding rows), refresh `<pr>.pending` after each fold.
+   `open`→`dismissed`/`stale`, and the same transitions for `reopened` — there
+   is no direct edge into `fixed`, so every fix passes through `applied` and the
+   publication check below; `stale`→`dismissed` when a human confirms an
+   obsolete finding, and `stale`→`reopened` when it rematches later;
+   `applied`→`fixed` once the ancestor check (or its patch-id / content
+   fallback) shows the fix is published; `applied`→`reopened` when the fix is
+   abandoned or invalid (the edit was discarded or the commit dropped), because
+   the defect itself is still there; `dismissed` stays reserved for an explicit
+   decision that the finding is not actionable; and for `report_only` once a
+   human fixes or dismisses one or re-verification finds it stale, without ever
+   making it auto-applicable; never rewrite finding rows), refresh
+   `<pr>.pending` after each fold.
 4. **`sweep.md` / `sweep-all.md` integration** — add the "Residual" count column
    to the summary table; `sweep.md` optionally invokes
    `/review:triage --non-interactive` as a final step; `sweep-all.md` runs the
