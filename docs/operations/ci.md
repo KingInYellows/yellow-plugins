@@ -14,6 +14,7 @@ procedures.
 **Repo Sources of Truth:**
 
 - `.github/workflows/validate-schemas.yml`
+- `.github/workflows/validate-schemas-fork.yml`
 - `.github/workflows/version-packages.yml`
 - `package.json`
 
@@ -36,7 +37,11 @@ procedures.
 
 ## Workflow Overview
 
-The Yellow Plugins CI/CD system consists of two primary workflows:
+The Yellow Plugins CI/CD system consists of two primary workflows, plus a
+fork-PR variant of the validation workflow. Other files in
+`.github/workflows/` (`lint-plugins.yml`, `claude.yml`,
+`claude-code-review.yml`, `upstream-pins-advisory.yml`) are outside this
+guide.
 
 ### 1. Validation Workflow (`.github/workflows/validate-schemas.yml`)
 
@@ -46,6 +51,11 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 - Pull requests to `main` (on schema/plugin/contract/code changes)
 - Pushes to `main` branch
 - Manual workflow dispatch
+
+Every job runs only on non-PR events and same-repo pull requests (the
+job-level `if:`). On a fork pull request every job here is skipped, and
+`validate-schemas-fork.yml` runs instead (see
+[Fork pull requests](#fork-pull-requests-validate-schemas-forkyml)).
 
 **Jobs:**
 
@@ -57,7 +67,7 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 - `integration-tests`
 - `contract-drift`
 - `security-audit`
-- `build` (non-PR events and same-repo pull requests)
+- `build`
 - `plugin-shell-tests` (needs `validate-schemas`; required by `ci-status`)
 - `goal-engine-compat` (needs `build`; required by `ci-status`)
 - `codex-install-verification` (advisory; not in `ci-status` `needs`)
@@ -81,6 +91,14 @@ seconds
 - `build-and-release` (validate versions, build artifacts, GitHub Release, optional NPM publish)
 - `notify` (failure notification)
 
+### Fork pull requests (`validate-schemas-fork.yml`)
+
+A lighter workflow for pull requests from forks, on GitHub-hosted runners so
+untrusted code never reaches self-hosted infrastructure. It runs
+`validate-schemas`, `lint-and-typecheck`, `unit-tests`, `validate-versions`,
+`changeset-check`, and its own `ci-status`, and only when the PR head is a
+fork.
+
 ---
 
 ## Validation Workflow
@@ -92,7 +110,7 @@ Parallel start: validate-schemas, lint-and-typecheck, validate-versions, changes
 lint-and-typecheck -> unit-tests -> integration-tests
 validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
-  -> build (non-PR events and same-repo pull requests)
+  -> build
 validate-schemas -> plugin-shell-tests
 build -> goal-engine-compat
 ci-status needs the blocking jobs above, including plugin-shell-tests and goal-engine-compat
