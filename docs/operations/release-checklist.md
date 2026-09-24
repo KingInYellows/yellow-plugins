@@ -433,8 +433,10 @@ metrics/observability.
 > **Scope note**: 3.2-3.7 below test a
 > `pnpm cli install/update/publish/ rollback/uninstall` command surface, a
 > `.claude-plugin/registry.json`, and a `.claude-plugin/cache/` layout. **None
-> of that exists in this repository.** `packages/cli` ships exactly one
-> subcommand (`pnpm cli validate:plugins`); install/update/rollback/uninstall
+> of that exists in this repository.** The runnable validator is
+> `pnpm validate:plugins` (root `package.json` →
+> `node scripts/validate-plugin.js`); there is no root `cli` script.
+> Install/update/rollback/uninstall
 > are handled natively by Claude Code (`docs/CLAUDE.md` "Architecture"). 3.2-3.7
 > describe the design-time CLI contract in `docs/contracts/cli-contracts.md` and
 > cannot currently pass — they are **not** part of the blocking release gate.
