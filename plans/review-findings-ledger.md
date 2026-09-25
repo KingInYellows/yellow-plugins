@@ -964,14 +964,14 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 6: SessionStart hook and final docs
 
-- [ ] 6.1: In `catalog/plugins/yellow-review.json`, add `hooks.SessionStart`
+- [x] 6.1: In `catalog/plugins/yellow-review.json`, add `hooks.SessionStart`
       with `matcher: "*"`, the command
       `bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh"` and
       `"timeout": 3`, and set `targets.codex.includeHooks: false`. The generator
       has no Cursor hook path, so Cursor needs nothing. Run
       `pnpm generate:manifests`, then `pnpm validate:generated`, then refresh
       the snapshot.
-- [ ] 6.2: Write `plugins/yellow-review/hooks/scripts/session-start.sh` via
+- [x] 6.2: Write `plugins/yellow-review/hooks/scripts/session-start.sh` via
       heredoc with LF endings, in the yellow-debt shape: `set -uo pipefail`,
       always emit `{"continue": true}`, don't read stdin, build the message with
       `jq -n`. Time budget: `git -C "$CLAUDE_PROJECT_DIR" rev-parse` and the
@@ -1011,7 +1011,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 6.3: `plugins/yellow-review/tests/session-start.bats` covers:
+- [x] 6.3: `plugins/yellow-review/tests/session-start.bats` covers:
   - no repo or no dir → bare continue;
   - the counts;
   - fixed and dismissed records don't count, even though the append-only file is
@@ -1022,7 +1022,7 @@ yellow-core changes. Each stage carries its own changeset.
   - a lock held by a background writer → "pending unknown" within budget;
   - a malformed sidecar → unknown;
   - the output is valid JSON (`run --separate-stderr`, `jq -e`).
-- [ ] 6.4: Docs:
+- [x] 6.4: Docs:
   - `docs/architecture-overview.md`: add a `yellow-review` row to the
     SessionStart table.
   - `plugins/yellow-review/CLAUDE.md`: replace "the plugin ships no hooks" in
@@ -1045,7 +1045,7 @@ yellow-core changes. Each stage carries its own changeset.
       `/review:pr` on a scratch PR, start a new session, and confirm the message
       appears. After the first reviews, record the `category_split` value (the
       measurement the brainstorm asks for).
-- [ ] 6.6: Changeset: `yellow-review` minor.
+- [x] 6.6: Changeset: `yellow-review` minor.
 
 ## Testing Strategy
 
@@ -1286,4 +1286,4 @@ behaviour, so every PR passes the CI gate on its own.
 - [x] 3. agent/feat/review-ledger-persistence (completed 2026-09-25)
 - [x] 4. agent/feat/review-triage-command (completed 2026-09-25)
 - [x] 5. agent/feat/review-sweep-ledger (completed 2026-09-25)
-- [ ] 6. agent/feat/review-ledger-session-hook
+- [x] 6. agent/feat/review-ledger-session-hook (completed 2026-09-25; manual check 6.5 pending)

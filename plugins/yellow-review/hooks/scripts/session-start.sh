@@ -1,0 +1,133 @@
+#!/bin/bash
+# session-start.sh — one line about pending review-ledger findings.
+#
+# Reads only the per-PR sidecars that lib/review-ledger.sh keeps next to
+# each ledger in $(git rev-parse --git-common-dir)/yellow-review/findings/:
+#   <pr>.pending  "<pending> <attention> <jsonl-bytes>"
+#   <pr>.state    "<OPEN|MERGED|CLOSED> <epoch>"
+# A sidecar counts only while its <pr>.jsonl exists, its byte count still
+# matches, and <pr>.state says OPEN and is under 7 days old; otherwise the PR
+# is named as unverified, or folded within budget, or named as unknown.
+# Output holds integers and PR numbers only — never ledger text.
+#
+# NOTE: SessionStart hooks run in parallel across plugins; this one is
+# independent. stdin is intentionally not read. Budget 3 s (catalog
+# timeout): git ~50 ms, per-PR shared lock <= 0.2 s, fallback folds capped
+# at 1.5 s in total.
+
+# Intentionally omit -e: a SessionStart hook must always print
+# {"continue": true}, and -e would exit on the first failed probe.
+set -uo pipefail
+
+finish() {
+  printf '{"continue": true}\n'
+  exit 0
+}
+
+command -v jq >/dev/null 2>&1 || finish
+command -v git >/dev/null 2>&1 || finish
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+common=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || finish
+case "$common" in /*) ;; *) finish ;; esac
+DIR="$common/yellow-review/findings"
+[ -d "$DIR" ] || finish
+
+now_ms() {
+  local t
+  t=$(date +%s%N 2>/dev/null)
+  case "$t" in
+    *N | '') printf '%s000' "$(date +%s)" ;;
+    *) printf '%s' "${t:0:13}" ;;
+  esac
+}
+FOLD_BUDGET_MS=1500
+fold_spent=0
+now=$(date +%s)
+week=$((7 * 24 * 3600))
+
+# Minimal fold: latest transition per finding, in file order.
+FOLD_JQ='split("\n") | map(select(length > 0) | (try fromjson catch null) | select(type == "object" and .v == 1 and .type == "transition"))
+  | reduce .[] as $t ({}; .[$t.finding_id] = $t.state) | [.[]]
+  | "\(map(select(. == "open" or . == "reopened" or . == "applied")) | length) \(map(select(. == "report_only" or . == "stale")) | length)"'
+
+pending=0 attention=0
+counted='' unverified='' unknown=''
+
+# Read one PR's counts (runs in a subshell holding the shared lock).
+# Prints "<pending> <attention> <fold-ms-spent>", or "x x <ms>" when unknown.
+read_counts() {
+  local pr="$1" p a b size t0 t1 out
+  if [ -f "$DIR/$pr.pending" ] && read -r p a b <"$DIR/$pr.pending" 2>/dev/null &&
+    [[ "$p" =~ ^[0-9]+$ && "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+    size=$(wc -c <"$DIR/$pr.jsonl" | tr -d ' ')
+    if [ "$b" = "$size" ]; then
+      printf '%s %s 0' "$p" "$a"
+      return 0
+    fi
+  fi
+  if [ "$fold_spent" -ge "$FOLD_BUDGET_MS" ] || ! command -v timeout >/dev/null 2>&1; then
+    printf 'x x 0'
+    return 0
+  fi
+  t0=$(now_ms)
+  out=$(timeout "$(awk -v ms="$((FOLD_BUDGET_MS - fold_spent))" 'BEGIN { printf "%.3f", ms / 1000 }')" \
+    jq -R -s -r "$FOLD_JQ" "$DIR/$pr.jsonl" 2>/dev/null) || out=''
+  t1=$(now_ms)
+  [[ "$out" =~ ^[0-9]+\ [0-9]+$ ]] || out='x x'
+  printf '%s %s' "$out" "$((t1 - t0))"
+}
+
+for f in "$DIR"/*.jsonl; do
+  [ -f "$f" ] || continue
+  pr=$(basename -- "$f" .jsonl)
+  [[ "$pr" =~ ^[1-9][0-9]{0,9}$ ]] || continue
+  st='' ts=0
+  [ -f "$DIR/$pr.state" ] && read -r st ts <"$DIR/$pr.state" 2>/dev/null
+  [[ "$ts" =~ ^[0-9]+$ ]] || ts=0
+  if [ "$st" != OPEN ] || [ $((now - ts)) -ge "$week" ]; then
+    unverified="$unverified #$pr"
+    continue
+  fi
+  counts=''
+  if [ ! -e "$DIR/$pr.lock" ]; then
+    counts=$(read_counts "$pr")
+  elif command -v flock >/dev/null 2>&1; then
+    counts=$( (
+      exec 9<"$DIR/$pr.lock" || exit 1
+      flock -s -w 0.2 9 || exit 1
+      read_counts "$pr"
+    ) 2>/dev/null) || counts=''
+  fi
+  spent=${counts##* }
+  [[ "$spent" =~ ^[0-9]+$ ]] && fold_spent=$((fold_spent + spent))
+  counts=${counts% *}
+  if [[ "$counts" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
+    p=${BASH_REMATCH[1]} a=${BASH_REMATCH[2]}
+    pending=$((pending + p))
+    attention=$((attention + a))
+    [ $((p + a)) -gt 0 ] && counted="$counted #$pr"
+  else
+    unknown="$unknown #$pr"
+  fi
+done
+
+if [ $((pending + attention)) -eq 0 ] && [ -z "$unverified" ] && [ -z "$unknown" ]; then
+  finish
+fi
+
+prs=$(printf '%s' "$counted" | sed 's/^ //; s/ /, /g')
+unv=$(printf '%s' "$unverified" | sed 's/^ //; s/ /, /g')
+unk=$(printf '%s' "$unknown" | sed 's/^ //; s/ /, /g')
+first=$(printf '%s %s %s' "$counted" "$unknown" "$unverified" | tr -s ' ' | sed 's/^ //' | cut -d' ' -f1)
+msg="[yellow-review] Review ledger: $pending pending, $attention need attention"
+[ -n "$prs" ] && msg="$msg (PRs $prs)"
+[ -n "$unk" ] && msg="$msg; pending unknown: $unk"
+[ -n "$unv" ] && msg="$msg; unverified: $unv"
+msg="$msg. Run /review:triage ${first#\#}."
+ctx="Review-findings ledger for this repository: $pending pending and $attention needing attention"
+[ -n "$prs" ] && ctx="$ctx on PRs $prs"
+[ -n "$unk" ] && ctx="$ctx; counts unknown for $unk"
+[ -n "$unv" ] && ctx="$ctx; PR state not verified for $unv"
+ctx="$ctx. /review:triage <PR> works through them."
+jq -cn --arg msg "$msg" --arg ctx "$ctx" \
+  '{continue: true, systemMessage: $msg, hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}}' 2>/dev/null || finish
