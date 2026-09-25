@@ -203,6 +203,8 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -q "ledger_bash:   ok (%s %s)" "$f"
   grep -q 'BASH_VERSINFO' "$f"
   grep -q '`ledger_bash` too old' "$f"
+  # the ledger is Bash 3.2-compatible, so stock macOS /bin/bash passes
+  grep -qF '|| [ "$bash_ver" = 3.2 ]; then' "$f"
 }
 
 # --- /review:triage (Stage 4) -----------------------------------------------

@@ -58,7 +58,16 @@ Prune is the only way a ledger is deleted, and the library checks
 gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOid,isCrossRepository
 ```
 
-- `MERGED` or `CLOSED`: run Step 2 and stop.
+- `MERGED` or `CLOSED`: never prune implicitly — the PR may have closed
+  after the caller last checked it, and deleting a ledger needs a human.
+  - With `--non-interactive`: print `Ledger: retained (PR <state>)` and
+    stop. Unattended triage never reaches Step 2.
+  - Attended: ask one AskUserQuestion, "Delete the ledger for closed PR
+    #<n>?", with the options "Delete" and "Keep". Run Step 2 only on
+    "Delete"; either way, stop.
+
+  A retained ledger is cleaned up later by `/review:sweep-all`'s confirmed
+  prune step or an explicit `/review:triage --prune <PR#>`.
 - Fetch the base by its OID (never interpolate the branch name) and the PR head
   (`remote-head` fetches `refs/pull/<PR>/head`, which also works for fork PRs,
   and retries until it equals `headRefOid`):
@@ -113,7 +122,7 @@ Use `triage-noninteractive` in unattended mode. By latest state:
   tree that cannot be read never retires a deletion finding.
 
 When `large` is true, add a notice that the ledger is over 2 MiB. Ledgers are
-never compacted; merging or closing the PR prunes them.
+never compacted; a confirmed prune after the PR merges or closes deletes them.
 
 ## Step 6: Unattended mode stops here
 
