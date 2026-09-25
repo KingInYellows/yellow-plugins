@@ -178,6 +178,16 @@ rl_append() {
   (umask 077 && printf '%s\n' "$line" >>"$file")
 }
 
+# Append an observation and, optionally, its opening transition: one or two
+# complete lines in a single write. Caller holds the lock.
+rl_append_pair() {
+  local file="$1" lines="$2"
+  case "$lines" in
+    *$'\n'*$'\n'*) rl_err "refusing more than two records"; return 1 ;;
+  esac
+  (umask 077 && printf '%s\n' "$lines" >>"$file")
+}
+
 # Tail repair, under the lock, before any append or fold. A final record
 # missing only its newline gets it; an unparseable tail is quarantined to
 # <file>.corrupt-<ts> and the file truncated to its last newline.
@@ -1269,9 +1279,8 @@ rl_observe_locked() {
       if printf '%s' "$fold" | jq -e --arg id "$id" 'any(.findings[]; .finding_id == $id)' >/dev/null; then
         id=$(printf '%s:%s:%s' "$id" "$RL_O_RUN" "$i" | rl_sha256)
       fi
-      rl_append "$f" "$(obs "$id")" || return 1
       if [ "$(jq -r '.report_only' <<<"$c")" = true ]; then state=report_only; else state=open; fi
-      rl_append "$f" "$(rl_transition_record "$id" "$state" "" "$RL_O_HEAD" "$RL_O_SOURCE" "" "" "" null)" || return 1
+      rl_append_pair "$f" "$(obs "$id")"$'\n'"$(rl_transition_record "$id" "$state" "" "$RL_O_HEAD" "$RL_O_SOURCE" "" "" "" null)" || return 1
       new=$((new + 1))
       continue
     fi
