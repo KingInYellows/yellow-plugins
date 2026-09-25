@@ -110,6 +110,13 @@ schema_fields() {
   jq -e '.categories | keys == ["contract","correctness","docs","maintainability","performance","reliability","security","testing"]' "$VOCAB" >/dev/null
 }
 
+@test "ledger: review-all's imperative Read explicitly loads item 7 before dispatch" {
+  run bash -c "grep -A2 'block): Read' '$REVIEW_ALL'"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "Step 5 item 7's"
+  echo "$output" | grep -q "alias-expanded \`<rule-vocabulary>\` jq procedure"
+}
+
 @test "ledger: the injected rule vocabulary also exposes category_aliases" {
   grep -q 'category_aliases' "$REVIEW_PR"
   grep -q 'alias of' "$REVIEW_PR"
