@@ -252,6 +252,15 @@ setup() {
   ! grep -rq "$tok" "$LEDGER_DIR"
 }
 
+@test "credential-shaped category_raw is withheld before it reaches the ledger" {
+  printf 'x = 1\n' >|p.js
+  H=$(commit_all pw)
+  tok="aB3dEfGhIjKlMnOpQrStUvWxYz0123456789"
+  observe "$H" "[$(finding p.js 1 "{\"category\":\"$tok\"}")]" >/dev/null
+  ! grep -rq "$tok" "$LEDGER_DIR"
+  [ "$(fold | jq -r '.findings[0].obs.category_raw')" = "[withheld]" ]
+}
+
 @test "redaction: with yellow-core missing no model-authored text is stored" {
   export RL_CORE_LIB="$BATS_TEST_TMPDIR/missing/compound-staging.sh"
   observe "$BASE" "[$(finding a.sh 2 '{"title":"sensitive title","suggested_fix":"do the thing","scope":"somefn"}')]" >/dev/null
