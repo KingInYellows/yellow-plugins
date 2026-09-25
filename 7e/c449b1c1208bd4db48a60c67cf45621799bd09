@@ -1,0 +1,91 @@
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_520e182b5f7c63::t_ac209baedbb9f9 966-974
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_06861e097d1394 584,587,590,593,595,612,614,616,640,644,648,683,699,1279-1284,1288-1289
+  s_520e182b5f7c63::t_80487279652efb 705,731,742,745,748,752,1285
+  s_520e182b5f7c63::t_739721c004e95c 872,877,893,903,929,940,1287
+plugins/yellow-review/.claude-plugin/plugin.json
+  s_520e182b5f7c63::t_1c775175108a99 18-26
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_53e14a164013d4 173-178,183-187,195,322-325
+  s_520e182b5f7c63::t_dd665662f0735d 55,79-83,179-182,227-230
+plugins/yellow-review/lib/review-ledger-vocab.json
+  s_520e182b5f7c63::t_ac9ed81d12fa31 1-93,1-19,21-93
+plugins/yellow-review/lib/review-ledger.sh
+  s_520e182b5f7c63::t_be65e441f7b7f4 1-621,630-658,661-667,669-924,930-1040,1043-1072,1074-1082,1084-1094,1102-1199,1202-1208,1210-1220,1222-1228,1230-1233,1235-1240,1242-1245,1247-1248,1250-1254,1256,1258-1319,1321-1325,1327-1423,1425,1434-1443,1450-1543,1843-1850,1857-1878,1880-1889
+  s_520e182b5f7c63::t_b348d718222e33 1676-1842,1854-1856,1879
+.changeset/review-ledger-lib.md
+  s_520e182b5f7c63::t_6cb2c4c0ef4d97 1-7
+plugins/yellow-review/tests/mocks/gh
+  s_520e182b5f7c63::t_929aed806f9f1d 55-64,77
+plugins/yellow-review/tests/helpers/ledger-repo.bash
+  s_520e182b5f7c63::t_7d1f06d7bcf54a 1-58
+catalog/plugins/yellow-review.json
+  s_520e182b5f7c63::t_9e34557ef21007 22-29
+plugins/yellow-review/tests/review-ledger.bats
+  s_520e182b5f7c63::t_61a566ec8962e8 1-254,1-234,236-254,264-567,264-567,575-598,575-598,623-648,623-648
+  s_520e182b5f7c63::t_421439da42ee93 784-954
+.github/workflows/validate-schemas.yml
+  s_520e182b5f7c63::t_583571aec314a1 1408-1410
+.changeset/review-rule-scope-fields.md
+  s_520e182b5f7c63::t_f500c9442abc49 1-10
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_520e182b5f7c63::t_6e6ded51c4da43 116-117,133-134,138
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_520e182b5f7c63::t_96f7f15320d6a7 138-139,155-156,160
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_520e182b5f7c63::t_303afacb1bdb3a 195-196,215-216,220
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_9ca5cc9d071696 261-262,280-281,285
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_520e182b5f7c63::t_0c543dbc9d6dc5 207-208,224-225,229
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_d0bc89ad8e60eb 144-145,161-162,166
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_520e182b5f7c63::t_bfaf59887c0c00 107-108,127-128,132
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_520e182b5f7c63::t_2e4facfcb8f7d3 112-113,132-133,137
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_520e182b5f7c63::t_11a74e9f4adffa 197-198,221-222,226
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_520e182b5f7c63::t_100352f24bafaf 142-143,162-163,167
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_520e182b5f7c63::t_11a88bef42eed0 169-170,189-190,194
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_520e182b5f7c63::t_b61ad99c0e5755 111-112,131-132,136
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_520e182b5f7c63::t_0050bffe36f06c 163-164,183-184,188
+plugins/yellow-review/commands/review/review-all.md
+  s_520e182b5f7c63::t_79fec1855230eb 266-269,281-282,293-296,425-426
+plugins/yellow-review/commands/review/review-pr.md
+  s_520e182b5f7c63::t_95e35ca616b890 597,601-602,609-615,618-621,627-629,637-638,651-652,671-679,723-724,831,845-850,886-889,1119-1120
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_520e182b5f7c63::t_5780edaf596c98 164-165,181-182,187-189
+plugins/yellow-review/tests/skill-content.bats
+  s_520e182b5f7c63::t_bf7f71f35f05cb 46-111
+  s_520e182b5f7c63::t_f137d0f390e3f5 167-201
+plugins/yellow-review/commands/review/triage.md
+  s_520e182b5f7c63::t_f2a2f526b5deb2 1-208
+.changeset/review-triage-command.md
+  s_520e182b5f7c63::t_694b45011c1611 1-10
+README.md
+  s_520e182b5f7c63::t_8f2c2db9502be7 41,276
+plugins/yellow-review/README.md
+  s_520e182b5f7c63::t_c03fce8f57bbfa 37,159-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7ec449b1c1208bd4db48a60c67cf45621799bd09",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
