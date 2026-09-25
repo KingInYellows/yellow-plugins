@@ -65,9 +65,14 @@ anything, so an interrupted run loses nothing.
    compact-return object plus:
    - `reviewers`: every reviewer that flagged it after Step 6.2's merge.
    - `queue`: `fixer`, `residual` or `report_only`.
-2. Write the array with the Write tool to a file under a fresh `mktemp -d`
-   directory, and remember the element order: the library reports results by
-   1-based ordinal.
+   Before the next step, redact any credential-shaped substring inside
+   `title`, `suggested_fix`, `migration`, or other free-text field (AGENTS.md's
+   Security & Prompt-Injection Rules) — the raw finding can quote a value the
+   reviewer copied from the diff, and this file is written before the
+   ledger's own redaction pass runs.
+2. Write the redacted array with the Write tool to a file under a fresh
+   `mktemp -d` directory, and remember the element order: the library reports
+   results by 1-based ordinal.
 3. Run:
 
    ```bash
@@ -76,10 +81,18 @@ anything, so an interrupted run loses nothing.
      --run-id <RUN_ID> --source <SOURCE> <"<findings-file>"
    ```
 
-4. From the JSON result, keep `findings[]` (`ordinal` → `finding_id`) for Steps
-   7 and 9, and `new`, `merged`, `reopened`, `suppressed_dismissed` and
+   Remove the `mktemp -d` directory immediately after this command returns,
+   on both success and failure — it held reviewer-authored text and must not
+   outlive the call.
+
+4. From the JSON result, keep `findings[]` (`ordinal` → `finding_id`) for
+   Steps 7 and 9, and `new`, `merged`, `reopened`, `suppressed_dismissed` and
    `rejected` for Step 10. A `rejected` entry names only an ordinal and a
-   reason; list the ordinals in Coverage.
+   reason; list the ordinals in Coverage. Before Step 7 touches anything,
+   drop every ordinal whose `findings[]` entry has `status: "suppressed"`
+   from the fixer, residual and report-only queues — it names a dismissed
+   finding a reviewer merely repeated, and fixing or transitioning it makes
+   the ledger's `dismissed -> applied` step illegal.
 
 ## Step 7 — record each applied fix
 
@@ -123,20 +136,28 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
-   REMOTE=$("$RL" remote-head <PR>) || exit 0
-   for id in <finding_id> <finding_id>; do
-     "$RL" transition <PR> "$id" applied --published-head "$REMOTE" --actor <SOURCE>
-   done
-   "$RL" settle <PR> --remote-head "$REMOTE" --actor <SOURCE> \
-     --ids-json '["<finding_id>", "<finding_id>"]'
+   if REMOTE=$("$RL" remote-head <PR>); then
+     for id in <finding_id> <finding_id>; do
+       "$RL" transition <PR> "$id" applied --published-head "$REMOTE" --actor <SOURCE>
+     done
+     "$RL" settle <PR> --remote-head "$REMOTE" --actor <SOURCE> \
+       --ids-json '["<finding_id>", "<finding_id>"]'
+   else
+     RC=$?
+     echo "[review:pr] Warning: ledger remote-head failed (exit $RC)" >&2
+   fi
    ```
 
    `remote-head` fetches `refs/pull/<PR>/head` (fork PRs included) and retries
-   until it equals `headRefOid`; exit 6 means it never matched, so leave the
-   findings `applied`. `settle` moves each finding to `fixed` only when the fix
-   is proved published (ancestor or `git patch-id`) and no longer reproduces at
-   the remote head; a reverted or abandoned fix becomes `reopened`; anything
-   unverifiable stays `applied`.
+   until it equals `headRefOid`; exit 6 means it never matched (or `gh` could
+   not read `headRefOid`), so leave the findings `applied` and route the
+   failure through Conventions' failure policy — add "Ledger: write failed at
+   remote-head (exit N)" to Coverage instead of exiting silently. `settle`
+   moves each finding to `fixed` only when the fix is proved published
+   (ancestor or `git patch-id`) and no longer reproduces at the remote head; an
+   abandoned fix (unreachable from any ref) becomes `reopened`; a proved fix
+   whose anchor still matches, and anything unverifiable, stays `applied` for
+   `/review:triage`.
 
 3. **Push declined, failed, or skipped** (the interactive gate was rejected, or
    the provider returned an error): append nothing more. The findings stay

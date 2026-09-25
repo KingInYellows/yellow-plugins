@@ -864,11 +864,42 @@ review_run() {
   [ "$(fold | jq '.pending')" -eq 3 ]
 }
 
-@test "settle reopens a proved fix that a later commit reverted" {
+# Intentional behavior change (codex P1 on #869): a proved fix (fix_sha is
+# an ancestor of the published head) whose anchor reproduces stays `applied`
+# rather than `reopened` — anchor-only reverify cannot distinguish a genuine
+# revert from a benign additive fix whose anchor line survives unchanged, so
+# a surviving anchor alone must not resurface a published fix. `reopened` is
+# reserved for evidence the fix commit itself was lost (the `abandoned`
+# path). This used to assert `reopened`/`reverted-after-publication`; it now
+# asserts the fix stays `applied`.
+@test "settle keeps a proved fix applied when its anchor reproduces after a later revert" {
   review_run
   git revert --no-edit HEAD >/dev/null
   REV=$(git rev-parse HEAD)
   out=$("$RL" settle "$LEDGER_PR" --remote-head "$REV")
-  [ "$(printf '%s' "$out" | jq -r '.results[0].state')" = reopened ]
-  [ "$(fold | jq -r '.findings[] | select(.finding_id == "'"$FIXED"'") | .reason')" = reverted-after-publication ]
+  [ "$(printf '%s' "$out" | jq -r '.results[0].state')" = applied ]
+  [ "$(state_of "$FIXED")" = applied ]
+}
+
+# Additive-fix scenario (codex P1 on #869): a guard inserted above the cited
+# line shifts, but does not remove, the anchor — reverify reports
+# `reproduced` via a shifted-line match even though the defect is fixed.
+# A proved fix must not reopen on that signal alone.
+@test "settle keeps a proved fix applied when a guard is added above an unchanged anchor" {
+  git checkout -q -b guard-fix
+  printf 'foo() {\n  do_something\n  rm -rf "$dir"\n}\n' >|g.sh
+  H1=$(commit_all guarded_target)
+  git push -q origin "HEAD:refs/pull/$LEDGER_PR/head" 2>/dev/null
+  out=$(observe "$H1" "[$(finding g.sh 3 '{"rule":"missing-input-validation","category":"security"}')]")
+  FIXED=$(printf '%s' "$out" | jq -r '.findings[0].finding_id')
+  transition "$FIXED" applied --head "$H1" --actor review-pr --reason "add guard above unsafe rm" >/dev/null
+  printf 'foo() {\n  do_something\n  [ -n "$dir" ] || return 1\n  rm -rf "$dir"\n}\n' >|g.sh
+  FIX=$(commit_all "fix: guard rm -rf with a validation check")
+  transition "$FIXED" applied --fix-sha "$FIX" --actor review-pr >/dev/null
+  git push -q origin "HEAD:refs/pull/$LEDGER_PR/head" --force 2>/dev/null
+  out=$("$RL" settle "$LEDGER_PR" --remote-head "$FIX")
+  [ "$(printf '%s' "$out" | jq -r '.results[0].publication')" = proved:ancestor ]
+  [ "$(printf '%s' "$out" | jq -r '.results[0].reverify')" = reproduced ]
+  [ "$(printf '%s' "$out" | jq -r '.results[0].state')" = applied ]
+  [ "$(state_of "$FIXED")" = applied ]
 }
