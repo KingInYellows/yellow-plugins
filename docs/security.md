@@ -404,7 +404,9 @@ include prompt injection defenses:
   credentials from every Linear MCP response immediately after fetch. The
   patterns include key prefixes, auth headers and the repository's named
   credential assignments. Only the sanitized copy is displayed or written to
-  the worktree, wrapped in `--- begin/end ---` reference-only fences.
+  the worktree, wrapped in `--- begin/end ---` reference-only fences. The
+  plugin's other commands and agents don't redact yet; that is tracked as P0
+  work in the yellow-linear improvement brainstorm.
 - **yellow-debt**: Scanner agents fence code content with injection boundary
   markers
 - **yellow-ruvector**: Hook scripts validate all inputs before constructing

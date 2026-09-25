@@ -217,6 +217,14 @@ is untrusted. **Sanitize immediately after each fetch, before display, file
 writes, or any other use.** Fencing alone does not remove credential bytes
 from the session transcript or worktree.
 
+**Current coverage.** `/linear:work` and `linear-issue-loader` apply this
+procedure today. The other commands and agents (`/linear:sync`,
+`/linear:triage`, `/linear:status`, `/linear:create`, `/linear:plan-cycle`,
+`/linear:delegate`, `linear-explorer`, `linear-pr-linker`) don't yet. Adopting
+it there is P0 work in
+`docs/brainstorms/2026-09-25-yellow-linear-improvements-for-opus-5-5-brainstorm.md`.
+New or edited callers should follow it.
+
 This covers every Linear MCP tool: issue and comment reads, and also
 metadata lookups (`list_teams`, `list_issue_statuses`, `list_cycles`,
 `list_users`, `list_issue_labels`, `list_projects`). Names and titles are
