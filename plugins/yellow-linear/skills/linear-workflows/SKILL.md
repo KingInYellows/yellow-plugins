@@ -229,7 +229,7 @@ returned:
 3. Discard the raw response. Use only the sanitized copy for session output,
    brainstorm/context packets, and downstream agent prompts.
 
-Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `END`):
+Minimum patterns (PEM private-key blocks are redacted in full, from `BEGIN` through the `END` line of the same key type):
 
 - `sk-proj-`, `sk-ant-`, generic `sk-` API keys
 - `AIza` (Google API keys)
@@ -263,17 +263,19 @@ responses:
 
 ```bash
 awk '
-BEGIN { inpem = 0 }
+BEGIN { inpem = 0; pemend = "" }
 {
   line = $0
   if (inpem) {
     print "--- redacted credential at line " NR " ---"
-    if (line ~ /-----END [A-Z ]*PRIVATE KEY-----/) inpem = 0
+    if (index(line, pemend) > 0) { inpem = 0; pemend = "" }
     next
   }
-  if (line ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+  if (match(line, /-----BEGIN [A-Z ]*PRIVATE KEY-----/)) {
     print "--- redacted credential at line " NR " ---"
-    if (line !~ /-----END [A-Z ]*PRIVATE KEY-----/) inpem = 1
+    pemtype = substr(line, RSTART + 11, RLENGTH - 16)
+    pemend = "-----END " pemtype "-----"
+    if (index(substr(line, RSTART + RLENGTH), pemend) == 0) inpem = 1
     next
   }
   if (line ~ /sk-(proj-|ant-)?[A-Za-z0-9_-]{16,}/ ||
