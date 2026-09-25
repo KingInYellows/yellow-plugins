@@ -534,6 +534,29 @@ pr_with_finding() {
 
 # --- CLAUDE-49: scope verified at the anchor --------------------------------
 
+@test "a mismatched fence marker inside a backtick block does not close it" {
+  source "$RL"
+  cat >"$BATS_TEST_TMPDIR/fence.md" <<'EOF'
+# Doc
+
+## Inside
+
+```
+echo hello
+~~~
+# Not a heading
+```
+
+## After
+
+text
+EOF
+  IFS=$'\t' read -r path8 _ _ _ _ <<<"$(rl_md_heading_path "$BATS_TEST_TMPDIR/fence.md" 8)"
+  IFS=$'\t' read -r path13 _ _ _ _ <<<"$(rl_md_heading_path "$BATS_TEST_TMPDIR/fence.md" 13)"
+  [ "$path8" = "Doc > Inside" ]
+  [ "$path13" = "Doc > After" ]
+}
+
 @test "CLAUDE-49: markdown scopes resolve to the true enclosing heading path" {
   printf '# Doc\n\n## Admin\n\nSame paragraph text.\n\n## Handlers\n\nSame paragraph text.\n' >|s.md
   H=$(commit_all md-scopes)

@@ -619,8 +619,22 @@ rl_map_line() {
 rl_md_heading_path() {
   awk -v L="$2" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
+    {
+      line = $0
+      sub(/^[ \t]+/, "", line)
+      if (match(line, /^(`+|~+)/)) {
+        run = substr(line, RSTART, RLENGTH)
+        char = substr(run, 1, 1)
+        len = length(run)
+        if (!fence) {
+          fence = 1; fence_char = char; fence_len = len
+        } else if (char == fence_char && len >= fence_len) {
+          fence = 0; fence_char = ""; fence_len = 0
+        }
+        next
+      }
+      if (fence) next
+    }
     /^#{1,6}[ \t]/ {
       lvl = match($0, /[^#]/) - 1
       text = substr($0, lvl + 1); sub(/[ \t]#+[ \t]*$/, "", text); text = trim(text)
