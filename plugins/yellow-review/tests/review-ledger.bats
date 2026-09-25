@@ -798,6 +798,19 @@ pr_with_finding() {
   MOCK_GH_FAIL=1 run -6 "$RL" remote-head "$LEDGER_PR"
 }
 
+@test "remote-head refuses a shallow clone even when pull/<n>/head matches" {
+  printf 'a\n' >|a.txt
+  H=$(commit_all shallow-src)
+  git push -q origin "HEAD:refs/heads/main" "HEAD:refs/pull/$LEDGER_PR/head" 2>/dev/null
+  git clone -q --depth 1 "file://$ORIGIN" "$BATS_TEST_TMPDIR/shallow"
+  cd "$BATS_TEST_TMPDIR/shallow"
+  [ "$(git rev-parse --is-shallow-repository)" = true ]
+  export RL_FETCH_BACKOFF=0
+  MOCK_GH_HEAD_OID=$H run -6 --separate-stderr "$RL" remote-head "$LEDGER_PR"
+  [ -z "$output" ]
+  [[ "$stderr" == *"shallow repository"* ]]
+}
+
 # The review-pr Step 6 → 7 → 8 → 9 write sequence, scripted end to end.
 review_run() {
   git checkout -q -b feat

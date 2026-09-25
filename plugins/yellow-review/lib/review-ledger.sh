@@ -1651,6 +1651,9 @@ cmd_remote_head() {
   [[ "$remote" =~ ^[A-Za-z0-9._-]+$ ]] || rl_die "$RL_EXIT_USAGE" "remote-head: bad --remote"
   want=$(gh pr view "$pr" --json headRefOid 2>/dev/null | jq -r '.headRefOid // empty' 2>/dev/null) || want=''
   rl_is_sha "$want" || rl_die "$RL_EXIT_UNVERIFIABLE" "remote-head: could not read headRefOid for PR #$pr"
+  # A shallow clone can fetch the head yet never prove publication or
+  # re-verify (both return unverifiable there), so refuse it up front.
+  rl_is_shallow && rl_die "$RL_EXIT_UNVERIFIABLE" "remote-head: shallow repository; the ledger cannot verify PR #$pr"
   for delay in 0 ${RL_FETCH_BACKOFF:-1 2 4 8 16}; do
     [ "$delay" -gt 0 ] && sleep "$delay"
     git fetch -q "$remote" "refs/pull/$pr/head" 2>/dev/null || continue
