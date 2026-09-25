@@ -1,0 +1,55 @@
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_0e9ca486378b02::t_b7f533b076fbbc 137-139
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_0e9ca486378b02::t_6c088980fbf62d 159-161
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_0e9ca486378b02::t_48864ac015597d 219-221
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_0e9ca486378b02::t_0a55362086a19c 284-286
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_0e9ca486378b02::t_84319daf644d61 228-230
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_0e9ca486378b02::t_fda24a602df93a 165-167
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_0e9ca486378b02::t_98fddcf4811f06 131-133
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_0e9ca486378b02::t_5314b7951e95f8 136-138
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_0e9ca486378b02::t_f66f9570c5bf96 225-227
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_0e9ca486378b02::t_3eda5205d9115e 166-168
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_0e9ca486378b02::t_3c59cf0f42d3e9 193-195
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_0e9ca486378b02::t_43311400103f2e 135-137
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_0e9ca486378b02::t_99017ad78ff79e 187-189
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_0e9ca486378b02::t_a31a115c737779 394-396
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_0e9ca486378b02::t_187b1c9bf8acbb 394-396
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_0e9ca486378b02::t_e351d2fbeaec55 186-188
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_0e9ca486378b02::t_3fd550031f77ff 395-397
+plugins/yellow-review/tests/review-ledger.bats
+  s_0e9ca486378b02::t_c3ba434898b701 649-655
+plugins/yellow-review/tests/skill-content.bats
+  s_0e9ca486378b02::t_ea9fe4994d3a0f 88-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0db98f0550933d3dcc8e08d352311a458aacff72",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
