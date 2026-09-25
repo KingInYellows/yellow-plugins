@@ -56,6 +56,19 @@ setup() {
   while IFS= read -r l; do printf '%s' "$l" | jq -e . >/dev/null; done <"$f"
 }
 
+@test "orphan observation without a transition is invisible until re-observed" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  f="$LEDGER_DIR/$LEDGER_PR.jsonl"
+  head -n 1 "$f" >|"$f.orphan"
+  mv "$f.orphan" "$f"
+  [ "$(fold | jq '.pending')" -eq 0 ]
+  [ "$(fold | jq '.attention')" -eq 0 ]
+  [ "$(fold | jq '.findings | length')" -eq 0 ]
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  [ "$(fold | jq '.pending')" -eq 1 ]
+  [ "$(state_of "$(ids)")" = open ]
+}
+
 # --- transitions and fold ---------------------------------------------------
 
 @test "illegal transitions exit 3; legal ones append" {
