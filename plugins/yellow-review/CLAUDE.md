@@ -77,10 +77,11 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with a `Residual` pending/attention column), and a
-  single `/flow:compound` pass at the end. Right after enumeration (before
-  the confirmation and the empty-list exit) it prunes the ledgers of PRs
-  missing from an all-authors open-PR query, via `/review:triage --prune`,
-  and skips pruning when that query fails or may be truncated
+  single `/flow:compound` pass at the end. It lists the ledgers of PRs
+  missing from an all-authors open-PR query and deletes them via
+  `/review:triage --prune` only after the confirmation (a prune-only prompt
+  when there is nothing to sweep); it skips pruning when that query fails
+  or may be truncated
 - `/review:triage` — Own the review-findings ledger's lifecycle for one PR:
   `reconcile` against the fetched head, then attended Apply / Dismiss (with
   `depends_on`) / Restore file / Skip. `--non-interactive` applies nothing
