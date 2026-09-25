@@ -1146,6 +1146,10 @@ yellow-core changes. Each stage carries its own changeset.
 
 ## Out of Scope (follow-ups)
 
+- Rule-level semantic re-verification in `rl reverify` / `rl_reverify_row`: the
+  shipped check hashes anchor text at the mapped line (CLAUDE-48), so `reproduced`
+  means "reported line unchanged," not "defect still fires." Re-running the
+  original rule per finding belongs in the library stack, not this plan.
 - `claude plugin eval` suite for triage judgement (P10).
 - Compaction / rewrite of long ledgers (P6).
 - Per-finding "carried over" markers in the Step 10 tables (P11).
