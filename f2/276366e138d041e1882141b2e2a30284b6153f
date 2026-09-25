@@ -1,0 +1,50 @@
+plugins/yellow-review/tests/skill-content.bats
+  s_58268e9f7cfc1b::t_3c4bec4e1eff9d 112-117
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_58268e9f7cfc1b::t_cea0ada8561a67 185-187
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_58268e9f7cfc1b::t_df926dd69356d3 157-159
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_58268e9f7cfc1b::t_886d7af7545979 135-137
+plugins/yellow-review/commands/review/review-pr.md
+  s_58268e9f7cfc1b::t_45c373038097dd 589-591,594-599,607-608,613-616
+  s_58268e9f7cfc1b::t_7de31badf6f5db 617
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_58268e9f7cfc1b::t_2eab2e30205847 217-219
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_58268e9f7cfc1b::t_7d2e1281324c37 164-166
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_58268e9f7cfc1b::t_298af255122085 163-165
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_58268e9f7cfc1b::t_f4284724b157e1 183-186
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_58268e9f7cfc1b::t_f0850823bcb824 223-225
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_58268e9f7cfc1b::t_942feacf99c9a9 191-193
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_58268e9f7cfc1b::t_c3c0a5b23cf2f6 129-131
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_58268e9f7cfc1b::t_9e078ce124ba96 226-228
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_58268e9f7cfc1b::t_c0250d6db905de 134-136
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_58268e9f7cfc1b::t_030726491547f2 133-135
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_58268e9f7cfc1b::t_7ad5d5dce7dadd 282-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f2276366e138d041e1882141b2e2a30284b6153f",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
