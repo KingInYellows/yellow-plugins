@@ -36,11 +36,17 @@ Determine what the user wants to work on:
    - Validate: alphanumeric, spaces, and hyphens only, max 100 characters.
    - Fetch cycles via `mcp__plugin_yellow-linear_linear__list_cycles` for the
      auto-detected team (see "Team Context" in `linear-workflows` skill).
-   - Match by name (case-insensitive substring).
+   - **Sanitize the `list_cycles` response immediately** (see "Remote Content
+     Sanitization" in `linear-workflows`). Discard the raw payload; match and
+     display cycle names from the sanitized copy only.
+   - Match by name (case-insensitive substring) on the **sanitized** cycle
+     names.
    - Fetch issues from the matched cycle via
      `mcp__plugin_yellow-linear_linear__list_issues`.
-   - Present issues as a numbered list and let the user select which to work on
-     via `AskUserQuestion` (multi-select).
+   - **Sanitize the `list_issues` response immediately** (same procedure).
+     Discard the raw payload; use only the sanitized copy for selection.
+   - Present issues as a numbered list from the **sanitized** issue titles and
+     let the user select which to work on via `AskUserQuestion` (multi-select).
 3. **No arguments:** Prompt via `AskUserQuestion`: "Enter a Linear issue ID
    (e.g., ENG-123) or cycle name."
 
@@ -209,8 +215,9 @@ Based on user's choice in Step 5:
 - **Input validation:** `$ARGUMENTS` validated via regex before MCP tool use;
   never interpolated into shell commands
 - **Remote content sanitization:** Credential redaction runs on every MCP
-  response immediately after fetch, before session display (Step 3) and before
-  any worktree write (Step 4). Only sanitized copies are used downstream.
+  response immediately after fetch — including `list_cycles` and `list_issues` in
+  Step 1 before `AskUserQuestion`, Step 3 display, and Step 4 worktree writes.
+  Only sanitized copies are used downstream.
 - **Brainstorm doc isolation:** Issue description and comments wrapped in
   `--- begin/end ---` reference-only delimiters to prevent prompt injection
 - **Tier 1 transition:** "In Progress" is reversible and non-destructive; no
