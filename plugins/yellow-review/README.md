@@ -178,9 +178,9 @@ closed PR.
 `/review:sweep` runs `/review:triage --non-interactive` after its resolve
 pass and prints `Ledger: <pending> pending, <attention> need attention`.
 `/review:sweep-all` adds a `Residual` column (`pending/attention`) to its
-summary table. It also prunes the ledgers of PRs that no longer appear in an
-all-authors open-PR query, and skips the prune when that query fails or may
-be truncated.
+summary table. After its confirmation it also prunes the ledgers of PRs that
+no longer appear in an all-authors open-PR query, and skips the prune when
+that query fails or may be truncated.
 
 ## Confidence gating
 
