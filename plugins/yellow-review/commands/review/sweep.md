@@ -152,7 +152,10 @@ longer `OPEN`, skip this step and report `Ledger: skipped (PR <state>)` in
 Step 4. Otherwise invoke the `Skill` tool with `skill: "review:triage"` and
 the args string `<PR#> --non-interactive`. Unattended triage re-verifies
 every ledger finding against the fetched PR head (published fixes become
-`fixed`, vanished anchors `stale`) and never edits, commits or prompts.
+`fixed`, vanished anchors `stale`) and never edits, commits, prompts or
+prunes: if the PR closes between the check above and triage, triage keeps
+the ledger and reports `Ledger: retained (PR <state>)`; `/review:sweep-all`
+asks before deleting it later.
 
 Then read the counts:
 

@@ -322,6 +322,22 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
 }
 
+@test "sweep-all: the empty-list exit always prints and stops; only the prune prompt is conditional" {
+  block=$(awk '/^\*\*Empty-list early exit\.\*\*/ { p = 1 } /^### Step 3: Upfront confirmation gate/ { p = 0 } p' "$SWEEP_ALL" | tr -s ' \n' ' ')
+  grep -qF 'If the resulting array is empty (`[]` or length 0), run both steps below in order, then stop:' <<<"$block"
+  grep -qF 'Prune prompt — only when the prune list is non-empty.** With an empty prune list or `skip`, go straight to step 2.' <<<"$block"
+  grep -qF 'Always, whatever step 1 did:** print' <<<"$block"
+  grep -qF '[review:sweep-all] No open non-draft PRs found. Nothing to sweep.' <<<"$block"
+  # the exit is not conjoined with the prune condition
+  ! grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+}
+
+@test "sweep: unattended triage never prunes a PR that closed after the state check" {
+  norm=$(tr -s ' \n' ' ' <"$SWEEP")
+  grep -qF 'never edits, commits, prompts or prunes' <<<"$norm"
+  grep -qF 'reports `Ledger: retained (PR <state>)`' <<<"$norm"
+}
+
 @test "sweep-all: pruning skips on a failed or possibly truncated open-PR query" {
   grep -q '^### Step 2b: Find ledgers of closed PRs' "$SWEEP_ALL"
   # deletion only after a confirmation: Step 3b follows the Step 3 gate
