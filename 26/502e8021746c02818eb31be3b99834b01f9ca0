@@ -2,6 +2,7 @@ tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
   s_520e182b5f7c63::t_ac209baedbb9f9 966-974
 plans/review-findings-ledger.md
   s_520e182b5f7c63::t_06861e097d1394 584,587,590,593,595,612,614,616,640,644,648,683,699,1279-1289
+  s_58268e9f7cfc1b::t_00bd2d04111c2b 809-810
 plugins/yellow-review/.claude-plugin/plugin.json
   s_520e182b5f7c63::t_1c775175108a99 18-26
 plugins/yellow-review/CLAUDE.md
@@ -33,6 +34,14 @@ plugins/yellow-review/tests/review-ledger.bats
       "agent_id": {
         "tool": "claude",
         "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
         "model": "claude-opus-5-5"
       },
       "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
