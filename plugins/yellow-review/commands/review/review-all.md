@@ -225,13 +225,17 @@ aggregation rules change there, propagate the same change here.
    | `thermonuclear-reviewer` | `yellow-review:review:thermonuclear-reviewer` | maintainability |
 
 7. **Compact-return pass 1** (mirrors review-pr.md Step 5, including item
-   6's `<file-line-counts>` block): when `thermonuclear-reviewer` is in
-   this PR's dispatched set, Read
-   `${CLAUDE_PLUGIN_ROOT}/commands/review/review-pr.md` Step 5 items 2 and
-   6 — item 2's sanitizer entry (the literal-delimiter substitution and
-   XML-escaping order, including the `file-line-counts` delimiter pair)
-   and item 6's collection-and-injection shell snippet — and run that
-   procedure against this PR before spawning the persona. Bind `DIFF_BASE`
+   6's `<file-line-counts>` block and item 7's `<rule-vocabulary>` block): Read
+   `${CLAUDE_PLUGIN_ROOT}/commands/review/review-pr.md` Step 5 item 7's
+   alias-expanded `<rule-vocabulary>` jq procedure before spawning any Wave 2
+   reviewer — every dispatched-reviewer injection below needs it, not only PRs
+   that dispatch `thermonuclear-reviewer`. If the Read fails (file missing,
+   path unresolved), stop and report the exact path. When
+   `thermonuclear-reviewer` is in this PR's dispatched set, also Read Step 5
+   items 2 and 6 — item 2's sanitizer entry (the literal-delimiter substitution
+   and XML-escaping order, including the `file-line-counts` delimiter pair) and
+   item 6's collection-and-injection shell snippet — and run that procedure
+   against this PR before spawning the persona. Bind `DIFF_BASE`
    to the base ref this PR resolved above in sub-step 2
    (`origin/<baseRefName>`, or its fallback-ladder result) inside the same
    Bash call that runs item 6's snippet, not a prior one — a shell
