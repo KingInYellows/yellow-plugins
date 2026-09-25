@@ -1,0 +1,23 @@
+plugins/yellow-review/README.md
+  s_0e9ca486378b02::t_2af38a83185ab5 19-20
+plugins/yellow-review/lib/review-ledger.sh
+  s_0e9ca486378b02::t_9e94f331769810 616-619,638-639,642-646
+plugins/yellow-review/tests/review-ledger.bats
+  s_0e9ca486378b02::t_f36fa477095d47 656-666
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7d68674c5a97bab2cac6d2f2c2779150d2512e30",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
