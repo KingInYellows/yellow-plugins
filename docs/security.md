@@ -186,9 +186,9 @@ shared by every worktree of the clone and written only by
 from untrusted PR content, so the hook never emits it: `systemMessage` and
 `additionalContext` carry integers and PR numbers only. It is read-only (no
 network, no writes), takes each ledger lock shared with a 0.2 s wait, caps
-its fallback fold at 1.5 s inside the 3 s catalog timeout, and always exits
-with valid `{"continue": true}` JSON, so a busy or corrupt ledger can block
-nothing. It is not carried into the Codex or Cursor manifests.
+its fallback fold at 1.5 s, stops starting new PRs at a single 2.3 s overall
+deadline inside the 3 s catalog timeout, and always exits with valid
+`{"continue": true}` JSON, so a busy or corrupt ledger can block nothing. It is not carried into the Codex or Cursor manifests.
 
 **yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
 compaction-preservation instruction that Claude Code appends to the compaction
