@@ -7,7 +7,7 @@ plugins/yellow-review/.claude-plugin/plugin.json
 plugins/yellow-review/CLAUDE.md
   s_520e182b5f7c63::t_53e14a164013d4 165-180,303-306
 plugins/yellow-review/lib/review-ledger-vocab.json
-  s_520e182b5f7c63::t_ac9ed81d12fa31 1-93
+  s_520e182b5f7c63::t_ac9ed81d12fa31 1-93,1-19,21-93
 plugins/yellow-review/lib/review-ledger.sh
   s_520e182b5f7c63::t_be65e441f7b7f4 1-1546
 .changeset/review-ledger-lib.md
@@ -19,7 +19,7 @@ plugins/yellow-review/tests/helpers/ledger-repo.bash
 catalog/plugins/yellow-review.json
   s_520e182b5f7c63::t_9e34557ef21007 22-29
 plugins/yellow-review/tests/review-ledger.bats
-  s_520e182b5f7c63::t_61a566ec8962e8 1-608
+  s_520e182b5f7c63::t_61a566ec8962e8 1-608,1-234,236-608
 .github/workflows/validate-schemas.yml
   s_520e182b5f7c63::t_583571aec314a1 1408-1410
 ---
