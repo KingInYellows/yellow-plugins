@@ -237,8 +237,8 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
 - `AKIA` (AWS access keys)
 - `Bearer <token>` (any case, any length) and `Authorization:` header values
 - `ses_` (AWS SES keys)
-- Named credential assignments: any `NAME=value`, `NAME: value` or
-  `export NAME=value` where `NAME` is one of the repository's credential
+- Named credential assignments: any `NAME=value`, `NAME: value`,
+  `export NAME=value` or quoted JSON/YAML key (`"NAME": value`) where `NAME` is one of the repository's credential
   variables (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`,
   `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`,
   `SEMGREP_APP_TOKEN`, `MORPH_API_KEY`, `CERAMIC_API_KEY`) or ends in
@@ -272,7 +272,7 @@ BEGIN { inpem = 0 }
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
       tolower(line) ~ /bearer[ \t]+[^ \t]/ ||
       tolower(line) ~ /authorization[ \t]*:/ ||
-      tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_token|_secret|_password))[ \t]*[=:]/) {
+      tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_token|_secret|_password))["\047]?[ \t]*[=:]/) {
     print "--- redacted credential at line " NR " ---"
   } else if (tolower(line) ~ /^[ \t]*---[ \t]*(begin|end)([ \t]|$)/) {
     print "[fenced: marker removed at line " NR "]"

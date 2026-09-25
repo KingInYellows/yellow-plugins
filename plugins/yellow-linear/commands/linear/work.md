@@ -16,6 +16,8 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
   - mcp__plugin_yellow-linear_linear__list_comments
   - mcp__plugin_yellow-linear_linear__save_issue
+skills:
+  - linear-workflows
 ---
 
 # Work on Linear Issue
