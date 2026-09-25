@@ -619,6 +619,20 @@ pr_with_finding() {
   [ "$("$RL" reverify "$LEDGER_PR" "$id" --head "$H2")" = not_reproduced ]
 }
 
+@test "reverify: a whitespace-only edit to a verified-scope anchor still reproduces" {
+  printf '# Doc\n\n## A\n\nflag one\n' >|ws.md
+  H=$(commit_all ws-scope)
+  observe "$H" "[$(finding ws.md 5 '{"scope":"A","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  id=$(ids)
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  transition "$id" applied --head "$H" >/dev/null
+  # whitespace-only edit: anchor normalizes the same; strict hash rematch must
+  # compare scope through the stored key, not raw text against the SHA-256.
+  sed -i.bak '5s/flag one/  flag  one  /' ws.md && rm ws.md.bak
+  H2=$(commit_all ws-edit)
+  [ "$("$RL" reverify "$LEDGER_PR" "$id" --head "$H2")" = reproduced ]
+}
+
 # --- summary, run ids, worktree anchors -------------------------------------
 
 @test "summary reports per-PR counts from the sidecar, and folds on a size mismatch" {

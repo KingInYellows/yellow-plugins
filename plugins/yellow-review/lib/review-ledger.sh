@@ -1102,7 +1102,7 @@ rl_reverify_row() {
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
   excl=$(rl_sibling_lines "$id" "$file" "$hash" "$T")
   if hit=$(rl_window_match "$content" "$ln" 3 "$hash" "$anchor" "$excl"); then
-    if [ "$sstat" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+    if [ "$sstat" != verified ] || rl_scope_still "$content" "$np" "$hit" "$scope" "$sdisp"; then
       printf 'reproduced'
       return 0
     fi
