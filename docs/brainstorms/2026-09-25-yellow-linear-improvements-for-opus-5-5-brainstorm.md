@@ -115,10 +115,13 @@ User constraints from the dialogue:
   and add a validator or bats test that pins the tool names the plugin uses.
 - **README and CLAUDE.md cleanup.** Provider-neutral prerequisites, correct
   delegate description, and headless auth documented.
-- **Credential redaction before persisting remote content.** Run credential
-  detection over every fetched issue, comment, attachment, and linked document
-  before writing the context packet or any other worktree file. Replace hits
-  with `--- redacted credential at line N ---` per AGENTS.md.
+- **Credential redaction right after fetching.** Run credential detection
+  over every MCP response (issue, comment, attachment, linked document) as
+  soon as it arrives. Replace hits with `--- redacted credential at line N
+  ---` per AGENTS.md. Use only the sanitized copy from then on, for display
+  (`/linear:work` Step 3 and the loader agent print descriptions and comments
+  to the session) as well as for the context packet and any other worktree
+  file.
 - **Fence markers can't be forged.** Redaction doesn't catch a Linear field
   that contains its own `--- end ... ---` line, which would close the fence
   early. The packet is later read by `/flow:plan`, which has Bash and Write.
@@ -148,10 +151,18 @@ User constraints from the dialogue:
   `gitBranchName` comes from Linear. So:
   - The template grammar is limited to fixed placeholders (`{type}`, `{id}`,
     `{slug}`, `{user}`) plus `[a-z0-9/._-]` literals.
-  - Every rendered name must pass `git check-ref-format --branch` and is
-    rejected if it starts with `-`. On failure, fall back to
-    `<type>/<ID>-<slug>` or ask the user; never pass it to the provider
-    anyway.
+  - Every final name, rendered from the template or taken from Linear's
+    `gitBranchName`, must pass two checks:
+    - Executable code applies a safe-character allowlist to the whole name:
+      `^[A-Za-z0-9][A-Za-z0-9/._-]*$`. This matters because
+      `git check-ref-format` only checks ref syntax and accepts `;`, `$()`,
+      backticks and `&`.
+    - It must also pass `git check-ref-format --branch`.
+
+    On failure, fall back to `<type>/<ID>-<slug>` built from validated parts,
+    or ask the user; never pass it to the provider anyway. The name is always
+    passed as a quoted argument after `--`, never interpolated into a shell
+    string.
 - **Milestone summaries (consented once, then automatic).** Two points,
   deduplicated like the existing PR-link comments:
   1. After `/flow:plan`, a short plan summary comment on the issue.
