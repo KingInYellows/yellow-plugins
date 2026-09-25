@@ -297,7 +297,7 @@ BEGIN { inpem = 0; pemend = ""; incont = 0; keyind = 0; bslash = 0 }
     redact()
     pemtype = substr(line, RSTART + 11, RLENGTH - 16)
     pemend = "-----END " pemtype "-----"
-    if (index(substr(line, RSTART + RLENGTH), pemend) == 0) inpem = 1
+    if (trim(substr(line, RSTART + RLENGTH)) != pemend) inpem = 1
     next
   }
   low = tolower(line)
