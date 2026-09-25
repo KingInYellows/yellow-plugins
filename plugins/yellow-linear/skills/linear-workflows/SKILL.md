@@ -237,6 +237,7 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
 - `AKIA` (AWS access keys)
 - `Bearer <token>` (any case, any length) and `Authorization:` header values
 - `ses_` (AWS SES keys)
+- `lin_api_` / `lin_oauth_` (Linear API keys and OAuth tokens)
 - Named credential assignments: any `NAME=value`, `NAME: value`,
   `export NAME=value` or quoted JSON/YAML key (`"NAME": value`) where `NAME` is one of the repository's credential
   variables (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`,
@@ -271,6 +272,7 @@ BEGIN { inpem = 0 }
       line ~ /github_pat_[A-Za-z0-9_]{20,}/ ||
       line ~ /AKIA[0-9A-Z]{16}/ ||
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
+      line ~ /lin_(api|oauth)_[A-Za-z0-9]{16,}/ ||
       tolower(line) ~ /bearer[ \t]+[^ \t]/ ||
       tolower(line) ~ /authorization[ \t]*:/ ||
       tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_access_key|_token|_secret|_password))["\047]?[ \t]*[=:]/) {
