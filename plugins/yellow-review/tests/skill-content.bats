@@ -235,9 +235,12 @@ TRIAGE="$COMMANDS_DIR/triage.md"
 @test "triage: per-card actions are gated by the legal rl_edge_ok transitions" {
   norm=$(tr '\n' ' ' <"$TRIAGE" | tr -s ' ')
   grep -qF 'per `rl_edge_ok` in `lib/review-ledger.sh`: Apply and Restore file need a legal `→ applied` edge (not from `stale`); Dismiss needs a legal `→ dismissed` edge (not from `applied`)' <<<"$norm"
-  grep -qF -- '- **Apply** — offered for `open`, `reopened`, `report_only` and `applied` cards, never `stale`.' <<<"$norm"
+  grep -qF 'Neither Apply nor Restore file is offered on an `applied` card either' <<<"$norm"
+  grep -qF -- '- **Apply** — offered for `open`, `reopened` and `report_only` cards, never `stale` or `applied`.' <<<"$norm"
   grep -qF -- '- **Dismiss** — offered for every card except `applied` (no legal `→ dismissed` edge from `applied`).' <<<"$norm"
-  grep -qF -- '- **Restore file** — offered only for a card marked `deletion` whose state is `open`, `reopened`, `report_only` or `applied` (never `stale`, which has no legal `→ applied` edge)' <<<"$norm"
+  grep -qF -- '- **Restore file** — offered only for a card marked `deletion` whose state is `open`, `reopened` or `report_only` (never `stale`, which has no legal `→ applied` edge, or `applied`)' <<<"$norm"
+  grep -qF 'Use that printed OID as `<headRefOid>` for every later step' <<<"$norm"
+  grep -qF 'Remove that directory as soon as the transition returns' <<<"$norm"
 }
 
 @test "triage: reconcile runs before any attended action and prune goes through the library" {
