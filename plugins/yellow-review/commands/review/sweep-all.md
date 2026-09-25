@@ -105,18 +105,23 @@ truncated: skip pruning entirely. Otherwise the printed PR numbers are the
 prune list. Nothing is deleted yet.
 
 **Empty-list early exit.** If the resulting array is empty (`[]` or
-length 0) and the prune list is non-empty, ask once with `AskUserQuestion`:
-``Delete the review-findings ledgers of <K> closed or merged PRs (#<a>,
-#<b>, …)?`` with options **Delete ledgers** and **Keep them**. Only
-**Delete ledgers** runs Step 3b's prune; any other answer, a dismissed
-prompt or a non-interactive environment keeps them. Then print:
+length 0), run both steps below in order, then stop:
 
-```text
-[review:sweep-all] No open non-draft PRs found. Nothing to sweep.
-```
+1. **Prune prompt — only when the prune list is non-empty.** With an empty
+   prune list or `skip`, go straight to step 2. Otherwise ask once with
+   `AskUserQuestion`:
+   ``Delete the review-findings ledgers of <K> closed or merged PRs (#<a>,
+   #<b>, …)?`` with options **Delete ledgers** and **Keep them**. Only
+   **Delete ledgers** runs Step 3b's prune; any other answer, a dismissed
+   prompt or a non-interactive environment keeps them.
+2. **Always, whatever step 1 did:** print
 
-Then stop. Do NOT show the Step 3 confirmation gate (confirming zero
-PRs is confusing). Exit 0 — nothing to do is not a failure.
+   ```text
+   [review:sweep-all] No open non-draft PRs found. Nothing to sweep.
+   ```
+
+   and stop. Do NOT show the Step 3 confirmation gate (confirming zero PRs
+   is confusing). Exit 0 — nothing to do is not a failure.
 
 ### Step 3: Upfront confirmation gate
 
