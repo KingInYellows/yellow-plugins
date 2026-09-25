@@ -1,0 +1,25 @@
+plans/review-findings-ledger.md
+  s_58268e9f7cfc1b::t_b2faaba7bc05d6 19
+  s_58268e9f7cfc1b::t_02871fb88aa7ed 207-212,217-219
+  s_58268e9f7cfc1b::t_727b6c38e80aa1 345-347
+  s_58268e9f7cfc1b::t_697be0f60f0d57 427-439
+  s_58268e9f7cfc1b::t_314dda51f8e303 803-810
+  s_58268e9f7cfc1b::t_1267ba4a7ee63a 278-281
+  s_58268e9f7cfc1b::t_e3a34308fb03cb 220-222,282-284,348-351,440-446,779-783,811-813,817-823,902-912,936-938,940-941,969-977
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "66f49fb36536de393f70f7ab28613cde0ff9f924",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
