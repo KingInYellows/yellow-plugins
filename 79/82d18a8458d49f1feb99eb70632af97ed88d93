@@ -1,0 +1,26 @@
+plugins/yellow-review/lib/review-ledger.sh
+  s_58268e9f7cfc1b::t_b1c312f821521a 622-629
+  s_58268e9f7cfc1b::t_08e7b63c7674a7 668
+  s_58268e9f7cfc1b::t_00d6cfd4924f33 659-660
+  s_58268e9f7cfc1b::t_0c159462ae9121 925-929
+plugins/yellow-review/tests/review-ledger.bats
+  s_58268e9f7cfc1b::t_e2b52272a21520 559-565
+  s_58268e9f7cfc1b::t_cde725af7c4d3d 590-599
+  s_58268e9f7cfc1b::t_83885b4f63e33c 600-613
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7982d18a8458d49f1feb99eb70632af97ed88d93",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

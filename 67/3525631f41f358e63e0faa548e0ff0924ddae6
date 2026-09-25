@@ -1,0 +1,34 @@
+plugins/yellow-review/tests/review-ledger.bats
+  s_58268e9f7cfc1b::t_667779f3988865 635
+  s_58268e9f7cfc1b::t_2e6f16bfe59941 374-394
+  s_58268e9f7cfc1b::t_8eed302d3df7a1 281
+  s_58268e9f7cfc1b::t_abba40b6d4c07a 264-273,275-277,279-280,282-285
+  s_58268e9f7cfc1b::t_2bc1069bf046d4 274,278
+  s_58268e9f7cfc1b::t_305e8fd4ccf210 452-473
+  s_58268e9f7cfc1b::t_0581ad707ad702 622-634,636-637
+plugins/yellow-review/lib/review-ledger.sh
+  s_58268e9f7cfc1b::t_af123fd6641996 1059-1063
+  s_58268e9f7cfc1b::t_7f52c0c2c6290e 658
+  s_58268e9f7cfc1b::t_9145f196e33b42 920-924
+  s_58268e9f7cfc1b::t_f7c4d3f1168943 1473-1475
+  s_58268e9f7cfc1b::t_ab2ec7cdb98def 1132,1135
+  s_58268e9f7cfc1b::t_1fb7e810354b14 619-629,633
+  s_58268e9f7cfc1b::t_40eb4febee4e6a 1083-1116
+  s_58268e9f7cfc1b::t_0d9f12ebb3cf1e 1026-1028
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "673525631f41f358e63e0faa548e0ff0924ddae6",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
