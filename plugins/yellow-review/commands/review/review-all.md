@@ -148,11 +148,17 @@ branch and its own learnings pre-pass result). The sub-steps below mirror
 aggregation rules change there, propagate the same change here.
 
 1. **Checkout** (mirrors `stack-traversal` skill Step 5), using the
-   provider resolved in Step 0:
+   provider resolved in Step 0. `<branch>` is a fork PR's `headRefName` and
+   is attacker-controlled: validate it first with the same check as
+   `review-pr.md` Step 3 (`git check-ref-format --branch "<branch>"` plus
+   rejecting any character outside `[A-Za-z0-9._/-]` and any leading `-`;
+   refuse to check out and report the error if either check fails), then
+   always quote it:
 
-   **Graphite:** `gt checkout <branch>`
+   **Graphite:** `gt checkout "<branch>"` (the installed `gt` rejects `--
+   <branch>`, so do not add it)
 
-   **GitHub:** `git checkout <branch>`
+   **GitHub:** `git checkout "<branch>"`
 
 2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
 

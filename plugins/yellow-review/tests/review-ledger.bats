@@ -817,12 +817,14 @@ reconcile() { "$RL" reconcile "$LEDGER_PR" --head "$1" --base "${2:-$BASE}"; }
   [ "$(printf '%s' "$out" | jq '.reopened')" -eq 1 ]
 }
 
-@test "reconcile: a published-then-reverted applied fix reopens with its reason" {
+@test "reconcile: a published-then-reverted fix stays applied (anchor-only reverify)" {
+  # A surviving anchor no longer reopens a proved fix (see rl_settle_one):
+  # anchor-only reverify cannot tell a revert from an additive fix.
   pr_with_finding
   git revert --no-edit HEAD >/dev/null
   out=$(reconcile "$(git rev-parse HEAD)")
-  [ "$(printf '%s' "$out" | jq -r '.transitions[0].to')" = reopened ]
-  [ "$(fold | jq -r '.findings[0].reason')" = reverted-after-publication ]
+  [ "$(printf '%s' "$out" | jq '[.transitions[] | select(.to == "reopened")] | length')" -eq 0 ]
+  [ "$(state_of "$ID")" = applied ]
 }
 
 @test "reconcile: a dropped fix commit reopens with reason fix-abandoned" {
@@ -901,16 +903,34 @@ deleted_util() {
   [ "$(git diff --cached --name-status)" = "$(printf 'A\tlib/util.sh')" ]
 }
 
-@test "CLAUDE-47: restore refuses a dirty tree, a HEAD mismatch and a non-deletion finding" {
+@test "CLAUDE-47: restore refuses a HEAD mismatch and a non-deletion finding" {
   deleted_util
-  printf 'x\n' >|dirty.txt
-  run -3 "$RL" restore "$LEDGER_PR" "$ID" --head "$H" --base "$B1"
-  rm dirty.txt
   run -3 "$RL" restore "$LEDGER_PR" "$ID" --head "$B1" --base "$B1"
   observe "$H" "[$(finding a.sh 2)]" >/dev/null
   other=$(fold | jq -r '.findings[] | select(.obs.file == "a.sh") | .finding_id')
   run -3 "$RL" restore "$LEDGER_PR" "$other" --head "$H" --base "$B1"
   [ ! -e lib/util.sh ]
+}
+
+# codex P2 on #870: /review:triage's Step 8 intentionally batches every
+# selected Apply/Dismiss/Restore into one commit, so the tree is routinely
+# dirty by the time a later card is processed. restore must gate only on
+# the target path, not the whole tree.
+@test "CLAUDE-47: restore succeeds after an earlier unrelated edit in the same session" {
+  deleted_util
+  printf 'x\n' >|dirty.txt
+  run -0 "$RL" restore "$LEDGER_PR" "$ID" --head "$H" --base "$B1"
+  [ "$(git hash-object lib/util.sh)" = "$(git rev-parse "$B1:lib/util.sh")" ]
+  [ "$(git diff --cached --name-status)" = "$(printf 'A\tlib/util.sh')" ]
+  [ -e dirty.txt ]
+}
+
+@test "CLAUDE-47: restore still refuses when the target path itself is dirty or occupied" {
+  deleted_util
+  mkdir -p lib
+  printf 'squatter\n' >|lib/util.sh
+  run -3 "$RL" restore "$LEDGER_PR" "$ID" --head "$H" --base "$B1"
+  [ "$(cat lib/util.sh)" = squatter ]
 }
 
 @test "CLAUDE-47: restore refuses a parent symlinked outside the repository" {

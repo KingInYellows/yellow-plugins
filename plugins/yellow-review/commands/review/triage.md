@@ -90,8 +90,10 @@ RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
 Use `triage-noninteractive` in unattended mode. By latest state:
 
 - `applied` becomes `fixed` when the fix is proved on the PR head and no
-  longer reproduces there. It becomes `reopened` when the fix was reverted
-  or abandoned. Otherwise it stays `applied`.
+  longer reproduces there. It becomes `reopened` when the fix commit was
+  abandoned (unreachable from any ref). Otherwise it stays `applied`,
+  including a proved fix whose anchor still matches: anchor-only re-verify
+  cannot tell a revert from an additive fix, so that case is left for you.
 - `open`, `reopened` or `report_only` become `stale` when the anchor no
   longer matches.
 - `stale` becomes `reopened` when the anchor matches again.
@@ -134,11 +136,15 @@ a `suggested_fix`, needs the edit gate, and still shows each change before
 moving on. Everything else is reviewed one by one.
 
 For each card, in the printed order, ask with AskUserQuestion which action
-to take:
+to take. Offer only the actions legal for the state printed on that card,
+per `rl_edge_ok` in `lib/review-ledger.sh`: Apply and Restore file need a
+legal `→ applied` edge (not from `stale`); Dismiss needs a legal
+`→ dismissed` edge (not from `applied`). Skip and Stop are always offered.
 
-- **Apply** — needs the edit gate. If the gate is closed, offer to check
-  the PR out through the active stacked-PR provider (invoke the `Skill`
-  tool with `skill: "stack-provider-router"`, then check out
+- **Apply** — offered for `open`, `reopened`, `report_only` and `applied`
+  cards, never `stale`. Needs the edit gate. If the gate is closed, offer
+  to check the PR out through the active stacked-PR provider (invoke the
+  `Skill` tool with `skill: "stack-provider-router"`, then check out
   `headRefName` with that provider, as `review-pr.md` Step 3 does) or
   refuse. Validate the path first with
   `"$RL" validate-path anchor <headRefOid> "<file>"`. Then Read
@@ -152,10 +158,12 @@ to take:
 
   A `report_only` finding can be fixed this way when the human chooses it,
   but approve-all never picks it.
-- **Dismiss** — ask for the reason (the AskUserQuestion "Other" free-text
-  field) and for any paths the reason depends on, such as the guard that
-  makes a sink safe. Write the reason to a file with the Write tool, and
-  the dependency paths as a JSON array of strings to a second file, then:
+- **Dismiss** — offered for every card except `applied` (no legal
+  `→ dismissed` edge from `applied`). Ask for the reason (the
+  AskUserQuestion "Other" free-text field) and for any paths the reason
+  depends on, such as the guard that makes a sink safe. Write the reason
+  to a file with the Write tool, and the dependency paths as a JSON array
+  of strings to a second file, then:
 
   ```bash
   RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
@@ -169,8 +177,10 @@ to take:
   the finding open. While every dependency blob is unchanged, the dismissal
   keeps the finding out of later reviews; once one changes, the next review
   reopens it.
-- **Restore file** — offered only for a card marked `deletion`, never in
-  unattended mode, and only with the edit gate open:
+- **Restore file** — offered only for a card marked `deletion` whose state
+  is `open`, `reopened`, `report_only` or `applied` (never `stale`, which
+  has no legal `→ applied` edge), never in unattended mode, and only with
+  the edit gate open:
 
   ```bash
   RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
@@ -178,8 +188,11 @@ to take:
   ```
 
   The library writes the current base blob byte-for-byte (never
-  model-authored content) after re-checking the gate and the path. Then
-  record `applied` as for Apply.
+  model-authored content) after re-checking the gate and the path — it
+  only requires the target path itself to be free of uncommitted changes
+  or an untracked file, so an earlier Apply or Restore to a different
+  path in this same loop does not block it. Then record `applied` as for
+  Apply.
 - **Skip** — move on and leave the state unchanged.
 - **Stop** — end the loop.
 
@@ -190,10 +203,11 @@ If any Apply or Restore changed files, commit and submit exactly as
 `stack-provider-router` resolution, the provider's own commit and submit
 commands, and the commit message
 `fix: address review-ledger findings for PR #<n>`. Around those commands,
-run `references/review-pr/ledger.md` "Step 9" items 1 and 2 with
-`--actor triage`: `--fix-sha` after the commit, then `remote-head`,
-`--published-head` and `settle` once submission succeeds. A declined or
-failed push leaves the fixes `applied`, which still counts as pending.
+Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its
+"Step 9" items 1 and 2 with `--actor triage`: `--fix-sha` after the commit,
+then `remote-head`, `--published-head` and `settle` once submission
+succeeds. If the Read fails, stop and report the path. A declined or failed
+push leaves the fixes `applied`, which still counts as pending.
 
 ## Step 9: Report
 
