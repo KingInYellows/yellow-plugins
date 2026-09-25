@@ -362,3 +362,13 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q '`?` when its entry is `null` (fold' "$SWEEP_ALL"
   grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
 }
+
+@test "sweep-all: the prune loop uses find (zsh-safe) and a bounded PR-number check" {
+  grep -q "find \"\$DIR\" -maxdepth 1 -type f -name '\*.jsonl'" "$SWEEP_ALL"
+  grep -q "grep -Exq '\[1-9\]\[0-9\]{0,9}'" "$SWEEP_ALL"
+}
+
+@test "triage: descriptions stay on one line and diffs never take a path" {
+  [ "$(sed -n '2,5p' "$TRIAGE" | grep -c '^description: ')" -eq 1 ]
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'show it with `git diff` and no path argument'
+}

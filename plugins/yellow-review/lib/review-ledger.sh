@@ -78,7 +78,6 @@ rl_is_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
 
 rl_validate_pr() { [[ "$1" =~ ^[1-9][0-9]{0,9}$ ]]; }
 
-# Whitespace-normalize one line: collapse runs, trim both ends.
 # Whitespace-normalize one line in pure bash: tabs to spaces, drop CRs,
 # squeeze runs of spaces, trim one leading and one trailing space.
 rl_normalize_line() {
@@ -226,7 +225,11 @@ rl_repair_tail() {
 rl_gh_state() {
   local pr="$1" out st
   command -v gh >/dev/null 2>&1 || return 1
-  out=$(gh pr view "$pr" --json state 9>&- 2>/dev/null) || return 1
+  if command -v timeout >/dev/null 2>&1; then
+    out=$(timeout "${RL_GH_TIMEOUT:-15}" gh pr view "$pr" --json state 9>&- 2>/dev/null) || return 1
+  else
+    out=$(gh pr view "$pr" --json state 9>&- 2>/dev/null) || return 1
+  fi
   st=$(printf '%s' "$out" | jq -r '.state // empty' 2>/dev/null) || return 1
   case "$st" in
     OPEN | MERGED | CLOSED) printf '%s' "$st" ;;
@@ -364,7 +367,7 @@ rl_redact_batch() {
   fi
   joined=$(mktemp "$(rl_tmp)/rb.XXXXXX") || return 1
   red=$(mktemp "$(rl_tmp)/rb.XXXXXX") || return 1
-  jq -j '.[] | tostring | gsub("\u001e"; " ") + "\n\u001e\n"' "$in" >|"$joined" || return 1
+  jq -j '.[] | tostring | gsub("\u0000"; "") | gsub("\u001e"; " ") + "\n\u001e\n"' "$in" >|"$joined" || return 1
   n_in=$(jq 'length' "$in")
   if cs_redact_secrets <"$joined" >|"$red" 2>/dev/null; then
     n_out=$(grep -c $'^\x1e$' "$red")
@@ -382,16 +385,18 @@ rl_redact_batch() {
       | ($red | split("\n\u001e\n") | .[:-1]) as $r
       | [range(0; $orig | length) as $i
          | if ($bad | contains(" \($i) ")) then [$w, false]
-           else [$r[$i], ($r[$i] == ($orig[$i] | tostring | gsub("\u001e"; " ")))] end]' "$in"
+           else [$r[$i], ($r[$i] == ($orig[$i] | tostring | gsub("\u0000"; "") | gsub("\u001e"; " ")))] end]' "$in"
     return 0
   fi
   while IFS= read -r -d '' s; do
     if rl_anchor_safe "$s"; then
-      pairs=$(jq -c --arg t "$s" '. + [[$t, true]]' <<<"$pairs")
+      pairs=$(jq -c --arg t "$s" '. + [[$t, true]]' <<<"$pairs") || return 1
     else
-      pairs=$(jq -c --arg t "$(rl_redact "$s")" '. + [[$t, false]]' <<<"$pairs")
+      pairs=$(jq -c --arg t "$(rl_redact "$s")" '. + [[$t, false]]' <<<"$pairs") || return 1
     fi
   done < <(jq -j '.[] | tostring | gsub("\u0000"; "") + "\u0000"' "$in")
+  # every input string must come back, or the caller would mis-slice
+  [ "$(jq 'length' <<<"$pairs")" = "$(jq 'length' "$in")" ] || return 1
   printf '%s\n' "$pairs"
 }
 
@@ -436,21 +441,6 @@ rl_vocab_lookup() {
     | (if .categories[$k] then [$k, 1] elif .category_aliases[$k] then [.category_aliases[$k], 1] else ["maintainability", 0] end) as $m
     | "\($m[0]) \(if ((.categories[$m[0]] // []) | index($r)) != null then $r else "unclassified" end) \($m[1])"' "$RL_VOCAB"
 }
-
-rl_normalize_category() {
-  local out
-  out=$(rl_vocab_lookup "$1" '')
-  [ "${out##* }" = 1 ] && printf '%s' "${out%% *}"
-  return 0
-}
-
-rl_validate_rule() {
-  local out
-  out=$(jq -r --arg c "$1" --arg r "$2" \
-    'if ((.categories[$c] // []) | index($r)) != null then $r else "unclassified" end' "$RL_VOCAB")
-  printf '%s' "$out"
-}
-
 
 # --- path validation (CLAUDE-44, 45, 47) -------------------------------------
 
@@ -643,9 +633,12 @@ rl_line_clamped() {
 # awk normalization identical to rl_normalize_line.
 RL_AWK_NORM='function norm(s) { gsub(/\t/, " ", s); gsub(/\r/, "", s); gsub(/ +/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }'
 
-# Bigram Dice similarity of two normalized strings, 0..1.
+# Bigram Dice similarity of two normalized strings, 0..1. Keep in sync with
+# sim() inside rl_window_alias, which inlines the same formula so one awk
+# process can scan a whole window.
 rl_similarity() {
-  awk -v a="$1" -v b="$2" 'BEGIN {
+  RL_AW_A="$1" RL_AW_B="$2" awk 'BEGIN {
+    a = ENVIRON["RL_AW_A"]; b = ENVIRON["RL_AW_B"]
     if (a == b) { print 1; exit }
     na = length(a) - 1; nb = length(b) - 1
     if (na < 1 || nb < 1) { print 0; exit }
@@ -694,10 +687,6 @@ rl_path_fate() {
 }
 
 # rl_map_line <from> <to> <path> <line>
-# Prints "<result> <line> <path>"; result is exact | shifted | anchored |
-# unmapped | deleted | unverifiable. `anchored` means the line itself was
-# changed; the line printed is where its hunk now starts.
-# rl_map_line <from> <to> <path> <line>
 # Prints "<result>\x1f<line>\x1f<path>"; result is exact | shifted | anchored
 # | unmapped | deleted | unverifiable. `anchored` means the line itself was
 # changed; the line printed is where its hunk now starts. Blob diffs are
@@ -736,8 +725,14 @@ rl_map_line() {
   if [ -z "$dfile" ]; then
     n=$((n + 1))
     dfile="$(rl_tmp)/diff-$from-$to-$n"
-    git diff "${RL_DIFF_FLAGS[@]}" -U0 "$from:$p" "$to:$np" >|"$dfile" 2>/dev/null || : >|"$dfile"
+    if ! git diff "${RL_DIFF_FLAGS[@]}" -U0 "$from:$p" "$to:$np" >|"$dfile" 2>/dev/null; then
+      : >|"$dfile.fail"
+    fi
     printf '%s\t%s\n' "$n" "$p" >>"$manifest"
+  fi
+  if [ -e "$dfile.fail" ]; then
+    printf 'unmapped\x1f0\x1f%s' "$np"
+    return 0
   fi
   awk -v L="$L" -v np="$np" '
     /^Binary files / { binary = 1 }
@@ -1010,29 +1005,31 @@ rl_redact_reason() {
 
 # --- re-verification (CLAUDE-48; brainstorm Open Question 2) ----------------
 
-# Lines at <T> that belong to sibling findings (same file and anchor hash)
-# whose own line maps unchanged; the window search must not claim them.
 # --- per-run index of the fold ----------------------------------------------
 
 # One row per finding, fields separated by \x1f (never whitespace, so empty
 # fields survive `read`), so matching and re-verification loops never
 # re-parse the fold. Columns:
 #   1 id  2 state  3 file  4 line  5 head_sha  6 base_sha  7 anchor_hash
-#   8 category  9 rule  10 scope  11 scope_status  12 occ  13 deletion
+#   8 category  9 rule  10 scope key (hash of the raw verified scope)
+#   11 scope_status  12 occ  13 deletion
 #   14 anchor_source  15 anchor text (normalized; empty when withheld or
 #   when it holds control bytes)  16 fix_sha  17 " fp fp … "
 #   18 depends_on as path\x1dblob entries joined by \x1e
+#   19 display scope (the redacted scope, passed back to the verifier as
+#   the claim when checking that the scope still holds)
 RL_INDEX_JQ='
   def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
   def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
   .findings[] | [
     .finding_id, .state, (.obs.file | f), (.obs.line | tostring), (.obs.head_sha | f), (.obs.base_sha | f),
-    (.obs.anchor_hash | f), (.obs.category | f), (.obs.rule | f), (.obs.scope | f), (.obs.scope_status | f),
+    (.obs.anchor_hash | f), (.obs.category | f), (.obs.rule | f), ((.obs.scope_key // .obs.scope) | f), (.obs.scope_status | f),
     (.obs.occ | f), ((.obs.deletion // false) | tostring), (.obs.anchor_source // "commit"),
     (if .obs.anchor_withheld or .obs.anchor_lines == null then ""
      else (.obs.anchor_lines | join(" ") | norm) | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
     (.fix_sha | f), (" " + ((.fingerprints // []) | join(" ")) + " "),
-    ((.depends_on // []) | map((.path | f) + "\u001d" + (.blob | f)) | join("\u001e"))
+    ((.depends_on // []) | map((.path | f) + "\u001d" + (.blob | f)) | join("\u001e")),
+    (.obs.scope | f)
   ] | join("\u001f")'
 
 # Write the fold and its index into the scratch dir. Arg: fold JSON.
@@ -1070,12 +1067,14 @@ rl_sibling_lines() {
 
 # Does the anchor occur in [c-r, c+r] of <content>, skipping excluded
 # lines? Compares normalized text when it is known, else hashes the window
-# (one awk and one sha256 call either way). Prints the hit line.
+# (one awk and one sha256 call either way). Prints the hit line. Text
+# reaches awk through ENVIRON: `awk -v` would expand backslash escapes and
+# stop `printf "x\n"` from matching itself.
 rl_window_match() {
   local content="$1" c="$2" r="$3" hash="$4" text="$5" excl="$6" dir h name
   if [ -n "$text" ]; then
-    awk -v c="$c" -v r="$r" -v t="$text" -v excl="$excl" "$RL_AWK_NORM"'
-      BEGIN { n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1 }
+    RL_AW_T="$text" awk -v c="$c" -v r="$r" -v excl="$excl" "$RL_AWK_NORM"'
+      BEGIN { t = ENVIRON["RL_AW_T"]; n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1 }
       NR >= c - r && NR <= c + r && !(NR in skip) && norm($0) == t { print NR; found = 1; exit }
       END { exit !found }' "$content"
     return
@@ -1093,13 +1092,11 @@ rl_window_match() {
   return 1
 }
 
-# Search <content> for the anchor hash in [c-r, c+r], skipping excluded
-# lines. Prints the hit line.
-
 # Nearest line in [c-40, c+40] whose similarity to <text> is >= 0.8.
 rl_window_alias() {
   local content="$1" c="$2" text="$3" excl="$4"
-  awk -v c="$c" -v t="$text" -v excl="$excl" "$RL_AWK_NORM"'
+  RL_AW_T="$text" awk -v c="$c" -v excl="$excl" "$RL_AWK_NORM"'
+    # same formula as rl_similarity; keep the two in sync
     function sim(a, b,   na, nb, i, m, g, ca) {
       if (a == b) return 1
       na = length(a) - 1; nb = length(b) - 1
@@ -1109,25 +1106,21 @@ rl_window_alias() {
       for (i = 1; i <= nb; i++) { g = substr(b, i, 2); if (ca[g] > 0) { ca[g]--; m++ } }
       return (2 * m) / (na + nb)
     }
-    BEGIN { n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1; best = -1 }
+    BEGIN { t = ENVIRON["RL_AW_T"]; n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1; best = -1 }
     NR >= c - 40 && NR <= c + 40 && !(NR in skip) {
       if (sim(norm($0), t) >= 0.8) { d = NR - c; if (d < 0) d = -d; if (best < 0 || d < bestd) { best = NR; bestd = d } }
     }
     END { if (best > 0) print best; else exit 1 }' "$content"
 }
 
-# rl_reverify_finding <fold-json> <finding_id> <target-head> [strict]
-# Prints reproduced | not_reproduced | unverifiable. `strict` disables the
-# alias search; it is implied for `applied` findings, whose anchor line is
-# expected to change (that is the fix) and would otherwise alias-match it.
 # rl_reverify_row <index-row> <target-head> [strict]
 # Prints reproduced | not_reproduced | unverifiable. `strict` disables the
 # alias search; it is implied for `applied` findings, whose anchor line is
 # expected to change (that is the fix) and would otherwise alias-match it.
 rl_reverify_row() {
   local row="$1" T="$2" strict="${3:-}" res ln np entry content excl hit
-  local id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps
-  IFS=$'\x1f' read -r id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps <<<"$row"
+  local id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps sdisp
+  IFS=$'\x1f' read -r id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps sdisp <<<"$row"
   [ -n "$id" ] || { printf 'unverifiable'; return 0; }
   [ "$state" = applied ] && strict=strict
   if rl_is_shallow || ! rl_have_commit "$T"; then
@@ -1167,7 +1160,7 @@ rl_reverify_row() {
   fi
   if [ -z "$strict" ] && [ -z "$occ" ] && [ -n "$anchor" ]; then
     if hit=$(rl_window_alias "$content" "$ln" "$anchor" "$excl"); then
-      if [ "$sstat" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+      if [ "$sstat" != verified ] || rl_scope_still "$content" "$np" "$hit" "$scope" "$sdisp"; then
         printf 'reproduced'
         return 0
       fi
@@ -1176,6 +1169,22 @@ rl_reverify_row() {
   printf 'not_reproduced'
 }
 
+# Does the verified scope at <line> still hash to the stored scope key?
+# The claim passed to the verifier is the stored display scope; legacy
+# records (no key) compare the raw scope text.
+rl_scope_still() {
+  local content="$1" path="$2" line="$3" skey="$4" claim="$5" now
+  now=$(rl_verify_scope "$content" "$path" "$line" "$claim" | cut -f2)
+  [ -n "$now" ] || return 1
+  if rl_is_sha256 "$skey"; then
+    [ "$(printf '%s' "$now" | rl_sha256)" = "$skey" ]
+  else
+    [ "$now" = "$skey" ]
+  fi
+}
+
+rl_is_sha256() { [[ "$1" =~ ^[0-9a-f]{64}$ ]]; }
+
 # Re-verify one finding by id against the current index.
 rl_reverify_finding() {
   local row
@@ -1183,8 +1192,6 @@ rl_reverify_finding() {
   rl_reverify_row "$row" "$2" "${3:-}"
 }
 
-# rl_publication <fold-json> <finding_id> <remote-head>
-# proved:ancestor | proved:patch-id | unproved | abandoned | unverifiable
 # rl_publication_fix <fix-sha> <remote-head>
 # proved:ancestor | proved:patch-id | unproved | abandoned | unverifiable.
 # The patch-id scan is one streaming pipeline; results are cached per
@@ -1230,14 +1237,11 @@ rl_publication() {
 
 # Is a dismissal still applicable at <H>? The anchor must still match
 # (strict re-verify) and every depends_on entry must be a regular file at
-# <H> with the recorded blob (CLAUDE-44).
-# Is a dismissal still applicable at <H>? The anchor must still match
-# (strict re-verify) and every depends_on entry must be a regular file at
 # <H> with the recorded blob (CLAUDE-44). Arg: index row, head.
 rl_dismissal_applicable_row() {
   local row="$1" H="$2" deps entry pair p blob
   [ "$(rl_reverify_row "$row" "$H" strict)" = reproduced ] || return 1
-  deps=${row##*$'\x1f'}
+  IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ deps _ <<<"$row"
   [ -n "$deps" ] || return 0
   while IFS= read -r -d $'\x1e' pair || [ -n "$pair" ]; do
     [ -n "$pair" ] || continue
@@ -1269,15 +1273,13 @@ RL_VALIDATE_FINDING_JQ='
   elif .pre_existing then "pre-existing"
   else "ok" end'
 
-# rl_build_candidate <finding-json> <head> <base> <source commit|worktree>
-# Prints a candidate observation (without finding_id), or "REJECT <reason>".
 # One jq pass per finding: the validation verdict and every field
 # rl_build_candidate needs, NUL-terminated (NULs inside values are dropped).
 RL_CAND_FIELDS_JQ='
   def s: (. // "") | tostring | gsub("\u0000"; "");
   (try (RL_VALIDATE) catch "invalid-json") as $v
-  | [ $v, (.file | s), (.line | s), (.category | s), (.rule | s), (.scope | s), (.title | s),
-      (.suggested_fix | s), (.migration_path | s), ._red[0], ._red[1], ._red[2], ._red[3],
+  | [ $v, (.file | s), (.line | s), (.category | s), (.rule | s), (.scope | s),
+      (._red[0] | s), (._red[1] | s), (._red[2] | s), (._red[3] | s),
       ((.breaking_change_class // "") | s
         | if IN("name-rename", "signature-change", "removal", "semantics-change") then . else "" end),
       ((if has("queue") then .queue == "report_only"
@@ -1294,7 +1296,7 @@ RL_CAND_FIELDS_JQ='
 rl_build_candidate() {
   local fj="$1" H="$2" B="$3" src="$4" verdict file line cat_raw rule_raw scope_claimed scope_stored title fix mig bcc report_only defaulted
   local vres where oid content text hash cat_stored cat rule mapped sv scope scope_status sstart send occ deletion
-  local withheld fp root key
+  local withheld fp root key scope_key
   {
     IFS= read -r -d '' verdict
     IFS= read -r -d '' file
@@ -1302,9 +1304,6 @@ rl_build_candidate() {
     IFS= read -r -d '' cat_raw
     IFS= read -r -d '' rule_raw
     IFS= read -r -d '' scope_claimed
-    IFS= read -r -d '' title
-    IFS= read -r -d '' fix
-    IFS= read -r -d '' mig
     IFS= read -r -d '' title
     IFS= read -r -d '' fix
     IFS= read -r -d '' mig
@@ -1332,14 +1331,21 @@ rl_build_candidate() {
   hash=$(rl_hash_line "$text")
 
   read -r cat rule mapped <<<"$(rl_vocab_lookup "$cat_raw" "$rule_raw")"
+  if [ -z "$cat" ]; then
+    rl_err "rule vocabulary unreadable; filing under maintainability/unclassified"
+    cat=maintainability rule=unclassified mapped=0
+  fi
   [ -n "$rule_raw" ] || rule=unclassified
   cat_stored=${cat_raw:0:64}
   rl_suspicious "$cat_stored" && cat_stored='[withheld]'
 
   sv=$(rl_verify_scope "$content" "$file" "$line" "$scope_claimed")
-  scope=unscoped scope_status=unscoped occ=''
+  scope=unscoped scope_status=unscoped occ='' scope_key=unscoped
   if [ "${sv%%$'\t'*}" = verified ]; then
     IFS=$'\t' read -r _ scope sstart send <<<"$sv"
+    # identity uses a hash of the raw verified scope; only the display copy
+    # is redacted, so two scopes that redact alike never merge
+    scope_key=$(printf '%s' "$scope" | rl_sha256)
     scope=$(rl_redact "${scope:0:200}")
     scope_status=verified
     occ=$(rl_occurrence "$content" "$line" "$sstart" "$send")
@@ -1350,10 +1356,10 @@ rl_build_candidate() {
   withheld=false
   key=$line
   [ "$scope_status" = unscoped ] || key=null
-  fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope" --arg h "$hash" --argjson l "$key" --arg o "$occ" \
+  fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope_key" --arg h "$hash" --argjson l "$key" --arg o "$occ" \
     '[$f, $c, $r, $s, $h, $l, (if $o == "" then null else $o end)]' | rl_sha256)
   jq -cn --argjson f "$fj" --arg fp "$fp" --arg cat "$cat" --arg cat_stored "$cat_stored" --arg rule "$rule" \
-    --arg scope "$scope" --arg sc "$scope_stored" --arg ss "$scope_status" --arg occ "$occ" \
+    --arg scope "$scope" --arg skey "$scope_key" --arg sc "$scope_stored" --arg ss "$scope_status" --arg occ "$occ" \
     --arg file "$file" --argjson line "$line" --argjson del "$deletion" --arg hash "$hash" \
     --arg text "$text" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
     --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" \
@@ -1366,7 +1372,7 @@ rl_build_candidate() {
                        | if length >= 32 and test("[a-z]") and test("[A-Z]") and test("[0-9]") then "[withheld]" else . end)
                  | unique),
      severity: $f.severity, category: $cat, category_raw: ($cat_stored | gsub("[^A-Za-z0-9 ._\\[\\]-]"; "")),
-     rule: $rule, scope: $scope, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
+     rule: $rule, scope: $scope, scope_key: $skey, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
      file: $file, line: $line, deletion: $del, anchor_hash: $hash,
      anchor_lines: (if $withheld then null else [$text] end),
      anchor_withheld: $withheld, anchor_source: $src, confidence: $f.confidence,
@@ -1377,17 +1383,14 @@ rl_build_candidate() {
      _ordinals: [$ord]}'
 }
 
-# Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
-# RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
-# RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
 # Candidate rows for the matching passes, \x1f-separated like the index:
-#   1 ordinal-index  2 fingerprint  3 category  4 rule  5 scope  6 anchor_hash
-#   7 deletion  8 file  9 line  10 occ  11 anchor text (normalized, or empty)
-#   12 report_only  13 input ordinals (space-joined)
+#   1 fingerprint  2 category  3 rule  4 scope key  5 anchor_hash  6 deletion
+#   7 file  8 line  9 occ  10 anchor text (normalized, or empty)
+#   11 report_only  12 input ordinals (space-joined)
 RL_CAND_ROW_JQ='
   def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
   def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
-  [ .fingerprint, (.category | f), (.rule | f), (.scope | f), .anchor_hash, (.deletion | tostring),
+  [ .fingerprint, (.category | f), (.rule | f), ((.scope_key // .scope) | f), .anchor_hash, (.deletion | tostring),
     (.file | f), (.line | tostring), (.occ | f),
     (if .anchor_lines == null then "" else (.anchor_lines | join(" ") | norm)
        | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
@@ -1399,7 +1402,7 @@ RL_CAND_ROW_JQ='
 # RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
 # RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
 rl_observe_locked() {
-  local f fold n i c r eid res ln np dist best bestd claimed=' ' pairs='' at id state row status results='' o
+  local f fold n i c r eid res ln np dist claimed=' ' pairs='' at id state row status results='' o
   local cfp cdel cfile cline cocc ctext cro cords
   local rid _rstate rfile rline rhead rbase ranchor
   local -a cands crows match via unavail
@@ -1472,7 +1475,7 @@ rl_observe_locked() {
   # stored anchor, mapped line within 40, similarity >= 0.8. Nearest wins.
   # Only an existing finding whose own anchor line was edited (`anchored`)
   # can alias: one whose line maps unchanged is still a separate site.
-  local -a best bestd
+  local pairs_c=''
   while IFS= read -r r; do
     i=${r%%$'\x1f'*}
     r=${r#*$'\x1f'}
@@ -1488,19 +1491,22 @@ rl_observe_locked() {
     [ "$res" = anchored ] && [ "$np" = "$cfile" ] || continue
     dist=$((ln - cline))
     dist=${dist#-}
-    [ "$dist" -lt "${bestd[$i]:-41}" ] || continue
+    [ "$dist" -le 40 ] || continue
     awk -v s="$(rl_similarity "$ctext" "$ranchor")" 'BEGIN { exit !(s >= 0.8) }' || continue
-    best[$i]=$rid bestd[$i]=$dist
+    pairs_c+="$dist"$'\t'"$i"$'\t'"$rid"$'\n'
   done < <(awk -F '\037' '
     NR == FNR { if ($9 == "" && $10 != "" && $6 != "true") { k = $2 FS $3 FS $4; c[k] = c[k] " " (FNR - 1) } next }
     $12 == "" && $15 != "" && $13 != "true" { k = $8 FS $9 FS $10; if (k in c) { n = split(c[k], a, " "); for (j = 1; j <= n; j++) print a[j] "\037" $0 } }' \
     "$(rl_tmp)/crows" "$(rl_tmp)/index")
-  for ((i = 0; i < n; i++)); do
-    [ -n "${match[$i]:-}" ] || [ -z "${best[$i]:-}" ] && continue
-    [[ "$claimed" == *" ${best[$i]} "* ]] && continue
-    match[$i]=${best[$i]} via[$i]=alias
-    claimed="$claimed${best[$i]} "
-  done
+  # nearest pairs first, so a candidate whose best alias is taken still gets
+  # its next-nearest one
+  while IFS=$'\t' read -r dist i eid; do
+    [ -n "$eid" ] || continue
+    [ -n "${match[$i]:-}" ] && continue
+    [[ "$claimed" == *" $eid "* ]] && continue
+    match[$i]=$eid via[$i]=alias
+    claimed="$claimed$eid "
+  done < <(printf '%s' "$pairs_c" | sort -n -k1,1)
 
   # Actions.
   local new=0 merged=0 reopened=0 suppressed=0
@@ -1589,6 +1595,12 @@ rl_need_pr() {
   rl_validate_pr "${1:-}" || rl_die "$RL_EXIT_USAGE" "PR must be a positive integer"
 }
 
+# `shift 2` with one argument left fails without shifting, and the parse
+# loop would spin forever; every value-taking flag checks first.
+rl_need_val() {
+  [ $# -ge 2 ] || rl_die "$RL_EXIT_USAGE" "$1 needs a value"
+}
+
 rl_need_sha() {
   rl_is_sha "${2:-}" || rl_die "$RL_EXIT_USAGE" "$1 must be a 40-hex commit SHA"
 }
@@ -1599,12 +1611,12 @@ cmd_observe() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --run-id) run="${2:-}"; shift 2 ;;
-      --step) step="${2:-}"; shift 2 ;;
-      --head) head="${2:-}"; shift 2 ;;
-      --base) base="${2:-}"; shift 2 ;;
-      --anchor-source) src="${2:-}"; shift 2 ;;
-      --source) source="${2:-}"; shift 2 ;;
+      --run-id) rl_need_val "$@"; run="${2:-}"; shift 2 ;;
+      --step) rl_need_val "$@"; step="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
+      --base) rl_need_val "$@"; base="${2:-}"; shift 2 ;;
+      --anchor-source) rl_need_val "$@"; src="${2:-}"; shift 2 ;;
+      --source) rl_need_val "$@"; source="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "observe: unknown argument" ;;
     esac
   done
@@ -1637,7 +1649,12 @@ cmd_observe() {
   jq -c '[.[] | (if type == "object" then . else {} end)
     | (.title, .suggested_fix, .migration_path, .scope) | if type == "string" then . else "" end]' "$input" >|"$(rl_tmp)/texts.json" ||
     rl_die "$RL_EXIT_INVALID" "observe: could not read finding fields"
-  rl_redact_batch "$(rl_tmp)/texts.json" >|"$(rl_tmp)/texts.red.json" || rl_die 1 "observe: redaction failed"
+  rl_redact_batch "$(rl_tmp)/texts.json" >|"$(rl_tmp)/texts.red.json" ||
+    rl_die 1 "observe: redaction failed (scratch dir or jq error); nothing was written, safe to retry"
+  jq -c --slurpfile r "$(rl_tmp)/texts.red.json" '
+    to_entries[] | (if (.value | type) == "object" then .value else {} end)
+    + {_red: ($r[0][(.key * 4):(.key * 4 + 4)] | map(.[0]))}' "$input" >|"$(rl_tmp)/findings.jsonl" ||
+    rl_die 1 "observe: could not prepare findings; nothing was written"
   i=0
   while IFS= read -r fj; do
     i=$((i + 1))
@@ -1646,9 +1663,7 @@ cmd_observe() {
       "REJECT "*) printf '%s\t%s\n' "$i" "${cand#REJECT }" >>"$(rl_tmp)/rejected.tsv" ;;
       *) printf '%s\n' "$cand" >>"$(rl_tmp)/cands.jsonl" ;;
     esac
-  done < <(jq -c --slurpfile r "$(rl_tmp)/texts.red.json" '
-    to_entries[] | (if (.value | type) == "object" then .value else {} end)
-    + {_red: ($r[0][(.key * 4):(.key * 4 + 4)] | map(.[0]))}' "$input")
+  done <"$(rl_tmp)/findings.jsonl"
   # Anchor snapshots, checked in one batch: a line redaction would change,
   # or one the fail-closed pass flags, keeps only its hash and line hint.
   jq -sc 'map(.anchor_lines[0] // "")' "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/anchors.json" || rl_die 1 "observe: anchor extraction failed"
@@ -1681,25 +1696,37 @@ rl_transition_locked() {
   rl_repair_tail "$f" || return 1
   fold=$(rl_fold_file "$f") || return 1
   rl_index_set "$fold" || return 1
+  local ids_done='' skipped=''
   for id in $RL_T_IDS; do
-    row=$(rl_index_row "$id") || { rl_err "unknown finding_id"; return "$RL_EXIT_INVALID"; }
+    row=$(rl_index_row "$id") || { rl_err "unknown finding_id $id (list them with: cards $RL_T_PR)"; return "$RL_EXIT_INVALID"; }
     IFS=$'\x1f' read -r _ cur _ <<<"$row"
-    rl_edge_ok "$cur" "$RL_T_STATE" || { rl_err "illegal transition $cur -> $RL_T_STATE"; return "$RL_EXIT_INVALID"; }
+    # a batch that only records --fix-sha/--published-head skips findings
+    # that left `applied` meanwhile, instead of failing every other one
+    if [ "$RL_T_BATCH" = true ] && [ "$RL_T_STATE" = applied ] && [ -n "$RL_T_FIX$RL_T_PUB" ] && [ "$cur" != applied ]; then
+      skipped+="$id "
+      continue
+    fi
+    rl_edge_ok "$cur" "$RL_T_STATE" || { rl_err "illegal transition $cur -> $RL_T_STATE for $id"; return "$RL_EXIT_INVALID"; }
     if [ "$cur:$RL_T_STATE" = applied:applied ] && [ -z "$RL_T_FIX$RL_T_PUB" ]; then
       rl_err "applied -> applied must add --fix-sha or --published-head"
       return "$RL_EXIT_INVALID"
     fi
     froms+="$cur "
+    ids_done+="$id "
     rec=$(rl_transition_record "$id" "$RL_T_STATE" "$RL_T_REASON" "$RL_T_HEAD" "$RL_T_ACTOR" "$RL_T_FIX" "$RL_T_PUB" "$RL_T_PROOF" "$RL_T_DEPS")
     recs+="$rec"$'\n'
   done
-  (umask 077 && printf '%s' "$recs" >>"$f") || return 1
+  if [ -n "$recs" ]; then
+    (umask 077 && printf '%s' "$recs" >>"$f") || return 1
+  fi
   fold=$(rl_fold_file "$f") || return 1
   rl_refresh_sidecar "$RL_T_DIR" "$RL_T_PR" "$fold" || rl_err "sidecar refresh failed"
-  jq -c --arg ids "$RL_T_IDS" --arg froms "$froms" --arg to "$RL_T_STATE" --argjson batch "$RL_T_BATCH" '
+  jq -c --arg ids "$ids_done" --arg froms "$froms" --arg to "$RL_T_STATE" --argjson batch "$RL_T_BATCH" \
+    --arg skipped "$skipped" '
     ($ids | split(" ") | map(select(length > 0))) as $i | ($froms | split(" ")) as $fr
     | [range(0; $i | length) as $k | {finding_id: $i[$k], from: $fr[$k], to: $to}] as $r
-    | if $batch then {results: $r, pending: .pending, attention: .attention}
+    | if $batch then {results: $r, skipped: ($skipped | split(" ") | map(select(length > 0))),
+                      pending: .pending, attention: .attention}
       else $r[0] + {pending: .pending, attention: .attention} end' <<<"$fold"
 }
 
@@ -1714,14 +1741,14 @@ cmd_transition() {
   shift 3
   while [ $# -gt 0 ]; do
     case "$1" in
-      --reason) reason="${2:-}"; shift 2 ;;
-      --fix-sha) fix="${2:-}"; rl_need_sha --fix-sha "$fix"; shift 2 ;;
-      --published-head) pub="${2:-}"; rl_need_sha --published-head "$pub"; shift 2 ;;
-      --proof) proof="${2:-}"; shift 2 ;;
-      --depends-on-json) depsj="${2:-}"; shift 2 ;;
-      --head) head="${2:-}"; rl_need_sha --head "$head"; shift 2 ;;
-      --actor) actor="${2:-}"; shift 2 ;;
-      --ids-json) idsj="${2:-}"; shift 2 ;;
+      --reason) rl_need_val "$@"; reason="${2:-}"; shift 2 ;;
+      --fix-sha) rl_need_val "$@"; fix="${2:-}"; rl_need_sha --fix-sha "$fix"; shift 2 ;;
+      --published-head) rl_need_val "$@"; pub="${2:-}"; rl_need_sha --published-head "$pub"; shift 2 ;;
+      --proof) rl_need_val "$@"; proof="${2:-}"; shift 2 ;;
+      --depends-on-json) rl_need_val "$@"; depsj="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; rl_need_sha --head "$head"; shift 2 ;;
+      --actor) rl_need_val "$@"; actor="${2:-}"; shift 2 ;;
+      --ids-json) rl_need_val "$@"; idsj="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "transition: unknown argument" ;;
     esac
   done
@@ -1747,7 +1774,7 @@ cmd_transition() {
   if [ "$id" = - ]; then
     jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and test("^[0-9a-f]{64}$"))' <<<"$idsj" >/dev/null 2>&1 ||
       rl_die "$RL_EXIT_USAGE" "transition: --ids-json must be a non-empty array of finding ids"
-    RL_T_IDS=$(jq -r 'unique | join(" ")' <<<"$idsj") RL_T_BATCH=true
+    RL_T_IDS=$(jq -r 'reduce .[] as $x ([]; if index([$x]) then . else . + [$x] end) | join(" ")' <<<"$idsj") RL_T_BATCH=true
   else
     [ -z "$idsj" ] || rl_die "$RL_EXIT_USAGE" "transition: pass - as the finding_id with --ids-json"
     RL_T_IDS=$id RL_T_BATCH=false
@@ -1785,7 +1812,7 @@ cmd_dismissed_context() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --head) head="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
       --fenced) fenced=1; shift ;;
       *) rl_die "$RL_EXIT_USAGE" "dismissed-context: unknown argument" ;;
     esac
@@ -1817,10 +1844,12 @@ cmd_dismissed_context() {
 cmd_reverify() {
   local pr="${1:-}" id="${2:-}" head='' fold r
   rl_need_pr "$pr"
+  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || rl_die "$RL_EXIT_USAGE" "finding_id must be 64-hex"
   [ "${3:-}" = --head ] && head="${4:-}"
   rl_need_sha --head "$head"
   fold=$(rl_read_fold "$pr") || exit $?
   rl_index_set "$fold" || rl_die 1 "reverify: index failed"
+  rl_index_row "$id" >/dev/null || rl_die "$RL_EXIT_INVALID" "reverify: unknown finding_id"
   r=$(rl_reverify_finding "$id" "$head")
   printf '%s\n' "$r"
   [ "$r" = unverifiable ] && exit "$RL_EXIT_UNVERIFIABLE"
@@ -1830,10 +1859,12 @@ cmd_reverify() {
 cmd_publication() {
   local pr="${1:-}" id="${2:-}" head='' fold r
   rl_need_pr "$pr"
+  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || rl_die "$RL_EXIT_USAGE" "finding_id must be 64-hex"
   [ "${3:-}" = --remote-head ] && head="${4:-}"
   rl_need_sha --remote-head "$head"
   fold=$(rl_read_fold "$pr") || exit $?
   rl_index_set "$fold" || rl_die 1 "publication: index failed"
+  rl_index_row "$id" >/dev/null || rl_die "$RL_EXIT_INVALID" "publication: unknown finding_id"
   r=$(rl_publication "$id" "$head")
   printf '%s\n' "$r"
   [ "$r" = unverifiable ] && exit "$RL_EXIT_UNVERIFIABLE"
@@ -1946,7 +1977,7 @@ cmd_remote_head() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --remote) remote="${2:-}"; shift 2 ;;
+      --remote) rl_need_val "$@"; remote="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "remote-head: unknown argument" ;;
     esac
   done
@@ -2029,9 +2060,9 @@ cmd_settle() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --remote-head) head="${2:-}"; shift 2 ;;
-      --ids-json) ids="${2:-}"; shift 2 ;;
-      --actor) actor="${2:-}"; shift 2 ;;
+      --remote-head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
+      --ids-json) rl_need_val "$@"; ids="${2:-}"; shift 2 ;;
+      --actor) rl_need_val "$@"; actor="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "settle: unknown argument" ;;
     esac
   done
@@ -2136,9 +2167,9 @@ cmd_reconcile() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --head) head="${2:-}"; shift 2 ;;
-      --base) base="${2:-}"; shift 2 ;;
-      --actor) actor="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
+      --base) rl_need_val "$@"; base="${2:-}"; shift 2 ;;
+      --actor) rl_need_val "$@"; actor="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "reconcile: unknown argument" ;;
     esac
   done
@@ -2168,8 +2199,8 @@ cmd_restore() {
   shift 2
   while [ $# -gt 0 ]; do
     case "$1" in
-      --head) head="${2:-}"; shift 2 ;;
-      --base) base="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
+      --base) rl_need_val "$@"; base="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "restore: unknown argument" ;;
     esac
   done
@@ -2181,7 +2212,7 @@ cmd_restore() {
   [ -n "$row" ] || rl_die "$RL_EXIT_INVALID" "restore: unknown finding_id"
   [ "$(jq -r '.deletion' <<<"$row")" = true ] || rl_die "$RL_EXIT_INVALID" "restore: not a deletion finding"
   file=$(jq -r '.file' <<<"$row")
-  v=$(rl_validate_path restore "$base" "$file") || rl_die "$RL_EXIT_INVALID" "restore: path rejected ($v)"
+  v=$(rl_validate_path restore "$base" "$file") || rl_die "$?" "restore: path rejected ($v)"
   root=$(rl_repo_root) || rl_die 1 "restore: not inside a repository"
   [ -z "$(git --literal-pathspecs status --porcelain -- "$root/$file" 2>/dev/null)" ] || rl_die "$RL_EXIT_INVALID" "restore: the target path has an uncommitted change or untracked file in the way"
   parent=$(dirname -- "$root/$file")
@@ -2206,7 +2237,7 @@ cmd_resolve_path() {
   fold=$(rl_read_fold "$pr") || exit $?
   file=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .obs.file')
   [ -n "$file" ] || rl_die "$RL_EXIT_INVALID" "resolve-path: unknown finding_id"
-  v=$(rl_validate_path anchor "$head" "$file") || rl_die "$RL_EXIT_INVALID" "resolve-path: path rejected ($v)"
+  v=$(rl_validate_path anchor "$head" "$file") || rl_die "$?" "resolve-path: path rejected ($v); exit 6 means the head is not fetched (run remote-head)"
   root=$(rl_repo_root) || rl_die 1 "resolve-path: not inside a repository"
   rl_worktree_entry_ok "$root" "$file" || rl_die "$RL_EXIT_INVALID" "resolve-path: worktree entry is not a regular file inside the repository"
   jq -cn --arg f "$file" --arg p "$root/$file" '{file: $f, path: $p}'
@@ -2252,19 +2283,26 @@ rl_usage() {
 review-ledger.sh <subcommand> [args]
   observe <pr> --head <sha> [--base <sha>] --step 6|8 [--run-id <id>]
           [--anchor-source commit|worktree] [--source review-pr|review-all]   (stdin: findings JSON array)
-  transition <pr> <finding_id | - --ids-json '[...]'> <state> [--reason R] [--fix-sha S] [--published-head S]
+  transition <pr> <finding_id> <state> [--reason R] [--fix-sha S] [--published-head S]
           [--proof ancestor|patch-id] [--depends-on-json '["path"]'] [--head S] [--actor A]
+  transition <pr> - <state> --ids-json '["<id>", ...]' [same flags]   (all-or-nothing; a
+          fix-sha/published-head batch skips ids no longer applied and lists them)
   fold <pr>
   dismissed-context <pr> --head <sha> [--fenced]
   remote-head <pr> [--remote <name>]
   settle <pr> --remote-head <sha> [--ids-json '[...]'] [--actor A]
   reconcile <pr> --head <sha> --base <sha> [--actor triage|triage-noninteractive]
   restore <pr> <finding_id> --head <sha> --base <sha>
-  cards <pr> | resolve-path <pr> <finding_id> --head <sha>
+  cards <pr>
+  resolve-path <pr> <finding_id> --head <sha>   (checked {file, path} for Read/Edit;
+          never copy a stored file name onto a command line)
   reverify <pr> <finding_id> --head <sha>
   publication <pr> <finding_id> --remote-head <sha>
   validate-path <anchor|dependency|restore> <rev> <path> [<base>]
   prune <pr> | summary [--all | <pr>] | new-run-id
+Exit codes: 0 ok, 2 usage, 3 invalid / illegal transition, 4 lock timeout,
+5 PR closed, 6 unverifiable. Most subcommands print JSON; reverify,
+publication, restore and prune print one token or line.
 USAGE
 }
 
