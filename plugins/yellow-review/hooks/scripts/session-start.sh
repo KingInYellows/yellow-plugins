@@ -8,6 +8,10 @@
 # A sidecar counts only while its <pr>.jsonl exists, its byte count still
 # matches, and <pr>.state says OPEN and is under 7 days old; otherwise the PR
 # is named as unverified, or folded within budget, or named as unknown.
+# Each category names at most 10 PRs, then "+N more". Past the overall
+# deadline the remaining ledgers are only counted as unknown: no clock
+# reads, locks or folds per file, so a clone with hundreds of ledgers
+# still finishes inside the budget.
 # Output holds integers and PR numbers only — never ledger text.
 #
 # NOTE: SessionStart hooks run in parallel across plugins; this one is
@@ -54,7 +58,30 @@ FOLD_JQ='split("\n") | map(select(length > 0) | (try fromjson catch null) | sele
   | "\(map(select(. == "open" or . == "reopened" or . == "applied")) | length) \(map(select(. == "report_only" or . == "stale")) | length)"'
 
 pending=0 attention=0
+# per category: a count of every PR, and a list of only the first LIST_MAX
+LIST_MAX=10
 counted='' unverified='' unknown=''
+n_counted=0 n_unverified=0 n_unknown=0
+
+# list_add <category> <pr>
+list_add() {
+  local n_var="n_$1" n
+  n=$((${!n_var} + 1))
+  printf -v "$n_var" '%s' "$n"
+  if [ "$n" -le "$LIST_MAX" ]; then
+    printf -v "$1" '%s #%s' "${!1}" "$2"
+  fi
+}
+
+# list_show <category>: "#1, #2" or "#1, …, #10, +N more"
+list_show() {
+  local n_var="n_$1" s more
+  s=${!1# }
+  s=${s// /, }
+  more=$((${!n_var} - LIST_MAX))
+  [ "$more" -gt 0 ] && s="$s, +$more more"
+  printf '%s' "$s"
+}
 
 # Read one PR's counts (runs in a subshell holding the shared lock).
 # Prints "<pending> <attention> <fold-ms-spent>", or "x x <ms>" when unknown.
@@ -88,22 +115,25 @@ read_counts() {
   printf '%s %s' "$out" "$((t1 - t0))"
 }
 
+past_deadline=0
 for f in "$DIR"/*.jsonl; do
   [ -f "$f" ] || continue
   pr=${f##*/}
   pr=${pr%.jsonl}
   [[ "$pr" =~ ^[1-9][0-9]{0,9}$ ]] || continue
   # overall deadline (DEADLINE_MS, 2.3 s): locks and folds must not push
-  # the hook past its 3 s catalog timeout
-  if [ $(($(now_ms) - start_ms)) -ge "$DEADLINE_MS" ]; then
-    unknown="$unknown #$pr"
+  # the hook past its 3 s catalog timeout. Once it passes, every remaining
+  # ledger is just counted as unknown, without reading the clock again.
+  if [ "$past_deadline" = 1 ] || [ $(($(now_ms) - start_ms)) -ge "$DEADLINE_MS" ]; then
+    past_deadline=1
+    list_add unknown "$pr"
     continue
   fi
   st='' ts=0
   [ -f "$DIR/$pr.state" ] && read -r st ts <"$DIR/$pr.state" 2>/dev/null
   [[ "$ts" =~ ^[0-9]+$ ]] || ts=0
   if [ "$st" != OPEN ] || [ $((now - ts)) -ge "$week" ]; then
-    unverified="$unverified #$pr"
+    list_add unverified "$pr"
     continue
   fi
   counts=''
@@ -123,19 +153,19 @@ for f in "$DIR"/*.jsonl; do
     p=${BASH_REMATCH[1]} a=${BASH_REMATCH[2]}
     pending=$((pending + p))
     attention=$((attention + a))
-    [ $((p + a)) -gt 0 ] && counted="$counted #$pr"
+    [ $((p + a)) -gt 0 ] && list_add counted "$pr"
   else
-    unknown="$unknown #$pr"
+    list_add unknown "$pr"
   fi
 done
 
-if [ $((pending + attention)) -eq 0 ] && [ -z "$unverified" ] && [ -z "$unknown" ]; then
+if [ $((pending + attention)) -eq 0 ] && [ "$n_unverified" -eq 0 ] && [ "$n_unknown" -eq 0 ]; then
   finish
 fi
 
-prs=$(printf '%s' "$counted" | sed 's/^ //; s/ /, /g')
-unv=$(printf '%s' "$unverified" | sed 's/^ //; s/ /, /g')
-unk=$(printf '%s' "$unknown" | sed 's/^ //; s/ /, /g')
+prs=$(list_show counted)
+unv=$(list_show unverified)
+unk=$(list_show unknown)
 first=$(printf '%s %s %s' "$counted" "$unknown" "$unverified" | tr -s ' ' | sed 's/^ //' | cut -d' ' -f1)
 msg="[yellow-review] Review ledger: $pending pending, $attention need attention"
 [ -n "$prs" ] && msg="$msg (PRs $prs)"
