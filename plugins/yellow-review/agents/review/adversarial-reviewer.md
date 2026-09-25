@@ -192,6 +192,8 @@ human judgment, not for automated fixing.
       "title": "<scenario-oriented summary>",
       "severity": "P0|P1|P2|P3",
       "category": "adversarial",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "<repo-relative path>",
       "line": 42,
       "confidence": 100,
@@ -209,6 +211,11 @@ human judgment, not for automated fixing.
 
 `line` must be an integer — the 1-based line number of the finding in
 `file`; the `42` above is an example value, not a literal.
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
+for your `category` (`unclassified` when none fits); `scope` is the enclosing
+dotted symbol path at `line` (e.g. `handlers.createUser`), or the nearest
+markdown heading in a prose file.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow

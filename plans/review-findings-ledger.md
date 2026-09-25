@@ -740,7 +740,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 2: `rule` and `scope` in compact-return producers
 
-- [ ] 2.1: Add `"rule"` and `"scope"` to the schema example of the 13 JSON
+- [x] 2.1: Add `"rule"` and `"scope"` to the schema example of the 13 JSON
       producers:
   - yellow-review: `project-compliance-reviewer`, `correctness-reviewer`,
     `maintainability-reviewer`, `project-standards-reviewer`,
@@ -766,7 +766,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 2.2: `review-pr.md` changes:
+- [x] 2.2: `review-pr.md` changes:
   - Step 5 injects a `<rule-vocabulary>` block, built from
     `review-ledger-vocab.json`, into every reviewer prompt. It is repo-internal
     but still XML-escaped.
@@ -777,17 +777,17 @@ yellow-core changes. Each stage carries its own changeset.
     `codex-reviewer`.
   - Coverage gains two lines: "Findings defaulted (missing rule/scope)" and
     "Categories unmapped".
-- [ ] 2.3: Make the same edits in `review-all.md` Step 4 (the parity rule) and
+- [x] 2.3: Make the same edits in `review-all.md` Step 4 (the parity rule) and
       in the "Finding Output Format" section of
       `skills/pr-review-workflow/SKILL.md`.
-- [ ] 2.4: Leave Step 6.2's in-run dedup unchanged; its fingerprint is separate
+- [x] 2.4: Leave Step 6.2's in-run dedup unchanged; its fingerprint is separate
       and in-memory. Document that the library computes the ledger fingerprint
       later.
-- [ ] 2.5: Tests: extend `skill-content.bats` to assert that every producer in
+- [x] 2.5: Tests: extend `skill-content.bats` to assert that every producer in
       the census lists `rule` and `scope`, and that the schema examples in
       `review-pr.md`, `review-all.md` and SKILL.md agree. Also find and update
       any fixture or test that pins the 10-field shape.
-- [ ] 2.6: Changesets: `yellow-review` patch and `yellow-core` patch.
+- [x] 2.6: Changesets: `yellow-review` patch and `yellow-core` patch.
 
 ### Stage 3: Persist findings from `/review:pr` and `/review:all`
 
@@ -1364,7 +1364,7 @@ behaviour, so every PR passes the CI gate on its own.
 <!-- Updated by flow:work. Do not edit manually. -->
 
 - [x] 1. agent/feat/review-ledger-lib (completed 2026-09-24)
-- [ ] 2. agent/feat/review-rule-scope-fields
+- [x] 2. agent/feat/review-rule-scope-fields (completed 2026-09-24)
 - [ ] 3. agent/feat/review-ledger-persistence
 - [ ] 4. agent/feat/review-triage-command
 - [ ] 5. agent/feat/review-sweep-ledger
