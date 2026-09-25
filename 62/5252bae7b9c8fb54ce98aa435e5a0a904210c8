@@ -1,0 +1,22 @@
+docs/solutions/code-quality/prettier-description-wrap-silent-truncation.md
+  s_520e182b5f7c63::t_2ca2f93aec7582 60-89
+docs/solutions/logic-errors/review-ledger-awk-cache-and-reparse-bugs.md
+  s_520e182b5f7c63::t_044cb5b33ebd4a 1-369
+  s_520e182b5f7c63::t_3c84bb2ebea3e2 370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "625252bae7b9c8fb54ce98aa435e5a0a904210c8",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
