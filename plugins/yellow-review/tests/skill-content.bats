@@ -85,6 +85,15 @@ schema_fields() {
   done < <(producers)
 }
 
+@test "ledger: every producer explains escaping ' > ' inside a heading path segment" {
+  while IFS= read -r f; do
+    grep -qF 'is `Parent > A \> B`.' "$f" || { echo "no heading escape: $f"; false; }
+  done < <(
+    producers
+    printf '%s\n' "$WORKFLOW_SKILL" "$SKILLS_DIR/yellow-thermonuclear-review/SKILL.md"
+  )
+}
+
 @test "ledger: review-pr.md and SKILL.md schema examples carry the same fields" {
   a=$(schema_fields "$REVIEW_PR")
   b=$(schema_fields "$WORKFLOW_SKILL")

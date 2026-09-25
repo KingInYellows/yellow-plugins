@@ -391,7 +391,9 @@ this category, or `unclassified` when no such block is injected or none of
 its entries fits. `scope` is the enclosing dotted symbol path at `line`
 (e.g. `handlers.createUser`); in a prose file, use the nearest markdown
 heading only when it is unique in the file, otherwise the full
-`Parent > Child` heading path. Both feed the review-findings ledger's
+`Parent > Child` heading path. In that path, escape a literal ` > ` inside
+one heading's own text as ` \> ` and double any `\`: `## A > B` under
+`# Parent` is `Parent > A \> B`. Both feed the review-findings ledger's
 identity key on hosts that keep one — default a missing value to
 `unclassified` / `unscoped` rather than omitting the field.
 

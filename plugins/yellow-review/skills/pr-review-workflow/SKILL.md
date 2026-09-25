@@ -183,7 +183,9 @@ tables.
 is the enclosing dotted symbol path; in a prose file it is the nearest
 markdown heading when that heading is unique in the file, otherwise the full
 `Parent > Child` heading path (`rl_verify_scope` rejects an ambiguous short
-form). Both feed the review-findings ledger's identity key; the orchestrator defaults a
+form). In that path, escape a literal ` > ` inside one heading's own text as
+` \> ` and double any `\`: `## A > B` under `# Parent` is `Parent > A \> B`.
+Both feed the review-findings ledger's identity key; the orchestrator defaults a
 missing value to `unclassified` / `unscoped` and counts it instead of
 dropping the return.
 
