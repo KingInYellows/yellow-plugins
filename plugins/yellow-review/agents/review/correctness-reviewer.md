@@ -128,7 +128,9 @@ the JSON block.
 for your `category` (`unclassified` when none fits); `scope` is the enclosing
 dotted symbol path at `line` (e.g. `handlers.createUser`); in a prose file,
 use the nearest markdown heading only when it is unique in the file,
-otherwise the full `Parent > Child` heading path.
+otherwise the full `Parent > Child` heading path. In that path, escape a
+literal ` > ` inside one heading's own text as ` \> ` and double any `\`:
+`## A > B` under `# Parent` is `Parent > A \> B`.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow
