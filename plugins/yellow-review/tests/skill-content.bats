@@ -109,3 +109,9 @@ schema_fields() {
   grep -q "item 7's \`<rule-vocabulary>\` block" "$REVIEW_ALL"
   jq -e '.categories | keys == ["contract","correctness","docs","maintainability","performance","reliability","security","testing"]' "$VOCAB" >/dev/null
 }
+
+@test "ledger: the injected rule vocabulary also exposes category_aliases" {
+  grep -q 'category_aliases' "$REVIEW_PR"
+  grep -q 'alias of' "$REVIEW_PR"
+  jq -e '.category_aliases | has("plugin-contract") and has("adversarial") and has("project-compliance")' "$VOCAB" >/dev/null
+}

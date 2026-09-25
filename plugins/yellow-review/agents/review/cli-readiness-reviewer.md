@@ -160,8 +160,9 @@ entire malformed return.
 
 `rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
 for your `category` (`unclassified` when none fits); `scope` is the enclosing
-dotted symbol path at `line` (e.g. `handlers.createUser`), or the nearest
-markdown heading in a prose file.
+dotted symbol path at `line` (e.g. `handlers.createUser`); in a prose file,
+use the nearest markdown heading only when it is unique in the file,
+otherwise the full `Parent > Child` heading path.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow
