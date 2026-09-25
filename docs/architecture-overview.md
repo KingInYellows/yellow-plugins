@@ -433,6 +433,7 @@ Summary only; each plugin's `catalog/plugins/<name>.json` hooks block and its
 | yellow-core     | Compound-staging drain dispatcher. Guard: `COMPOUND_DRAIN_IN_PROGRESS=1`.                                                |
 | yellow-ci       | Shared 3s budget: optional `gh run list`, 500-byte routing cache, defanged `systemMessage`.                              |
 | yellow-debt     | Scans `todos/debt/` for pending/ready high/critical findings; emits a `systemMessage` warning if any exist.              |
+| yellow-review   | Reads review-ledger sidecars under `git-common-dir`; emits pending/attention counts and PR numbers, never ledger text.   |
 | yellow-research | Write `credential-status.json`; disown Context7 `_lc_prewarm` (lockfile scan, HTTP library-ID resolution, cache update). |
 | yellow-semgrep  | Write `credential-status.json` (presence/source only).                                                                   |
 | yellow-morph    | Prewarms morphmcp only; does not write `credential-status.json`.                                                         |
