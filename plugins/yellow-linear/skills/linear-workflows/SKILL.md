@@ -229,7 +229,7 @@ returned:
 3. Discard the raw response. Use only the sanitized copy for session output,
    brainstorm/context packets, and downstream agent prompts.
 
-Minimum patterns (PEM private-key blocks are redacted in full, from `BEGIN` through the `END` line of the same key type):
+Minimum patterns (PEM private-key blocks are redacted in full, from `BEGIN` through a line that is exactly the `END` delimiter of the same key type):
 
 - `sk-proj-`, `sk-ant-`, generic `sk-` API keys
 - `AIza` (Google API keys)
@@ -244,8 +244,11 @@ Minimum patterns (PEM private-key blocks are redacted in full, from `BEGIN` thro
   `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`,
   `SEMGREP_APP_TOKEN`, `MORPH_API_KEY`, `CERAMIC_API_KEY`) or ends in
   `_API_KEY`, `_ACCESS_KEY` (e.g. `AWS_SECRET_ACCESS_KEY`), `_TOKEN`,
-  `_SECRET` or `_PASSWORD`. Redact the whole line
-  even when the value doesn't match a known key prefix.
+  `_SECRET` or `_PASSWORD`. Redact the whole line even when the value
+  doesn't match a known key prefix. When the key has no value on its line,
+  also redact the continuation lines: the indented value or `|`/`>` block
+  scalar after a YAML `KEY:`, or the next lines after a shell line ending
+  in `\`.
 
 **Redact in-process. Never move raw Linear text anywhere else.** An MCP
 response is already in the model's context. Apply the patterns above to it
@@ -263,19 +266,39 @@ responses:
 
 ```bash
 awk '
-BEGIN { inpem = 0; pemend = "" }
+function indent(s) { return match(s, /[^ \t]/) ? RSTART - 1 : length(s) }
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+function redact() { print "--- redacted credential at line " NR " ---" }
+BEGIN { inpem = 0; pemend = ""; incont = 0; keyind = 0; bslash = 0 }
 {
   line = $0
   if (inpem) {
-    print "--- redacted credential at line " NR " ---"
-    if (index(line, pemend) > 0) { inpem = 0; pemend = "" }
+    redact()
+    if (trim(line) == pemend) { inpem = 0; pemend = "" }
     next
   }
+  if (incont) {
+    if (bslash || trim(line) == "" || indent(line) > keyind) {
+      redact()
+      bslash = (line ~ /\\[ \t]*$/)
+      next
+    }
+    incont = 0
+  }
   if (match(line, /-----BEGIN [A-Z ]*PRIVATE KEY-----/)) {
-    print "--- redacted credential at line " NR " ---"
+    redact()
     pemtype = substr(line, RSTART + 11, RLENGTH - 16)
     pemend = "-----END " pemtype "-----"
     if (index(substr(line, RSTART + RLENGTH), pemend) == 0) inpem = 1
+    next
+  }
+  low = tolower(line)
+  if (match(low, /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_access_key|_token|_secret|_password))["\047]?[ \t]*[=:]/)) {
+    redact()
+    rest = trim(substr(line, RSTART + RLENGTH))
+    if (rest == "" || rest ~ /^[|>][-+0-9]*$/ || rest ~ /\\$/) {
+      incont = 1; keyind = indent(line); bslash = (rest ~ /\\$/)
+    }
     next
   }
   if (line ~ /sk-(proj-|ant-)?[A-Za-z0-9_-]{16,}/ ||
@@ -285,11 +308,10 @@ BEGIN { inpem = 0; pemend = "" }
       line ~ /AKIA[0-9A-Z]{16}/ ||
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
       line ~ /lin_(api|oauth)_[A-Za-z0-9]{16,}/ ||
-      tolower(line) ~ /bearer[ \t]+[^ \t]/ ||
-      tolower(line) ~ /authorization[ \t]*:/ ||
-      tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_access_key|_token|_secret|_password))["\047]?[ \t]*[=:]/) {
-    print "--- redacted credential at line " NR " ---"
-  } else if (tolower(line) ~ /^[ \t]*---[ \t]*(begin|end)([ \t]|$)/) {
+      low ~ /bearer[ \t]+[^ \t]/ ||
+      low ~ /authorization[ \t]*:/) {
+    redact()
+  } else if (low ~ /^[ \t]*---[ \t]*(begin|end)([ \t]|$)/) {
     print "[fenced: marker removed at line " NR "]"
   } else {
     print line
