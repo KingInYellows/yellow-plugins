@@ -616,9 +616,21 @@ rl_map_line() {
 # Prints "<path>\t<innermost>\t<start>\t<end>\t<innermost-count>", where
 # path joins headings with " > " and end is the line before the next
 # heading of the same or a higher level.
+#
+# Collision guard: a heading segment whose own text contains a literal
+# " > " (e.g. a heading literally titled "A > B") would otherwise
+# canonicalize identically to sibling headings "A" and "B" nested inside
+# each other. Before joining, each segment has "\" doubled and any literal
+# " > " substring escaped to " \> ", so only the real join separator is an
+# unescaped " > ". Segments with no separator in their text are emitted
+# unchanged, so the ordinary "Parent > Child" claim format used by
+# reviewers keeps verifying via rl_verify_scope unaffected. The
+# <innermost> field is always the raw (unescaped) heading text, since a
+# single-occurrence claim is matched against it directly.
 rl_md_heading_path() {
   awk -v L="$2" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/ > /, " \\> ", s); return s }
     /^[ \t]*(```+|~~~+)/ {
       line = $0; sub(/^[ \t]*/, "", line)
       ch = substr(line, 1, 1); n = 0
@@ -643,7 +655,7 @@ rl_md_heading_path() {
     END {
       if (inner == 0) exit 1
       path = ""
-      for (k = 1; k <= 6; k++) if (k in stack) path = (path == "" ? stack[k] : path " > " stack[k])
+      for (k = 1; k <= 6; k++) if (k in stack) { seg = esc(stack[k]); path = (path == "" ? seg : path " > " seg) }
       if (!closed) endline = NR
       printf "%s\t%s\t%d\t%d\t%d\n", path, stack[inner], sline[inner], endline, seen[stack[inner]]
     }' "$1"
@@ -905,7 +917,11 @@ rl_reverify_finding() {
     return 0
   fi
   if [ "$deletion" = true ]; then
-    if rl_tree_entry "$T" "$file" >/dev/null; then printf 'not_reproduced'; else printf 'reproduced'; fi
+    if entry=$(rl_tree_entry "$T" "$file") && rl_regular_mode "${entry%% *}"; then
+      printf 'not_reproduced'
+    else
+      printf 'reproduced'
+    fi
     return 0
   fi
   if [ "$source" = worktree ]; then
@@ -1007,8 +1023,9 @@ RL_VALIDATE_FINDING_JQ='
 # Prints a candidate observation (without finding_id), or "REJECT <reason>".
 rl_build_candidate() {
   local fj="$1" H="$2" B="$3" src="$4" verdict file line vres where oid content n text hash
-  local cat_raw cat rule rule_raw scope_claimed sv scope scope_status sstart send occ deletion
-  local title fix mig bcc withheld alines report_only fp root
+  local cat_raw cat cat_stored rule rule_raw scope_claimed sv scope scope_status sstart send occ deletion
+  local title fix mig bcc withheld alines report_only fp root rev_json rev_out rev_i rev_ln rev_r
+  local -a rev_filtered rev_redacted
   verdict=$(jq -r "$RL_VALIDATE_FINDING_JQ" <<<"$fj" 2>/dev/null) || verdict=invalid-json
   [ "$verdict" = ok ] || { printf 'REJECT %s' "$verdict"; return 0; }
   file=$(jq -r '.file' <<<"$fj")
@@ -1039,7 +1056,11 @@ rl_build_candidate() {
     cat=maintainability
   fi
   cat_stored=${cat_raw:0:64}
-  rl_suspicious "$cat_stored" && cat_stored='[withheld]'
+  # rl_suspicious alone only catches long mixed-case+digit tokens, so an
+  # all-lowercase credential-shaped category (e.g. a lowercase-payload
+  # ghp_ token) never trips it; rl_anchor_safe additionally routes the
+  # value through cs_redact_secrets, which knows the actual token shapes.
+  rl_anchor_safe "$cat_stored" || cat_stored='[withheld]'
   rule_raw=$(jq -r '.rule // ""' <<<"$fj")
   scope_claimed=$(jq -r '.scope // ""' <<<"$fj")
   if [ -z "$rule_raw" ]; then rule=unclassified; else rule=$(rl_validate_rule "$cat" "$rule_raw"); fi
@@ -1059,6 +1080,40 @@ rl_build_candidate() {
   [ -n "$mig" ] && mig=$(rl_redact "$mig")
   bcc=$(jq -r '.breaking_change_class // "" | select(IN("name-rename", "signature-change", "removal", "semantics-change"))' <<<"$fj")
   [ -n "$scope_claimed" ] && scope_claimed=$(rl_redact "$scope_claimed")
+
+  # reviewers: character-filtering alone (below) does not stop a
+  # credential-shaped value from surviving verbatim. Run the filtered set
+  # through cs_redact_secrets as a single batch — one invocation for the
+  # whole array, not one per entry, since reviewers is unbounded
+  # model-authored input and cs_redact_secrets costs ~40ms per call.
+  mapfile -t rev_filtered < <(jq -r '
+    (if (.reviewers | type) == "array" then .reviewers
+     elif (.reviewer | type) == "string" then [.reviewer]
+     else ["unknown"] end)
+    | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "")[0:64])
+    | unique[]' <<<"$fj")
+  rev_redacted=()
+  if [ "${#rev_filtered[@]}" -gt 0 ] && rl_load_core \
+     && rev_out=$(printf '%s\n' "${rev_filtered[@]}" | cs_redact_secrets 2>/dev/null) \
+     && [ "$(printf '%s\n' "$rev_out" | wc -l)" -eq "${#rev_filtered[@]}" ]; then
+    rev_i=0
+    while IFS= read -r rev_ln; do
+      if [ "$rev_ln" = "${rev_filtered[$rev_i]}" ] && ! rl_suspicious "$rev_ln"; then
+        rev_redacted+=("$rev_ln")
+      else
+        rev_redacted+=('[withheld]')
+      fi
+      rev_i=$((rev_i + 1))
+    done <<<"$rev_out"
+  else
+    # Core missing, redaction failed, or the batch lost a record — fall
+    # back to the fail-closed per-entry check.
+    for rev_r in "${rev_filtered[@]}"; do
+      if rl_anchor_safe "$rev_r"; then rev_redacted+=("$rev_r"); else rev_redacted+=('[withheld]'); fi
+    done
+  fi
+  rev_json=$(printf '%s\n' "${rev_redacted[@]}" | jq -R -s 'split("\n") | map(select(length > 0)) | unique')
+
   withheld=false
   if rl_anchor_safe "$text"; then alines=$(jq -cn --arg t "$text" '[$t]'); else alines=null withheld=true; fi
   report_only=$(jq -r 'if has("queue") then .queue == "report_only"
@@ -1074,12 +1129,10 @@ rl_build_candidate() {
     --arg scope "$scope" --arg sc "$scope_claimed" --arg ss "$scope_status" --arg occ "$occ" \
     --arg file "$file" --argjson line "$line" --argjson del "$deletion" --arg hash "$hash" \
     --argjson alines "$alines" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
-    --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" '
+    --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" --argjson reviewers "$rev_json" '
     def nn: if . == "" then null else . end;
     {fingerprint: $fp,
-     reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
-                  elif ($f.reviewer | type) == "string" then [$f.reviewer] else ["unknown"] end)
-                 | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "")) | unique),
+     reviewers: $reviewers,
      severity: $f.severity, category: $cat, category_raw: ($cat_stored | gsub("[^A-Za-z0-9 ._\\[\\]-]"; "")),
      rule: $rule, scope: $scope, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
      file: $file, line: $line, deletion: $del, anchor_hash: $hash, anchor_lines: $alines,
@@ -1417,8 +1470,9 @@ cmd_dismissed_context() {
     rl_dismissal_applicable "$fold" "$id" "$head" || continue
     out=$(printf '%s' "$fold" | jq -c --arg id "$id" --argjson acc "$out" '
       $acc + [.findings[] | select(.finding_id == $id)
-        | {finding_id, reason, title: .obs.title, file: .obs.file, line: .obs.line,
-           category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity}]')
+        | {finding_id, reason, file: .obs.file, line: .obs.line,
+           category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity,
+           depends_on: ((.depends_on // []) | map(.path))}]')
   done < <(printf '%s' "$fold" | jq -r '.findings[] | select(.state == "dismissed") | .finding_id')
   printf '%s\n' "$out"
 }
