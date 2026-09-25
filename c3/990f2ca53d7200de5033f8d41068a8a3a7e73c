@@ -1,0 +1,19 @@
+docs/security.md
+  s_58268e9f7cfc1b::t_b1780278bef8da 152-153,168,181-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c3990f2ca53d7200de5033f8d41068a8a3a7e73c",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
