@@ -208,7 +208,10 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   unverified, folds a sidecar whose byte count no longer matches (1.5 s total
   budget), and reports a PR as "pending unknown" when its lock is busy. It
   prints `systemMessage` plus a factual `additionalContext` only when
-  something is pending, needs attention, or is unverified or unknown.
+  something is pending, needs attention, or is unverified or unknown. Each
+  category names at most 10 PRs, then `+N more`; past its 2.3 s deadline
+  the hook only counts the remaining ledgers as unknown (no per-file clock
+  reads, locks or folds).
   Integers and PR numbers only; never ledger text. Always
   `{"continue": true}`, no `set -e`.
 
