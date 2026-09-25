@@ -247,12 +247,28 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
   `_SECRET` or `_PASSWORD`. Redact the whole line
   even when the value doesn't match a known key prefix.
 
-When Bash is available, pipe each fetched text block through this `awk`
-program. It implements every pattern above, including case-insensitive named
+**Never put raw Linear text inside a shell command.** An MCP response lives
+in the model's context, not in a shell variable. Pasting it into a command
+string, heredoc or `printf` lets quotes, `$(...)` or heredoc delimiters in a
+malicious issue change the command before anything is redacted. Use one of
+these two channels:
+
+1. **File channel (callers with Write and Bash).**
+   - Create a private temp file outside the worktree:
+     `RAW=$(mktemp "${TMPDIR:-/tmp}/linear-raw.XXXXXX")`. Print the path.
+   - Write the raw MCP text to that literal path with the **Write tool**,
+     which does no shell interpretation.
+   - Run the program below on the file (`awk '...' "$RAW"`), keep only its
+     output, then `rm -f -- "$RAW"`.
+2. **In-process channel (callers without Write, such as
+   `linear-issue-loader`).** Apply the same patterns yourself, line by line,
+   and never shell out with the raw text.
+
+The program implements every pattern above, including case-insensitive named
 assignments, and runs under mawk, gawk and busybox awk:
 
 ```bash
-printf '%s\n' "$text" | awk '
+awk '
 BEGIN { inpem = 0 }
 {
   line = $0
@@ -282,7 +298,7 @@ BEGIN { inpem = 0 }
   } else {
     print line
   }
-}'
+}' "$RAW"
 ```
 
 When sanitizing in prose only, still enforce the same rule: never print or
