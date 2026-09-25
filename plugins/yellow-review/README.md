@@ -34,6 +34,7 @@ yellow-core integration before reviewing real PRs.
 | `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
 | `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
 | `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation |
+| `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
 
 ## Agents
 
@@ -154,6 +155,23 @@ findings and the report-only queue, P0 `human` findings included.
 
 The Step 10 report ends Coverage with a `Ledger:` line (new, carried over,
 reopened, pending, need attention).
+
+`/review:triage [PR]` works the ledger down. It first reconciles every
+finding against the fetched PR head. An `applied` fix becomes `fixed` once
+it is proved published, and becomes `reopened` if it was reverted or
+abandoned. Findings whose anchor is gone become `stale`, and a `stale`
+finding whose anchor matches again becomes `reopened`. Anything
+unverifiable (a shallow clone, missing objects) is listed rather than
+changed. After that it walks the remaining findings one card at a time:
+
+- **Apply** — only when HEAD is the PR head and the tree is clean.
+- **Dismiss** — with a reason and optional dependency paths. The dismissal
+  lapses when one of them changes.
+- **Restore file** — for a file the PR deleted, byte-for-byte from the base.
+- **Skip.**
+
+`--non-interactive` reconciles and applies nothing. `--prune <PR#>` deletes
+the ledger of a merged or closed PR.
 
 ## Confidence gating
 

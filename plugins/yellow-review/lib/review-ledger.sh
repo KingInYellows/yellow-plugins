@@ -1756,6 +1756,173 @@ cmd_settle() {
   rl_locked "$pr" rl_settle_locked
 }
 
+# --- stage 4: reconcile and restore -----------------------------------------
+
+# reconcile <pr> --head <headRefOid> --base <baseRefOid> [--actor A]
+# The deterministic core of every /review:triage mode, by latest state:
+#   applied            — publication + re-verify at the head (rl_settle_one)
+#   open, reopened,
+#   report_only        — not_reproduced → stale
+#   stale              — reproduced → reopened
+#   unverifiable       — no transition; listed
+# Deletion findings follow the current-base rule: a base that no longer has
+# the path retires the finding (dismissed, "retired: base deleted path").
+# A local-HEAD mismatch never marks an applied finding stale: `applied`
+# only ever moves through publication proof.
+rl_reconcile_locked() {
+  local f fold id state deletion file rv out res pub t='[]' unv='[]' bytes
+  rl_writer_gate "$RL_C_DIR" "$RL_C_PR" || return $?
+  f="$RL_C_DIR/$RL_C_PR.jsonl"
+  rl_repair_tail "$f" || return 1
+  fold=$(rl_fold_file "$f") || return 1
+  rec() { t=$(jq -c --arg id "$1" --arg from "$2" --arg to "$3" --arg r "$4" '. + [{finding_id: $id, from: $from, to: $to, reason: $r}]' <<<"$t"); }
+  while IFS=$'\t' read -r id state deletion file; do
+    [ -n "$id" ] || continue
+    if [ "$deletion" = true ] && [ "$state" != applied ] && [ "$state" != fixed ] && [ "$state" != dismissed ]; then
+      if ! rl_have_commit "$RL_C_BASE"; then
+        unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv")
+        continue
+      fi
+      if ! rl_tree_entry "$RL_C_BASE" "$file" >/dev/null; then
+        rl_append "$f" "$(rl_transition_record "$id" dismissed "retired: base deleted path" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
+        rec "$id" "$state" dismissed "retired: base deleted path"
+        continue
+      fi
+    fi
+    case "$state" in
+      applied)
+        out=$(rl_settle_one "$f" "$fold" "$id" "$RL_C_HEAD" "$RL_C_ACTOR") || return 1
+        read -r res pub rv <<<"$out"
+        if [ "$res" != applied ]; then
+          rec "$id" applied "$res" "$pub"
+        elif [ "$pub" = unverifiable ] || [ "$rv" = unverifiable ]; then
+          unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv")
+        fi
+        ;;
+      open | reopened | report_only)
+        rv=$(rl_reverify_finding "$fold" "$id" "$RL_C_HEAD")
+        case "$rv" in
+          not_reproduced)
+            rl_append "$f" "$(rl_transition_record "$id" stale "anchor no longer matches at ${RL_C_HEAD:0:12}" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
+            rec "$id" "$state" stale "anchor no longer matches"
+            ;;
+          unverifiable) unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv") ;;
+        esac
+        ;;
+      stale)
+        rv=$(rl_reverify_finding "$fold" "$id" "$RL_C_HEAD")
+        case "$rv" in
+          reproduced)
+            rl_append "$f" "$(rl_transition_record "$id" reopened "re-matched at ${RL_C_HEAD:0:12}" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
+            rec "$id" stale reopened "re-matched"
+            ;;
+          unverifiable) unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv") ;;
+        esac
+        ;;
+    esac
+  done < <(printf '%s' "$fold" | jq -r '.findings[] | [.finding_id, .state, ((.obs.deletion // false) | tostring), .obs.file] | join("\t")')
+  fold=$(rl_fold_file "$f") || return 1
+  rl_refresh_sidecar "$RL_C_DIR" "$RL_C_PR" "$fold" || rl_err "sidecar refresh failed"
+  bytes=0
+  [ -f "$f" ] && bytes=$(rl_file_size "$f")
+  jq -cn --argjson t "$t" --argjson u "$unv" --argjson fold "$fold" --argjson bytes "$bytes" '
+    {transitions: $t, unverifiable: $u, pending: $fold.pending, attention: $fold.attention,
+     by_state: $fold.by_state, category_split: $fold.category_split, bytes: $bytes,
+     large: ($bytes > 2097152)}'
+}
+
+cmd_reconcile() {
+  local pr="${1:-}" head='' base='' actor=triage-noninteractive
+  rl_need_pr "$pr"
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --head) head="${2:-}"; shift 2 ;;
+      --base) base="${2:-}"; shift 2 ;;
+      --actor) actor="${2:-}"; shift 2 ;;
+      *) rl_die "$RL_EXIT_USAGE" "reconcile: unknown argument" ;;
+    esac
+  done
+  rl_need_sha --head "$head"
+  rl_need_sha --base "$base"
+  case "$actor" in triage | triage-noninteractive) ;; *) rl_die "$RL_EXIT_USAGE" "reconcile: bad --actor" ;; esac
+  RL_C_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
+  RL_C_PR=$pr RL_C_HEAD=$head RL_C_BASE=$base RL_C_ACTOR=$actor
+  rl_locked "$pr" rl_reconcile_locked
+}
+
+# restore <pr> <finding_id> --head <headRefOid> --base <baseRefOid>
+# CLAUDE-47: bring back a file the PR deleted, byte-for-byte from the
+# current base, for a deletion finding only. Refuses unless HEAD equals
+# <head> and the tree is clean, the path passes `restore` validation, and
+# the re-checked parent stays inside the repository after `mkdir -p`. The
+# content is never model-authored; git refuses to write through a
+# symlinked leading directory. Leaves the file staged; the caller commits
+# and records `applied`.
+cmd_restore() {
+  local pr="${1:-}" id="${2:-}" head='' base='' fold row file v root parent
+  rl_need_pr "$pr"
+  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || rl_die "$RL_EXIT_USAGE" "restore: finding_id must be 64-hex"
+  shift 2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --head) head="${2:-}"; shift 2 ;;
+      --base) base="${2:-}"; shift 2 ;;
+      *) rl_die "$RL_EXIT_USAGE" "restore: unknown argument" ;;
+    esac
+  done
+  rl_need_sha --head "$head"
+  rl_need_sha --base "$base"
+  [ "$(git rev-parse HEAD 2>/dev/null)" = "$head" ] || rl_die "$RL_EXIT_INVALID" "restore: HEAD is not the PR head"
+  [ -z "$(git status --porcelain 2>/dev/null)" ] || rl_die "$RL_EXIT_INVALID" "restore: the working tree is not clean"
+  fold=$(rl_read_fold "$pr") || exit $?
+  row=$(printf '%s' "$fold" | jq -c --arg id "$id" '.findings[] | select(.finding_id == $id) | {file: .obs.file, deletion: (.obs.deletion // false)}')
+  [ -n "$row" ] || rl_die "$RL_EXIT_INVALID" "restore: unknown finding_id"
+  [ "$(jq -r '.deletion' <<<"$row")" = true ] || rl_die "$RL_EXIT_INVALID" "restore: not a deletion finding"
+  file=$(jq -r '.file' <<<"$row")
+  v=$(rl_validate_path restore "$base" "$file") || rl_die "$RL_EXIT_INVALID" "restore: path rejected ($v)"
+  root=$(rl_repo_root) || rl_die 1 "restore: not inside a repository"
+  parent=$(dirname -- "$root/$file")
+  mkdir -p -- "$parent" || rl_die 1 "restore: cannot create the parent directory"
+  if [ -L "$parent" ] || ! rl_inside_root "$root" "$parent"; then
+    rl_die "$RL_EXIT_INVALID" "restore: parent escapes the repository"
+  fi
+  git checkout "$base" -- "$file" 2>/dev/null || rl_die 1 "restore: git checkout failed"
+  printf 'restored\n'
+}
+
+# cards <pr> — the pending and attention findings as display-safe cards for
+# /review:triage, in severity order. Every stored value has ANSI sequences
+# and C0/DEL bytes removed (P8), the ledger-finding fence delimiters
+# substituted and XML metacharacters escaped; the model-authored fields sit
+# inside a reference-only fence.
+RL_CARDS_JQ='
+  def strip: (. // "") | tostring | gsub("\u001b\\[[0-9;?]*[ -/]*[@-~]"; "") | gsub("[\u0000-\u001f\u007f]"; " ");
+  def esc: strip
+    | gsub("--- begin ledger-finding \\(reference only\\) ---"; "[ESCAPED] begin ledger-finding (reference only)")
+    | gsub("--- end ledger-finding ---"; "[ESCAPED] end ledger-finding")
+    | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+  [ .findings[] | select(.state | IN("open", "reopened", "applied", "report_only", "stale")) ]
+  | sort_by(.obs.severity, .obs.file, .obs.line)
+  | to_entries[]
+  | .key as $k | .value as $f
+  | "[\($k + 1)] \($f.obs.severity) \($f.state) \($f.obs.file | esc):\($f.obs.line) \($f.obs.category)/\($f.obs.rule) scope=\($f.obs.scope | esc)"
+    + (if $f.obs.deletion then " deletion" else "" end)
+    + (if $f.state == "report_only" then " report-only" else "" end)
+    + "\nfinding_id: \($f.finding_id)\n"
+    + "--- begin ledger-finding (reference only) ---\n"
+    + "title: \($f.obs.title | esc)\n"
+    + "suggested_fix: \($f.obs.suggested_fix | esc)\n"
+    + "last_reason: \($f.reason | esc)\n"
+    + "--- end ledger-finding ---\n"'
+
+cmd_cards() {
+  local pr="${1:-}" fold
+  rl_need_pr "$pr"
+  fold=$(rl_read_fold "$pr") || exit $?
+  printf '%s' "$fold" | jq -r "$RL_CARDS_JQ"
+}
+
 rl_usage() {
   cat <<'USAGE'
 review-ledger.sh <subcommand> [args]
@@ -1767,6 +1934,9 @@ review-ledger.sh <subcommand> [args]
   dismissed-context <pr> --head <sha> [--fenced]
   remote-head <pr> [--remote <name>]
   settle <pr> --remote-head <sha> [--ids-json '[...]'] [--actor A]
+  reconcile <pr> --head <sha> --base <sha> [--actor triage|triage-noninteractive]
+  restore <pr> <finding_id> --head <sha> --base <sha>
+  cards <pr>
   reverify <pr> <finding_id> --head <sha>
   publication <pr> <finding_id> --remote-head <sha>
   validate-path <anchor|dependency|restore> <rev> <path> [<base>]
@@ -1789,7 +1959,7 @@ rl_main() {
     help | -h | --help) rl_usage ;;
     '') rl_usage >&2; exit "$RL_EXIT_USAGE" ;;
     new-run-id) rl_new_run_id; printf '\n' ;;
-    observe | transition | fold | reverify | publication | prune | summary | dismissed-context | validate-path | record-state | remote-head | settle)
+    observe | transition | fold | reverify | publication | prune | summary | dismissed-context | validate-path | record-state | remote-head | settle | reconcile | restore | cards)
       git rev-parse --git-dir >/dev/null 2>&1 || rl_die 1 "not inside a git repository"
       "cmd_${sub//-/_}" "$@"
       ;;
