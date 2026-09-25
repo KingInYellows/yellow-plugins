@@ -1129,12 +1129,17 @@ rl_reverify_row() {
   fi
   if [ "$del" = true ]; then
     # resolved only when the path is back as a regular file; a symlink,
-    # submodule or tree at that path still leaves the deletion in place
-    if entry=$(rl_tree_entry "$T" "$file") && rl_regular_mode "${entry%% *}"; then
-      printf 'not_reproduced'
-    else
-      printf 'reproduced'
-    fi
+    # submodule or tree at that path still leaves the deletion in place,
+    # and a tree that cannot be read proves neither
+    entry=$(rl_tree_lookup "$T" "$file")
+    case "$entry" in
+      unverifiable) printf 'unverifiable' ;;
+      present\ *)
+        entry=${entry#present }
+        if rl_regular_mode "${entry%% *}"; then printf 'not_reproduced'; else printf 'reproduced'; fi
+        ;;
+      *) printf 'reproduced' ;;
+    esac
     return 0
   fi
   if [ "$src" = worktree ]; then
@@ -1244,9 +1249,13 @@ rl_publication() {
 # Is a dismissal still applicable at <H>? The anchor must still match
 # (strict re-verify) and every depends_on entry must be a regular file at
 # <H> with the recorded blob (CLAUDE-44). Arg: index row, head.
+# Returns 0 applicable, 1 no longer applicable, 2 unverifiable (a tree or
+# object could not be read): callers must neither reopen nor inject then.
 rl_dismissal_applicable_row() {
-  local row="$1" H="$2" deps entry pair p blob
-  [ "$(rl_reverify_row "$row" "$H" strict)" = reproduced ] || return 1
+  local row="$1" H="$2" deps entry pair p blob rv
+  rv=$(rl_reverify_row "$row" "$H" strict)
+  [ "$rv" = unverifiable ] && return 2
+  [ "$rv" = reproduced ] || return 1
   IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ deps _ <<<"$row"
   [ -n "$deps" ] || return 0
   while IFS= read -r -d $'\x1e' pair || [ -n "$pair" ]; do
@@ -1254,7 +1263,12 @@ rl_dismissal_applicable_row() {
     p=${pair%%$'\x1d'*}
     blob=${pair#*$'\x1d'}
     blob=${blob%$'\n'}
-    entry=$(rl_tree_entry "$H" "$p") || return 1
+    entry=$(rl_tree_lookup "$H" "$p")
+    case "$entry" in
+      unverifiable) return 2 ;;
+      absent) return 1 ;;
+    esac
+    entry=${entry#present }
     rl_regular_mode "${entry%% *}" || return 1
     [ "${entry##* }" = "$blob" ] || return 1
   done <<<"$deps"
@@ -1523,7 +1537,7 @@ rl_observe_locked() {
   done < <(printf '%s' "$pairs_c" | sort -n -k1,1)
 
   # Actions.
-  local new=0 merged=0 reopened=0 suppressed=0
+  local new=0 merged=0 reopened=0 suppressed=0 app
   at=$(rl_now)
   RL_AT=$at
   for ((i = 0; i < n; i++)); do
@@ -1545,7 +1559,14 @@ rl_observe_locked() {
     IFS=$'\x1f' read -r _ state _ <<<"$row"
     case "$state" in
       dismissed)
-        if [ "${via[$i]}" != alias ] && rl_dismissal_applicable_row "$row" "$RL_O_HEAD"; then
+        # 0 applicable, 1 lapsed, 2 unverifiable: only a lapsed dismissal
+        # (or an alias match) reopens; an unverifiable one is left alone
+        app=1
+        if [ "${via[$i]}" != alias ]; then
+          rl_dismissal_applicable_row "$row" "$RL_O_HEAD"
+          app=$?
+        fi
+        if [ "$app" -ne 1 ]; then
           suppressed=$((suppressed + 1))
           status=suppressed
         else
@@ -2022,17 +2043,25 @@ cmd_remote_head() {
 }
 
 # Settle one `applied` finding against the remote head (CLAUDE-48):
-# publication proof AND a not_reproduced re-verify give `fixed`. When the fix
-# commit is unreachable (`abandoned`, e.g. a restack rewrote it and the
-# patch-id no longer matches), the strict re-verify decides: not_reproduced
-# is the brainstorm's content-check fallback proof and gives `fixed`
-# (reason unproved-content-check); reproduced gives `reopened`
-# (fix-abandoned); unverifiable stays `applied`. A proved fix whose anchor still reproduces stays
-# `applied`: anchor-only reverify cannot tell a real revert from an additive
-# fix (e.g. a guard inserted above an unchanged line), so a surviving anchor
-# alone must not reopen a published fix. Anything unverifiable or unproved
-# also leaves it `applied`. Caller holds the lock. Prints the target state
-# or "applied". Args: file fold id remote-head actor.
+#
+#   publication         strict re-verify   result
+#   proved              not_reproduced     fixed (proof ancestor / patch-id)
+#   proved              reproduced         applied (anchor-only limitation)
+#   unproved/abandoned  not_reproduced     fixed, unproved-content-check
+#   abandoned           reproduced         reopened, fix-abandoned
+#   unproved            reproduced         applied (not yet published)
+#   any                 unverifiable       applied
+#
+# The content check (not_reproduced at the remote head) is the brainstorm's
+# fallback proof whenever ancestry and patch-id fail: a restack can leave
+# the old fix SHA on a stale local ref while the rewritten fix is already
+# published, so local reachability only separates `abandoned` from
+# `unproved` when the defect still reproduces. A proved fix whose anchor
+# still reproduces stays `applied`: anchor-only reverify cannot tell a real
+# revert from an additive fix (e.g. a guard inserted above an unchanged
+# line). A record with no fix SHA yet is never settled. Caller holds the
+# lock. Prints the target state or "applied". Args: file fold id
+# remote-head actor.
 rl_settle_one() {
   local f="$1" row="$2" H="$3" actor="$4" id fix pub rv to='' reason='' proof=''
   IFS=$'\x1f' read -r id _ _ _ _ _ _ _ _ _ _ _ _ _ _ fix _ <<<"$row"
@@ -2045,12 +2074,16 @@ rl_settle_one() {
         not_reproduced) to=fixed ;;
       esac
       ;;
-    abandoned)
-      rv=$(rl_reverify_row "$row" "$H" strict)
-      case "$rv" in
-        not_reproduced) to=fixed reason=unproved-content-check proof=content-check ;;
-        reproduced) to=reopened reason=fix-abandoned ;;
-      esac
+    unproved | abandoned)
+      if [ -n "$fix" ]; then
+        rv=$(rl_reverify_row "$row" "$H" strict)
+        case "$rv" in
+          not_reproduced) to=fixed reason=unproved-content-check proof=content-check ;;
+          reproduced)
+            if [ "$pub" = abandoned ]; then to=reopened reason=fix-abandoned; fi
+            ;;
+        esac
+      fi
       ;;
   esac
   if [ -n "$to" ]; then

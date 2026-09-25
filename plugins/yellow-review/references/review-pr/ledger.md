@@ -181,12 +181,15 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    failure through Conventions' failure policy — add "Ledger: write failed at
    remote-head (exit N)" to Coverage instead of exiting silently. `settle`
    moves each finding to `fixed` when the fix is proved published (ancestor
-   or `git patch-id`) and no longer reproduces at the remote head. When the
-   fix commit is unreachable from every ref (a restack rewrote it), the
-   re-verify decides: no longer reproducing is the content-check fallback
-   proof and gives `fixed` (`unproved-content-check`); still reproducing gives
-   `reopened` (`fix-abandoned`). A proved fix whose anchor still matches, and
-   anything unverifiable, stays `applied` for `/review:triage`.
+   or `git patch-id`) and no longer reproduces at the remote head. When
+   neither proof holds (a restack rewrote the fix, even if the old commit
+   survives on a local branch), the re-verify decides: no longer reproducing
+   is the content-check fallback proof and gives `fixed`
+   (`unproved-content-check`); still reproducing gives `reopened`
+   (`fix-abandoned`) only when the fix commit is unreachable from every ref,
+   and otherwise stays `applied` (possibly not yet published). A proved fix
+   whose anchor still matches, and anything unverifiable, stays `applied` for
+   `/review:triage`.
 
 3. **Push declined, failed, or skipped** (the interactive gate was rejected, or
    the provider returned an error): append nothing more. The findings stay
