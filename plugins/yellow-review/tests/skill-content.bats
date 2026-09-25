@@ -216,10 +216,41 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   [ "$step6" -lt "$restore" ]
 }
 
+@test "triage: per-card actions are gated by the legal rl_edge_ok transitions" {
+  norm=$(tr '\n' ' ' <"$TRIAGE" | tr -s ' ')
+  grep -qF 'per `rl_edge_ok` in `lib/review-ledger.sh`: Apply and Restore file need a legal `→ applied` edge (not from `stale`); Dismiss needs a legal `→ dismissed` edge (not from `applied`)' <<<"$norm"
+  grep -qF -- '- **Apply** — offered for `open`, `reopened`, `report_only` and `applied` cards, never `stale`.' <<<"$norm"
+  grep -qF -- '- **Dismiss** — offered for every card except `applied` (no legal `→ dismissed` edge from `applied`).' <<<"$norm"
+  grep -qF -- '- **Restore file** — offered only for a card marked `deletion` whose state is `open`, `reopened`, `report_only` or `applied` (never `stale`, which has no legal `→ applied` edge)' <<<"$norm"
+}
+
 @test "triage: reconcile runs before any attended action and prune goes through the library" {
   rec=$(grep -n '"\$RL" reconcile <PR>' "$TRIAGE" | cut -d: -f1)
   cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
   [ "$rec" -lt "$cards" ]
   grep -q '"\$RL" prune <PR>' "$TRIAGE"
   ! grep -q 'rm -' "$TRIAGE"
+}
+
+@test "triage: Step 8 explicitly Reads the shared ledger reference before using it" {
+  grep -q 'Read `\${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its' "$TRIAGE"
+  grep -q 'If the Read fails, stop and report the path' "$TRIAGE"
+}
+
+# --- PR head checkout: validated and quoted, never raw shell-interpolated --
+# headRefName is attacker-controlled on a fork PR. Pin that review-pr.md
+# (the source triage.md's Apply gate delegates to) validates it and never
+# hands the raw, unquoted value to `gt checkout` or `git checkout`.
+
+@test "review-pr: headRefName is validated and quoted before checkout, never used bare" {
+  grep -q 'git check-ref-format --branch "<headRefName>"' "$REVIEW_PR"
+  grep -q 'gt checkout "<headRefName>"' "$REVIEW_PR"
+  ! grep -q '^gt checkout <headRefName>$' "$REVIEW_PR"
+}
+
+@test "review-all: mirrors review-pr's validated, quoted checkout for parity" {
+  grep -q 'validate it first with the same check as' "$REVIEW_ALL"
+  grep -q 'gt checkout "<branch>"' "$REVIEW_ALL"
+  grep -q 'git checkout "<branch>"' "$REVIEW_ALL"
+  ! grep -q '^   \*\*Graphite:\*\* `gt checkout <branch>`$' "$REVIEW_ALL"
 }
