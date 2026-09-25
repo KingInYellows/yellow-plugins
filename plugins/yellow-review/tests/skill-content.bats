@@ -43,3 +43,69 @@ REVIEW_ALL="$COMMANDS_DIR/review-all.md"
   count=$(grep -c '^gt track$' "$REVIEW_ALL")
   [ "$count" -eq 1 ]
 }
+
+# --- review-findings ledger: rule and scope in the compact-return schema ----
+# Every compact-return producer must emit `rule` and `scope`, or its
+# findings reach the ledger defaulted to unclassified/unscoped and lose
+# their identity key (plans/review-findings-ledger.md Stage 2).
+
+REVIEW_PR="$COMMANDS_DIR/review-pr.md"
+WORKFLOW_SKILL="$SKILLS_DIR/pr-review-workflow/SKILL.md"
+YR_AGENTS="$BATS_TEST_DIRNAME/../agents/review"
+YC_AGENTS="$BATS_TEST_DIRNAME/../../yellow-core/agents/review"
+VOCAB="$BATS_TEST_DIRNAME/../lib/review-ledger-vocab.json"
+
+producers() {
+  local n
+  for n in project-compliance correctness maintainability project-standards reliability adversarial plugin-contract cli-readiness agent-cli-readiness agent-native thermonuclear; do
+    printf '%s\n' "$YR_AGENTS/$n-reviewer.md"
+  done
+  printf '%s\n' "$YC_AGENTS/security-reviewer.md" "$YC_AGENTS/performance-reviewer.md"
+}
+
+# Field names inside a file's first ```json example that has "findings".
+schema_fields() {
+  awk '/^```json/ { inb = 1; buf = ""; next }
+       inb && /^```/ { if (buf ~ /"findings"/) { print buf; exit } inb = 0; next }
+       inb { buf = buf "\n" $0 }' "$1" |
+    grep -oE '^ +"[a-z_]+":' | tr -d ' ":' | sort -u
+}
+
+@test "ledger: the producer census is complete (every compact-return example is covered)" {
+  census=$(producers | sort)
+  found=$(grep -l '^ *"autofix_class": "' "$YR_AGENTS"/*.md "$YC_AGENTS"/*.md | sort)
+  [ "$census" = "$found" ]
+}
+
+@test "ledger: every compact-return producer lists rule and scope after category" {
+  while IFS= read -r f; do
+    grep -q '^ *"rule": "<slug from the injected rule-vocabulary>",$' "$f" || { echo "no rule: $f"; false; }
+    grep -q '^ *"scope": "<enclosing dotted symbol path or nearest markdown heading>",$' "$f" || { echo "no scope: $f"; false; }
+    [ "$(grep -A1 '^ *"category": ' "$f" | grep -c '"rule":')" -eq 1 ]
+  done < <(producers)
+}
+
+@test "ledger: review-pr.md and SKILL.md schema examples carry the same fields" {
+  a=$(schema_fields "$REVIEW_PR")
+  b=$(schema_fields "$WORKFLOW_SKILL")
+  [ -n "$a" ]
+  [ "$a" = "$b" ]
+  printf '%s\n' "$a" | grep -qx rule
+  printf '%s\n' "$a" | grep -qx scope
+}
+
+@test "ledger: missing rule/scope is defaulted, not dropped, in both review commands" {
+  grep -q 'rule: unclassified`, `scope: unscoped`' "$REVIEW_PR"
+  grep -q 'Defaulted, never dropped:\*\* `rule` and `scope`' "$REVIEW_PR"
+  grep -q 'Findings defaulted (missing rule/scope)' "$REVIEW_PR"
+  grep -q 'Categories unmapped' "$REVIEW_PR"
+  grep -q '`rule: unclassified`, `scope: unscoped`' "$REVIEW_ALL"
+  grep -q 'defaulted to$' "$REVIEW_ALL"
+}
+
+@test "ledger: both review commands inject the rule vocabulary from the plugin's file" {
+  grep -q '^7\. A `<rule-vocabulary>` block' "$REVIEW_PR"
+  grep -q 'lib/review-ledger-vocab.json' "$REVIEW_PR"
+  grep -q "item 7's \`<rule-vocabulary>\` block" "$REVIEW_ALL"
+  jq -e '.categories | keys == ["contract","correctness","docs","maintainability","performance","reliability","security","testing"]' "$VOCAB" >/dev/null
+}
