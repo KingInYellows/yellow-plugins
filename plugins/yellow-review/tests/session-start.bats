@@ -123,3 +123,9 @@ hook() { run --separate-stderr bash "$HOOK"; }
   run --separate-stderr env PATH="$BATS_TEST_TMPDIR/nojq" /bin/bash "$HOOK"
   [ "$output" = '{"continue": true}' ]
 }
+
+@test "the overall deadline reports remaining PRs as unknown instead of overrunning" {
+  observe "$BASE" "[$(finding a.sh 1)]" >/dev/null
+  RL_HOOK_DEADLINE_MS=0 hook
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"pending unknown: #12"* ]]
+}

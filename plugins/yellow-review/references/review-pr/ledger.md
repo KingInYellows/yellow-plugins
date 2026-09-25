@@ -145,6 +145,10 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    fi
    ```
 
+   A `--fix-sha` or `--published-head` batch skips any id that is no longer
+   `applied` (for example a finding a concurrent triage already moved) and lists
+   it under `skipped`; add those ids to Coverage. Exit 3 names the offending id.
+
    `remote-head` fetches `refs/pull/<PR>/head` (fork PRs included) and retries
    until it equals `headRefOid`; exit 6 means it never matched (or `gh` could
    not read `headRefOid`), so leave the findings `applied` and route the

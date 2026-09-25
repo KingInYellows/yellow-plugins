@@ -213,7 +213,9 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   Sums the review ledger's `<pr>.pending` sidecars for PRs whose
   `<pr>.state` is OPEN and under 7 days old. It names the other PRs as
   unverified, folds a sidecar whose byte count no longer matches (1.5 s total
-  budget), and reports a PR as "pending unknown" when its lock is busy. It
+  budget), and reports a PR as "pending unknown" when its lock is busy,
+  its fold would overrun the budget, or the overall 2.3 s deadline passes
+  before the hook reaches it. It
   prints `systemMessage` plus a factual `additionalContext` only when
   something is pending, needs attention, or is unverified or unknown.
   Integers and PR numbers only; never ledger text. Always

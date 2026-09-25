@@ -217,12 +217,11 @@ setup() {
 
 @test "category aliases normalize reviewer names to the closed vocabulary" {
   source "$RL"
-  [ "$(rl_normalize_category plugin-contract)" = contract ]
-  [ "$(rl_normalize_category Adversarial)" = correctness ]
-  [ "$(rl_normalize_category security)" = security ]
-  [ -z "$(rl_normalize_category nonsense)" ]
-  [ "$(rl_validate_rule security injection)" = injection ]
-  [ "$(rl_validate_rule docs injection)" = unclassified ]
+  [ "$(rl_vocab_lookup plugin-contract removal)" = "contract removal 1" ]
+  [ "$(rl_vocab_lookup Adversarial logic-error)" = "correctness logic-error 1" ]
+  [ "$(rl_vocab_lookup security injection)" = "security injection 1" ]
+  [ "$(rl_vocab_lookup nonsense injection)" = "maintainability unclassified 0" ]
+  [ "$(rl_vocab_lookup docs injection)" = "docs unclassified 1" ]
 }
 
 # --- redaction (P3) ---------------------------------------------------------
@@ -1084,9 +1083,12 @@ deleted_util() {
   [ "$(fold | jq -r '[.findings[].state] | unique | join(",")')" = applied ]
   transition "${id[0]}" applied --fix-sha "$BASE" >/dev/null
   transition "${id[0]}" fixed >/dev/null
-  # fixed -> applied is illegal, so nothing in this batch is written
-  run -3 transition - applied --fix-sha "$BASE" --ids-json "$ids_json"
-  [ "$(fold | jq -r '[.findings[] | select(.fix_sha != null)] | length')" -eq 1 ]
+  # fixed -> dismissed is illegal, so nothing in this batch is written
+  run -3 transition - dismissed --reason nope --ids-json "$ids_json"
+  [ "$(fold | jq -r '[.findings[] | select(.state == "dismissed")] | length')" -eq 0 ]
+  # an annotation-only batch skips the finding that left `applied`
+  run -0 transition - applied --fix-sha "$BASE" --ids-json "$ids_json"
+  [ "$(printf '%s' "$output" | jq '.skipped | length')" -eq 1 ]
   run -2 transition - applied --ids-json '["nothex"]'
   run -2 transition "${id[1]}" applied --ids-json "$ids_json"
 }
@@ -1097,4 +1099,116 @@ deleted_util() {
   observe "$H" "[$(finding q.js 1), $(finding q.js 2), $(finding q.js 3), $(finding q.js 4)]" >/dev/null
   [ "$(fold | jq -c '[.findings | sort_by(.obs.line)[] | .obs.anchor_withheld]')" = "[false,true,false,true]" ]
   ! grep -rq 'hunter2hunter2\|zzzzzzzz' "$LEDGER_DIR"
+}
+
+# --- /review:pr pass on the review-pass PR ----------------------------------
+
+@test "anchor text with backslashes still matches itself (no awk -v escape expansion)" {
+  printf 'a\nprintf "hello\\n"\nb\n' >|bs.sh
+  H=$(commit_all backslash)
+  observe "$H" "[$(finding bs.sh 2)]" >/dev/null
+  id=$(ids)
+  transition "$id" dismissed --head "$H" --reason "intended" >/dev/null
+  [ "$("$RL" dismissed-context "$LEDGER_PR" --head "$H" | jq 'length')" -eq 1 ]
+  source "$RL"
+  rl_tmp >/dev/null
+  RL_AW_CHECK=$(printf '%s' 'printf "hello\n"')
+  [ "$(rl_window_match "$REPO/bs.sh" 2 1 x "$RL_AW_CHECK" '')" = 2 ]
+  [ "$(rl_similarity 'a\tb' 'a\tb')" = 1 ]
+}
+
+@test "a value-taking flag given last with no value is a usage error, not a hang" {
+  run -2 timeout 10 "$RL" settle "$LEDGER_PR" --remote-head
+  run -2 timeout 10 "$RL" transition "$LEDGER_PR" - applied --ids-json
+  run -2 timeout 10 "$RL" observe "$LEDGER_PR" --head
+}
+
+@test "writer gate: a fresh OPEN state skips gh; a stale one asks again" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  MOCK_GH_PR_STATE=MERGED run -0 observe "$BASE" "[$(finding a.sh 3)]"
+  RL_STATE_FRESH=0 MOCK_GH_PR_STATE=MERGED run -5 observe "$BASE" "[$(finding a.sh 4)]"
+}
+
+@test "a failed blob diff maps to unmapped, so re-verify says unverifiable" {
+  observe "$BASE" "[$(finding a.sh 3)]" >/dev/null
+  id=$(ids)
+  printf 'zero\none\ntwo\nthree\nfour\nfive\n' >|a.sh
+  H2=$(commit_all shift)
+  real_git=$(command -v git)
+  printf '#!/bin/sh\ncase " $* " in *" -U0 "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >|"$BATS_TEST_TMPDIR/bin/git"
+  chmod +x "$BATS_TEST_TMPDIR/bin/git"
+  run "$RL" reverify "$LEDGER_PR" "$id" --head "$H2"
+  rm "$BATS_TEST_TMPDIR/bin/git"
+  [ "$output" = unverifiable ]
+}
+
+@test "a file that turns binary is unverifiable, never a bogus line" {
+  observe "$BASE" "[$(finding a.sh 3)]" >/dev/null
+  id=$(ids)
+  printf 'one\n\000\001binary\n' >|a.sh
+  H2=$(commit_all binary)
+  run -6 "$RL" reverify "$LEDGER_PR" "$id" --head "$H2"
+}
+
+@test "the one-at-a-time redaction fallback still redacts and keeps every finding" {
+  pem='-----BEGIN RSA PRIVATE KEY----- then more'
+  out=$(observe "$BASE" "[$(finding a.sh 1 "$(jq -cn --arg t "$pem" '{title: $t}')"), $(finding a.sh 2 '{"title":"plain second title"}')]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 2 ]
+  ! grep -rq 'BEGIN RSA PRIVATE KEY' "$LEDGER_DIR"
+  [ "$(fold | jq -r '.findings[] | select(.obs.line == 2) | .obs.title')" = "plain second title" ]
+}
+
+@test "a NUL inside a model-authored field does not shift or drop the finding" {
+  out=$(observe "$BASE" "[$(finding a.sh 2 '{"title":"nul\u0000inside","suggested_fix":"fix\u0000it"}')]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+  [ "$(fold | jq -r '.findings[0].obs.title')" = nulinside ]
+  [ "$(fold | jq -r '.findings[0].obs.file')" = a.sh ]
+}
+
+@test "scopes that redact alike stay separate findings (identity uses the raw scope)" {
+  export RL_CORE_LIB="$BATS_TEST_TMPDIR/missing/compound-staging.sh"
+  printf '# Doc\n\n## Admin\n\nSame paragraph text.\n\n## Handlers\n\nSame paragraph text.\n' >|s.md
+  H=$(commit_all md-scopes)
+  observe "$H" "[$(finding s.md 5 '{"scope":"Admin","category":"docs","rule":"wrong-doc"}'), $(finding s.md 9 '{"scope":"Handlers","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  [ "$(fold | jq -r '[.findings[].obs.scope_key] | unique | length')" -eq 2 ]
+  ! grep -rq 'Handlers' "$LEDGER_DIR"
+}
+
+@test "multi-entry depends_on: changing the second dependency reopens the dismissal" {
+  mkdir -p lib src
+  printf 'guard\n' >|lib/one.sh
+  printf 'guard two\n' >|lib/two.sh
+  printf 'sink() {\n  eval "$1"\n}\n' >|src/sink.sh
+  H1=$(commit_all deps)
+  observe "$H1" "[$(finding src/sink.sh 2 '{"category":"security","rule":"injection"}')]" >/dev/null
+  id=$(ids)
+  transition "$id" dismissed --head "$H1" --reason ok --depends-on-json '["lib/one.sh", "lib/two.sh"]' >/dev/null
+  [ "$(fold | jq '.findings[0].depends_on | length')" -eq 2 ]
+  [ "$("$RL" dismissed-context "$LEDGER_PR" --head "$H1" | jq 'length')" -eq 1 ]
+  printf 'weakened\n' >|lib/two.sh
+  H2=$(commit_all weaken-two)
+  [ "$("$RL" dismissed-context "$LEDGER_PR" --head "$H2" | jq 'length')" -eq 0 ]
+}
+
+@test "exit codes name the failure: unknown ids, unfetched heads, skipped batch ids" {
+  observe "$BASE" "[$(finding a.sh 2), $(finding a.sh 3)]" >/dev/null
+  mapfile -t id < <(ids)
+  zero=$(printf '%064d' 0)
+  run -3 "$RL" reverify "$LEDGER_PR" "$zero" --head "$BASE"
+  run -3 "$RL" publication "$LEDGER_PR" "$zero" --remote-head "$BASE"
+  run -2 "$RL" reverify "$LEDGER_PR" nothex --head "$BASE"
+  run -6 "$RL" resolve-path "$LEDGER_PR" "${id[0]}" --head 1111111111111111111111111111111111111111
+  run --separate-stderr -3 transition - dismissed --ids-json "[\"${id[0]}\", \"$zero\"]"
+  [[ "$stderr" == *"$zero"* ]]
+  transition "${id[0]}" applied >/dev/null
+  run -0 transition - applied --fix-sha "$BASE" --ids-json "[\"${id[1]}\", \"${id[0]}\"]"
+  [ "$(printf '%s' "$output" | jq -r '.skipped[0]')" = "${id[1]}" ]
+  [ "$(printf '%s' "$output" | jq -r '.results[0].finding_id')" = "${id[0]}" ]
+}
+
+@test "rl_normalize_line: tabs, CRs and long space runs normalize like the awk copy" {
+  source "$RL"
+  [ "$(rl_normalize_line $'\t a  \t  b\r    c  ')" = "a b c" ]
+  [ "$(printf '%s\n' $'\t a  \t  b\r    c  ' | awk "$RL_AWK_NORM"' { print norm($0) }')" = "a b c" ]
 }

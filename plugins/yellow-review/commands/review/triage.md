@@ -1,11 +1,7 @@
 ---
 name: review:triage
-description:
-  'Triage the review-findings ledger of one PR: re-verify every residual finding
-  against the PR head, then fix, dismiss, restore or skip each one. Use when a
-  sweep summary or the session-start notice reports pending review findings;
-  --non-interactive and --prune are the unattended modes /review:sweep and
-  /review:sweep-all call.'
+# prettier-ignore
+description: 'Triage the review-findings ledger of one PR: re-verify every residual finding against the PR head, then fix, dismiss, restore or skip each one. Use when a sweep summary or the session-start notice reports pending review findings; --non-interactive and --prune are the unattended modes /review:sweep and /review:sweep-all call.'
 argument-hint: '[PR# | URL | branch] [--non-interactive] | --prune <PR#>'
 allowed-tools:
   - Bash
@@ -157,8 +153,13 @@ legal `→ applied` edge (not from `stale`); Dismiss needs a legal
   ```
 
   It re-validates the stored path at the PR head and in the worktree and prints
-  `{"file", "path"}`. Pass `path` to Read and Edit, make the change the human
-  approved, show the diff, and record it:
+  `{"file", "path"}`. Exit 3 means the id is unknown or the stored path is
+  unsafe at the head or in the worktree: tell the human and offer Dismiss or
+  Skip, never the file name from the card. Exit 6 means the head is not fetched:
+  run `remote-head` again, then retry. Pass `path` to Read and Edit, make the
+  change the human approved, show it with `git diff` and no path argument (the
+  edit gate guarantees a clean tree, so that shows only this change), and record
+  it:
 
   ```bash
   RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
