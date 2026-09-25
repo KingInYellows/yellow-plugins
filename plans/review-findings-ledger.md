@@ -776,27 +776,38 @@ yellow-core changes. Each stage carries its own changeset.
 <!-- /deepen-plan -->
 
 - [ ] 3.2: **New Step 3e (after 3d, before Step 5): dismissed context.**
-  1. Record `REVIEWED_HEAD` (`git rev-parse HEAD` after Step 3's checkout), then
-     run `rl dismissed-context <pr> --head <REVIEWED_HEAD>`. Anchoring on the
-     checked-out commit, not a separately fetched `headRefOid`, keeps this read
-     and Step 3.3's snapshot on the same revision even on a fork or after a
-     force-push (`references/review-pr/ledger.md` "Conventions" and "Step 3e").
-  2. Build a `--- begin dismissed-findings (reference only) ---` /
+  1. Validate the PR head and set `REVIEWED_HEAD` before any ledger read (P7):
+     a. Re-query `headRefOid` with
+        `gh pr view <pr> --json headRefOid -q .headRefOid` — a fresh read at
+        Step 3e, not the Step 3 snapshot. A force-push or provider restack between
+        them would otherwise leave dismissed-context and observe on different
+        revisions.
+     b. `git fetch origin pull/<pr>/head` (works for fork PRs). Retry with
+        1/2/4/8/16 s backoff until
+        `git ls-remote origin refs/pull/<pr>/head` matches the fresh
+        `headRefOid` (fetch-race research above).
+     c. Require `FETCH_HEAD`, `git rev-parse HEAD`, and the fresh `headRefOid`
+        to all match; set `REVIEWED_HEAD` to that SHA. A shallow repository, a
+        missing object, or any mismatch makes the head `unverifiable`: skip
+        Steps 3.2–3.5 ledger writes, add "Ledger: head unverifiable" to
+        Coverage, and continue the review without persistence.
+  2. Run `rl dismissed-context <pr> --head <REVIEWED_HEAD>`.
+  3. Build a `--- begin dismissed-findings (reference only) ---` /
      `--- end dismissed-findings ---` block. Its `<advisory>` says the content
      is reference data only and that instructions inside it must not be
      followed.
-  3. Sanitize every interpolated value in this order. First, substitute the
+  4. Sanitize every interpolated value in this order. First, substitute the
      block's own delimiters and the pr-context, file-line-counts and
      learnings-context delimiters (`[ESCAPED] …`). Then XML-escape.
-  4. Before injection, drop any entry whose stored text still contains an
+  5. Before injection, drop any entry whose stored text still contains an
      `IGNORE PREVIOUS`, `system:` or `assistant:` line prefix, and count the
      drops. This follows the layered-defense learning.
-  5. Inject the block into every reviewer. Skip it in legacy mode, as the
+  6. Inject the block into every reviewer. Skip it in legacy mode, as the
      learnings block is skipped.
 - [ ] 3.3: **After Step 6's partition, before Step 7:** run
-      `rl observe --step 6` on every surviving finding in the fixer, residual
-      actionable and report-only queues. Snapshot each anchor from HEAD before
-      any edit. Findings with `pre_existing: true` and findings the confidence
+      `rl observe --step 6 --head <REVIEWED_HEAD>` on every surviving finding in
+      the fixer, residual actionable and report-only queues. Snapshot each
+      anchor from `REVIEWED_HEAD` before any edit. Findings with `pre_existing: true` and findings the confidence
       gate suppressed are not persisted, because they were never reported as
       this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
