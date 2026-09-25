@@ -251,6 +251,7 @@ assignments, and runs under mawk, gawk and busybox awk:
 
 ```bash
 printf '%s\n' "$text" | awk '
+BEGIN { inpem = 0 }
 {
   line = $0
   if (inpem) {
