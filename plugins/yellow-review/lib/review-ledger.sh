@@ -1248,6 +1248,12 @@ rl_need_pr() {
   rl_validate_pr "${1:-}" || rl_die "$RL_EXIT_USAGE" "PR must be a positive integer"
 }
 
+# `shift 2` with one argument left fails without shifting, and the parse
+# loop would spin forever; every value-taking flag checks first.
+rl_need_val() {
+  [ $# -ge 2 ] || rl_die "$RL_EXIT_USAGE" "$1 needs a value"
+}
+
 rl_need_sha() {
   rl_is_sha "${2:-}" || rl_die "$RL_EXIT_USAGE" "$1 must be a 40-hex commit SHA"
 }
@@ -1258,12 +1264,12 @@ cmd_observe() {
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
-      --run-id) run="${2:-}"; shift 2 ;;
-      --step) step="${2:-}"; shift 2 ;;
-      --head) head="${2:-}"; shift 2 ;;
-      --base) base="${2:-}"; shift 2 ;;
-      --anchor-source) src="${2:-}"; shift 2 ;;
-      --source) source="${2:-}"; shift 2 ;;
+      --run-id) rl_need_val "$@"; run="${2:-}"; shift 2 ;;
+      --step) rl_need_val "$@"; step="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; shift 2 ;;
+      --base) rl_need_val "$@"; base="${2:-}"; shift 2 ;;
+      --anchor-source) rl_need_val "$@"; src="${2:-}"; shift 2 ;;
+      --source) rl_need_val "$@"; source="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "observe: unknown argument" ;;
     esac
   done
@@ -1348,13 +1354,13 @@ cmd_transition() {
   shift 3
   while [ $# -gt 0 ]; do
     case "$1" in
-      --reason) reason="${2:-}"; shift 2 ;;
-      --fix-sha) fix="${2:-}"; rl_need_sha --fix-sha "$fix"; shift 2 ;;
-      --published-head) pub="${2:-}"; rl_need_sha --published-head "$pub"; shift 2 ;;
-      --proof) proof="${2:-}"; shift 2 ;;
-      --depends-on-json) depsj="${2:-}"; shift 2 ;;
-      --head) head="${2:-}"; rl_need_sha --head "$head"; shift 2 ;;
-      --actor) actor="${2:-}"; shift 2 ;;
+      --reason) rl_need_val "$@"; reason="${2:-}"; shift 2 ;;
+      --fix-sha) rl_need_val "$@"; fix="${2:-}"; rl_need_sha --fix-sha "$fix"; shift 2 ;;
+      --published-head) rl_need_val "$@"; pub="${2:-}"; rl_need_sha --published-head "$pub"; shift 2 ;;
+      --proof) rl_need_val "$@"; proof="${2:-}"; shift 2 ;;
+      --depends-on-json) rl_need_val "$@"; depsj="${2:-}"; shift 2 ;;
+      --head) rl_need_val "$@"; head="${2:-}"; rl_need_sha --head "$head"; shift 2 ;;
+      --actor) rl_need_val "$@"; actor="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "transition: unknown argument" ;;
     esac
   done

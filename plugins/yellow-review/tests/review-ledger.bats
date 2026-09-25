@@ -627,6 +627,13 @@ pr_with_finding() {
   [[ "$("$RL" new-run-id)" =~ ^[0-9a-f-]{32,36}$ ]]
 }
 
+@test "a value-taking flag given last with no value is a usage error, not a hang" {
+  run -2 timeout 10 "$RL" observe "$LEDGER_PR" --head
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  id=$(ids)
+  run -2 timeout 10 "$RL" transition "$LEDGER_PR" "$id" applied --reason
+}
+
 @test "step 8 may anchor on the worktree, only for tracked regular files at HEAD" {
   printf 'one\ntwo\nthree changed\nfour\nfive\n' >|a.sh
   printf 'untracked\n' >|new.sh
