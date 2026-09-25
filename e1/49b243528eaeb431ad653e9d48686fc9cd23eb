@@ -1,0 +1,29 @@
+plugins/yellow-review/references/review-pr/ledger.md
+  s_58268e9f7cfc1b::t_bcb64dfc950abc 139-148,152-156
+  s_58268e9f7cfc1b::t_05f314b7007213 68-75,84-89,91-95
+  s_58268e9f7cfc1b::t_8b967a7374675b 157-160
+plugins/yellow-review/commands/review/setup.md
+  s_58268e9f7cfc1b::t_5cca903afe1637 116-121
+  s_58268e9f7cfc1b::t_a5c58fa6595666 73
+  s_58268e9f7cfc1b::t_747411ddd0cfbe 75-80
+plugins/yellow-review/lib/review-ledger.sh
+  s_58268e9f7cfc1b::t_6a8387318e3e35 1658-1665
+plugins/yellow-review/tests/review-ledger.bats
+  s_58268e9f7cfc1b::t_2cbdab80aa0c96 826-834,839-863
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e149b243528eaeb431ad653e9d48686fc9cd23eb",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
