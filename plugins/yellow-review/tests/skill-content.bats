@@ -147,6 +147,23 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -q 'settle <PR> --remote-head' "$LEDGER_REF"
 }
 
+@test "ledger: REVIEWED_HEAD is set only after remote-head verification" {
+  # Guards against re-anchoring the ledger on a stale local checkout: the
+  # remote-head call must precede the variable assignment and the
+  # dismissed-context read, and an unverifiable head must skip both.
+  verify_line=$(grep -n 'REMOTE=\$("\$RL" remote-head <PR>)' "$LEDGER_REF" | head -1 | cut -d: -f1)
+  assign_line=$(grep -n 'REVIEWED_HEAD="\$LOCAL"' "$LEDGER_REF" | head -1 | cut -d: -f1)
+  read_line=$(grep -n 'dismissed-context <PR> --head <REVIEWED_HEAD> --fenced' "$LEDGER_REF" | head -1 | cut -d: -f1)
+  [ -n "$verify_line" ]
+  [ -n "$assign_line" ]
+  [ -n "$read_line" ]
+  [ "$verify_line" -lt "$assign_line" ]
+  [ "$assign_line" -lt "$read_line" ]
+  grep -q 'never the raw `git rev-parse HEAD` from Step 3' "$LEDGER_REF"
+  grep -q 'the head is \*\*unverifiable\*\*' "$LEDGER_REF"
+  grep -q 'Ledger: head unverifiable' "$LEDGER_REF"
+}
+
 @test "ledger: review-pr.md points at ledger.md at Steps 3e, 6, 7, 8, 9 and 10" {
   grep -q '^### Step 3e: Review-findings ledger' "$REVIEW_PR"
   grep -q 'references/review-pr/ledger.md' "$REVIEW_PR"
