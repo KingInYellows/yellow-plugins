@@ -323,7 +323,12 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
 }
 
 @test "sweep-all: pruning skips on a failed or possibly truncated open-PR query" {
-  grep -q '^### Step 2b: Prune ledgers of closed PRs' "$SWEEP_ALL"
+  grep -q '^### Step 2b: Find ledgers of closed PRs' "$SWEEP_ALL"
+  # deletion only after a confirmation: Step 3b follows the Step 3 gate
+  gate=$(grep -n '^### Step 3: Upfront confirmation gate' "$SWEEP_ALL" | cut -d: -f1)
+  prune=$(grep -n '^### Step 3b: Prune ledgers of closed PRs' "$SWEEP_ALL" | cut -d: -f1)
+  [ "$gate" -lt "$prune" ]
+  grep -q 'Delete the review-findings ledgers of <K> closed or merged PRs' "$SWEEP_ALL"
   grep -q "gh pr list --state open --limit 1000 --json number) || { printf 'skip" "$SWEEP_ALL"
   grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
   grep -q '`--prune <PR#>`' "$SWEEP_ALL"
