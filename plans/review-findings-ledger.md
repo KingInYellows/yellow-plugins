@@ -253,30 +253,36 @@ it. None is out of scope.
   1. the fix SHA is an ancestor of the remote head, or `git patch-id --stable`
      over a `-U0` diff (context-insensitive, so a restack that only touches
      surrounding lines still matches) finds it on the PR branch; or
-  2. **fallback, only when (1) fails and the fix commit is unreachable from
-     every local ref and the remote branch** (a restack rewrote it and the
-     original SHA was dropped, or it was gc'd): the `not_reproduced` re-verify
-     result itself, per the brainstorm's authoritative fallback — a content
-     check showing the finding no longer reproduces at the remote head proves
-     publication exactly as an ancestor or patch-id match would.
+  2. **fallback, whenever (1) fails** (`unproved` or `abandoned`): the
+     `not_reproduced` re-verify result itself, per the brainstorm's
+     authoritative fallback — a content check showing the finding no longer
+     reproduces at the remote head proves publication exactly as an ancestor or
+     patch-id match would. This widens the earlier rule, which applied the
+     fallback only when the fix commit was unreachable from every local ref:
+     local reachability says nothing about publication to the remote head (a
+     restack leaves the old fix SHA on a stale local branch or tag while the
+     rewritten fix is already published), so it no longer gates the fallback. It
+     only separates `abandoned` from `unproved` when the re-verify reproduces.
 
-  | Result                                                                                                                 | Action                                                                                 |
-  | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-  | Ancestor/patch-id proof passes and re-verify reproduces (a later revert, or an additive fix above an unchanged anchor) | Stay `applied` for `/review:triage`: anchor-only re-verify cannot tell the two apart   |
-  | Ancestor/patch-id proof passes and re-verify returns `not_reproduced`                                                  | `applied→fixed`                                                                        |
-  | Proof (1) fails, fix commit unreachable from every local ref and the remote branch, re-verify `not_reproduced`         | `applied→fixed` via the fallback content-check proof (reason `unproved-content-check`) |
-  | Proof (1) fails, fix commit unreachable from every local ref and the remote branch, re-verify reproduces               | `applied→reopened` with reason `fix-abandoned` — the defect itself is still there      |
-  | Either check returns `unverifiable`                                                                                    | Stay `applied`                                                                         |
+  | Publication                                                          | Re-verify                                                                 | Action                                                                               |
+  | -------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | proved (ancestor / patch-id)                                         | `not_reproduced`                                                          | `applied→fixed`, proof `ancestor` / `patch-id`                                       |
+  | proved                                                               | reproduces (a later revert, or an additive fix above an unchanged anchor) | Stay `applied` for `/review:triage`: anchor-only re-verify cannot tell the two apart |
+  | `unproved` or `abandoned`                                            | `not_reproduced`                                                          | `applied→fixed`, reason `unproved-content-check`, proof `content-check`              |
+  | `abandoned` (unreachable from every local ref and the remote branch) | reproduces                                                                | `applied→reopened`, reason `fix-abandoned` — the defect itself is still there        |
+  | `unproved` (still on some local ref)                                 | reproduces                                                                | Stay `applied`: the fix may not be published yet                                     |
+  | any                                                                  | `unverifiable` (or publication `unverifiable`)                            | Stay `applied`                                                                       |
 
   A patch-id miss never reopens a finding by itself — the research below holds
   that it only delays `fixed`. `fix-abandoned` requires the re-verify to
   positively reproduce the defect; an unreachable fix commit whose defect no
   longer reproduces is the successful-restack case, not an abandoned one, and
-  settles as `fixed` through the fallback instead. The third and fourth rows are
-  the trigger for the brainstorm's fallback-`fixed` and `applied→reopened`
-  edges. This runs in `review-pr.md`/`review-all.md` Step 9 after submission,
-  and in triage (attended and `--non-interactive`) for every `applied` record. A
-  content check counts only when it evaluates the current remote head.
+  settles as `fixed` through the fallback instead — as does a fix commit still
+  held by a stale local ref. The third and fourth rows are the trigger for the
+  brainstorm's fallback-`fixed` and `applied→reopened` edges. This runs in
+  `review-pr.md`/`review-all.md` Step 9 after submission, and in triage
+  (attended and `--non-interactive`) for every `applied` record. A content check
+  counts only when it evaluates the current remote head.
 
 <!-- deepen-plan: external -->
 
@@ -326,7 +332,9 @@ it. None is out of scope.
   for `headRefOid`), then revert and push. Triage appends `reopened` and never
   `fixed`, and pending increases by 1. Also: a fix that is published and still
   present becomes `fixed`, and a shallow clone leaves the record `applied` with
-  a note.
+  a note. Also: a fix commit kept on a stray local branch, absent from the
+  remote head, with no patch-id match and the defect gone settles `fixed` via
+  `unproved-content-check`.
 
 #### CLAUDE-49 — verify scope ancestry at the anchor · Stages 1, 2
 
@@ -427,6 +435,7 @@ states.
   "anchor_hash": "<sha256 of normalized anchor lines>",
   "anchor_lines": ["..."],
   "anchor_withheld": false,
+  "anchor_source": "commit|worktree",
   "confidence": 75,
   "autofix_class": "gated_auto",
   "owner": "downstream-resolver",
@@ -481,6 +490,14 @@ Rules:
     `attention`; then run `observe` again with a matching candidate and assert
     it reappears as `open` with one coherent history instead of a silently
     dropped finding.
+- `anchor_source` records where the anchor was snapshotted: `commit` (the
+  default, `head_sha`'s tree) or `worktree`
+  (`observe --step 8 --anchor-source worktree`, task 3.4: the post-fix working
+  tree, before the fix is committed). Re-verification maps a `commit` anchor's
+  line from `head_sha` to the target head; a `worktree` anchor's line is already
+  a post-fix coordinate, so it is tested in place rather than mapped as a
+  coordinate in `head_sha` (which would mark shifted simplifier findings
+  `stale`). A record without the field reads as `commit`.
 - Fold result = the latest transition per `finding_id`.
   - pending = latest ∈ {`open`, `reopened`, `applied`}
   - attention = latest ∈ {`report_only`, `stale`}
@@ -557,18 +574,18 @@ Exit codes:
 
 Diagnostics go to stderr with the prefix `[review-ledger]`.
 
-| Subcommand                                                                                                               | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observe <pr> --run-id <id> --step 6\|8 --head <sha> --base <sha>`                                                       | stdin: the aggregated findings JSON array. Under lock it: repairs the tail; checks the tombstone and live state (reopen → drop the tombstone, fresh ledger); validates paths; verifies scope; computes occurrences and fingerprints; snapshots anchors; redacts; dedups (exact → alias/line-map); appends observations and new `open`/`report_only` transitions, or `reopened` for re-observed `fixed`, `stale` or inapplicable `dismissed`; skips re-adding an applicable `dismissed`; refreshes sidecars. stdout: `{new, merged, reopened, suppressed_dismissed, defaulted, rejected:[{ordinal, reason}]}`. Rejected paths are withheld (the ordinal only). |
-| `transition <pr> <finding_id> <state> [--reason …] [--fix-sha …] [--published-head …] [--proof …] [--depends-on-json …]` | Validates the edge and appends.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `fold <pr>`                                                                                                              | Prints `{pending, attention, by_state, findings:[latest view]}`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `dismissed-context <pr> --head <sha>`                                                                                    | Applicable dismissals only (CLAUDE-44), as JSON; the command prose fences them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `reverify <pr> <finding_id> --head <sha>`                                                                                | Prints `reproduced` / `not_reproduced` / `unverifiable` (CLAUDE-48).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `publication <pr> <finding_id> --remote-head <sha>`                                                                      | Prints `proved:ancestor` / `proved:patch-id` / `unproved` / `abandoned` / `unverifiable`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `reconcile <pr> --head <sha> --base <sha>`                                                                               | Stage 4. The deterministic core of every triage mode: re-verify, publication, and the stale/reopen/fixed transitions (task 4.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `validate-path <mode> <rev> <path>`                                                                                      | CLAUDE-45; also used by the triage prose.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `prune <pr>`                                                                                                             | Checks `gh pr view <pr> --json state`, and only if the state is MERGED or CLOSED: under lock, deletes `.jsonl/.pending/.state` and writes `.closed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `record-state <pr>` / `summary [--all]`                                                                                  | State cache refresh; per-PR counts for sweep-all.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Subcommand                                                                                                               | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observe <pr> --run-id <id> --step 6\|8 --head <sha> --base <sha> [--anchor-source commit\|worktree]`                    | stdin: the aggregated findings JSON array. `--anchor-source worktree` is accepted only with `--step 8` and HEAD equal to `--head`; it snapshots anchors from the working tree and persists `anchor_source: worktree` on each observation (default `commit`: the `--head` tree). Under lock it: repairs the tail; checks the tombstone and live state (reopen → drop the tombstone, fresh ledger); validates paths; verifies scope; computes occurrences and fingerprints; snapshots anchors; redacts; dedups (exact → alias/line-map); appends observations and new `open`/`report_only` transitions, or `reopened` for re-observed `fixed`, `stale` or inapplicable `dismissed`; skips re-adding an applicable `dismissed`; refreshes sidecars. stdout: `{new, merged, reopened, suppressed_dismissed, defaulted, rejected:[{ordinal, reason}]}`. Rejected paths are withheld (the ordinal only). |
+| `transition <pr> <finding_id> <state> [--reason …] [--fix-sha …] [--published-head …] [--proof …] [--depends-on-json …]` | Validates the edge and appends.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `fold <pr>`                                                                                                              | Prints `{pending, attention, by_state, findings:[latest view]}`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `dismissed-context <pr> --head <sha>`                                                                                    | Applicable dismissals only (CLAUDE-44), as JSON; the command prose fences them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `reverify <pr> <finding_id> --head <sha>`                                                                                | Prints `reproduced` / `not_reproduced` / `unverifiable` (CLAUDE-48).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `publication <pr> <finding_id> --remote-head <sha>`                                                                      | Prints `proved:ancestor` / `proved:patch-id` / `unproved` / `abandoned` / `unverifiable`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `reconcile <pr> --head <sha> --base <sha>`                                                                               | Stage 4. The deterministic core of every triage mode: re-verify, publication, and the stale/reopen/fixed transitions (task 4.2).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `validate-path <mode> <rev> <path>`                                                                                      | CLAUDE-45; also used by the triage prose.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `prune <pr>`                                                                                                             | Checks `gh pr view <pr> --json state`, and only if the state is MERGED or CLOSED: under lock, deletes `.jsonl/.pending/.state` and writes `.closed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `record-state <pr>` / `summary [--all]`                                                                                  | State cache refresh; per-PR counts for sweep-all.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Internal helpers (Bats-tested): `rl_lock`, `rl_repair_tail`, `rl_redact`
 (`cs_redact_secrets`, then the fail-closed pass from brainstorm stage 1:
@@ -703,6 +720,8 @@ yellow-core changes. Each stage carries its own changeset.
     anchor, which sets `anchor_withheld: true`.
   - Everything is withheld when yellow-core is missing.
   - Illegal transitions exit 3.
+  - `observe --anchor-source worktree`: refused (exit 2) without `--step 8`,
+    refused when HEAD ≠ `--head`, and persisted as `anchor_source: worktree`.
   - The fold's pending and attention definitions.
   - Tombstone refusal, and reopen.
   - Prune refuses an OPEN PR.
@@ -735,7 +754,10 @@ yellow-core changes. Each stage carries its own changeset.
 <!-- /deepen-plan -->
 
 - [ ] 1.13: Add a "Library" entry to `plugins/yellow-review/CLAUDE.md`; the
-      library is internal and not user-facing yet. Changeset: `yellow-review`
+      library is internal and not user-facing yet. Also list the new
+      non-optional `yellow-core` dependency under Prerequisites in
+      `plugins/yellow-review/README.md`: each stage ships on its own, so the
+      stage that adds a dependency discloses it. Changeset: `yellow-review`
       patch.
 
 ### Stage 2: `rule` and `scope` in compact-return producers
@@ -932,7 +954,15 @@ yellow-core changes. Each stage carries its own changeset.
     fixed.
 - [ ] 3.10: Update the README and `plugins/yellow-review/CLAUDE.md` with
       `/review:pr` persistence, the ledger's location and lifecycle states, and
-      the new prerequisites. Changeset: `yellow-review` minor.
+      the new prerequisites. Document the ledger trust boundary this stage
+      activates in `docs/security.md` (Trust Boundaries): model-derived review
+      data stored under `$(git rev-parse --git-common-dir)/yellow-review/` (dir
+      0700, files 0600, shared by every worktree of the clone, never pushed);
+      redaction before anything is persisted (`cs_redact_secrets` plus the
+      fail-closed pass, everything withheld without yellow-core); and
+      dismissed-finding context re-injected into later reviewer prompts inside a
+      delimiter-substituted reference-only fence. Stage 6 adds only the hook
+      row. Changeset: `yellow-review` minor.
 
 ### Stage 4: `/review:triage`
 
@@ -952,15 +982,30 @@ yellow-core changes. Each stage carries its own changeset.
   - `unverifiable`: no transition; the finding is listed.
   - A local-HEAD mismatch never marks an `applied` finding `stale` (locked).
 
-  Deletion findings follow the brainstorm's current-base rule: the path must
-  exist at `baseRefOid` and be absent at the head. If the base itself lacks the
-  path, the finding becomes `dismissed` with reason
-  `retired: base deleted path`.
+  Deletion findings (`deletion: true`) are an exception to the generic
+  `not_reproduced → stale` edge above: the head deliberately has no file for the
+  anchor to match, so reconcile re-verifies them with a base-anchor check
+  instead (the brainstorm's current-base rule). While the path still exists at
+  `baseRefOid` and is still absent, or not a regular file, at the head, the
+  result is `reproduced` — never `stale` — so the Restore action (task 4.4)
+  stays available. Only a regular file back at the head gives `not_reproduced`.
+  If the base itself lacks the path, the finding becomes `dismissed` with reason
+  `retired: base deleted path`. If the base tree lookup itself fails (a partial
+  clone whose promisor remote is offline), the finding is `unverifiable` and
+  unchanged. Test: "reconcile: a deletion finding retires when the base itself
+  deleted the path" (base still has the path → no transition; base deletes it
+  too → `dismissed`), with the observe → restore end-to-end in task 1.11.
 
 - [ ] 4.3: Triage flow:
   1. Resolve the PR with
      `gh pr view --json number,state,headRefName,headRefOid,baseRefOid,isCrossRepository`.
-  2. If the state is MERGED or CLOSED, run `rl prune` and stop.
+  2. If the state is MERGED or CLOSED, never prune implicitly.
+     `--non-interactive` prints `Ledger: retained (PR <state>)` and stops, so an
+     unattended caller that raced a PR closing (sweep's Step 3b) can never
+     delete a ledger. Attended triage asks one AskUserQuestion ("Delete the
+     ledger for closed PR #N?"); only a yes runs `rl prune`, and either way it
+     stops. Retained ledgers are cleaned up by `/review:sweep-all`'s confirmed
+     prune step or an explicit `/review:triage --prune <PR#>`.
   3. Fetch `pull/<pr>/head` (P7).
   4. Edit gate: `git rev-parse HEAD` must equal `headRefOid`, and
      `git status --porcelain` must be empty. Otherwise, run read-only.
@@ -1006,7 +1051,9 @@ yellow-core changes. Each stage carries its own changeset.
   - The CLAUDE-47 refused-restore cases and the dependency-mode dismissal tests
     (CLAUDE-44) call `validate-path` and the restore helper directly; the
     happy-path observe→restore flow is covered in Stage 1 (task 1.11).
-  - `skill-content.bats` asserts triage.md's fence and gate text.
+  - `skill-content.bats` asserts triage.md's fence and gate text, that the
+    `--non-interactive` path never reaches prune for a MERGED/CLOSED PR, and
+    that the attended prune sits behind its AskUserQuestion.
 - [ ] 4.6: README and CLAUDE.md: the command list, a "When to Use What" entry,
       and the triage modes. Update root `README.md`'s yellow-review command
       count/inventory for `/review:triage` (AGENTS.md's Documentation
@@ -1017,7 +1064,9 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and Step
       4 (final summary): `/review:triage <pr> --non-interactive`, run every
       time. It applies nothing and costs little, and it is skipped when the PR
-      is no longer OPEN. Step 4 reads `rl summary` and gains the line "Ledger:
+      is no longer OPEN; if the PR closes between that check and triage,
+      `--non-interactive` triage retains the ledger (task 4.3) rather than
+      pruning it. Step 4 reads `rl summary` and gains the line "Ledger:
       <pending> pending, <attention> need attention".
 - [ ] 5.2: `sweep-all.md`:
   - The Step 5 table gains a `Residual` column showing `<pending>/<attention>`
