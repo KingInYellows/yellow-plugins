@@ -16,7 +16,7 @@ the sweep summary and a SessionStart hook.
 The brainstorm is the authority; this plan does not revisit its Key Decisions.
 It adds the implementation contract (record schema, library API, re-verification
 mechanics, `rule` vocabulary), resolves the six design questions deferred from
-#854 (CLAUDE-44…49), answers the brainstorm's Open Questions, and closes gaps
+\#854 (CLAUDE-44…49), answers the brainstorm's Open Questions, and closes gaps
 found during planning research.
 
 Detail level: COMPREHENSIVE. Six stacked PRs; each ships its own tests, docs and
@@ -204,15 +204,22 @@ it. None is out of scope.
   `--non-interactive`. Preconditions:
   1. The edit gate passes: HEAD SHA equals `headRefOid` and the tree is clean.
   2. `rl_validate_path restore <baseRefOid> <path>` passes. `restore` mode
-     means: lexical rules as CLAUDE-45; the source is `<baseRefOid>:<path>` (the
-     current base, since that is the version the PR deletes) with mode
+     means: lexical rules as CLAUDE-45, with the tree lookup run as
+     `git --literal-pathspecs ls-tree -z --full-tree <baseRefOid> -- <path>` and
+     the result string-compared against the requested path, so a deleted
+     filename that happens to be pathspec magic (e.g. `:(top)normal`) cannot
+     select an unrelated blob; the source is `<baseRefOid>:<path>` (the current
+     base, since that is the version the PR deletes) with mode
      `100644`/`100755`; the destination does not exist and is not a symlink
      (`! test -e && ! test -L`); and the nearest existing ancestor directory's
      `realpath` is inside the repo root. Missing parents are created with
      `mkdir -p -- <parent>` and then re-checked.
-  3. The restore itself is `git checkout <baseRefOid> -- <path>`. Git refuses to
-     write through a symlinked leading directory. The file content is never
-     model-authored.
+  3. The restore itself is
+     `git --literal-pathspecs checkout <baseRefOid> -- <path>` — `--` alone only
+     ends option parsing and does not stop Git from reinterpreting pathspec
+     magic in `<path>`, so `--literal-pathspecs` is required at this step too,
+     not just at validation. Git refuses to write through a symlinked leading
+     directory. The file content is never model-authored.
 
   After restoring, the usual publication path runs: `applied`, then `applied`
   with the fix SHA, then `fixed` subject to CLAUDE-48.
@@ -267,6 +274,13 @@ it. None is out of scope.
      within the verified scope.
   3. Only for findings without an occurrence key, do an alias search: same
      scope, a nearest match within ±40 lines.
+
+  Anchor presence approximates the defect, not proves it: `rl_reverify_row`
+  (`lib/review-ledger.sh`) hashes the line's text, so a fix that adds a guard
+  above an unchanged sink still hashes to `reproduced`. Full condition
+  re-verification would require re-running the original rule per finding, which
+  this mechanical check does not do; a `reproduced` result here means "the
+  reported line is unchanged," not "the defect still fires."
 
   The outcome is `reproduced` (hit), `not_reproduced` (no hit), or
   `unverifiable` (P7).
@@ -328,11 +342,13 @@ it. None is out of scope.
 
 <!-- /deepen-plan -->
 
-- **Test.** Two identical `createUser` bodies inside `admin` and `handlers` (a
-  shell fixture parsed by ctags; the test is skipped with a reason when ctags is
-  absent). Swapping the claimed scopes resolves each finding to its true
-  enclosing scope, so they don't merge. With ctags masked from PATH, both are
-  `unscoped` and still separate (line-keyed). A markdown variant uses two
+- **Test.** Two identical `createUser` bodies inside `admin` and `handlers`,
+  split across two cases per the ctags research above: a JS fixture (object-
+  literal methods) with ctags masked from PATH proves the `unscoped`, line-keyed
+  fallback; a Python fixture (`Admin.create_user` / `Handlers.create_user`,
+  where ctags fills `end:`) with real universal-ctags proves that swapping the
+  claimed scopes still resolves each finding to its true enclosing scope,
+  skipped with a reason when ctags is absent. A markdown variant uses two
   identical paragraphs under different headings. `/review:setup` reports whether
   universal-ctags is present (optional).
 
@@ -408,7 +424,26 @@ states.
 Rules:
 
 - A new `finding_id` is written as an `observation` immediately followed by a
-  `transition` (`open`, or `report_only` for the report-only queue).
+  `transition` (`open`, or `report_only` for the report-only queue), as a single
+  `printf` call writing both lines in one `write(2)` (`rl_append_pair` in
+  `plugins/yellow-review/lib/review-ledger.sh`), so termination between the two
+  records is the exception, not something every append risks.
+  - Recovery for the residual case: fold only materializes a finding when both
+    its `observation` and a transition exist (`RL_FOLD_JQ`'s
+    `$f.obs[.] != null and $f.st[.] != null` filter), so an orphaned
+    `observation` counts toward neither `pending` nor `attention` — it is
+    invisible, not merged into. It is also invisible to exact-fingerprint
+    matching, which only indexes folded findings, so the next `observe` run for
+    that fingerprint cannot merge into the orphan; it mints the same
+    `finding_id` again (fingerprint-derived, and unclaimed in the index) with a
+    fresh observation + opening transition, which fold then reports as the
+    current, complete state. No separate repair command is needed.
+  - Planned test (`plugins/yellow-review/tests/review-ledger.bats`): hand-append
+    an `observation` with no following `transition` to simulate termination
+    between the two records; assert `rl fold` counts it in neither `pending` nor
+    `attention`; then run `observe` again with a matching candidate and assert
+    it reappears as `open` with one coherent history instead of a silently
+    dropped finding.
 - Fold result = the latest transition per `finding_id`.
   - pending = latest ∈ {`open`, `reopened`, `applied`}
   - attention = latest ∈ {`report_only`, `stale`}
@@ -741,7 +776,11 @@ yellow-core changes. Each stage carries its own changeset.
 <!-- /deepen-plan -->
 
 - [ ] 3.2: **New Step 3e (after 3d, before Step 5): dismissed context.**
-  1. Run `rl dismissed-context <pr> --head <headRefOid>`.
+  1. Record `REVIEWED_HEAD` (`git rev-parse HEAD` after Step 3's checkout), then
+     run `rl dismissed-context <pr> --head <REVIEWED_HEAD>`. Anchoring on the
+     checked-out commit, not a separately fetched `headRefOid`, keeps this read
+     and Step 3.3's snapshot on the same revision even on a fork or after a
+     force-push (`references/review-pr/ledger.md` "Conventions" and "Step 3e").
   2. Build a `--- begin dismissed-findings (reference only) ---` /
      `--- end dismissed-findings ---` block. Its `<advisory>` says the content
      is reference data only and that instructions inside it must not be
@@ -761,16 +800,27 @@ yellow-core changes. Each stage carries its own changeset.
       gate suppressed are not persisted, because they were never reported as
       this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
-      **Step 8:** run `rl observe --step 8` on the simplifier's findings,
-      anchored on the post-fix working tree. The library accepts
-      `--anchor-source worktree` for step 8 only, and requires every path to be
-      tracked at HEAD.
+      **Step 8:** run `rl observe --step 8 --anchor-source worktree` on the
+      simplifier's findings, keeping `--head` at the pre-commit `REVIEWED_HEAD`
+      (`observe` requires `git rev-parse HEAD == --head`, which still holds
+      because Step 9 hasn't committed yet). Each finding is tagged
+      `anchor_source: worktree`, and re-verification (`rl_reverify_row` in
+      `review-ledger.sh`) skips the head-to-target line remap for that tag and
+      uses the stored line as-is, so a worktree line is never misread against
+      `REVIEWED_HEAD`. Every path must still be tracked at `REVIEWED_HEAD`; a
+      finding in a file the fixer just created is rejected (counted under
+      `rejected`, not persisted) rather than deferred — accept this as a known
+      gap, not something to fix here.
 - [ ] 3.5: **Step 9:**
   1. Once the commit exists, record `applied --fix-sha <sha>` for each applied
      finding.
-  2. Once provider submission reports success, run
-     `git fetch origin pull/<pr>/head`, check that FETCH_HEAD equals
-     `headRefOid`, then record `applied --published-head <sha>`.
+  2. Once provider submission reports success, run `rl remote-head <pr>` rather
+     than a raw `git fetch` compared against the pre-fix `headRefOid`:
+     submission moves the PR head, so comparing `FETCH_HEAD` to the value
+     captured in Step 3 would reject every successful publication. `remote-head`
+     re-reads `headRefOid` from `gh pr view` at call time and retries the fetch
+     with backoff until it matches (`review-ledger.sh`'s `cmd_remote_head`).
+     Record the printed OID with `applied --published-head <sha>`.
   3. Run `rl publication`, then `rl reverify` at that head, then append `fixed`
      or `reopened` (CLAUDE-48).
   4. If the push is declined or fails, append nothing more. The records stay
@@ -849,9 +899,17 @@ yellow-core changes. Each stage carries its own changeset.
       delimiter substitution and XML escaping. The options are:
   - **Apply**: requires the edit gate. If the gate fails, offer to check the PR
     out through the stack-provider router, or refuse.
-  - **Dismiss**: asks for a reason and `depends_on` paths, which are validated
-    in `dependency` mode at the head (CLAUDE-44).
-  - **Restore file**: only for findings with `deletion: true` (CLAUDE-47).
+  - **Dismiss**: offered only when the finding's current state has a legal
+    `dismissed` edge (`open`, `reopened`, `report_only`, `stale`), matching the
+    ledger's transition table (`rl_edge_ok` in `lib/review-ledger.sh`). An
+    `applied` finding has no `applied → dismissed` edge; it must resolve to
+    `fixed` or `reopened` on a later reconcile before it can be dismissed.
+    Otherwise, asks for a reason and `depends_on` paths, which are validated in
+    `dependency` mode at the head (CLAUDE-44).
+  - **Restore file**: only for findings with `deletion: true` (CLAUDE-47) whose
+    current state has a legal `applied` edge (`open`, `reopened`,
+    `report_only`). `stale` has no direct `stale → applied` edge, so a stale
+    deletion finding must reopen on a later reconcile before it can be restored.
   - **Skip** and **Stop**.
 
   A human may fix or dismiss a `report_only` finding, but it is never
@@ -875,10 +933,12 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 5: Sweep integration
 
-- [ ] 5.1: `sweep.md` gains Step 5: `/review:triage <pr> --non-interactive`, run
+- [ ] 5.1: `sweep.md` gains a reconciliation step inserted between the
+      `/review:resolve` step and the final summary step, so the summary can
+      report post-triage counts: `/review:triage <pr> --non-interactive`, run
       every time. It applies nothing and costs little, and it is skipped when
-      the PR is no longer OPEN. The Step 4 summary gains the line "Ledger:
-      <pending> pending, <attention> need attention".
+      the PR is no longer OPEN. The final summary step reads `rl summary` and
+      gains the line "Ledger: <pending> pending, <attention> need attention".
 - [ ] 5.2: `sweep-all.md`:
   - The Step 5 table gains a `Residual` column showing `<pending>/<attention>`
     from `rl summary`. It shows `—` when there is no ledger and `?` when the
@@ -906,15 +966,15 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 6.2: Write `plugins/yellow-review/hooks/scripts/session-start.sh` via
       heredoc with LF endings, in the yellow-debt shape: `set -uo pipefail`,
       always emit `{"continue": true}`, don't read stdin, build the message with
-      `jq -n`. Time budget:
-
-  | Phase                                          | Budget           |
-  | ---------------------------------------------- | ---------------- |
-  | `git -C "$CLAUDE_PROJECT_DIR" rev-parse`       | ≤ 50 ms          |
-  | glob `*.pending`                               | ≤ 5 ms           |
-  | per PR: shared `flock -s -w 0.2`, `stat`, read | ≤ 5 ms each      |
-  | fallback fold, capped across all PRs           | ≤ 1.5 s total    |
-  | slack                                          | remaining ~1.4 s |
+      `jq -n`. Time budget: `git -C "$CLAUDE_PROJECT_DIR" rev-parse` and the
+      `*.jsonl` glob run first and stay near 0. The rest shares a single
+      deadline (`DEADLINE_MS`, 2.3 s — 0.7 s shy of the 3 s catalog timeout)
+      instead of per-phase caps, because independent per-PR budgets (e.g. a 0.2
+      s lock wait times several ledgers) can sum past the hook's timeout and get
+      the whole output discarded. Each PR's `flock -s -w 0.2` wait and its
+      fallback fold (`FOLD_BUDGET_MS`, 1.5 s, shared across all PRs) are both
+      bounded by the time remaining until `DEADLINE_MS`; a PR whose lock or fold
+      would cross the deadline is reported "pending unknown" instead of waiting.
 
   Rules:
   - Ignore a sidecar whose `.jsonl` no longer exists.
