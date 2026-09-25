@@ -268,3 +268,10 @@ User constraints from the dialogue:
    implementation.
 7. How does the P0 regex change interact with other plugins that extract
    Linear IDs from branch names (for example gt-workflow and yellow-review)?
+8. **JSON same-indent credential values.** The `linear-workflows` awk
+   sanitizer's continuation logic uses `indent(line) > keyind`, so a
+   credential value on the next line at the *same* indentation as an empty
+   `"NAME":` JSON key can reach the normal `print` path. Fix during
+   `/flow:plan`: track JSON value continuations separately from YAML
+   indentation, or treat `indent(line) >= keyind` while `incont` is set
+   (PR #874, CodeRabbit `2cdddb5c`).
