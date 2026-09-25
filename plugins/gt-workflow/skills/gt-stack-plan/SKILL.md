@@ -93,7 +93,7 @@ Read the feature description and identify:
 #### 1b. Detect Linear Issues
 
 If reading a plan file, check for a `## Linear Issues` section. If found,
-extract issue IDs (and titles only when present for legacy plans):
+extract issue IDs only; discard any titles on legacy lines:
 
 ```
 ## Linear Issues
