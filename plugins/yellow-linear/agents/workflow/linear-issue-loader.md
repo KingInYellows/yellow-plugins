@@ -76,6 +76,10 @@ the user's workspace.
 
 If issue not found, report the error and stop.
 
+**Sanitize immediately:** Run remote-content sanitization on the `get_issue`
+response before any later step (see "Remote Content Sanitization" in
+`linear-workflows`). Discard the raw payload.
+
 **Error handling:**
 - If the MCP tool returns an authentication error: report '[linear-issue-loader] Authentication failed. Re-run to trigger OAuth re-authentication, or check your Linear API key.' and stop.
 - If the MCP tool returns a rate limit error (429 or similar): report '[linear-issue-loader] Rate limited by Linear API. Stop and retry after a brief pause.' and stop.
@@ -85,11 +89,14 @@ If issue not found, report the error and stop.
 
 Fetch recent comments (up to 5) via `list_comments` for the issue.
 
+**Sanitize immediately:** Run the same remote-content sanitization on the
+`list_comments` response before display. Discard the raw payload.
+
 If comments fail to load (rate limit, network error, or API error), present the issue without comments and note: '[linear-issue-loader] Comments could not be loaded: <error>. Showing issue without comments.'
 
 ### Step 5: Present Context
 
-Display the issue in a clean summary:
+Display the issue in a clean summary from the **sanitized** copies only:
 
 ```
 ## ENG-123: Issue Title
@@ -97,10 +104,10 @@ Display the issue in a clean summary:
 **Status:** In Progress | **Priority:** High | **Assignee:** @username
 
 ### Description
-[Full issue description text]
+[Sanitized issue description — never the raw MCP payload]
 
 ### Recent Comments (up to 5)
-- @alice (2 days ago): Comment text...
+- @alice (2 days ago): Sanitized comment text...
 - @bob (5 days ago): Comment text...
 - @carol (1 week ago): Comment text...
 ```
@@ -109,6 +116,7 @@ Display the issue in a clean summary:
 
 - Read-only — never modify the issue
 - Keep output concise but complete
-- Include full description text (developers need acceptance criteria)
+- Include full sanitized description text (developers need acceptance criteria)
+- Never display raw MCP responses — sanitize immediately after each fetch
 - Show at most 5 recent comments to avoid noise
 - For null or absent fields, display 'Unset' instead of 'null', 'undefined', or empty. Apply this to: Status, Priority, Assignee, and any other optional fields. Example: **Assignee:** Unset

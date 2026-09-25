@@ -210,6 +210,36 @@ confirmation.
 
 Read-only agents never modify state.
 
+### Remote Content Sanitization
+
+Every MCP response that carries issue, comment, attachment, or document text
+is untrusted. **Sanitize immediately after each fetch, before display, file
+writes, or any other use.** Fencing alone does not remove credential bytes
+from the session transcript or worktree.
+
+For each text field returned by `get_issue`, `list_comments`, or any other
+Linear MCP tool:
+
+1. Run line-by-line credential detection over the raw text.
+2. Replace any line that matches a credential pattern with
+   `--- redacted credential at line N ---` (per AGENTS.md).
+3. Discard the raw response. Use only the sanitized copy for session output,
+   brainstorm/context packets, and downstream agent prompts.
+
+Minimum patterns (extend with PEM private-key blocks when present):
+
+- `sk-proj-`, `sk-ant-`, generic `sk-` API keys
+- `AIza` (Google API keys)
+- `ghp_` / `gho_` / `ghs_` / `ghu_` and `github_pat_` (GitHub tokens)
+- `AKIA` (AWS access keys)
+- `Bearer ` and `Authorization:` header values
+- `ses_` (AWS SES keys)
+
+When Bash is available, pipe each fetched text block through an `awk` program
+that applies these patterns (see `plugins/yellow-council/skills/council-patterns/SKILL.md`
+for the canonical 11-pattern block). When sanitizing in prose only, still
+enforce the same rule: never print or write the raw MCP payload.
+
 ## PR Convention
 
 - Create PRs via the active stacked-PR provider (resolved via the
