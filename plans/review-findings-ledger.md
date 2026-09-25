@@ -1047,6 +1047,8 @@ yellow-core changes. Each stage carries its own changeset.
     - a shallow clone gives unverifiable;
     - a fork-style PR head fetched from `pull/<n>/head` in the fixture origin;
     - retirement when the base deleted the path;
+    - deletion finding: observe → reconcile leaves pending (not `stale`) →
+      restore (CLAUDE-47);
     - `stale` → `reopened` on a rematch.
   - The CLAUDE-47 refused-restore cases and the dependency-mode dismissal tests
     (CLAUDE-44) call `validate-path` and the restore helper directly; the
