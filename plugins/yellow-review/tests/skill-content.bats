@@ -248,7 +248,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
 }
 
 @test "sweep-all: pruning skips on a failed or possibly truncated open-PR query" {
-  grep -q '^### Step 3b: Prune ledgers of closed PRs' "$SWEEP_ALL"
+  grep -q '^### Step 2b: Prune ledgers of closed PRs' "$SWEEP_ALL"
   grep -q "gh pr list --state open --limit 1000 --json number) || { printf 'skip" "$SWEEP_ALL"
   grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
   grep -q '`--prune <PR#>`' "$SWEEP_ALL"
@@ -259,5 +259,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
 @test "sweep-all: the summary table carries a Residual column from the ledger" {
   grep -q 'review-ledger.sh" summary --all' "$SWEEP_ALL"
   grep -q '^| PR# | Title .*| Outcome   | Residual |' "$SWEEP_ALL"
-  grep -q '`—` when the PR has no ledger, and `?` when the call failed' "$SWEEP_ALL"
+  grep -q 'emits `"<PR#>": null` for that' "$SWEEP_ALL"
+  grep -q '`?` when its entry is `null` (fold' "$SWEEP_ALL"
+  grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
 }
