@@ -992,6 +992,76 @@ reconcile() { "$RL" reconcile "$LEDGER_PR" --head "$1" --base "${2:-$BASE}"; }
   [ "$(fold | jq -r '.findings[0].reason')" = "retired: base deleted path" ]
 }
 
+# rm_loose <oid>: delete one loose object; fixtures never pack (gc.auto=0)
+rm_loose() { rm -f -- ".git/objects/${1:0:2}/${1:2}"; }
+
+# lib/util.sh exists at B1 and is deleted at H (branch feat); one
+# deletion finding observed against that pair, its id in $DEL_ID.
+deletion_pair() {
+  git config gc.auto 0
+  mkdir -p lib
+  printf 'util() {\n  :\n}\n' >|lib/util.sh
+  B1=$(commit_all util)
+  git checkout -q -b feat
+  git rm -q -r lib
+  H=$(commit_all delete)
+  OBS_BASE=$B1 observe "$H" "[$(finding lib/util.sh 2)]" >/dev/null
+  DEL_ID=$(ids)
+}
+
+@test "rl_tree_lookup tells a present, an absent and an unreadable entry apart" {
+  git config gc.auto 0
+  source "$RL"
+  mkdir -p lib
+  printf 'x\n' >|lib/u.sh
+  H=$(commit_all u)
+  [[ "$(rl_tree_lookup "$H" lib/u.sh)" == "present 100644 "* ]]
+  [ "$(rl_tree_lookup "$H" lib/none.sh)" = absent ]
+  rm_loose "$(git rev-parse "$H^{tree}")"
+  [ "$(rl_tree_lookup "$H" lib/u.sh)" = unverifiable ]
+}
+
+@test "reconcile: a deletion finding whose base tree cannot be read is unverifiable, never retired" {
+  deletion_pair
+  # the base commit stays; its root tree object goes
+  rm_loose "$(git rev-parse "$B1^{tree}")"
+  git cat-file -e "$B1^{commit}"
+  ! git ls-tree "$B1" >/dev/null 2>&1
+  out=$(reconcile "$H" "$B1")
+  [ "$(printf '%s' "$out" | jq '.transitions | length')" -eq 0 ]
+  [ "$(printf '%s' "$out" | jq --arg id "$DEL_ID" '.unverifiable | index($id) != null')" = true ]
+  [ "$(state_of "$DEL_ID")" = open ]
+}
+
+@test "reconcile: a partial clone whose promisor is offline leaves a deletion finding unverifiable" {
+  deletion_pair
+  git push -q origin main feat 2>/dev/null
+  git -C "$ORIGIN" config uploadpack.allowFilter true
+  git -C "$ORIGIN" config uploadpack.allowAnySHA1InWant true
+  P="$BATS_TEST_TMPDIR/partial"
+  # file:// (a plain path would do a local clone and ignore the filter)
+  git clone -q --no-checkout --filter=tree:0 "file://$ORIGIN" "$P" 2>/dev/null || skip "git cannot make a partial clone"
+  mkdir -p "$P/.git/yellow-review/findings"
+  cp "$LEDGER_DIR/$LEDGER_PR".* "$P/.git/yellow-review/findings/"
+  mv "$ORIGIN" "$ORIGIN.offline"
+  cd "$P"
+  git cat-file -e "$B1^{commit}"
+  # preflight: the base tree really is missing, not merely unfetched lazily
+  GIT_NO_LAZY_FETCH=1 git rev-list --objects --missing=print "$B1" 2>/dev/null | grep -q '^?'
+  out=$(reconcile "$H" "$B1")
+  [ "$(printf '%s' "$out" | jq '.transitions | length')" -eq 0 ]
+  [ "$(printf '%s' "$out" | jq --arg id "$DEL_ID" '.unverifiable | index($id) != null')" = true ]
+  [ "$(state_of "$DEL_ID")" = open ]
+}
+
+@test "reverify: a deletion finding at a head whose tree cannot be read is unverifiable" {
+  deletion_pair
+  printf 'unrelated\n' >|other.txt
+  H2=$(commit_all unrelated)
+  rm_loose "$(git rev-parse "$H2^{tree}")"
+  [ "$("$RL" reverify "$LEDGER_PR" "$DEL_ID" --head "$H2")" = unverifiable ]
+}
+
 @test "reconcile reports a large-ledger notice past 2 MiB" {
   observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
   head -c 2200000 /dev/zero | tr '\0' 'x' | command fold -w 1000 | sed 's/^/{"v":9,"pad":"/; s/$/"}/' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
