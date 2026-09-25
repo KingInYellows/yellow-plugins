@@ -1128,7 +1128,13 @@ rl_reverify_row() {
     return 0
   fi
   if [ "$del" = true ]; then
-    if rl_tree_entry "$T" "$file" >/dev/null; then printf 'not_reproduced'; else printf 'reproduced'; fi
+    # resolved only when the path is back as a regular file; a symlink,
+    # submodule or tree at that path still leaves the deletion in place
+    if entry=$(rl_tree_entry "$T" "$file") && rl_regular_mode "${entry%% *}"; then
+      printf 'not_reproduced'
+    else
+      printf 'reproduced'
+    fi
     return 0
   fi
   if [ "$src" = worktree ]; then
@@ -1279,7 +1285,7 @@ RL_CAND_FIELDS_JQ='
   def s: (. // "") | tostring | gsub("\u0000"; "");
   (try (RL_VALIDATE) catch "invalid-json") as $v
   | [ $v, (.file | s), (.line | s), (.category | s), (.rule | s), (.scope | s),
-      (._red[0] | s), (._red[1] | s), (._red[2] | s), (._red[3] | s),
+      (._red[0] | s), (._red[1] | s), (._red[2] | s), (._red[3] | s), (._red[4] | s), (._red[5] | s),
       ((.breaking_change_class // "") | s
         | if IN("name-rename", "signature-change", "removal", "semantics-change") then . else "" end),
       ((if has("queue") then .queue == "report_only"
@@ -1296,7 +1302,7 @@ RL_CAND_FIELDS_JQ='
 rl_build_candidate() {
   local fj="$1" H="$2" B="$3" src="$4" verdict file line cat_raw rule_raw scope_claimed scope_stored title fix mig bcc report_only defaulted
   local vres where oid content text hash cat_stored cat rule mapped sv scope scope_status sstart send occ deletion
-  local withheld fp root key scope_key
+  local withheld fp root key scope_key cat_red rev_red
   {
     IFS= read -r -d '' verdict
     IFS= read -r -d '' file
@@ -1308,6 +1314,8 @@ rl_build_candidate() {
     IFS= read -r -d '' fix
     IFS= read -r -d '' mig
     IFS= read -r -d '' scope_stored
+    IFS= read -r -d '' cat_red
+    IFS= read -r -d '' rev_red
     IFS= read -r -d '' bcc
     IFS= read -r -d '' report_only
     IFS= read -r -d '' defaulted
@@ -1336,8 +1344,10 @@ rl_build_candidate() {
     cat=maintainability rule=unclassified mapped=0
   fi
   [ -n "$rule_raw" ] || rule=unclassified
+  # category_raw and reviewer names arrive pre-redacted (._red[4], ._red[5]);
+  # any change the redactor made withholds the value outright
   cat_stored=${cat_raw:0:64}
-  rl_suspicious "$cat_stored" && cat_stored='[withheld]'
+  [ "$cat_red" = "$cat_stored" ] && ! rl_suspicious "$cat_stored" || cat_stored='[withheld]'
 
   sv=$(rl_verify_scope "$content" "$file" "$line" "$scope_claimed")
   scope=unscoped scope_status=unscoped occ='' scope_key=unscoped
@@ -1363,14 +1373,18 @@ rl_build_candidate() {
     --arg file "$file" --argjson line "$line" --argjson del "$deletion" --arg hash "$hash" \
     --arg text "$text" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
     --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" \
-    --argjson defaulted "$defaulted" --argjson unmapped "$((1 - mapped))" --argjson ord "${RL_ORDINAL:-0}" '
+    --argjson defaulted "$defaulted" --argjson unmapped "$((1 - mapped))" --argjson ord "${RL_ORDINAL:-0}" \
+    --arg rev_red "$rev_red" '
     def nn: if . == "" then null else . end;
     {fingerprint: $fp,
      reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
                   elif ($f.reviewer | type) == "string" then [$f.reviewer] else ["unknown"] end)
-                 | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "") | .[0:64]
-                       | if length >= 32 and test("[a-z]") and test("[A-Z]") and test("[0-9]") then "[withheld]" else . end)
-                 | unique),
+                 | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "") | .[0:64]) | unique
+                 | ($rev_red | split("\n")) as $red
+                 | if ($red | length) != length then map("[withheld]")
+                   else [range(0; length) as $i | if .[$i] == $red[$i]
+                     and (.[$i] | (length >= 32 and test("[a-z]") and test("[A-Z]") and test("[0-9]")) | not)
+                     then .[$i] else "[withheld]" end] | unique end),
      severity: $f.severity, category: $cat, category_raw: ($cat_stored | gsub("[^A-Za-z0-9 ._\\[\\]-]"; "")),
      rule: $rule, scope: $scope, scope_key: $skey, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
      file: $file, line: $line, deletion: $del, anchor_hash: $hash,
@@ -1646,14 +1660,21 @@ cmd_observe() {
   : >|"$(rl_tmp)/rejected.tsv"
   # Every model-authored text field, redacted in one batch. Any ._red the
   # input itself carries is discarded first.
+  # stride 6: title, fix, migration path, claimed scope, raw category (first
+  # 64 chars) and the character-filtered reviewer names joined by newlines
+  # (the filter strips newlines, so the join splits back exactly)
   jq -c '[.[] | (if type == "object" then . else {} end)
-    | (.title, .suggested_fix, .migration_path, .scope) | if type == "string" then . else "" end]' "$input" >|"$(rl_tmp)/texts.json" ||
+    | ((.title, .suggested_fix, .migration_path, .scope) | if type == "string" then . else "" end),
+      ((.category // "") | tostring | .[0:64]),
+      ((if (.reviewers | type) == "array" then .reviewers
+        elif (.reviewer | type) == "string" then [.reviewer] else ["unknown"] end)
+       | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "") | .[0:64]) | unique | join("\n"))]' "$input" >|"$(rl_tmp)/texts.json" ||
     rl_die "$RL_EXIT_INVALID" "observe: could not read finding fields"
   rl_redact_batch "$(rl_tmp)/texts.json" >|"$(rl_tmp)/texts.red.json" ||
     rl_die 1 "observe: redaction failed (scratch dir or jq error); nothing was written, safe to retry"
   jq -c --slurpfile r "$(rl_tmp)/texts.red.json" '
     to_entries[] | (if (.value | type) == "object" then .value else {} end)
-    + {_red: ($r[0][(.key * 4):(.key * 4 + 4)] | map(.[0]))}' "$input" >|"$(rl_tmp)/findings.jsonl" ||
+    + {_red: ($r[0][(.key * 6):(.key * 6 + 6)] | map(.[0]))}' "$input" >|"$(rl_tmp)/findings.jsonl" ||
     rl_die 1 "observe: could not prepare findings; nothing was written"
   i=0
   while IFS= read -r fj; do
@@ -1830,8 +1851,9 @@ cmd_dismissed_context() {
   out=$(printf '%s' "$fold" | jq -c --arg ids "$ids" '
     ($ids | split(" ")) as $keep
     | [.findings[] | select(.finding_id as $x | $keep | index($x))
-      | {finding_id, reason, title: .obs.title, file: .obs.file, line: .obs.line,
-         category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity}]')
+      | {finding_id, reason, file: .obs.file, line: .obs.line,
+         category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity,
+         depends_on: ((.depends_on // []) | map(.path))}]')
   if [ -n "$fenced" ]; then
     r=$(rl_render_dismissed "$out") || rl_die 1 "dismissed-context: render failed"
     printf '%s' "$r" | jq -r '.block | select(. != "")'
