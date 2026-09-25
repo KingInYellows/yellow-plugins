@@ -170,8 +170,10 @@ changed. After that it walks the remaining findings one card at a time:
 - **Restore file** — for a file the PR deleted, byte-for-byte from the base.
 - **Skip.**
 
-`--non-interactive` reconciles and applies nothing. `--prune <PR#>` deletes
-the ledger of a merged or closed PR.
+`--non-interactive` reconciles and applies nothing, and keeps the ledger of
+a PR that has merged or closed. Attended triage of such a PR asks before
+deleting its ledger. `--prune <PR#>` deletes the ledger of a merged or
+closed PR.
 
 ## Confidence gating
 

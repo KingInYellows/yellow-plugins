@@ -251,25 +251,57 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   ! grep -q 'rm -' "$TRIAGE"
 }
 
+@test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
+  step3=$(awk '/^## Step 3:/ { p = 1; next } /^## Step 4:/ { p = 0 } p' "$TRIAGE" | tr -s ' \n' ' ')
+  grep -qF 'With `--non-interactive`: print `Ledger: retained (PR <state>)` and stop. Unattended triage never reaches Step 2.' <<<"$step3"
+  grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep". Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
+  # Step 2 (prune) is named only by those two bullets
+  [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
+  ! grep -q 'run Step 2 and stop' "$TRIAGE"
+}
+
 @test "triage: Step 8 explicitly Reads the shared ledger reference before using it" {
   grep -q 'Read `\${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its' "$TRIAGE"
   grep -q 'If the Read fails, stop and report the path' "$TRIAGE"
 }
 
-# --- PR head checkout: validated and quoted, never raw shell-interpolated --
-# headRefName is attacker-controlled on a fork PR. Pin that review-pr.md
-# (the source triage.md's Apply gate delegates to) validates it and never
-# hands the raw, unquoted value to `gt checkout` or `git checkout`.
+# --- PR head checkout: captured into a variable, never templated ----------
+# headRefName is attacker-controlled on a fork PR, and check-ref-format
+# accepts `$(...)`, so any command text the value is written into is a
+# shell sink. Pin that review-pr.md (the source triage.md's Apply gate
+# delegates to) and review-all.md capture it with gh into $head_ref,
+# validate that variable before any other command, and never template it.
 
-@test "review-pr: headRefName is validated and quoted before checkout, never used bare" {
-  grep -q 'git check-ref-format --branch "<headRefName>"' "$REVIEW_PR"
-  grep -q 'gt checkout "<headRefName>"' "$REVIEW_PR"
-  ! grep -q '^gt checkout <headRefName>$' "$REVIEW_PR"
+# The fenced bash block that captures head_ref in <file>.
+head_ref_block() {
+  awk '/^ *```bash$/ { inb = 1; buf = ""; next }
+       inb && /^ *```$/ { if (buf ~ /head_ref=\$\(gh pr view/) { print buf; exit } inb = 0; next }
+       inb { buf = buf $0 "\n" }' "$1"
 }
 
-@test "review-all: mirrors review-pr's validated, quoted checkout for parity" {
-  grep -q 'validate it first with the same check as' "$REVIEW_ALL"
-  grep -q 'gt checkout "<branch>"' "$REVIEW_ALL"
-  grep -q 'git checkout "<branch>"' "$REVIEW_ALL"
-  ! grep -q '^   \*\*Graphite:\*\* `gt checkout <branch>`$' "$REVIEW_ALL"
+assert_head_ref_checkout() {
+  local f="$1" block
+  block=$(head_ref_block "$f")
+  [ -n "$block" ] || { echo "no head_ref block: $f"; false; }
+  # capture first, then the allowlist, then check-ref-format, then checkout
+  printf '%s' "$block" | head -1 | grep -qF 'head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName)'
+  printf '%s' "$block" | grep -qF "'' | -* | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-]*)"
+  printf '%s' "$block" | grep -qF 'git check-ref-format --branch "$head_ref"'
+  printf '%s' "$block" | grep -qF 'gt checkout "$head_ref"'
+  [ "$(printf '%s' "$block" | grep -n 'case "$head_ref"' | cut -d: -f1)" -lt \
+    "$(printf '%s' "$block" | grep -n 'check-ref-format' | cut -d: -f1)" ]
+  # the value is never templated into command text anywhere in the file
+  ! grep -qE '"<headRefName>"|"<branch>"' "$f"
+  ! grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+}
+
+@test "review-pr: headRefName is captured into a variable and validated before any command" {
+  assert_head_ref_checkout "$REVIEW_PR"
+  grep -q 'never write the `headRefName` value from' "$REVIEW_PR"
+}
+
+@test "review-all: mirrors review-pr's captured, validated checkout for parity" {
+  assert_head_ref_checkout "$REVIEW_ALL"
+  grep -q 'exactly as `review-pr.md`' "$REVIEW_ALL"
+  grep -qF '# Graphite; GitHub: git checkout "$head_ref"' "$REVIEW_ALL"
 }

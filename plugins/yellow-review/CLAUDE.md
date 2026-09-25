@@ -79,8 +79,10 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:triage` — Own the review-findings ledger's lifecycle for one PR:
   `reconcile` against the fetched head, then attended Apply / Dismiss (with
   `depends_on`) / Restore file / Skip. `--non-interactive` applies nothing
-  (used by `/review:sweep`); `--prune <PR#>` is the only ledger deletion
-  path (used by `/review:sweep-all`)
+  and never prunes, even for a PR that closed mid-run (used by
+  `/review:sweep`); attended triage of a closed PR asks before pruning.
+  `rl prune` — via `--prune <PR#>` (used by `/review:sweep-all`) or that
+  confirmed prompt — is the only ledger deletion path
 
 ### Agents (17)
 

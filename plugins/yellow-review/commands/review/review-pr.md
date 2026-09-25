@@ -86,19 +86,34 @@ gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRef
 ```
 
 Calculate gross line count (additions + deletions). `headRefName` is
-attacker-controlled on a fork PR, so validate it before it ever reaches a
-shell command: run `git check-ref-format --branch "<headRefName>"` and
-separately reject any character outside `[A-Za-z0-9._/-]` (check-ref-format
-alone still permits backticks) and any value starting with `-` (flag
-injection). If either check fails, report `[review:pr] Error: unsafe head
-ref '<headRefName>' — refusing to check out` and stop. Otherwise checkout
-the PR branch, always quoted (the installed `gt` does not accept `--` to
-end option parsing — `gt checkout -- <branch>` raises "Unexpected
-argument", so do not add it):
+attacker-controlled on a fork PR, and `git check-ref-format` accepts `$`,
+backticks, `;` and parentheses in a ref, so the value must never be written
+into command text — not quoted, and not into a validation command either:
+substituting it into any Bash command runs its `$(...)` before a check can
+reject it. Capture it from `gh` into a variable and validate the variable
+against `^[A-Za-z0-9._/-]+$` with no leading `-`, before any other command
+sees it, in the same Bash call as the checkout:
 
 ```bash
-gt checkout "<headRefName>"
+head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName) || exit 1
+case "$head_ref" in
+  '' | -* | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-]*)
+    printf '[review:pr] Error: unsafe head ref on PR #%s — refusing to check out\n' <PR#> >&2
+    exit 1 ;;
+esac
+git check-ref-format --branch "$head_ref" >/dev/null 2>&1 || {
+  printf '[review:pr] Error: invalid head ref on PR #%s — refusing to check out\n' <PR#> >&2
+  exit 1
+}
+gt checkout "$head_ref"
 ```
+
+Only ever reference `"$head_ref"`; never write the `headRefName` value from
+the metadata above inline into a command. The allowlist is spelled out
+rather than written as ranges so no locale widens it; a non-ASCII ref is
+refused by design. If either check fails, stop. The installed `gt` does not
+accept `--` to end option parsing (`gt checkout -- <branch>` raises
+"Unexpected argument"), so do not add it.
 
 If `gt checkout` fails, try `gh pr checkout <PR#>` then `gt track` — that
 path checks out by numeric PR and never passes the raw ref to a shell
