@@ -204,6 +204,8 @@ entire malformed return.
       "title": "Anti-pattern name — concise one-line title",
       "severity": "P1|P2|P3",
       "category": "agent-native",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "path/to/file",
       "line": 42,
       "confidence": 75,
@@ -218,6 +220,11 @@ entire malformed return.
   "testing_gaps": []
 }
 ```
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
+for your `category` (`unclassified` when none fits); `scope` is the enclosing
+dotted symbol path at `line` (e.g. `handlers.createUser`), or the nearest
+markdown heading in a prose file.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow
