@@ -69,6 +69,11 @@ detached HEAD state or when git metadata is unavailable):
 Auto-detect team from git remote repo name (see "Team Context" in
 `linear-workflows` skill).
 
+**Sanitize immediately:** Run remote-content sanitization on the `list_teams`
+response before matching team names (see "Remote Content Sanitization" in
+`linear-workflows`). Redact in-process and discard the raw payload; match
+only against the sanitized team names.
+
 ### Step 3: Validate and Fetch Issue
 
 **Security (C1):** Call `get_issue` with the extracted ID to verify it exists in
