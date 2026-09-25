@@ -400,6 +400,11 @@ include prompt injection defenses:
   per-capture nonce closer so a `--- code end ---` line in reviewed
   content cannot terminate the fence; they still have no runtime tool
   restriction (see Trust Boundaries above).
+- **yellow-linear**: `/linear:work` and `linear-issue-loader` redact
+  credentials from every Linear MCP response immediately after fetch. The
+  patterns include key prefixes, auth headers and the repository's named
+  credential assignments. Only the sanitized copy is displayed or written to
+  the worktree, wrapped in `--- begin/end ---` reference-only fences.
 - **yellow-debt**: Scanner agents fence code content with injection boundary
   markers
 - **yellow-ruvector**: Hook scripts validate all inputs before constructing

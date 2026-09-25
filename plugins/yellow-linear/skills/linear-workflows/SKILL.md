@@ -234,6 +234,13 @@ Minimum patterns (extend with PEM private-key blocks when present):
 - `AKIA` (AWS access keys)
 - `Bearer ` and `Authorization:` header values
 - `ses_` (AWS SES keys)
+- Named credential assignments: any `NAME=value`, `NAME: value` or
+  `export NAME=value` where `NAME` is one of the repository's credential
+  variables (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`,
+  `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`,
+  `SEMGREP_APP_TOKEN`, `MORPH_API_KEY`, `CERAMIC_API_KEY`) or ends in
+  `_API_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD`. Redact the whole line
+  even when the value doesn't match a known key prefix.
 
 When Bash is available, pipe each fetched text block through an `awk` program
 that applies these patterns (see `plugins/yellow-council/skills/council-patterns/SKILL.md`

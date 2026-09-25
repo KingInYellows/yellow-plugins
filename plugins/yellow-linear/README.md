@@ -61,6 +61,13 @@ server is visible in the current session.
 | ------ | ---------------------------- | --------------------- |
 | Linear | `https://mcp.linear.app/mcp` | OAuth (browser popup) |
 
+## Security
+
+Linear issue text is treated as untrusted. `/linear:work` and the
+`linear-issue-loader` agent redact credential-like lines, such as API keys,
+tokens and `*_API_KEY=` assignments, as soon as the text is fetched. They
+show and save only the redacted copy, fenced as reference-only.
+
 ## Limitations
 
 - MCP-only — no offline mode
