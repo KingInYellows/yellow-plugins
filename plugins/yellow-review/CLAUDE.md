@@ -54,10 +54,12 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ### Commands (7)
 
-- `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
-  integration before reviewing PRs
+- `/review:setup` — Validate GitHub, jq, Graphite, yellow-core and the
+  review-ledger prerequisites (flock, realpath, git 2.31+, optional
+  universal-ctags) before reviewing PRs
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
-  application. Accepts `--non-interactive` to suppress its Step 9
+  application; persists every reported-but-unapplied finding to the
+  review-findings ledger. Accepts `--non-interactive` to suppress its Step 9
   push-confirmation prompt and its Step 9b "save learnings" prompt (used by
   `/review:sweep`)
 - `/review:resolve` — Parallel resolution of unresolved PR review comments via
@@ -162,21 +164,28 @@ resolution, and sequential stack review. Graphite-native workflow.
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
 
-### Library (internal, not yet wired into a command)
+### Library
 
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
   shared by every worktree of the clone. Subcommands `observe`, `transition`,
   `fold`, `dismissed-context`, `reverify`, `publication`, `validate-path`,
-  `prune`, `record-state`, `summary`, `new-run-id`; JSON on stdin/stdout,
-  exit codes 2 usage / 3 invalid / 4 lock timeout / 5 PR closed / 6
-  unverifiable. The rule vocabulary is `lib/review-ledger-vocab.json`.
+  `prune`, `record-state`, `summary`, `new-run-id`, `remote-head`,
+  `settle`; JSON on stdin/stdout, exit codes 2 usage / 3 invalid / 4 lock
+  timeout / 5 PR closed / 6 unverifiable. The rule vocabulary is `lib/review-ledger-vocab.json`.
 - Every model-authored string is redacted with yellow-core's
   `cs_redact_secrets` (hence the required `yellow-core` dependency) plus a
   fail-closed credential pass; without yellow-core the library withholds all
   model-authored text. Requires `jq`, `flock`, `realpath` and git >= 2.31;
   universal-ctags is optional (code scopes fall back to `unscoped`).
+- `/review:pr` and `/review:all` call it at Step 3e (dismissed-findings
+  context), after Step 6's partition (`observe --step 6`), Step 7
+  (`applied`), after Step 8 (`observe --step 8 --anchor-source worktree`)
+  and Step 9 (`--fix-sha`, `remote-head`, `--published-head`, `settle`).
+  The procedure lives once in `references/review-pr/ledger.md`; both
+  commands read it, so keep them in parity through that file. A ledger
+  error never aborts a review — it is reported in Coverage.
 
 ## When to Use What
 
