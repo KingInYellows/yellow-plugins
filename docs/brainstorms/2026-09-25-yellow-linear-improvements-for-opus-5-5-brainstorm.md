@@ -110,6 +110,14 @@ User constraints from the dialogue:
   detection over every fetched issue, comment, attachment, and linked document
   before writing the context packet or any other worktree file. Replace hits
   with `--- redacted credential at line N ---` per AGENTS.md.
+- **Fence markers can't be forged.** Redaction doesn't catch a Linear field
+  that contains its own `--- end ... ---` line, which would close the fence
+  early. The packet is later read by `/flow:plan`, which has Bash and Write.
+  So each `/linear:work` run generates a random fence token
+  (`--- begin linear-context-<token> ---`). Before writing, any existing
+  `--- begin`/`--- end` lines in remote content are escaped, for example
+  replaced with `[fenced: …]`, following the brainstorm-orchestrator
+  learnings-fence pattern.
 
 ### P1 — Work loop for long Opus 5.5 sessions
 
@@ -159,7 +167,14 @@ User constraints from the dialogue:
   steps into sub-issues or milestones after confirmation (Tier 2).
 - **SessionStart hook (optional, off by default).** On a branch that has an
   issue ID, inject a one-line issue summary. Opt-in via config so it never
-  slows down unrelated sessions.
+  slows down unrelated sessions. The issue title and other fields are
+  untrusted, and the hook injects them with no human in the loop. So the
+  hook runs them through the same pipeline as the context packet before
+  emitting its JSON `systemMessage`:
+  1. Redact credentials.
+  2. Escape fence markers.
+  3. Cap the summary (ID, state type and title, at most 200 characters).
+  4. Wrap it in a per-invocation fence marked reference-only.
 
 ### P2 — Native handoff and light PM
 
