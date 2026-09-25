@@ -93,10 +93,12 @@ RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
 Use `triage-noninteractive` in unattended mode. By latest state:
 
 - `applied` becomes `fixed` when the fix is proved on the PR head and no
-  longer reproduces there. It becomes `reopened` when the fix commit was
-  abandoned (unreachable from any ref). Otherwise it stays `applied`,
-  including a proved fix whose anchor still matches: anchor-only re-verify
-  cannot tell a revert from an additive fix, so that case is left for you.
+  longer reproduces there. When the fix commit is unreachable from any ref
+  (a restack rewrote it), a finding that no longer reproduces also becomes
+  `fixed` (content-check fallback) and one that still reproduces becomes
+  `reopened` (`fix-abandoned`). Otherwise it stays `applied`, including a
+  proved fix whose anchor still matches: anchor-only re-verify cannot tell a
+  revert from an additive fix, so that case is left for you.
 - `open`, `reopened` or `report_only` become `stale` when the anchor no
   longer matches.
 - `stale` becomes `reopened` when the anchor matches again.

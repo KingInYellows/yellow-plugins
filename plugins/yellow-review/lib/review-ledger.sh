@@ -1159,7 +1159,7 @@ rl_reverify_row() {
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
   excl=$(rl_sibling_lines "$id" "$file" "$hash" "$T")
   if hit=$(rl_window_match "$content" "$ln" 3 "$hash" "$anchor" "$excl"); then
-    if [ "$sstat" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+    if [ "$sstat" != verified ] || rl_scope_still "$content" "$np" "$hit" "$scope" "$sdisp"; then
       printf 'reproduced'
       return 0
     fi
@@ -2022,9 +2022,12 @@ cmd_remote_head() {
 }
 
 # Settle one `applied` finding against the remote head (CLAUDE-48):
-# publication proof AND a not_reproduced re-verify give `fixed`; an
-# abandoned fix gives `reopened` (fix-abandoned) — that is genuine evidence
-# the fix commit was lost. A proved fix whose anchor still reproduces stays
+# publication proof AND a not_reproduced re-verify give `fixed`. When the fix
+# commit is unreachable (`abandoned`, e.g. a restack rewrote it and the
+# patch-id no longer matches), the strict re-verify decides: not_reproduced
+# is the brainstorm's content-check fallback proof and gives `fixed`
+# (reason unproved-content-check); reproduced gives `reopened`
+# (fix-abandoned); unverifiable stays `applied`. A proved fix whose anchor still reproduces stays
 # `applied`: anchor-only reverify cannot tell a real revert from an additive
 # fix (e.g. a guard inserted above an unchanged line), so a surviving anchor
 # alone must not reopen a published fix. Anything unverifiable or unproved
@@ -2042,7 +2045,13 @@ rl_settle_one() {
         not_reproduced) to=fixed ;;
       esac
       ;;
-    abandoned) to=reopened reason=fix-abandoned ;;
+    abandoned)
+      rv=$(rl_reverify_row "$row" "$H" strict)
+      case "$rv" in
+        not_reproduced) to=fixed reason=unproved-content-check proof=content-check ;;
+        reproduced) to=reopened reason=fix-abandoned ;;
+      esac
+      ;;
   esac
   if [ -n "$to" ]; then
     [ "$to" = reopened ] && proof=''

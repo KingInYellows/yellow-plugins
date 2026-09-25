@@ -973,6 +973,32 @@ reconcile() { "$RL" reconcile "$LEDGER_PR" --head "$1" --base "${2:-$BASE}"; }
   [ "$(fold | jq -r '.findings[0].reason')" = fix-abandoned ]
 }
 
+@test "reconcile: a restacked fix with a new patch-id settles fixed via the content check" {
+  pr_with_finding
+  # drop the recorded fix commit and land an equivalent fix whose diff (and
+  # so patch-id) differs, as a restack that rewrote the change would
+  git reset -q --hard "$H1"
+  sed -i.bak '2s/.*/  if [ "${x}" = 1 ]; then echo one; fi/' q.sh && rm q.sh.bak
+  NEW=$(commit_all "fix, rewritten")
+  git reflog expire --expire=now --all
+  out=$(reconcile "$NEW")
+  [ "$(printf '%s' "$out" | jq -r '.transitions[0].to')" = fixed ]
+  [ "$(fold | jq -r '.findings[0].reason')" = unproved-content-check ]
+}
+
+@test "reverify: a whitespace-only edit to a verified-scope anchor still reproduces" {
+  git checkout -q -b feat
+  printf '# Doc\n\n## Setup\n\nRun the installer as root.\n' >|w.md
+  H1=$(commit_all feature)
+  observe "$H1" "[$(finding w.md 5 '{"rule":"wrong-condition","scope":"Setup"}')]" >/dev/null
+  ID=$(ids)
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  transition "$ID" applied --head "$H1" >/dev/null
+  printf '# Doc\n\n## Setup\n\nRun  the installer  as root. \n' >|w.md
+  H2=$(commit_all "whitespace only")
+  [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H2")" = reproduced ]
+}
+
 @test "reconcile: a shallow clone leaves applied and open findings untouched and listed" {
   pr_with_finding
   observe "$H1" "[$(finding q.sh 1)]" >/dev/null
