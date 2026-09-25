@@ -1662,11 +1662,14 @@ cmd_remote_head() {
 }
 
 # Settle one `applied` finding against the remote head (CLAUDE-48):
-# publication proof AND a not_reproduced re-verify give `fixed`; a proved
-# fix that reproduces gives `reopened` (reverted-after-publication); an
-# abandoned fix gives `reopened` (fix-abandoned); anything unverifiable or
-# unproved leaves it `applied`. Caller holds the lock. Prints the target
-# state or "applied". Args: file fold id remote-head actor.
+# publication proof AND a not_reproduced re-verify give `fixed`; an
+# abandoned fix gives `reopened` (fix-abandoned) — that is genuine evidence
+# the fix commit was lost. A proved fix whose anchor still reproduces stays
+# `applied`: anchor-only reverify cannot tell a real revert from an additive
+# fix (e.g. a guard inserted above an unchanged line), so a surviving anchor
+# alone must not reopen a published fix. Anything unverifiable or unproved
+# also leaves it `applied`. Caller holds the lock. Prints the target state
+# or "applied". Args: file fold id remote-head actor.
 rl_settle_one() {
   local f="$1" fold="$2" id="$3" H="$4" actor="$5" pub rv to='' reason='' proof=''
   pub=$(rl_publication "$fold" "$id" "$H")
@@ -1676,7 +1679,6 @@ rl_settle_one() {
       rv=$(rl_reverify_finding "$fold" "$id" "$H" strict)
       case "$rv" in
         not_reproduced) to=fixed ;;
-        reproduced) to=reopened reason=reverted-after-publication ;;
       esac
       ;;
     abandoned) to=reopened reason=fix-abandoned ;;
