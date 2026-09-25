@@ -70,8 +70,14 @@ if [ -x "$ledger" ]; then
 else
   printf 'ledger_lib:    NOT FOUND\n'
 fi
-if command -v ctags >/dev/null 2>&1 && ctags --version 2>/dev/null | grep -q 'Universal Ctags'; then
+if [ -x "$ledger" ] && bash -c '. "$1" && rl_ctags_usable' _ "$ledger"; then
   printf 'ctags:         universal-ctags\n'
+elif command -v ctags >/dev/null 2>&1 && ctags --version 2>/dev/null | grep -q 'Universal Ctags'; then
+  if ! command -v timeout >/dev/null 2>&1; then
+    printf 'ctags:         universal-ctags (unusable: timeout not found)\n'
+  else
+    printf 'ctags:         universal-ctags (unusable: missing end field)\n'
+  fi
 else
   printf 'ctags:         optional-missing\n'
 fi
@@ -106,6 +112,12 @@ If `redaction` is missing, warn but continue:
 If `ctags` is `optional-missing`, note it: "universal-ctags is not installed;
 the ledger records code-scope findings as `unscoped` (line-keyed). Optional:
 `brew install universal-ctags` or `apt install universal-ctags`."
+
+If `ctags` is `universal-ctags (unusable: ...)`, note it: "universal-ctags
+is installed but the ledger cannot use it (missing `timeout` or an `end`
+field in `ctags --list-fields`); code-scope findings fall back to
+`unscoped`. On macOS: `brew install coreutils` for `timeout`, or upgrade
+to a Universal Ctags build that reports the `end` field."
 
 ### Step 3: Report
 
