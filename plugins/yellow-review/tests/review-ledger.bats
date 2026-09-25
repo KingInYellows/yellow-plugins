@@ -554,6 +554,22 @@ pr_with_finding() {
   [ "$(fold | jq -r '[.findings[] | select(.obs.scope_status == "unscoped")] | length')" -eq 1 ]
 }
 
+@test "CLAUDE-49: a heading literally containing '>' does not collide with true nesting" {
+  # "# A > B" (one heading whose text is "A > B") vs "# A" nesting "## B":
+  # naively joining with " > " canonicalizes both to the same "A > B" path.
+  printf '# A > B\n\nSame paragraph text.\n\n# A\n\n## B\n\nSame paragraph text.\n' >|coll.md
+  H=$(commit_all md-heading-collision)
+  observe "$H" "[$(finding coll.md 3 '{"scope":"A > B","category":"docs","rule":"wrong-doc"}'), $(finding coll.md 9 '{"scope":"A > B","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  # the same claim text verifies at both locations (one via the literal
+  # heading, one via true nesting) but must resolve to distinct canonical
+  # scopes, so the two locations stay separate findings with distinct
+  # fingerprints instead of collapsing into one.
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = verified ]
+  [ "$(fold | jq -r '[.findings[].obs.scope] | sort | join("|")')" = 'A > B|A \> B' ]
+  [ "$(fold | jq -r '[.findings[].finding_id] | unique | length')" -eq 2 ]
+}
+
 @test "CLAUDE-49: generic or unverifiable scope claims are unscoped and line-keyed" {
   source "$RL"
   printf 'a\nb\n' >|"$BATS_TEST_TMPDIR/f.sh"

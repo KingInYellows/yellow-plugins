@@ -616,9 +616,21 @@ rl_map_line() {
 # Prints "<path>\t<innermost>\t<start>\t<end>\t<innermost-count>", where
 # path joins headings with " > " and end is the line before the next
 # heading of the same or a higher level.
+#
+# Collision guard: a heading segment whose own text contains a literal
+# " > " (e.g. a heading literally titled "A > B") would otherwise
+# canonicalize identically to sibling headings "A" and "B" nested inside
+# each other. Before joining, each segment has "\" doubled and any literal
+# " > " substring escaped to " \> ", so only the real join separator is an
+# unescaped " > ". Segments with no separator in their text are emitted
+# unchanged, so the ordinary "Parent > Child" claim format used by
+# reviewers keeps verifying via rl_verify_scope unaffected. The
+# <innermost> field is always the raw (unescaped) heading text, since a
+# single-occurrence claim is matched against it directly.
 rl_md_heading_path() {
   awk -v L="$2" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+    function esc(s) { gsub(/\\/, "\\\\", s); gsub(/ > /, " \\> ", s); return s }
     /^[ \t]*(```+|~~~+)/ {
       line = $0; sub(/^[ \t]*/, "", line)
       ch = substr(line, 1, 1); n = 0
@@ -643,7 +655,7 @@ rl_md_heading_path() {
     END {
       if (inner == 0) exit 1
       path = ""
-      for (k = 1; k <= 6; k++) if (k in stack) path = (path == "" ? stack[k] : path " > " stack[k])
+      for (k = 1; k <= 6; k++) if (k in stack) { seg = esc(stack[k]); path = (path == "" ? seg : path " > " seg) }
       if (!closed) endline = NR
       printf "%s\t%s\t%d\t%d\t%d\n", path, stack[inner], sline[inner], endline, seen[stack[inner]]
     }' "$1"
