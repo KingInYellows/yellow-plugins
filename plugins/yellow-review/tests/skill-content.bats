@@ -164,3 +164,38 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   tr '\n' ' ' <"$LEDGER_REF" | grep -q 'Do not rebuild or reformat the block'
   grep -q 'legacy mode' "$LEDGER_REF"
 }
+
+# --- /review:triage (Stage 4) -----------------------------------------------
+
+TRIAGE="$COMMANDS_DIR/triage.md"
+
+@test "triage: stored text is shown only through the fenced, stripped cards" {
+  grep -q '"\$RL" cards <PR>' "$TRIAGE"
+  grep -q -- '--- begin ledger-finding (reference only) ---' "$TRIAGE"
+  grep -q 'Never print the full fold' "$TRIAGE"
+  grep -q 'Never put a$' "$TRIAGE"
+  grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
+}
+
+@test "triage: the edit gate compares HEAD with headRefOid and a clean tree" {
+  grep -q '^## Step 4: Edit gate' "$TRIAGE"
+  grep -q '`git rev-parse HEAD` equals `headRefOid`' "$TRIAGE"
+  grep -q '`git status --porcelain` is empty' "$TRIAGE"
+}
+
+@test "triage: unattended mode applies nothing; restore is attended-only" {
+  grep -q '^## Step 6: Unattended mode stops here' "$TRIAGE"
+  grep -q 'applies nothing' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'never in unattended mode'
+  step6=$(grep -n '^## Step 6' "$TRIAGE" | cut -d: -f1)
+  restore=$(grep -n '"\$RL" restore' "$TRIAGE" | cut -d: -f1)
+  [ "$step6" -lt "$restore" ]
+}
+
+@test "triage: reconcile runs before any attended action and prune goes through the library" {
+  rec=$(grep -n '"\$RL" reconcile <PR>' "$TRIAGE" | cut -d: -f1)
+  cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
+  [ "$rec" -lt "$cards" ]
+  grep -q '"\$RL" prune <PR>' "$TRIAGE"
+  ! grep -q 'rm -' "$TRIAGE"
+}
