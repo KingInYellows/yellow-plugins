@@ -1,0 +1,29 @@
+.changeset/review-ledger-review-pass.md
+  s_0e9ca486378b02::t_8bf9e8a182d8d5 11-15
+plugins/yellow-review/README.md
+  s_0e9ca486378b02::t_e6102b23802e74 161-167
+plugins/yellow-review/commands/review/triage.md
+  s_0e9ca486378b02::t_bbd0e155bdf2bf 95-103,109-113
+plugins/yellow-review/lib/review-ledger.sh
+  s_0e9ca486378b02::t_7f4c1fe5993130 498-522,1132-1142,1155-1160,1250-1251,1253-1256,1264-1269,1538,1560-1567,2042-2060,2073-2082,2168-2180
+plugins/yellow-review/references/review-pr/ledger.md
+  s_0e9ca486378b02::t_8c41a9a3db7e28 184-192
+plugins/yellow-review/tests/review-ledger.bats
+  s_0e9ca486378b02::t_3223e932a8e742 407-416,989-1014,1069-1138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8b69b29723b7c4e0e26adc02daba0b1625bf8f6f",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
