@@ -1,0 +1,46 @@
+plugins/yellow-review/references/review-pr/ledger.md
+  s_520e182b5f7c63::t_aeed3c5d5389f7 1-5,8-29,34-44,55-106,109-147,151-157
+  s_520e182b5f7c63::t_fe8c78bae0e080 149-150
+  s_520e182b5f7c63::t_8a88d3fe1f47b5 6-7
+  s_520e182b5f7c63::t_eb25cbaafecd5f 30-33
+  s_520e182b5f7c63::t_ff1292fb6e7c15 45-47,52-54
+  s_520e182b5f7c63::t_304169f5113e9c 107-108
+  s_520e182b5f7c63::t_5ff152d98785ae 148
+  s_520e182b5f7c63::t_1ab4f000c818b8 48-51
+.changeset/review-ledger-persistence.md
+  s_520e182b5f7c63::t_43b491a6a1fb70 1-9
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_e5690ce80f22b4 721,743,757,763,768,781,783,796,800,807,1213
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_d8fb7825f0c132 57-59,61-62,167,174-176,182-188
+plugins/yellow-review/README.md
+  s_520e182b5f7c63::t_9d097c1e402d09 19-21,128-157
+plugins/yellow-review/commands/review/review-all.md
+  s_520e182b5f7c63::t_a5541f851cca61 160,212-221,324-327,332-333,342-343,372-376,427-428
+plugins/yellow-review/commands/review/review-pr.md
+  s_520e182b5f7c63::t_c2bf4324f1da8f 85,294-302,619-621,940-946,968-969,983-985,1025-1029,1112
+plugins/yellow-review/commands/review/setup.md
+  s_520e182b5f7c63::t_43b0ba6fc9be79 11-12,52-77,88-93,100-109,121
+plugins/yellow-review/lib/review-ledger.sh
+  s_520e182b5f7c63::t_c941cdf7699415 1083-1089,1188-1189,1197,1209,1217,1222,1229,1234,1237,1243,1245,1308,1314,1412,1414-1421,1432-1437,1532-1661,1670-1672,1695
+plugins/yellow-review/tests/review-ledger.bats
+  s_520e182b5f7c63::t_e5d11791bdf834 609-712
+plugins/yellow-review/tests/skill-content.bats
+  s_520e182b5f7c63::t_3d094b103afebc 112-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ebe030517778f2df5b3306ce911b9044db23a646",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
