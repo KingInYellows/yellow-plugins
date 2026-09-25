@@ -77,6 +77,38 @@ filtering), and `title`. Substitute the actual PR numbers and titles as
 literals in every later block (variables do not survive across Bash tool
 calls).
 
+### Step 2b: Prune ledgers of closed PRs
+
+Review-findings ledgers live in the clone's git dir, one per PR. Delete the
+ones whose PR has closed or merged. Run this unconditionally, before the
+empty-list check below and before the Step 3 confirmation gate — cleanup
+must not depend on having another PR to sweep, and it needs no confirmation
+of its own: Step 3's prompt asks only whether to run `/review:sweep` on the
+enumerated list, a separate decision from deleting ledgers of PRs that are
+already closed. This query is separate from Step 2's list too: it covers
+every author and includes drafts.
+
+```bash
+set -u
+OPEN_JSON=$(gh pr list --state open --limit 1000 --json number) || { printf 'skip\n'; exit 0; }
+[ "$(printf '%s' "$OPEN_JSON" | jq 'length')" -lt 1000 ] || { printf 'skip\n'; exit 0; }
+DIR="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/findings"
+[ -d "$DIR" ] || exit 0
+for f in "$DIR"/*.jsonl; do
+  [ -f "$f" ] || continue
+  pr=$(basename -- "$f" .jsonl)
+  printf '%s' "$pr" | grep -Eq '^[1-9][0-9]*$' || continue
+  printf '%s' "$OPEN_JSON" | jq -e --argjson n "$pr" 'any(.[]; .number == $n)' >/dev/null || printf '%s\n' "$pr"
+done
+```
+
+`skip` means the query failed or returned 1000 rows, so the list may be
+truncated: skip pruning entirely. Otherwise, for each PR number printed,
+invoke the `Skill` tool with `skill: "review:triage"` and the args string
+`--prune <PR#>`. Triage re-checks the PR's state itself and deletes the
+ledger only when GitHub reports it `MERGED` or `CLOSED`, so a stale list
+never deletes a live ledger.
+
 **Empty-list early exit.** If the resulting array is empty (`[]` or
 length 0), print:
 
@@ -128,33 +160,6 @@ proceed to Step 4 or any later step.
 This is the only human prompt in the entire command. After Proceed,
 sweep-all runs unattended until the summary is printed.
 
-### Step 3b: Prune ledgers of closed PRs
-
-Review-findings ledgers live in the clone's git dir, one per PR. Delete the
-ones whose PR has closed or merged. This query is separate from Step 2's
-list: it covers every author and includes drafts.
-
-```bash
-set -u
-OPEN_JSON=$(gh pr list --state open --limit 1000 --json number) || { printf 'skip\n'; exit 0; }
-[ "$(printf '%s' "$OPEN_JSON" | jq 'length')" -lt 1000 ] || { printf 'skip\n'; exit 0; }
-DIR="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/findings"
-[ -d "$DIR" ] || exit 0
-for f in "$DIR"/*.jsonl; do
-  [ -f "$f" ] || continue
-  pr=$(basename -- "$f" .jsonl)
-  printf '%s' "$pr" | grep -Eq '^[1-9][0-9]*$' || continue
-  printf '%s' "$OPEN_JSON" | jq -e --argjson n "$pr" 'any(.[]; .number == $n)' >/dev/null || printf '%s\n' "$pr"
-done
-```
-
-`skip` means the query failed or returned 1000 rows, so the list may be
-truncated: skip pruning entirely. Otherwise, for each PR number printed,
-invoke the `Skill` tool with `skill: "review:triage"` and the args string
-`--prune <PR#>`. Triage re-checks the PR's state itself and deletes the
-ledger only when GitHub reports it `MERGED` or `CLOSED`, so a stale list
-never deletes a live ledger.
-
 ### Step 4: Sequential sweep loop
 
 For each PR in the sorted list, in order from lowest PR number to
@@ -201,8 +206,12 @@ Read every PR's residual ledger counts in one call:
 ```
 
 It prints `{"<PR#>": {"pending": N, "attention": M}, …}` for every ledger
-in this clone. For each row, the `Residual` cell is `<pending>/<attention>`,
-`—` when the PR has no ledger, and `?` when the call failed.
+in this clone. A ledger that fails to fold emits `"<PR#>": null` for that
+entry while the command still exits 0 — a per-row failure, not a call
+failure. For each row, the `Residual` cell is `<pending>/<attention>`,
+`—` when the PR has no ledger, and `?` when its entry is `null` (fold
+failed) or the whole call failed. Exclude any `?` row from the pending
+and attention totals below — do not treat `null` as `0`.
 
 Print a pipe-delimited markdown summary table:
 
@@ -262,8 +271,9 @@ Otherwise, with `attempted_count >= 1`:
 - **Pre-flight failure** (gh missing, gh not authenticated, jq missing,
   dirty tree): exit non-zero with a named `[review:sweep-all] Error:`
   message. No enumeration or M3 gate is shown.
-- **Empty PR list after filtering**: exit 0 with the
-  `No open non-draft PRs found.` message. No M3 gate is shown.
+- **Empty PR list after filtering**: Step 2b's pruning still runs (it is
+  unconditional) before exiting 0 with the `No open non-draft PRs found.`
+  message. No M3 gate is shown.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
   No sweeps run.
 - **Per-PR sweep failure mid-loop**: marked `skipped` in the summary
