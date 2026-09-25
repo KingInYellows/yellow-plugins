@@ -40,7 +40,7 @@ setup() {
 @test "tail repair: a valid final record missing its newline is completed" {
   observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
   f="$LEDGER_DIR/$LEDGER_PR.jsonl"
-  head -c -1 "$f" >|"$f.x" && mv "$f.x" "$f"
+  head -c "$(($(wc -c <"$f") - 1))" "$f" >|"$f.x" && mv "$f.x" "$f"
   [ "$(tail -c 1 "$f" | od -An -tx1 | tr -d ' ')" != 0a ]
   [ "$(fold | jq '.pending')" -eq 1 ]
   [ "$(tail -c 1 "$f" | od -An -tx1 | tr -d ' ')" = 0a ]
@@ -1202,4 +1202,130 @@ deleted_util() {
   [[ "$out" == *"&lt;b&gt;"* ]]
   [ "$(printf '%s\n' "$out" | head -1 | cut -d' ' -f2)" = P1 ]
   [[ "$out" == *"report-only"* ]]
+}
+
+# --- review-pass hardening --------------------------------------------------
+
+@test "a ledger far larger than one argv string still returns observe/transition JSON" {
+  seq 1 200 | sed 's/^/statement number /' >|big.sh
+  H=$(commit_all big)
+  long=$(printf 'long title text %.0s' $(seq 1 60))
+  arr=$(jq -cn --arg t "$long" '[range(1; 101) | {title: $t, severity: "P2", category: "correctness", rule: "logic-error", scope: "unscoped", file: "big.sh", line: ., confidence: 75, autofix_class: "gated_auto", owner: "downstream-resolver", requires_verification: true, pre_existing: false, suggested_fix: $t, reviewer: "x"}]')
+  out=$(observe "$H" "$arr")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 100 ]
+  [ "$(fold | wc -c)" -gt 140000 ]
+  run -0 transition "$(ids | head -1)" dismissed --reason done
+  [ "$(printf '%s' "$output" | jq -r '.to')" = dismissed ]
+}
+
+@test "resolve-path prints the checked absolute path for a finding id, never needing the name" {
+  mkdir -p docs
+  printf 'x\n' >|'docs/$(touch pwned).md'
+  H=$(commit_all odd-name)
+  observe "$H" "[$(finding 'docs/$(touch pwned).md' 1)]" >/dev/null
+  run -0 "$RL" resolve-path "$LEDGER_PR" "$(ids)" --head "$H"
+  [ "$(printf '%s' "$output" | jq -r '.path')" = "$REPO/docs/\$(touch pwned).md" ]
+  [ ! -e pwned ]
+  rm 'docs/$(touch pwned).md'
+  ln -s ../a.sh 'docs/$(touch pwned).md'
+  run -3 "$RL" resolve-path "$LEDGER_PR" "$(ids)" --head "$H"
+}
+
+@test "restore treats bracketed names literally and cannot overwrite look-alike paths" {
+  mkdir -p 'app/[id]' app/i app/d
+  printf 'dynamic\n' >|'app/[id]/page.tsx'
+  printf 'i-base\n' >|app/i/page.tsx
+  printf 'd-base\n' >|app/d/page.tsx
+  B1=$(commit_all app)
+  git checkout -q -b feat
+  git rm -q -r 'app/[id]'
+  printf 'i-pr-edit\n' >|app/i/page.tsx
+  H=$(commit_all delete-dynamic)
+  OBS_BASE=$B1 observe "$H" "[$(finding 'app/[id]/page.tsx' 1)]" >/dev/null
+  run -0 "$RL" restore "$LEDGER_PR" "$(ids)" --head "$H" --base "$B1"
+  [ "$(cat 'app/[id]/page.tsx')" = dynamic ]
+  [ "$(cat app/i/page.tsx)" = i-pr-edit ]
+  [ "$(git diff --cached --name-only)" = 'app/[id]/page.tsx' ]
+}
+
+@test "paths with C1, bidi or zero-width characters, or under .git, are rejected" {
+  for p in $'a\xc2\x9bb.md' $'a\xe2\x80\xaeb.md' $'a\xe2\x80\x8bb.md' $'a\xe2\x81\xa6b.md' .git/config .GIT/hooks/x; do
+    run -3 "$RL" validate-path anchor "$BASE" "$p"
+    [ "$output" = control-char ] || [ "$output" = bad-segment ]
+  done
+}
+
+@test "restore refuses a tracked symlink into .git on the way down" {
+  mkdir -p hooks/x
+  printf 'y\n' >|hooks/x/y
+  B1=$(commit_all hooks)
+  git checkout -q -b feat
+  git rm -q -r hooks
+  ln -s .git/hooks-link hooks
+  H=$(commit_all symlink-to-git)
+  OBS_BASE=$B1 observe "$H" "[$(finding hooks/x/y 1)]" >/dev/null
+  run -3 "$RL" restore "$LEDGER_PR" "$(ids)" --head "$H" --base "$B1"
+}
+
+@test "quoted credential assignments and credential-shaped labels are withheld" {
+  printf 'const password = "Tr0ub4dor&3";\n' >|p.js
+  H=$(commit_all pw)
+  tok="aB3dEfGhIjKlMnOpQrStUvWxYz0123456789"
+  observe "$H" "[$(finding p.js 1 "{\"category\":\"$tok\",\"reviewer\":\"$tok\",\"suggested_fix\":\"use apiKey: '3f7a9c2e8b1d4f6a0c5e7b9d2f4a6c8e' instead\"}")]" >/dev/null
+  ! grep -rq 'Tr0ub4dor' "$LEDGER_DIR"
+  ! grep -rq "$tok" "$LEDGER_DIR"
+  ! grep -rq '3f7a9c2e8b1d4f6a0c5e7b9d2f4a6c8e' "$LEDGER_DIR"
+  [ "$(fold | jq -r '.findings[0].obs.anchor_withheld')" = true ]
+}
+
+@test "cards keep file and scope inside the fence and strip C1 and bidi characters" {
+  observe "$BASE" "[$(finding a.sh 2 "$(jq -cn '{title: "a\u009b31mred ‮evil"}')")]" >/dev/null
+  out=$("$RL" cards "$LEDGER_PR")
+  header=$(printf '%s\n' "$out" | head -1)
+  [[ "$header" != *a.sh* ]]
+  [[ "$out" == *$'\nfile: a.sh\n'* ]]
+  [[ "$out" != *$'\xc2\x9b'* ]]
+  [[ "$out" != *$'\xe2\x80\xae'* ]]
+}
+
+@test "remote-head rejects an option-shaped remote name; reverify exits 6 when unverifiable" {
+  run -2 "$RL" remote-head "$LEDGER_PR" --remote --upload-pack=x
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  printf '%s\n' "$BASE" >|.git/shallow
+  run -6 "$RL" reverify "$LEDGER_PR" "$(ids)" --head "$BASE"
+  [ "$output" = unverifiable ]
+  rm .git/shallow
+}
+
+@test "prune also removes quarantined ledger tails" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  printf '{"v":1,"type":"obs' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
+  fold >/dev/null
+  ls "$LEDGER_DIR/$LEDGER_PR.jsonl.corrupt-"* >/dev/null
+  MOCK_GH_PR_STATE=MERGED "$RL" prune "$LEDGER_PR" >/dev/null
+  ! ls "$LEDGER_DIR/$LEDGER_PR.jsonl.corrupt-"* 2>/dev/null
+}
+
+@test "transition batches ids atomically: one illegal edge rejects the whole batch" {
+  observe "$BASE" "[$(finding a.sh 1), $(finding a.sh 2), $(finding a.sh 3)]" >/dev/null
+  mapfile -t id < <(ids)
+  ids_json=$(printf '%s\n' "${id[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')
+  run -0 transition - applied --ids-json "$ids_json"
+  [ "$(printf '%s' "$output" | jq '.results | length')" -eq 3 ]
+  [ "$(fold | jq -r '[.findings[].state] | unique | join(",")')" = applied ]
+  transition "${id[0]}" applied --fix-sha "$BASE" >/dev/null
+  transition "${id[0]}" fixed >/dev/null
+  # fixed -> applied is illegal, so nothing in this batch is written
+  run -3 transition - applied --fix-sha "$BASE" --ids-json "$ids_json"
+  [ "$(fold | jq -r '[.findings[] | select(.fix_sha != null)] | length')" -eq 1 ]
+  run -2 transition - applied --ids-json '["nothex"]'
+  run -2 transition "${id[1]}" applied --ids-json "$ids_json"
+}
+
+@test "batched redaction checks every record, not just the first" {
+  printf 'ok line\nconst password = "hunter2hunter2";\nplain\napi_key: "zzzzzzzz"\n' >|q.js
+  H=$(commit_all creds)
+  observe "$H" "[$(finding q.js 1), $(finding q.js 2), $(finding q.js 3), $(finding q.js 4)]" >/dev/null
+  [ "$(fold | jq -c '[.findings | sort_by(.obs.line)[] | .obs.anchor_withheld]')" = "[false,true,false,true]" ]
+  ! grep -rq 'hunter2hunter2\|zzzzzzzz' "$LEDGER_DIR"
 }

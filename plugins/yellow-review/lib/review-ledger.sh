@@ -53,11 +53,9 @@ rl_die() {
 # --- small utilities --------------------------------------------------------
 
 rl_sha256() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum | cut -d' ' -f1
-  else
-    shasum -a 256 | cut -d' ' -f1
-  fi
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h=$(sha256sum); else h=$(shasum -a 256); fi
+  printf '%s' "${h%% *}"
 }
 
 rl_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
@@ -81,19 +79,18 @@ rl_is_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
 rl_validate_pr() { [[ "$1" =~ ^[1-9][0-9]{0,9}$ ]]; }
 
 # Whitespace-normalize one line: collapse runs, trim both ends.
+# Whitespace-normalize one line in pure bash: tabs to spaces, drop CRs,
+# squeeze runs of spaces, trim one leading and one trailing space.
 rl_normalize_line() {
   local s="$1"
   s="${s//$'\t'/ }"
   s="${s//$'\r'/}"
-  printf '%s' "$s" | tr -s ' ' | sed -e 's/^ //' -e 's/ $//'
+  while [[ "$s" == *'  '* ]]; do s="${s//  / }"; done
+  s="${s# }"
+  printf '%s' "${s% }"
 }
 
 rl_hash_line() { printf '%s' "$(rl_normalize_line "$1")" | rl_sha256; }
-
-# Strip C0, DEL and ANSI escape sequences for terminal display (P8).
-rl_display_strip() {
-  printf '%s' "$1" | sed -E $'s/\x1b\\[[0-9;?]*[ -\\/]*[@-~]//g' | tr -d '\000-\010\013-\037\177' | tr '\n\t' '  '
-}
 
 # --- repository and ledger locations ----------------------------------------
 
@@ -130,9 +127,28 @@ rl_ensure_dir() {
 
 rl_file_size() { wc -c <"$1" | tr -d ' '; }
 
-rl_is_shallow() { [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; }
+rl_is_shallow() {
+  if [ -n "$RL_TMP" ]; then
+    [ -e "$RL_TMP/shallow-no" ] && return 1
+    [ -e "$RL_TMP/shallow-yes" ] && return 0
+  fi
+  if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ]; then
+    [ -n "$RL_TMP" ] && : >"$RL_TMP/shallow-yes"
+    return 0
+  fi
+  [ -n "$RL_TMP" ] && : >"$RL_TMP/shallow-no"
+  return 1
+}
 
-rl_have_commit() { git cat-file -e "$1^{commit}" 2>/dev/null; }
+# Commit present in the object store; positive answers are cached per run.
+rl_have_commit() {
+  if [ -n "$RL_TMP" ] && rl_is_sha "$1" && [ -e "$RL_TMP/have-$1" ]; then
+    return 0
+  fi
+  git cat-file -e "$1^{commit}" 2>/dev/null || return 1
+  if [ -n "$RL_TMP" ] && rl_is_sha "$1"; then : >"$RL_TMP/have-$1"; fi
+  return 0
+}
 
 # --- locking and atomic writes ----------------------------------------------
 
@@ -176,16 +192,6 @@ rl_append() {
     *$'\n'*) rl_err "refusing multi-line record"; return 1 ;;
   esac
   (umask 077 && printf '%s\n' "$line" >>"$file")
-}
-
-# Append an observation and, optionally, its opening transition: one or two
-# complete lines in a single write. Caller holds the lock.
-rl_append_pair() {
-  local file="$1" lines="$2"
-  case "$lines" in
-    *$'\n'*$'\n'*) rl_err "refusing more than two records"; return 1 ;;
-  esac
-  (umask 077 && printf '%s\n' "$lines" >>"$file")
 }
 
 # Tail repair, under the lock, before any append or fold. A final record
@@ -239,7 +245,11 @@ rl_write_state() {
 # no tombstone the write proceeds: losing findings is the failure this
 # ledger exists to prevent.
 rl_writer_gate() {
-  local dir="$1" pr="$2" st=''
+  local dir="$1" pr="$2" st='' cst='' cts=0
+  if [ ! -e "$dir/$pr.closed" ] && [ -f "$dir/$pr.state" ] && read -r cst cts <"$dir/$pr.state" &&
+    [ "$cst" = OPEN ] && [[ "$cts" =~ ^[0-9]+$ ]] && [ $(($(date +%s) - cts)) -lt "${RL_STATE_FRESH:-120}" ]; then
+    return 0
+  fi
   st=$(rl_gh_state "$pr") || st=''
   if [ -e "$dir/$pr.closed" ]; then
     if [ "$st" = "OPEN" ]; then
@@ -311,21 +321,78 @@ rl_load_core() {
   [ "$RL_CORE_STATE" = ok ]
 }
 
-# Fail-closed pass: env-style credential assignments and long mixed-case
-# high-entropy tokens that cs_redact_secrets does not know. Already-redacted
-# markers are removed first so `API_KEY=[REDACTED]` does not trip it.
+# Fail-closed pass: env-style credential assignments, quoted keyword
+# assignments, and long mixed-case high-entropy tokens that
+# cs_redact_secrets does not know. Already-redacted markers are removed
+# first so `API_KEY=[REDACTED]` does not trip it. An awk function, so the
+# single-string check and the batch check share one definition.
+RL_SUSP_AWK='
+function susp(s,   l, t, w) {
+  gsub(/\[REDACTED[^]]*\]/, "", s)
+  if (s ~ /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[ \t]*[=:][ \t]*[^ \t]/) return 1
+  l = tolower(s)
+  if (l ~ /(pass(word|wd)?|secret|token|api[_-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^"\047][^"\047][^"\047][^"\047]/) return 1
+  t = s
+  while (match(t, /[A-Za-z0-9+\/_=-]+/)) {
+    w = substr(t, RSTART, RLENGTH)
+    if (length(w) >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) return 1
+    t = substr(t, RSTART + RLENGTH)
+  }
+  return 0
+}'
+
 rl_suspicious() {
-  local probe
-  probe=$(printf '%s' "$1" | sed -E 's/\[REDACTED[^]]*\]//g')
-  if printf '%s\n' "$probe" | grep -Eq '(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*[^[:space:]]'; then
+  printf '%s\n' "$1" | awk "$RL_SUSP_AWK"'
+    susp($0) { hit = 1; exit }
+    END { exit !hit }'
+}
+
+# rl_redact_batch <json-array-file>: redact many strings with one
+# cs_redact_secrets run (each run compiles ~20 regexes, which dominates the
+# cost of redacting one string). Prints a JSON array of [text, unchanged]
+# pairs in input order: text is the redacted string, or RL_WITHHELD when
+# the fail-closed pass trips, or RL_UNREDACTED without yellow-core;
+# unchanged is true when redaction left the string byte-identical and it
+# is safe (the anchor-snapshot rule). Records are separated by a line
+# holding only \x1e; if redaction merges or drops a separator (a PEM range
+# spanning records), every string falls back to the one-at-a-time path.
+rl_redact_batch() {
+  local in="$1" joined red bad n_in n_out s pairs='[]'
+  if ! rl_load_core; then
+    jq -c --arg m "$RL_UNREDACTED" 'map([$m, false])' "$in"
     return 0
   fi
-  printf '%s\n' "$probe" | grep -Eo '[A-Za-z0-9+/_=-]{32,}' | while IFS= read -r tok; do
-    if [[ "$tok" =~ [a-z] && "$tok" =~ [A-Z] && "$tok" =~ [0-9] ]]; then
-      echo hit
-      break
+  joined=$(mktemp "$(rl_tmp)/rb.XXXXXX") || return 1
+  red=$(mktemp "$(rl_tmp)/rb.XXXXXX") || return 1
+  jq -j '.[] | tostring | gsub("\u001e"; " ") + "\n\u001e\n"' "$in" >|"$joined" || return 1
+  n_in=$(jq 'length' "$in")
+  if cs_redact_secrets <"$joined" >|"$red" 2>/dev/null; then
+    n_out=$(grep -c $'^\x1e$' "$red")
+  else
+    n_out=-1
+  fi
+  if [ "$n_out" = "$n_in" ]; then
+    bad=$(awk "$RL_SUSP_AWK"'
+      BEGIN { rec = 0 }
+      $0 == "\036" { rec++; next }
+      susp($0) { bad[rec] = 1 }
+      END { for (r in bad) printf "%s ", r }' "$red")
+    jq -c --rawfile red "$red" --arg bad " $bad" --arg w "$RL_WITHHELD" '
+      . as $orig
+      | ($red | split("\n\u001e\n") | .[:-1]) as $r
+      | [range(0; $orig | length) as $i
+         | if ($bad | contains(" \($i) ")) then [$w, false]
+           else [$r[$i], ($r[$i] == ($orig[$i] | tostring | gsub("\u001e"; " ")))] end]' "$in"
+    return 0
+  fi
+  while IFS= read -r -d '' s; do
+    if rl_anchor_safe "$s"; then
+      pairs=$(jq -c --arg t "$s" '. + [[$t, true]]' <<<"$pairs")
+    else
+      pairs=$(jq -c --arg t "$(rl_redact "$s")" '. + [[$t, false]]' <<<"$pairs")
     fi
-  done | grep -q hit
+  done < <(jq -j '.[] | tostring | gsub("\u0000"; "") + "\u0000"' "$in")
+  printf '%s\n' "$pairs"
 }
 
 # Redact one model-authored string. Prints the text to store.
@@ -360,20 +427,30 @@ rl_anchor_safe() {
 
 # --- category and rule vocabulary -------------------------------------------
 
+# Map a raw reviewer category to the closed vocabulary and validate the
+# rule against it, in one jq call. Prints "<category> <rule> <mapped>"
+# where <mapped> is 0 when the category fell back to maintainability.
+rl_vocab_lookup() {
+  jq -r --arg c "$1" --arg r "$2" '
+    ($c | ascii_downcase | gsub("[_ ]"; "-") | sub("^-+"; "") | sub("-+$"; "")) as $k
+    | (if .categories[$k] then [$k, 1] elif .category_aliases[$k] then [.category_aliases[$k], 1] else ["maintainability", 0] end) as $m
+    | "\($m[0]) \(if ((.categories[$m[0]] // []) | index($r)) != null then $r else "unclassified" end) \($m[1])"' "$RL_VOCAB"
+}
+
 rl_normalize_category() {
-  local raw
-  raw=$(printf '%s' "$1" | tr 'A-Z_ ' 'a-z--' | sed -e 's/^-*//' -e 's/-*$//')
-  jq -r --arg c "$raw" '
-    if .categories[$c] then $c
-    elif .category_aliases[$c] then .category_aliases[$c]
-    else "" end' "$RL_VOCAB"
+  local out
+  out=$(rl_vocab_lookup "$1" '')
+  [ "${out##* }" = 1 ] && printf '%s' "${out%% *}"
+  return 0
 }
 
 rl_validate_rule() {
-  local cat="$1" rule="$2"
-  jq -r --arg c "$cat" --arg r "$rule" '
-    if ((.categories[$c] // []) | index($r)) != null then $r else "unclassified" end' "$RL_VOCAB"
+  local out
+  out=$(jq -r --arg c "$1" --arg r "$2" \
+    'if ((.categories[$c] // []) | index($r)) != null then $r else "unclassified" end' "$RL_VOCAB")
+  printf '%s' "$out"
 }
+
 
 # --- path validation (CLAUDE-44, 45, 47) -------------------------------------
 
@@ -383,11 +460,12 @@ rl_path_lexical() {
   local LC_ALL=C
   [ -n "$p" ] || { printf 'empty'; return 1; }
   [ "${#p}" -le 4096 ] || { printf 'too-long'; return 1; }
-  if [[ "$p" == *[[:cntrl:]]* ]]; then
+  if [[ "$p" == *[[:cntrl:]]* ]] || [[ "$p" == *$'\xc2'[$'\x80'-$'\x9f']* ]] ||
+    [[ "$p" == *$'\xe2\x80'[$'\x8b'-$'\x8f'$'\xa8'-$'\xae']* ]] || [[ "$p" == *$'\xe2\x81'[$'\xa6'-$'\xa9']* ]]; then
     printf 'control-char'
     return 1
   fi
-  if [ "$(printf '%s' "$p" | jq -Rj . 2>/dev/null)" != "$p" ]; then
+  if [[ "$p" == *[$'\x80'-$'\xff']* ]] && [ "$(printf '%s' "$p" | jq -Rj . 2>/dev/null)" != "$p" ]; then
     printf 'invalid-utf8'
     return 1
   fi
@@ -402,6 +480,10 @@ rl_path_lexical() {
     case "$seg" in
       '' | . | ..) printf 'bad-segment'; return 1 ;;
     esac
+    if [ "$rest" = "$p" ] && [ "$(printf '%s' "$seg" | tr 'A-Z' 'a-z')" = .git ]; then
+      printf 'bad-segment'
+      return 1
+    fi
     [ "$seg" = "$rest" ] && break
     rest="${rest#*/}"
   done
@@ -450,10 +532,27 @@ rl_tree_lookup() {
 
 rl_regular_mode() { [ "$1" = 100644 ] || [ "$1" = 100755 ]; }
 
+# Every parent of <path> that exists under <root> is a real directory (no
+# symlink anywhere on the way down), so a restore cannot be steered outside
+# the tree or into .git through a tracked symlink.
+rl_parents_real() {
+  local root="$1" rest="$2" cur="$1" seg
+  while [[ "$rest" == */* ]]; do
+    seg="${rest%%/*}"
+    rest="${rest#*/}"
+    cur="$cur/$seg"
+    [ -L "$cur" ] && return 1
+    [ -e "$cur" ] || return 0
+    [ -d "$cur" ] || return 1
+  done
+  return 0
+}
+
 # Inside <root> after canonicalization.
 rl_inside_root() {
   local root="$1" target="$2" real
-  real=$(realpath -e -- "$target" 2>/dev/null) || return 1
+  [ -e "$target" ] || return 1
+  real=$(realpath -- "$target" 2>/dev/null) || return 1
   case "$real" in
     "$root" | "$root"/*) return 0 ;;
   esac
@@ -478,7 +577,7 @@ rl_worktree_entry_ok() {
 # Success prints "<mode> <oid> head|base". Failure prints a reason token
 # and returns 3, or 6 when <rev> itself is not in the object store.
 rl_validate_path() {
-  local mode="$1" rev="$2" p="$3" base="${4:-}" reason entry root anc
+  local mode="$1" rev="$2" p="$3" base="${4:-}" reason entry root
   case "$mode" in
     anchor | dependency | restore) ;;
     *) printf 'bad-mode-arg'; return "$RL_EXIT_USAGE" ;;
@@ -493,12 +592,10 @@ rl_validate_path() {
         printf 'destination-exists'
         return "$RL_EXIT_INVALID"
       fi
-      anc=$(dirname -- "$root/$p")
-      while [ ! -e "$anc" ] && [ ! -L "$anc" ]; do anc=$(dirname -- "$anc"); done
-      if [ -L "$anc" ] || [ ! -d "$anc" ] || ! rl_inside_root "$root" "$anc"; then
+      rl_parents_real "$root" "$p" || {
         printf 'outside-root'
         return "$RL_EXIT_INVALID"
-      fi
+      }
     fi
     printf '%s head' "$entry"
     return 0
@@ -536,9 +633,6 @@ rl_blob_file() {
   fi
   printf '%s' "$f"
 }
-
-rl_line_count() { awk 'END { print NR }' "$1"; }
-rl_line_at() { awk -v n="$2" 'NR == n { print; exit }' "$1"; }
 
 # Line <n> of a file, clamped to [1, count]. Prints the clamped number on
 # the first line and the text on the second.
@@ -603,31 +697,50 @@ rl_path_fate() {
 # Prints "<result> <line> <path>"; result is exact | shifted | anchored |
 # unmapped | deleted | unverifiable. `anchored` means the line itself was
 # changed; the line printed is where its hunk now starts.
+# rl_map_line <from> <to> <path> <line>
+# Prints "<result>\x1f<line>\x1f<path>"; result is exact | shifted | anchored
+# | unmapped | deleted | unverifiable. `anchored` means the line itself was
+# changed; the line printed is where its hunk now starts. Blob diffs are
+# cached per run, so repeated mappings between the same commits are cheap.
 rl_map_line() {
-  local from="$1" to="$2" p="$3" L="$4" fate kind np out
+  local from="$1" to="$2" p="$3" L="$4" fate kind np manifest n rec dfile=''
   if ! rl_have_commit "$from" || ! rl_have_commit "$to"; then
-    printf 'unverifiable 0 %s' "$p"
+    printf 'unverifiable\x1f0\x1f%s' "$p"
     return 0
   fi
-  if [ "$(git rev-parse "$from^{commit}")" = "$(git rev-parse "$to^{commit}")" ]; then
-    printf 'exact %s %s' "$L" "$p"
+  if [ "$from" = "$to" ] || { ! { rl_is_sha "$from" && rl_is_sha "$to"; } &&
+    [ "$(git rev-parse "$from^{commit}")" = "$(git rev-parse "$to^{commit}")" ]; }; then
+    printf 'exact\x1f%s\x1f%s' "$L" "$p"
     return 0
   fi
-  fate=$(rl_path_fate "$from" "$to" "$p") || { printf 'unverifiable 0 %s' "$p"; return 0; }
+  fate=$(rl_path_fate "$from" "$to" "$p") || { printf 'unverifiable\x1f0\x1f%s' "$p"; return 0; }
   kind="${fate%%$'\t'*}"
   np="${fate#*$'\t'}"
   case "$kind" in
-    U) printf 'exact %s %s' "$L" "$p"; return 0 ;;
-    D) printf 'deleted 0 %s' "$p"; return 0 ;;
+    U) printf 'exact\x1f%s\x1f%s' "$L" "$p"; return 0 ;;
+    D) printf 'deleted\x1f0\x1f%s' "$p"; return 0 ;;
     M | R | T) ;;
-    *) printf 'unmapped 0 %s' "$p"; return 0 ;;
+    *) printf 'unmapped\x1f0\x1f%s' "$p"; return 0 ;;
   esac
-  out=$(git diff "${RL_DIFF_FLAGS[@]}" -U0 "$from:$p" "$to:$np" 2>/dev/null) || { printf 'unmapped 0 %s' "$np"; return 0; }
-  if printf '%s\n' "$out" | grep -q '^Binary files '; then
-    printf 'unmapped 0 %s' "$np"
-    return 0
+  manifest="$(rl_tmp)/diffs-$from-$to"
+  n=0
+  if [ -f "$manifest" ]; then
+    while IFS= read -r rec; do
+      n=$((n + 1))
+      if [ "${rec#*$'\t'}" = "$p" ]; then
+        dfile="$(rl_tmp)/diff-$from-$to-${rec%%$'\t'*}"
+        break
+      fi
+    done <"$manifest"
   fi
-  printf '%s\n' "$out" | awk -v L="$L" -v np="$np" '
+  if [ -z "$dfile" ]; then
+    n=$((n + 1))
+    dfile="$(rl_tmp)/diff-$from-$to-$n"
+    git diff "${RL_DIFF_FLAGS[@]}" -U0 "$from:$p" "$to:$np" >|"$dfile" 2>/dev/null || : >|"$dfile"
+    printf '%s\t%s\n' "$n" "$p" >>"$manifest"
+  fi
+  awk -v L="$L" -v np="$np" '
+    /^Binary files / { binary = 1 }
     /^@@ / {
       if (done) next
       h = $0; sub(/^@@ -/, "", h)
@@ -645,10 +758,11 @@ rl_map_line() {
       delta += d - b
     }
     END {
+      if (binary) { printf "unmapped\0370\037%s", np; exit }
       if (!done) res = L + delta
       kind = anchored ? "anchored" : (res == L ? "exact" : "shifted")
-      printf "%s %d %s", kind, res, np
-    }'
+      printf "%s\037%d\037%s", kind, res, np
+    }' "$dfile"
 }
 
 # --- scope verification (CLAUDE-49, P12) ------------------------------------
@@ -710,10 +824,16 @@ rl_md_heading_path() {
 }
 
 rl_ctags_usable() {
+  case "${RL_CTAGS_STATE:-}" in
+    yes) return 0 ;;
+    no) return 1 ;;
+  esac
+  RL_CTAGS_STATE=no
   command -v ctags >/dev/null 2>&1 || return 1
   command -v timeout >/dev/null 2>&1 || return 1
   ctags --version 2>/dev/null | grep -q 'Universal Ctags' || return 1
-  ctags --list-fields 2>/dev/null | grep -Eq '^e[[:space:]]+end'
+  ctags --list-fields 2>/dev/null | grep -Eq '^e[[:space:]]+end' || return 1
+  RL_CTAGS_STATE=yes
 }
 
 # Code: universal-ctags on the blob (cached per content file + basename,
@@ -756,8 +876,13 @@ rl_ctags_scope() {
 # means "to end of file".
 rl_verify_scope() {
   local content="$1" path="$2" L="$3" claim="$4" md mpath inner start end count r
-  claim=$(printf '%s' "$claim" | sed -E -e 's/^[#[:space:]]+//' -e 's/[[:space:]]+$//')
-  if [ -z "$claim" ] || [[ "$RL_GENERIC_SCOPES" == *" $(printf '%s' "$claim" | tr 'A-Z' 'a-z') "* ]]; then
+  while [[ "$claim" == [#[:space:]]* ]]; do claim=${claim:1}; done
+  while [[ "$claim" == *[[:space:]] ]]; do claim=${claim%?}; done
+  local generic=''
+  shopt -q nocasematch || { shopt -s nocasematch; generic=reset; }
+  [[ "$RL_GENERIC_SCOPES" == *" $claim "* ]] && claim=''
+  [ -n "$generic" ] && shopt -u nocasematch
+  if [ -z "$claim" ]; then
     printf 'unscoped'
     return 0
   fi
@@ -867,7 +992,7 @@ rl_edge_ok() {
 # Build one transition record. Args: id state reason head actor fix pub proof deps-json
 rl_transition_record() {
   jq -cn --arg id "$1" --arg state "$2" --arg reason "$3" --arg head "$4" --arg actor "$5" \
-    --arg fix "$6" --arg pub "$7" --arg proof "$8" --argjson deps "${9:-null}" --arg at "$(rl_now)" '
+    --arg fix "$6" --arg pub "$7" --arg proof "$8" --argjson deps "${9:-null}" --arg at "${RL_AT:-$(rl_now)}" '
     {v: 1, type: "transition", finding_id: $id, state: $state,
      reason: (if $reason == "" then null else $reason end),
      head_sha: (if $head == "" then null else $head end), at: $at, actor: $actor,
@@ -887,42 +1012,89 @@ rl_redact_reason() {
 
 # Lines at <T> that belong to sibling findings (same file and anchor hash)
 # whose own line maps unchanged; the window search must not claim them.
-# Only live-state siblings (open/reopened/applied/report_only) are excluded:
-# dismissed/fixed/stale siblings are omitted deliberately so a re-appearing
-# anchor can still re-match their mapped line. Re-verification therefore errs
-# toward reproduced, not a false fixed. Follow-up: exclude every sibling whose
-# anchor maps unchanged regardless of lifecycle state.
+# --- per-run index of the fold ----------------------------------------------
+
+# One row per finding, fields separated by \x1f (never whitespace, so empty
+# fields survive `read`), so matching and re-verification loops never
+# re-parse the fold. Columns:
+#   1 id  2 state  3 file  4 line  5 head_sha  6 base_sha  7 anchor_hash
+#   8 category  9 rule  10 scope  11 scope_status  12 occ  13 deletion
+#   14 anchor_source  15 anchor text (normalized; empty when withheld or
+#   when it holds control bytes)  16 fix_sha  17 " fp fp … "
+#   18 depends_on as path\x1dblob entries joined by \x1e
+RL_INDEX_JQ='
+  def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
+  def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
+  .findings[] | [
+    .finding_id, .state, (.obs.file | f), (.obs.line | tostring), (.obs.head_sha | f), (.obs.base_sha | f),
+    (.obs.anchor_hash | f), (.obs.category | f), (.obs.rule | f), (.obs.scope | f), (.obs.scope_status | f),
+    (.obs.occ | f), ((.obs.deletion // false) | tostring), (.obs.anchor_source // "commit"),
+    (if .obs.anchor_withheld or .obs.anchor_lines == null then ""
+     else (.obs.anchor_lines | join(" ") | norm) | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
+    (.fix_sha | f), (" " + ((.fingerprints // []) | join(" ")) + " "),
+    ((.depends_on // []) | map((.path | f) + "\u001d" + (.blob | f)) | join("\u001e"))
+  ] | join("\u001f")'
+
+# Write the fold and its index into the scratch dir. Arg: fold JSON.
+rl_index_set() {
+  printf '%s' "$1" >|"$(rl_tmp)/fold.json" || return 1
+  jq -r "$RL_INDEX_JQ" "$(rl_tmp)/fold.json" >|"$(rl_tmp)/index" || return 1
+}
+
+# The index row of one finding id.
+rl_index_row() {
+  local r
+  [ -f "$(rl_tmp)/index" ] || return 1
+  while IFS= read -r r; do
+    if [ "${r%%$'\x1f'*}" = "$1" ]; then
+      printf '%s' "$r"
+      return 0
+    fi
+  done <"$(rl_tmp)/index"
+  return 1
+}
+# Lines at <T> that belong to sibling findings (same file and anchor hash)
+# whose own line maps unchanged; the window search must not claim them.
 rl_sibling_lines() {
-  local fold="$1" id="$2" T="$3" rows shead sline sfile res ln np
-  rows=$(printf '%s' "$fold" | jq -r --arg id "$id" '
-    (.findings[] | select(.finding_id == $id) | .obs) as $o
-    | .findings[] | select(.finding_id != $id and .obs.file == $o.file and .obs.anchor_hash == $o.anchor_hash
-        and (.state | IN("open", "reopened", "applied", "report_only")) and (.obs.deletion | not))
-    | .finding_id + "\t" + .obs.head_sha + "\t" + (.obs.line | tostring)' 2>/dev/null)
-  [ -n "$rows" ] || return 0
-  sfile=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .obs.file')
-  while IFS=$'\t' read -r _ shead sline; do
-    read -r res ln np <<<"$(rl_map_line "$shead" "$T" "$sfile" "$sline")"
+  local self="$1" sfile="$2" shash="$3" T="$4" r id state file line head hash del res ln np
+  local _b _c _d _e _f _g _h _i _j _k _l
+  [ -f "$(rl_tmp)/index" ] || return 0
+  while IFS= read -r r; do
+    IFS=$'\x1f' read -r id state file line head _b hash _c _d _e _f _g del _h _i _j _k _l <<<"$r"
+    [ "$id" != "$self" ] && [ "$file" = "$sfile" ] && [ "$hash" = "$shash" ] && [ "$del" != true ] || continue
+    case "$state" in open | reopened | applied | report_only) ;; *) continue ;; esac
+    IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$head" "$T" "$file" "$line")"
     case "$res" in exact | shifted) printf '%s\n' "$ln" ;; esac
-  done <<<"$rows"
+  done <"$(rl_tmp)/index"
+}
+
+# Does the anchor occur in [c-r, c+r] of <content>, skipping excluded
+# lines? Compares normalized text when it is known, else hashes the window
+# (one awk and one sha256 call either way). Prints the hit line.
+rl_window_match() {
+  local content="$1" c="$2" r="$3" hash="$4" text="$5" excl="$6" dir h name
+  if [ -n "$text" ]; then
+    awk -v c="$c" -v r="$r" -v t="$text" -v excl="$excl" "$RL_AWK_NORM"'
+      BEGIN { n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1 }
+      NR >= c - r && NR <= c + r && !(NR in skip) && norm($0) == t { print NR; found = 1; exit }
+      END { exit !found }' "$content"
+    return
+  fi
+  dir=$(mktemp -d "$(rl_tmp)/win.XXXXXX") || return 1
+  awk -v c="$c" -v r="$r" -v d="$dir" -v excl="$excl" "$RL_AWK_NORM"'
+    BEGIN { n = split(excl, xs, "\n"); for (i = 1; i <= n; i++) skip[xs[i]] = 1 }
+    NR >= c - r && NR <= c + r && !(NR in skip) { f = d "/" NR; printf "%s", norm($0) > f; close(f) }' "$content"
+  while read -r h name; do
+    if [ "$h" = "$hash" ]; then
+      printf '%s' "${name##*/}"
+      return 0
+    fi
+  done < <(cd -- "$dir" && { sha256sum -- * 2>/dev/null || shasum -a 256 -- * 2>/dev/null; })
+  return 1
 }
 
 # Search <content> for the anchor hash in [c-r, c+r], skipping excluded
 # lines. Prints the hit line.
-rl_window_hash() {
-  local content="$1" c="$2" r="$3" hash="$4" excl="$5" i n lo hi
-  n=$(rl_line_count "$content")
-  lo=$((c - r)); [ "$lo" -lt 1 ] && lo=1
-  hi=$((c + r)); [ "$hi" -gt "$n" ] && hi=$n
-  for ((i = lo; i <= hi; i++)); do
-    if [ -n "$excl" ] && printf '%s\n' "$excl" | grep -qx "$i"; then continue; fi
-    if [ "$(rl_hash_line "$(rl_line_at "$content" "$i")")" = "$hash" ]; then
-      printf '%s' "$i"
-      return 0
-    fi
-  done
-  return 1
-}
 
 # Nearest line in [c-40, c+40] whose similarity to <text> is >= 0.8.
 rl_window_alias() {
@@ -948,46 +1120,28 @@ rl_window_alias() {
 # Prints reproduced | not_reproduced | unverifiable. `strict` disables the
 # alias search; it is implied for `applied` findings, whose anchor line is
 # expected to change (that is the fix) and would otherwise alias-match it.
-rl_reverify_finding() {
-  local fold="$1" id="$2" T="$3" strict="${4:-}" f res ln np entry content excl hit
-  f=$(printf '%s' "$fold" | jq -c --arg id "$id" '.findings[] | select(.finding_id == $id)')
-  [ -n "$f" ] || { printf 'unverifiable'; return 0; }
-  local file line head hash occ deletion source state scope scope_status alines
-  file=$(jq -r '.obs.file' <<<"$f")
-  line=$(jq -r '.obs.line' <<<"$f")
-  head=$(jq -r '.obs.head_sha' <<<"$f")
-  hash=$(jq -r '.obs.anchor_hash' <<<"$f")
-  occ=$(jq -r '.obs.occ // ""' <<<"$f")
-  deletion=$(jq -r '.obs.deletion // false' <<<"$f")
-  source=$(jq -r '.obs.anchor_source // "commit"' <<<"$f")
-  state=$(jq -r '.state' <<<"$f")
-  scope=$(jq -r '.obs.scope' <<<"$f")
-  scope_status=$(jq -r '.obs.scope_status' <<<"$f")
-  alines=$(jq -r 'if .obs.anchor_withheld then "" else (.obs.anchor_lines // [] | join(" ")) end' <<<"$f")
+# rl_reverify_row <index-row> <target-head> [strict]
+# Prints reproduced | not_reproduced | unverifiable. `strict` disables the
+# alias search; it is implied for `applied` findings, whose anchor line is
+# expected to change (that is the fix) and would otherwise alias-match it.
+rl_reverify_row() {
+  local row="$1" T="$2" strict="${3:-}" res ln np entry content excl hit
+  local id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps
+  IFS=$'\x1f' read -r id state file line head base hash cat rule scope sstat occ del src anchor _fix _fps _deps <<<"$row"
+  [ -n "$id" ] || { printf 'unverifiable'; return 0; }
   [ "$state" = applied ] && strict=strict
   if rl_is_shallow || ! rl_have_commit "$T"; then
     printf 'unverifiable'
     return 0
   fi
-  if [ "$deletion" = true ]; then
-    # resolved only when the path is back as a regular file; a symlink,
-    # submodule or tree at that path still leaves the deletion in place,
-    # and a tree that cannot be read proves neither
-    entry=$(rl_tree_lookup "$T" "$file")
-    case "$entry" in
-      unverifiable) printf 'unverifiable' ;;
-      present\ *)
-        entry=${entry#present }
-        if rl_regular_mode "${entry%% *}"; then printf 'not_reproduced'; else printf 'reproduced'; fi
-        ;;
-      *) printf 'reproduced' ;;
-    esac
+  if [ "$del" = true ]; then
+    if rl_tree_entry "$T" "$file" >/dev/null; then printf 'not_reproduced'; else printf 'reproduced'; fi
     return 0
   fi
-  if [ "$source" = worktree ]; then
+  if [ "$src" = worktree ]; then
     res=anchored ln=$line np=$file
   else
-    read -r res ln np <<<"$(rl_map_line "$head" "$T" "$file" "$line")"
+    IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$head" "$T" "$file" "$line")"
   fi
   case "$res" in
     unverifiable | unmapped) printf 'unverifiable'; return 0 ;;
@@ -1004,16 +1158,16 @@ rl_reverify_finding() {
   entry=${entry#present }
   rl_regular_mode "${entry%% *}" || { printf 'not_reproduced'; return 0; }
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
-  excl=$(rl_sibling_lines "$fold" "$id" "$T")
-  if hit=$(rl_window_hash "$content" "$ln" 3 "$hash" "$excl"); then
-    if [ "$scope_status" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+  excl=$(rl_sibling_lines "$id" "$file" "$hash" "$T")
+  if hit=$(rl_window_match "$content" "$ln" 3 "$hash" "$anchor" "$excl"); then
+    if [ "$sstat" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
       printf 'reproduced'
       return 0
     fi
   fi
-  if [ -z "$strict" ] && [ -z "$occ" ] && [ -n "$alines" ]; then
-    if hit=$(rl_window_alias "$content" "$ln" "$(rl_normalize_line "$alines")" "$excl"); then
-      if [ "$scope_status" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+  if [ -z "$strict" ] && [ -z "$occ" ] && [ -n "$anchor" ]; then
+    if hit=$(rl_window_alias "$content" "$ln" "$anchor" "$excl"); then
+      if [ "$sstat" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
         printf 'reproduced'
         return 0
       fi
@@ -1022,55 +1176,75 @@ rl_reverify_finding() {
   printf 'not_reproduced'
 }
 
+# Re-verify one finding by id against the current index.
+rl_reverify_finding() {
+  local row
+  row=$(rl_index_row "$1") || { printf 'unverifiable'; return 0; }
+  rl_reverify_row "$row" "$2" "${3:-}"
+}
+
 # rl_publication <fold-json> <finding_id> <remote-head>
 # proved:ancestor | proved:patch-id | unproved | abandoned | unverifiable
-rl_publication() {
-  local fold="$1" id="$2" H="$3" fix pid c
-  fix=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .fix_sha // ""')
+# rl_publication_fix <fix-sha> <remote-head>
+# proved:ancestor | proved:patch-id | unproved | abandoned | unverifiable.
+# The patch-id scan is one streaming pipeline; results are cached per
+# (fix, head) for the run, since several findings share one fix commit.
+rl_publication_fix() {
+  local fix="$1" H="$2" cache r='' pid
   [ -n "$fix" ] || { printf 'unproved'; return 0; }
   if rl_is_shallow || ! rl_have_commit "$H" || ! rl_have_commit "$fix"; then
     printf 'unverifiable'
     return 0
   fi
+  cache="$(rl_tmp)/pub-$fix-$H"
+  if [ -f "$cache" ]; then
+    read -r r <"$cache"
+    printf '%s' "$r"
+    return 0
+  fi
   if git merge-base --is-ancestor "$fix" "$H" 2>/dev/null; then
-    printf 'proved:ancestor'
-    return 0
+    r=proved:ancestor
+  else
+    pid=$(git diff-tree -p -U0 --no-color --no-ext-diff "$fix" 2>/dev/null | git patch-id --stable 2>/dev/null)
+    pid=${pid%% *}
+    if [ -n "$pid" ] && git rev-list --no-merges --max-count=500 "$H" --not "$fix^" 2>/dev/null |
+      git diff-tree --stdin -p -U0 --no-color --no-ext-diff 2>/dev/null | git patch-id --stable 2>/dev/null |
+      awk -v p="$pid" '$1 == p { f = 1 } END { exit !f }'; then
+      r=proved:patch-id
+    elif [ -z "$(git for-each-ref --contains "$fix" --format='%(refname)' 2>/dev/null)" ]; then
+      r=abandoned
+    else
+      r=unproved
+    fi
   fi
-  pid=$(git diff-tree -p -U0 --no-color --no-ext-diff "$fix" 2>/dev/null | git patch-id --stable 2>/dev/null | cut -d' ' -f1)
-  if [ -n "$pid" ]; then
-    while IFS= read -r c; do
-      if [ "$(git diff-tree -p -U0 --no-color --no-ext-diff "$c" 2>/dev/null | git patch-id --stable 2>/dev/null | cut -d' ' -f1)" = "$pid" ]; then
-        printf 'proved:patch-id'
-        return 0
-      fi
-    done < <(git rev-list --no-merges --max-count=500 "$H" --not "$fix^" 2>/dev/null)
-  fi
-  if [ -z "$(git for-each-ref --contains "$fix" --format='%(refname)' 2>/dev/null)" ]; then
-    printf 'abandoned'
-    return 0
-  fi
-  printf 'unproved'
+  printf '%s\n' "$r" >|"$cache"
+  printf '%s' "$r"
+}
+
+rl_publication() {
+  local row fix
+  row=$(rl_index_row "$1") || { printf 'unproved'; return 0; }
+  IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ fix _ <<<"$row"
+  rl_publication_fix "$fix" "$2"
 }
 
 # Is a dismissal still applicable at <H>? The anchor must still match
 # (strict re-verify) and every depends_on entry must be a regular file at
-# <H> with the recorded blob (CLAUDE-44). Returns 0 applicable, 1 no longer
-# applicable, 2 unverifiable (a tree or object could not be read): callers
-# must neither reopen nor inject then.
-rl_dismissal_applicable() {
-  local fold="$1" id="$2" H="$3" deps p blob entry rv
-  rv=$(rl_reverify_finding "$fold" "$id" "$H" strict)
-  [ "$rv" = unverifiable ] && return 2
-  [ "$rv" = reproduced ] || return 1
-  deps=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | (.depends_on // [])[] | .path + "\t" + .blob')
+# <H> with the recorded blob (CLAUDE-44).
+# Is a dismissal still applicable at <H>? The anchor must still match
+# (strict re-verify) and every depends_on entry must be a regular file at
+# <H> with the recorded blob (CLAUDE-44). Arg: index row, head.
+rl_dismissal_applicable_row() {
+  local row="$1" H="$2" deps entry pair p blob
+  [ "$(rl_reverify_row "$row" "$H" strict)" = reproduced ] || return 1
+  deps=${row##*$'\x1f'}
   [ -n "$deps" ] || return 0
-  while IFS=$'\t' read -r p blob; do
-    entry=$(rl_tree_lookup "$H" "$p")
-    case "$entry" in
-      unverifiable) return 2 ;;
-      absent) return 1 ;;
-    esac
-    entry=${entry#present }
+  while IFS= read -r -d $'\x1e' pair || [ -n "$pair" ]; do
+    [ -n "$pair" ] || continue
+    p=${pair%%$'\x1d'*}
+    blob=${pair#*$'\x1d'}
+    blob=${blob%$'\n'}
+    entry=$(rl_tree_entry "$H" "$p") || return 1
     rl_regular_mode "${entry%% *}" || return 1
     [ "${entry##* }" = "$blob" ] || return 1
   done <<<"$deps"
@@ -1097,20 +1271,54 @@ RL_VALIDATE_FINDING_JQ='
 
 # rl_build_candidate <finding-json> <head> <base> <source commit|worktree>
 # Prints a candidate observation (without finding_id), or "REJECT <reason>".
+# One jq pass per finding: the validation verdict and every field
+# rl_build_candidate needs, NUL-terminated (NULs inside values are dropped).
+RL_CAND_FIELDS_JQ='
+  def s: (. // "") | tostring | gsub("\u0000"; "");
+  (try (RL_VALIDATE) catch "invalid-json") as $v
+  | [ $v, (.file | s), (.line | s), (.category | s), (.rule | s), (.scope | s), (.title | s),
+      (.suggested_fix | s), (.migration_path | s), ._red[0], ._red[1], ._red[2], ._red[3],
+      ((.breaking_change_class // "") | s
+        | if IN("name-rename", "signature-change", "removal", "semantics-change") then . else "" end),
+      ((if has("queue") then .queue == "report_only"
+        else (.autofix_class == "advisory" or .owner == "human" or .owner == "release") end) | tostring),
+      (if (.rule // "") != "" and (.scope // "") != "" then "0" else "1" end) ]
+  | map(. + "\u0000") | add'
+# rl_build_candidate <finding-json> <head> <base> <source commit|worktree>
+# Prints a candidate observation (without finding_id), or "REJECT <reason>".
+# The candidate carries _defaulted/_unmapped counters that cmd_observe sums
+# and strips before anything is written. <finding-json> must carry ._red,
+# the pre-redacted [title, suggested_fix, migration_path, scope] that
+# cmd_observe adds; its anchor_lines are provisional until cmd_observe's
+# batch anchor check.
 rl_build_candidate() {
-  local fj="$1" H="$2" B="$3" src="$4" verdict file line vres where oid content n text hash
-  local cat_raw cat cat_stored rule rule_raw scope_claimed sv scope scope_status sstart send occ deletion
-  local title fix mig bcc withheld alines report_only fp root rev_json rev_out rev_i rev_ln rev_r
-  local -a rev_filtered rev_redacted
-  verdict=$(jq -r "$RL_VALIDATE_FINDING_JQ" <<<"$fj" 2>/dev/null) || verdict=invalid-json
-  [ "$verdict" = ok ] || { printf 'REJECT %s' "$verdict"; return 0; }
-  file=$(jq -r '.file' <<<"$fj")
-  line=$(jq -r '.line' <<<"$fj")
+  local fj="$1" H="$2" B="$3" src="$4" verdict file line cat_raw rule_raw scope_claimed scope_stored title fix mig bcc report_only defaulted
+  local vres where oid content text hash cat_stored cat rule mapped sv scope scope_status sstart send occ deletion
+  local withheld fp root key
+  {
+    IFS= read -r -d '' verdict
+    IFS= read -r -d '' file
+    IFS= read -r -d '' line
+    IFS= read -r -d '' cat_raw
+    IFS= read -r -d '' rule_raw
+    IFS= read -r -d '' scope_claimed
+    IFS= read -r -d '' title
+    IFS= read -r -d '' fix
+    IFS= read -r -d '' mig
+    IFS= read -r -d '' title
+    IFS= read -r -d '' fix
+    IFS= read -r -d '' mig
+    IFS= read -r -d '' scope_stored
+    IFS= read -r -d '' bcc
+    IFS= read -r -d '' report_only
+    IFS= read -r -d '' defaulted
+  } < <(jq -j "${RL_CAND_FIELDS_JQ/RL_VALIDATE/$RL_VALIDATE_FINDING_JQ}" <<<"$fj" 2>/dev/null)
+  [ "${verdict:-}" = ok ] || { printf 'REJECT %s' "${verdict:-invalid-json}"; return 0; }
   if [ "$src" = worktree ]; then
     root=$(rl_repo_root) || { printf 'REJECT no-repo'; return 0; }
     vres=$(rl_validate_path anchor "$H" "$file") || { printf 'REJECT path:%s' "$vres"; return 0; }
     rl_worktree_entry_ok "$root" "$file" || { printf 'REJECT path:worktree-entry'; return 0; }
-    content="$(rl_tmp)/wt-$RANDOM-$RANDOM"
+    content=$(mktemp "$(rl_tmp)/wt.XXXXXX") || { printf 'REJECT path:unreadable'; return 0; }
     cp -- "$root/$file" "$content" || { printf 'REJECT path:unreadable'; return 0; }
     where='head'
   else
@@ -1123,271 +1331,256 @@ rl_build_candidate() {
   { IFS= read -r line; IFS= read -r text; } < <(rl_line_clamped "$content" "$line")
   hash=$(rl_hash_line "$text")
 
-  cat_raw=$(jq -r '.category' <<<"$fj")
-  cat=$(rl_normalize_category "$cat_raw")
-  if [ -z "$cat" ]; then
-    cat=maintainability
-  fi
+  read -r cat rule mapped <<<"$(rl_vocab_lookup "$cat_raw" "$rule_raw")"
+  [ -n "$rule_raw" ] || rule=unclassified
   cat_stored=${cat_raw:0:64}
-  # rl_suspicious alone only catches long mixed-case+digit tokens, so an
-  # all-lowercase credential-shaped category (e.g. a lowercase-payload
-  # ghp_ token) never trips it; rl_anchor_safe additionally routes the
-  # value through cs_redact_secrets, which knows the actual token shapes.
-  rl_anchor_safe "$cat_stored" || cat_stored='[withheld]'
-  rule_raw=$(jq -r '.rule // ""' <<<"$fj")
-  scope_claimed=$(jq -r '.scope // ""' <<<"$fj")
-  if [ -z "$rule_raw" ]; then rule=unclassified; else rule=$(rl_validate_rule "$cat" "$rule_raw"); fi
+  rl_suspicious "$cat_stored" && cat_stored='[withheld]'
 
   sv=$(rl_verify_scope "$content" "$file" "$line" "$scope_claimed")
   scope=unscoped scope_status=unscoped occ=''
   if [ "${sv%%$'\t'*}" = verified ]; then
     IFS=$'\t' read -r _ scope sstart send <<<"$sv"
+    scope=$(rl_redact "${scope:0:200}")
     scope_status=verified
     occ=$(rl_occurrence "$content" "$line" "$sstart" "$send")
   fi
 
-  title=$(rl_redact "$(jq -r '.title' <<<"$fj")")
-  fix=$(jq -r '.suggested_fix // ""' <<<"$fj")
-  [ -n "$fix" ] && fix=$(rl_redact "$fix")
-  mig=$(jq -r '.migration_path // ""' <<<"$fj")
-  [ -n "$mig" ] && mig=$(rl_redact "$mig")
-  bcc=$(jq -r '.breaking_change_class // "" | select(IN("name-rename", "signature-change", "removal", "semantics-change"))' <<<"$fj")
-  [ -n "$scope_claimed" ] && scope_claimed=$(rl_redact "$scope_claimed")
-
-  # reviewers: character-filtering alone (below) does not stop a
-  # credential-shaped value from surviving verbatim. Run the filtered set
-  # through cs_redact_secrets as a single batch — one invocation for the
-  # whole array, not one per entry, since reviewers is unbounded
-  # model-authored input and cs_redact_secrets costs ~40ms per call.
-  mapfile -t rev_filtered < <(jq -r '
-    (if (.reviewers | type) == "array" then .reviewers
-     elif (.reviewer | type) == "string" then [.reviewer]
-     else ["unknown"] end)
-    | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "")[0:64])
-    | unique[]' <<<"$fj")
-  rev_redacted=()
-  if [ "${#rev_filtered[@]}" -gt 0 ] && rl_load_core \
-     && rev_out=$(printf '%s\n' "${rev_filtered[@]}" | cs_redact_secrets 2>/dev/null) \
-     && [ "$(printf '%s\n' "$rev_out" | wc -l)" -eq "${#rev_filtered[@]}" ]; then
-    rev_i=0
-    while IFS= read -r rev_ln; do
-      if [ "$rev_ln" = "${rev_filtered[$rev_i]}" ] && ! rl_suspicious "$rev_ln"; then
-        rev_redacted+=("$rev_ln")
-      else
-        rev_redacted+=('[withheld]')
-      fi
-      rev_i=$((rev_i + 1))
-    done <<<"$rev_out"
-  else
-    # Core missing, redaction failed, or the batch lost a record — fall
-    # back to the fail-closed per-entry check.
-    for rev_r in "${rev_filtered[@]}"; do
-      if rl_anchor_safe "$rev_r"; then rev_redacted+=("$rev_r"); else rev_redacted+=('[withheld]'); fi
-    done
-  fi
-  rev_json=$(printf '%s\n' "${rev_redacted[@]}" | jq -R -s 'split("\n") | map(select(length > 0)) | unique')
-
+  # title, fix, migration path and claimed scope arrive pre-redacted (._red);
+  # the anchor snapshot is checked in one batch after all candidates exist
   withheld=false
-  if rl_anchor_safe "$text"; then alines=$(jq -cn --arg t "$text" '[$t]'); else alines=null withheld=true; fi
-  report_only=$(jq -r 'if has("queue") then .queue == "report_only"
-    else (.autofix_class == "advisory" or .owner == "human" or .owner == "release") end' <<<"$fj")
-  if [ "$scope_status" = unscoped ]; then
-    fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope" --arg h "$hash" --argjson l "$line" --arg o "$occ" \
-      '[$f, $c, $r, $s, $h, $l, (if $o == "" then null else $o end)]' | rl_sha256)
-  else
-    fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope" --arg h "$hash" --arg o "$occ" \
-      '[$f, $c, $r, $s, $h, null, (if $o == "" then null else $o end)]' | rl_sha256)
-  fi
+  key=$line
+  [ "$scope_status" = unscoped ] || key=null
+  fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope" --arg h "$hash" --argjson l "$key" --arg o "$occ" \
+    '[$f, $c, $r, $s, $h, $l, (if $o == "" then null else $o end)]' | rl_sha256)
   jq -cn --argjson f "$fj" --arg fp "$fp" --arg cat "$cat" --arg cat_stored "$cat_stored" --arg rule "$rule" \
-    --arg scope "$scope" --arg sc "$scope_claimed" --arg ss "$scope_status" --arg occ "$occ" \
+    --arg scope "$scope" --arg sc "$scope_stored" --arg ss "$scope_status" --arg occ "$occ" \
     --arg file "$file" --argjson line "$line" --argjson del "$deletion" --arg hash "$hash" \
-    --argjson alines "$alines" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
-    --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" --argjson reviewers "$rev_json" '
+    --arg text "$text" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
+    --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" \
+    --argjson defaulted "$defaulted" --argjson unmapped "$((1 - mapped))" --argjson ord "${RL_ORDINAL:-0}" '
     def nn: if . == "" then null else . end;
     {fingerprint: $fp,
-     reviewers: $reviewers,
+     reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
+                  elif ($f.reviewer | type) == "string" then [$f.reviewer] else ["unknown"] end)
+                 | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "") | .[0:64]
+                       | if length >= 32 and test("[a-z]") and test("[A-Z]") and test("[0-9]") then "[withheld]" else . end)
+                 | unique),
      severity: $f.severity, category: $cat, category_raw: ($cat_stored | gsub("[^A-Za-z0-9 ._\\[\\]-]"; "")),
      rule: $rule, scope: $scope, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
-     file: $file, line: $line, deletion: $del, anchor_hash: $hash, anchor_lines: $alines,
+     file: $file, line: $line, deletion: $del, anchor_hash: $hash,
+     anchor_lines: (if $withheld then null else [$text] end),
      anchor_withheld: $withheld, anchor_source: $src, confidence: $f.confidence,
      autofix_class: $f.autofix_class, owner: $f.owner,
      requires_verification: $f.requires_verification, pre_existing: $f.pre_existing,
      title: $title, suggested_fix: ($fix | nn), breaking_change_class: ($bcc | nn),
-     migration_path: ($mig | nn), report_only: $ro}'
-}
-
-# --- observe: matching and append (under the lock) --------------------------
-
-# Append {ordinal, finding_id, status} for every input ordinal a candidate
-# absorbed, so callers can address later transitions by input position.
-rl_ordinal_results() {
-  jq -c --argjson c "$2" --arg id "$3" --arg st "$4" \
-    '. + [$c._ordinals[] | {ordinal: ., finding_id: $id, status: $st}] | sort_by(.ordinal)' <<<"$1"
+     migration_path: ($mig | nn), report_only: $ro, _defaulted: $defaulted, _unmapped: $unmapped,
+     _ordinals: [$ord]}'
 }
 
 # Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
 # RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
 # RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
+# Candidate rows for the matching passes, \x1f-separated like the index:
+#   1 ordinal-index  2 fingerprint  3 category  4 rule  5 scope  6 anchor_hash
+#   7 deletion  8 file  9 line  10 occ  11 anchor text (normalized, or empty)
+#   12 report_only  13 input ordinals (space-joined)
+RL_CAND_ROW_JQ='
+  def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
+  def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
+  [ .fingerprint, (.category | f), (.rule | f), (.scope | f), .anchor_hash, (.deletion | tostring),
+    (.file | f), (.line | tostring), (.occ | f),
+    (if .anchor_lines == null then "" else (.anchor_lines | join(" ") | norm)
+       | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
+    (.report_only | tostring), (._ordinals | map(tostring) | join(" ")) ] | join("\u001f")'
+
+# --- observe: matching and append (under the lock) --------------------------
+
+# Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
+# RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
+# RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
 rl_observe_locked() {
-  local f fold n i c eid res ln np row from to cand_fp dist best bestd
-  local -a cands match via unavail
-  local -A claimed
+  local f fold n i c r eid res ln np dist best bestd claimed=' ' pairs='' at id state row status results='' o
+  local cfp cdel cfile cline cocc ctext cro cords
+  local rid _rstate rfile rline rhead rbase ranchor
+  local -a cands crows match via unavail
   rl_writer_gate "$RL_O_DIR" "$RL_O_PR" || return $?
   f="$RL_O_DIR/$RL_O_PR.jsonl"
   rl_repair_tail "$f" || return 1
   fold=$(rl_fold_file "$f") || return 1
-  mapfile -t cands <"$RL_O_CANDS"
+  rl_index_set "$fold" || return 1
+  cands=()
+  while IFS= read -r c; do cands+=("$c"); done <"$RL_O_CANDS"
+  crows=()
+  while IFS= read -r c; do crows+=("$c"); done < <(jq -r "$RL_CAND_ROW_JQ" "$RL_O_CANDS")
   n=${#cands[@]}
+
+  # Candidate/existing pairs are joined in awk on their shared key, so the
+  # passes below only walk pairs that can match (never candidates x rows).
+  # Each pair line is "<candidate index>\x1f<index row>".
+  printf '%s\n' "${crows[@]}" >|"$(rl_tmp)/crows"
 
   # Pass A: line-map siblings (same category, rule, scope and anchor hash)
   # whose recorded line maps unchanged to within 3 lines. Nearest wins,
   # and one existing finding absorbs at most one candidate per run.
-  local pairs=''
-  for ((i = 0; i < n; i++)); do
-    c="${cands[$i]}"
-    while IFS=$'\t' read -r eid from to row np_old; do
-      [ -n "$eid" ] || continue
-      read -r res ln np <<<"$(rl_map_line "$from" "$to" "$np_old" "$row")"
-      if [ "$res" = unverifiable ]; then
-        unavail[$i]=1
-        continue
-      fi
-      [ "$np" = "$(jq -r '.file' <<<"$c")" ] || continue
-      case "$res" in exact | shifted) ;; *) continue ;; esac
-      dist=$((ln - $(jq -r '.line' <<<"$c")))
-      dist=${dist#-}
-      [ "$dist" -le 3 ] && pairs+="$dist"$'\t'"$i"$'\t'"$eid"$'\n'
-    done < <(printf '%s' "$fold" | jq -r --argjson c "$c" --arg H "$RL_O_HEAD" --arg B "$RL_O_BASE" '
-      .findings[] | select(.obs.category == $c.category and .obs.rule == $c.rule and .obs.scope == $c.scope
-        and .obs.anchor_hash == $c.anchor_hash and ((.obs.deletion // false) == $c.deletion))
-      | [.finding_id, (if $c.deletion then .obs.base_sha else .obs.head_sha end),
-         (if $c.deletion then $B else $H end), (.obs.line | tostring), .obs.file] | join("\t")')
-  done
+  while IFS= read -r r; do
+    i=${r%%$'\x1f'*}
+    r=${r#*$'\x1f'}
+    IFS=$'\x1f' read -r cfp _ _ _ _ cdel cfile cline _ <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r rid _rstate rfile rline rhead rbase _ <<<"$r"
+    if [ "$cdel" = true ]; then
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rbase" "$RL_O_BASE" "$rfile" "$rline")"
+    else
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+    fi
+    if [ "$res" = unverifiable ]; then
+      unavail[$i]=1
+      continue
+    fi
+    [ "$np" = "$cfile" ] || continue
+    case "$res" in exact | shifted) ;; *) continue ;; esac
+    dist=$((ln - cline))
+    dist=${dist#-}
+    [ "$dist" -le 3 ] && pairs+="$dist"$'\t'"$i"$'\t'"$rid"$'\n'
+  done < <(awk -F '\037' '
+    NR == FNR { k = $2 FS $3 FS $4 FS $5 FS $6; c[k] = c[k] " " (FNR - 1); next }
+    { k = $8 FS $9 FS $10 FS $7 FS $13; if (k in c) { n = split(c[k], a, " "); for (j = 1; j <= n; j++) print a[j] "\037" $0 } }' \
+    "$(rl_tmp)/crows" "$(rl_tmp)/index")
   while IFS=$'\t' read -r dist i eid; do
     [ -n "$eid" ] || continue
     [ -n "${match[$i]:-}" ] && continue
-    [ -n "${claimed[$eid]:-}" ] && continue
+    [[ "$claimed" == *" $eid "* ]] && continue
     match[$i]=$eid via[$i]=line
-    claimed[$eid]=1
+    claimed="$claimed$eid "
   done < <(printf '%s' "$pairs" | sort -n -k1,1)
 
   # Pass B: exact fingerprint. Occurrence-keyed candidates use it only when
   # line mapping was unavailable: their ordinal shifts when a sibling is
   # fixed, so the ordinal is not an identity.
-  for ((i = 0; i < n; i++)); do
+  while IFS=$'\x1f' read -r i rid; do
     [ -n "${match[$i]:-}" ] && continue
-    c="${cands[$i]}"
-    if [ "$(jq -r '.occ // ""' <<<"$c")" != "" ] && [ -z "${unavail[$i]:-}" ]; then continue; fi
-    cand_fp=$(jq -r '.fingerprint' <<<"$c")
-    while IFS= read -r eid; do
-      [ -n "$eid" ] || continue
-      [ -n "${claimed[$eid]:-}" ] && continue
-      match[$i]=$eid via[$i]=exact
-      claimed[$eid]=1
-      break
-    done < <(printf '%s' "$fold" | jq -r --arg fp "$cand_fp" '.findings[] | select(.fingerprints | index($fp)) | .finding_id')
-  done
+    IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ cocc _ <<<"${crows[$i]}"
+    if [ -n "$cocc" ] && [ -z "${unavail[$i]:-}" ]; then continue; fi
+    [[ "$claimed" == *" $rid "* ]] && continue
+    match[$i]=$rid via[$i]=exact
+    claimed="$claimed$rid "
+  done < <(awk -F '\037' '
+    NR == FNR { f[$1] = f[$1] " " (FNR - 1); next }
+    { n = split($17, fps, " "); for (j = 1; j <= n; j++) if (fps[j] in f) { m = split(f[fps[j]], a, " "); for (k = 1; k <= m; k++) print a[k] "\037" $1 } }' \
+    "$(rl_tmp)/crows" "$(rl_tmp)/index" | sort -t "$(printf '\037')" -k1,1n -s)
 
   # Pass C: alias — same category, rule and scope, no occurrence key, a
   # stored anchor, mapped line within 40, similarity >= 0.8. Nearest wins.
   # Only an existing finding whose own anchor line was edited (`anchored`)
   # can alias: one whose line maps unchanged is still a separate site.
-  for ((i = 0; i < n; i++)); do
+  local -a best bestd
+  while IFS= read -r r; do
+    i=${r%%$'\x1f'*}
+    r=${r#*$'\x1f'}
     [ -n "${match[$i]:-}" ] && continue
-    c="${cands[$i]}"
-    [ "$(jq -r 'if .occ == null and .anchor_lines != null then "y" else "n" end' <<<"$c")" = y ] || continue
-    local ctext cline cfile
-    ctext=$(rl_normalize_line "$(jq -r '.anchor_lines | join(" ")' <<<"$c")")
-    cline=$(jq -r '.line' <<<"$c")
-    cfile=$(jq -r '.file' <<<"$c")
-    best='' bestd=41
-    while IFS=$'\t' read -r eid from row np_old etext; do
-      [ -n "$eid" ] || continue
-      [ -n "${claimed[$eid]:-}" ] && continue
-      read -r res ln np <<<"$(rl_map_line "$from" "$RL_O_HEAD" "$np_old" "$row")"
-      [ "$res" = anchored ] || continue
-      [ "$np" = "$cfile" ] || continue
-      dist=$((ln - cline))
-      dist=${dist#-}
-      [ "$dist" -lt "$bestd" ] || continue
-      awk -v s="$(rl_similarity "$ctext" "$(rl_normalize_line "$etext")")" 'BEGIN { exit !(s >= 0.8) }' || continue
-      best=$eid bestd=$dist
-    done < <(printf '%s' "$fold" | jq -r --argjson c "$c" '
-      .findings[] | select(.obs.category == $c.category and .obs.rule == $c.rule and .obs.scope == $c.scope
-        and .obs.occ == null and .obs.anchor_lines != null and ((.obs.deletion // false) | not) and ($c.deletion | not))
-      | [.finding_id, .obs.head_sha, (.obs.line | tostring), .obs.file, (.obs.anchor_lines | join(" "))] | join("\t")')
-    if [ -n "$best" ]; then
-      match[$i]=$best via[$i]=alias
-      claimed[$best]=1
+    IFS=$'\x1f' read -r _ _ _ _ _ _ cfile cline _ ctext _ <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _rhash _rcat _rrule _rscope _rss _rocc _rdel _rsrc ranchor _ <<<"$r"
+    [[ "$claimed" == *" $rid "* ]] && continue
+    if [ "$rfile" != "$cfile" ]; then
+      # only a file renamed onto the candidate's path can hold its alias
+      [ "$(rl_path_fate "$rhead" "$RL_O_HEAD" "$rfile")" = "R"$'\t'"$cfile" ] || continue
     fi
+    IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+    [ "$res" = anchored ] && [ "$np" = "$cfile" ] || continue
+    dist=$((ln - cline))
+    dist=${dist#-}
+    [ "$dist" -lt "${bestd[$i]:-41}" ] || continue
+    awk -v s="$(rl_similarity "$ctext" "$ranchor")" 'BEGIN { exit !(s >= 0.8) }' || continue
+    best[$i]=$rid bestd[$i]=$dist
+  done < <(awk -F '\037' '
+    NR == FNR { if ($9 == "" && $10 != "" && $6 != "true") { k = $2 FS $3 FS $4; c[k] = c[k] " " (FNR - 1) } next }
+    $12 == "" && $15 != "" && $13 != "true" { k = $8 FS $9 FS $10; if (k in c) { n = split(c[k], a, " "); for (j = 1; j <= n; j++) print a[j] "\037" $0 } }' \
+    "$(rl_tmp)/crows" "$(rl_tmp)/index")
+  for ((i = 0; i < n; i++)); do
+    [ -n "${match[$i]:-}" ] || [ -z "${best[$i]:-}" ] && continue
+    [[ "$claimed" == *" ${best[$i]} "* ]] && continue
+    match[$i]=${best[$i]} via[$i]=alias
+    claimed="$claimed${best[$i]} "
   done
 
   # Actions.
-  local new=0 merged=0 reopened=0 suppressed=0 app id state at status results='[]'
-
+  local new=0 merged=0 reopened=0 suppressed=0
   at=$(rl_now)
+  RL_AT=$at
   for ((i = 0; i < n; i++)); do
     c="${cands[$i]}"
+    IFS=$'\x1f' read -r cfp _ _ _ _ _ _ _ _ _ cro cords <<<"${crows[$i]}"
     id="${match[$i]:-}"
-    obs() {
-      jq -c --arg id "$1" --argjson pr "$RL_O_PR" --arg H "$RL_O_HEAD" --arg B "$RL_O_BASE" --arg at "$at" \
-        --arg run "$RL_O_RUN" --arg src "$RL_O_SOURCE" --arg step "$RL_O_STEP" '
-        {v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals)
-        + {pr: $pr, head_sha: $H, base_sha: (if $B == "" then null else $B end), at: $at, run_id: $run, source: $src, step: $step}' <<<"$c"
-    }
     if [ -z "$id" ]; then
-      id=$(jq -r '.fingerprint' <<<"$c")
-      if printf '%s' "$fold" | jq -e --arg id "$id" 'any(.findings[]; .finding_id == $id)' >/dev/null; then
+      id=$cfp
+      if rl_index_row "$id" >/dev/null; then
         id=$(printf '%s:%s:%s' "$id" "$RL_O_RUN" "$i" | rl_sha256)
       fi
-      if [ "$(jq -r '.report_only' <<<"$c")" = true ]; then state=report_only; else state=open; fi
-      rl_append_pair "$f" "$(obs "$id")"$'\n'"$(rl_transition_record "$id" "$state" "" "$RL_O_HEAD" "$RL_O_SOURCE" "" "" "" null)" || return 1
+      if [ "$cro" = true ]; then state=report_only; else state=open; fi
+      rl_append_pair "$f" "$(rl_observation_record "$c" "$id" "$at" "$state")" || return 1
       new=$((new + 1))
-      results=$(rl_ordinal_results "$results" "$c" "$id" new)
+      for o in $cords; do results+="$o"$'\t'"$id"$'\tnew\n'; done
       continue
     fi
-    state=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .state')
+    row=$(rl_index_row "$id")
+    IFS=$'\x1f' read -r _ state _ <<<"$row"
     case "$state" in
       dismissed)
-        # 0 applicable, 1 lapsed, 2 unverifiable: only a lapsed dismissal
-        # (or an alias match) reopens; an unverifiable one is left alone
-        app=1
-        if [ "${via[$i]}" != alias ]; then
-          rl_dismissal_applicable "$fold" "$id" "$RL_O_HEAD"
-          app=$?
-        fi
-        if [ "$app" -ne 1 ]; then
+        if [ "${via[$i]}" != alias ] && rl_dismissal_applicable_row "$row" "$RL_O_HEAD"; then
           suppressed=$((suppressed + 1))
           status=suppressed
         else
-          rl_append "$f" "$(obs "$id")" || return 1
+          rl_append "$f" "$(rl_observation_record "$c" "$id" "$at")" || return 1
           rl_append "$f" "$(rl_transition_record "$id" reopened "dismissal no longer applies" "$RL_O_HEAD" "$RL_O_SOURCE" "" "" "" null)" || return 1
           reopened=$((reopened + 1))
           status=reopened
         fi
         ;;
       fixed | stale)
-        rl_append "$f" "$(obs "$id")" || return 1
+        rl_append "$f" "$(rl_observation_record "$c" "$id" "$at")" || return 1
         rl_append "$f" "$(rl_transition_record "$id" reopened "re-observed after $state" "$RL_O_HEAD" "$RL_O_SOURCE" "" "" "" null)" || return 1
         reopened=$((reopened + 1))
         status=reopened
         ;;
       *)
-        rl_append "$f" "$(obs "$id")" || return 1
+        rl_append "$f" "$(rl_observation_record "$c" "$id" "$at")" || return 1
         merged=$((merged + 1))
         status=merged
         ;;
     esac
-    results=$(rl_ordinal_results "$results" "$c" "$id" "$status")
+    for o in $cords; do results+="$o"$'\t'"$id"$'\t'"$status"$'\n'; done
   done
+  results=$(printf '%s' "$results" | jq -Rsc 'split("\n") | map(select(length > 0) | split("\t")
+    | {ordinal: (.[0] | tonumber), finding_id: .[1], status: .[2]}) | sort_by(.ordinal)')
   fold=$(rl_fold_file "$f") || return 1
   rl_refresh_sidecar "$RL_O_DIR" "$RL_O_PR" "$fold" || rl_err "sidecar refresh failed"
-  jq -cn --arg run "$RL_O_RUN" --argjson new "$new" --argjson merged "$merged" --argjson reopened "$reopened" \
+  jq -c --arg run "$RL_O_RUN" --argjson new "$new" --argjson merged "$merged" --argjson reopened "$reopened" \
     --argjson sup "$suppressed" --argjson def "$RL_O_DEFAULTED" --argjson unm "$RL_O_UNMAPPED" \
-    --argjson rej "$RL_O_REJECTED" --argjson fold "$fold" --argjson results "$results" '
+    --argjson rej "$RL_O_REJECTED" --argjson results "$results" '
     {run_id: $run, new: $new, merged: $merged, reopened: $reopened, suppressed_dismissed: $sup,
      defaulted: $def, category_unmapped: $unm, rejected: $rej, findings: $results,
-     pending: $fold.pending, attention: $fold.attention}'
+     pending: .pending, attention: .attention}' <<<"$fold"
+}
+
+# The persisted observation for a candidate: its fields minus the
+# run-internal counters, plus identity and provenance.
+rl_observation_record() {
+  jq -c --arg id "$2" --argjson pr "$RL_O_PR" --arg H "$RL_O_HEAD" --arg B "$RL_O_BASE" --arg at "$3" \
+    --arg run "$RL_O_RUN" --arg src "$RL_O_SOURCE" --arg step "$RL_O_STEP" --arg state "${4:-}" '
+    ({v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals, ._defaulted, ._unmapped)
+     + {pr: $pr, head_sha: $H, base_sha: (if $B == "" then null else $B end), at: $at, run_id: $run, source: $src, step: $step}),
+    (if $state == "" then empty else
+      {v: 1, type: "transition", finding_id: $id, state: $state, reason: null, head_sha: $H, at: $at,
+       actor: $src, fix_sha: null, published_head_sha: null, proof: null, depends_on: null} end)' <<<"$1"
+}
+
+# Append an observation and, optionally, its opening transition: one or two
+# complete lines in a single write. Caller holds the lock.
+rl_append_pair() {
+  local file="$1" lines="$2"
+  case "$lines" in
+    *$'\n'*$'\n'*) rl_err "refusing more than two records"; return 1 ;;
+  esac
+  (umask 077 && printf '%s\n' "$lines" >>"$file")
 }
 
 # --- subcommands ------------------------------------------------------------
@@ -1401,7 +1594,7 @@ rl_need_sha() {
 }
 
 cmd_observe() {
-  local pr="${1:-}" run='' step='' head='' base='' src=commit source=review-pr input count i fj cand
+  local pr="${1:-}" run='' step='' head='' base='' src=commit source=review-pr input i fj cand
   rl_need_pr "$pr"
   shift
   while [ $# -gt 0 ]; do
@@ -1433,62 +1626,87 @@ cmd_observe() {
   input="$(rl_tmp)/input.json"
   cat >|"$input"
   jq -e 'type == "array"' "$input" >/dev/null 2>&1 || rl_die "$RL_EXIT_INVALID" "observe: stdin must be a JSON array"
-  count=$(jq 'length' "$input")
-  RL_O_REJECTED='[]' RL_O_DEFAULTED=0 RL_O_UNMAPPED=0
+  RL_O_REJECTED='[]'
+  # once, in this shell, so every per-finding subshell inherits the result
+  rl_load_core || true
+  rl_ctags_usable || true
   : >|"$(rl_tmp)/cands.jsonl"
-  for ((i = 0; i < count; i++)); do
-    fj=$(jq -c ".[$i]" "$input")
-    cand=$(rl_build_candidate "$fj" "$head" "$base" "$src")
+  : >|"$(rl_tmp)/rejected.tsv"
+  # Every model-authored text field, redacted in one batch. Any ._red the
+  # input itself carries is discarded first.
+  jq -c '[.[] | (if type == "object" then . else {} end)
+    | (.title, .suggested_fix, .migration_path, .scope) | if type == "string" then . else "" end]' "$input" >|"$(rl_tmp)/texts.json" ||
+    rl_die "$RL_EXIT_INVALID" "observe: could not read finding fields"
+  rl_redact_batch "$(rl_tmp)/texts.json" >|"$(rl_tmp)/texts.red.json" || rl_die 1 "observe: redaction failed"
+  i=0
+  while IFS= read -r fj; do
+    i=$((i + 1))
+    cand=$(RL_ORDINAL=$i rl_build_candidate "$fj" "$head" "$base" "$src")
     case "$cand" in
-      "REJECT "*)
-        RL_O_REJECTED=$(jq -c --argjson o "$((i + 1))" --arg r "${cand#REJECT }" '. + [{ordinal: $o, reason: $r}]' <<<"$RL_O_REJECTED")
-        ;;
-      *)
-        # rl_build_candidate ran in a subshell; re-derive its two flags.
-        RL_O_DEFAULTED=$((RL_O_DEFAULTED + $(jq -r 'if (.rule // "") != "" and (.scope // "") != "" then 0 else 1 end' <<<"$fj")))
-        if [ -z "$(rl_normalize_category "$(jq -r '.category' <<<"$fj")")" ]; then
-          RL_O_UNMAPPED=$((RL_O_UNMAPPED + 1))
-        fi
-        jq -c --argjson o "$((i + 1))" '. + {_ordinals: [$o]}' <<<"$cand" >>"$(rl_tmp)/cands.jsonl"
-        ;;
+      "REJECT "*) printf '%s\t%s\n' "$i" "${cand#REJECT }" >>"$(rl_tmp)/rejected.tsv" ;;
+      *) printf '%s\n' "$cand" >>"$(rl_tmp)/cands.jsonl" ;;
     esac
-  done
+  done < <(jq -c --slurpfile r "$(rl_tmp)/texts.red.json" '
+    to_entries[] | (if (.value | type) == "object" then .value else {} end)
+    + {_red: ($r[0][(.key * 4):(.key * 4 + 4)] | map(.[0]))}' "$input")
+  # Anchor snapshots, checked in one batch: a line redaction would change,
+  # or one the fail-closed pass flags, keeps only its hash and line hint.
+  jq -sc 'map(.anchor_lines[0] // "")' "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/anchors.json" || rl_die 1 "observe: anchor extraction failed"
+  rl_redact_batch "$(rl_tmp)/anchors.json" >|"$(rl_tmp)/anchors.red.json" || rl_die 1 "observe: anchor redaction failed"
+  jq -c --slurpfile r "$(rl_tmp)/anchors.red.json" -n '
+    [inputs] | to_entries[] | .key as $k | .value
+    | if $r[0][$k][1] then . else . + {anchor_lines: null, anchor_withheld: true} end' \
+    "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/cands.checked.jsonl" || rl_die 1 "observe: anchor check failed"
+  mv -f -- "$(rl_tmp)/cands.checked.jsonl" "$(rl_tmp)/cands.jsonl"
+  RL_O_REJECTED=$(jq -Rsc 'split("\n") | map(select(length > 0) | split("\t") | {ordinal: (.[0] | tonumber), reason: .[1]})' "$(rl_tmp)/rejected.tsv")
   # One candidate per fingerprint per run: merge two reviewers' copies.
   jq -sc 'group_by(.fingerprint) | map(
-      .[0] + {_ordinals: (map(._ordinals[]) | sort), reviewers: (map(.reviewers[]) | unique), severity: (map(.severity) | min),
+      .[0] + {_ordinals: (map(._ordinals[]) | sort), _defaulted: 0, _unmapped: 0, reviewers: (map(.reviewers[]) | unique), severity: (map(.severity) | min),
               confidence: (map(.confidence) | max), report_only: (all(.report_only))}) | .[]' \
     "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/grouped.jsonl" || rl_die 1 "observe: grouping failed"
+  read -r RL_O_DEFAULTED RL_O_UNMAPPED < <(jq -rs '"\(map(._defaulted) | add // 0) \(map(._unmapped) | add // 0)"' "$(rl_tmp)/cands.jsonl")
   RL_O_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
   RL_O_PR=$pr RL_O_HEAD=$head RL_O_BASE=$base RL_O_RUN=$run RL_O_STEP=$step RL_O_SOURCE=$source
   RL_O_CANDS="$(rl_tmp)/grouped.jsonl"
   rl_locked "$pr" rl_observe_locked
 }
 
+# Every id in RL_T_IDS moves to RL_T_STATE, or none does: all edges are
+# checked before the first append.
 rl_transition_locked() {
-  local f fold cur rec
+  local f fold id cur row froms='' recs='' rec RL_AT
+  RL_AT=$(rl_now)
   rl_writer_gate "$RL_T_DIR" "$RL_T_PR" || return $?
   f="$RL_T_DIR/$RL_T_PR.jsonl"
   rl_repair_tail "$f" || return 1
   fold=$(rl_fold_file "$f") || return 1
-  cur=$(printf '%s' "$fold" | jq -r --arg id "$RL_T_ID" '.findings[] | select(.finding_id == $id) | .state')
-  [ -n "$cur" ] || { rl_err "unknown finding_id"; return "$RL_EXIT_INVALID"; }
-  rl_edge_ok "$cur" "$RL_T_STATE" || { rl_err "illegal transition $cur -> $RL_T_STATE"; return "$RL_EXIT_INVALID"; }
-  if [ "$cur:$RL_T_STATE" = applied:applied ] && [ -z "$RL_T_FIX$RL_T_PUB" ]; then
-    rl_err "applied -> applied must add --fix-sha or --published-head"
-    return "$RL_EXIT_INVALID"
-  fi
-  rec=$(rl_transition_record "$RL_T_ID" "$RL_T_STATE" "$RL_T_REASON" "$RL_T_HEAD" "$RL_T_ACTOR" "$RL_T_FIX" "$RL_T_PUB" "$RL_T_PROOF" "$RL_T_DEPS")
-  rl_append "$f" "$rec" || return 1
+  rl_index_set "$fold" || return 1
+  for id in $RL_T_IDS; do
+    row=$(rl_index_row "$id") || { rl_err "unknown finding_id"; return "$RL_EXIT_INVALID"; }
+    IFS=$'\x1f' read -r _ cur _ <<<"$row"
+    rl_edge_ok "$cur" "$RL_T_STATE" || { rl_err "illegal transition $cur -> $RL_T_STATE"; return "$RL_EXIT_INVALID"; }
+    if [ "$cur:$RL_T_STATE" = applied:applied ] && [ -z "$RL_T_FIX$RL_T_PUB" ]; then
+      rl_err "applied -> applied must add --fix-sha or --published-head"
+      return "$RL_EXIT_INVALID"
+    fi
+    froms+="$cur "
+    rec=$(rl_transition_record "$id" "$RL_T_STATE" "$RL_T_REASON" "$RL_T_HEAD" "$RL_T_ACTOR" "$RL_T_FIX" "$RL_T_PUB" "$RL_T_PROOF" "$RL_T_DEPS")
+    recs+="$rec"$'\n'
+  done
+  (umask 077 && printf '%s' "$recs" >>"$f") || return 1
   fold=$(rl_fold_file "$f") || return 1
   rl_refresh_sidecar "$RL_T_DIR" "$RL_T_PR" "$fold" || rl_err "sidecar refresh failed"
-  jq -cn --arg id "$RL_T_ID" --arg from "$cur" --arg to "$RL_T_STATE" --argjson fold "$fold" \
-    '{finding_id: $id, from: $from, to: $to, pending: $fold.pending, attention: $fold.attention}'
+  jq -c --arg ids "$RL_T_IDS" --arg froms "$froms" --arg to "$RL_T_STATE" --argjson batch "$RL_T_BATCH" '
+    ($ids | split(" ") | map(select(length > 0))) as $i | ($froms | split(" ")) as $fr
+    | [range(0; $i | length) as $k | {finding_id: $i[$k], from: $fr[$k], to: $to}] as $r
+    | if $batch then {results: $r, pending: .pending, attention: .attention}
+      else $r[0] + {pending: .pending, attention: .attention} end' <<<"$fold"
 }
 
 cmd_transition() {
-  local pr="${1:-}" id="${2:-}" state="${3:-}" reason='' fix='' pub='' proof='' depsj='' head='' actor=triage
+  local pr="${1:-}" id="${2:-}" state="${3:-}" reason='' fix='' pub='' proof='' depsj='' head='' actor=triage idsj=''
   rl_need_pr "$pr"
-  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || rl_die "$RL_EXIT_USAGE" "transition: finding_id must be 64-hex"
+  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || [ "$id" = - ] || rl_die "$RL_EXIT_USAGE" "transition: finding_id must be 64-hex (or - with --ids-json)"
   case "$state" in
     open | report_only | applied | fixed | dismissed | stale | reopened) ;;
     *) rl_die "$RL_EXIT_USAGE" "transition: unknown state" ;;
@@ -1503,11 +1721,12 @@ cmd_transition() {
       --depends-on-json) depsj="${2:-}"; shift 2 ;;
       --head) head="${2:-}"; rl_need_sha --head "$head"; shift 2 ;;
       --actor) actor="${2:-}"; shift 2 ;;
+      --ids-json) idsj="${2:-}"; shift 2 ;;
       *) rl_die "$RL_EXIT_USAGE" "transition: unknown argument" ;;
     esac
   done
   case "$actor" in review-pr | review-all | triage | triage-noninteractive) ;; *) rl_die "$RL_EXIT_USAGE" "transition: bad --actor" ;; esac
-  case "$proof" in '' | ancestor | patch-id | content) ;; *) rl_die "$RL_EXIT_USAGE" "transition: bad --proof" ;; esac
+  case "$proof" in '' | ancestor | patch-id) ;; *) rl_die "$RL_EXIT_USAGE" "transition: bad --proof" ;; esac
   [ -n "$head" ] || head=$(git rev-parse HEAD 2>/dev/null) || head=''
   RL_T_DEPS=null
   if [ -n "$depsj" ]; then
@@ -1525,7 +1744,15 @@ cmd_transition() {
     done
   fi
   RL_T_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
-  RL_T_PR=$pr RL_T_ID=$id RL_T_STATE=$state RL_T_HEAD=$head RL_T_ACTOR=$actor
+  if [ "$id" = - ]; then
+    jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and test("^[0-9a-f]{64}$"))' <<<"$idsj" >/dev/null 2>&1 ||
+      rl_die "$RL_EXIT_USAGE" "transition: --ids-json must be a non-empty array of finding ids"
+    RL_T_IDS=$(jq -r 'unique | join(" ")' <<<"$idsj") RL_T_BATCH=true
+  else
+    [ -z "$idsj" ] || rl_die "$RL_EXIT_USAGE" "transition: pass - as the finding_id with --ids-json"
+    RL_T_IDS=$id RL_T_BATCH=false
+  fi
+  RL_T_PR=$pr RL_T_STATE=$state RL_T_HEAD=$head RL_T_ACTOR=$actor
   RL_T_FIX=$fix RL_T_PUB=$pub RL_T_PROOF=$proof
   RL_T_REASON=''
   [ -n "$reason" ] && RL_T_REASON=$(rl_redact_reason "$reason")
@@ -1553,7 +1780,7 @@ cmd_fold() {
 }
 
 cmd_dismissed_context() {
-  local pr="${1:-}" head='' fenced='' fold id out='[]' r
+  local pr="${1:-}" head='' fenced='' fold id ids='' out r
   rl_need_pr "$pr"
   shift
   while [ $# -gt 0 ]; do
@@ -1565,15 +1792,19 @@ cmd_dismissed_context() {
   done
   rl_need_sha --head "$head"
   fold=$(rl_read_fold "$pr") || exit $?
-  while IFS= read -r id; do
-    [ -n "$id" ] || continue
-    rl_dismissal_applicable "$fold" "$id" "$head" || continue
-    out=$(printf '%s' "$fold" | jq -c --arg id "$id" --argjson acc "$out" '
-      $acc + [.findings[] | select(.finding_id == $id)
-        | {finding_id, reason, file: .obs.file, line: .obs.line,
-           category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity,
-           depends_on: ((.depends_on // []) | map(.path))}]')
-  done < <(printf '%s' "$fold" | jq -r '.findings[] | select(.state == "dismissed") | .finding_id')
+  rl_index_set "$fold" || rl_die 1 "dismissed-context: index failed"
+  local row state
+  while IFS= read -r row; do
+    IFS=$'\x1f' read -r id state _ <<<"$row"
+    [ "$state" = dismissed ] || continue
+    rl_dismissal_applicable_row "$row" "$head" || continue
+    ids="$ids$id "
+  done <"$(rl_tmp)/index"
+  out=$(printf '%s' "$fold" | jq -c --arg ids "$ids" '
+    ($ids | split(" ")) as $keep
+    | [.findings[] | select(.finding_id as $x | $keep | index($x))
+      | {finding_id, reason, title: .obs.title, file: .obs.file, line: .obs.line,
+         category: .obs.category, rule: .obs.rule, scope: .obs.scope, severity: .obs.severity}]')
   if [ -n "$fenced" ]; then
     r=$(rl_render_dismissed "$out") || rl_die 1 "dismissed-context: render failed"
     printf '%s' "$r" | jq -r '.block | select(. != "")'
@@ -1584,12 +1815,16 @@ cmd_dismissed_context() {
 }
 
 cmd_reverify() {
-  local pr="${1:-}" id="${2:-}" head='' fold
+  local pr="${1:-}" id="${2:-}" head='' fold r
   rl_need_pr "$pr"
   [ "${3:-}" = --head ] && head="${4:-}"
   rl_need_sha --head "$head"
   fold=$(rl_read_fold "$pr") || exit $?
-  printf '%s\n' "$(rl_reverify_finding "$fold" "$id" "$head")"
+  rl_index_set "$fold" || rl_die 1 "reverify: index failed"
+  r=$(rl_reverify_finding "$id" "$head")
+  printf '%s\n' "$r"
+  [ "$r" = unverifiable ] && exit "$RL_EXIT_UNVERIFIABLE"
+  return 0
 }
 
 cmd_publication() {
@@ -1598,7 +1833,8 @@ cmd_publication() {
   [ "${3:-}" = --remote-head ] && head="${4:-}"
   rl_need_sha --remote-head "$head"
   fold=$(rl_read_fold "$pr") || exit $?
-  r=$(rl_publication "$fold" "$id" "$head")
+  rl_index_set "$fold" || rl_die 1 "publication: index failed"
+  r=$(rl_publication "$id" "$head")
   printf '%s\n' "$r"
   [ "$r" = unverifiable ] && exit "$RL_EXIT_UNVERIFIABLE"
   return 0
@@ -1615,7 +1851,7 @@ cmd_validate_path() {
 
 rl_prune_locked() {
   local d="$RL_R_DIR" pr="$RL_R_PR"
-  rm -f -- "${d:?}/${pr:?}.jsonl" "${d:?}/${pr:?}.pending" "${d:?}/${pr:?}.state"
+  rm -f -- "${d:?}/${pr:?}.jsonl" "${d:?}/${pr:?}.pending" "${d:?}/${pr:?}.state" "${d:?}/${pr:?}.jsonl.corrupt-"*
   rl_atomic_write "$d/$pr.closed" "$RL_R_STATE $(date -u +%s)"$'\n'
 }
 
@@ -1631,15 +1867,6 @@ cmd_prune() {
   RL_R_PR=$pr RL_R_STATE=$st
   rl_locked "$pr" rl_prune_locked || exit $?
   printf 'pruned: PR #%s (%s)\n' "$pr" "$st"
-}
-
-cmd_record_state() {
-  local pr="${1:-}" st d
-  rl_need_pr "$pr"
-  st=$(rl_gh_state "$pr") || rl_die "$RL_EXIT_UNVERIFIABLE" "record-state: could not read PR #$pr state"
-  d=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
-  rl_write_state "$d" "$pr" "$st"
-  printf '%s\n' "$st"
 }
 
 # Per-PR counts: the sidecar when its byte count matches, else a fold.
@@ -1691,7 +1918,8 @@ RL_FENCE_JQ='
     gsub("--- begin (?<k>dismissed-findings|pr-context|file-line-counts|learnings-context) \\(reference only\\) ---"; "[ESCAPED] begin \(.k) (reference only)")
     | gsub("--- end (?<k>dismissed-findings|pr-context|file-line-counts|learnings-context) ---"; "[ESCAPED] end \(.k)");
   def xml: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
-  def clean: (. // "") | tostring | gsub("[\r\n\t]+"; " ") | esc_delims | xml;
+  def clean: (. // "") | tostring | gsub("\u001b\\[[0-9;?]*[ -/]*[@-~]"; "")
+    | gsub("[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]+"; " ") | esc_delims | xml;
   def marked: (. // "") | tostring | test("(^|\n)[ \t]*(ignore previous|system:|assistant:)"; "i");
   [ .[] | select((.reason | marked) | not) ] as $keep
   | {filtered: (length - ($keep | length)), injected: ($keep | length),
@@ -1722,7 +1950,7 @@ cmd_remote_head() {
       *) rl_die "$RL_EXIT_USAGE" "remote-head: unknown argument" ;;
     esac
   done
-  [[ "$remote" =~ ^[A-Za-z0-9._-]+$ ]] || rl_die "$RL_EXIT_USAGE" "remote-head: bad --remote"
+  [[ "$remote" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || rl_die "$RL_EXIT_USAGE" "remote-head: bad --remote"
   want=$(gh pr view "$pr" --json headRefOid 2>/dev/null | jq -r '.headRefOid // empty' 2>/dev/null) || want=''
   rl_is_sha "$want" || rl_die "$RL_EXIT_UNVERIFIABLE" "remote-head: could not read headRefOid for PR #$pr"
   # A shallow clone can fetch the head yet never prove publication or
@@ -1730,7 +1958,7 @@ cmd_remote_head() {
   rl_is_shallow && rl_die "$RL_EXIT_UNVERIFIABLE" "remote-head: shallow repository; the ledger cannot verify PR #$pr"
   for delay in 0 ${RL_FETCH_BACKOFF:-1 2 4 8 16}; do
     [ "$delay" -gt 0 ] && sleep "$delay"
-    git fetch -q "$remote" "refs/pull/$pr/head" 2>/dev/null || continue
+    git fetch -q -- "$remote" "refs/pull/$pr/head" 2>/dev/null || continue
     got=$(git rev-parse -q --verify FETCH_HEAD 2>/dev/null) || continue
     if [ "$got" = "$want" ]; then
       printf '%s\n' "$got"
@@ -1750,12 +1978,13 @@ cmd_remote_head() {
 # also leaves it `applied`. Caller holds the lock. Prints the target state
 # or "applied". Args: file fold id remote-head actor.
 rl_settle_one() {
-  local f="$1" fold="$2" id="$3" H="$4" actor="$5" pub rv to='' reason='' proof=''
-  pub=$(rl_publication "$fold" "$id" "$H")
+  local f="$1" row="$2" H="$3" actor="$4" id fix pub rv to='' reason='' proof=''
+  IFS=$'\x1f' read -r id _ _ _ _ _ _ _ _ _ _ _ _ _ _ fix _ <<<"$row"
+  pub=$(rl_publication_fix "$fix" "$H")
   case "$pub" in
     proved:*)
       proof="${pub#proved:}"
-      rv=$(rl_reverify_finding "$fold" "$id" "$H" strict)
+      rv=$(rl_reverify_row "$row" "$H" strict)
       case "$rv" in
         not_reproduced) to=fixed ;;
       esac
@@ -1772,14 +2001,16 @@ rl_settle_one() {
 }
 
 rl_settle_locked() {
-  local f fold id out res pub rv results='[]'
+  local f fold id out res pub rv row results='[]'
   rl_writer_gate "$RL_S_DIR" "$RL_S_PR" || return $?
   f="$RL_S_DIR/$RL_S_PR.jsonl"
   rl_repair_tail "$f" || return 1
   fold=$(rl_fold_file "$f") || return 1
+  rl_index_set "$fold" || return 1
   while IFS= read -r id; do
     [ -n "$id" ] || continue
-    out=$(rl_settle_one "$f" "$fold" "$id" "$RL_S_HEAD" "$RL_S_ACTOR") || return 1
+    row=$(rl_index_row "$id") || continue
+    out=$(rl_settle_one "$f" "$row" "$RL_S_HEAD" "$RL_S_ACTOR") || return 1
     read -r res pub rv <<<"$out"
     results=$(jq -c --arg id "$id" --arg to "$res" --arg p "$pub" --arg r "$rv" \
       '. + [{finding_id: $id, state: $to, publication: $p, reverify: $r}]' <<<"$results")
@@ -1788,7 +2019,7 @@ rl_settle_locked() {
       and ($ids == null or (.finding_id as $x | $ids | index($x)) != null)) | .finding_id')
   fold=$(rl_fold_file "$f") || return 1
   rl_refresh_sidecar "$RL_S_DIR" "$RL_S_PR" "$fold" || rl_err "sidecar refresh failed"
-  jq -cn --argjson r "$results" --argjson fold "$fold" '{results: $r, pending: $fold.pending, attention: $fold.attention}'
+  jq -c --argjson r "$results" '{results: $r, pending: .pending, attention: .attention}' <<<"$fold"
 }
 
 # settle <pr> --remote-head <sha> [--ids-json '[...]'] [--actor A]
@@ -1833,7 +2064,10 @@ rl_reconcile_locked() {
   rl_repair_tail "$f" || return 1
   fold=$(rl_fold_file "$f") || return 1
   rec() { t=$(jq -c --arg id "$1" --arg from "$2" --arg to "$3" --arg r "$4" '. + [{finding_id: $id, from: $from, to: $to, reason: $r}]' <<<"$t"); }
-  while IFS=$'\t' read -r id state deletion file; do
+  rl_index_set "$fold" || return 1
+  local row
+  while IFS= read -r row; do
+    IFS=$'\x1f' read -r id state file _ _ _ _ _ _ _ _ _ deletion _ <<<"$row"
     [ -n "$id" ] || continue
     if [ "$deletion" = true ] && [ "$state" != applied ] && [ "$state" != fixed ] && [ "$state" != dismissed ]; then
       if ! rl_have_commit "$RL_C_BASE"; then
@@ -1856,7 +2090,7 @@ rl_reconcile_locked() {
     fi
     case "$state" in
       applied)
-        out=$(rl_settle_one "$f" "$fold" "$id" "$RL_C_HEAD" "$RL_C_ACTOR") || return 1
+        out=$(rl_settle_one "$f" "$row" "$RL_C_HEAD" "$RL_C_ACTOR") || return 1
         read -r res pub rv <<<"$out"
         if [ "$res" != applied ]; then
           rec "$id" applied "$res" "$pub"
@@ -1865,7 +2099,7 @@ rl_reconcile_locked() {
         fi
         ;;
       open | reopened | report_only)
-        rv=$(rl_reverify_finding "$fold" "$id" "$RL_C_HEAD")
+        rv=$(rl_reverify_row "$row" "$RL_C_HEAD")
         case "$rv" in
           not_reproduced)
             rl_append "$f" "$(rl_transition_record "$id" stale "anchor no longer matches at ${RL_C_HEAD:0:12}" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
@@ -1875,7 +2109,7 @@ rl_reconcile_locked() {
         esac
         ;;
       stale)
-        rv=$(rl_reverify_finding "$fold" "$id" "$RL_C_HEAD")
+        rv=$(rl_reverify_row "$row" "$RL_C_HEAD")
         case "$rv" in
           reproduced)
             rl_append "$f" "$(rl_transition_record "$id" reopened "re-matched at ${RL_C_HEAD:0:12}" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
@@ -1885,15 +2119,15 @@ rl_reconcile_locked() {
         esac
         ;;
     esac
-  done < <(printf '%s' "$fold" | jq -r '.findings[] | [.finding_id, .state, ((.obs.deletion // false) | tostring), .obs.file] | join("\t")')
+  done <"$(rl_tmp)/index"
   fold=$(rl_fold_file "$f") || return 1
   rl_refresh_sidecar "$RL_C_DIR" "$RL_C_PR" "$fold" || rl_err "sidecar refresh failed"
   bytes=0
   [ -f "$f" ] && bytes=$(rl_file_size "$f")
-  jq -cn --argjson t "$t" --argjson u "$unv" --argjson fold "$fold" --argjson bytes "$bytes" '
-    {transitions: $t, unverifiable: $u, pending: $fold.pending, attention: $fold.attention,
-     by_state: $fold.by_state, category_split: $fold.category_split, bytes: $bytes,
-     large: ($bytes > 2097152)}'
+  jq -c --argjson t "$t" --argjson u "$unv" --argjson bytes "$bytes" '
+    {transitions: $t, unverifiable: $u, pending: .pending, attention: .attention,
+     by_state: .by_state, category_split: .category_split, bytes: $bytes,
+     large: ($bytes > 2097152)}' <<<"$fold"
 }
 
 cmd_reconcile() {
@@ -1952,11 +2186,30 @@ cmd_restore() {
   [ -z "$(git --literal-pathspecs status --porcelain -- "$root/$file" 2>/dev/null)" ] || rl_die "$RL_EXIT_INVALID" "restore: the target path has an uncommitted change or untracked file in the way"
   parent=$(dirname -- "$root/$file")
   mkdir -p -- "$parent" || rl_die 1 "restore: cannot create the parent directory"
-  if [ -L "$parent" ] || ! rl_inside_root "$root" "$parent"; then
+  if ! rl_parents_real "$root" "$file" || ! rl_inside_root "$root" "$parent"; then
     rl_die "$RL_EXIT_INVALID" "restore: parent escapes the repository"
   fi
   git --literal-pathspecs checkout "$base" -- "$file" 2>/dev/null || rl_die 1 "restore: git checkout failed"
   printf 'restored\n'
+}
+
+# resolve-path <pr> <finding_id> --head <sha>: re-validate a finding's stored
+# path at the PR head and in the worktree, and print it as JSON
+# {"file", "path"} for the Read and Edit tools. Callers address findings by
+# id, so a PR-controlled file name never reaches a command line.
+cmd_resolve_path() {
+  local pr="${1:-}" id="${2:-}" head='' fold file v root
+  rl_need_pr "$pr"
+  [[ "$id" =~ ^[0-9a-f]{64}$ ]] || rl_die "$RL_EXIT_USAGE" "resolve-path: finding_id must be 64-hex"
+  [ "${3:-}" = --head ] && head="${4:-}"
+  rl_need_sha --head "$head"
+  fold=$(rl_read_fold "$pr") || exit $?
+  file=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .obs.file')
+  [ -n "$file" ] || rl_die "$RL_EXIT_INVALID" "resolve-path: unknown finding_id"
+  v=$(rl_validate_path anchor "$head" "$file") || rl_die "$RL_EXIT_INVALID" "resolve-path: path rejected ($v)"
+  root=$(rl_repo_root) || rl_die 1 "resolve-path: not inside a repository"
+  rl_worktree_entry_ok "$root" "$file" || rl_die "$RL_EXIT_INVALID" "resolve-path: worktree entry is not a regular file inside the repository"
+  jq -cn --arg f "$file" --arg p "$root/$file" '{file: $f, path: $p}'
 }
 
 # cards <pr> — the pending and attention findings as display-safe cards for
@@ -1965,7 +2218,8 @@ cmd_restore() {
 # substituted and XML metacharacters escaped; the model-authored fields sit
 # inside a reference-only fence.
 RL_CARDS_JQ='
-  def strip: (. // "") | tostring | gsub("\u001b\\[[0-9;?]*[ -/]*[@-~]"; "") | gsub("[\u0000-\u001f\u007f]"; " ");
+  def strip: (. // "") | tostring | gsub("\u001b\\[[0-9;?]*[ -/]*[@-~]"; "")
+    | gsub("[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]+"; " ");
   def esc: strip
     | gsub("--- begin ledger-finding \\(reference only\\) ---"; "[ESCAPED] begin ledger-finding (reference only)")
     | gsub("--- end ledger-finding ---"; "[ESCAPED] end ledger-finding")
@@ -1974,11 +2228,13 @@ RL_CARDS_JQ='
   | sort_by(.obs.severity, .obs.file, .obs.line)
   | to_entries[]
   | .key as $k | .value as $f
-  | "[\($k + 1)] \($f.obs.severity) \($f.state) \($f.obs.file | esc):\($f.obs.line) \($f.obs.category)/\($f.obs.rule) scope=\($f.obs.scope | esc)"
+  | "[\($k + 1)] \($f.obs.severity) \($f.state) \($f.obs.category)/\($f.obs.rule) line \($f.obs.line)"
     + (if $f.obs.deletion then " deletion" else "" end)
     + (if $f.state == "report_only" then " report-only" else "" end)
     + "\nfinding_id: \($f.finding_id)\n"
     + "--- begin ledger-finding (reference only) ---\n"
+    + "file: \($f.obs.file | esc)\n"
+    + "scope: \($f.obs.scope | esc)\n"
     + "title: \($f.obs.title | esc)\n"
     + "suggested_fix: \($f.obs.suggested_fix | esc)\n"
     + "last_reason: \($f.reason | esc)\n"
@@ -1996,19 +2252,19 @@ rl_usage() {
 review-ledger.sh <subcommand> [args]
   observe <pr> --head <sha> [--base <sha>] --step 6|8 [--run-id <id>]
           [--anchor-source commit|worktree] [--source review-pr|review-all]   (stdin: findings JSON array)
-  transition <pr> <finding_id> <state> [--reason R] [--fix-sha S] [--published-head S]
-          [--proof ancestor|patch-id|content] [--depends-on-json '["path"]'] [--head S] [--actor A]
+  transition <pr> <finding_id | - --ids-json '[...]'> <state> [--reason R] [--fix-sha S] [--published-head S]
+          [--proof ancestor|patch-id] [--depends-on-json '["path"]'] [--head S] [--actor A]
   fold <pr>
   dismissed-context <pr> --head <sha> [--fenced]
   remote-head <pr> [--remote <name>]
   settle <pr> --remote-head <sha> [--ids-json '[...]'] [--actor A]
   reconcile <pr> --head <sha> --base <sha> [--actor triage|triage-noninteractive]
   restore <pr> <finding_id> --head <sha> --base <sha>
-  cards <pr>
+  cards <pr> | resolve-path <pr> <finding_id> --head <sha>
   reverify <pr> <finding_id> --head <sha>
   publication <pr> <finding_id> --remote-head <sha>
   validate-path <anchor|dependency|restore> <rev> <path> [<base>]
-  prune <pr> | record-state <pr> | summary [--all | <pr>] | new-run-id
+  prune <pr> | summary [--all | <pr>] | new-run-id
 USAGE
 }
 
@@ -2027,7 +2283,7 @@ rl_main() {
     help | -h | --help) rl_usage ;;
     '') rl_usage >&2; exit "$RL_EXIT_USAGE" ;;
     new-run-id) rl_new_run_id; printf '\n' ;;
-    observe | transition | fold | reverify | publication | prune | summary | dismissed-context | validate-path | record-state | remote-head | settle | reconcile | restore | cards)
+    observe | transition | fold | reverify | publication | prune | summary | dismissed-context | validate-path | remote-head | settle | reconcile | restore | cards | resolve-path)
       git rev-parse --git-dir >/dev/null 2>&1 || rl_die 1 "not inside a git repository"
       "cmd_${sub//-/_}" "$@"
       ;;

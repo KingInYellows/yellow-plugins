@@ -149,10 +149,8 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
-   FIX=$(git rev-parse HEAD)
-   for id in <finding_id> <finding_id>; do
-     "$RL" transition <PR> "$id" applied --fix-sha "$FIX" --actor <SOURCE>
-   done
+   "$RL" transition <PR> - applied --fix-sha "$(git rev-parse HEAD)" --actor <SOURCE> \
+     --ids-json '["<finding_id>", "<finding_id>"]'
    ```
 
    Then run the provider's submit command.
@@ -163,9 +161,8 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
    if REMOTE=$("$RL" remote-head <PR>); then
-     for id in <finding_id> <finding_id>; do
-       "$RL" transition <PR> "$id" applied --published-head "$REMOTE" --actor <SOURCE>
-     done
+     "$RL" transition <PR> - applied --published-head "$REMOTE" --actor <SOURCE> \
+       --ids-json '["<finding_id>", "<finding_id>"]'
      "$RL" settle <PR> --remote-head "$REMOTE" --actor <SOURCE> \
        --ids-json '["<finding_id>", "<finding_id>"]'
    else
@@ -200,8 +197,10 @@ Add one line to Step 10's Coverage section, built from the `observe` and
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention
 ```
 
-Also add, when non-zero: "Dismissed findings injected: N (M filtered)", the
-rejected ordinals, and every "Ledger: write failed" line.
+Also add, when non-zero: "Dismissed findings injected: N (M filtered)",
+"Re-detections suppressed by an applicable dismissal: N" (`observe`'s
+`suppressed_dismissed`), the rejected ordinals, and every "Ledger: write failed"
+line.
 
 When Step 3e marked the head unverifiable, none of the above ran: emit only
 "Ledger: head unverifiable" (already added to Coverage at Step 3e) and skip

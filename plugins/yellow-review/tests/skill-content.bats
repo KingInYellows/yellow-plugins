@@ -213,7 +213,9 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q '"\$RL" cards <PR>' "$TRIAGE"
   grep -q -- '--- begin ledger-finding (reference only) ---' "$TRIAGE"
   grep -q 'Never print the full fold' "$TRIAGE"
-  grep -q 'Never put a$' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'Never put a title, reason or other stored'
+  grep -q '"\$RL" resolve-path <PR> <finding_id> --head <headRefOid>' "$TRIAGE"
+  ! grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
   grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
 }
 
@@ -225,7 +227,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
 
 @test "triage: unattended mode applies nothing; restore is attended-only" {
   grep -q '^## Step 6: Unattended mode stops here' "$TRIAGE"
-  grep -q 'applies nothing' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'applies nothing'
+  grep -q 'git fetch --no-tags origin <baseRefOid>' "$TRIAGE"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'never in unattended mode'
   step6=$(grep -n '^## Step 6' "$TRIAGE" | cut -d: -f1)
   restore=$(grep -n '"\$RL" restore' "$TRIAGE" | cut -d: -f1)

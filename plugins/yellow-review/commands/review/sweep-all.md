@@ -92,10 +92,10 @@ OPEN_JSON=$(gh pr list --state open --limit 1000 --json number) || { printf 'ski
 [ "$(printf '%s' "$OPEN_JSON" | jq 'length')" -lt 1000 ] || { printf 'skip\n'; exit 0; }
 DIR="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/findings"
 [ -d "$DIR" ] || exit 0
-for f in "$DIR"/*.jsonl; do
-  [ -f "$f" ] || continue
+# find, not a glob: the Bash tool may run zsh, where an unmatched glob errors
+find "$DIR" -maxdepth 1 -type f -name '*.jsonl' | while IFS= read -r f; do
   pr=$(basename -- "$f" .jsonl)
-  printf '%s' "$pr" | grep -Eq '^[1-9][0-9]*$' || continue
+  printf '%s\n' "$pr" | grep -Exq '[1-9][0-9]{0,9}' || continue
   printf '%s' "$OPEN_JSON" | jq -e --argjson n "$pr" 'any(.[]; .number == $n)' >/dev/null || printf '%s\n' "$pr"
 done
 ```
