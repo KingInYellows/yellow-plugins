@@ -1,0 +1,28 @@
+plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md
+  s_58268e9f7cfc1b::t_ece3d409107e77 365-366
+  s_58268e9f7cfc1b::t_a9e9cff9404308 390-398
+plugins/yellow-review/commands/review/review-all.md
+  s_58268e9f7cfc1b::t_a294d582a9f2f3 228-238
+plugins/yellow-review/tests/skill-content.bats
+  s_58268e9f7cfc1b::t_7291edf1bc902a 113-119
+plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md
+  s_58268e9f7cfc1b::t_90b84c1276cf31 364-365,389-397
+plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md
+  s_58268e9f7cfc1b::t_f7879a1fc194bf 364-365,389-397
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "14ad63c67a8bada2ad747da7a208be1fc606d573",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
