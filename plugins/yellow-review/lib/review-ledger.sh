@@ -613,6 +613,10 @@ rl_map_line() {
 # --- scope verification (CLAUDE-49, P12) ------------------------------------
 
 # Markdown: walk the heading stack (skipping fenced code) up to line L.
+# Fences follow CommonMark 0.31.2 section 4.5: at most 3 spaces of indent,
+# a backtick fence's info string holds no backtick, and a line closes the
+# fence only when it repeats the opening character at least as many times
+# and has nothing but spaces/tabs after the run ("```stray" is content).
 # Prints "<path>\t<innermost>\t<start>\t<end>\t<innermost-count>", where
 # path joins headings with " > " and end is the line before the next
 # heading of the same or a higher level.
@@ -631,12 +635,15 @@ rl_md_heading_path() {
   awk -v L="$2" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     function esc(s) { gsub(/\\/, "\\\\", s); gsub(/ > /, " \\> ", s); return s }
-    /^[ \t]*(```+|~~~+)/ {
-      line = $0; sub(/^[ \t]*/, "", line)
+    /^ ? ? ?(```|~~~)/ {
+      line = $0; sub(/^ ? ? ?/, "", line)
       ch = substr(line, 1, 1); n = 0
       while (substr(line, n + 1, 1) == ch) n++
-      if (!fence) { fence = 1; fchar = ch; flen = n }
-      else if (ch == fchar && n >= flen) fence = 0
+      rest = substr(line, n + 1)
+      if (!fence) {
+        if (ch == "`" && index(rest, "`")) next
+        fence = 1; fchar = ch; flen = n
+      } else if (ch == fchar && n >= flen && rest ~ /^[ \t]*$/) fence = 0
       next
     }
     fence { next }

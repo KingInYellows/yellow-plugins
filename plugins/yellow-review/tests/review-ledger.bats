@@ -653,6 +653,17 @@ pr_with_finding() {
   [ "$out" = "$(printf 'Doc > Real Section\tReal Section\t3\t11\t1')" ]
 }
 
+@test "CLAUDE-49: a fence-like line with trailing text inside a fence does not close it" {
+  source "$RL"
+  printf '# Doc\n\n## Real Section\n\n```sh\n```stray\n## Fake Heading\ncontent\n```  \n\nTrailer.\n' >|"$BATS_TEST_TMPDIR/f.md"
+  out=$(rl_md_heading_path "$BATS_TEST_TMPDIR/f.md" 8)
+  [ "$out" = "$(printf 'Doc > Real Section\tReal Section\t3\t11\t1')" ]
+  # a four-space-indented marker is not a fence (CommonMark: at most 3)
+  printf '# Doc\n\n## Real Section\n\n    ```\n## Next\nbody\n' >|"$BATS_TEST_TMPDIR/g.md"
+  out=$(rl_md_heading_path "$BATS_TEST_TMPDIR/g.md" 7)
+  [ "$out" = "$(printf 'Doc > Next\tNext\t6\t7\t1')" ]
+}
+
 @test "CLAUDE-49: without ctags two identical code handlers stay separate" {
   printf 'admin = {\n  createUser() { run(x) },\n}\nhandlers = {\n  createUser() { run(x) },\n}\n' >|u.js
   H=$(commit_all js)
