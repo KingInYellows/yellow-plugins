@@ -1025,6 +1025,53 @@ reconcile() { "$RL" reconcile "$LEDGER_PR" --head "$1" --base "${2:-$BASE}"; }
   [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H2")" = reproduced ]
 }
 
+@test "reverify: a verified markdown scope over 200 chars that is still present stays reproduced" {
+  git checkout -q -b feat
+  long="Installer $(printf 'configuration step %d and ' $(seq 1 12))cleanup"
+  printf '# Doc\n\n## %s\n\nRun the installer as root.\n' "$long" >|w.md
+  H1=$(commit_all feature)
+  observe "$H1" "[$(finding w.md 5 "$(jq -cn --arg s "$long" '{rule: "wrong-condition", scope: $s}')")]" >/dev/null
+  ID=$(ids)
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  # the stored display copy is truncated, so it is no longer a usable claim
+  [ "${#long}" -gt 200 ]
+  [ "$(fold | jq -r '.findings[0].obs.scope')" != "Doc > $long" ]
+  printf '# Doc\n\n## %s\n\nRun  the installer  as root. \n' "$long" >|w.md
+  H2=$(commit_all "whitespace only")
+  [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H2")" = reproduced ]
+  # a renamed heading is a scope that no longer holds
+  printf '# Doc\n\n## Other\n\nRun the installer  as root.\n' >|w.md
+  H3=$(commit_all renamed)
+  [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H3")" = not_reproduced ]
+}
+
+@test "reverify: a redacted markdown scope that is still present stays reproduced" {
+  export RL_CORE_LIB="$BATS_TEST_TMPDIR/missing/compound-staging.sh"
+  git checkout -q -b feat
+  printf '# Doc\n\n## Setup\n\nRun the installer as root.\n' >|w.md
+  H1=$(commit_all feature)
+  observe "$H1" "[$(finding w.md 5 '{"rule":"wrong-condition","scope":"Setup"}')]" >/dev/null
+  ID=$(ids)
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  [ "$(fold | jq -r '.findings[0].obs.scope')" != "Doc > Setup" ]
+  printf '# Doc\n\n## Setup\n\nRun  the installer  as root. \n' >|w.md
+  H2=$(commit_all "whitespace only")
+  [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H2")" = reproduced ]
+}
+
+@test "rl_scope_still: a code scope whose display copy is not exact is unverifiable" {
+  source "$RL"
+  printf 'class Admin:\n    def create_user(self):\n        run(x)\n' >|u.py
+  key=$(printf '%s' Admin.create_user | rl_sha256)
+  run rl_scope_still "$PWD/u.py" u.py 3 "$key" '[withheld]'
+  [ "$status" -eq 2 ]
+  run rl_scope_still "$PWD/u.py" u.py 3 "$key" 'Admin.create_u'
+  [ "$status" -eq 2 ]
+  # an exact display copy is still checked, and ctags missing proves nothing
+  RL_CTAGS_STATE=no run rl_scope_still "$PWD/u.py" u.py 3 "$key" Admin.create_user
+  [ "$status" -eq 2 ]
+}
+
 @test "reconcile: a shallow clone leaves applied and open findings untouched and listed" {
   pr_with_finding
   observe "$H1" "[$(finding q.sh 1)]" >/dev/null

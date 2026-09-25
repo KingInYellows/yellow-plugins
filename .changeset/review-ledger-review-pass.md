@@ -13,3 +13,7 @@ whose commit a restack rewrote now settles `fixed` by content check even when a
 stale local ref still holds the old commit, and a tree that cannot be read (a
 partial clone offline) leaves findings unverifiable instead of retiring,
 staling or reopening them.
+Re-verify no longer uses the redacted, 200-character display scope as the
+claim: a markdown scope is re-derived at the matched line and compared by hash,
+and a code scope whose display copy was truncated or redacted is unverifiable
+rather than wrongly `not_reproduced`.

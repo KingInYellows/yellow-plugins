@@ -1016,8 +1016,8 @@ rl_redact_reason() {
 #   14 anchor_source  15 anchor text (normalized; empty when withheld or
 #   when it holds control bytes)  16 fix_sha  17 " fp fp … "
 #   18 depends_on as path\x1dblob entries joined by \x1e
-#   19 display scope (the redacted scope, passed back to the verifier as
-#   the claim when checking that the scope still holds)
+#   19 display scope (the redacted, truncated scope; rl_scope_still uses
+#   it as a code claim only when it hashes to the scope key)
 RL_INDEX_JQ='
   def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
   def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
@@ -1164,27 +1164,51 @@ rl_reverify_row() {
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
   excl=$(rl_sibling_lines "$id" "$file" "$hash" "$T")
   if hit=$(rl_window_match "$content" "$ln" 3 "$hash" "$anchor" "$excl"); then
-    if [ "$sstat" != verified ] || rl_scope_still "$content" "$np" "$hit" "$scope" "$sdisp"; then
-      printf 'reproduced'
-      return 0
-    fi
+    rl_scope_verdict "$content" "$np" "$hit" "$scope" "$sdisp" "$sstat" && return 0
   fi
   if [ -z "$strict" ] && [ -z "$occ" ] && [ -n "$anchor" ]; then
     if hit=$(rl_window_alias "$content" "$ln" "$anchor" "$excl"); then
-      if [ "$sstat" != verified ] || rl_scope_still "$content" "$np" "$hit" "$scope" "$sdisp"; then
-        printf 'reproduced'
-        return 0
-      fi
+      rl_scope_verdict "$content" "$np" "$hit" "$scope" "$sdisp" "$sstat" && return 0
     fi
   fi
   printf 'not_reproduced'
 }
 
+# An anchor hit at <line>: print "reproduced" when its scope still holds
+# (or was never verified), "unverifiable" when that cannot be decided, and
+# return 0 for both; return 1, printing nothing, when the scope is gone.
+rl_scope_verdict() {
+  local rc=0
+  if [ "$6" = verified ]; then
+    rl_scope_still "$1" "$2" "$3" "$4" "$5" || rc=$?
+  fi
+  case "$rc" in
+    0) printf 'reproduced' ;;
+    2) printf 'unverifiable' ;;
+    *) return 1 ;;
+  esac
+}
+
 # Does the verified scope at <line> still hash to the stored scope key?
-# The claim passed to the verifier is the stored display scope; legacy
+# Returns 0 holds, 1 gone, 2 unverifiable. The display copy (<claim>) is
+# redacted and cut to 200 chars, so it is never trusted as the claim
+# blindly: markdown re-derives the heading path at <line> and needs no
+# claim; code uses the display copy only when it hashes to the key (it is
+# then the exact verified scope), and is unverifiable otherwise. Legacy
 # records (no key) compare the raw scope text.
 rl_scope_still() {
   local content="$1" path="$2" line="$3" skey="$4" claim="$5" now
+  if rl_is_sha256 "$skey"; then
+    case "$path" in
+      *.md | *.mdx | *.MD | *.markdown)
+        now=$(rl_md_heading_path "$content" "$line" | cut -f1)
+        [ -n "$now" ] && [ "$(printf '%s' "$now" | rl_sha256)" = "$skey" ]
+        return
+        ;;
+    esac
+    [ "$(printf '%s' "$claim" | rl_sha256)" = "$skey" ] || return 2
+    rl_ctags_usable || return 2
+  fi
   now=$(rl_verify_scope "$content" "$path" "$line" "$claim" | cut -f2)
   [ -n "$now" ] || return 1
   if rl_is_sha256 "$skey"; then
