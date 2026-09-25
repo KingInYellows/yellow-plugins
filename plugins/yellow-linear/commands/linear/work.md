@@ -222,8 +222,9 @@ Based on user's choice in Step 5:
   never interpolated into shell commands
 - **Remote content sanitization:** Credential redaction runs on every MCP
   response immediately after fetch — including `list_cycles` and `list_issues` in
-  Step 1 before `AskUserQuestion`, Step 3 display, and Step 4 worktree writes.
-  Only sanitized copies are used downstream.
+  Step 1 before `AskUserQuestion`, Step 3 display, Step 4 worktree writes, and
+  the Step 6 H1 `get_issue` re-fetch before `save_issue`. Only sanitized copies
+  are used downstream.
 - **Brainstorm doc isolation:** Issue description and comments wrapped in
   `--- begin/end ---` reference-only delimiters to prevent prompt injection
 - **Tier 1 transition:** "In Progress" is reversible and non-destructive; no
