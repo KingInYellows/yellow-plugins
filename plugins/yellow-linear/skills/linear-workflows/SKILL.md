@@ -229,7 +229,7 @@ returned:
 3. Discard the raw response. Use only the sanitized copy for session output,
    brainstorm/context packets, and downstream agent prompts.
 
-Minimum patterns (extend with PEM private-key blocks when present):
+Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `END`):
 
 - `sk-proj-`, `sk-ant-`, generic `sk-` API keys
 - `AIza` (Google API keys)
@@ -253,6 +253,16 @@ assignments, and runs under mawk, gawk and busybox awk:
 printf '%s\n' "$text" | awk '
 {
   line = $0
+  if (inpem) {
+    print "--- redacted credential at line " NR " ---"
+    if (line ~ /-----END [A-Z ]*PRIVATE KEY-----/) inpem = 0
+    next
+  }
+  if (line ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+    print "--- redacted credential at line " NR " ---"
+    if (line !~ /-----END [A-Z ]*PRIVATE KEY-----/) inpem = 1
+    next
+  }
   if (line ~ /sk-(proj-|ant-)?[A-Za-z0-9_-]{16,}/ ||
       line ~ /AIza[0-9A-Za-z_-]{20,}/ ||
       line ~ /(ghp|gho|ghs|ghu)_[A-Za-z0-9]{20,}/ ||
@@ -261,7 +271,6 @@ printf '%s\n' "$text" | awk '
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
       line ~ /[Bb]earer[ \t]+[A-Za-z0-9._~+\/=-]{8,}/ ||
       line ~ /[Aa]uthorization[ \t]*:/ ||
-      line ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/ ||
       tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_token|_secret|_password))[ \t]*[=:]/) {
     print "--- redacted credential at line " NR " ---"
   } else {
