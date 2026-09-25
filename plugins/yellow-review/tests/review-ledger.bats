@@ -646,6 +646,14 @@ pr_with_finding() {
   [ "$(rl_verify_scope "$BATS_TEST_TMPDIR/d.md" d.md 5 'Top > Dup' | cut -f2)" = "Top > Dup" ]
 }
 
+@test "CLAUDE-49: duplicate headings with literal '>' require escaped scope paths" {
+  source "$RL"
+  printf '# Parent\n\n## A > B\n\nfirst\n\n## A > B\n\nsecond\n' >|"$BATS_TEST_TMPDIR/dup-gt.md"
+  [ "$(rl_verify_scope "$BATS_TEST_TMPDIR/dup-gt.md" dup-gt.md 5 'Parent > A > B')" = unscoped ]
+  [ "$(rl_verify_scope "$BATS_TEST_TMPDIR/dup-gt.md" dup-gt.md 5 'Parent > A \> B' | cut -f2)" = "Parent > A \> B" ]
+  [ "$(rl_verify_scope "$BATS_TEST_TMPDIR/dup-gt.md" dup-gt.md 9 'Parent > A \> B' | cut -f2)" = "Parent > A \> B" ]
+}
+
 @test "CLAUDE-49: a mismatched fence marker inside a backtick block does not close it" {
   source "$RL"
   printf '# Doc\n\n## Real Section\n\n```text\n~~~\n## Fake Heading\ncontent\n```\n\nTrailer.\n' >|"$BATS_TEST_TMPDIR/f.md"

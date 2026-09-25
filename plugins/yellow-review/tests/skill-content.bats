@@ -85,6 +85,16 @@ schema_fields() {
   done < <(producers)
 }
 
+@test "ledger: every compact-return producer documents heading-separator escaping" {
+  while IFS= read -r f; do
+    grep -q 'Parent > A \\> B' "$f" || { echo "no heading-separator escape guidance: $f"; false; }
+  done < <(producers)
+  grep -q 'Parent > A \\> B' "$WORKFLOW_SKILL"
+  grep -q 'Parent > A \\> B' "$SKILLS_DIR/yellow-thermonuclear-review/SKILL.md"
+  grep -q 'Parent > A \\> B' "$SKILLS_DIR/../codex/skills/yellow-thermonuclear-review/SKILL.md"
+  grep -q 'Parent > A \\> B' "$SKILLS_DIR/../cursor/skills/yellow-thermonuclear-review/SKILL.md"
+}
+
 @test "ledger: review-pr.md and SKILL.md schema examples carry the same fields" {
   a=$(schema_fields "$REVIEW_PR")
   b=$(schema_fields "$WORKFLOW_SKILL")
