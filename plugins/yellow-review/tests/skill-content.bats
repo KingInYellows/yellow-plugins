@@ -106,6 +106,15 @@ schema_fields() {
 @test "ledger: both review commands inject the rule vocabulary from the plugin's file" {
   grep -q '^7\. A `<rule-vocabulary>` block' "$REVIEW_PR"
   grep -q 'lib/review-ledger-vocab.json' "$REVIEW_PR"
+  grep -q 'category_aliases' "$REVIEW_PR"
+  grep -q 'alias of' "$REVIEW_PR"
   grep -q "item 7's \`<rule-vocabulary>\` block" "$REVIEW_ALL"
   jq -e '.categories | keys == ["contract","correctness","docs","maintainability","performance","reliability","security","testing"]' "$VOCAB" >/dev/null
+  out=$(jq -r '
+    .categories as $cats
+    | (.categories | to_entries[] | "\(.key): \(.value | join(", "))"),
+      (.category_aliases | to_entries[] | "\(.key) (alias of \(.value)): \($cats[.value] | join(", "))")
+  ' "$VOCAB")
+  grep -q '^plugin-contract (alias of contract):' <<<"$out"
+  grep -q '^adversarial (alias of correctness):' <<<"$out"
 }

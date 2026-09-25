@@ -6,5 +6,6 @@
 Add `rule` and `scope` to the compact-return schema of every review persona
 (including yellow-core's `security-reviewer` and `performance-reviewer`).
 `/review:pr` and `/review:all` inject the rule vocabulary into reviewer prompts
-and default a missing `rule`/`scope` to `unclassified`/`unscoped` instead of
+(including `category_aliases` resolved to normalized category slugs) and
+default a missing `rule`/`scope` to `unclassified`/`unscoped` instead of
 dropping the return.

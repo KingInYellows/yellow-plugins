@@ -587,11 +587,15 @@ Each agent receives:
    markers present is a complete, empty block and is emitted as such.
 7. A `<rule-vocabulary>` block — into every dispatched reviewer. It lists
    the closed `rule` slugs per normalized category, from the plugin's
-   vocabulary file:
+   vocabulary file, plus one line per `category_aliases` entry resolved to
+   its normalized category's slugs:
 
    ```bash
-   jq -r '.categories | to_entries[] | "\(.key): \(.value | join(", "))"' \
-     "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger-vocab.json"
+   jq -r '
+     .categories as $cats
+     | (.categories | to_entries[] | "\(.key): \(.value | join(", "))"),
+       (.category_aliases | to_entries[] | "\(.key) (alias of \(.value)): \($cats[.value] | join(", "))")
+   ' "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger-vocab.json"
    ```
 
    The file is repo-internal, but XML-escape the output anyway (`&`, then
@@ -599,7 +603,7 @@ Each agent receives:
 
    ```
    <rule-vocabulary>
-   <one "category: slug, slug, …" line per category>
+   <one "category: slug, slug, …" line per category; one "alias (alias of category): …" line per alias>
    Every category also accepts `unclassified`.
    </rule-vocabulary>
    ```
