@@ -100,8 +100,17 @@ User constraints from the dialogue:
 - **Issue-ID extraction** matches team keys case-insensitively and normalizes
   to uppercase before `get_issue`; the C1 validation is unchanged. It should
   also accept the configured team key.
-- **Checks use state `type` instead of names** everywhere. "Blocked" is read
-  from issue relations.
+- **Classify states by `type`, not name.** Use it for the broad checks:
+  terminal (`completed`/`canceled`), active (`started`) or early
+  (`triage`/`backlog`/`unstarted`). `type` alone can't tell "In Progress"
+  from "In Review", because many teams give both the `started` type. So
+  review-specific checks and transitions use one of two things:
+  - an explicit status mapping that `/linear:setup` records in the config
+    (`states.inProgress`, `states.inReview`, stored as state IDs), or
+  - PR/Diff evidence: an open PR or diff linked to the issue means it's in
+    review.
+
+  "Blocked" is read from issue relations.
 - **Check every MCP parameter** in commands and agents against the live schema,
   and add a validator or bats test that pins the tool names the plugin uses.
 - **README and CLAUDE.md cleanup.** Provider-neutral prerequisites, correct
@@ -135,6 +144,14 @@ User constraints from the dialogue:
   P0 fix too.
 - **Uses the issue's branch name.** `/linear:work` reads `gitBranchName`
   (or the configured `branchFormat`) and passes it to the stack provider.
+  Both are untrusted: the template is committed config anyone can edit, and
+  `gitBranchName` comes from Linear. So:
+  - The template grammar is limited to fixed placeholders (`{type}`, `{id}`,
+    `{slug}`, `{user}`) plus `[a-z0-9/._-]` literals.
+  - Every rendered name must pass `git check-ref-format --branch` and is
+    rejected if it starts with `-`. On failure, fall back to
+    `<type>/<ID>-<slug>` or ask the user; never pass it to the provider
+    anyway.
 - **Milestone summaries (consented once, then automatic).** Two points,
   deduplicated like the existing PR-link comments:
   1. After `/flow:plan`, a short plan summary comment on the issue.
@@ -152,7 +169,8 @@ User constraints from the dialogue:
     summary and asks two questions: whether the repo should allow milestone
     summaries (writes repo policy) and whether *this user* wants them posted
     automatically (stores their "yes" outside the repo in
-    `${CLAUDE_CONFIG_DIR:-~/.claude}` plugin data, keyed by repo). Summaries
+    `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` plugin data, keyed by repo; stop
+    with an error if both are unset or empty, never a literal `~`). Summaries
     post without a per-post prompt only when the repo policy allows them
     **and** the current user has consented. Otherwise each summary is shown
     as a draft and posted only after confirmation.
@@ -175,6 +193,13 @@ User constraints from the dialogue:
   2. Escape fence markers.
   3. Cap the summary (ID, state type and title, at most 200 characters).
   4. Wrap it in a per-invocation fence marked reference-only.
+
+  The hook must never slow down or break session start:
+  - Declare a short `timeout` in the hook manifest, for example 5s.
+  - Keep any Linear lookup within a smaller internal deadline, or read a
+    summary that `/linear:work` cached instead of calling the network.
+  - Fail open: on every error or timeout path, emit valid empty hook JSON so
+    the session starts without the summary.
 
 ### P2 — Native handoff and light PM
 
