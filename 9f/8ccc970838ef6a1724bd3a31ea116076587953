@@ -1,0 +1,27 @@
+plugins/yellow-review/tests/skill-content.bats
+  s_58268e9f7cfc1b::t_a3dd53e4a83d96 150-166
+plugins/yellow-review/references/review-pr/ledger.md
+  s_58268e9f7cfc1b::t_ffd990538c599a 18-21
+  s_58268e9f7cfc1b::t_20e7f2d32e75cb 205-209
+  s_58268e9f7cfc1b::t_165dd6147cbc26 39-63
+plugins/yellow-review/lib/review-ledger.sh
+  s_58268e9f7cfc1b::t_700dfe02f73af2 1611-1614,1622,1628
+plugins/yellow-review/tests/review-ledger.bats
+  s_58268e9f7cfc1b::t_6d5fb80ba85103 761-763,766,780
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f8ccc970838ef6a1724bd3a31ea116076587953",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}

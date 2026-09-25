@@ -1,0 +1,27 @@
+docs/security.md
+  s_0e9ca486378b02::t_03fe626fd7d193 253-278
+plugins/yellow-review/commands/review/setup.md
+  s_0e9ca486378b02::t_2f41112b24e3b2 65-73,109-112
+plugins/yellow-review/lib/review-ledger.sh
+  s_0e9ca486378b02::t_e4cb03ea8a3c74 1654-1656
+plugins/yellow-review/tests/review-ledger.bats
+  s_0e9ca486378b02::t_f1e7a0c81a0016 801-813
+plugins/yellow-review/tests/skill-content.bats
+  s_0e9ca486378b02::t_06a46e0f359534 200-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bca1efe7e60e9c701ab6469aebc4db7d7f1a84df",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
