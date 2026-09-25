@@ -718,7 +718,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 3: Persist findings from `/review:pr` and `/review:all`
 
-- [ ] 3.1: Create `plugins/yellow-review/references/review-pr/ledger.md`, the
+- [x] 3.1: Create `plugins/yellow-review/references/review-pr/ledger.md`, the
       single procedure both commands read, just as they read
       `knowledge-compounding.md`. It defines the calls below. If the Read fails,
       stop and report the path rather than improvising.
@@ -740,7 +740,7 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 3.2: **New Step 3e (after 3d, before Step 5): dismissed context.**
+- [x] 3.2: **New Step 3e (after 3d, before Step 5): dismissed context.**
   1. Run `rl dismissed-context <pr> --head <headRefOid>`.
   2. Build a `--- begin dismissed-findings (reference only) ---` /
      `--- end dismissed-findings ---` block. Its `<advisory>` says the content
@@ -754,18 +754,18 @@ yellow-core changes. Each stage carries its own changeset.
      drops. This follows the layered-defense learning.
   5. Inject the block into every reviewer. Skip it in legacy mode, as the
      learnings block is skipped.
-- [ ] 3.3: **After Step 6's partition, before Step 7:** run
+- [x] 3.3: **After Step 6's partition, before Step 7:** run
       `rl observe --step 6` on every surviving finding in the fixer, residual
       actionable and report-only queues. Snapshot each anchor from HEAD before
       any edit. Findings with `pre_existing: true` and findings the confidence
       gate suppressed are not persisted, because they were never reported as
       this PR's work.
-- [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
+- [x] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
       **Step 8:** run `rl observe --step 8` on the simplifier's findings,
       anchored on the post-fix working tree. The library accepts
       `--anchor-source worktree` for step 8 only, and requires every path to be
       tracked at HEAD.
-- [ ] 3.5: **Step 9:**
+- [x] 3.5: **Step 9:**
   1. Once the commit exists, record `applied --fix-sha <sha>` for each applied
      finding.
   2. Once provider submission reports success, run
@@ -778,9 +778,9 @@ yellow-core changes. Each stage carries its own changeset.
 
   The Graphite and GitHub provider paths make the same calls.
 
-- [ ] 3.6: **Step 10:** add the "Ledger" line (P11). Coverage also reports write
+- [x] 3.6: **Step 10:** add the "Ledger" line (P11). Coverage also reports write
       failures, and the dismissed entries injected and filtered.
-- [ ] 3.7: Mirror 3.2–3.6 in the inlined sub-steps of `review-all.md` Step 4
+- [x] 3.7: Mirror 3.2–3.6 in the inlined sub-steps of `review-all.md` Step 4
       (P4), with a parity comment that points at `ledger.md`.
 
 <!-- deepen-plan: codebase -->
@@ -793,18 +793,18 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 3.8: `commands/review/setup.md`: required checks for `flock`, `realpath`,
+- [x] 3.8: `commands/review/setup.md`: required checks for `flock`, `realpath`,
       `jq`, git ≥ 2.31 and yellow-core's `compound-staging.sh`; an optional
       check for universal-ctags ("scope verification degrades to unscoped"). Add
       a macOS install hint: `brew install flock coreutils universal-ctags`.
-- [ ] 3.9: Tests:
+- [x] 3.9: Tests:
   - `skill-content.bats` asserts that both commands reference `ledger.md` at
     Steps 3e, 6, 7, 8 and 9, and that the dismissed-findings fence substitutes
     every delimiter.
   - `review-ledger.bats` adds a scripted end-to-end run against the bare-origin
     fixture: observe (step 6), applied, observe (step 8), fix-sha, published,
     fixed.
-- [ ] 3.10: Update the README and `plugins/yellow-review/CLAUDE.md` with
+- [x] 3.10: Update the README and `plugins/yellow-review/CLAUDE.md` with
       `/review:pr` persistence, the ledger's location and lifecycle states, and
       the new prerequisites. Changeset: `yellow-review` minor.
 
@@ -1210,7 +1210,7 @@ behaviour, so every PR passes the CI gate on its own.
 
 - [x] 1. agent/feat/review-ledger-lib (completed 2026-09-24)
 - [x] 2. agent/feat/review-rule-scope-fields (completed 2026-09-24)
-- [ ] 3. agent/feat/review-ledger-persistence
+- [x] 3. agent/feat/review-ledger-persistence (completed 2026-09-25)
 - [ ] 4. agent/feat/review-triage-command
 - [ ] 5. agent/feat/review-sweep-ledger
 - [ ] 6. agent/feat/review-ledger-session-hook

@@ -82,7 +82,7 @@ stash before running review." and stop.
 ### Step 3: Fetch PR Metadata and Checkout
 
 ```bash
-gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName
+gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
 ```
 
 Calculate gross line count (additions + deletions). Checkout the PR branch:
@@ -290,6 +290,15 @@ relevant to this PR.
    `[review:pr] Warning: learnings-researcher unavailable, proceeding
    without past-learnings injection` to stderr and continue with no
    injection block. The pipeline must never abort because of the pre-pass.
+
+### Step 3e: Review-findings ledger — dismissed context
+
+Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its
+"Conventions" and "Step 3e" sections: record `PR`, `REVIEWED_HEAD`,
+`BASE_OID`, `RUN_ID` and `SOURCE=review-pr`, and build the
+dismissed-findings block. The same file defines the ledger writes after
+Steps 6, 7, 8 and 9 and the Step 10 Ledger line. If the Read fails, stop
+and report the exact path; do not improvise the ledger calls.
 
 ### Step 4: Tiered persona dispatch
 
@@ -607,6 +616,9 @@ Each agent receives:
    If the command fails, omit the block and note "rule vocabulary
    unavailable" in Coverage; reviewers then emit `unclassified`, which
    Step 6 accepts.
+8. The dismissed-findings block from Step 3e, when non-empty — into every
+   reviewer, unchanged, next to the learnings-context block, and skipped in
+   legacy mode like item 3.
 
 #### Compact-return enforcement
 
@@ -925,6 +937,13 @@ Before reporting any P0 or P1 finding:
   "missing null check" guarded by the caller. Drop findings that fail
   this check.
 
+#### Ledger write (after partition)
+
+Before Step 7 edits anything, run ledger.md's "After Step 6" section: every
+finding in the three queues goes to `review-ledger.sh observe --step 6`
+(not pre-existing or suppressed findings), and the returned `finding_id`s
+are kept for Steps 7 and 9.
+
 ### Step 7: Apply Fixes
 
 For surviving P0/P1 findings with `autofix_class: safe_auto` and a
@@ -946,6 +965,8 @@ the Residual Actionable Work section of the report.
 For `advisory` findings: do not apply. Surface in the Coverage / Residual
 Risks section.
 
+After each applied fix, record it in the ledger (ledger.md "Step 7").
+
 ### Step 8: Pass 2 — Code Simplifier
 
 Launch `code-simplifier` via the Agent tool
@@ -958,6 +979,9 @@ the Residual Actionable Work section — they are NOT auto-applied. To
 auto-apply a simplifier finding, an orchestrator must explicitly mark it
 `safe_auto` based on its content (e.g., a no-op rename of a private
 helper); the default routing is human review.
+
+Persist the simplifier's findings with ledger.md's "After Step 8" section
+(`--step 8 --anchor-source worktree`).
 
 ### Step 9: Commit and Push
 
@@ -997,6 +1021,11 @@ node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" subm
 
 Read the JSON result's `status` field; `SUCCESS` continues, anything else
 reports the result's `recoveryAction`.
+
+**Ledger.** When Step 7 applied fixes, run the commit command, then
+ledger.md "Step 9" item 1 (record `--fix-sha`), then the submit command,
+then item 2 (`remote-head`, `--published-head`, `settle`) once submission
+reports success. A declined or failed push appends nothing more (item 3).
 
 ### Steps 9a + 9b: Knowledge Compounding and Memory Record
 
@@ -1080,6 +1109,7 @@ findings were produced but extension classification was malformed."
 - Categories unmapped: <count or omit when zero>
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
+- Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention (plus dismissed-context counts, rejected ordinals and write failures — ledger.md "Step 10")
 
 ### Verdict
 Ready to merge | Ready with fixes | Not ready

@@ -16,6 +16,9 @@ resolution, and sequential stack review.
 - `jq` installed
 - Graphite CLI (`gt`) for branch management
 - Clean working directory before running review commands
+- For the review-findings ledger: `flock`, `realpath`, git 2.31+ and the
+  yellow-core plugin (credential redaction). On macOS:
+  `brew install flock coreutils`. universal-ctags is optional.
 
 Run `/review:setup` after install to verify the local prerequisites and optional
 yellow-core integration before reviewing real PRs.
@@ -121,6 +124,36 @@ Two caveats worth knowing before enabling it:
   persona back out after `reviewer_set.include` adds it — add
   `maintainability` to `focus_areas` too, or the opt-in snippet above has
   no effect.
+
+## Review-findings ledger
+
+`/review:pr` and `/review:all` persist every finding they report but do not
+apply, so an unattended sweep no longer loses them with the transcript. That
+covers P2/P3 `safe_auto`, `gated_auto`, `manual`, the code-simplifier's
+findings and the report-only queue, P0 `human` findings included.
+
+- **Where:** one append-only JSONL file per PR at
+  `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`. It
+  lives inside `.git`, so every worktree of the clone shares it and it never
+  appears in a diff. It is local to this clone and this machine.
+- **When:** after Step 6's partition (before any edit), after each Step 7
+  fix (`applied`), after the Step 8 simplifier pass, and at Step 9 (the
+  fixing commit's SHA, then the published head). A fix becomes `fixed` only
+  when its commit is proved to be on the remote PR head and the defect no
+  longer reproduces there.
+- **Lifecycle states:** `open`, `report_only`, `applied`, `fixed`,
+  `dismissed`, `stale`, `reopened`. Pending = `open`, `reopened`, `applied`;
+  needs attention = `report_only`, `stale`. Re-observing a `fixed` or
+  `stale` finding, or a dismissed one whose anchor or dependencies changed,
+  reopens it.
+- **Dismissed findings** that still apply are injected into reviewer prompts
+  as a fenced, reference-only block, so a re-review does not raise them
+  again.
+- Every stored title, fix, reason and anchor line is redacted first. Without
+  yellow-core the ledger withholds all model-authored text.
+
+The Step 10 report ends Coverage with a `Ledger:` line (new, carried over,
+reopened, pending, need attention).
 
 ## Confidence gating
 
