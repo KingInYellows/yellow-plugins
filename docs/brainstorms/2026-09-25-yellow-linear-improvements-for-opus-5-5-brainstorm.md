@@ -57,6 +57,11 @@ User constraints from the dialogue:
 8. **Headless auth isn't documented.** The README says OAuth needs a browser.
    Linear now accepts `Authorization: Bearer <api key>` and has a
    `/mcp/readonly` endpoint, both relevant to cloud/remote Claude Code sessions.
+9. **Remote content persisted without credential redaction.** `/linear:work`
+   writes issue descriptions and comments into `docs/brainstorms/` with fencing
+   only. Fencing changes model interpretation, not stored bytes — credential
+   detection and `--- redacted credential at line N ---` replacement must run
+   before any remote content is written to the worktree (AGENTS.md).
 
 ## Why This Approach
 
@@ -101,6 +106,10 @@ User constraints from the dialogue:
   and add a validator or bats test that pins the tool names the plugin uses.
 - **README and CLAUDE.md cleanup.** Provider-neutral prerequisites, correct
   delegate description, and headless auth documented.
+- **Credential redaction before persisting remote content.** Run credential
+  detection over every fetched issue, comment, attachment, and linked document
+  before writing the context packet or any other worktree file. Replace hits
+  with `--- redacted credential at line N ---` per AGENTS.md.
 
 ### P1 — Work loop for long Opus 5.5 sessions
 
