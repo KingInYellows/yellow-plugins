@@ -176,6 +176,15 @@ User constraints from the dialogue:
   3. Cap the summary (ID, state type and title, at most 200 characters).
   4. Wrap it in a per-invocation fence marked reference-only.
 
+  The hook must never slow down or break session start:
+  - Declare a short `timeout` in the hook manifest, for example 5s.
+  - Keep any Linear lookup within a smaller internal deadline, or read a
+    summary that `/linear:work` cached instead of calling the network.
+  - Fail open: on every error or timeout path, emit valid empty hook JSON
+    (`{}`) so the session starts without the summary. Use `set -uo pipefail`
+    (never `set -e`), route diagnostics to stderr, and centralize exits
+    through a helper that always prints valid JSON (AGENTS.md hook rules).
+
 ### P2 — Native handoff and light PM
 
 - **Delegation through Linear.** `/linear:delegate` hands off with
