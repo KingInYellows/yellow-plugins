@@ -392,6 +392,16 @@ setup() {
   [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$H3")" = not_reproduced ]
 }
 
+@test "a line number far beyond Bash's range (1e100) is clamped to the last line" {
+  run -0 --separate-stderr observe "$BASE" "[$(finding a.sh 1 '{"line":1e100}')]"
+  [ "$(printf '%s' "$output" | jq '.new')" -eq 1 ]
+  [[ "$stderr" != *"integer expression expected"* ]]
+  [ "$(fold | jq '.findings[0].obs.line')" -eq 5 ]
+  # the same anchor as an honest line-5 finding, not the empty-line hash
+  LEDGER_PR=13 observe "$BASE" "[$(finding a.sh 5)]" >/dev/null
+  [ "$(fold | jq -r '.findings[0].obs.anchor_hash')" = "$("$RL" fold 13 | jq -r '.findings[0].obs.anchor_hash')" ]
+}
+
 # --- CLAUDE-44: depends_on must exist, unchanged, at the head ---------------
 
 dismiss_with_guard() {
