@@ -149,8 +149,8 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
-yellow-morph, yellow-research, and yellow-semgrep are shell;
+Ten plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
+yellow-morph, yellow-research, yellow-semgrep, and yellow-review are shell;
 yellow-ci, gt-workflow, and github-workflow run a dependency-free Node
 runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
@@ -165,6 +165,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 | yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
 | yellow-research | SessionStart                                      | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`             |
 | yellow-semgrep  | SessionStart                                      | Emit `credential-status.json` for `/setup:all`                                           |
+| yellow-review   | SessionStart                                      | Report pending review-ledger findings (counts and PR numbers only)                       |
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
 dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated
@@ -176,6 +177,18 @@ read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is carried
 into the generated Codex manifest (`hooks/codex-hooks.json`) but is **inert on
 Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its Codex-side
 behavior is schema/unit/parity-tested, not live-verified.
+
+**yellow-review SessionStart.** `hooks/scripts/session-start.sh` reads the
+review-findings ledger's `<pr>.pending` and `<pr>.state` sidecars under
+`$(git rev-parse --git-common-dir)/yellow-review/findings/`, a directory
+shared by every worktree of the clone and written only by
+`lib/review-ledger.sh`. The ledger holds model-authored finding text derived
+from untrusted PR content, so the hook never emits it: `systemMessage` and
+`additionalContext` carry integers and PR numbers only. It is read-only (no
+network, no writes), takes each ledger lock shared with a 0.2 s wait, caps
+its fallback fold at 1.5 s inside the 3 s catalog timeout, and always exits
+with valid `{"continue": true}` JSON, so a busy or corrupt ledger can block
+nothing. It is not carried into the Codex or Cursor manifests.
 
 **yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
 compaction-preservation instruction that Claude Code appends to the compaction
