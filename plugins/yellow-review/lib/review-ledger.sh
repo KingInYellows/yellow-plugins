@@ -1039,7 +1039,7 @@ rl_build_candidate() {
     cat=maintainability
   fi
   cat_stored=${cat_raw:0:64}
-  rl_suspicious "$cat_stored" && cat_stored='[withheld]'
+  rl_anchor_safe "$cat_stored" || cat_stored='[withheld]'
   rule_raw=$(jq -r '.rule // ""' <<<"$fj")
   scope_claimed=$(jq -r '.scope // ""' <<<"$fj")
   if [ -z "$rule_raw" ]; then rule=unclassified; else rule=$(rl_validate_rule "$cat" "$rule_raw"); fi
