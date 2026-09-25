@@ -810,12 +810,12 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 4: `/review:triage`
 
-- [ ] 4.1: Create `plugins/yellow-review/commands/review/triage.md` with
+- [x] 4.1: Create `plugins/yellow-review/commands/review/triage.md` with
       `name: review:triage`, a single-line description, and `allowed-tools`
       Bash/Read/Edit/AskUserQuestion/Skill. Usage:
       `[PR# | URL | branch] [--non-interactive]` or `--prune <pr>`. An unknown
       flag is an error, as in `review-pr.md` Step 1.
-- [ ] 4.2: Add the library subcommand
+- [x] 4.2: Add the library subcommand
       `reconcile <pr> --head <sha> --base <sha>`. It is the deterministic core
       of every triage mode, which makes `--non-interactive` fully Bats-testable.
       For each finding, by latest state:
@@ -831,7 +831,7 @@ yellow-core changes. Each stage carries its own changeset.
   path, the finding becomes `dismissed` with reason
   `retired: base deleted path`.
 
-- [ ] 4.3: Triage flow:
+- [x] 4.3: Triage flow:
   1. Resolve the PR with
      `gh pr view --json number,state,headRefName,headRefOid,baseRefOid,isCrossRepository`.
   2. If the state is MERGED or CLOSED, run `rl prune` and stop.
@@ -841,7 +841,7 @@ yellow-core changes. Each stage carries its own changeset.
   5. Run `rl reconcile`.
   6. If the ledger is over 2 MiB, print a notice (P6).
   7. `--non-interactive` stops here and prints its summary.
-- [ ] 4.4: The attended loop mirrors `/debt:triage`. A pre-loop AskUserQuestion
+- [x] 4.4: The attended loop mirrors `/debt:triage`. A pre-loop AskUserQuestion
       shows the pending and attention counts and offers "review each" or
       "approve all proposed fixes". Then, in severity order, each finding gets a
       display-stripped (P8) card with the proposed change. Its stored fields sit
@@ -859,7 +859,7 @@ yellow-core changes. Each stage carries its own changeset.
   `stack-provider-router` exactly as `review-pr.md` Step 9 does, push
   confirmation included, then follow the same publication contract.
 
-- [ ] 4.5: Tests:
+- [x] 4.5: Tests:
   - `review-ledger.bats` gains the `reconcile` matrix:
     - fix, then revert (CLAUDE-48);
     - a dropped fix commit gives `reopened` with reason `fix-abandoned`;
@@ -870,7 +870,7 @@ yellow-core changes. Each stage carries its own changeset.
   - The restore tests (CLAUDE-47) and the dependency-mode dismissal tests
     (CLAUDE-44) call `validate-path` and the restore helper directly.
   - `skill-content.bats` asserts triage.md's fence and gate text.
-- [ ] 4.6: README and CLAUDE.md: the command list, a "When to Use What" entry,
+- [x] 4.6: README and CLAUDE.md: the command list, a "When to Use What" entry,
       and the triage modes. Changeset: `yellow-review` minor.
 
 ### Stage 5: Sweep integration
@@ -1211,6 +1211,6 @@ behaviour, so every PR passes the CI gate on its own.
 - [x] 1. agent/feat/review-ledger-lib (completed 2026-09-24)
 - [x] 2. agent/feat/review-rule-scope-fields (completed 2026-09-24)
 - [x] 3. agent/feat/review-ledger-persistence (completed 2026-09-25)
-- [ ] 4. agent/feat/review-triage-command
+- [x] 4. agent/feat/review-triage-command (completed 2026-09-25)
 - [ ] 5. agent/feat/review-sweep-ledger
 - [ ] 6. agent/feat/review-ledger-session-hook
