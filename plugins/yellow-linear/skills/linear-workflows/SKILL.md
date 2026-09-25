@@ -295,7 +295,9 @@ BEGIN { inpem = 0; pemend = ""; incont = 0; keyind = 0; bslash = 0 }
   low = tolower(line)
   if (match(low, /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_access_key|_token|_secret|_password))["\047]?[ \t]*[=:]/)) {
     redact()
-    rest = trim(substr(line, RSTART + RLENGTH))
+    rest = substr(line, RSTART + RLENGTH)
+    sub(/(^|[ \t])#.*$/, "", rest)
+    rest = trim(rest)
     if (rest == "" || rest ~ /^[|>][-+0-9]*$/ || rest ~ /\\$/) {
       incont = 1; keyind = indent(line); bslash = (rest ~ /\\$/)
     }
