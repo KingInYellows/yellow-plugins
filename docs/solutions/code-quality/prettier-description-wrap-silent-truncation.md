@@ -57,3 +57,33 @@ settings and may not wrap. Always test in-repo.
 Add `plugins/**/*.md` to `.prettierignore` to prevent accidental formatting
 of plugin authoring files. This is a repo-wide decision (not yet made as of
 2026-06-10) — until it is made, treat the above as the working rule.
+
+---
+
+## Update — 2026-09-25
+
+### PR #873 (yellow-plugins): `commands/review/triage.md` frontmatter description
+
+Same failure mode reproduced during a `/review:pr` pass on PR #873: prettier
+reflowed the frontmatter `description:` in
+`plugins/yellow-review/commands/review/triage.md` onto multiple lines, which
+Claude Code's frontmatter parser silently truncates.
+
+This time the fix applied was a **per-file inline opt-out** rather than the
+blanket `.prettierignore` addition proposed above (still not a repo-wide
+decision as of this update): add a `# prettier-ignore` comment directly above
+the `description:` line, keeping it on one line while leaving the rest of the
+file subject to normal formatting.
+
+```yaml
+---
+name: review:triage
+# prettier-ignore
+description: 'Triage the review-findings ledger of one PR: ...'
+---
+```
+
+Prefer `# prettier-ignore` scoped to the `description:` line when only that
+field needs protecting; reserve the blanket `.prettierignore` decision for when
+the number of affected files grows large enough that per-file comments become
+their own maintenance burden.
