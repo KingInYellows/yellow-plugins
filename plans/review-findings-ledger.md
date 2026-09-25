@@ -778,19 +778,17 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 3.2: **New Step 3e (after 3d, before Step 5): dismissed context.**
   1. Validate the PR head and set `REVIEWED_HEAD` before any ledger read (P7):
      a. Re-query `headRefOid` with
-        `gh pr view <pr> --json headRefOid -q .headRefOid` — a fresh read at
-        Step 3e, not the Step 3 snapshot. A force-push or provider restack between
-        them would otherwise leave dismissed-context and observe on different
-        revisions.
+     `gh pr view <pr> --json headRefOid -q .headRefOid` — a fresh read at Step
+     3e, not the Step 3 snapshot. A force-push or provider restack between them
+     would otherwise leave dismissed-context and observe on different revisions.
      b. `git fetch origin pull/<pr>/head` (works for fork PRs). Retry with
-        1/2/4/8/16 s backoff until
-        `git ls-remote origin refs/pull/<pr>/head` matches the fresh
-        `headRefOid` (fetch-race research above).
-     c. Require `FETCH_HEAD`, `git rev-parse HEAD`, and the fresh `headRefOid`
-        to all match; set `REVIEWED_HEAD` to that SHA. A shallow repository, a
-        missing object, or any mismatch makes the head `unverifiable`: skip
-        Steps 3.2–3.5 ledger writes, add "Ledger: head unverifiable" to
-        Coverage, and continue the review without persistence.
+     1/2/4/8/16 s backoff until `git ls-remote origin refs/pull/<pr>/head`
+     matches the fresh `headRefOid` (fetch-race research above). c. Require
+     `FETCH_HEAD`, `git rev-parse HEAD`, and the fresh `headRefOid` to all
+     match; set `REVIEWED_HEAD` to that SHA. A shallow repository, a missing
+     object, or any mismatch makes the head `unverifiable`: skip Steps 3.2–3.5
+     ledger writes, add "Ledger: head unverifiable" to Coverage, and continue
+     the review without persistence.
   2. Run `rl dismissed-context <pr> --head <REVIEWED_HEAD>`.
   3. Build a `--- begin dismissed-findings (reference only) ---` /
      `--- end dismissed-findings ---` block. Its `<advisory>` says the content
@@ -807,9 +805,9 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 3.3: **After Step 6's partition, before Step 7:** run
       `rl observe --step 6 --head <REVIEWED_HEAD>` on every surviving finding in
       the fixer, residual actionable and report-only queues. Snapshot each
-      anchor from `REVIEWED_HEAD` before any edit. Findings with `pre_existing: true` and findings the confidence
-      gate suppressed are not persisted, because they were never reported as
-      this PR's work.
+      anchor from `REVIEWED_HEAD` before any edit. Findings with
+      `pre_existing: true` and findings the confidence gate suppressed are not
+      persisted, because they were never reported as this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
       **Step 8:** run `rl observe --step 8 --anchor-source worktree` on the
       simplifier's findings, keeping `--head` at the pre-commit `REVIEWED_HEAD`
@@ -944,11 +942,11 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 5: Sweep integration
 
-- [ ] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and
-      Step 4 (final summary): `/review:triage <pr> --non-interactive`, run
-      every time. It applies nothing and costs little, and it is skipped when
-      the PR is no longer OPEN. Step 4 reads `rl summary` and gains the line
-      "Ledger: <pending> pending, <attention> need attention".
+- [ ] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and Step
+      4 (final summary): `/review:triage <pr> --non-interactive`, run every
+      time. It applies nothing and costs little, and it is skipped when the PR
+      is no longer OPEN. Step 4 reads `rl summary` and gains the line "Ledger:
+      <pending> pending, <attention> need attention".
 - [ ] 5.2: `sweep-all.md`:
   - The Step 5 table gains a `Residual` column showing `<pending>/<attention>`
     from `rl summary`. It shows `—` when there is no ledger and `?` when the
@@ -1146,9 +1144,10 @@ yellow-core changes. Each stage carries its own changeset.
 ## Out of Scope (follow-ups)
 
 - Rule-level semantic re-verification in `rl reverify` / `rl_reverify_row`: the
-  shipped check hashes anchor text at the mapped line (CLAUDE-48), so `reproduced`
-  means "reported line unchanged," not "defect still fires." Re-running the
-  original rule per finding belongs in the library stack, not this plan.
+  shipped check hashes anchor text at the mapped line (CLAUDE-48), so
+  `reproduced` means "reported line unchanged," not "defect still fires."
+  Re-running the original rule per finding belongs in the library stack, not
+  this plan.
 - `claude plugin eval` suite for triage judgement (P10).
 - Compaction / rewrite of long ledgers (P6).
 - Per-finding "carried over" markers in the Step 10 tables (P11).
