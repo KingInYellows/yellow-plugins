@@ -942,12 +942,12 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 5: Sweep integration
 
-- [ ] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and Step
+- [x] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and Step
       4 (final summary): `/review:triage <pr> --non-interactive`, run every
       time. It applies nothing and costs little, and it is skipped when the PR
       is no longer OPEN. Step 4 reads `rl summary` and gains the line "Ledger:
       <pending> pending, <attention> need attention".
-- [ ] 5.2: `sweep-all.md`:
+- [x] 5.2: `sweep-all.md`:
   - The Step 5 table gains a `Residual` column showing `<pending>/<attention>`
     from `rl summary`. It shows `—` when there is no ledger and `?` when the
     library fails.
@@ -958,7 +958,7 @@ yellow-core changes. Each stage carries its own changeset.
     entirely. For each `findings/<pr>.jsonl` whose PR is not in the list, it
     calls `/review:triage --prune <pr>`, which re-checks the state before
     deleting anything.
-- [ ] 5.3: Tests: `skill-content.bats` assertions for the new steps and the
+- [x] 5.3: Tests: `skill-content.bats` assertions for the new steps and the
       truncation guard. Update the sweep descriptions in the README and
       CLAUDE.md. Changeset: `yellow-review` patch.
 
@@ -1285,5 +1285,5 @@ behaviour, so every PR passes the CI gate on its own.
 - [x] 2. agent/feat/review-rule-scope-fields (completed 2026-09-24)
 - [x] 3. agent/feat/review-ledger-persistence (completed 2026-09-25)
 - [x] 4. agent/feat/review-triage-command (completed 2026-09-25)
-- [ ] 5. agent/feat/review-sweep-ledger
+- [x] 5. agent/feat/review-sweep-ledger (completed 2026-09-25)
 - [ ] 6. agent/feat/review-ledger-session-hook

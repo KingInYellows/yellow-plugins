@@ -173,6 +173,13 @@ changed. After that it walks the remaining findings one card at a time:
 `--non-interactive` reconciles and applies nothing. `--prune <PR#>` deletes
 the ledger of a merged or closed PR.
 
+`/review:sweep` runs `/review:triage --non-interactive` after its resolve
+pass and prints `Ledger: <pending> pending, <attention> need attention`.
+`/review:sweep-all` adds a `Residual` column (`pending/attention`) to its
+summary table. It also prunes the ledgers of PRs that no longer appear in an
+all-authors open-PR query, and skips the prune when that query fails or may
+be truncated.
+
 ## Confidence gating
 
 Four conditional personas (`agent-native-reviewer`,

@@ -128,6 +128,33 @@ proceed to Step 4 or any later step.
 This is the only human prompt in the entire command. After Proceed,
 sweep-all runs unattended until the summary is printed.
 
+### Step 3b: Prune ledgers of closed PRs
+
+Review-findings ledgers live in the clone's git dir, one per PR. Delete the
+ones whose PR has closed or merged. This query is separate from Step 2's
+list: it covers every author and includes drafts.
+
+```bash
+set -u
+OPEN_JSON=$(gh pr list --state open --limit 1000 --json number) || { printf 'skip\n'; exit 0; }
+[ "$(printf '%s' "$OPEN_JSON" | jq 'length')" -lt 1000 ] || { printf 'skip\n'; exit 0; }
+DIR="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/findings"
+[ -d "$DIR" ] || exit 0
+for f in "$DIR"/*.jsonl; do
+  [ -f "$f" ] || continue
+  pr=$(basename -- "$f" .jsonl)
+  printf '%s' "$pr" | grep -Eq '^[1-9][0-9]*$' || continue
+  printf '%s' "$OPEN_JSON" | jq -e --argjson n "$pr" 'any(.[]; .number == $n)' >/dev/null || printf '%s\n' "$pr"
+done
+```
+
+`skip` means the query failed or returned 1000 rows, so the list may be
+truncated: skip pruning entirely. Otherwise, for each PR number printed,
+invoke the `Skill` tool with `skill: "review:triage"` and the args string
+`--prune <PR#>`. Triage re-checks the PR's state itself and deletes the
+ledger only when GitHub reports it `MERGED` or `CLOSED`, so a stale list
+never deletes a live ledger.
+
 ### Step 4: Sequential sweep loop
 
 For each PR in the sorted list, in order from lowest PR number to
@@ -167,20 +194,34 @@ variables do not survive across separate Bash tool calls.
 
 ### Step 5: End-of-loop summary table
 
+Read every PR's residual ledger counts in one call:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary --all
+```
+
+It prints `{"<PR#>": {"pending": N, "attention": M}, …}` for every ledger
+in this clone. For each row, the `Residual` cell is `<pending>/<attention>`,
+`—` when the PR has no ledger, and `?` when the call failed.
+
 Print a pipe-delimited markdown summary table:
 
 ```text
 [review:sweep-all] Summary
 
-| PR# | Title                            | Outcome   | Skip Reason            | Notes                        |
-|-----|----------------------------------|-----------|------------------------|------------------------------|
-| 123 | feat(yellow-debt): add scanner   | attempted |                        |                              |
-| 124 | fix(yellow-ci): lint regression  | attempted |                        |                              |
-| 125 | refactor(yellow-core): split lib | skipped   | PR closed before sweep |                              |
-| 126 | docs: update CLAUDE.md           | attempted |                        | Error: stack-provider adoption failed (…) |
+| PR# | Title                            | Outcome   | Residual | Skip Reason            | Notes                        |
+|-----|----------------------------------|-----------|----------|------------------------|------------------------------|
+| 123 | feat(yellow-debt): add scanner   | attempted | 2/1      |                        |                              |
+| 124 | fix(yellow-ci): lint regression  | attempted | —        |                        |                              |
+| 125 | refactor(yellow-core): split lib | skipped   | —        | PR closed before sweep |                              |
+| 126 | docs: update CLAUDE.md           | attempted | 0/0      |                        | Error: stack-provider adoption failed (…) |
 
-Totals: Attempted 3 | Skipped 1 | Total 4
+Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention
 ```
+
+`Residual` is `pending/attention`: pending findings are `open`, `reopened`
+or `applied` (fixed locally, not yet published); attention findings are
+`report_only` or `stale`. Work them down with `/review:triage <PR#>`.
 
 Truncate long titles at ~30 characters with `…` if needed for table
 readability. Both the table and the totals line are required.
