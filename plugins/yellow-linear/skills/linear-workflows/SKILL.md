@@ -242,7 +242,8 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
   variables (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`,
   `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`,
   `SEMGREP_APP_TOKEN`, `MORPH_API_KEY`, `CERAMIC_API_KEY`) or ends in
-  `_API_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD`. Redact the whole line
+  `_API_KEY`, `_ACCESS_KEY` (e.g. `AWS_SECRET_ACCESS_KEY`), `_TOKEN`,
+  `_SECRET` or `_PASSWORD`. Redact the whole line
   even when the value doesn't match a known key prefix.
 
 When Bash is available, pipe each fetched text block through this `awk`
@@ -272,7 +273,7 @@ BEGIN { inpem = 0 }
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
       tolower(line) ~ /bearer[ \t]+[^ \t]/ ||
       tolower(line) ~ /authorization[ \t]*:/ ||
-      tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_token|_secret|_password))["\047]?[ \t]*[=:]/) {
+      tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?["\047]?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_access_key|_token|_secret|_password))["\047]?[ \t]*[=:]/) {
     print "--- redacted credential at line " NR " ---"
   } else if (tolower(line) ~ /^[ \t]*---[ \t]*(begin|end)([ \t]|$)/) {
     print "[fenced: marker removed at line " NR "]"

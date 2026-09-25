@@ -204,6 +204,9 @@ User constraints from the dialogue:
   2. Escape fence markers.
   3. Cap the summary (ID, state type and title, at most 200 characters).
   4. Wrap it in a per-invocation fence marked reference-only.
+  5. Emit the `systemMessage` through a real JSON encoder (for example
+     `jq -n --arg m "$summary" '{systemMessage: $m}'`), never by string
+     concatenation. Redaction and fence escaping don't escape JSON syntax.
 
   The hook must never slow down or break session start:
   - Declare a short `timeout` in the hook manifest, for example 5s.

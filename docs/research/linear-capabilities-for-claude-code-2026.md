@@ -244,7 +244,7 @@ No MCP tool reads agent guidance **[schema: none observed]**.
 | Cursor background agents | 2025-08-21 | https://linear.app/changelog/page/4 |
 | Sentry Agent (root cause) | 2025-10-02 | changelog page 4 |
 | Factory | 2025-10-16 | changelog page 4 |
-| GitHub Copilot agent | 2025-10-28; Copilot cloud agent for Linear GA 2026-07-30 | changelog; https://github.blog/changelog/2026-07-23-copilot-cloud-agent-for-linear-is-now-generally-available/ |
+| GitHub Copilot agent | 2025-10-28; Copilot cloud agent for Linear GA announced by GitHub 2026-07-23 (Linear changelog entry 2026-07-30) | changelog; https://github.blog/changelog/2026-07-23-copilot-cloud-agent-for-linear-is-now-generally-available/ |
 | OpenAI Codex agent | 2025-12-04 | changelog page 3 |
 | Warp | 2025-12-11 | changelog page 3 |
 | Vercel Eve (build-your-own) | 2026-06-18 | changelog page 1 |
