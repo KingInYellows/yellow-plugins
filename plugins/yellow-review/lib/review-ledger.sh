@@ -505,6 +505,12 @@ rl_blob_file() {
 rl_line_count() { awk 'END { print NR }' "$1"; }
 rl_line_at() { awk -v n="$2" 'NR == n { print; exit }' "$1"; }
 
+# Line <n> of a file, clamped to [1, count]. Prints the clamped number on
+# the first line and the text on the second.
+rl_line_clamped() {
+  awk -v n="$2" '{ l[NR] = $0 } END { if (n > NR) n = NR; if (n < 1) n = 1; printf "%d\n%s\n", n, l[n] }' "$1"
+}
+
 # awk normalization identical to rl_normalize_line.
 RL_AWK_NORM='function norm(s) { gsub(/\t/, " ", s); gsub(/\r/, "", s); gsub(/ +/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }'
 
@@ -1051,10 +1057,7 @@ rl_build_candidate() {
   fi
   deletion=false
   [ "$where" = base ] && deletion=true
-  n=$(rl_line_count "$content")
-  [ "$n" -lt 1 ] && n=1
-  [ "$line" -gt "$n" ] && line=$n
-  text=$(rl_line_at "$content" "$line")
+  { IFS= read -r line; IFS= read -r text; } < <(rl_line_clamped "$content" "$line")
   hash=$(rl_hash_line "$text")
 
   cat_raw=$(jq -r '.category' <<<"$fj")
