@@ -41,7 +41,10 @@ now_ms() {
   esac
 }
 FOLD_BUDGET_MS=1500
+# stop starting new PRs (and cap each fold) 0.7 s before the 3 s timeout
+DEADLINE_MS=${RL_HOOK_DEADLINE_MS:-2300}
 fold_spent=0
+start_ms=$(now_ms)
 now=$(date +%s)
 week=$((7 * 24 * 3600))
 
@@ -59,7 +62,8 @@ read_counts() {
   local pr="$1" p a b size t0 t1 out
   if [ -f "$DIR/$pr.pending" ] && read -r p a b <"$DIR/$pr.pending" 2>/dev/null &&
     [[ "$p" =~ ^[0-9]+$ && "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
-    size=$(wc -c <"$DIR/$pr.jsonl" | tr -d ' ')
+    size=$(wc -c <"$DIR/$pr.jsonl")
+    size=${size//[!0-9]/}
     if [ "$b" = "$size" ]; then
       printf '%s %s 0' "$p" "$a"
       return 0
@@ -70,7 +74,14 @@ read_counts() {
     return 0
   fi
   t0=$(now_ms)
-  out=$(timeout "$(awk -v ms="$((FOLD_BUDGET_MS - fold_spent))" 'BEGIN { printf "%.3f", ms / 1000 }')" \
+  local left=$((FOLD_BUDGET_MS - fold_spent)) until_deadline
+  until_deadline=$((DEADLINE_MS - ($(now_ms) - start_ms)))
+  [ "$until_deadline" -lt "$left" ] && left=$until_deadline
+  if [ "$left" -le 0 ]; then
+    printf 'x x 0'
+    return 0
+  fi
+  out=$(timeout "$(printf '%d.%03d' $((left / 1000)) $((left % 1000)))" \
     jq -R -s -r "$FOLD_JQ" "$DIR/$pr.jsonl" 2>/dev/null) || out=''
   t1=$(now_ms)
   [[ "$out" =~ ^[0-9]+\ [0-9]+$ ]] || out='x x'
@@ -79,8 +90,15 @@ read_counts() {
 
 for f in "$DIR"/*.jsonl; do
   [ -f "$f" ] || continue
-  pr=$(basename -- "$f" .jsonl)
+  pr=${f##*/}
+  pr=${pr%.jsonl}
   [[ "$pr" =~ ^[1-9][0-9]{0,9}$ ]] || continue
+  # overall deadline (DEADLINE_MS, 2.3 s): locks and folds must not push
+  # the hook past its 3 s catalog timeout
+  if [ $(($(now_ms) - start_ms)) -ge "$DEADLINE_MS" ]; then
+    unknown="$unknown #$pr"
+    continue
+  fi
   st='' ts=0
   [ -f "$DIR/$pr.state" ] && read -r st ts <"$DIR/$pr.state" 2>/dev/null
   [[ "$ts" =~ ^[0-9]+$ ]] || ts=0
