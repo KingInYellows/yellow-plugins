@@ -21,7 +21,8 @@ User constraints from the dialogue:
 - Scope: all three areas (work loop, agent platform, PM), ranked by impact.
 - Repo setup: a **committed per-repo config file**, written by `/linear:setup`.
 - Write-back: **summaries at milestones** (plan summary when work starts,
-  wrap-up when the PR opens) with no per-post prompt once the repo opts in;
+  wrap-up when the PR opens) with no per-post prompt only when the committed
+  repo policy allows them **and** the current user has opted in locally;
   sub-issues, new issues and anything else still ask first.
 - Workspace: **solo / mostly solo**. Keep triage and cycle features light; no
   multi-team, SLA or customer-request investment.
@@ -79,15 +80,18 @@ User constraints from the dialogue:
   `.claude/`, which would make the config vanish on fresh clones. Proposed
   fields: `team` (key), `defaultProject`, `defaultLabels`, `branchFormat`
   (`linear` = use the issue's `gitBranchName`, or a custom template),
-  `writeBack` (`milestones` | `minimal`), `readOnlyAgents` (bool). Every
-  command reads it first. Without it, commands fall back to today's
-  repo-name matching and suggest running `/linear:setup`.
+  `writeBack` (`milestones` | `minimal` — **repo policy only**, whether
+  milestone summaries are permitted in this repository), `readOnlyAgents`
+  (bool). Every command reads it first. Without it, commands fall back to
+  today's repo-name matching and suggest running `/linear:setup`.
 - **`/linear:setup` becomes the repo setup wizard.** It checks MCP visibility
   and auth (OAuth or bearer API key), resolves the stack provider through
   `/stack:status` instead of probing `gt`, lets you pick the team and project,
-  writes the config, and can add a short "Linear conventions" block to the
-  repo's CLAUDE.md. That block fills the gap left by agent guidance, which the
-  MCP server doesn't expose.
+  writes the committed config, records **per-user** milestone-summary consent
+  outside the repo (in the user's Claude config dir, keyed by repo identity),
+  and can add a short "Linear conventions" block to the repo's CLAUDE.md.
+  That block fills the gap left by agent guidance, which the MCP server doesn't
+  expose.
 - **Issue-ID extraction** matches team keys case-insensitively and normalizes
   to uppercase before `get_issue`; the C1 validation is unchanged. It should
   also accept the configured team key.
@@ -121,17 +125,20 @@ User constraints from the dialogue:
      what changed, tests, anything left open.
 
   These are externally visible writes, so AGENTS.md requires filtering and
-  explicit user confirmation. The design meets that in two parts:
-  - **Consent is recorded once, per user.** The committed config holds only
-    the repo's policy (`writeBack: "milestones" | "minimal"`, meaning
-    milestone summaries are allowed here). It never records anyone's consent,
-    because teammates who clone the repo or check out a branch would inherit
-    it without agreeing. `/linear:setup` shows each user a sample summary and
-    stores their "yes" outside the repo: in the user's
-    `${CLAUDE_CONFIG_DIR:-~/.claude}` plugin data, keyed by repo. Summaries
-    post automatically only when the repo allows them and that user has
-    consented locally. Otherwise each summary is shown as a draft and posted
-    only after confirmation.
+  explicit user confirmation. The design meets that in three parts:
+  - **Repo policy is committed; consent is per user.** `.yellow-linear.json`
+    holds only whether milestone summaries are allowed (`writeBack:
+    "milestones" | "minimal"`). It never records anyone's consent, because
+    teammates who clone the repo or check out a branch would inherit it
+    without agreeing.
+  - **Automatic posts need both gates.** `/linear:setup` shows a sample
+    summary and asks two questions: whether the repo should allow milestone
+    summaries (writes repo policy) and whether *this user* wants them posted
+    automatically (stores their "yes" outside the repo in
+    `${CLAUDE_CONFIG_DIR:-~/.claude}` plugin data, keyed by repo). Summaries
+    post without a per-post prompt only when the repo policy allows them
+    **and** the current user has consented. Otherwise each summary is shown
+    as a draft and posted only after confirmation.
   - **Content is filtered before every post.** Remove local absolute paths,
     environment values and anything matching credential patterns. Limit the
     summary to what the plan or PR already makes public.
