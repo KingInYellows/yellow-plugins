@@ -115,3 +115,52 @@ schema_fields() {
   grep -q 'alias of' "$REVIEW_PR"
   jq -e '.category_aliases | has("plugin-contract") and has("adversarial") and has("project-compliance")' "$VOCAB" >/dev/null
 }
+
+# --- review-findings ledger: write points (Stage 3) -------------------------
+
+LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
+
+@test "ledger: ledger.md defines every write point both commands reference" {
+  for h in '## Conventions' '## Step 3e' '## After Step 6' '## Step 7' '## After Step 8' '## Step 9' '## Step 10'; do
+    grep -q "^$h" "$LEDGER_REF" || { echo "missing section: $h"; false; }
+  done
+  grep -q 'dismissed-context <PR> --head <REVIEWED_HEAD> --fenced' "$LEDGER_REF"
+  grep -q 'observe <PR> --head <REVIEWED_HEAD> --base <BASE_OID> --step 6' "$LEDGER_REF"
+  grep -q -- '--step 8 --anchor-source worktree' "$LEDGER_REF"
+  grep -q 'remote-head <PR>' "$LEDGER_REF"
+  grep -q 'settle <PR> --remote-head' "$LEDGER_REF"
+}
+
+@test "ledger: review-pr.md points at ledger.md at Steps 3e, 6, 7, 8, 9 and 10" {
+  grep -q '^### Step 3e: Review-findings ledger' "$REVIEW_PR"
+  grep -q 'references/review-pr/ledger.md' "$REVIEW_PR"
+  grep -q '^#### Ledger write (after partition)' "$REVIEW_PR"
+  grep -q 'ledger.md "Step 7"' "$REVIEW_PR"
+  grep -q 'ledger.md.s "After Step 8"' "$REVIEW_PR"
+  grep -q 'ledger.md "Step 9" item 1' "$REVIEW_PR"
+  grep -q '^- Ledger: <new> new' "$REVIEW_PR"
+  grep -q 'headRefOid,baseRefOid' "$REVIEW_PR"
+  # the write after partition sits between the quality gates and Step 7
+  gates=$(grep -n '^#### Quality gates' "$REVIEW_PR" | cut -d: -f1)
+  write=$(grep -n '^#### Ledger write (after partition)' "$REVIEW_PR" | cut -d: -f1)
+  step7=$(grep -n '^### Step 7: Apply Fixes' "$REVIEW_PR" | cut -d: -f1)
+  [ "$gates" -lt "$write" ] && [ "$write" -lt "$step7" ]
+}
+
+@test "ledger: review-all.md mirrors every write point" {
+  grep -q 'references/review-pr/ledger.md' "$REVIEW_ALL"
+  grep -q 'SOURCE=review-all' "$REVIEW_ALL"
+  grep -q 'mirrors review-pr.md Step 3e' "$REVIEW_ALL"
+  grep -q 'run ledger.md.s "After$' "$REVIEW_ALL"
+  grep -q 'ledger.md "Step 7"' "$REVIEW_ALL"
+  grep -q 'ledger.md "After Step 8"' "$REVIEW_ALL"
+  grep -q 'ledger.md "Step 9" item 1' "$REVIEW_ALL"
+  grep -q 'ledger.md "Step 10"' "$REVIEW_ALL"
+  grep -q 'headRefOid,baseRefOid' "$REVIEW_ALL"
+}
+
+@test "ledger: the dismissed block is injected unchanged and skipped in legacy mode" {
+  grep -q '^8\. The dismissed-findings block from Step 3e' "$REVIEW_PR"
+  tr '\n' ' ' <"$LEDGER_REF" | grep -q 'Do not rebuild or reformat the block'
+  grep -q 'legacy mode' "$LEDGER_REF"
+}
