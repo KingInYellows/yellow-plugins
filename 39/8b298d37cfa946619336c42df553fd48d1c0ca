@@ -1,0 +1,38 @@
+plugins/yellow-review/hooks/scripts/session-start.sh
+  s_520e182b5f7c63::t_108f735fe95ffe 1-126
+  s_520e182b5f7c63::t_1184fb3a455922 127-133
+.changeset/review-ledger-session-hook.md
+  s_520e182b5f7c63::t_cc5c9f54096b0b 1-8
+catalog/plugins/yellow-review.json
+  s_520e182b5f7c63::t_96975d82633215 22-35,48
+docs/architecture-overview.md
+  s_520e182b5f7c63::t_341345f05197e3 436
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_8c4c43d1202921 899,906,946,957,980,1216
+plugins/yellow-review/.claude-plugin/plugin.json
+  s_520e182b5f7c63::t_d4478785854772 19-32
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_941c22b78c2b20 201-213,319-321,345-346
+plugins/yellow-review/README.md
+  s_520e182b5f7c63::t_f283cd11329946 176-185
+plugins/yellow-review/tests/session-start.bats
+  s_520e182b5f7c63::t_ad601eb3d49cd1 1-125
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_520e182b5f7c63::t_02ebc2f49638b3 967-980
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "398b298d37cfa946619336c42df553fd48d1c0ca",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
