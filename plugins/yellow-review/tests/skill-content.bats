@@ -193,3 +193,34 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q '"\$RL" prune <PR>' "$TRIAGE"
   ! grep -q 'rm -' "$TRIAGE"
 }
+
+# --- sweep integration (Stage 5) --------------------------------------------
+
+SWEEP="$COMMANDS_DIR/sweep.md"
+SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
+
+@test "sweep: unattended triage runs after resolve and before the summary, skipped when not open" {
+  resolve=$(grep -n '^### Step 3: Run /review:resolve' "$SWEEP" | cut -d: -f1)
+  triage=$(grep -n '^### Step 3b: Reconcile the review-findings ledger' "$SWEEP" | cut -d: -f1)
+  summary=$(grep -n '^### Step 4: Final summary' "$SWEEP" | cut -d: -f1)
+  [ "$resolve" -lt "$triage" ] && [ "$triage" -lt "$summary" ]
+  grep -q '`<PR#> --non-interactive`' "$SWEEP"
+  grep -q 'skill: "review:triage"' "$SWEEP"
+  grep -q 'longer `OPEN`, skip this step' "$SWEEP"
+  grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
+}
+
+@test "sweep-all: pruning skips on a failed or possibly truncated open-PR query" {
+  grep -q '^### Step 3b: Prune ledgers of closed PRs' "$SWEEP_ALL"
+  grep -q "gh pr list --state open --limit 1000 --json number) || { printf 'skip" "$SWEEP_ALL"
+  grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
+  grep -q '`--prune <PR#>`' "$SWEEP_ALL"
+  # the prune query covers every author, not the --author @me sweep list
+  ! grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+}
+
+@test "sweep-all: the summary table carries a Residual column from the ledger" {
+  grep -q 'review-ledger.sh" summary --all' "$SWEEP_ALL"
+  grep -q '^| PR# | Title .*| Outcome   | Residual |' "$SWEEP_ALL"
+  grep -q '`—` when the PR has no ledger, and `?` when the call failed' "$SWEEP_ALL"
+}

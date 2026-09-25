@@ -144,17 +144,40 @@ addressed) and routes each thread through a `pr-comment-resolver` agent
 that either submits a fix or posts a false-positive response and marks
 the thread resolved.
 
+### Step 3b: Reconcile the review-findings ledger
+
+Run this every time. It applies nothing and costs little. First re-check
+the state with `gh pr view <PR#> --json state -q .state`; when the PR is no
+longer `OPEN`, skip this step and report `Ledger: skipped (PR <state>)` in
+Step 4. Otherwise invoke the `Skill` tool with `skill: "review:triage"` and
+the args string `<PR#> --non-interactive`. Unattended triage re-verifies
+every ledger finding against the fetched PR head (published fixes become
+`fixed`, vanished anchors `stale`) and never edits, commits or prompts.
+
+Then read the counts:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary <PR#>
+```
+
+The output is `{"<PR#>": {"pending": N, "attention": M}}`, or `{}` when the
+PR has no ledger. Keep both numbers for Step 4.
+
 ### Step 4: Final summary
 
-Reached after Step 2 (`/review:pr`) and Step 3 (`/review:resolve`) have
-run. Print a summary line for the run:
+Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
+3b (ledger) have run. Print a summary line for the run:
 
 ```text
 [review:sweep] PR #<PR#>
   Review:  completed (unattended; see /review:pr output above)
   Resolve: <one-line summary from /review:resolve, e.g., "5 threads
             resolved, 2 fixes applied" or "no open threads found">
+  Ledger:  <pending> pending, <attention> need attention — /review:triage <PR#>
 ```
+
+Print `Ledger:  none` when `summary` returned `{}`, and
+`Ledger:  unavailable` when it failed.
 
 If `/review:resolve`'s output cannot be reduced to a one-line summary,
 report `Resolve: completed (output unavailable — see above)` rather
@@ -184,5 +207,7 @@ than synthesizing a plausible-looking summary.
 - **`/review:resolve` returns no extractable summary**: report
   `Resolve: completed (output unavailable — see above)` rather than
   synthesizing one.
+- **Ledger step fails** (Step 3b): report `Ledger:  unavailable` and finish
+  normally — the ledger never blocks a sweep.
 - **Zero unresolved threads** is a clean outcome — `/review:resolve`
   reports that as success and `/review:sweep` does the same.
