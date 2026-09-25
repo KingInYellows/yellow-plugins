@@ -235,7 +235,7 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
 - `AIza` (Google API keys)
 - `ghp_` / `gho_` / `ghs_` / `ghu_` and `github_pat_` (GitHub tokens)
 - `AKIA` (AWS access keys)
-- `Bearer ` and `Authorization:` header values
+- `Bearer <token>` (any case, any length) and `Authorization:` header values
 - `ses_` (AWS SES keys)
 - Named credential assignments: any `NAME=value`, `NAME: value` or
   `export NAME=value` where `NAME` is one of the repository's credential
@@ -270,8 +270,8 @@ BEGIN { inpem = 0 }
       line ~ /github_pat_[A-Za-z0-9_]{20,}/ ||
       line ~ /AKIA[0-9A-Z]{16}/ ||
       line ~ /ses_[A-Za-z0-9]{16,}/ ||
-      line ~ /[Bb]earer[ \t]+[A-Za-z0-9._~+\/=-]{8,}/ ||
-      line ~ /[Aa]uthorization[ \t]*:/ ||
+      tolower(line) ~ /bearer[ \t]+[^ \t]/ ||
+      tolower(line) ~ /authorization[ \t]*:/ ||
       tolower(line) ~ /(^|[^a-z0-9_])(export[ \t]+)?(devin_service_user_token|devin_org_id|[a-z0-9_]*(_api_key|_token|_secret|_password))[ \t]*[=:]/) {
     print "--- redacted credential at line " NR " ---"
   } else {
