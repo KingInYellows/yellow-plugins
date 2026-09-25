@@ -247,25 +247,19 @@ Minimum patterns (PEM private-key blocks are redacted in full, `BEGIN` through `
   `_SECRET` or `_PASSWORD`. Redact the whole line
   even when the value doesn't match a known key prefix.
 
-**Never put raw Linear text inside a shell command.** An MCP response lives
-in the model's context, not in a shell variable. Pasting it into a command
-string, heredoc or `printf` lets quotes, `$(...)` or heredoc delimiters in a
-malicious issue change the command before anything is redacted. Use one of
-these two channels:
+**Redact in-process. Never move raw Linear text anywhere else.** An MCP
+response is already in the model's context. Apply the patterns above to it
+directly, line by line, before displaying, writing or passing on any of it.
+- Never paste raw Linear text into a shell command, heredoc or `printf`.
+  Quotes, `$(...)` or heredoc delimiters in a malicious issue could change the
+  command before anything is redacted.
+- Never write the unredacted payload to a file, temp files included. A
+  cancellation or error would leave the secret on disk.
 
-1. **File channel (callers with Write and Bash).**
-   - Create a private temp file outside the worktree:
-     `RAW=$(mktemp "${TMPDIR:-/tmp}/linear-raw.XXXXXX")`. Print the path.
-   - Write the raw MCP text to that literal path with the **Write tool**,
-     which does no shell interpretation.
-   - Run the program below on the file (`awk '...' "$RAW"`), keep only its
-     output, then `rm -f -- "$RAW"`.
-2. **In-process channel (callers without Write, such as
-   `linear-issue-loader`).** Apply the same patterns yourself, line by line,
-   and never shell out with the raw text.
-
-The program implements every pattern above, including case-insensitive named
-assignments, and runs under mawk, gawk and busybox awk:
+The `awk` program below is the executable definition of the same patterns. It
+exists to test and review them (it runs under mawk, gawk and busybox awk), and
+to redact text that is already on disk. It is **not** a channel for raw MCP
+responses:
 
 ```bash
 awk '
@@ -298,7 +292,7 @@ BEGIN { inpem = 0 }
   } else {
     print line
   }
-}' "$RAW"
+}' "$FILE"
 ```
 
 When sanitizing in prose only, still enforce the same rule: never print or
