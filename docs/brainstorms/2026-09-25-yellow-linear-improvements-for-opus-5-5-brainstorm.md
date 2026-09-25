@@ -105,7 +105,13 @@ User constraints from the dialogue:
   project and milestone, linked Linear documents, and team Agent Skills
   (`list_agent_skills` / `get_agent_skill`), all fenced as untrusted. The
   brainstorm doc it writes becomes a full context packet, so a long session
-  doesn't have to go back to Linear for it.
+  doesn't have to go back to Linear for it. Fencing only changes how the
+  model reads the text; it doesn't remove anything. So before writing, run
+  credential detection over every piece of remote content and replace each
+  hit with `--- redacted credential at line N ---` (AGENTS.md). The packet
+  lives in the worktree and can end up committed. Today's `/linear:work`
+  already writes descriptions and comments without redaction, so this is a
+  P0 fix too.
 - **Uses the issue's branch name.** `/linear:work` reads `gitBranchName`
   (or the configured `branchFormat`) and passes it to the stack provider.
 - **Milestone summaries (consented once, then automatic).** Two points,
@@ -116,11 +122,16 @@ User constraints from the dialogue:
 
   These are externally visible writes, so AGENTS.md requires filtering and
   explicit user confirmation. The design meets that in two parts:
-  - **Consent is recorded once.** `/linear:setup` shows a sample summary and
-    asks whether to post milestone summaries automatically. Only a "yes"
-    writes `writeBack: "milestones"` to the committed config. Without that
-    opt-in, each summary is shown as a draft and posted only after
-    confirmation.
+  - **Consent is recorded once, per user.** The committed config holds only
+    the repo's policy (`writeBack: "milestones" | "minimal"`, meaning
+    milestone summaries are allowed here). It never records anyone's consent,
+    because teammates who clone the repo or check out a branch would inherit
+    it without agreeing. `/linear:setup` shows each user a sample summary and
+    stores their "yes" outside the repo: in the user's
+    `${CLAUDE_CONFIG_DIR:-~/.claude}` plugin data, keyed by repo. Summaries
+    post automatically only when the repo allows them and that user has
+    consented locally. Otherwise each summary is shown as a draft and posted
+    only after confirmation.
   - **Content is filtered before every post.** Remove local absolute paths,
     environment values and anything matching credential patterns. Limit the
     summary to what the plan or PR already makes public.
@@ -178,7 +189,7 @@ User constraints from the dialogue:
 5. Where do milestone summaries hook in: yellow-core's `/flow:plan` and
    `/flow:work`, or only yellow-linear's own commands? The cross-plugin
    contract must degrade cleanly when yellow-linear isn't installed.
-6. Does a one-time consent recorded in the committed config satisfy the
+6. Does a one-time consent recorded per user (outside the repo) satisfy the
    AGENTS.md rule that externally visible mutations need explicit
    confirmation? Or does the safety model need an explicit new tier for
    consented automatic comments? Settle this in `/flow:plan` before
