@@ -1,0 +1,137 @@
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_520e182b5f7c63::t_ac209baedbb9f9 966-974
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_06861e097d1394 584,587,590,593,595,612,614,616,640,644,648,683,699,1279-1284,1289
+  s_520e182b5f7c63::t_80487279652efb 705,731,742,745,748,752,1285
+  s_520e182b5f7c63::t_e5690ce80f22b4 756,778,805,811,823,840,842,855,859,866,1286
+  s_520e182b5f7c63::t_739721c004e95c 872,877,893,903,929,940,1287
+  s_520e182b5f7c63::t_dc14a1d70b56e0 950,961,1288
+plugins/yellow-review/.claude-plugin/plugin.json
+  s_520e182b5f7c63::t_1c775175108a99 18-26
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_53e14a164013d4 178-183,188-192,200,327-330
+  s_520e182b5f7c63::t_d8fb7825f0c132 57-59,61-62,177,193-199
+  s_520e182b5f7c63::t_dd665662f0735d 55,84-88,184-187,232-235
+  s_520e182b5f7c63::t_e9ad206cd6306c 75-76,79-83
+plugins/yellow-review/lib/review-ledger-vocab.json
+  s_520e182b5f7c63::t_ac9ed81d12fa31 1-93,1-19,21-93
+plugins/yellow-review/lib/review-ledger.sh
+  s_520e182b5f7c63::t_be65e441f7b7f4 1-621,630-658,661-667,669-924,930-1092,1100-1197,1200-1206,1208-1218,1220-1226,1228-1231,1233-1238,1240-1243,1245-1246,1248-1252,1254,1256-1317,1319-1323,1325-1421,1423,1432-1441,1448-1541,1839-1846,1853-1874,1876-1885
+  s_58268e9f7cfc1b::t_b1c312f821521a 622-629
+  s_58268e9f7cfc1b::t_08e7b63c7674a7 668
+  s_58268e9f7cfc1b::t_00d6cfd4924f33 659-660
+  s_58268e9f7cfc1b::t_0c159462ae9121 925-929
+  s_520e182b5f7c63::t_c941cdf7699415 1093-1099,1198-1199,1207,1219,1227,1232,1239,1244,1247,1253,1255,1318,1324,1422,1424-1431,1442-1447,1542-1671,1847-1849
+  s_520e182b5f7c63::t_b348d718222e33 1672-1838,1850-1852,1875
+.changeset/review-ledger-lib.md
+  s_520e182b5f7c63::t_6cb2c4c0ef4d97 1-7
+plugins/yellow-review/tests/mocks/gh
+  s_520e182b5f7c63::t_929aed806f9f1d 55-64,77
+plugins/yellow-review/tests/helpers/ledger-repo.bash
+  s_520e182b5f7c63::t_7d1f06d7bcf54a 1-58
+catalog/plugins/yellow-review.json
+  s_520e182b5f7c63::t_9e34557ef21007 22-29
+plugins/yellow-review/tests/review-ledger.bats
+  s_520e182b5f7c63::t_61a566ec8962e8 1-558,1-234,236-558,566-589,566-589,614-639,614-639
+  s_58268e9f7cfc1b::t_e2b52272a21520 559-565
+  s_58268e9f7cfc1b::t_cde725af7c4d3d 590-599
+  s_58268e9f7cfc1b::t_83885b4f63e33c 600-613
+  s_520e182b5f7c63::t_e5d11791bdf834 640-743
+  s_520e182b5f7c63::t_421439da42ee93 744-914
+.github/workflows/validate-schemas.yml
+  s_520e182b5f7c63::t_583571aec314a1 1408-1410
+.changeset/review-rule-scope-fields.md
+  s_520e182b5f7c63::t_f500c9442abc49 1-10
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_520e182b5f7c63::t_6e6ded51c4da43 116-117,133-137
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_520e182b5f7c63::t_96f7f15320d6a7 138-139,155-159
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_520e182b5f7c63::t_303afacb1bdb3a 195-196,215-219
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_9ca5cc9d071696 261-262,280-284
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_520e182b5f7c63::t_0c543dbc9d6dc5 207-208,224-228
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_d0bc89ad8e60eb 144-145,161-165
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_520e182b5f7c63::t_bfaf59887c0c00 107-108,127-131
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_520e182b5f7c63::t_2e4facfcb8f7d3 112-113,132-136
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_520e182b5f7c63::t_11a74e9f4adffa 197-198,221-225
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_520e182b5f7c63::t_100352f24bafaf 142-143,162-166
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_520e182b5f7c63::t_11a88bef42eed0 169-170,189-193
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_520e182b5f7c63::t_b61ad99c0e5755 111-112,131-135
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_520e182b5f7c63::t_0050bffe36f06c 163-164,183-187
+plugins/yellow-review/commands/review/review-all.md
+  s_520e182b5f7c63::t_79fec1855230eb 266-269,281-282,293-296,425-426
+  s_520e182b5f7c63::t_a5541f851cca61 160,212-221,324-327,332-333,342-343,372-376,427-428
+plugins/yellow-review/commands/review/review-pr.md
+  s_520e182b5f7c63::t_95e35ca616b890 597-618,626-627,640-641,660-668,712-713,820,834-839,875-878,1108-1109
+  s_520e182b5f7c63::t_c2bf4324f1da8f 85,294-302,619-621,940-946,968-969,983-985,1025-1029,1112
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_520e182b5f7c63::t_5780edaf596c98 164-165,181-187
+plugins/yellow-review/tests/skill-content.bats
+  s_520e182b5f7c63::t_bf7f71f35f05cb 46-111
+  s_520e182b5f7c63::t_3d094b103afebc 112-160
+  s_520e182b5f7c63::t_f137d0f390e3f5 161-195
+  s_520e182b5f7c63::t_2c9d1bbb3ac639 196-226
+plugins/yellow-review/references/review-pr/ledger.md
+  s_520e182b5f7c63::t_aeed3c5d5389f7 1-5,8-29,34-44,55-106,109-147,151-157
+  s_520e182b5f7c63::t_fe8c78bae0e080 149-150
+  s_520e182b5f7c63::t_8a88d3fe1f47b5 6-7
+  s_520e182b5f7c63::t_eb25cbaafecd5f 30-33
+  s_520e182b5f7c63::t_ff1292fb6e7c15 45-47,52-54
+  s_520e182b5f7c63::t_304169f5113e9c 107-108
+  s_520e182b5f7c63::t_5ff152d98785ae 148
+  s_520e182b5f7c63::t_1ab4f000c818b8 48-51
+.changeset/review-ledger-persistence.md
+  s_520e182b5f7c63::t_43b491a6a1fb70 1-9
+plugins/yellow-review/README.md
+  s_520e182b5f7c63::t_9d097c1e402d09 19-21,129-158
+  s_520e182b5f7c63::t_c03fce8f57bbfa 37,159-175
+  s_520e182b5f7c63::t_e6582cd6505818 176-182
+plugins/yellow-review/commands/review/setup.md
+  s_520e182b5f7c63::t_43b0ba6fc9be79 11-12,52-77,88-93,100-109,121
+plugins/yellow-review/commands/review/triage.md
+  s_520e182b5f7c63::t_f2a2f526b5deb2 1-208
+.changeset/review-triage-command.md
+  s_520e182b5f7c63::t_694b45011c1611 1-10
+README.md
+  s_520e182b5f7c63::t_8f2c2db9502be7 41,276
+.changeset/review-sweep-ledger.md
+  s_520e182b5f7c63::t_5ae484d79ad8b3 1-7
+plugins/yellow-review/commands/review/sweep-all.md
+  s_520e182b5f7c63::t_26f79f2782fc15 131-157,197-206,212-217,219,222-225
+plugins/yellow-review/commands/review/sweep.md
+  s_520e182b5f7c63::t_e1004f7036b433 147-165,168-169,176,179-181,210-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ca2856a5c58ab5cebc01bfe3279fcfc75b01f631",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
