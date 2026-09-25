@@ -69,8 +69,12 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
   "$RL" remote-head <PR>
   ```
 
-  If `remote-head` exits 6, continue: `reconcile` reports every finding it
-  cannot check as unverifiable instead of changing it.
+  `remote-head` re-reads `headRefOid` itself and prints the OID it
+  confirmed. Use that printed OID as `<headRefOid>` for every later step
+  (the edit gate, `reconcile`, `cards`, every transition): the PR may have
+  advanced since the metadata query above. If `remote-head` exits 6,
+  continue with the queried `headRefOid`: `reconcile` reports every
+  finding it cannot check as unverifiable instead of changing it.
 
 ## Step 4: Edit gate
 
@@ -139,10 +143,14 @@ For each card, in the printed order, ask with AskUserQuestion which action
 to take. Offer only the actions legal for the state printed on that card,
 per `rl_edge_ok` in `lib/review-ledger.sh`: Apply and Restore file need a
 legal `→ applied` edge (not from `stale`); Dismiss needs a legal
-`→ dismissed` edge (not from `applied`). Skip and Stop are always offered.
+`→ dismissed` edge (not from `applied`). Neither Apply nor Restore file is
+offered on an `applied` card either: `applied → applied` is legal only with
+`--fix-sha` or `--published-head`, so a new edit there could not be
+recorded — Step 8's commit and settle move it on. Skip and Stop are always
+offered.
 
-- **Apply** — offered for `open`, `reopened`, `report_only` and `applied`
-  cards, never `stale`. Needs the edit gate. If the gate is closed, offer
+- **Apply** — offered for `open`, `reopened` and `report_only` cards, never
+  `stale` or `applied`. Needs the edit gate. If the gate is closed, offer
   to check the PR out through the active stacked-PR provider (invoke the
   `Skill` tool with `skill: "stack-provider-router"`, then check out
   `headRefName` with that provider, as `review-pr.md` Step 3 does) or
@@ -161,9 +169,10 @@ legal `→ applied` edge (not from `stale`); Dismiss needs a legal
 - **Dismiss** — offered for every card except `applied` (no legal
   `→ dismissed` edge from `applied`). Ask for the reason (the
   AskUserQuestion "Other" free-text field) and for any paths the reason
-  depends on, such as the guard that makes a sink safe. Write the reason
-  to a file with the Write tool, and the dependency paths as a JSON array
-  of strings to a second file, then:
+  depends on, such as the guard that makes a sink safe. Create a fresh
+  `mktemp -d` directory, redact any credential-shaped substring from the
+  reason, and write the reason to a file there with the Write tool and the
+  dependency paths as a JSON array of strings to a second file, then:
 
   ```bash
   RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
@@ -171,15 +180,17 @@ legal `→ applied` edge (not from `stale`); Dismiss needs a legal
     --reason "$(cat <reason-file>)" --depends-on-json "$(cat <deps-file>)"
   ```
 
-  Leave out `--depends-on-json` when there are no dependency paths. Exit 3
+  Remove that directory as soon as the transition returns, on success or
+  failure. Leave out `--depends-on-json` when there are no dependency
+  paths. Exit 3
   names a dependency entry by number: a dependency must exist as a
   regular file at the PR head. Tell the human to drop that path or keep
   the finding open. While every dependency blob is unchanged, the dismissal
   keeps the finding out of later reviews; once one changes, the next review
   reopens it.
 - **Restore file** — offered only for a card marked `deletion` whose state
-  is `open`, `reopened`, `report_only` or `applied` (never `stale`, which
-  has no legal `→ applied` edge), never in unattended mode, and only with
+  is `open`, `reopened` or `report_only` (never `stale`, which has no legal
+  `→ applied` edge, or `applied`), never in unattended mode, and only with
   the edit gate open:
 
   ```bash
