@@ -556,6 +556,13 @@ pr_with_finding() {
   [ "$(rl_verify_scope "$BATS_TEST_TMPDIR/d.md" d.md 5 'Top > Dup' | cut -f2)" = "Top > Dup" ]
 }
 
+@test "CLAUDE-49: a mismatched fence marker inside a backtick block does not close it" {
+  source "$RL"
+  printf '# Doc\n\n## Real Section\n\n```text\n~~~\n## Fake Heading\ncontent\n```\n\nTrailer.\n' >|"$BATS_TEST_TMPDIR/f.md"
+  out=$(rl_md_heading_path "$BATS_TEST_TMPDIR/f.md" 8)
+  [ "$out" = "$(printf 'Doc > Real Section\tReal Section\t3\t11\t1')" ]
+}
+
 @test "CLAUDE-49: without ctags two identical code handlers stay separate" {
   printf 'admin = {\n  createUser() { run(x) },\n}\nhandlers = {\n  createUser() { run(x) },\n}\n' >|u.js
   H=$(commit_all js)
@@ -578,6 +585,30 @@ pr_with_finding() {
   [ "$(fold | jq '.findings | length')" -eq 2 ]
   observe "$H" "[$(finding u.py 3 '{"scope":"Admin.create_user"}'), $(finding u.py 7 '{"scope":"Handlers.create_user"}')]" >/dev/null
   [ "$(fold | jq -r '[.findings[] | select(.obs.scope_status == "verified") | .obs.scope] | sort | join(",")')" = "Admin.create_user,Handlers.create_user" ]
+}
+
+@test "CLAUDE-49: ctags cache is keyed by filename, not just content" {
+  source "$RL"
+  rl_ctags_usable || skip "universal-ctags not installed"
+  printf 'def run():\n    pass\n' >|blob.content
+  content="$PWD/blob.content"
+  r=$(rl_ctags_scope "$content" a.py 1 run)
+  [ "$(printf '%s' "$r" | cut -f1)" = run ]
+  ! rl_ctags_scope "$content" a.unrecognizedext 1 run
+}
+
+@test "CLAUDE-49: a hash rematch within the window is rejected outside the recorded scope" {
+  printf '# Doc\n## A\nflag one\n## B\nflag one\n' >|s2.md
+  H=$(commit_all scoped-dup)
+  observe "$H" "[$(finding s2.md 3 '{"scope":"A","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  id=$(ids)
+  [ "$(fold | jq -r '.findings[0].obs.scope')" = "Doc > A" ]
+  transition "$id" applied --head "$H" >/dev/null
+  # fixing the anchor under A leaves an identical line two rows away under B;
+  # a scope-blind hash rematch would wrongly call this still reproduced.
+  sed -i.bak '3s/.*/flag two/' s2.md && rm s2.md.bak
+  H2=$(commit_all fix-a)
+  [ "$("$RL" reverify "$LEDGER_PR" "$id" --head "$H2")" = not_reproduced ]
 }
 
 # --- summary, run ids, worktree anchors -------------------------------------
