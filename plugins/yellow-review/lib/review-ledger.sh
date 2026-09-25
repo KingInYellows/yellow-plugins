@@ -1038,6 +1038,8 @@ rl_build_candidate() {
   if [ -z "$cat" ]; then
     cat=maintainability
   fi
+  cat_stored=${cat_raw:0:64}
+  rl_suspicious "$cat_stored" && cat_stored='[withheld]'
   rule_raw=$(jq -r '.rule // ""' <<<"$fj")
   scope_claimed=$(jq -r '.scope // ""' <<<"$fj")
   if [ -z "$rule_raw" ]; then rule=unclassified; else rule=$(rl_validate_rule "$cat" "$rule_raw"); fi
@@ -1068,7 +1070,7 @@ rl_build_candidate() {
     fp=$(jq -cn --arg f "$file" --arg c "$cat" --arg r "$rule" --arg s "$scope" --arg h "$hash" --arg o "$occ" \
       '[$f, $c, $r, $s, $h, null, (if $o == "" then null else $o end)]' | rl_sha256)
   fi
-  jq -cn --argjson f "$fj" --arg fp "$fp" --arg cat "$cat" --arg cat_raw "$cat_raw" --arg rule "$rule" \
+  jq -cn --argjson f "$fj" --arg fp "$fp" --arg cat "$cat" --arg cat_stored "$cat_stored" --arg rule "$rule" \
     --arg scope "$scope" --arg sc "$scope_claimed" --arg ss "$scope_status" --arg occ "$occ" \
     --arg file "$file" --argjson line "$line" --argjson del "$deletion" --arg hash "$hash" \
     --argjson alines "$alines" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
@@ -1078,7 +1080,7 @@ rl_build_candidate() {
      reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
                   elif ($f.reviewer | type) == "string" then [$f.reviewer] else ["unknown"] end)
                  | map(select(type == "string") | gsub("[^A-Za-z0-9._-]"; "")) | unique),
-     severity: $f.severity, category: $cat, category_raw: ($cat_raw | .[0:64] | gsub("[^A-Za-z0-9 ._-]"; "")),
+     severity: $f.severity, category: $cat, category_raw: ($cat_stored | gsub("[^A-Za-z0-9 ._\\[\\]-]"; "")),
      rule: $rule, scope: $scope, scope_claimed: ($sc | nn), scope_status: $ss, occ: ($occ | nn),
      file: $file, line: $line, deletion: $del, anchor_hash: $hash, anchor_lines: $alines,
      anchor_withheld: $withheld, anchor_source: $src, confidence: $f.confidence,
