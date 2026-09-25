@@ -1207,6 +1207,11 @@ yellow-core changes. Each stage carries its own changeset.
 
 ## Out of Scope (follow-ups)
 
+- Post-commit re-observation of `anchor_source: worktree` findings (task 3.4
+  gap): once Step 9's fix commit exists, run `rl observe` again for each
+  worktree-anchored finding, anchored to that commit/tree so later
+  reconciliation maps its line normally. Needs a new `--step` value alongside
+  the current `6|8`.
 - Rule-level semantic re-verification in `rl reverify` / `rl_reverify_row`: the
   shipped check hashes anchor text at the mapped line (CLAUDE-48), so
   `reproduced` means "reported line unchanged," not "defect still fires."
