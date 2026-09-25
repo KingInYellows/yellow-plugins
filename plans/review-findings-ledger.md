@@ -231,13 +231,14 @@ it. None is out of scope.
 
 - **Test.** End-to-end observe→restore (`review-ledger.bats`, task 1.11): a
   fixture where base has `lib/util.sh` and head deletes it. Feed a
-  `deletion: true` finding through `observe --step 6 --head <headRefOid>
-  --base <baseRefOid>`; assert the anchor snapshots from the base tree (not
-  rejected), the observation carries `deletion: true`, and fold shows it
-  pending. Then run the restore helper on that ledger record; assert restore
-  writes the base blob byte-for-byte and `git diff --cached` shows the re-add.
-  This path must not rely on a pre-seeded observation — `observe` is the
-  entry point. Refused restore cases (unit tests against the helper directly):
+  `deletion: true` finding through
+  `observe --step 6 --head <headRefOid> --base <baseRefOid>`; assert the anchor
+  snapshots from the base tree (not rejected), the observation carries
+  `deletion: true`, and fold shows it pending. Then run the restore helper on
+  that ledger record; assert restore writes the base blob byte-for-byte and
+  `git diff --cached` shows the re-add. This path must not rely on a pre-seeded
+  observation — `observe` is the entry point. Refused restore cases (unit tests
+  against the helper directly):
   - the parent `lib` is a symlink to `/tmp/outside`;
   - the destination is a dangling symlink;
   - the base mode is `120000`;
@@ -858,9 +859,8 @@ yellow-core changes. Each stage carries its own changeset.
       can offer Restore. The end-to-end observe→restore test (CLAUDE-47, task
       1.11) must carry a deletion finding through `observe` into restore, not
       only a pre-seeded record fed straight to `restore`. Findings with
-      `pre_existing: true` and findings the
-      confidence gate suppressed are not persisted, because they were never
-      reported as this PR's work.
+      `pre_existing: true` and findings the confidence gate suppressed are not
+      persisted, because they were never reported as this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
       **Step 8:** run `rl observe --step 8 --anchor-source worktree` on the
       simplifier's findings, keeping `--head` at the pre-commit `REVIEWED_HEAD`
