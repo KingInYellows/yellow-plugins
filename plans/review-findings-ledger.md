@@ -944,12 +944,11 @@ yellow-core changes. Each stage carries its own changeset.
 
 ### Stage 5: Sweep integration
 
-- [ ] 5.1: `sweep.md` gains a reconciliation step inserted between the
-      `/review:resolve` step and the final summary step, so the summary can
-      report post-triage counts: `/review:triage <pr> --non-interactive`, run
+- [ ] 5.1: `sweep.md` gains Step 3b between Step 3 (`/review:resolve`) and
+      Step 4 (final summary): `/review:triage <pr> --non-interactive`, run
       every time. It applies nothing and costs little, and it is skipped when
-      the PR is no longer OPEN. The final summary step reads `rl summary` and
-      gains the line "Ledger: <pending> pending, <attention> need attention".
+      the PR is no longer OPEN. Step 4 reads `rl summary` and gains the line
+      "Ledger: <pending> pending, <attention> need attention".
 - [ ] 5.2: `sweep-all.md`:
   - The Step 5 table gains a `Residual` column showing `<pending>/<attention>`
     from `rl summary`. It shows `—` when there is no ledger and `?` when the
