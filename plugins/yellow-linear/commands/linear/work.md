@@ -180,8 +180,10 @@ Title: <sanitized issue title>
 Every value that came from Linear sits inside a nonce fence, including titles,
 status, assignee, labels, acceptance criteria and cross-reference titles. Only
 the validated `<ISSUE-ID>` appears outside the fences, as the document heading.
-The `- <ISSUE-ID>: <title>` lines keep the format that `/flow:plan` and
-`gt-stack-plan` parse from `## Linear Issues`; they skip the fence lines.
+The `- <ISSUE-ID>: <title>` lines inside the list fence keep the format that
+`/flow:plan` and `gt-stack-plan` parse from `## Linear Issues`; they skip the
+fence lines. `/flow:plan` extracts validated IDs only and does not propagate
+titles into plan metadata.
 
 `<NONCE>` is a fresh random value for each run, for example
 `od -An -N6 -tx1 /dev/urandom | tr -d ' \n'`. Remote text never contains it,
