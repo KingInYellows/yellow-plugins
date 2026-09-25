@@ -1,0 +1,41 @@
+.changeset/review-ledger-lib.md
+  s_520e182b5f7c63::t_6cb2c4c0ef4d97 1-7
+.github/workflows/validate-schemas.yml
+  s_520e182b5f7c63::t_583571aec314a1 1408-1410
+catalog/plugins/yellow-review.json
+  s_520e182b5f7c63::t_9e34557ef21007 22-29
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_06861e097d1394 549,552,555,558,560,577,579,581,605,609,613,648,664,1206-1216
+plugins/yellow-review/.claude-plugin/plugin.json
+  s_520e182b5f7c63::t_1c775175108a99 18-26
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_53e14a164013d4 165-180,303-306
+plugins/yellow-review/lib/review-ledger-vocab.json
+  s_520e182b5f7c63::t_ac9ed81d12fa31 1-93
+plugins/yellow-review/lib/review-ledger.sh
+  s_520e182b5f7c63::t_be65e441f7b7f4 1-1546
+plugins/yellow-review/tests/helpers/ledger-repo.bash
+  s_520e182b5f7c63::t_7d1f06d7bcf54a 1-58
+plugins/yellow-review/tests/mocks/gh
+  s_520e182b5f7c63::t_929aed806f9f1d 55-64,77
+plugins/yellow-review/tests/review-ledger.bats
+  s_520e182b5f7c63::t_61a566ec8962e8 1-608
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_520e182b5f7c63::t_ac209baedbb9f9 966-974
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80788f1d47d28c3de12d3233c68f2366e0a9afae",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
