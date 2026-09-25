@@ -173,6 +173,16 @@ changed. After that it walks the remaining findings one card at a time:
 `--non-interactive` reconciles and applies nothing. `--prune <PR#>` deletes
 the ledger of a merged or closed PR.
 
+A SessionStart hook prints one line when any open PR in this clone has
+pending or attention findings, for example
+`[yellow-review] Review ledger: 3 pending, 1 need attention (PRs #12, #34). Run /review:triage 12.`
+It names PRs whose last-seen state is not OPEN, or is over a week old, as
+unverified instead of counting them. It reads only small sidecar files and
+never prints finding text.
+
+Trade-offs: the ledger is local to one clone on one machine. Deleting the
+clone deletes it, and nothing is posted to GitHub.
+
 `/review:sweep` runs `/review:triage --non-interactive` after its resolve
 pass and prints `Ledger: <pending> pending, <attention> need attention`.
 `/review:sweep-all` adds a `Residual` column (`pending/attention`) to its
