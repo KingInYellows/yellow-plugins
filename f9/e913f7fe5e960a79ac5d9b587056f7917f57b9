@@ -1,0 +1,55 @@
+.changeset/review-rule-scope-fields.md
+  s_520e182b5f7c63::t_f500c9442abc49 1-10
+plans/review-findings-ledger.md
+  s_520e182b5f7c63::t_80487279652efb 705,731,742,745,748,752,1272
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_520e182b5f7c63::t_6e6ded51c4da43 116-117,133-137
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_520e182b5f7c63::t_96f7f15320d6a7 138-139,155-159
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_520e182b5f7c63::t_303afacb1bdb3a 195-196,215-219
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_9ca5cc9d071696 261-262,280-284
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_520e182b5f7c63::t_0c543dbc9d6dc5 207-208,224-228
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_520e182b5f7c63::t_d0bc89ad8e60eb 144-145,161-165
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_520e182b5f7c63::t_bfaf59887c0c00 107-108,127-131
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_520e182b5f7c63::t_2e4facfcb8f7d3 112-113,132-136
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_520e182b5f7c63::t_11a74e9f4adffa 197-198,221-225
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_520e182b5f7c63::t_100352f24bafaf 142-143,162-166
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_520e182b5f7c63::t_11a88bef42eed0 169-170,189-193
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_520e182b5f7c63::t_b61ad99c0e5755 111-112,131-135
+plugins/yellow-review/agents/review/thermonuclear-reviewer.md
+  s_520e182b5f7c63::t_0050bffe36f06c 163-164,183-187
+plugins/yellow-review/commands/review/review-all.md
+  s_520e182b5f7c63::t_79fec1855230eb 256-259,271-272,283-286,404-405
+plugins/yellow-review/commands/review/review-pr.md
+  s_520e182b5f7c63::t_95e35ca616b890 588-609,614-615,628-629,648-656,700-701,808,822-827,863-866,1079-1080
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_520e182b5f7c63::t_5780edaf596c98 164-165,181-187
+plugins/yellow-review/tests/skill-content.bats
+  s_520e182b5f7c63::t_bf7f71f35f05cb 46-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f9e913f7fe5e960a79ac5d9b587056f7917f57b9",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
