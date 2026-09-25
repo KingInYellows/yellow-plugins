@@ -619,7 +619,14 @@ rl_map_line() {
 rl_md_heading_path() {
   awk -v L="$2" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
-    /^[ \t]*(```|~~~)/ { fence = !fence; next }
+    /^[ \t]*(```+|~~~+)/ {
+      line = $0; sub(/^[ \t]*/, "", line)
+      ch = substr(line, 1, 1); n = 0
+      while (substr(line, n + 1, 1) == ch) n++
+      if (!fence) { fence = 1; fchar = ch; flen = n }
+      else if (ch == fchar && n >= flen) fence = 0
+      next
+    }
     fence { next }
     /^#{1,6}[ \t]/ {
       lvl = match($0, /[^#]/) - 1
@@ -649,7 +656,8 @@ rl_ctags_usable() {
   ctags --list-fields 2>/dev/null | grep -Eq '^e[[:space:]]+end'
 }
 
-# Code: universal-ctags on the blob (cached per content file). A claim is
+# Code: universal-ctags on the blob (cached per content file + basename,
+# since the filename is parser-relevant to ctags). A claim is
 # accepted when every dotted segment is a tag containing the anchor line:
 # by [line, end] when ctags reports `end` (Go, Python), otherwise from the
 # tag line to the next sibling tag. Prints "<full>\t<start>\t<end>".
@@ -657,7 +665,7 @@ rl_ctags_scope() {
   local content="$1" path="$2" L="$3" claim="$4" dir tags base
   rl_ctags_usable || return 1
   base=$(basename -- "$path")
-  dir="$content.ctags"
+  dir="$content.ctags/$base"
   tags="$dir/tags.json"
   if [ ! -f "$tags" ]; then
     mkdir -p -- "$dir" || return 1
@@ -914,9 +922,11 @@ rl_reverify_finding() {
   rl_regular_mode "${entry%% *}" || { printf 'not_reproduced'; return 0; }
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
   excl=$(rl_sibling_lines "$fold" "$id" "$T")
-  if rl_window_hash "$content" "$ln" 3 "$hash" "$excl" >/dev/null; then
-    printf 'reproduced'
-    return 0
+  if hit=$(rl_window_hash "$content" "$ln" 3 "$hash" "$excl"); then
+    if [ "$scope_status" != verified ] || [ "$(rl_verify_scope "$content" "$np" "$hit" "$scope" | cut -f2)" = "$scope" ]; then
+      printf 'reproduced'
+      return 0
+    fi
   fi
   if [ -z "$strict" ] && [ -z "$occ" ] && [ -n "$alines" ]; then
     if hit=$(rl_window_alias "$content" "$ln" "$(rl_normalize_line "$alines")" "$excl"); then
