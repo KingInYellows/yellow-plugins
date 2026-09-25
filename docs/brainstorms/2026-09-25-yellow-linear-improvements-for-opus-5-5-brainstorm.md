@@ -20,9 +20,9 @@ User constraints from the dialogue:
 
 - Scope: all three areas (work loop, agent platform, PM), ranked by impact.
 - Repo setup: a **committed per-repo config file**, written by `/linear:setup`.
-- Write-back: **summaries at milestones** are auto-posted (plan summary when
-  work starts, wrap-up when the PR opens); sub-issues, new issues and anything
-  else still ask first.
+- Write-back: **summaries at milestones** (plan summary when work starts,
+  wrap-up when the PR opens) with no per-post prompt once the repo opts in;
+  sub-issues, new issues and anything else still ask first.
 - Workspace: **solo / mostly solo**. Keep triage and cycle features light; no
   multi-team, SLA or customer-request investment.
 
@@ -74,7 +74,9 @@ User constraints from the dialogue:
 
 ### P0 — Foundations (correctness + repo setup)
 
-- **Per-repo config** `.claude/yellow-linear.json`, committed. Proposed
+- **Per-repo config** `.yellow-linear.json` at the repo root, committed.
+  It sits outside `.claude/` because many repos (this one included) gitignore
+  `.claude/`, which would make the config vanish on fresh clones. Proposed
   fields: `team` (key), `defaultProject`, `defaultLabels`, `branchFormat`
   (`linear` = use the issue's `gitBranchName`, or a custom template),
   `writeBack` (`milestones` | `minimal`), `readOnlyAgents` (bool). Every
@@ -106,11 +108,22 @@ User constraints from the dialogue:
   doesn't have to go back to Linear for it.
 - **Uses the issue's branch name.** `/linear:work` reads `gitBranchName`
   (or the configured `branchFormat`) and passes it to the stack provider.
-- **Milestone summaries (auto, Tier 1).** Two points, deduplicated like the
-  existing PR-link comments:
+- **Milestone summaries (consented once, then automatic).** Two points,
+  deduplicated like the existing PR-link comments:
   1. After `/flow:plan`, a short plan summary comment on the issue.
   2. When the PR opens (`/linear:sync --after-submit`), a wrap-up comment:
      what changed, tests, anything left open.
+
+  These are externally visible writes, so AGENTS.md requires filtering and
+  explicit user confirmation. The design meets that in two parts:
+  - **Consent is recorded once.** `/linear:setup` shows a sample summary and
+    asks whether to post milestone summaries automatically. Only a "yes"
+    writes `writeBack: "milestones"` to the committed config. Without that
+    opt-in, each summary is shown as a draft and posted only after
+    confirmation.
+  - **Content is filtered before every post.** Remove local absolute paths,
+    environment values and anything matching credential patterns. Limit the
+    summary to what the plan or PR already makes public.
 - **PR linking through Diffs.** When Linear's Diffs are available, link with
   `get_diff` / `update_diff` (relationship `closes`/`contributes`) instead of
   a URL comment, and put the correct magic words in PR bodies (`Fixes`,
@@ -150,9 +163,10 @@ User constraints from the dialogue:
 
 ## Open Questions
 
-1. Config location and name: `.claude/yellow-linear.json` or a
-   `linear:` section in an existing shared yellow config? Check whether other
-   plugins already have a per-repo config convention before planning.
+1. Config name: a standalone `.yellow-linear.json` or a `linear:` section
+   in a shared yellow config? Check whether other plugins already have a
+   tracked per-repo config convention before planning. Either way it must
+   live outside `.claude/`.
 2. Can a single plugin declare both the full and `/mcp/readonly` MCP servers
    without a duplicate OAuth prompt? Needs a clean-install test.
 3. When were the Diffs tools shipped and are they generally available?
@@ -164,5 +178,10 @@ User constraints from the dialogue:
 5. Where do milestone summaries hook in: yellow-core's `/flow:plan` and
    `/flow:work`, or only yellow-linear's own commands? The cross-plugin
    contract must degrade cleanly when yellow-linear isn't installed.
-6. How does the P0 regex change interact with other plugins that extract
+6. Does a one-time consent recorded in the committed config satisfy the
+   AGENTS.md rule that externally visible mutations need explicit
+   confirmation? Or does the safety model need an explicit new tier for
+   consented automatic comments? Settle this in `/flow:plan` before
+   implementation.
+7. How does the P0 regex change interact with other plugins that extract
    Linear IDs from branch names (for example gt-workflow and yellow-review)?
