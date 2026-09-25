@@ -996,7 +996,9 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 4.5: Tests:
   - `review-ledger.bats` gains the `reconcile` matrix:
     - fix, then revert (CLAUDE-48);
-    - a dropped fix commit gives `reopened` with reason `fix-abandoned`;
+    - an unreachable fix commit whose defect still reproduces gives `reopened`
+      with reason `fix-abandoned`; a restacked fix whose defect no longer
+      reproduces settles `fixed` via `unproved-content-check`;
     - a shallow clone gives unverifiable;
     - a fork-style PR head fetched from `pull/<n>/head` in the fixture origin;
     - retirement when the base deleted the path;
