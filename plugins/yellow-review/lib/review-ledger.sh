@@ -1873,7 +1873,7 @@ cmd_restore() {
   if [ -L "$parent" ] || ! rl_inside_root "$root" "$parent"; then
     rl_die "$RL_EXIT_INVALID" "restore: parent escapes the repository"
   fi
-  git checkout "$base" -- "$file" 2>/dev/null || rl_die 1 "restore: git checkout failed"
+  git --literal-pathspecs checkout "$base" -- "$file" 2>/dev/null || rl_die 1 "restore: git checkout failed"
   printf 'restored\n'
 }
 
