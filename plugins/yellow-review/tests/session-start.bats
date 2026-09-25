@@ -117,6 +117,49 @@ hook() { run --separate-stderr bash "$HOOK"; }
   printf '%s' "$output" | jq -e '.continue == true and (.systemMessage | type == "string")' >/dev/null
 }
 
+# fake_ledgers <from> <to>: OPEN ledgers with 1 pending each, sidecars only
+fake_ledgers() {
+  local pr now
+  now=$(date +%s)
+  mkdir -p "$LEDGER_DIR"
+  for ((pr = $1; pr <= $2; pr++)); do
+    printf '{}\n' >|"$LEDGER_DIR/$pr.jsonl"
+    printf '1 0 3\n' >|"$LEDGER_DIR/$pr.pending"
+    printf 'OPEN %s\n' "$now" >|"$LEDGER_DIR/$pr.state"
+  done
+}
+
+msg_hashes() { printf '%s' "$1" | tr -cd '#' | wc -c | tr -d ' '; }
+
+@test "a category names at most 10 PRs, then +N more" {
+  fake_ledgers 1 12
+  hook
+  msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" == "[yellow-review] Review ledger: 12 pending, 0 need attention (PRs #"*", +2 more). Run /review:triage "* ]]
+  [ "$(msg_hashes "$msg")" -eq 10 ]
+}
+
+@test "past the deadline 1,000 ledgers are counted as unknown, not enumerated" {
+  fake_ledgers 1 1000
+  RL_HOOK_DEADLINE_MS=0 hook
+  msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" == "[yellow-review] Review ledger: 0 pending, 0 need attention; pending unknown: #"*", +990 more. Run /review:triage "* ]]
+  [ "$(msg_hashes "$msg")" -eq 10 ]
+}
+
+@test "1,000 ledgers stay under 3 s with bounded output" {
+  fake_ledgers 1 1000
+  start=$(date +%s%N)
+  hook
+  elapsed_ms=$((($(date +%s%N) - start) / 1000000))
+  [ "$elapsed_ms" -lt 3000 ]
+  printf '%s' "$output" | jq -e '.continue == true' >/dev/null
+  msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" =~ \+[0-9]+\ more ]]
+  # at most 10 counted and 10 unknown PRs are named
+  [ "$(msg_hashes "$msg")" -le 20 ]
+}
+
 @test "jq missing: still a bare continue" {
   mkdir -p "$BATS_TEST_TMPDIR/nojq"
   for b in git sed awk tr cut wc date basename; do ln -sf "$(command -v "$b")" "$BATS_TEST_TMPDIR/nojq/$b"; done
