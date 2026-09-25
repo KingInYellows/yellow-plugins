@@ -1854,11 +1854,14 @@ cmd_reconcile() {
 # restore <pr> <finding_id> --head <headRefOid> --base <baseRefOid>
 # CLAUDE-47: bring back a file the PR deleted, byte-for-byte from the
 # current base, for a deletion finding only. Refuses unless HEAD equals
-# <head> and the tree is clean, the path passes `restore` validation, and
-# the re-checked parent stays inside the repository after `mkdir -p`. The
-# content is never model-authored; git refuses to write through a
-# symlinked leading directory. Leaves the file staged; the caller commits
-# and records `applied`.
+# <head>, the target path itself carries no uncommitted change or
+# untracked file (an earlier Apply/Restore this same triage session made
+# to a DIFFERENT path is fine — Step 8 batches all of them into one
+# commit), the path passes `restore` validation, and the re-checked
+# parent stays inside the repository after `mkdir -p`. The content is
+# never model-authored; git refuses to write through a symlinked leading
+# directory. Leaves the file staged; the caller commits and records
+# `applied`.
 cmd_restore() {
   local pr="${1:-}" id="${2:-}" head='' base='' fold row file v root parent
   rl_need_pr "$pr"
@@ -1874,7 +1877,6 @@ cmd_restore() {
   rl_need_sha --head "$head"
   rl_need_sha --base "$base"
   [ "$(git rev-parse HEAD 2>/dev/null)" = "$head" ] || rl_die "$RL_EXIT_INVALID" "restore: HEAD is not the PR head"
-  [ -z "$(git status --porcelain 2>/dev/null)" ] || rl_die "$RL_EXIT_INVALID" "restore: the working tree is not clean"
   fold=$(rl_read_fold "$pr") || exit $?
   row=$(printf '%s' "$fold" | jq -c --arg id "$id" '.findings[] | select(.finding_id == $id) | {file: .obs.file, deletion: (.obs.deletion // false)}')
   [ -n "$row" ] || rl_die "$RL_EXIT_INVALID" "restore: unknown finding_id"
@@ -1882,6 +1884,7 @@ cmd_restore() {
   file=$(jq -r '.file' <<<"$row")
   v=$(rl_validate_path restore "$base" "$file") || rl_die "$RL_EXIT_INVALID" "restore: path rejected ($v)"
   root=$(rl_repo_root) || rl_die 1 "restore: not inside a repository"
+  [ -z "$(git --literal-pathspecs status --porcelain -- "$root/$file" 2>/dev/null)" ] || rl_die "$RL_EXIT_INVALID" "restore: the target path has an uncommitted change or untracked file in the way"
   parent=$(dirname -- "$root/$file")
   mkdir -p -- "$parent" || rl_die 1 "restore: cannot create the parent directory"
   if [ -L "$parent" ] || ! rl_inside_root "$root" "$parent"; then
