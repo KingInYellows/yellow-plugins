@@ -15,8 +15,10 @@ file per PR inside the clone's git dir, managed by `lib/review-ledger.sh`;
   findings on stdin from a file.
 - Values recorded once per PR, at Step 3e:
   - `PR` — the PR number.
-  - `REVIEWED_HEAD` — `git rev-parse HEAD` after Step 3's checkout. Every
-    `observe` anchors on this commit.
+  - `REVIEWED_HEAD` — set only after Step 3e's head-verification succeeds
+    (never the raw `git rev-parse HEAD` from Step 3's checkout, which may
+    be stale by the time Step 3e runs). Every `observe` anchors on this
+    commit.
   - `BASE_OID` — `baseRefOid` from Step 3's `gh pr view`.
   - `RUN_ID` — `"$RL" new-run-id`.
   - `SOURCE` — `review-pr` in `/review:pr`, `review-all` in `/review:all` (pass
@@ -34,7 +36,31 @@ file per PR inside the clone's git dir, managed by `lib/review-ledger.sh`;
 
 ## Step 3e — dismissed-findings context
 
-Record the values listed under Conventions, then run:
+**Verify the head before setting `REVIEWED_HEAD`.** A stale local checkout
+or a force-push between Step 3's `gh pr view` and this step would
+otherwise anchor a dismissal, and every later observation, to a revision
+GitHub no longer serves as the PR head:
+
+```bash
+RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
+if REMOTE=$("$RL" remote-head <PR>); then
+  LOCAL=$(git rev-parse HEAD)
+  [ "$REMOTE" = "$LOCAL" ] && REVIEWED_HEAD="$LOCAL"
+fi
+```
+
+`remote-head` re-reads `headRefOid` from `gh pr view` at call time — not
+Step 3's snapshot — fetches `refs/pull/<PR>/head`, and retries with
+backoff until the two match, so its printed OID is the current remote
+head. If it exits non-zero (exit 6: a shallow repository, a missing
+object, or the ref never matching), or its output disagrees with
+`git rev-parse HEAD`, the head is **unverifiable**: leave `REVIEWED_HEAD`
+unset, skip every ledger read and write for this run — this section's
+`dismissed-context` call and every write point below through Step 10's
+`settle` — add "Ledger: head unverifiable" to Coverage, and continue the
+review with no ledger persistence.
+
+Only once `REVIEWED_HEAD` is set, run:
 
 ```bash
 RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
@@ -176,3 +202,8 @@ Add one line to Step 10's Coverage section, built from the `observe` and
 
 Also add, when non-zero: "Dismissed findings injected: N (M filtered)", the
 rejected ordinals, and every "Ledger: write failed" line.
+
+When Step 3e marked the head unverifiable, none of the above ran: emit only
+"Ledger: head unverifiable" (already added to Coverage at Step 3e) and skip
+the `<new>/<merged>/<reopened>/<pending>/<attention>` line entirely — there
+is no fold to report.
