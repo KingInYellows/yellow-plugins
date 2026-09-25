@@ -197,3 +197,10 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   tr '\n' ' ' <"$LEDGER_REF" | grep -q 'Do not rebuild or reformat the block'
   grep -q 'legacy mode' "$LEDGER_REF"
 }
+
+@test "setup: the ledger check reports the Bash its shebang runs under" {
+  f="$COMMANDS_DIR/setup.md"
+  grep -q "ledger_bash:   ok (%s %s)" "$f"
+  grep -q 'BASH_VERSINFO' "$f"
+  grep -q '`ledger_bash` too old' "$f"
+}
