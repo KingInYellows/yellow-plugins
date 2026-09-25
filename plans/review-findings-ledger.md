@@ -229,9 +229,15 @@ it. None is out of scope.
   After restoring, the usual publication path runs: `applied`, then `applied`
   with the fix SHA, then `fixed` subject to CLAUDE-48.
 
-- **Test.** A base with `lib/util.sh` and a head that deletes it: restore writes
-  the base blob byte-for-byte, and `git diff --cached` shows the re-add. Refused
-  cases:
+- **Test.** End-to-end observe→restore (`review-ledger.bats`, task 1.11): a
+  fixture where base has `lib/util.sh` and head deletes it. Feed a
+  `deletion: true` finding through `observe --step 6 --head <headRefOid>
+  --base <baseRefOid>`; assert the anchor snapshots from the base tree (not
+  rejected), the observation carries `deletion: true`, and fold shows it
+  pending. Then run the restore helper on that ledger record; assert restore
+  writes the base blob byte-for-byte and `git diff --cached` shows the re-add.
+  This path must not rely on a pre-seeded observation — `observe` is the
+  entry point. Refused restore cases (unit tests against the helper directly):
   - the parent `lib` is a symlink to `/tmp/outside`;
   - the destination is a dangling symlink;
   - the base mode is `120000`;
@@ -685,7 +691,8 @@ yellow-core changes. Each stage carries its own changeset.
   - Concurrent writers: 10 background `observe`s, then every line parses and the
     counts are exact.
   - Tail repair, both cases.
-  - The CLAUDE-44, 45, 46, 48 and 49 tests above.
+  - The CLAUDE-44, 45, 46, 47, 48 and 49 tests above, including the
+    observe→restore end-to-end for `deletion: true` findings (CLAUDE-47).
   - The locked fingerprint fixtures:
     - a different `rule` on the same statement stays separate;
     - the same `rule` from two reviewers merges;
@@ -848,9 +855,10 @@ yellow-core changes. Each stage carries its own changeset.
       anchor), `observe` snapshots that one from `baseRefOid` instead, since
       `<REVIEWED_HEAD>:<file>` cannot exist for a path the PR deletes — this is
       how `observe` avoids rejecting a deletion finding before attended triage
-      can offer Restore. Add an end-to-end `observe` test that carries a
-      deletion finding through this path, not only a pre-seeded record fed
-      straight to `restore`. Findings with `pre_existing: true` and findings the
+      can offer Restore. The end-to-end observe→restore test (CLAUDE-47, task
+      1.11) must carry a deletion finding through `observe` into restore, not
+      only a pre-seeded record fed straight to `restore`. Findings with
+      `pre_existing: true` and findings the
       confidence gate suppressed are not persisted, because they were never
       reported as this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
@@ -993,8 +1001,9 @@ yellow-core changes. Each stage carries its own changeset.
     - a fork-style PR head fetched from `pull/<n>/head` in the fixture origin;
     - retirement when the base deleted the path;
     - `stale` → `reopened` on a rematch.
-  - The restore tests (CLAUDE-47) and the dependency-mode dismissal tests
-    (CLAUDE-44) call `validate-path` and the restore helper directly.
+  - The CLAUDE-47 refused-restore cases and the dependency-mode dismissal tests
+    (CLAUDE-44) call `validate-path` and the restore helper directly; the
+    happy-path observe→restore flow is covered in Stage 1 (task 1.11).
   - `skill-content.bats` asserts triage.md's fence and gate text.
 - [ ] 4.6: README and CLAUDE.md: the command list, a "When to Use What" entry,
       and the triage modes. Update root `README.md`'s yellow-review command
