@@ -586,12 +586,17 @@ Each agent receives:
    confident findings about files it never measured. `rows=0` with both
    markers present is a complete, empty block and is emitted as such.
 7. A `<rule-vocabulary>` block — into every dispatched reviewer. It lists
-   the closed `rule` slugs per normalized category, from the plugin's
-   vocabulary file:
+   the closed `rule` slugs per normalized category, plus every
+   `category_aliases` entry resolved to its normalized category's own
+   slug list, from the plugin's vocabulary file:
 
    ```bash
-   jq -r '.categories | to_entries[] | "\(.key): \(.value | join(", "))"' \
-     "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger-vocab.json"
+   jq -r '
+     .categories as $cats
+     | ( $cats | to_entries[] | "\(.key): \(.value | join(", "))" ),
+       ( .category_aliases | to_entries[]
+         | "\(.key) (alias of \(.value)): \($cats[.value] | join(", "))" )
+   ' "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger-vocab.json"
    ```
 
    The file is repo-internal, but XML-escape the output anyway (`&`, then
@@ -599,10 +604,16 @@ Each agent receives:
 
    ```
    <rule-vocabulary>
-   <one "category: slug, slug, …" line per category>
+   <one "category: slug, slug, …" line per normalized category>
+   <one "alias (alias of category): slug, slug, …" line per category alias>
    Every category also accepts `unclassified`.
    </rule-vocabulary>
    ```
+
+   Reviewers whose own category is an alias (e.g. `plugin-contract`,
+   `adversarial`, `project-compliance`) find their alias row directly in
+   the block and pick a slug from it — they do not need to resolve the
+   alias to its normalized category themselves.
 
    If the command fails, omit the block and note "rule vocabulary
    unavailable" in Coverage; reviewers then emit `unclassified`, which
