@@ -242,10 +242,67 @@ Minimum patterns (extend with PEM private-key blocks when present):
   `_API_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD`. Redact the whole line
   even when the value doesn't match a known key prefix.
 
-When Bash is available, pipe each fetched text block through an `awk` program
-that applies these patterns (see `plugins/yellow-council/skills/council-patterns/SKILL.md`
-for the canonical 11-pattern block). When sanitizing in prose only, still
-enforce the same rule: never print or write the raw MCP payload.
+When Bash is available, pipe each fetched text block through this `awk`
+program (self-contained — includes named-assignment matchers the council
+block lacks):
+
+```bash
+printf '%s\n' "$text" | awk '
+function cred_hit(re, minlen,   s) {
+  s = $0
+  while (match(s, re)) {
+    if (RLENGTH >= minlen) return 1
+    s = substr(s, RSTART + 1)
+  }
+  return 0
+}
+function is_cred_var(name,   upper) {
+  upper = toupper(name)
+  if (upper == "DEVIN_SERVICE_USER_TOKEN" || upper == "DEVIN_ORG_ID" ||
+      upper == "PERPLEXITY_API_KEY" || upper == "TAVILY_API_KEY" ||
+      upper == "EXA_API_KEY" || upper == "SEMGREP_APP_TOKEN" ||
+      upper == "MORPH_API_KEY" || upper == "CERAMIC_API_KEY") return 1
+  return upper ~ /_API_KEY$/ || upper ~ /_TOKEN$/ ||
+         upper ~ /_SECRET$/ || upper ~ /_PASSWORD$/
+}
+function named_cred_line(line,   s, name, eq, colon) {
+  s = line
+  sub(/^[[:space:]]+/, "", s)
+  if (match(s, /^[Ee][Xx][Pp][Oo][Rr][Tt][[:space:]]+/))
+    s = substr(s, RSTART + RLENGTH)
+  eq = index(s, "=")
+  colon = index(s, ":")
+  if (eq > 0 && (colon == 0 || eq < colon)) {
+    name = substr(s, 1, eq - 1)
+    sub(/[[:space:]]+$/, "", name)
+    return is_cred_var(name)
+  }
+  if (colon > 0) {
+    name = substr(s, 1, colon - 1)
+    sub(/[[:space:]]+$/, "", name)
+    return is_cred_var(name)
+  }
+  return 0
+}
+{
+  line = $0
+  if (cred_hit("sk-proj-[A-Za-z0-9_-]+", 28)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("sk-ant-[A-Za-z0-9_-]+", 27)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("sk-[A-Za-z0-9]+", 23)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("AIza[0-9A-Za-z_-]+", 39)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("gh[pous]_[A-Za-z0-9]+", 40)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("github_pat_[A-Za-z0-9_]+", 51)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("AKIA[0-9A-Z]+", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("Bearer[[:space:]]+[A-Za-z0-9._~+\\/-]+", 8)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("Authorization:[[:space:]]*[A-Za-z0-9]", 14)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("ses_[A-Za-z0-9]+", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (named_cred_line($0)) line = "--- redacted credential at line " NR " ---"
+  print line
+}'
+```
+
+When sanitizing in prose only, still enforce the same rule: never print or write
+the raw MCP payload.
 
 ## PR Convention
 
