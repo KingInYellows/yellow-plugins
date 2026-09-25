@@ -157,7 +157,7 @@ aggregation rules change there, propagate the same change here.
 2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
 
    ```bash
-   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName
+   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
    git fetch origin "<baseRefName>" --no-tags
    ```
 
@@ -208,6 +208,16 @@ aggregation rules change there, propagate the same change here.
    escape hatch and explicitly does not receive learnings injection; for
    legacy mode, skip injection even though the pre-pass already computed
    the block.
+
+   **Ledger — dismissed context** (mirrors review-pr.md Step 3e): Read
+   `${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its
+   "Conventions" and "Step 3e" sections for this PR with
+   `SOURCE=review-all` (record `REVIEWED_HEAD`, `BASE_OID` and a fresh
+   `RUN_ID` per PR). Inject the resulting block into every reviewer next
+   to the learnings block, with the same legacy-mode skip. If the Read
+   fails, stop and report the path. The ledger calls in sub-steps 8–11
+   and the Final Summary follow the same file; keep them in parity with
+   review-pr.md, which points at it too.
 
 6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
    personas + conditional personas + the "Opt-in only" registry (the
@@ -315,11 +325,16 @@ aggregation rules change there, propagate the same change here.
    Run intent-verification quality gates (line accuracy,
    protected-artifact filter, skim-FP check) before any P0/P1 surfaces.
 
+   **Ledger write** (mirrors review-pr.md "Ledger write (after
+   partition)"): before sub-step 9 edits anything, run ledger.md's "After
+   Step 6" section and keep the returned `finding_id`s.
+
 9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): for surviving
    **P0/P1** findings with `autofix_class: safe_auto → review-fixer` and a
    concrete `suggested_fix`, apply sequentially via Edit. P2/P3 findings
    are not auto-applied here — they go through the resolve-PR flow at
-   Step 12 instead. Parity rule with `review-pr.md` Step 7.
+   Step 12 instead. Parity rule with `review-pr.md` Step 7. Record each
+   applied fix with ledger.md "Step 7".
 
 10. **Code simplifier pass 2** (mirrors review-pr.md Step 8): launch
     `code-simplifier` on the now-modified code. Normalize its prose
@@ -328,7 +343,8 @@ aggregation rules change there, propagate the same change here.
     `safe_auto`-only auto-apply rule, simplifier findings therefore route
     to the Residual Actionable Work section and are **NOT** auto-applied
     unless an orchestrator explicitly reclassifies a specific finding as
-    `safe_auto`. Parity rule with `review-pr.md` Step 8.
+    `safe_auto`. Parity rule with `review-pr.md` Step 8. Persist the
+    simplifier's findings with ledger.md "After Step 8".
 
 11. **Commit + submit** (mirrors review-pr.md Step 9):
 
@@ -356,6 +372,11 @@ aggregation rules change there, propagate the same change here.
 
     Read the JSON result's `status` field; `SUCCESS` continues, anything
     else reports the result's `recoveryAction`.
+
+    **Ledger** (mirrors review-pr.md Step 9): when sub-step 9 applied
+    fixes, run the commit command, then ledger.md "Step 9" item 1, then the
+    submit command, then item 2 once submission reports success. A
+    rejected or failed push appends nothing more.
 
     If rejected: report changes remain uncommitted for manual review and
     continue to the next PR (do not run Step 12 or Step 13 for this PR).
@@ -407,6 +428,8 @@ Present per-PR breakdown:
 - Reviewers skipped via graceful degradation (with reasons)
 - Findings defaulted (missing rule/scope) and categories unmapped, when
   either is non-zero (review-pr.md Step 10 Coverage)
+- Ledger line per ledger.md "Step 10" (new, carried over, reopened,
+  pending, need attention, plus any write failures)
 - Plugin contract changes (when `plugin-contract-reviewer` produced
   one or more findings): table with columns `# | File | Change | Class
   | Migration Path` per the review-pr.md Step 10 template. Omit when
