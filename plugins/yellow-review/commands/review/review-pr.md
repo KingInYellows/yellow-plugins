@@ -85,13 +85,24 @@ stash before running review." and stop.
 gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
 ```
 
-Calculate gross line count (additions + deletions). Checkout the PR branch:
+Calculate gross line count (additions + deletions). `headRefName` is
+attacker-controlled on a fork PR, so validate it before it ever reaches a
+shell command: run `git check-ref-format --branch "<headRefName>"` and
+separately reject any character outside `[A-Za-z0-9._/-]` (check-ref-format
+alone still permits backticks) and any value starting with `-` (flag
+injection). If either check fails, report `[review:pr] Error: unsafe head
+ref '<headRefName>' — refusing to check out` and stop. Otherwise checkout
+the PR branch, always quoted (the installed `gt` does not accept `--` to
+end option parsing — `gt checkout -- <branch>` raises "Unexpected
+argument", so do not add it):
 
 ```bash
-gt checkout <headRefName>
+gt checkout "<headRefName>"
 ```
 
-If `gt checkout` fails, try `gh pr checkout <PR#>` then `gt track`.
+If `gt checkout` fails, try `gh pr checkout <PR#>` then `gt track` — that
+path checks out by numeric PR and never passes the raw ref to a shell
+command.
 
 ### Step 3a: Fetch base branch (CE PR #544 hardening)
 
