@@ -423,6 +423,31 @@ rl_tree_entry() {
   return 1
 }
 
+# rl_tree_lookup <rev> <path>: rl_tree_entry for callers whose ledger
+# state depends on the answer. Prints "present <mode> <oid>", "absent"
+# (the tree was read and has no such entry) or "unverifiable" (git ls-tree
+# itself failed: the tree object is missing, e.g. a partial clone whose
+# promisor remote is offline, or corrupt). Classified on the exit status,
+# never on stderr text; GIT_NO_LAZY_FETCH=1 keeps a partial clone offline.
+rl_tree_lookup() {
+  local rev="$1" p="$2" tmp rec meta rpath r=absent
+  tmp=$(mktemp "${RL_TMP:-${TMPDIR:-/tmp}}/ls-tree.XXXXXX") || { printf 'unverifiable'; return 0; }
+  if GIT_NO_LAZY_FETCH=1 git --literal-pathspecs ls-tree -z --full-tree "$rev" -- "$p" >|"$tmp" 2>/dev/null; then
+    while IFS= read -r -d '' rec; do
+      meta="${rec%%$'\t'*}"
+      rpath="${rec#*$'\t'}"
+      if [ "$rpath" = "$p" ]; then
+        r="present ${meta%% *} ${meta##* }"
+        break
+      fi
+    done <"$tmp"
+  else
+    r=unverifiable
+  fi
+  rm -f -- "$tmp"
+  printf '%s' "$r"
+}
+
 rl_regular_mode() { [ "$1" = 100644 ] || [ "$1" = 100755 ]; }
 
 # Inside <root> after canonicalization.
@@ -945,11 +970,18 @@ rl_reverify_finding() {
     return 0
   fi
   if [ "$deletion" = true ]; then
-    if entry=$(rl_tree_entry "$T" "$file") && rl_regular_mode "${entry%% *}"; then
-      printf 'not_reproduced'
-    else
-      printf 'reproduced'
-    fi
+    # resolved only when the path is back as a regular file; a symlink,
+    # submodule or tree at that path still leaves the deletion in place,
+    # and a tree that cannot be read proves neither
+    entry=$(rl_tree_lookup "$T" "$file")
+    case "$entry" in
+      unverifiable) printf 'unverifiable' ;;
+      present\ *)
+        entry=${entry#present }
+        if rl_regular_mode "${entry%% *}"; then printf 'not_reproduced'; else printf 'reproduced'; fi
+        ;;
+      *) printf 'reproduced' ;;
+    esac
     return 0
   fi
   if [ "$source" = worktree ]; then
@@ -962,7 +994,12 @@ rl_reverify_finding() {
     deleted) printf 'not_reproduced'; return 0 ;;
     exact | shifted) printf 'reproduced'; return 0 ;;
   esac
-  entry=$(rl_tree_entry "$T" "$np") || { printf 'not_reproduced'; return 0; }
+  entry=$(rl_tree_lookup "$T" "$np")
+  case "$entry" in
+    unverifiable) printf 'unverifiable'; return 0 ;;
+    absent) printf 'not_reproduced'; return 0 ;;
+  esac
+  entry=${entry#present }
   rl_regular_mode "${entry%% *}" || { printf 'not_reproduced'; return 0; }
   content=$(rl_blob_file "${entry##* }") || { printf 'unverifiable'; return 0; }
   excl=$(rl_sibling_lines "$fold" "$id" "$T")
@@ -1015,14 +1052,23 @@ rl_publication() {
 
 # Is a dismissal still applicable at <H>? The anchor must still match
 # (strict re-verify) and every depends_on entry must be a regular file at
-# <H> with the recorded blob (CLAUDE-44).
+# <H> with the recorded blob (CLAUDE-44). Returns 0 applicable, 1 no longer
+# applicable, 2 unverifiable (a tree or object could not be read): callers
+# must neither reopen nor inject then.
 rl_dismissal_applicable() {
-  local fold="$1" id="$2" H="$3" deps p blob entry
-  [ "$(rl_reverify_finding "$fold" "$id" "$H" strict)" = reproduced ] || return 1
+  local fold="$1" id="$2" H="$3" deps p blob entry rv
+  rv=$(rl_reverify_finding "$fold" "$id" "$H" strict)
+  [ "$rv" = unverifiable ] && return 2
+  [ "$rv" = reproduced ] || return 1
   deps=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | (.depends_on // [])[] | .path + "\t" + .blob')
   [ -n "$deps" ] || return 0
   while IFS=$'\t' read -r p blob; do
-    entry=$(rl_tree_entry "$H" "$p") || return 1
+    entry=$(rl_tree_lookup "$H" "$p")
+    case "$entry" in
+      unverifiable) return 2 ;;
+      absent) return 1 ;;
+    esac
+    entry=${entry#present }
     rl_regular_mode "${entry%% *}" || return 1
     [ "${entry##* }" = "$blob" ] || return 1
   done <<<"$deps"
@@ -1275,7 +1321,7 @@ rl_observe_locked() {
   done
 
   # Actions.
-  local new=0 merged=0 reopened=0 suppressed=0 id state at status results='[]'
+  local new=0 merged=0 reopened=0 suppressed=0 app id state at status results='[]'
 
   at=$(rl_now)
   for ((i = 0; i < n; i++)); do
@@ -1301,7 +1347,14 @@ rl_observe_locked() {
     state=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .state')
     case "$state" in
       dismissed)
-        if [ "${via[$i]}" != alias ] && rl_dismissal_applicable "$fold" "$id" "$RL_O_HEAD"; then
+        # 0 applicable, 1 lapsed, 2 unverifiable: only a lapsed dismissal
+        # (or an alias match) reopens; an unverifiable one is left alone
+        app=1
+        if [ "${via[$i]}" != alias ]; then
+          rl_dismissal_applicable "$fold" "$id" "$RL_O_HEAD"
+          app=$?
+        fi
+        if [ "$app" -ne 1 ]; then
           suppressed=$((suppressed + 1))
           status=suppressed
         else
@@ -1785,11 +1838,19 @@ rl_reconcile_locked() {
         unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv")
         continue
       fi
-      if ! rl_tree_entry "$RL_C_BASE" "$file" >/dev/null; then
-        rl_append "$f" "$(rl_transition_record "$id" dismissed "retired: base deleted path" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
-        rec "$id" "$state" dismissed "retired: base deleted path"
-        continue
-      fi
+      # retire only on a confirmed absence: a base tree that cannot be read
+      # (partial clone, promisor offline) proves nothing either way
+      case "$(rl_tree_lookup "$RL_C_BASE" "$file")" in
+        absent)
+          rl_append "$f" "$(rl_transition_record "$id" dismissed "retired: base deleted path" "$RL_C_HEAD" "$RL_C_ACTOR" "" "" "" null)" || return 1
+          rec "$id" "$state" dismissed "retired: base deleted path"
+          continue
+          ;;
+        unverifiable)
+          unv=$(jq -c --arg id "$id" '. + [$id]' <<<"$unv")
+          continue
+          ;;
+      esac
     fi
     case "$state" in
       applied)
