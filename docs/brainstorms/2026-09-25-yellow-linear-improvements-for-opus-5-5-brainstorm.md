@@ -198,8 +198,10 @@ User constraints from the dialogue:
   - Declare a short `timeout` in the hook manifest, for example 5s.
   - Keep any Linear lookup within a smaller internal deadline, or read a
     summary that `/linear:work` cached instead of calling the network.
-  - Fail open: on every error or timeout path, emit valid empty hook JSON so
-    the session starts without the summary.
+  - Fail open: on every error or timeout path, emit valid empty hook JSON
+    (`{}`) so the session starts without the summary. Use `set -uo pipefail`
+    (never `set -e`), route diagnostics to stderr, and centralize exits
+    through a helper that always prints valid JSON (AGENTS.md hook rules).
 
 ### P2 — Native handoff and light PM
 
