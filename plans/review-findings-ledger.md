@@ -145,10 +145,15 @@ it. None is out of scope.
   - a leading `/` or `-`;
   - empty, `.` or `..` segments, and a trailing `/`;
   - a path not found at `<rev>` (via
-    `git ls-tree -z --full-tree <rev> -- <path>` parsed NUL-safely, never the
-    C-quoted default), or found with a mode other than `100644`/`100755`
-    (`120000` symlinks and `160000` submodules are rejected before anything is
-    dereferenced).
+    `git --literal-pathspecs ls-tree -z --full-tree <rev> -- <path>` parsed
+    NUL-safely, never the C-quoted default, with the returned name
+    string-compared against the requested path so pathspec magic in a tracked
+    name — e.g. `:(top)normal` — cannot select an unrelated entry or be rejected
+    when the unrelated name is absent), or found with a mode other than
+    `100644`/`100755` (`120000` symlinks and `160000` submodules are rejected
+    before anything is dereferenced). This lookup is shared by all three modes
+    (`anchor`, `dependency`, `restore`) — `--literal-pathspecs` and exact-name
+    comparison are not restore-only.
 
   When the worktree is read (the gate passes), it also requires
   `test -f && ! test -L` on the entry and a `realpath` inside the canonical repo
@@ -235,22 +240,36 @@ it. None is out of scope.
 
 #### CLAUDE-48 — re-verify at the current remote head before `applied→fixed` · Stages 1, 3, 4
 
-- **Decision.** Moving to `fixed` needs two things:
-  1. publication proof: the fix SHA is an ancestor of the remote head, or
-     `git patch-id --stable` matches a commit on the PR branch;
-  2. `rl reverify` at the freshly fetched current `headRefOid` returns
-     `not_reproduced`.
+- **Decision.** Moving to `fixed` needs a publication proof plus a
+  `not_reproduced` re-verify at the freshly fetched current `headRefOid`. The
+  proof is one of:
+  1. the fix SHA is an ancestor of the remote head, or `git patch-id --stable`
+     over a `-U0` diff (context-insensitive, so a restack that only touches
+     surrounding lines still matches) finds it on the PR branch; or
+  2. **fallback, only when (1) fails and the fix commit is unreachable from
+     every local ref and the remote branch** (a restack rewrote it and the
+     original SHA was dropped, or it was gc'd): the `not_reproduced` re-verify
+     result itself, per the brainstorm's authoritative fallback — a content
+     check showing the finding no longer reproduces at the remote head proves
+     publication exactly as an ancestor or patch-id match would.
 
-  | Result                                                                                                   | Action                                                     |
-  | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-  | Proof passes and the defect reproduces (a later revert)                                                  | Append `reopened` with reason `reverted-after-publication` |
-  | Either check returns `unverifiable`                                                                      | Stay `applied`                                             |
-  | Proof fails and the fix commit is no longer on any local ref or the remote branch (dropped or discarded) | `applied→reopened` with reason `fix-abandoned`             |
+  | Result                                                                                                                 | Action                                                                                 |
+  | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+  | Ancestor/patch-id proof passes and re-verify reproduces (a later revert, or an additive fix above an unchanged anchor) | Stay `applied` for `/review:triage`: anchor-only re-verify cannot tell the two apart   |
+  | Ancestor/patch-id proof passes and re-verify returns `not_reproduced`                                                  | `applied→fixed`                                                                        |
+  | Proof (1) fails, fix commit unreachable from every local ref and the remote branch, re-verify `not_reproduced`         | `applied→fixed` via the fallback content-check proof (reason `unproved-content-check`) |
+  | Proof (1) fails, fix commit unreachable from every local ref and the remote branch, re-verify reproduces               | `applied→reopened` with reason `fix-abandoned` — the defect itself is still there      |
+  | Either check returns `unverifiable`                                                                                    | Stay `applied`                                                                         |
 
-  The last row is the trigger for the brainstorm's `applied→reopened` edge. It
-  runs in `review-pr.md`/`review-all.md` Step 9 after submission, and in triage
-  (attended and `--non-interactive`) for every `applied` record. A content check
-  counts only when it evaluates the current remote head.
+  A patch-id miss never reopens a finding by itself — the research below holds
+  that it only delays `fixed`. `fix-abandoned` requires the re-verify to
+  positively reproduce the defect; an unreachable fix commit whose defect no
+  longer reproduces is the successful-restack case, not an abandoned one, and
+  settles as `fixed` through the fallback instead. The third and fourth rows are
+  the trigger for the brainstorm's fallback-`fixed` and `applied→reopened`
+  edges. This runs in `review-pr.md`/`review-all.md` Step 9 after submission,
+  and in triage (attended and `--non-interactive`) for every `applied` record. A
+  content check counts only when it evaluates the current remote head.
 
 <!-- deepen-plan: external -->
 
@@ -277,10 +296,21 @@ it. None is out of scope.
 
   Anchor presence approximates the defect, not proves it: `rl_reverify_row`
   (`lib/review-ledger.sh`) hashes the line's text, so a fix that adds a guard
-  above an unchanged sink still hashes to `reproduced`. Full condition
-  re-verification would require re-running the original rule per finding, which
-  this mechanical check does not do; a `reproduced` result here means "the
-  reported line is unchanged," not "the defect still fires."
+  above an unchanged sink still hashes to `reproduced`, and an edited or
+  relocated line whose defect logic is untouched can still hash to
+  `not_reproduced`. This one mechanical signal drives all three defect-based
+  transitions that read it — `applied→fixed` (CLAUDE-48),
+  `open|reopened|report_only→stale`, and the defect-based `stale→reopened` (task
+  4.2) — none of them re-run the original rule, only the anchor text. Where the
+  signal is ambiguous the design already favors no change over a forced
+  transition: `unverifiable` never counts either way, and an `applied` record
+  whose anchor merely reproduces is left `applied` rather than forced to
+  `reopened` (`rl_settle_one`). Full condition re-verification, which would
+  remove the ambiguity by re-running the original rule per finding, is an
+  out-of-scope follow-up (see "Out of Scope"), not something this mechanical
+  check does; a `reproduced` result here means "the reported line is unchanged,"
+  not "the defect still fires," and `not_reproduced` means only "the reported
+  line changed," not "the defect is gone."
 
   The outcome is `reproduced` (hit), `not_reproduced` (no hit), or
   `unverifiable` (P7).
@@ -800,14 +830,29 @@ yellow-core changes. Each stage carries its own changeset.
   5. Before injection, drop any entry whose stored text still contains an
      `IGNORE PREVIOUS`, `system:` or `assistant:` line prefix, and count the
      drops. This follows the layered-defense learning.
-  6. Inject the block into every reviewer. Skip it in legacy mode, as the
+  6. **Gap (CWE-1427):** step 3's fields include the finding's free-form
+     `title`. Delimiter substitution, XML-escaping and the step-5 prefix filter
+     stop structural attacks but not ordinary-language instructions written into
+     model-authored text like `title`. Drop `title` from the injected payload;
+     keep only validated structural metadata (`file`, `line`, `category`,
+     `rule`, `scope`, `severity`) plus the human-written `reason`, which already
+     states why the finding does not apply.
+  7. Inject the block into every reviewer. Skip it in legacy mode, as the
      learnings block is skipped.
 - [ ] 3.3: **After Step 6's partition, before Step 7:** run
-      `rl observe --step 6 --head <REVIEWED_HEAD>` on every surviving finding in
-      the fixer, residual actionable and report-only queues. Snapshot each
-      anchor from `REVIEWED_HEAD` before any edit. Findings with
-      `pre_existing: true` and findings the confidence gate suppressed are not
-      persisted, because they were never reported as this PR's work.
+      `rl observe --step 6 --head <REVIEWED_HEAD> --base <baseRefOid>` on every
+      surviving finding in the fixer, residual actionable and report-only
+      queues. Snapshot each anchor from `REVIEWED_HEAD`, except a finding tagged
+      `deletion: true`: per the anchor-mode contract above (only `anchor` mode
+      falls back to the base tree, and only for a deletion finding's primary
+      anchor), `observe` snapshots that one from `baseRefOid` instead, since
+      `<REVIEWED_HEAD>:<file>` cannot exist for a path the PR deletes — this is
+      how `observe` avoids rejecting a deletion finding before attended triage
+      can offer Restore. Add an end-to-end `observe` test that carries a
+      deletion finding through this path, not only a pre-seeded record fed
+      straight to `restore`. Findings with `pre_existing: true` and findings the
+      confidence gate suppressed are not persisted, because they were never
+      reported as this PR's work.
 - [ ] 3.4: **Step 7:** after each applied fix, run `rl transition … applied`.
       **Step 8:** run `rl observe --step 8 --anchor-source worktree` on the
       simplifier's findings, keeping `--head` at the pre-commit `REVIEWED_HEAD`
@@ -820,6 +865,20 @@ yellow-core changes. Each stage carries its own changeset.
       finding in a file the fixer just created is rejected (counted under
       `rejected`, not persisted) rather than deferred — accept this as a known
       gap, not something to fix here.
+
+      **Gap:** nothing currently rebases these `anchor_source: worktree`
+      findings once Step 9 commits the fix. `rl_reverify_row` skips the
+      head-to-target remap for that tag and instead re-probes only ±3 lines
+      around the stored line number in the target tree; once a later
+      commit or restack inserts enough lines above an otherwise-unchanged
+      finding — or any smaller shift for an occurrence-keyed finding, which
+      has no alias search — the probe misses and reconciliation mis-marks
+      it `stale`. Fix: once Step 9's fix commit exists, run `rl observe`
+      again for every `anchor_source: worktree` finding, anchored to that
+      commit/tree in place of the worktree coordinate (this needs `observe`
+      to accept a post-commit step, alongside its current `--step 6|8`), so
+      later reconciliation maps its line the normal way.
+
 - [ ] 3.5: **Step 9:**
   1. Once the commit exists, record `applied --fix-sha <sha>` for each applied
      finding.
@@ -938,7 +997,9 @@ yellow-core changes. Each stage carries its own changeset.
     (CLAUDE-44) call `validate-path` and the restore helper directly.
   - `skill-content.bats` asserts triage.md's fence and gate text.
 - [ ] 4.6: README and CLAUDE.md: the command list, a "When to Use What" entry,
-      and the triage modes. Changeset: `yellow-review` minor.
+      and the triage modes. Update root `README.md`'s yellow-review command
+      count/inventory for `/review:triage` (AGENTS.md's Documentation
+      Expectations). Changeset: `yellow-review` minor.
 
 ### Stage 5: Sweep integration
 
@@ -1025,6 +1086,9 @@ yellow-core changes. Each stage carries its own changeset.
 - [ ] 6.4: Docs:
   - `docs/architecture-overview.md`: add a `yellow-review` row to the
     SessionStart table.
+  - `docs/security.md`: add a `yellow-review` row to the SessionStart hooks
+    table, documenting the new hook's trust boundary (reads ledger state from
+    the shared Git directory, emits only integers and PR numbers).
   - `plugins/yellow-review/CLAUDE.md`: replace "the plugin ships no hooks" in
     the Codex section; add Hooks and Testing entries.
   - README: add a "Review ledger" section covering the lifecycle states, where
@@ -1242,7 +1306,8 @@ behaviour, so every PR passes the CI gate on its own.
   plugins/yellow-review/lib/review-ledger.sh,
   plugins/yellow-review/tests/review-ledger.bats,
   plugins/yellow-review/tests/skill-content.bats,
-  plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md,
+  plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md, root
+  `README.md` (yellow-review command count/inventory),
   .changeset/review-triage-command.md
 - **Tasks:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
 - **Depends on:** #3
@@ -1272,7 +1337,8 @@ behaviour, so every PR passes the CI gate on its own.
   plugins/yellow-review/hooks/scripts/session-start.sh,
   plugins/yellow-review/tests/session-start.bats,
   `tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap`,
-  docs/architecture-overview.md, plugins/yellow-review/README.md,
-  plugins/yellow-review/CLAUDE.md, .changeset/review-ledger-session-hook.md
+  docs/architecture-overview.md, docs/security.md,
+  plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md,
+  .changeset/review-ledger-session-hook.md
 - **Tasks:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
 - **Depends on:** #5
