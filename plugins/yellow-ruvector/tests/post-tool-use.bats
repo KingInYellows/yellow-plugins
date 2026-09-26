@@ -329,3 +329,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ -z "$(ls -A "$base/meta/.ruvector")" ]
   rm -rf "$base"
 }
+
+@test "unsafe path keys in an existing coedit.json are dropped on the next write" {
+  jq -n '{version:1, extra:"x", pairs:{
+    "../outside":{"src/a.ts":5}, "src/a.ts":{"../outside":5, "/etc/passwd":2, ".git/config":1, "src/c.ts":4},
+    "/etc/passwd":{"src/a.ts":2}, "src/c.ts":{"src/a.ts":4}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(jq -c '[.pairs | keys[]] | sort' "$COEDIT")" = '["src/a.ts","src/b.ts","src/c.ts"]' ]
+  [ "$(jq -c '.pairs["src/a.ts"] | keys' "$COEDIT")" = '["src/b.ts","src/c.ts"]' ]
+  [ "$(jq 'has("extra")' "$COEDIT")" = "false" ]
+  [ "$(pair src/a.ts src/c.ts)" -eq 4 ]
+}

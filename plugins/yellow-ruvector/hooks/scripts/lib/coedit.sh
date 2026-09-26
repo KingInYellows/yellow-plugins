@@ -140,8 +140,18 @@ coedit_bump() {
       mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
     fi
   fi
+  # Existing keys are project data (a checkout can ship a coedit.json):
+  # every rewrite keeps only root-relative paths coedit_normalize could have
+  # produced, and only the version/pairs fields.
   printf '%s' "$cur" | jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" '
-    .version = 1
+    def safe: type == "string" and length > 0 and length <= 512
+      and (test("[[:cntrl:]]") | not) and (startswith("/") | not)
+      and ((split("/") | map(select(. == "" or . == "." or . == "..")) | length) == 0)
+      and (test("^(\\.ruvector|\\.git)(/|$)|^docs/solutions/") | not);
+    {version: 1,
+     pairs: (.pairs | with_entries(select(.key | safe)
+                     | .value |= with_entries(select(.key | safe)))
+                    | with_entries(select(.value | length > 0)))}
     | .pairs[$a][$b] = ((.pairs[$a][$b] // 0) + 1)
     | .pairs[$b][$a] = ((.pairs[$b][$a] // 0) + 1)
     | if ([.pairs[] | length] | add // 0) > $cap then
