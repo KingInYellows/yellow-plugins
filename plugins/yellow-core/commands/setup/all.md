@@ -637,8 +637,9 @@ prefixes and are not in the recorded probe list.
   (`.claude/composio-usage.json`) is missing → run `/composio:setup`.
 - NEEDS SETUP: not `composio_tools_visible`. Open `/mcp`, select
   `composio-server`, and choose Authenticate. Complete the browser login,
-  then restart Claude Code if the tools are still missing. Headless hosts
-  use the consumer-key `claude mcp add` fallback in `/composio:setup`.
+  then restart Claude Code if the tools are still missing. On WSL or
+  headless hosts, run `claude mcp login plugin:yellow-composio:composio-server
+  --no-browser` in a separate terminal; `/composio:setup` has the rest.
 
 **yellow-codex:**
 

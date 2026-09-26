@@ -53,22 +53,57 @@ Three possible prefixes exist; in priority order:
    (legacy / headless path).
 
 If ToolSearch returns at least one Composio tool, record which prefix is
-active and proceed to Step 3.
+active and proceed to Step 3. If the only prefix visible is
+`mcp__claude_ai_composio__*`, also record `bundled: unauthenticated` —
+the plugin's own server has not finished OAuth. Setup still proceeds, and
+Step 6 reports it.
 
 If ToolSearch returns no Composio tools, the MCP is **OFFLINE**. The
-bundled server does not start until Claude Code finishes OAuth. Tell the
-user:
+bundled server does not start until Claude Code finishes OAuth. Only in
+this branch, detect WSL — the browser's OAuth callback to a random
+`localhost` port can fail to reach a WSL2 NAT guest:
 
-```text
-[yellow-composio] Composio MCP: OFFLINE (no tools registered this session).
-
-Open /mcp, select composio-server (yellow-composio), and choose
-Authenticate. Complete the browser login, restart Claude Code if the
-tools are still missing, then re-run /composio:setup.
-Tools appear under mcp__plugin_yellow-composio_composio-server__*.
+```bash
+case "$(uname -r)" in
+  *microsoft-standard*|*WSL2*) wsl=wsl2 ;;
+  *[Mm]icrosoft*) wsl=wsl1 ;;
+  *) wsl=no ;;
+esac
+net=unknown
+if [ "$wsl" = wsl2 ] && command -v wslinfo >/dev/null 2>&1; then
+  net=$(wslinfo --networking-mode 2>/dev/null || printf 'unknown')
+fi
+printf '[yellow-composio] wsl=%s networking=%s\n' "$wsl" "${net:-unknown}"
 ```
 
-Headless fallback (no browser). A user-level server takes precedence over
+Tell the user it is OFFLINE (no tools registered this session), then give
+the steps for their environment. Tools appear under
+`mcp__plugin_yellow-composio_composio-server__*`; restart Claude Code if
+they are still missing after login, then re-run `/composio:setup`.
+
+- **`wsl=no`:** open `/mcp`, select composio-server (yellow-composio), and
+  choose Authenticate. No browser on this machine (SSH, headless)? Use the
+  `--no-browser` login below instead.
+- **`wsl=wsl1` or `wsl=wsl2`:** lead with the `--no-browser` login. For
+  `wsl2` with `networking=nat` or `unknown`, add as a second option:
+  set `networkingMode=mirrored` under `[wsl2]` in `%UserProfile%\.wslconfig`,
+  run `wsl --shutdown` from Windows, then use `/mcp` → Authenticate.
+
+The `--no-browser` login, run in a separate terminal (it needs a TTY, so
+not through `!` or this session; on WSL, run it from the WSL shell
+itself):
+
+```text
+  claude mcp login plugin:yellow-composio:composio-server --no-browser
+```
+
+Open the printed URL in any browser, finish the Composio login and
+consent, then paste the full `http://localhost:<port>/callback?...` URL
+the browser lands on (the page itself may fail to load) back into the
+terminal. No inbound connection to WSL is needed. That URL holds a one-time
+authorization code — paste it only into that terminal, never into this chat.
+
+Consumer-key fallback (last resort). A user-level server takes precedence over
 this plugin. It stores the consumer key in plaintext in `~/.claude.json`:
 
 ```text
@@ -222,6 +257,13 @@ Usage Tracking: [initialized|existing counter (N executions this month)]
 ==============================
 Setup complete. Run /composio:status to see usage dashboard.
 ```
+
+When Step 2 recorded `bundled: unauthenticated`, append to `MCP Health:`
+the note `(via claude.ai connector; bundled server not authenticated)`
+and add one line after the table: authenticate it with `/mcp` →
+composio-server → Authenticate, or, on WSL or headless hosts, with the
+Step 2 `--no-browser` login in a separate terminal. Do not run the Step 2
+WSL probe here — the claude.ai connector works, so nothing is broken.
 
 ## Idempotency
 
