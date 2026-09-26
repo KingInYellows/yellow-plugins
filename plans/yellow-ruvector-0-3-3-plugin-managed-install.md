@@ -478,7 +478,11 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     then the XDG fallback `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/`;
     write `$HOME`, not `~`, since a tilde from a parameter default is never
     expanded)
-    and look for `current/node_modules/ruvector/bin/cli.js` there. Model the
+    and look for `current/node_modules/ruvector/bin/cli.js` there. Count a
+    candidate only where the launcher's `validate_paths` would accept it
+    (physically under HOME or `/tmp`, or under an absolute, non-system
+    `CLAUDE_CONFIG_DIR` / `XDG_DATA_HOME`), so `/setup:all` never reports
+    READY for an install the launcher rejects. Model the
     READY/PARTIAL rules on morph's block at 441-461. The probe only checks
     that an install exists: an install from an older lockfile is not a setup
     need, because the launcher (and the prewarm hook) reinstall to the new
@@ -602,13 +606,17 @@ Adding a changeset for yellow-core is part of this task.
        rather than drop increments; past that the increment is skipped. Every
        jq over the store is killed after 0.3 s (a slow store skips the
        increment and is not set aside), which keeps the whole hook well
-       inside the 1 s PostToolUse timeout with its allow JSON. Test that N concurrent sessions yield a count
-       of N, not just valid JSON.
+       inside the 1 s PostToolUse timeout with its allow JSON. The contract
+       is bounded loss: under normal contention (N sessions finishing inside
+       the shared budget) N concurrent sessions yield a count of N, and a
+       test asserts exactly that, not just valid JSON; an increment is lost
+       only when a lock wait or the jq bound runs out.
        A hook killed while holding a lock (the 1 s timeout) must not
        disable recording: a lock older than a minute is stale and is
        reclaimed once per lock generation (the reclaimer first creates
        `<lock>.reclaim.<inode>-<mtime>` with mkdir, since inodes alone are
-       reused at once, and re-checks the inode, mtime and age,
+       reused at once, and re-checks the inode and mtime, computing ages
+       from `stat` + `date` rather than `find -mmin`,
        so two waiters never both act and a fresh replacement lock is never
        deleted; markers are pruned after 10 minutes). The session file has
        its own per-session lock, so a busy store lock loses only that
@@ -638,7 +646,8 @@ Adding a changeset for yellow-core is part of this task.
   - A pair is recorded within the window. None is recorded across sessions or
     after 60 s.
   - Paths outside the root and `.ruvector/` paths are rejected.
-  - Concurrency: 20 parallel invocations never corrupt `coedit.json`.
+  - Concurrency: 20 parallel invocations never corrupt `coedit.json`, and
+    parallel edits within the budget each count (bounded loss, above).
   - The resolved binary is never invoked.
 - [ ] 2.6: Measure noise before and after (memories added per 10 edits plus 10
       commands on a fresh store) and put it in the PR body.
@@ -654,7 +663,10 @@ Adding a changeset for yellow-core is part of this task.
     partners of the normalized path in `coedit.json` with jq (no node start).
   - Keep up to 3 partners with a count of at least 3 that still exist under the
     root, the first time this session edits that file (the edited file goes
-    into the session file's `surfaced` list; see Data formats).
+    into the session file's `surfaced` list; see Data formats). Validate
+    candidates before applying the limit, so deleted or unsafe high-count
+    partners never hide valid ones below them; keep the scan bounded (missing
+    files cost no subprocess, directory checks are cached and capped).
   - Emit them with `emit_recall_json "PreToolUse" "<fenced block>"`: an advisory
     header, a reference-only fence, and forged-terminator scrubbing.
   - Bash stays a no-op allow. Drop the background `pre-edit` and `pre-command`
@@ -672,7 +684,10 @@ Adding a changeset for yellow-core is part of this task.
   - print the top 10 partners with counts from `coedit.json`, each
     re-validated, between reference-only fence lines (partner names are
     project data);
-  - handle a missing file ("no co-edit history yet").
+  - handle a missing file ("no co-edit history yet");
+  - the command passes the path on stdin (`--stdin`) through a quoted heredoc
+    whose delimiter is freshly randomized per call, never on the command
+    line.
 
 <!-- deepen-plan: external -->
 
@@ -863,12 +878,15 @@ shows nothing again. Capped at the last 200 entries.
   and offers a merge note. There is no automatic merge.
 - **A hash-stamped legacy store:** keep the existing ADR-210 detection and the
   `reembed` remediation unchanged.
-- **Leftover global `ruvector hooks init` entries:** setup and status detect and
-  warn. They are never edited automatically, except through the existing repair
+- **Leftover global `ruvector hooks init` entries:** status detects and warns;
+  `/ruvector:setup` lists them and, only after the user confirms, removes them
+  with `scripts/remove-legacy-hooks.sh --apply` (backup kept). Nothing edits
+  them without that confirmation, apart from the existing Cursor repair
   script.
 - **Concurrent sessions:** `intelligence.json` stays last-writer-wins
   (upstream). `coedit.json` edits wait up to ~0.4 s (shared by the session
-  and store locks) and then skip, so at worst one pair increment is lost.
+  and store locks) and then skip: loss is bounded to one pair increment per
+  timed-out wait, and none under normal contention.
 - **Paths:** reject user-supplied paths that are absolute, begin with `-`,
   or contain `..` components or control characters (AGENTS.md), and anything
   that resolves outside the root. Drop, never strip, a suggestion partner
