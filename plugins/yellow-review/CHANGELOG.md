@@ -1,5 +1,89 @@
 # Changelog
 
+## 3.5.0
+
+### Minor Changes
+
+- [`b273845`](https://github.com/KingInYellows/yellow-plugins/commit/b2738454e0ea6b13d92848cdc0341c8f057113c0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  and `/review:all` now persist every reported-but-unapplied finding to a per-PR
+  review-findings ledger inside the clone's git dir, inject still-applicable
+  dismissed findings into reviewer prompts, and record applied fixes through to
+  `fixed` once they are proved published. `/review:setup` checks the ledger's
+  prerequisites.
+
+- [`922715c`](https://github.com/KingInYellows/yellow-plugins/commit/922715c2333cd6b69a88594b89018591a85458c4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  SessionStart hook that prints one line when an open PR in this clone has
+  pending or attention findings in the review-findings ledger. It reads only
+  sidecar counts, names unverified PRs, stays within a 3 s budget (overall 2.3 s
+  deadline for lock waits and fallback folds, after which remaining ledgers are
+  only counted), names at most 10 PRs per category, and never prints finding
+  text.
+
+- [`6a634ba`](https://github.com/KingInYellows/yellow-plugins/commit/6a634bab0581bfc5ce859cd76a78f1e87b502cc2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/review:triage`: it reconciles a PR's review-findings ledger against the
+  fetched PR head (published fixes become `fixed`, reverted or abandoned ones
+  `reopened`, vanished anchors `stale`), then walks the remaining findings with
+  Apply, Dismiss (with `depends_on` paths), Restore file and Skip.
+  `--non-interactive` applies nothing and never deletes a ledger; attended
+  triage of a merged or closed PR asks first, and `--prune <PR#>` deletes the
+  ledger of a merged or closed PR. `/review:pr` and `/review:all` now capture a
+  fork PR's head ref into a variable and validate it before any command sees it.
+
+### Patch Changes
+
+- [`b074520`](https://github.com/KingInYellows/yellow-plugins/commit/b0745207a4825df886869619fa810f49b2b51614)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add the
+  internal review-findings ledger library (`lib/review-ledger.sh`), its rule
+  vocabulary and a Bats suite. yellow-review now declares a required yellow-core
+  dependency for credential redaction. No command uses the ledger yet.
+
+- [`77dc359`](https://github.com/KingInYellows/yellow-plugins/commit/77dc3595715ae779262bfb176deecbc2530b38db)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Harden and
+  speed up the review-findings ledger after a multi-agent review. Observe no
+  longer fails on large ledgers (the fold stayed off the command line) and
+  redacts in batches, so it is about 5x faster. Triage resolves stored paths by
+  finding id instead of putting PR-controlled file names on a command line.
+  Restore uses literal pathspecs. Secret detection now catches quoted password
+  and API-key assignments, and display stripping covers C1, bidi and zero-width
+  characters. The library also runs on macOS bash 3.2 and BSD realpath. A fix
+  whose commit a restack rewrote now settles `fixed` by content check even when
+  a stale local ref still holds the old commit, and a tree that cannot be read
+  (a partial clone offline) leaves findings unverifiable instead of retiring,
+  staling or reopening them. Re-verify no longer uses the redacted,
+  200-character display scope as the claim: a markdown scope is re-derived at
+  the matched line and compared by hash, and a code scope whose display copy was
+  truncated or redacted is unverifiable rather than wrongly `not_reproduced`.
+  The fail-closed credential pass now reads its whole input, so a hit in large
+  multi-line text is no longer lost to SIGPIPE under `pipefail` and stored.
+  `resolve-path` now refuses (exit 3) unless the worktree is checked out at the
+  PR head, so triage's Apply cannot edit a stale checkout.
+
+- [`6a634ba`](https://github.com/KingInYellows/yellow-plugins/commit/6a634bab0581bfc5ce859cd76a78f1e87b502cc2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Classify
+  `git ls-tree` failures as unverifiable in reconcile deletion retirement,
+  re-verify and dismissal applicability via `rl_tree_lookup`, so a partial clone
+  with an offline promisor no longer dismisses or reopens findings on unreadable
+  trees. Probe the target tree before accepting `exact` or `shifted` line
+  mappings in re-verify.
+
+- [`e386b13`](https://github.com/KingInYellows/yellow-plugins/commit/e386b1300e80730d8e22480796e4c08128a06d71)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `rule` and
+  `scope` to the compact-return schema of every review persona (including
+  yellow-core's `security-reviewer` and `performance-reviewer`). `/review:pr`
+  and `/review:all` inject the rule vocabulary into reviewer prompts and default
+  a missing `rule`/`scope` to `unclassified`/`unscoped` instead of dropping the
+  return.
+
+- [`50fdeb1`](https://github.com/KingInYellows/yellow-plugins/commit/50fdeb120e7cce74d43f90d35c694c372620ebe0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:sweep`
+  reconciles the review-findings ledger after its resolve pass and reports
+  pending and attention counts. `/review:sweep-all` shows a `Residual` column
+  and, after one confirmation, prunes the ledgers of closed or merged PRs; with
+  no PR to sweep it still stops after that prompt.
+
 ## 3.4.2
 
 ### Patch Changes

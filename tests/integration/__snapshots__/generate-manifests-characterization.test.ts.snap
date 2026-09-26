@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.4.2",
+      "version": "2.4.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -77,7 +77,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.4.2",
+      "version": "3.5.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -476,7 +476,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -949,7 +949,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.4.2",
+  "version": "3.5.0",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
