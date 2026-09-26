@@ -729,7 +729,8 @@ To enable missing MCP sources:
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
   Ceramic:    Bundled, OAuth only (no API key) — authenticate via /mcp → ceramic → Authenticate,
               or on WSL/headless: claude mcp login plugin:yellow-research:ceramic --no-browser
-              (separate terminal); if FAIL, restart Claude Code
+              in a separate terminal (needs a TTY — not via ! or this session; paste the
+              callback URL only into that terminal, never into chat); if FAIL, restart Claude Code
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.

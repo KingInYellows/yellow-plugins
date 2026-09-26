@@ -70,7 +70,8 @@ No Ceramic API key is read anywhere: `/research:setup` and `/setup:all` decide
 Ceramic availability from `ceramic_search` visibility alone. On WSL or headless
 hosts where the browser callback fails, authenticate with
 `claude mcp login plugin:yellow-research:ceramic --no-browser` in a separate
-terminal.
+terminal — it needs a TTY, so never run it through `!` or the Bash tool, and
+paste the callback URL (a one-time code) only into that terminal.
 
 Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still handle
 conversational queries and synthesis. The research-conductor and code-researcher
