@@ -123,12 +123,15 @@ Decisions made (change if you disagree):
 
 ### Phase 2 (branch B): Composio WSL remediation — yellow-composio + yellow-core patch
 
-- [ ] 2.1: Diagnose before writing docs: in a separate interactive WSL
+- [x] 2.1: Diagnose before writing docs: in a separate interactive WSL
       terminal run `claude mcp login plugin:yellow-composio:composio-server --no-browser`,
       complete the login, paste the redirect URL, confirm `claude mcp list` shows
       `✔ Connected`. Record whether it succeeded; if the redirect URL paste fails
       too, the root cause is on Composio's side (cf. ComposioHQ/composio#3485) —
       stop and re-plan B around the consumer-key fallback only.
+      _Done 2026-09-26: the pasted redirect URL was accepted on WSL2 NAT;
+      `claude mcp list` shows composio-server `✔ Connected` and its tools
+      appeared in the running session without a restart._
 
 <!-- deepen-plan: external -->
 > **Research:** `claude mcp login` (added 2.1.186) needs a TTY — without one it
@@ -143,7 +146,7 @@ Decisions made (change if you disagree):
 > See: https://github.com/anthropics/claude-code/issues/90906,
 > https://github.com/anthropics/claude-code/issues/35740,
 > https://docs.composio.dev/kb/guide/consumer-project-boundaries-and-auth-selection
-<!-- /deepen-plan -->- [ ] 2.2: `plugins/yellow-composio/commands/composio/setup.md` Step 2
+<!-- /deepen-plan -->- [x] 2.2: `plugins/yellow-composio/commands/composio/setup.md` Step 2
       OFFLINE branch: add a small WSL probe (`/proc/sys/fs/binfmt_misc/WSLInterop`
       or `uname -r` ∋ `microsoft`; `wslinfo --networking-mode` when present) and,
       only when OFFLINE, print remediation in order:
@@ -167,20 +170,20 @@ Decisions made (change if you disagree):
 > `command -v wslinfo && wslinfo --networking-mode` (`nat` | `mirrored` |
 > `virtioproxy` | `none`); when `wslinfo` is absent report "unknown", not "nat".
 > See: https://learn.microsoft.com/en-us/windows/wsl/networking
-<!-- /deepen-plan -->- [ ] 2.3: Step 3/6: when the only visible prefix is `mcp__claude_ai_composio__*`,
+<!-- /deepen-plan -->- [x] 2.3: Step 3/6: when the only visible prefix is `mcp__claude_ai_composio__*`,
       report HEALTHY with a note that the bundled server is unauthenticated and
       how to authenticate it — today this state is reported as plain HEALTHY.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** CONFIRMED — Step 6 report line `composio/setup.md:219` prints
 > `MCP Health: [HEALTHY|DEGRADED|OFFLINE]` with no prefix distinction.
-<!-- /deepen-plan -->- [ ] 2.4: `commands/composio/status.md` (~142) OFFLINE detail → point at
+<!-- /deepen-plan -->- [x] 2.4: `commands/composio/status.md` (~142) OFFLINE detail → point at
       `--no-browser` login.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** CONFIRMED — `status.md:141-143`; `/composio:status` Step 4
 > (~130-144) decides OFFLINE via `ToolSearch("COMPOSIO_REMOTE_WORKBENCH")`.
-<!-- /deepen-plan -->- [ ] 2.5: Mirror briefly in `plugins/yellow-composio/{README.md,CLAUDE.md}`
+<!-- /deepen-plan -->- [x] 2.5: Mirror briefly in `plugins/yellow-composio/{README.md,CLAUDE.md}`
       and `skills/composio-patterns/SKILL.md` (~34, 49, 287-290).
 
 <!-- deepen-plan: codebase -->
@@ -188,7 +191,7 @@ Decisions made (change if you disagree):
 > unrelated `COMPOSIO_MANAGE_CONNECTIONS` table row; target lines ~34 and
 > 287-290 only. yellow-composio has no `tests/` dir and no bats test asserts
 > its OFFLINE text.
-<!-- /deepen-plan -->- [ ] 2.6: `plugins/yellow-core/commands/setup/all.md` yellow-composio block
+<!-- /deepen-plan -->- [x] 2.6: `plugins/yellow-core/commands/setup/all.md` yellow-composio block
       (~616-641, inside the `setup-all-classification` markers): replace the
       "Authenticate in /mcp" NEEDS SETUP detail with the `--no-browser` command
       — net ≤ +3 lines (file is already over the RULE 21 ceiling).
@@ -199,7 +202,7 @@ Decisions made (change if you disagree):
 > not strings (no `composio`/`CERAMIC` literals), but every `mcp__plugin_*` name
 > inside the markers must still appear in the Step 1.5 probe list — don't add a
 > new plugin tool name in the composio block.
-<!-- /deepen-plan -->- [ ] 2.7: `pnpm changeset` — yellow-composio **patch**, yellow-core **patch**.
+<!-- /deepen-plan -->- [x] 2.7: `pnpm changeset` — yellow-composio **patch**, yellow-core **patch**.
 
 ### Phase 3 (branch C): Ceramic OAuth-only — yellow-research minor, yellow-core patch
 

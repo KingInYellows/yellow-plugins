@@ -16,8 +16,15 @@ After updating from the stdio wrapper or a saved consumer key:
 ```
 
 Then open `/mcp`, select `composio-server`, and choose Authenticate.
-A headless host that cannot open a browser can still add a user-level
-server with a For You consumer key (`ck_...`). See `/composio:setup`.
+If the browser callback never completes (common on WSL2) or there is no
+browser, run this in a separate terminal and paste the redirect URL back:
+
+```bash
+claude mcp login plugin:yellow-composio:composio-server --no-browser
+```
+
+The last resort is a user-level server with a For You consumer key
+(`ck_...`). See `/composio:setup`.
 
 ## Installation
 
@@ -93,8 +100,8 @@ they fall back to existing local approaches with zero user-visible difference.
 
 - Composio account ([composio.dev](https://composio.dev))
 - A browser session for Claude Code's OAuth prompt on
-  `https://connect.composio.dev/mcp`. Headless hosts can use the
-  consumer-key fallback in `/composio:setup`.
+  `https://connect.composio.dev/mcp`. WSL and headless hosts can use
+  `claude mcp login ... --no-browser` (see above) instead.
 - `jq` (recommended for usage tracking)
 
 ## License
