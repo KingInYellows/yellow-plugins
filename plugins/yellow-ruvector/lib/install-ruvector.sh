@@ -226,14 +226,19 @@ yellow_ruvector_swap_current() {
 }
 
 # Remove install dirs other than $1 (current) and $2 (previous), plus stale
-# temp dirs from crashed installs. Caller holds the install lock.
+# temp dirs from crashed installs. Caller holds the install lock. An install
+# dir named on a live process's command line is kept too: the launcher execs
+# the resolved install-<hash> path, and a long-running MCP server still
+# lazy-loads modules from it after later upgrades move `current`.
 yellow_ruvector_prune() {
-  local keep_current="$1" keep_prev="${2:-}" d name
+  local keep_current="$1" keep_prev="${2:-}" d name in_use
+  in_use=$(ps -A -o args= 2>/dev/null || true)
   for d in "${RUVECTOR_DATA}"/install-* "${RUVECTOR_DATA}"/.install-*.tmp.*; do
     [ -e "$d" ] || continue
     name="${d##*/}"
     [ "$name" = "$keep_current" ] && continue
     [ -n "$keep_prev" ] && [ "$name" = "$keep_prev" ] && continue
+    case "$in_use" in *"/${name}/"*) continue ;; esac
     rm -rf -- "$d" 2>/dev/null
   done
   return 0
@@ -250,8 +255,8 @@ yellow_ruvector_model_cached() {
 # yellow_ruvector_run_bounded <secs> <cmd...> — run <cmd> for at most <secs>
 # (fractions allowed). Uses GNU timeout when it supports --kill-after;
 # otherwise (stock macOS) a background watcher sends TERM (to the command
-# and its children), then KILL 1s later. The watcher's stdio goes to /dev/null so a caller's $(...) is not
-# held open by it.
+# and its children), then KILL 1s later. The watcher's stdio goes to
+# /dev/null so a caller's $(...) is not held open by it.
 yellow_ruvector_run_bounded() {
   local secs="$1" pid watcher rc=0 t
   shift

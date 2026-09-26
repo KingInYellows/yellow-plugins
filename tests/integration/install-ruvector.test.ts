@@ -14,7 +14,7 @@
  * No test runs `npm ci`; install dirs are faked on disk.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -236,6 +236,30 @@ describe('yellow-ruvector install lib', () => {
       expect(existsSync(join(data, 'install-bbb'))).toBe(true);
       expect(existsSync(join(data, 'install-aaa'))).toBe(false);
       expect(existsSync(join(data, '.install-ddd.tmp.123'))).toBe(false);
+    });
+  });
+
+  describe('prune keeps installs a live process still uses', () => {
+    it('skips an install dir named on a running command line', async () => {
+      for (const n of ['install-aaa', 'install-bbb', 'install-ccc']) {
+        fakeInstall(data, n);
+      }
+      const holder = spawn(
+        'sh',
+        ['-c', 'sleep 30', join(data, 'install-aaa', 'node_modules', 'x.js')],
+        { stdio: 'ignore' }
+      );
+      try {
+        await new Promise((r) => setTimeout(r, 200));
+        const r = runBash(
+          'yellow_ruvector_data_dir; yellow_ruvector_prune install-ccc install-bbb',
+          env
+        );
+        expect(r.status).toBe(0);
+        expect(existsSync(join(data, 'install-aaa'))).toBe(true);
+      } finally {
+        holder.kill('SIGKILL');
+      }
     });
   });
 
