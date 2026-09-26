@@ -162,7 +162,7 @@ progress.
   `.ruvector/coedit.json`. Paths are root-relative and physical; paths
   outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
   control characters, or over 512 chars are ignored. Writes are temp file +
-  rename under a non-blocking mkdir lock (a busy lock skips one increment);
+  rename under a mkdir lock (waits up to 0.5s, then skips one increment);
   the file is capped at 5000 directed pairs, keeping the highest counts.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session
