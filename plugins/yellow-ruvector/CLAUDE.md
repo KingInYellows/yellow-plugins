@@ -20,7 +20,9 @@ ruvector.
      so subdirectory launches and new worktrees use the right store in the
      SAME session;
   3. guards a fresh store: if `.ruvector/` is missing or has no embedding
-     stamp and the ONNX model is not cached, it warms the model (`embed
+     stamp, the env does not select hash (`RUVECTOR_EMBEDDER=hash`, or
+     `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER` unset), and the ONNX model
+     is not cached, it warms the model (`embed
      text`, 15s, under the install lock); if that fails (offline), it drops
      the write tools `hooks_remember` and `hooks_pretrain` from
      `RUVECTOR_MCP_ALLOW` for the session. The server's write paths
@@ -169,7 +171,9 @@ progress.
   `.ruvector/coedit.json`. Paths are root-relative and physical; paths
   outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
   control characters, or over 512 chars are ignored. Writes are temp file +
-  rename under a mkdir lock (waits up to 0.5s, then skips one increment);
+  rename under one mkdir lock around the session read and pair update
+  (waits up to 0.5s, then skips that edit; stale-lock reclaim is
+  serialized on a second mutex);
   the file is capped at 5000 directed pairs, keeping the highest counts.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session

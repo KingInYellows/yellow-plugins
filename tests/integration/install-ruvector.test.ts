@@ -19,10 +19,12 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   readlinkSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -159,7 +161,9 @@ describe('yellow-ruvector install lib', () => {
   it('rejects `..` components when realpath -m is unavailable (BSD/macOS)', () => {
     const bin = join(home, 'fakebin');
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', {
+      mode: 0o755,
+    });
     const r = runBash('yellow_ruvector_validate_paths', {
       ...env,
       PATH: `${bin}:${process.env.PATH}`,
@@ -172,7 +176,9 @@ describe('yellow-ruvector install lib', () => {
   it('rejects a symlinked ancestor escaping HOME when realpath -m is unavailable', () => {
     const bin = join(home, 'fakebin2');
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', {
+      mode: 0o755,
+    });
     symlinkSync('/usr', join(home, 'escape'));
     const r = runBash('yellow_ruvector_validate_paths', {
       ...env,
@@ -186,7 +192,9 @@ describe('yellow-ruvector install lib', () => {
   it('still accepts a HOME-local data dir when realpath -m is unavailable', () => {
     const bin = join(home, 'fakebin3');
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', {
+      mode: 0o755,
+    });
     const r = runBash(
       'yellow_ruvector_validate_paths && printf "%s" "$RUVECTOR_DATA"',
       { ...env, PATH: `${bin}:${process.env.PATH}` }
@@ -289,10 +297,13 @@ describe('yellow-ruvector install lib', () => {
       const bin = join(home, 'nonpm');
       mkdirSync(bin, { recursive: true });
       writeFileSync(join(bin, 'npm'), '#!/bin/sh\nexit 99\n', { mode: 0o755 });
-      const r = runBash('yellow_ruvector_data_dir; yellow_ruvector_do_install', {
-        ...env,
-        PATH: `${bin}:${process.env.PATH}`,
-      });
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_do_install',
+        {
+          ...env,
+          PATH: `${bin}:${process.env.PATH}`,
+        }
+      );
       expect(r.status).toBe(0);
       expect(readlinkSync(join(data, 'current'))).toBe(`install-${hash}`);
       expect(existsSync(join(data, `install-${hash}`, 'marker'))).toBe(true);
@@ -351,11 +362,43 @@ describe('yellow-ruvector install lib', () => {
         env
       );
       expect(r.status).toBe(0);
-      expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
-      // Restored in place, never nested and no leftover grave.
-      const left = readdirSync(data).filter((n) => n.startsWith('.install.lock.stale'));
+      // Never moved aside or recreated: the same pid file, nothing left over.
+      expect(readFileSync(join(data, '.install.lock', 'pid'), 'utf8')).toBe(
+        String(process.pid)
+      );
+      const left = readdirSync(data).filter((n) =>
+        n.startsWith('.install.lock.')
+      );
       expect(left).toEqual([]);
       expect(readdirSync(join(data, '.install.lock'))).toEqual(['pid']);
+    });
+
+    it('reclaim waits its turn: a held reclaim mutex leaves the lock alone', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), '999999999');
+      mkdirSync(join(data, '.install.lock.reclaim'));
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
+    });
+
+    it('reclaim clears a minute-old abandoned mutex, then the stale lock', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), '999999999');
+      const mutex = join(data, '.install.lock.reclaim');
+      mkdirSync(mutex);
+      const old = new Date(Date.now() - 5 * 60 * 1000);
+      utimesSync(mutex, old, old);
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(existsSync(join(data, '.install.lock'))).toBe(false);
+      expect(existsSync(mutex)).toBe(false);
     });
 
     it('release never removes a lock another process now owns', () => {
