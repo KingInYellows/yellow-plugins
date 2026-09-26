@@ -386,6 +386,11 @@ coedit_suggest_once() {
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
   sfile="${store}/coedit-sessions/${sid}"
   [ -L "$sfile" ] && return 0
+  # Same session-size policy as coedit_record: never parse an oversized
+  # session file inside the 1s hook (the next record resets it).
+  if [ -f "$sfile" ] && [ "$(wc -c < "$sfile" | tr -d ' ')" -gt 65536 ]; then
+    return 0
+  fi
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     return 0
   fi

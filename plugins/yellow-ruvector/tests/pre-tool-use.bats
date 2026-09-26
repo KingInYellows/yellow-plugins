@@ -259,3 +259,13 @@ assert_allow_json() {
   [[ "$c" == *"src/b.ts"* ]]
   rm -rf "$outside"
 }
+
+@test "an oversized session file is never parsed before suggesting" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -n '{surfaced: [range(0;400000) | "x\(.)"]}' > "$RUVECTOR_DIR/coedit-sessions/s6"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s6 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+}
