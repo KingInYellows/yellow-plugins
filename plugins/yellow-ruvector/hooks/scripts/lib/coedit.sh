@@ -19,6 +19,9 @@
 
 COEDIT_WINDOW_SECS="${COEDIT_WINDOW_SECS:-60}"
 COEDIT_MAX_PAIRS="${COEDIT_MAX_PAIRS:-5000}"
+# A store past this size is set aside unparsed (5000 pairs of 512-char paths
+# stay well under it).
+COEDIT_MAX_BYTES="${COEDIT_MAX_BYTES:-4194304}"
 
 # coedit_sanitize_session <id> — print a filename-safe session id, or fail.
 coedit_sanitize_session() {
@@ -108,26 +111,32 @@ coedit_write_atomic() {
   fi
 }
 
-# coedit_lock <store-dir> — take the store's mkdir lock, waiting up to
-# 10 x 50ms: concurrent edits queue up instead of dropping their work; past
-# ~0.5s the caller skips (a lost count, never a corrupted file), leaving
-# headroom under the hook's 1s timeout so it still prints its allow JSON.
-# A lock older than a minute is from a killed hook (the hook's timeout is
-# 1s). Stale-lock reclaim is serialized on a second mutex, and the age is
-# re-checked under it, so one waiter can never delete a lock another waiter
-# just took; a mutex older than a minute (its holder was killed) is cleared.
-coedit_lock() {
-  local lock="${1}/.coedit.lock" mutex="${1}/.coedit.lock.reclaim" tries=0
+# coedit_lock_path <lock-dir> — take a mkdir lock, waiting up to 10 x 50ms:
+# concurrent edits queue up instead of dropping their work; past ~0.5s the
+# caller skips, leaving headroom under the hook's 1s timeout so it still
+# prints its allow JSON. A lock older than a minute is from a killed hook
+# (the hook's timeout is 1s). Each stale lock generation (its directory
+# inode) is reclaimed at most once: the reclaimer first creates the marker
+# <lock>.reclaim.<inode> (atomic mkdir) and re-checks the inode and age, so
+# two waiters that judged the same lock stale cannot both act, and neither
+# can delete a fresh lock that replaced it. Markers are pruned after 10
+# minutes, long after any waiter that saw that generation has finished.
+coedit_lock_path() {
+  local lock="$1" tries=0 ino marker
   until mkdir "$lock" 2>/dev/null; do
     tries=$((tries + 1))
     [ "$tries" -le 10 ] || return 1
     if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
-      if ! mkdir "$mutex" 2>/dev/null; then
-        [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$mutex" 2>/dev/null
-        mkdir "$mutex" 2>/dev/null || { sleep 0.05; continue; }
+      ino=$(ls -di "$lock" 2>/dev/null | awk '{print $1}')
+      case "$ino" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
+      find "$(dirname -- "$lock")" -maxdepth 1 -type d -name "$(basename -- "$lock").reclaim.*" \
+        -mmin +10 -exec rmdir {} + 2>/dev/null
+      marker="${lock}.reclaim.${ino}"
+      if mkdir "$marker" 2>/dev/null \
+         && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
+         && [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+        rmdir "$lock" 2>/dev/null
       fi
-      [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
-      rmdir "$mutex" 2>/dev/null
       continue
     fi
     sleep 0.05
@@ -135,21 +144,26 @@ coedit_lock() {
   return 0
 }
 
-coedit_unlock() { rmdir "${1}/.coedit.lock" 2>/dev/null; }
+coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
 
 # coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
-# The caller holds coedit_lock.
+# The caller holds the store lock (<store-dir>/.coedit.lock).
 coedit_bump() {
-  local dir="$1" a="$2" b="$3" f cur
+  local dir="$1" a="$2" b="$3" f cur size
   f="${dir}/coedit.json"
   cur='{"version":1,"pairs":{}}'
   # A symlinked (or non-regular) store file could import another project's
-  # pairs or swallow writes: set it aside.
+  # pairs or swallow writes, and an oversized one (a checkout can ship it)
+  # would not parse inside the hook's 1s: set it aside unparsed.
   if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
     mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
   fi
   if [ -f "$f" ]; then
-    if jq -e 'type == "object" and (.pairs | type) == "object"
+    size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
+    case "$size" in ''|*[!0-9]*) size=0 ;; esac
+    if [ "$size" -gt "$COEDIT_MAX_BYTES" ]; then
+      mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
+    elif jq -e 'type == "object" and (.pairs | type) == "object"
               and all(.pairs[]; type == "object" and all(.[]; type == "number"))' "$f" >/dev/null 2>&1; then
       cur=$(cat "$f")
     else
@@ -158,29 +172,30 @@ coedit_bump() {
   fi
   # Existing keys are project data (a checkout can ship a coedit.json):
   # every rewrite keeps only root-relative paths coedit_normalize could have
-  # produced, and only the version/pairs fields.
+  # produced, only the version/pairs fields, and rebuilds the pairs as
+  # undirected (both directions carry the larger of the two counts), so the
+  # store is symmetric after every write.
   printf '%s' "$cur" | jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" '
     def safe: type == "string" and length > 0 and length <= 512
       and (test("[[:cntrl:]]") | not) and (startswith("/") | not)
       and ((split("/") | map(select(. == "" or . == "." or . == "..")) | length) == 0)
       and (test("^(\\.ruvector|\\.git)(/|$)|^docs/solutions/") | not);
-    {version: 1,
-     pairs: (.pairs | with_entries(select(.key | safe)
-                     | .value |= with_entries(select(.key | safe)))
-                    | with_entries(select(.value | length > 0)))}
+    [.pairs | to_entries[] | select(.key | safe) | .key as $k
+     | .value | to_entries[]
+     | select((.key | safe) and .key != $k and .value > 0)
+     | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: (.value | floor)}]
+    | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
     # The new pair gets the same check: a session file is project data too.
     | if ($a | safe) and ($b | safe) and $a != $b then
-        .pairs[$a][$b] = ((.pairs[$a][$b] // 0) + 1)
-        | .pairs[$b][$a] = ((.pairs[$b][$a] // 0) + 1)
+        ([$a, $b] | min) as $k | ([$a, $b] | max) as $o
+        | if any(.[]; .k == $k and .o == $o)
+          then map(if .k == $k and .o == $o then .n += 1 else . end)
+          else . + [{k: $k, o: $o, n: 1}] end
       else . end
-    | if ([.pairs[] | length] | add // 0) > $cap then
-        # Evict whole undirected pairs so both directions stay in sync.
-        .pairs = ([.pairs | to_entries[] | .key as $k | .value | to_entries[]
-                   | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: .value}]
-                  | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
-                  | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
-                  | reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n | .[$e.o][$e.k] = $e.n))
-      else . end
+    # Cap: keep the highest counts, whole pairs at a time.
+    | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
+    | {version: 1,
+       pairs: (reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n | .[$e.o][$e.k] = $e.n))}
   ' 2>/dev/null | coedit_write_atomic "$f"
   return 0
 }
@@ -188,8 +203,12 @@ coedit_bump() {
 # coedit_record <root> <session-id> <path> — note an edit of <path>; when the
 # same session edited a different file within COEDIT_WINDOW_SECS, count the
 # pair. Needs <root>/.ruvector to exist (the project opted in).
+# Locks: a per-session lock covers the whole read-decide-write of the session
+# file, so parallel edits in one session never read the same prior state and
+# the session always advances to the latest edit; the store lock is only
+# taken for the pair update, and when it is busy only that increment is lost.
 coedit_record() {
-  local root="$1" sid rel dir sdir sfile now last="" epoch=0 state
+  local root="$1" sid rel dir sdir sfile slock now last="" epoch=0 state
   dir=$(coedit_store_dir "$root") || return 0
   sid=$(coedit_sanitize_session "${2:-}") || return 0
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
@@ -198,9 +217,8 @@ coedit_record() {
   [ -L "$sdir" ] && return 0
   mkdir -p "$sdir" 2>/dev/null || return 0
   sfile="${sdir}/${sid}"
-  # One lock around read-decide-write: parallel edits in the same session
-  # (and other sessions' pair updates) never read the same prior state.
-  coedit_lock "$dir" || return 0
+  slock="${sdir}/.${sid}.lock"
+  coedit_lock_path "$slock" || return 0
   now=$(date +%s)
   state='{}'
   if [ -f "$sfile" ] && [ ! -L "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then
@@ -210,11 +228,18 @@ coedit_record() {
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
   if [ -n "$last" ] && [ "$last" != "$rel" ] && [ $((now - epoch)) -ge 0 ] && [ $((now - epoch)) -le "$COEDIT_WINDOW_SECS" ]; then
-    coedit_bump "$dir" "$last" "$rel"
+    # The stored path is project data: re-resolve it (symlinks included)
+    # exactly as a fresh edit would be before it can enter the store.
+    if last=$(coedit_normalize "$root" "$last") && [ "$last" != "$rel" ]; then
+      if coedit_lock_path "${dir}/.coedit.lock"; then
+        coedit_bump "$dir" "$last" "$rel"
+        coedit_unlock_path "${dir}/.coedit.lock"
+      fi
+    fi
   fi
   printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
     | coedit_write_atomic "$sfile"
-  coedit_unlock "$dir"
+  coedit_unlock_path "$slock"
   return 0
 }
 

@@ -379,16 +379,60 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   done
 }
 
-@test "a stale co-edit lock is reclaimed, and a held reclaim mutex never deletes a fresh lock" {
+@test "a stale co-edit lock is reclaimed once per generation" {
   edit r1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
   touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
   edit r1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
-  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ] && [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim" ]
-  # Fresh lock + another waiter mid-reclaim (mutex held): nothing is deleted.
-  mkdir "$RUVECTOR_DIR/.coedit.lock" "$RUVECTOR_DIR/.coedit.lock.reclaim"
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
+  [ -d "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino" ]
+  # Another waiter already claimed this stale generation: leave the lock.
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock"
+  ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino"
   edit r1 "$PROJECT_ROOT/src/c.ts"
   [ -d "$RUVECTOR_DIR/.coedit.lock" ]
   [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
+}
+
+@test "a busy store lock loses only that increment; the session still advances" {
+  edit v1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  edit v1 "$PROJECT_ROOT/src/b.ts"
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  edit v1 "$PROJECT_ROOT/src/c.ts"
+  [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
+  [ "$(pair src/a.ts src/c.ts)" -eq 0 ]
+}
+
+@test "an oversized coedit.json is set aside unparsed" {
+  jq -n '{version:1, pairs:{"src/x.ts":{"src/y.ts":3}, "src/y.ts":{"src/x.ts":3}}}' > "$COEDIT"
+  edit o1 "$PROJECT_ROOT/src/a.ts"
+  COEDIT_MAX_BYTES=10 edit o1 "$PROJECT_ROOT/src/b.ts"
+  ls -d "$RUVECTOR_DIR"/coedit.json.corrupt-* >/dev/null
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(pair src/x.ts src/y.ts)" -eq 0 ]
+}
+
+@test "one-sided or mismatched pairs are rebuilt symmetric on the next write" {
+  jq -n '{version:1, pairs:{"src/x.ts":{"src/y.ts":7}, "src/p.ts":{"src/q.ts":2}, "src/q.ts":{"src/p.ts":5}}}' > "$COEDIT"
+  edit m1 "$PROJECT_ROOT/src/a.ts"
+  edit m1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/y.ts src/x.ts)" -eq 7 ]
+  [ "$(pair src/p.ts src/q.ts)" -eq 5 ] && [ "$(pair src/q.ts src/p.ts)" -eq 5 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ] && [ "$(pair src/b.ts src/a.ts)" -eq 1 ]
+}
+
+@test "a session's last path that now links outside the root is never paired" {
+  outside="$(mktemp -d)"; : > "$outside/secret.ts"
+  edit l1 "$PROJECT_ROOT/src/a.ts"
+  rm "$PROJECT_ROOT/src/a.ts"; ln -s "$outside/secret.ts" "$PROJECT_ROOT/src/a.ts"
+  edit l1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ "$(jq '[.pairs // {} | .. | objects | keys[]] | length' "$COEDIT" 2>/dev/null || echo 0)" -eq 0 ]
+  rm -rf "$outside"
 }
