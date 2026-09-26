@@ -459,6 +459,7 @@ coedit_partners() {
   done < <(coedit_jq -r --arg r "$rel" --argjson min "$min" '
       (.pairs[$r] // {}) | to_entries
       | map(select((.value | type) == "number" and .value >= $min
+                   and .key != $r
                    and (.key | test("[[:cntrl:]]") | not)))
       | sort_by(-.value, .key) | .[0:500][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null)
@@ -517,7 +518,9 @@ coedit_suggest_once() {
         | {surfaced}
           + (if (.last | type) == "string" and (.last | length) <= 4096 then {last} else {} end)
           + (if (.epoch | type) == "number" then {epoch} else {} end)' 2>/dev/null \
-      | coedit_write_atomic "$sfile"
+      | coedit_write_atomic "$sfile" || seen=1
+    # An unrecorded suggestion would repeat on every edit: only print it
+    # once `surfaced` was saved.
   fi
   coedit_unlock_path "$slock"
   [ "$seen" -eq 0 ] || return 0

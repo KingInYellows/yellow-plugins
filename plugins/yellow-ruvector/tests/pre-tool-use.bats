@@ -335,6 +335,25 @@ related_staged() {
   jq -e '(.surfaced | tojson | utf8bytelength) <= 32768 and .surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s13" >/dev/null
 }
 
+@test "a file is never suggested as its own partner" {
+  jq -n '{version:1, pairs:{"src/a.ts": {"src/a.ts": 99, "src/b.ts": 4}}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  c=$(ctx "$output")
+  [[ "$c" == *"src/b.ts"* ]]
+  [[ "$c" != *"- src/a.ts ("* ]]
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [[ "$output" != *$'\tsrc/a.ts'* ]]
+}
+
+@test "no suggestion is printed when it cannot be recorded" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/s14"
+  for i in 1 2; do
+    run --separate-stderr run_hook "$(event s14 Edit "$PROJECT_ROOT/src/a.ts")"
+    assert_allow_json "$output"
+    [ -z "$(ctx "$output")" ]
+  done
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done
