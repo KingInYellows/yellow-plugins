@@ -30,7 +30,9 @@ ruvector_resolve_root() {
 # the first entry of `git worktree list --porcelain`, unless it is bare or is
 # not a real checkout. For a --separate-git-dir repo git reports the parent
 # of the separate git dir, which lacks the tracked files; that is refused
-# rather than mistaken for the main checkout.
+# rather than mistaken for the main checkout. With nothing tracked the two
+# layouts look identical to git, so a repo with no tracked files has no
+# main worktree here (fail closed: no shared store).
 ruvector_main_worktree() {
   local out block first main tracked
   out=$(git -C "${1:-.}" worktree list --porcelain 2>/dev/null) || return 1
@@ -44,9 +46,9 @@ ruvector_main_worktree() {
     *) return 1 ;;
   esac
   # A real checkout has its tracked files; the separate git dir's parent
-  # does not. (With nothing tracked yet there is nothing to tell apart.)
+  # does not.
   tracked=$(git -C "$main" ls-files 2>/dev/null | head -n 1)
-  [ -z "$tracked" ] || [ -e "${main}/${tracked}" ] || return 1
+  [ -n "$tracked" ] && [ -e "${main}/${tracked}" ] || return 1
   printf '%s' "$main"
 }
 

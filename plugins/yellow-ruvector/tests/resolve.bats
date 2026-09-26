@@ -145,10 +145,23 @@ fake_install() {
   [ ! -e "$WORK/wts/.ruvector" ]
 }
 
+@test "heal_store: an empty --separate-git-dir repo never links to the git dir's parent" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  mkdir -p "$WORK/meta" "$WORK/main"
+  git -C "$WORK/main" init -q --separate-git-dir="$WORK/meta/.git"
+  git -C "$WORK/main" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  mkdir "$WORK/meta/.ruvector"
+  git -C "$WORK/main" worktree add -q "$WORK/wte" -b sep-empty
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wte"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/wte/.ruvector" ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q
-  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  echo x > "$WORK/f.txt"; git -C "$WORK" add f.txt
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
   mkdir "$WORK/.ruvector"
   git -C "$WORK" worktree add -q "$WORK/wt" -b keep
   mkdir "$WORK/wt/.ruvector"

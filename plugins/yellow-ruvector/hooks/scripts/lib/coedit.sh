@@ -109,9 +109,10 @@ coedit_write_atomic() {
 }
 
 # coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
-# mkdir lock with a bounded wait (20 x 50ms): concurrent sessions queue up
-# instead of dropping their increments; only past ~1s is an increment skipped
-# (a lost count, never a corrupted file). A lock older than a minute is from
+# mkdir lock with a bounded wait (10 x 50ms): concurrent sessions queue up
+# instead of dropping their increments; past ~0.5s the increment is skipped
+# (a lost count, never a corrupted file), leaving headroom under the hook's
+# 1s timeout so it still prints its allow JSON. A lock older than a minute is from
 # a killed hook and is cleared.
 coedit_bump() {
   local dir="$1" a="$2" b="$3" f lock cur tries=0
@@ -119,7 +120,7 @@ coedit_bump() {
   lock="${dir}/.coedit.lock"
   until mkdir "$lock" 2>/dev/null; do
     tries=$((tries + 1))
-    [ "$tries" -le 20 ] || return 0
+    [ "$tries" -le 10 ] || return 0
     if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
       rmdir "$lock" 2>/dev/null
       continue
@@ -152,8 +153,11 @@ coedit_bump() {
      pairs: (.pairs | with_entries(select(.key | safe)
                      | .value |= with_entries(select(.key | safe)))
                     | with_entries(select(.value | length > 0)))}
-    | .pairs[$a][$b] = ((.pairs[$a][$b] // 0) + 1)
-    | .pairs[$b][$a] = ((.pairs[$b][$a] // 0) + 1)
+    # The new pair gets the same check: a session file is project data too.
+    | if ($a | safe) and ($b | safe) and $a != $b then
+        .pairs[$a][$b] = ((.pairs[$a][$b] // 0) + 1)
+        | .pairs[$b][$a] = ((.pairs[$b][$a] // 0) + 1)
+      else . end
     | if ([.pairs[] | length] | add // 0) > $cap then
         # Evict whole undirected pairs so both directions stay in sync.
         .pairs = ([.pairs | to_entries[] | .key as $k | .value | to_entries[]

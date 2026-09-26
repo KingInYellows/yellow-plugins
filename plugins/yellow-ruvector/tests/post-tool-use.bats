@@ -230,7 +230,8 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
 @test "a linked worktree records into the main worktree's store" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  echo x > "$PROJECT_ROOT/f.txt"; git -C "$PROJECT_ROOT" add f.txt
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
   WT="$(mktemp -d)/wt"
   git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
   mkdir -p "$WT/src"; : > "$WT/src/a.ts"; : > "$WT/src/b.ts"
@@ -340,4 +341,30 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(jq -c '.pairs["src/a.ts"] | keys' "$COEDIT")" = '["src/b.ts","src/c.ts"]' ]
   [ "$(jq 'has("extra")' "$COEDIT")" = "false" ]
   [ "$(pair src/a.ts src/c.ts)" -eq 4 ]
+}
+
+@test "a tampered session file's last path never enters coedit.json" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  for bad in "../outside" "/etc/passwd" ".git/config" $'src/a.ts\nx'; do
+    jq -cn --arg l "$bad" --argjson e "$(date +%s)" '{last:$l, epoch:$e}' > "$RUVECTOR_DIR/coedit-sessions/t1"
+    edit t1 "$PROJECT_ROOT/src/b.ts"
+  done
+  [ "$(jq '[.pairs // {} | .. | objects | keys[]] | map(select(. != "src/b.ts" and . != "src/a.ts")) | length' "$COEDIT" 2>/dev/null || echo 0)" -eq 0 ]
+  [ "$(pair src/b.ts '../outside')" -eq 0 ]
+  # The session still records its own edit, so the next pair counts.
+  edit t1 "$PROJECT_ROOT/src/c.ts"
+  [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
+}
+
+@test "a held co-edit lock skips the increment well inside the 1s hook timeout" {
+  edit h1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event h1 Edit "$PROJECT_ROOT/src/b.ts")"
+  end=$(date +%s%N)
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
 }

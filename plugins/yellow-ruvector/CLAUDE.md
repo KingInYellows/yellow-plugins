@@ -27,8 +27,11 @@ ruvector.
      swallow ONNX failures and fall back to hash, which would stamp the
      store hash/64d and lock out every later write (ADR-210);
   4. `exec`s `node <data>/install-<hash>/node_modules/ruvector/bin/cli.js mcp start`
-     (the resolved `current` target, so pruning can skip installs a live
-     server still loads modules from).
+     (this plugin version's own lockfile hash, never `current`, so the
+     server matches this session's hooks and pruning can skip installs a
+     live server still loads modules from). If that install is gone, it
+     reinstalls it under the lock or exits; it never runs another
+     version's install.
 - Data dir: `$CLAUDE_PLUGIN_DATA`, or `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector`
   when the host does not set it. Install primitives live in
   `lib/install-ruvector.sh` (adapted from yellow-morph's install lib).
@@ -166,7 +169,7 @@ progress.
   `.ruvector/coedit.json`. Paths are root-relative and physical; paths
   outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
   control characters, or over 512 chars are ignored. Writes are temp file +
-  rename under a non-blocking mkdir lock (a busy lock skips one increment);
+  rename under a mkdir lock (waits up to 0.5s, then skips one increment);
   the file is capped at 5000 directed pairs, keeping the highest counts.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session
