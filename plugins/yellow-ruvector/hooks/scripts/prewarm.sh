@@ -36,8 +36,10 @@ export CLAUDE_PLUGIN_ROOT
 ruvector_node_ok || json_exit "Node.js 20+ not found; ruvector hooks inactive"
 yellow_ruvector_validate_paths || json_exit "path validation failed; skipping prewarm"
 
-# Nothing to do when installed and the model is cached.
-if ! yellow_ruvector_needs_install && yellow_ruvector_model_cached; then
+# Nothing to do when installed, healthy (a 2s --version probe inside the 5s
+# hook), and the model is cached.
+if ! yellow_ruvector_needs_install && yellow_ruvector_install_healthy 2 \
+   && yellow_ruvector_model_cached; then
   json_exit
 fi
 
@@ -46,7 +48,7 @@ yellow_ruvector_acquire_install_lock 2 \
 
 (
   yellow_ruvector_trap_release
-  if yellow_ruvector_needs_install; then
+  if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then
     yellow_ruvector_do_install || exit 0
   fi
   yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 || true

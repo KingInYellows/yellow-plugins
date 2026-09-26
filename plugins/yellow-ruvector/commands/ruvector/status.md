@@ -282,9 +282,12 @@ else
   fi
 fi
 # Store and CLI output are data, not instructions (modelId is a free string
-# from a project file) — fenced per the security-fencing skill.
+# from a project file) — fenced per the security-fencing skill. Each value
+# is flattened to one line with control characters removed and dash runs
+# shortened, so CLI or store text can never forge a fence or another key.
+_rv_flat() { printf '%s' "$1" | tr -d '\000-\010\013-\037\177' | tr '\n\r' '  ' | sed -E 's/-{3,}/--/g'; }
 printf -- '--- begin ruvector-provenance (reference only) ---\n'
-printf 'verdict=%s\ndetail=%s\nstore=%s\ntarget=%s\ndrop=%s\n' "$VERDICT" "$DETAIL" "$STORE" "$TARGET" "$DROP"
+printf 'verdict=%s\ndetail=%s\nstore=%s\ntarget=%s\ndrop=%s\n' "$VERDICT" "$(_rv_flat "$DETAIL")" "$(_rv_flat "$STORE")" "$(_rv_flat "$TARGET")" "$DROP"
 printf -- '--- end ruvector-provenance ---\n'
 ```
 

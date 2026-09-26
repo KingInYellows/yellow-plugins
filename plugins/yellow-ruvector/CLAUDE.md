@@ -323,7 +323,7 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 `bats tests/` from the plugin directory — one suite per hook
 (`session-start`, `pre-tool-use`, `post-tool-use` — co-edit recording,
 including a 20-way concurrency check — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
-`remove-legacy-hooks.bats`,
+`remove-legacy-hooks.bats`, `prewarm.bats` (install decision, npm stubbed),
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
 `memory-manager-flush.bats`, and `status-provenance.bats` (extracts the
 provenance bash block from `commands/ruvector/status.md` at run time and

@@ -525,12 +525,18 @@ exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   echo '{}' > "$RUVECTOR_DIR/coedit-sessions/old"
   echo '{}' > "$RUVECTOR_DIR/coedit-sessions/new"
-  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/old" 2>/dev/null \
-    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$RUVECTOR_DIR/coedit-sessions/old"
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/sub"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/sub/nested"
+  for f in old sub/nested; do
+    touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/$f" 2>/dev/null \
+      || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$RUVECTOR_DIR/coedit-sessions/$f"
+  done
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
   [ -e "$RUVECTOR_DIR/coedit-sessions/new" ]
+  # Top level only.
+  [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
 }
 
 @test "never prunes through a symlinked co-edit session dir" {
