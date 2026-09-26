@@ -449,8 +449,13 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
       Stop row drops yellow-ruvector in PR 2; PreToolUse gains co-edit
       suggestions in PR 3).
 - [ ] 1.5e: Update `plugins/yellow-core/commands/setup/all.md`:
-  - replace the line 63 probe and the READY rule at 435-439 with a DATA
-    `current` + lockfile check, modeled on morph's block at 441-461;
+  - replace the line 63 probe and the READY rule at 435-439 with a check of
+    yellow-ruvector's own install. `/setup:all` runs as a yellow-core command,
+    so its `CLAUDE_PLUGIN_DATA` is yellow-core's: resolve yellow-ruvector's
+    data dir explicitly (`${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/data/yellow-ruvector*/`,
+    then the XDG fallback `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector/`)
+    and look for `current/node_modules/ruvector/bin/cli.js` there. Model the
+    READY/PARTIAL rules on morph's block at 441-461;
   - update the example output at 689.
 
 <!-- deepen-plan: codebase -->
@@ -559,9 +564,10 @@ Adding a changeset for yellow-core is part of this task.
     1. Read `coedit-sessions/<session_id>` (last path and epoch).
     2. If the path differs and the edit is within 0–60 s, increment the
        symmetric pair in `coedit.json` under a mkdir lock, using jq with a
-       temp file and `mv`. Wait up to ~1 s (20 × 50 ms) for the lock so
-       concurrent sessions queue rather than drop increments; only past that
-       is an increment skipped. Test that N concurrent sessions yield a count
+       temp file and `mv`. Wait up to ~0.5 s (10 × 50 ms) for the lock so
+       concurrent sessions queue rather than drop increments; past that the
+       increment is skipped, which leaves half the 1 s PostToolUse timeout
+       for normalization, the jq update and the allow JSON. Test that N concurrent sessions yield a count
        of N, not just valid JSON.
     3. Rewrite the session file atomically.
   - Cap `coedit.json` at 5 000 pairs, evicting the lowest counts.
@@ -607,9 +613,12 @@ Adding a changeset for yellow-core is part of this task.
   - Update the header comment and the `hook-json.sh:27-28` comment.
 - [ ] 3.2: New command `commands/ruvector/related.md`
       (`/ruvector:related <file>`):
-  - validate the argument locally with `coedit_normalize` (the same
-    root-containment check the hooks use), so the command does not depend on
-    yellow-core's `validate-fs.sh`;
+  - reject, in the script (executable Bash, not only command prose), an
+    argument that is absolute, begins with `-`, has a `..` component, or
+    contains control characters, before any other use. Then validate it
+    locally with `coedit_normalize` (the same root-containment check the
+    hooks use), so the command does not depend on yellow-core's
+    `validate-fs.sh`;
   - normalize it to a root-relative path;
   - print the top 10 partners with counts from `coedit.json`, each
     re-validated, between reference-only fence lines (partner names are
@@ -803,10 +812,11 @@ These are listed per task above. The main ones:
   warn. They are never edited automatically, except through the existing repair
   script.
 - **Concurrent sessions:** `intelligence.json` stays last-writer-wins
-  (upstream). `coedit.json` skips writes when its lock is busy, so at worst one
-  pair increment is lost.
-- **Paths:** reject anything outside the root. Prefix `./` to arguments
-  beginning with `-`. Strip control characters from suggestions.
+  (upstream). `coedit.json` waits up to ~0.5 s for its lock and then skips
+  the write, so at worst one pair increment is lost.
+- **Paths:** reject user-supplied paths that are absolute, begin with `-`,
+  or contain `..` components or control characters (AGENTS.md), and anything
+  that resolves outside the root. Strip control characters from suggestions.
 
 ## Performance Considerations
 
