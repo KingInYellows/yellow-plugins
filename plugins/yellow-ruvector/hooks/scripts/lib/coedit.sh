@@ -431,12 +431,14 @@ coedit_suggest_once() {
   else
     { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
       | jq -c --arg r "$rel" '
-        # Newest last, at most 200 entries and 32 KB, so the session file
+        # Newest last, at most 200 entries and 32 KB serialized (UTF-8
+        # bytes of each JSON string plus its comma), so the session file
         # stays well under the 64 KB its readers accept.
         .surfaced = ((.surfaced // []) | map(select(. != $r)) + [$r] | reverse
           | reduce .[] as $p ({a: [], n: 0};
-              if (.a | length) < 200 and .n + ($p | length) + 3 <= 32768
-              then .a += [$p] | .n += ($p | length) + 3 else . end)
+              (($p | tojson | utf8bytelength) + 1) as $c
+              | if (.a | length) < 200 and .n + $c <= 32768
+                then .a += [$p] | .n += $c else . end)
           | .a | reverse)' 2>/dev/null \
       | coedit_write_atomic "$sfile"
   fi

@@ -245,6 +245,16 @@ assert_allow_json() {
   [[ "$(ctx "$output")" == *"src/b.ts"* ]]
 }
 
+@test "surfaced stays under the size cap with multibyte paths" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  long=$(printf '\xe6\xbc\xa2%.0s' $(seq 1 160))
+  jq -n --arg l "$long" '{surfaced: ([range(0;120)] | map("src/\($l)\(.).ts"))}' > "$RUVECTOR_DIR/coedit-sessions/s9"
+  run --separate-stderr run_hook "$(event s9 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s9")" -le 40000 ]
+  jq -e '.surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s9" >/dev/null
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done
