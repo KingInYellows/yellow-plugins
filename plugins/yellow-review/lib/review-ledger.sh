@@ -2334,6 +2334,9 @@ cmd_resolve_path() {
   file=$(printf '%s' "$fold" | jq -r --arg id "$id" '.findings[] | select(.finding_id == $id) | .obs.file')
   [ -n "$file" ] || rl_die "$RL_EXIT_INVALID" "resolve-path: unknown finding_id"
   v=$(rl_validate_path anchor "$head" "$file") || rl_die "$?" "resolve-path: path rejected ($v); exit 6 means the head is not fetched (run remote-head)"
+  # the path is for Read/Edit, so the worktree must be the PR head (a
+  # checkout of headRefName can land on a stale local branch)
+  [ "$(git rev-parse HEAD 2>/dev/null)" = "$head" ] || rl_die "$RL_EXIT_INVALID" "resolve-path: HEAD is not the PR head"
   root=$(rl_repo_root) || rl_die 1 "resolve-path: not inside a repository"
   rl_worktree_entry_ok "$root" "$file" || rl_die "$RL_EXIT_INVALID" "resolve-path: worktree entry is not a regular file inside the repository"
   jq -cn --arg f "$file" --arg p "$root/$file" '{file: $f, path: $p}'

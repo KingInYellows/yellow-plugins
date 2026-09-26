@@ -1329,6 +1329,18 @@ deleted_util() {
   run -3 "$RL" resolve-path "$LEDGER_PR" "$(ids)" --head "$H"
 }
 
+@test "resolve-path refuses a worktree that is not checked out at the PR head" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  # a stale checkout: the worktree sits on another commit than --head
+  printf 'one\ntwo\nthree\nfour\nfive\nsix\n' >|a.sh
+  commit_all later >/dev/null
+  run -3 "$RL" resolve-path "$LEDGER_PR" "$(ids)" --head "$BASE"
+  [[ "$output" == *"HEAD is not the PR head"* ]]
+  git checkout -q "$BASE"
+  run -0 "$RL" resolve-path "$LEDGER_PR" "$(ids)" --head "$BASE"
+  [ "$(printf '%s' "$output" | jq -r '.file')" = a.sh ]
+}
+
 @test "restore treats bracketed names literally and cannot overwrite look-alike paths" {
   mkdir -p 'app/[id]' app/i app/d
   printf 'dynamic\n' >|'app/[id]/page.tsx'

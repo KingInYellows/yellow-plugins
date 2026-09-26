@@ -177,9 +177,11 @@ offered.
   ```
 
   It re-validates the stored path at the PR head and in the worktree and prints
-  `{"file", "path"}`. Exit 3 means the id is unknown or the stored path is
-  unsafe at the head or in the worktree: tell the human and offer Dismiss or
-  Skip, never the file name from the card. Exit 6 means the head is not fetched:
+  `{"file", "path"}`. Exit 3 means the id is unknown, the worktree is not
+  checked out at `headRefOid` (a stale local branch: the edit gate is closed
+  again), or the stored path is unsafe at the head or in the worktree: tell the
+  human and offer Dismiss or Skip, never the file name from the card. Exit 6
+  means the head is not fetched:
   run `remote-head` again, then retry. Pass `path` to Read and Edit, make the
   change the human approved, show it with `git diff` and no path argument (the
   edit gate guarantees a clean tree, so that shows only this change), and record

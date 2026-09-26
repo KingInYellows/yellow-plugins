@@ -19,3 +19,5 @@ and a code scope whose display copy was truncated or redacted is unverifiable
 rather than wrongly `not_reproduced`.
 The fail-closed credential pass now reads its whole input, so a hit in large
 multi-line text is no longer lost to SIGPIPE under `pipefail` and stored.
+`resolve-path` now refuses (exit 3) unless the worktree is checked out at the
+PR head, so triage's Apply cannot edit a stale checkout.
