@@ -1,0 +1,27 @@
+plugins/yellow-review/commands/review/sweep.md
+  s_127f059773c31b::t_f4d14f0c17bd22 160-162
+plugins/yellow-review/tests/review-ledger.bats
+  s_127f059773c31b::t_3b1d143b1f9f80 134-135
+plugins/yellow-review/commands/review/sweep-all.md
+  s_127f059773c31b::t_1938ad8c51a4b6 114-117
+plugins/yellow-review/README.md
+  s_127f059773c31b::t_9d472459a3752a 180-185
+plugins/yellow-review/lib/review-ledger.sh
+  s_127f059773c31b::t_9fb4f57533df79 1981-1984,1986,1991-1992,1996,2000,2003
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1fd12ee14a65795c28e809869ef5b424b55dc492",
+  "prompts": {},
+  "sessions": {
+    "s_127f059773c31b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "31f3c714-88c2-4528-b7e6-b9907b808bb6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
