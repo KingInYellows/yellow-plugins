@@ -483,7 +483,12 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     (physically under HOME or `/tmp`, or under an absolute, non-system
     `CLAUDE_CONFIG_DIR` / `XDG_DATA_HOME`), so `/setup:all` never reports
     READY for an install the launcher rejects. Model the
-    READY/PARTIAL rules on morph's block at 441-461. The probe only checks
+    READY/PARTIAL rules on morph's block at 441-461, keeping the existing
+    `.ruvector/` prerequisite (the install is shared across projects, so a
+    repo without its own store still needs `/ruvector:setup`) and replacing
+    `node18_check` with a Node 20+ check (the launcher refuses older Node):
+    READY = Node 20+, install present, and `.ruvector/` exists; PARTIAL =
+    Node 20+ and `.ruvector/` exists but no install yet. The probe only checks
     that an install exists: an install from an older lockfile is not a setup
     need, because the launcher (and the prewarm hook) reinstall to the new
     lockfile on the next session without user action, so /setup:all does
@@ -681,7 +686,7 @@ Adding a changeset for yellow-core is part of this task.
     hooks use), so the command does not depend on yellow-core's
     `validate-fs.sh`;
   - normalize it to a root-relative path;
-  - print the top 10 partners with counts from `coedit.json`, each
+  - print up to 50 partners (top by count) from `coedit.json`, each
     re-validated, between reference-only fence lines (partner names are
     project data);
   - handle a missing file ("no co-edit history yet");
