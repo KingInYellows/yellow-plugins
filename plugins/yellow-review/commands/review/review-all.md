@@ -148,11 +148,29 @@ branch and its own learnings pre-pass result). The sub-steps below mirror
 aggregation rules change there, propagate the same change here.
 
 1. **Checkout** (mirrors `stack-traversal` skill Step 5), using the
-   provider resolved in Step 0:
+   provider resolved in Step 0. A fork PR's `headRefName` is
+   attacker-controlled and `git check-ref-format` accepts shell syntax, so
+   never write the branch name into command text — not quoted, and not into
+   a validation command. Capture and validate it exactly as `review-pr.md`
+   Step 3 does, in the same Bash call as the checkout, and only ever
+   reference `"$head_ref"`:
 
-   **Graphite:** `gt checkout <branch>`
+   ```bash
+   head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName) || exit 1
+   case "$head_ref" in
+     '' | -* | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-]*)
+       printf '[review:all] Error: unsafe head ref on PR #%s — refusing to check out\n' <PR#> >&2
+       exit 1 ;;
+   esac
+   git check-ref-format --branch "$head_ref" >/dev/null 2>&1 || {
+     printf '[review:all] Error: invalid head ref on PR #%s — refusing to check out\n' <PR#> >&2
+     exit 1
+   }
+   gt checkout "$head_ref"   # Graphite; GitHub: git checkout "$head_ref"
+   ```
 
-   **GitHub:** `git checkout <branch>`
+   If either check fails, report the error and do not review that PR. The
+   installed `gt` rejects `--`, so do not add it.
 
 2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
 

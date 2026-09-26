@@ -52,7 +52,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Plugin Components
 
-### Commands (7)
+### Commands (8)
 
 - `/review:setup` — Validate GitHub, jq, Graphite, yellow-core and the
   review-ledger prerequisites (flock, realpath, git 2.31+, optional
@@ -76,6 +76,13 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary, and a single `/flow:compound` pass at the end
+- `/review:triage` — Own the review-findings ledger's lifecycle for one PR:
+  `reconcile` against the fetched head, then attended Apply / Dismiss (with
+  `depends_on`) / Restore file / Skip. `--non-interactive` applies nothing
+  and never prunes, even for a PR that closed mid-run (used by
+  `/review:sweep`); attended triage of a closed PR asks before pruning.
+  `rl prune` — via `--prune <PR#>` (used by `/review:sweep-all`) or that
+  confirmed prompt — is the only ledger deletion path
 
 ### Agents (17)
 
@@ -171,9 +178,10 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
   shared by every worktree of the clone. Subcommands `observe`, `transition`,
   `fold`, `dismissed-context`, `reverify`, `publication`, `validate-path`,
-  `prune`, `record-state`, `summary`, `new-run-id`, `remote-head`,
-  `settle`; JSON on stdin/stdout, exit codes 2 usage / 3 invalid / 4 lock
-  timeout / 5 PR closed / 6 unverifiable. The rule vocabulary is `lib/review-ledger-vocab.json`.
+  `prune`, `record-state`, `summary`, `new-run-id`, `remote-head`, `settle`,
+  `reconcile`, `restore`, `cards`; JSON on stdin/stdout, exit codes 2 usage /
+  3 invalid / 4 lock timeout / 5 PR closed / 6 unverifiable. The rule
+  vocabulary is `lib/review-ledger-vocab.json`.
 - Every model-authored string is redacted with yellow-core's
   `cs_redact_secrets` (hence the required `yellow-core` dependency) plus a
   fail-closed credential pass; without yellow-core the library withholds all
@@ -218,6 +226,10 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   across multiple open PRs at once. Distinct from `/review:all scope=all`
   (which runs the deeper review pipeline per PR with per-PR push gates) —
   `sweep-all` is the lighter, fully-unattended batch alternative.
+- **`/review:triage`** — Work down the residual findings a review persisted
+  but did not apply: after a sweep, or when the session-start notice
+  reports pending findings. Distinct from `/review:resolve`, which only
+  handles GitHub review threads and never reads the ledger.
 - **`/flow:review`** (yellow-core) — Session-level review against a plan
   file. Evaluates plan adherence, cross-PR coherence, and scope drift.
   Complementary to `/review:pr` (per-PR code quality) — use both for full

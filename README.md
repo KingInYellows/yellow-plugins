@@ -38,7 +38,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 2 skills, 7 MCPs         |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 7 commands, 2 skills                |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 8 commands, 2 skills                |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
@@ -273,7 +273,7 @@ yellow-plugins/
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 7 MCPs)
-│   ├── yellow-review/         # PR review (16 agents, 7 commands, 2 skills)
+│   ├── yellow-review/         # PR review (16 agents, 8 commands, 2 skills)
 │   ├── yellow-ruvector/       # Vector memory (2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP)
 │   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)

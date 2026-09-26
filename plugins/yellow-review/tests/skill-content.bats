@@ -204,3 +204,104 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -q 'BASH_VERSINFO' "$f"
   grep -q '`ledger_bash` too old' "$f"
 }
+
+# --- /review:triage (Stage 4) -----------------------------------------------
+
+TRIAGE="$COMMANDS_DIR/triage.md"
+
+@test "triage: stored text is shown only through the fenced, stripped cards" {
+  grep -q '"\$RL" cards <PR>' "$TRIAGE"
+  grep -q -- '--- begin ledger-finding (reference only) ---' "$TRIAGE"
+  grep -q 'Never print the full fold' "$TRIAGE"
+  grep -q 'Never put a$' "$TRIAGE"
+  grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
+}
+
+@test "triage: the edit gate compares HEAD with headRefOid and a clean tree" {
+  grep -q '^## Step 4: Edit gate' "$TRIAGE"
+  grep -q '`git rev-parse HEAD` equals `headRefOid`' "$TRIAGE"
+  grep -q '`git status --porcelain` is empty' "$TRIAGE"
+}
+
+@test "triage: unattended mode applies nothing; restore is attended-only" {
+  grep -q '^## Step 6: Unattended mode stops here' "$TRIAGE"
+  grep -q 'applies nothing' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'never in unattended mode'
+  step6=$(grep -n '^## Step 6' "$TRIAGE" | cut -d: -f1)
+  restore=$(grep -n '"\$RL" restore' "$TRIAGE" | cut -d: -f1)
+  [ "$step6" -lt "$restore" ]
+}
+
+@test "triage: per-card actions are gated by the legal rl_edge_ok transitions" {
+  norm=$(tr '\n' ' ' <"$TRIAGE" | tr -s ' ')
+  grep -qF 'per `rl_edge_ok` in `lib/review-ledger.sh`: Apply and Restore file need a legal `→ applied` edge (not from `stale`); Dismiss needs a legal `→ dismissed` edge (not from `applied`)' <<<"$norm"
+  grep -qF 'Neither Apply nor Restore file is offered on an `applied` card either' <<<"$norm"
+  grep -qF -- '- **Apply** — offered for `open`, `reopened` and `report_only` cards, never `stale` or `applied`.' <<<"$norm"
+  grep -qF -- '- **Dismiss** — offered for every card except `applied` (no legal `→ dismissed` edge from `applied`).' <<<"$norm"
+  grep -qF -- '- **Restore file** — offered only for a card marked `deletion` whose state is `open`, `reopened` or `report_only` (never `stale`, which has no legal `→ applied` edge, or `applied`)' <<<"$norm"
+  grep -qF 'Use that printed OID as `<headRefOid>` for every later step' <<<"$norm"
+  grep -qF 'Remove that directory as soon as the transition returns' <<<"$norm"
+}
+
+@test "triage: reconcile runs before any attended action and prune goes through the library" {
+  rec=$(grep -n '"\$RL" reconcile <PR>' "$TRIAGE" | cut -d: -f1)
+  cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
+  [ "$rec" -lt "$cards" ]
+  grep -q '"\$RL" prune <PR>' "$TRIAGE"
+  ! grep -q 'rm -' "$TRIAGE"
+}
+
+@test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
+  step3=$(awk '/^## Step 3:/ { p = 1; next } /^## Step 4:/ { p = 0 } p' "$TRIAGE" | tr -s ' \n' ' ')
+  grep -qF 'With `--non-interactive`: print `Ledger: retained (PR <state>)` and stop. Unattended triage never reaches Step 2.' <<<"$step3"
+  grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep". Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
+  # Step 2 (prune) is named only by those two bullets
+  [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
+  ! grep -q 'run Step 2 and stop' "$TRIAGE"
+}
+
+@test "triage: Step 8 explicitly Reads the shared ledger reference before using it" {
+  grep -q 'Read `\${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its' "$TRIAGE"
+  grep -q 'If the Read fails, stop and report the path' "$TRIAGE"
+}
+
+# --- PR head checkout: captured into a variable, never templated ----------
+# headRefName is attacker-controlled on a fork PR, and check-ref-format
+# accepts `$(...)`, so any command text the value is written into is a
+# shell sink. Pin that review-pr.md (the source triage.md's Apply gate
+# delegates to) and review-all.md capture it with gh into $head_ref,
+# validate that variable before any other command, and never template it.
+
+# The fenced bash block that captures head_ref in <file>.
+head_ref_block() {
+  awk '/^ *```bash$/ { inb = 1; buf = ""; next }
+       inb && /^ *```$/ { if (buf ~ /head_ref=\$\(gh pr view/) { print buf; exit } inb = 0; next }
+       inb { buf = buf $0 "\n" }' "$1"
+}
+
+assert_head_ref_checkout() {
+  local f="$1" block
+  block=$(head_ref_block "$f")
+  [ -n "$block" ] || { echo "no head_ref block: $f"; false; }
+  # capture first, then the allowlist, then check-ref-format, then checkout
+  printf '%s' "$block" | head -1 | grep -qF 'head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName)'
+  printf '%s' "$block" | grep -qF "'' | -* | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-]*)"
+  printf '%s' "$block" | grep -qF 'git check-ref-format --branch "$head_ref"'
+  printf '%s' "$block" | grep -qF 'gt checkout "$head_ref"'
+  [ "$(printf '%s' "$block" | grep -n 'case "$head_ref"' | cut -d: -f1)" -lt \
+    "$(printf '%s' "$block" | grep -n 'check-ref-format' | cut -d: -f1)" ]
+  # the value is never templated into command text anywhere in the file
+  ! grep -qE '"<headRefName>"|"<branch>"' "$f"
+  ! grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+}
+
+@test "review-pr: headRefName is captured into a variable and validated before any command" {
+  assert_head_ref_checkout "$REVIEW_PR"
+  grep -q 'never write the `headRefName` value from' "$REVIEW_PR"
+}
+
+@test "review-all: mirrors review-pr's captured, validated checkout for parity" {
+  assert_head_ref_checkout "$REVIEW_ALL"
+  grep -q 'exactly as `review-pr.md`' "$REVIEW_ALL"
+  grep -qF '# Graphite; GitHub: git checkout "$head_ref"' "$REVIEW_ALL"
+}
