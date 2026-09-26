@@ -399,6 +399,20 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
 }
 
+@test "stale-lock reclaim and marker pruning do not depend on find" {
+  mkdir -p "$BATS_TEST_TMPDIR/nofind"
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/nofind/find"
+  chmod +x "$BATS_TEST_TMPDIR/nofind/find"
+  edit f1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock" "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1"
+  PATH="$BATS_TEST_TMPDIR/nofind:$PATH" edit f1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1" ]
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"

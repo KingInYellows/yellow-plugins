@@ -176,6 +176,23 @@ fake_install() {
   [ -L "$WORK/wtd/.ruvector" ]
 }
 
+@test "heal_store: over 50 sparse (skip-worktree) entries before the first checked-out file still links" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q
+  mkdir "$WORK/a"
+  for i in $(seq 1 60); do echo "$i" > "$WORK/a/f$i"; done
+  mkdir "$WORK/z"; echo keep > "$WORK/z/keep"
+  git -C "$WORK" add a z
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
+  git -C "$WORK" ls-files -z a | xargs -0 git -C "$WORK" update-index --skip-worktree
+  rm -rf "$WORK/a"
+  mkdir "$WORK/.ruvector"
+  git -C "$WORK" worktree add -q "$WORK/wtsp" -b sparse
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtsp"
+  [ "$status" -eq 0 ]
+  [ -L "$WORK/wtsp/.ruvector" ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q
