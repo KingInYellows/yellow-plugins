@@ -206,7 +206,7 @@ Decisions made (change if you disagree):
 
 ### Phase 3 (branch C): Ceramic OAuth-only — yellow-research minor, yellow-core patch
 
-- [ ] 3.1: `research/setup.md`: delete the Step 1 `CERAMIC_API_KEY` row, the
+- [x] 3.1: `research/setup.md`: delete the Step 1 `CERAMIC_API_KEY` row, the
       Step 2 `cer_sk` block, the Step 3 Ceramic REST-probe block, the
       `cer_sk` term in the redaction `sed`, the "Ceramic REST" report-table row
       and footnote, and the Step 5 `export CERAMIC_API_KEY` line. Ceramic stays
@@ -218,37 +218,37 @@ Decisions made (change if you disagree):
 > **Codebase:** CORRECTED line map for `research/setup.md`: Step 1 row 147-152;
 > `cer_sk` check 207-218; **REST-probe code 480-524** (not ~679-720); redaction
 > `sed` 538; report-table row 682 + note 706-710; Step 5 export 762.
-<!-- /deepen-plan -->- [ ] 3.2: `yellow-core/commands/setup/all.md`: remove the `CERAMIC_API_KEY`
+<!-- /deepen-plan -->- [x] 3.2: `yellow-core/commands/setup/all.md`: remove the `CERAMIC_API_KEY`
       dashboard row (~119) and trim the classification note (~534-540) to
       "Ceramic counts when `ceramic_search` is visible (OAuth)".
-- [ ] 3.3: yellow-research `README.md`, `CLAUDE.md`, `skills/research-patterns/SKILL.md`:
+- [x] 3.3: yellow-research `README.md`, `CLAUDE.md`, `skills/research-patterns/SKILL.md`:
       drop the "one remaining shell-env key" wording; Exa/Tavily/Perplexity are
       the only keys.
-- [ ] 3.4: `yellow-core/skills/multi-host-fleet/SKILL.md`: remove the
+- [x] 3.4: `yellow-core/skills/multi-host-fleet/SKILL.md`: remove the
       yellow-research/`CERAMIC_API_KEY` env-contract row (~58) and export line (~191).
-- [ ] 3.5: Delete `tests/integration/ceramic.test.ts`.
+- [x] 3.5: Delete `tests/integration/ceramic.test.ts`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** CONFIRMED safe — only picked up by the generic
 > `vitest run --dir tests/integration`; no workflow in `.github/workflows/`
 > sets `CERAMIC_API_KEY` or `RUN_LIVE`.
-<!-- /deepen-plan -->- [ ] 3.6: `rg -n 'CERAMIC_API_KEY|cer_sk|api\.ceramic\.ai'` excluding CHANGELOGs,
+<!-- /deepen-plan -->- [x] 3.6: `rg -n 'CERAMIC_API_KEY|cer_sk|api\.ceramic\.ai'` excluding CHANGELOGs,
       `plans/complete/`, `docs/brainstorms/`, `RESEARCH/` → only the two kept
       redaction/never-commit entries remain.
-- [ ] 3.7: `pnpm changeset` — yellow-research **minor** (removes a documented
+- [x] 3.7: `pnpm changeset` — yellow-research **minor** (removes a documented
       setup input), yellow-core **patch**.
 
 ### Phase 4: Quality gates (each branch)
 
-- [ ] 4.1: `pnpm validate:schemas && pnpm test:unit && pnpm test:integration && pnpm lint && pnpm typecheck`
-- [ ] 4.2: A: `pnpm validate:generated`, `pnpm validate:versions`.
+- [x] 4.1: `pnpm validate:schemas && pnpm test:unit && pnpm test:integration && pnpm lint && pnpm typecheck`
+- [x] 4.2: A: `pnpm validate:generated`, `pnpm validate:versions`.
       B & C: `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:setup-all`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** CONFIRMED all exist in `package.json`: `validate:generated`
 > (`generate-manifests.js --check`), `validate:setup-all`, `lint:plugins`
 > (`scripts/lint-plugins.sh`), `validate:agents`.
-<!-- /deepen-plan -->- [ ] 4.3: Submit as a 3-branch stack (A → B → C, independent) via `/smart-submit`
+<!-- /deepen-plan -->- [x] 4.3: Submit as a 3-branch stack (A → B → C, independent) via `/smart-submit`
       / `gt`; B and C both touch `setup/all.md` in different blocks — restack
       after A/B merge.
 

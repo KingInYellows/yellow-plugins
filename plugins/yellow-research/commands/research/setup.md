@@ -76,7 +76,7 @@ Then re-run /research:setup
 
 ### Step 1: Check Prerequisites and API Keys
 
-Run a single Bash call to check tools and all four env vars:
+Run a single Bash call to check tools and all three API keys:
 
 ```bash
 printf '=== Prerequisites ===\n'
@@ -144,21 +144,13 @@ check_key() {
 check_key EXA_API_KEY exa_api_key EXA_API_KEY
 check_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
 check_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
-# Ceramic uses OAuth in the MCP — userConfig has no ceramic_api_key entry.
-# The CERAMIC_API_KEY shell var only powers the REST-API live probe in Step 3.
-if [ -n "${CERAMIC_API_KEY:-}" ]; then
-  printf '%-22s set (shell env — REST probe only; MCP uses OAuth)\n' 'CERAMIC_API_KEY:'
-else
-  printf '%-22s NOT SET (REST probe will be skipped; MCP OAuth path unaffected)\n' 'CERAMIC_API_KEY:'
-fi
 ```
 
 `curl` and `jq` missing are informational warnings — they affect live testing
-only. Do not stop if they are absent. All four API keys are optional; if 0 are
-set, the command still completes successfully (showing all INACTIVE). Note that
-`CERAMIC_API_KEY` powers the REST-API live probe only — the Ceramic MCP server
-authenticates via OAuth 2.1 (browser flow on first use) and does NOT consume
-this env var.
+only. Do not stop if they are absent. All three API keys are optional; if 0 are
+set, the command still completes successfully (showing all INACTIVE). Ceramic
+has no key: its MCP server authenticates via OAuth 2.1 (browser flow on first
+use), and Step 3.5 checks it.
 
 ### Step 2: Validate Format of Present Keys
 
@@ -200,22 +192,6 @@ if [ -n "$key" ]; then
     printf 'PERPLEXITY_API_KEY: FORMAT INVALID (expected pplx- prefix + 40+ alphanumeric/dash/underscore chars)\n'
   else
     printf 'PERPLEXITY_API_KEY: FORMAT VALID\n'
-  fi
-fi
-```
-
-**Ceramic** (known `cer_sk` prefix observed in dashboard-issued keys; not
-stated in Ceramic docs but consistent across observed keys, so we enforce
-it — a missing prefix usually means a key was pasted into the wrong env
-var):
-
-```bash
-key="${CERAMIC_API_KEY:-}"
-if [ -n "$key" ]; then
-  if ! printf '%s' "$key" | grep -qE '^cer_sk[a-zA-Z0-9_-]{14,}$'; then
-    printf 'CERAMIC_API_KEY: FORMAT INVALID (expected cer_sk prefix + 14+ alphanumeric/underscore/dash chars, no whitespace)\n'
-  else
-    printf 'CERAMIC_API_KEY: FORMAT VALID\n'
   fi
 fi
 ```
@@ -477,52 +453,6 @@ else
 fi
 ```
 
-**Ceramic** (REST endpoint, separate from the OAuth-authenticated MCP):
-
-Ceramic has no userConfig entry — the MCP authenticates via OAuth, and the
-`CERAMIC_API_KEY` shell var only powers this REST probe. If the env is unset,
-mark it absent and skip; do not call `has_userconfig` (no userConfig path
-exists for this credential).
-
-```bash
-if [ -z "${CERAMIC_API_KEY:-}" ]; then
-  provider_status="ABSENT"
-  provider_detail="CERAMIC_API_KEY not in shell env (REST probe skipped). MCP OAuth path unaffected."
-else
-  response=$(curl -s --connect-timeout 5 --max-time 5 \
-    -w "\n%{http_code}" \
-    -X POST "https://api.ceramic.ai/search" \
-    -H "Authorization: Bearer ${CERAMIC_API_KEY}" \
-    -H "Content-Type: application/json" \
-    -d '{"query":"test"}')
-  curl_exit=$?
-  http_status=$(printf '%s' "$response" | tail -n1)
-
-  # Inline decision tree — Ceramic has no userConfig path (MCP authenticates
-  # via OAuth), so the v2.0.0 shell-env-only diagnostic does not apply here:
-  # a 401 means the REST key is genuinely bad. Keep the simple message.
-  if [ "$curl_exit" -ne 0 ]; then
-    provider_status="UNREACHABLE"
-    provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
-  elif [ "$http_status" = "200" ]; then
-    provider_status="ACTIVE"
-    provider_detail="Live test passed"
-  elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
-    provider_status="INVALID"
-    provider_detail="Key rejected by API (HTTP $http_status)"
-  elif [ "$http_status" = "429" ]; then
-    provider_status="RATE LIMITED"
-    provider_detail="Key may be valid; service is busy. Try again later."
-  elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
-    provider_status="UNREACHABLE"
-    provider_detail="API server error (HTTP $http_status)"
-  else
-    provider_status="UNREACHABLE"
-    provider_detail="Unexpected HTTP $http_status"
-  fi
-fi
-```
-
 Each provider block above runs its own inline decision tree (in the same
 subprocess as the curl probe) so `$curl_exit` and `$http_status` stay in
 scope. A standalone post-probe decision tree was tried earlier but failed —
@@ -535,7 +465,7 @@ and `provider_detail` are used in the results table. If body content must ever
 be shown for error context, redact key patterns first:
 
 ```bash
-sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g; s/cer_sk[a-zA-Z0-9_-]*/***REDACTED***/g'
+sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g'
 ```
 
 Never display EXA response bodies at all — EXA keys have no known prefix and
@@ -679,12 +609,10 @@ API Keys (all optional — plugin degrades gracefully)
   EXA            SET         VALID     ACTIVE         ACTIVE
   Tavily         SET         VALID     ACTIVE         ACTIVE
   Perplexity     NOT SET     N/A       N/A            INACTIVE
-  Ceramic REST   SET         VALID     ACTIVE         ACTIVE  (REST probe only)
 
 OAuth-authenticated MCP servers (no API key needed)
   Parallel Task  — Claude Code browser OAuth, prompted on first /research:deep use.
   Ceramic MCP    — Claude Code browser OAuth, prompted on first ceramic_search use.
-  (CERAMIC_API_KEY is for the REST live-probe above — the MCP uses OAuth.)
 
 MCP Sources (no API key required — always available if plugin/MCP installed)
   Source         Plugin / source       Status
@@ -702,12 +630,6 @@ Capability summary:
   /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
   MCP sources:      6/7 available
 ```
-
-`CERAMIC_API_KEY` is intentionally NOT counted in the API-source total —
-the Ceramic MCP authenticates via OAuth and works without this key. The
-key only powers the REST live-probe above. Counting it would
-misrepresent research capability when a user has all three functional
-keys (EXA/Tavily/Perplexity) set.
 
 Adjust the capability summary based on how many functional API keys are
 active (three — EXA, Tavily, Perplexity). A key counts as **active** when
@@ -757,10 +679,6 @@ To enable missing providers (recommended path, no restart required):
     /plugin disable yellow-research
     /plugin enable yellow-research
 
-  Optional shell-only env (no userConfig prompt — it gates the REST live-probe
-  in this command, not the MCP):
-    export CERAMIC_API_KEY="..."    # Get key: https://platform.ceramic.ai/keys
-
   Claude Code will prompt for each key. Dismiss the ones you don't need;
   answer the ones you want. Keys are stored in the system keychain (or
   ~/.claude/.credentials.json at 0600 perms on Linux).
@@ -777,7 +695,7 @@ wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
 no longer reads the shell *_API_KEY vars directly as of 2.0.0.)
 ```
 
-Only show the lines for keys that are absent or invalid (not all four if some
+Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
 
 If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
@@ -809,7 +727,9 @@ To enable missing MCP sources:
   DeepWiki:   Bundled — public repos only; no install needed. If FAIL, restart Claude Code
   ast-grep:   Bundled — install prerequisites: ast-grep binary and uv (see above)
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
-  Ceramic:    Bundled — OAuth auto-managed on first ceramic_search use; if FAIL, restart Claude Code
+  Ceramic:    Bundled, OAuth only (no API key) — authenticate via /mcp → ceramic → Authenticate,
+              or on WSL/headless: claude mcp login plugin:yellow-research:ceramic --no-browser
+              (separate terminal); if FAIL, restart Claude Code
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.
