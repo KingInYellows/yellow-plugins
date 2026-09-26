@@ -16,6 +16,8 @@ resolution, and sequential stack review.
 - `jq` installed
 - Graphite CLI (`gt`) for branch management
 - Clean working directory before running review commands
+- The yellow-core plugin, a required dependency: the review-findings ledger
+  library (`lib/review-ledger.sh`) uses its credential redaction
 
 Run `/review:setup` after install to verify the local prerequisites and optional
 yellow-core integration before reviewing real PRs.
