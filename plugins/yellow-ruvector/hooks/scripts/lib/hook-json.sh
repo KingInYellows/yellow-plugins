@@ -25,7 +25,7 @@ json_exit() {
 
 # emit_recall_json <hookEventName> <additionalContext> [systemMessage]
 # Model-facing recalled text goes in hookSpecificOutput.additionalContext
-# (SessionStart). Operator diagnostics go in
+# (SessionStart recall, PreToolUse co-edit suggestions). Operator diagnostics go in
 # systemMessage, which is shown to the user. Either string may be empty;
 # an empty field is omitted. Does not emit `decision` or
 # `permissionDecision`. Falls back to the plain allow payload if jq fails

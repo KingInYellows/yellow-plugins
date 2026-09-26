@@ -121,8 +121,9 @@ from the git toplevel. There is no manual queue management inside the plugin:
   (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
   `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
   There is no per-prompt recall
-- `pre-tool-use.sh` → background `ruvector hooks pre-edit` / `pre-command`
-  (read-only side effects)
+- `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit) → up to 3 co-edit
+  partners (count ≥ 3, existing files, once per file per session) as fenced
+  `hookSpecificOutput.additionalContext`; jq only
 - `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit
   recording in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`);
   no ruvector CLI call

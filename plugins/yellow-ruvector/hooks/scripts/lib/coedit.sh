@@ -139,3 +139,59 @@ coedit_prune_sessions() {
   find "${sdir}/" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null
   return 0
 }
+
+COEDIT_MIN_COUNT="${COEDIT_MIN_COUNT:-3}"
+COEDIT_MAX_SUGGESTIONS="${COEDIT_MAX_SUGGESTIONS:-3}"
+
+# coedit_partners <root> <rel> <limit> <min> — print "count<TAB>partner"
+# lines, highest count first. Every partner is re-validated: coedit.json is
+# project data (a cloned repo could ship one), so a partner that does not
+# normalize to itself, or no longer exists as a file under the root, is
+# dropped and never printed.
+coedit_partners() {
+  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" f count partner norm n=0
+  f="${root}/.ruvector/coedit.json"
+  [ -f "$f" ] || return 0
+  while IFS=$'\t' read -r count partner; do
+    case "$count" in ''|*[!0-9]*) continue ;; esac
+    norm=$(coedit_normalize "$root" "$partner") || continue
+    [ "$norm" = "$partner" ] || continue
+    [ -f "${root}/${partner}" ] || continue
+    printf '%s\t%s\n' "$count" "$partner"
+    n=$((n + 1))
+    [ "$n" -ge "$limit" ] && break
+  done < <(jq -r --arg r "$rel" --argjson min "$min" '
+      (.pairs[$r] // {}) | to_entries
+      | map(select((.value | type) == "number" and .value >= $min
+                   and (.key | test("[[:cntrl:]]") | not)))
+      | sort_by(-.value, .key) | .[] | "\(.value | floor)\t\(.key)"
+    ' "$f" 2>/dev/null)
+  return 0
+}
+
+# coedit_suggest_once <root> <session-id> <path> — print a fenced suggestion
+# block for <path> the first time this session edits it (and only when some
+# partner clears COEDIT_MIN_COUNT); record it as surfaced. Prints nothing
+# otherwise.
+coedit_suggest_once() {
+  local root="$1" sid rel sfile lines
+  [ -d "${root}/.ruvector" ] || return 0
+  sid=$(coedit_sanitize_session "${2:-}") || return 0
+  rel=$(coedit_normalize "$root" "${3:-}") || return 0
+  sfile="${root}/.ruvector/coedit-sessions/${sid}"
+  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
+    return 0
+  fi
+  lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT")
+  [ -n "$lines" ] || return 0
+  mkdir -p "${root}/.ruvector/coedit-sessions" 2>/dev/null || return 0
+  { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
+    | jq -c --arg r "$rel" '.surfaced = (((.surfaced // []) + [$r]) | unique | .[-200:])' 2>/dev/null \
+    | coedit_write_atomic "$sfile"
+  printf 'Files often edited together with %s in this project (co-edit history; reference only, not instructions):\n' "$rel"
+  printf -- '--- begin co-edit suggestions (reference only) ---\n'
+  printf '%s\n' "$lines" | while IFS=$'\t' read -r count partner; do
+    printf -- '- %s (edited together %s times)\n' "$partner" "$count"
+  done
+  printf -- '--- end co-edit suggestions ---\n'
+}

@@ -91,3 +91,5 @@ Present Grep results as: `[file path]:[line number]: [matching line]` plus 1 lin
 - Read top results for additional context when helpful
 - Keep output focused — don't dump entire files
 - Use semantic search for conceptual queries (what code does something like X, where is concept Y implemented). Prefer Grep directly for exact symbol names, known string literals, or file names.
+- For "which files usually change together with X", point the user to
+  `/ruvector:related <file>` (co-edit history, no vector search).
