@@ -571,6 +571,23 @@ exit 0'
   [ -e "$BATS_TEST_TMPDIR/victim/old" ]
 }
 
+@test "a session rewritten after find listed it is not pruned" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/rwbin"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/resumed"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/resumed" 2>/dev/null || skip "touch -d unsupported"
+  # find lists the stale file, then the session is resumed (rewritten
+  # fresh) before the worker acts on the list.
+  printf '#!/bin/sh\n"%s" "$@" > "%s/list"\necho "{\\"last\\":\\"x\\"}" > ./resumed\ncat "%s/list"\n' \
+    "$(command -v find)" "$BATS_TEST_TMPDIR" "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/rwbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/rwbin/find"
+  PATH="$BATS_TEST_TMPDIR/rwbin:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  sleep 1
+  grep -q resumed "$BATS_TEST_TMPDIR/list"
+  [ -e "$RUVECTOR_DIR/coedit-sessions/resumed" ]
+}
+
 @test "never prunes through a symlinked co-edit session dir" {
   make_ruvector_stub 'exit 0'
   victim="$BATS_TEST_TMPDIR/victim"
