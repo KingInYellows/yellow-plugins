@@ -362,6 +362,8 @@ Emit a single JSON object and no prose around it:
       "title": "<structural summary naming the restructuring>",
       "severity": "P1|P2|P3",
       "category": "maintainability",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "<repo-relative path>",
       "line": 42,
       "confidence": 100,
@@ -384,6 +386,17 @@ to `human` — a structural restructuring is never safe to apply automatically,
 so `safe_auto` is never valid here. `requires_verification` is always `true`.
 `pre_existing` is `true` only when the finding describes code the change set
 did not touch.
+
+`rule` is a slug from the `<rule-vocabulary>` block the host injects for
+this category, or `unclassified` when no such block is injected or none of
+its entries fits. `scope` is the enclosing dotted symbol path at `line`
+(e.g. `handlers.createUser`); in a prose file, use the nearest markdown
+heading only when it is unique in the file, otherwise the full
+`Parent > Child` heading path. In that path, escape a literal ` > ` inside
+one heading's own text as ` \> ` and double any `\`: `## A > B` under
+`# Parent` is `Parent > A \> B`. Both feed the review-findings ledger's
+identity key on hosts that keep one — default a missing value to
+`unclassified` / `unscoped` rather than omitting the field.
 
 `confidence` is one of exactly five anchors: `100` when the structural
 claim is mechanically verifiable from the change set (the duplicated helper

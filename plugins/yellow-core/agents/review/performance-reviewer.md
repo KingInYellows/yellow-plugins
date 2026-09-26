@@ -113,6 +113,8 @@ issue. No prose outside the structured output.
       "title": "What is wrong, in one sentence.",
       "severity": "P0|P1|P2|P3",
       "category": "performance",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "path/to/file.ts",
       "line": 42,
       "confidence": 75,
@@ -127,6 +129,14 @@ issue. No prose outside the structured output.
   "testing_gaps": []
 }
 ```
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
+for your `category` (`unclassified` when none fits); `scope` is the enclosing
+dotted symbol path at `line` (e.g. `handlers.createUser`); in a prose file,
+use the nearest markdown heading only when it is unique in the file,
+otherwise the full `Parent > Child` heading path. In that path, escape a
+literal ` > ` inside one heading's own text as ` \> ` and double any `\`:
+`## A > B` under `# Parent` is `Parent > A \> B`.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow

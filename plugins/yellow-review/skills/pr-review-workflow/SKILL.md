@@ -161,6 +161,8 @@ tables.
       "title": "<short actionable summary>",
       "severity": "P0|P1|P2|P3",
       "category": "<reviewer category>",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "<repo-relative path>",
       "line": 42,
       "confidence": 75,
@@ -175,6 +177,17 @@ tables.
   "testing_gaps": []
 }
 ```
+
+`rule` comes from the `<rule-vocabulary>` block the orchestrator injects
+(`lib/review-ledger-vocab.json`; `unclassified` when none fits) and `scope`
+is the enclosing dotted symbol path; in a prose file it is the nearest
+markdown heading when that heading is unique in the file, otherwise the full
+`Parent > Child` heading path (`rl_verify_scope` rejects an ambiguous short
+form). In that path, escape a literal ` > ` inside one heading's own text as
+` \> ` and double any `\`: `## A > B` under `# Parent` is `Parent > A \> B`.
+Both feed the review-findings ledger's identity key; the orchestrator defaults a
+missing value to `unclassified` / `unscoped` and counts it instead of
+dropping the return.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — reviewer agents ALWAYS emit them as empty arrays. The

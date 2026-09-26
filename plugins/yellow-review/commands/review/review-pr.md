@@ -585,12 +585,45 @@ Each agent receives:
    finding; a partial block would instead look authoritative and produce
    confident findings about files it never measured. `rows=0` with both
    markers present is a complete, empty block and is emitted as such.
+7. A `<rule-vocabulary>` block — into every dispatched reviewer. It lists
+   the closed `rule` slugs per normalized category, plus every
+   `category_aliases` entry resolved to its normalized category's own
+   slug list, from the plugin's vocabulary file:
+
+   ```bash
+   jq -r '
+     .categories as $cats
+     | ( $cats | to_entries[] | "\(.key): \(.value | join(", "))" ),
+       ( .category_aliases | to_entries[]
+         | "\(.key) (alias of \(.value)): \($cats[.value] | join(", "))" )
+   ' "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger-vocab.json"
+   ```
+
+   The file is repo-internal, but XML-escape the output anyway (`&`, then
+   `<`, then `>`), and render it as:
+
+   ```
+   <rule-vocabulary>
+   <one "category: slug, slug, …" line per normalized category>
+   <one "alias (alias of category): slug, slug, …" line per category alias>
+   Every category also accepts `unclassified`.
+   </rule-vocabulary>
+   ```
+
+   Reviewers whose own category is an alias (e.g. `plugin-contract`,
+   `adversarial`, `project-compliance`) find their alias row directly in
+   the block and pick a slug from it — they do not need to resolve the
+   alias to its normalized category themselves.
+
+   If the command fails, omit the block and note "rule vocabulary
+   unavailable" in Coverage; reviewers then emit `unclassified`, which
+   Step 6 accepts.
 
 #### Compact-return enforcement
 
 Each persona reviewer returns JSON matching the **extended compact-return
-schema below** (yellow-plugins keystone adds `category` to the upstream
-10-field schema documented in
+schema below** (yellow-plugins adds `category`, `rule` and `scope` to the
+upstream 10-field schema documented in
 `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`;
 the upstream file is the canonical source for aggregation rules but not
 for the schema itself):
@@ -603,6 +636,8 @@ for the schema itself):
       "title": "<short actionable summary>",
       "severity": "P0|P1|P2|P3",
       "category": "<reviewer category>",
+      "rule": "<slug from the injected rule-vocabulary>",
+      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
       "file": "<repo-relative path>",
       "line": 42,
       "confidence": 0,
@@ -620,6 +655,15 @@ for the schema itself):
 
 `line` must be an integer — the 1-based line number of the finding in
 `file`; the `42` above is an example value, not a literal.
+
+`rule` and `scope` feed the review-findings ledger's identity key. They
+are the one exception to the drop-the-return rule below: a finding
+missing either (or carrying a non-string or empty value) is kept with
+`rule: "unclassified"` / `scope: "unscoped"` and counted in Coverage,
+because yellow-core's `security-reviewer` and `performance-reviewer`
+version separately and skew must not lose findings. `review-ledger.sh`
+validates `rule` against the vocabulary and verifies `scope` at the
+anchor later; Step 6 does neither.
 
 `plugin-contract-reviewer` extends this schema with two optional
 per-finding fields: `breaking_change_class` and `migration_path`. See
@@ -664,7 +708,8 @@ trigger them:
 The aggregator in Step 6 normalizes legacy prose findings into the
 structured schema by inferring `confidence: 75`, `autofix_class:
 gated_auto`, `owner: downstream-resolver`, `requires_verification: true`,
-and `pre_existing: false` defaults when fields are absent. Keep this list
+`pre_existing: false`, `rule: unclassified` and `scope: unscoped` defaults
+when fields are absent. Keep this list
 in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
 reviewer that emits prose without listing it in both places means its
 findings are dropped as malformed.
@@ -771,7 +816,7 @@ Apply the aggregation steps from
      assuming it is always absent.
    - Infer defaults: `confidence: 75`, `autofix_class: gated_auto`,
      `owner: downstream-resolver`, `requires_verification: true`,
-     `pre_existing: false`
+     `pre_existing: false`, `rule: unclassified`, `scope: unscoped`
    - Wrap each agent's converted findings in the top-level envelope
      (`reviewer`, `findings`, `residual_risks`, `testing_gaps`) so it
      enters Step 1 indistinguishable from a structured return.
@@ -785,6 +830,12 @@ Apply the aggregation steps from
    - **Per-finding required (10 fields):** `title`, `severity`, `category`,
      `file`, `line`, `confidence`, `autofix_class`, `owner`,
      `requires_verification`, `pre_existing`. `suggested_fix` is optional.
+   - **Defaulted, never dropped:** `rule` and `scope`. A missing, empty or
+     non-string value becomes `unclassified` / `unscoped`; count each
+     defaulted finding for Coverage. Also count findings whose lowercased
+     `category` is neither a key of `categories` nor of
+     `category_aliases` in `lib/review-ledger-vocab.json` (the ledger
+     files them under `maintainability`).
    - **Value constraints:** `severity ∈ {P0, P1, P2, P3}`,
      `autofix_class ∈ {safe_auto, gated_auto, manual, advisory}`,
      `owner ∈ {review-fixer, downstream-resolver, human, release}`,
@@ -820,7 +871,10 @@ Apply the aggregation steps from
    the other does not, **preserve the extension fields from the
    contract-bearing finding in the merged result** so the Step 10
    Plugin Contract Changes table does not lose classification. Parity
-   rule with `review-all.md` Step 8.3.
+   rule with `review-all.md` Step 8.3. This in-run fingerprint stays
+   in memory; the ledger's persistent fingerprint (`file`, normalized
+   `category`, `rule`, verified `scope`, anchor hash) is computed later by
+   `lib/review-ledger.sh`.
 3. **Cross-reviewer agreement promotion.** When 2+ independent reviewers
    flag the same fingerprint, promote anchor by one step:
    `50 → 75`, `75 → 100`, `100 → 100`. Note agreement in the Reviewer
@@ -1033,6 +1087,8 @@ findings were produced but extension classification was malformed."
 - Findings suppressed at confidence < 75: <count>
 - Findings demoted to soft-bucket: <count>
 - Compact-return validation drops (base schema): <count>
+- Findings defaulted (missing rule/scope): <count or omit when zero> — update yellow-core / yellow-codex
+- Categories unmapped: <count or omit when zero>
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 
