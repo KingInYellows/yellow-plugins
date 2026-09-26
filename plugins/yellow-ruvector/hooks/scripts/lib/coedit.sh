@@ -32,13 +32,15 @@ coedit_sanitize_session() {
 }
 
 # coedit_normalize <root> <path> — print <path> relative to the physical
-# root, or fail for: empty, control characters, over 512 chars, outside the
-# root (symlinks resolved, the final component included), or inside
-# .ruvector/, .git/, or docs/solutions/.
+# root, or fail for: empty, control characters, a root-relative result over
+# 512 chars (raw input over 4096), outside the root (symlinks resolved, the
+# final component included), or inside .ruvector/, .git/, or docs/solutions/.
 coedit_normalize() {
   local root="${1:-}" p="${2:-}" abs dir rroot rel link hops=0
   [ -n "$root" ] && [ -n "$p" ] || return 1
-  [ "${#p}" -le 512 ] || return 1
+  # Edit paths arrive absolute, so only a loose raw bound here; the 512 cap
+  # applies to the stored root-relative path below.
+  [ "${#p}" -le 4096 ] || return 1
   if printf '%s' "$p" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
   case "$p" in
     /*) abs="$p" ;;
@@ -63,6 +65,7 @@ coedit_normalize() {
     "$rroot"/*) rel="${abs#"$rroot"/}" ;;
     *) return 1 ;;
   esac
+  [ -n "$rel" ] && [ "${#rel}" -le 512 ] || return 1
   if printf '%s' "$rel" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
   case "$rel" in
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;

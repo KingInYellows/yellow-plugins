@@ -436,3 +436,20 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(jq '[.pairs // {} | .. | objects | keys[]] | length' "$COEDIT" 2>/dev/null || echo 0)" -eq 0 ]
   rm -rf "$outside"
 }
+
+@test "the 512-char cap applies to the root-relative path, not the absolute one" {
+  deep="$PROJECT_ROOT/$(printf 'd%.0s' $(seq 1 200))/$(printf 'e%.0s' $(seq 1 200))/$(printf 'f%.0s' $(seq 1 200))"
+  mkdir -p "$deep/.ruvector" "$deep/src"; : > "$deep/src/a.ts"; : > "$deep/src/b.ts"
+  for f in a b; do
+    jq -cn --arg c "$deep" --arg f "$deep/src/$f.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"z1", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+      | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$deep" bash "$HOOK_SCRIPT" >/dev/null
+  done
+  [ "$(jq -r '.pairs["src/a.ts"]["src/b.ts"] // 0' "$deep/.ruvector/coedit.json")" -eq 1 ]
+  # A short symlink whose in-root target is over 512 chars is not recorded.
+  long="$PROJECT_ROOT/$(printf 'x%.0s' $(seq 1 250))/$(printf 'y%.0s' $(seq 1 250))"
+  mkdir -p "$long"; : > "$long/zzzzzzzzzzzzzzzz.ts"
+  ln -s "$long/zzzzzzzzzzzzzzzz.ts" "$PROJECT_ROOT/src/short.ts"
+  edit z2 "$PROJECT_ROOT/src/short.ts"
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/z2" ] || ! grep -q yyyy "$RUVECTOR_DIR/coedit-sessions/z2"
+}
