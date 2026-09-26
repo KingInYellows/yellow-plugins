@@ -523,3 +523,17 @@ exit 0'
   [ "$status" -eq 0 ]
   [ -e "$victim/old-file" ]
 }
+
+@test "never prunes through a .ruvector symlink to outside the project" {
+  make_ruvector_stub 'exit 0'
+  victim="$BATS_TEST_TMPDIR/victim-store"
+  mkdir -p "$victim/coedit-sessions"
+  echo keep > "$victim/coedit-sessions/old-file"
+  touch -d '10 days ago' "$victim/coedit-sessions/old-file" 2>/dev/null \
+    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$victim/coedit-sessions/old-file"
+  rm -rf "$RUVECTOR_DIR"
+  ln -s "$victim" "$RUVECTOR_DIR"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ -e "$victim/coedit-sessions/old-file" ]
+}

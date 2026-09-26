@@ -216,3 +216,30 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ -z "$(ls -A "$victim")" ]
   rm -rf "$victim"
 }
+
+@test "a .ruvector symlink to a directory outside the project is never written" {
+  victim="$(mktemp -d)"
+  rm -rf "$RUVECTOR_DIR"
+  ln -s "$victim" "$RUVECTOR_DIR"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ -z "$(ls -A "$victim")" ]
+  rm -rf "$victim"
+}
+
+@test "a linked worktree records into the main worktree's store" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  WT="$(mktemp -d)/wt"
+  git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
+  mkdir -p "$WT/src"; : > "$WT/src/a.ts"; : > "$WT/src/b.ts"
+  ln -s "$RUVECTOR_DIR" "$WT/.ruvector"
+  for f in a b; do
+    jq -cn --arg c "$WT" --arg f "$WT/src/$f.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"w1", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+      | PATH="$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
+  done
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
+}
