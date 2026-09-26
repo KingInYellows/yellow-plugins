@@ -46,14 +46,16 @@ ruvector_main_worktree() {
     *) return 1 ;;
   esac
   # A real checkout has its tracked files; the separate git dir's parent
-  # does not. One present file among the first 50 index entries is enough,
-  # so a locally deleted file does not matter; sparse-checkout entries
-  # (skip-worktree, not "H") are not expected on disk and are skipped.
+  # does not. One present file among the first 50 checked-out ("H") entries
+  # is enough, so a locally deleted file does not matter; sparse-checkout
+  # entries (skip-worktree, "S") are not expected on disk, so they are
+  # skipped without counting toward the 50.
   local n=0
-  while IFS= read -r -d '' tracked && [ "$n" -lt 50 ]; do
-    n=$((n + 1))
+  while [ "$n" -lt 50 ] && IFS= read -r -d '' tracked; do
     case "$tracked" in
-      "H "?*) [ -e "${main}/${tracked#H }" ] && { printf '%s' "$main"; return 0; } ;;
+      "H "?*)
+        n=$((n + 1))
+        [ -e "${main}/${tracked#H }" ] && { printf '%s' "$main"; return 0; } ;;
     esac
   done < <(git -C "$main" ls-files -v -z 2>/dev/null)
   return 1
