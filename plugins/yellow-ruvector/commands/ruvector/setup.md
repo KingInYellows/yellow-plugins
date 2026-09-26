@@ -71,7 +71,8 @@ grep -q '\.ruvector' "$ROOT/.gitignore" 2>/dev/null && printf 'entry present\n' 
 - Node.js missing or older than 20 → stop, report the install URL
 - `npm` or `jq` missing → stop, report what to install
 - Path validation failed → stop, report the printed reason
-- `install: missing or out of date` → Step 2a
+- `install: missing or out of date` or `onnx model: not cached` → Step 2a
+  (it installs only when needed and always warms an uncached model)
 - `.ruvector/` missing → Step 2b
 - Otherwise → Step 3
 

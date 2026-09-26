@@ -29,6 +29,7 @@ case "$1" in
 esac
 case "$2 $3" in
   "embed text")
+    [ -n "${FAKE_EMBED_SLEEP:-}" ] && sleep "$FAKE_EMBED_SLEEP"
     if [ -n "${FAKE_EMBED_OK:-}" ]; then
       d="$HOME/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
       echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
@@ -190,4 +191,20 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   launch "$REPO"
   [ "$status" -ne 0 ]
   [[ "$stderr" == *"outside HOME/tmp"* ]]
+}
+
+@test "TERM during model warm-up releases the lock and exits" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_SLEEP=5
+  fake_install
+  out="$BATS_TEST_TMPDIR/launch.out"
+  ( cd "$REPO" && PATH="$STUBS:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN" exec bash "$PLUGIN/bin/start-ruvector.sh" ) >"$out" 2>&1 &
+  pid=$!
+  for _ in $(seq 1 50); do [ -d "$DATA/.install.lock" ] && break; sleep 0.1; done
+  [ -d "$DATA/.install.lock" ]
+  kill -TERM "$pid"
+  rc=0; wait "$pid" || rc=$?
+  [ "$rc" -eq 143 ]
+  [ ! -e "$DATA/.install.lock" ]
+  ! grep -q EXEC "$out"
 }
