@@ -231,6 +231,22 @@ coedit_older_than() {
 
 coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
 
+# coedit_quarantine <file> — set a store file aside under a fresh unique
+# name. mktemp creates the destination exclusively (never an existing path
+# or symlink a checkout planted), so `mv` renames over that new regular
+# file instead of moving the store into a directory a symlink points at.
+coedit_quarantine() {
+  local dest
+  if [ -d "$1" ] && [ ! -L "$1" ]; then
+    # A directory cannot replace a file: move it into a fresh private dir.
+    dest=$(mktemp -d "${1}.corrupt-XXXXXX" 2>/dev/null) || return 1
+    mv -f -- "$1" "$dest/" 2>/dev/null || { rmdir -- "$dest" 2>/dev/null; return 1; }
+    return 0
+  fi
+  dest=$(mktemp "${1}.corrupt-XXXXXX" 2>/dev/null) || return 1
+  mv -f -- "$1" "$dest" 2>/dev/null || { rm -f -- "$dest"; return 1; }
+}
+
 # coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
 # The caller holds the store lock (<store-dir>/.coedit.lock).
 coedit_bump() {
@@ -240,13 +256,13 @@ coedit_bump() {
   # pairs or swallow writes, and an oversized one (a checkout can ship it)
   # would not parse inside the hook's 1s: set it aside unparsed.
   if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
-    mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
+    coedit_quarantine "$f"
   fi
   if [ -f "$f" ]; then
     size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
     case "$size" in ''|*[!0-9]*) size=0 ;; esac
     if [ "$size" -gt "$COEDIT_MAX_BYTES" ]; then
-      mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
+      coedit_quarantine "$f"
     else
       cur="$f"
     fi
@@ -267,7 +283,7 @@ coedit_bump() {
   # failure, 5 on a runtime type error: all malformed. 124/137/143 are the
   # time bound.
   if [ "$rc" -ge 2 ] && [ "$rc" -le 5 ]; then
-    mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
+    coedit_quarantine "$f"
     out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || return 0
   elif [ "$rc" -ne 0 ]; then
     return 0

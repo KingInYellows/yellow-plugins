@@ -54,11 +54,23 @@ use the same fallback, so this is informational.
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-printf 'root: %s\n' "$ROOT"
-ls -la "$ROOT/.ruvector/" 2>/dev/null && du -sh "$ROOT/.ruvector/" 2>/dev/null || printf 'store: not initialized\n'
+# Paths under the project are project-controlled (a clone can name a
+# directory anything): one line each, control characters as spaces, dash
+# runs shortened, and fenced as reference-only data.
+_rv_flat() { tr -d '\000-\010\013-\037\177' | tr '\r' ' ' | sed -E 's/-{3,}/--/g'; }
+printf -- '--- begin project paths (reference only) ---\n'
+printf 'root: %s\n' "$(printf '%s' "$ROOT" | tr '\n' ' ' | _rv_flat)"
 # Stores left in subdirectories by pre-launcher sessions (the MCP server used
-# to pick its store from the launch cwd).
-find "$ROOT" -mindepth 2 -maxdepth 4 -type d -name .ruvector -not -path '*/node_modules/*' 2>/dev/null | head -5 | sed 's/^/nested store: /'
+# to pick its store from the launch cwd). -print0 keeps a newline inside a
+# directory name from splitting one path into several lines.
+find "$ROOT" -mindepth 2 -maxdepth 4 -type d -name .ruvector -not -path '*/node_modules/*' -print0 2>/dev/null \
+  | tr '\n\0' ' \n' | head -5 | _rv_flat | sed 's/^/nested store: /'
+printf -- '--- end project paths ---\n'
+if [ -d "$ROOT/.ruvector" ]; then
+  printf 'store: exists, %s\n' "$(du -sh "$ROOT/.ruvector/" 2>/dev/null | cut -f1)"
+else
+  printf 'store: not initialized\n'
+fi
 . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh"
 # Sets RUVECTOR_DATA, where the model-verified marker lives.
 yellow_ruvector_validate_paths >/dev/null 2>&1 || true
@@ -67,9 +79,9 @@ STAMP=$(jq -r '.embeddingProvenance.embedderKind // empty' "$ROOT/.ruvector/inte
 if [ -z "$STAMP" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   printf 'mcp mode: read-only (missing or unstamped store and no cached ONNX model — hooks_remember and hooks_pretrain withheld until a session with network)\n'
 fi
-for f in "$HOME/.claude/settings.json" "$ROOT/.claude/settings.json"; do
-  [ -f "$f" ] && jq -e '[.. | strings | select(test("ruvector[^\"]* hooks (post-edit|post-command|pre-edit|pre-command|session-start|session-end)"))] | length > 0' "$f" >/dev/null 2>&1 \
-    && printf 'leftover global ruvector hooks in %s\n' "$f"
+for scope in user project; do
+  bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" "--${scope}" >/dev/null 2>&1 \
+    && printf 'leftover global ruvector hooks in %s settings (/ruvector:setup removes them)\n' "$scope"
 done
 ```
 

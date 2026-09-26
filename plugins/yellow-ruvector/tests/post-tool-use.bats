@@ -474,6 +474,18 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   jq -e '.last == "src/a.ts" and .surfaced == ["src/q.ts"]' "$RUVECTOR_DIR/coedit-sessions/p9" >/dev/null
 }
 
+@test "a planted quarantine symlink never receives the store" {
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"; echo keep > "$outside/coedit.json"
+  printf 'not json' > "$COEDIT"
+  now=$(date +%s)
+  for t in $(seq $((now - 2)) $((now + 5))); do ln -s "$outside" "$COEDIT.corrupt-$t"; done
+  edit y1 "$PROJECT_ROOT/src/a.ts"
+  edit y1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(cat "$outside/coedit.json")" = keep ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  ls "$COEDIT".corrupt-* | grep -qv -- "-[0-9]*$"
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
