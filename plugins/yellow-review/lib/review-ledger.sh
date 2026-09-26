@@ -315,17 +315,19 @@ rl_load_core() {
 # high-entropy tokens that cs_redact_secrets does not know. Already-redacted
 # markers are removed first so `API_KEY=[REDACTED]` does not trip it.
 rl_suspicious() {
-  local probe
+  local probe tok
   probe=$(printf '%s' "$1" | sed -E 's/\[REDACTED[^]]*\]//g')
   if printf '%s\n' "$probe" | grep -Eq '(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*[^[:space:]]'; then
     return 0
   fi
-  printf '%s\n' "$probe" | grep -Eo '[A-Za-z0-9+/_=-]{32,}' | while IFS= read -r tok; do
+  # Read the full token stream in-shell; piping through `grep -q` can exit
+  # early and, with pipefail, surface SIGPIPE (141) as a false negative.
+  while IFS= read -r tok; do
     if [[ "$tok" =~ [a-z] && "$tok" =~ [A-Z] && "$tok" =~ [0-9] ]]; then
-      echo hit
-      break
+      return 0
     fi
-  done | grep -q hit
+  done < <(printf '%s\n' "$probe" | grep -Eo '[A-Za-z0-9+/_=-]{32,}')
+  return 1
 }
 
 # Redact one model-authored string. Prints the text to store.

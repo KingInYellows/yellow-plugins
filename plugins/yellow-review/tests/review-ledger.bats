@@ -240,6 +240,15 @@ setup() {
 
 # --- redaction (P3) ---------------------------------------------------------
 
+@test "rl_suspicious: mixed-case token before many long tokens is still suspicious" {
+  source "$RL"
+  tok="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbC"
+  padding=$(printf 'A%.0s' $(seq 1 32))
+  payload="$tok $(for _ in $(seq 1 1000); do printf '%s ' "$padding"; done)"
+  run rl_suspicious "$payload"
+  [ "$status" -eq 0 ]
+}
+
 @test "redaction: planted credentials never reach the ledger directory" {
   tok="ghp_$(printf 'a%.0s' $(seq 1 36))"
   printf 'x\n-----BEGIN RSA PRIVATE KEY-----\ny\n' >|k.txt
