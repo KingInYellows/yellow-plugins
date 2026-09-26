@@ -1166,11 +1166,18 @@ yellow-core changes. Each stage carries its own changeset.
 
 <!-- /deepen-plan -->
 
-- [ ] 6.5: Manual check in a real Claude Code session, per AGENTS.md, recorded
-      in the PR body. Install from the worktree, seed a ledger by running
-      `/review:pr` on a scratch PR, start a new session, and confirm the message
-      appears. After the first reviews, record the `category_split` value (the
-      measurement the brainstorm asks for).
+- [x] 6.5a: Manual check in a real Claude Code session, per AGENTS.md, recorded
+      in the PR body. Seed a ledger by running `/review:pr` on a scratch PR,
+      start a new session, and confirm the message appears. Done 2026-09-26
+      against the marketplace install (yellow-review 3.5.0) on scratch PR #878;
+      results in the body of
+      [#872](https://github.com/KingInYellows/yellow-plugins/pull/872)
+      ("Manual check (task 6.5a)"). The notice and timing checks passed. One
+      gap came out of it: `/review:triage` on a closed PR does not refresh
+      `<pr>.state`.
+- [ ] 6.5b: After the first ten real `/review:pr` runs, record the
+      `category_split` value (the measurement the brainstorm asks for), summed
+      over those PRs. The scratch PR gave 2.
 - [x] 6.6: Changeset: `yellow-review` minor.
 
 ## Testing Strategy
@@ -1419,4 +1426,4 @@ behaviour, so every PR passes the CI gate on its own.
 - [x] 3. agent/feat/review-ledger-persistence (completed 2026-09-25)
 - [x] 4. agent/feat/review-triage-command (completed 2026-09-25)
 - [x] 5. agent/feat/review-sweep-ledger (completed 2026-09-25)
-- [x] 6. agent/feat/review-ledger-session-hook (completed 2026-09-25; manual check 6.5 pending)
+- [x] 6. agent/feat/review-ledger-session-hook (completed 2026-09-25; 6.5a done 2026-09-26, 6.5b pending)
