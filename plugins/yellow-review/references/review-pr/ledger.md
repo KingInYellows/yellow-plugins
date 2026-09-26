@@ -27,7 +27,7 @@ file per PR inside the clone's git dir, managed by `lib/review-ledger.sh`;
 - **Failure policy.** The review never aborts on a ledger error. When a library
   call exits non-zero, log
   `[review:pr] Warning: ledger <section> failed (exit N)` to stderr, add
-  "Ledger: write failed at <section> (exit N)" to Coverage, and continue. Exit 5
+  `Ledger: write failed at <section> (exit N)` to Coverage, and continue. Exit 5
   means the PR closed or merged mid-review; exit 4 means another review holds
   the PR's lock. The findings are still in the Step 10 report, so a failed write
   stays visible.
@@ -196,7 +196,7 @@ Add one line to Step 10's Coverage section, built from the `observe` and
 `settle` results and a final `"$RL" fold <PR> | jq -c '{pending, attention}'`
 (never print the full fold; it carries stored ledger text):
 
-```
+```text
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention
 ```
 

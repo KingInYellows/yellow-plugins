@@ -1629,6 +1629,8 @@ cmd_summary() {
 # start is dropped and counted. The model-authored title is never injected
 # (CWE-1427): only structural fields and the human-written reason are.
 # Prints nothing when no entry remains.
+# shellcheck disable=SC2016
+# SC2016: jq program — `$keep` and `($keep | …)` are jq, not shell.
 RL_FENCE_JQ='
   def esc_delims:
     gsub("--- begin (?<k>dismissed-findings|pr-context|file-line-counts|learnings-context) \\(reference only\\) ---"; "[ESCAPED] begin \(.k) (reference only)")
