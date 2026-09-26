@@ -121,3 +121,15 @@ setup() {
   # The user file is untouched by a --project apply.
   jq -e '.hooks | has("PostToolUse")' "$S" >/dev/null
 }
+
+@test "only real ruvector invocations are legacy; look-alikes are kept" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "my-ruvector hooks session-start"},
+    {type: "command", command: "echo '"'"'ruvector hooks post-edit'"'"'"},
+    {type: "command", command: "ruvector hooks post-editor"},
+    {type: "command", command: "npx -y ruvector@0.2 hooks post-edit --success"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 3 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] | index("npx -y ruvector@0.2 hooks post-edit --success") == null' "$S" >/dev/null
+}

@@ -45,7 +45,11 @@ npm --version 2>/dev/null || printf 'npm: not found\n'
 (command -v jq >/dev/null 2>&1 && jq --version) || printf 'jq: not found\n'
 command -v git >/dev/null 2>&1 && ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 ROOT="${ROOT:-$PWD}"
-printf 'project root: %s\n' "$ROOT"
+# The root path is project-controlled text: one line, control characters
+# removed, dash runs shortened, fenced as reference-only data.
+printf -- '--- begin project root (reference only) ---\n'
+printf 'project root: %s\n' "$(printf '%s' "$ROOT" | tr '\n\r' '  ' | tr -d '\000-\010\013-\037\177' | sed -E 's/-{3,}/--/g')"
+printf -- '--- end project root ---\n'
 
 printf '\n=== Plugin-managed ruvector ===\n'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set (run /ruvector:setup from within Claude Code)}"

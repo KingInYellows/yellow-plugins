@@ -120,6 +120,14 @@ finish() {
 if ! ruvector_resolve_bin; then
   finish
 fi
+# Recall loads the ONNX model. Until a warm-up has verified the cached model
+# (prewarm.sh does it under the install lock), a recall here would download
+# it concurrently through the same fixed cache file names: skip it. With the
+# hash embedder selected there is no model to load. RUVECTOR_BIN (the test
+# seam) has no plugin-managed model cache to check.
+if [ -z "${RUVECTOR_BIN:-}" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
+  finish
+fi
 if [ -z "$TIMEOUT_CMD" ]; then
   printf '[ruvector] no GNU-compatible timeout found; session-start recall runs without budget enforcement\n' >&2
 fi

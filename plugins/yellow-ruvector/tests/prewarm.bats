@@ -67,3 +67,18 @@ npm_called_within() {
   RUVECTOR_ONNX=0 run bash "$HOOK" </dev/null
   [ ! -e "$CLAUDE_PLUGIN_DATA/.install.lock" ]
 }
+
+@test "session-start skips recall until the ONNX model is verified (never races prewarm)" {
+  proj="$BATS_TEST_TMPDIR/proj"; mkdir -p "$proj/.ruvector"
+  cli "require('fs').writeFileSync('$BATS_TEST_TMPDIR/recall-ran', ''); console.log('0.3.3')"
+  SS="$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+  rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
+  run bash -c 'cd "$1" && printf "{\"cwd\":\"%s\"}" "$1" | CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$proj" "$SS"
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/recall-ran" ]
+  # Once verified (as prewarm's warm-up records it), recall runs.
+  bash -c '. "$1"; yellow_ruvector_data_dir; yellow_ruvector_model_fingerprint > "$RUVECTOR_DATA/model-verified"' _ "$LIB"
+  run bash -c 'cd "$1" && printf "{\"cwd\":\"%s\"}" "$1" | CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$proj" "$SS"
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/recall-ran" ]
+}
