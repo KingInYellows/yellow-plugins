@@ -588,6 +588,17 @@ exit 0'
   [ -e "$RUVECTOR_DIR/coedit-sessions/resumed" ]
 }
 
+@test "a stale per-session lock left by a killed hook does not block pruning" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.dead.lock"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/dead"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/dead" "$RUVECTOR_DIR/coedit-sessions/.dead.lock" 2>/dev/null || skip "touch -d unsupported"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/dead" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/dead" ]
+}
+
 @test "never prunes through a symlinked co-edit session dir" {
   make_ruvector_stub 'exit 0'
   victim="$BATS_TEST_TMPDIR/victim"

@@ -372,11 +372,14 @@ coedit_prune_sessions() {
       | while IFS= read -r f && [ "$SECONDS" -lt 5 ]; do
           f="${f#./}"
           sid=$(coedit_sanitize_session "$f") && [ "$sid" = "$f" ] || continue
-          mkdir ".${sid}.lock" 2>/dev/null || continue
+          # coedit_lock_path also reclaims a lock left by a killed hook (over
+          # a minute old), so an abandoned session is still pruned.
+          _coedit_tries_left=1
+          coedit_lock_path ".${sid}.lock" || continue
           if [ -f "$f" ] && [ ! -L "$f" ] && coedit_older_than "$(coedit_mtime "$f")" 604800; then
             rm -f -- "$f"
           fi
-          rmdir ".${sid}.lock" 2>/dev/null
+          coedit_unlock_path ".${sid}.lock"
         done ) \
     </dev/null >/dev/null 2>&1 &
   return 0
