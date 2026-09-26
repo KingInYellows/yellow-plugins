@@ -318,6 +318,8 @@ coedit_partners() {
   size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
   case "$size" in ''|*[!0-9]*) return 0 ;; esac
   [ "$size" -le "$COEDIT_MAX_BYTES" ] || return 0
+  # jq is time-bounded (COEDIT_JQ_SECS) and yields at most the top 50
+  # candidates, so a hostile store cannot keep the loop below busy.
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     norm=$(coedit_normalize "$root" "$partner") || continue
@@ -326,11 +328,11 @@ coedit_partners() {
     printf '%s\t%s\n' "$count" "$partner"
     n=$((n + 1))
     [ "$n" -ge "$limit" ] && break
-  done < <(jq -r --arg r "$rel" --argjson min "$min" '
+  done < <(coedit_jq -r --arg r "$rel" --argjson min "$min" '
       (.pairs[$r] // {}) | to_entries
       | map(select((.value | type) == "number" and .value >= $min
                    and (.key | test("[[:cntrl:]]") | not)))
-      | sort_by(-.value, .key) | .[] | "\(.value | floor)\t\(.key)"
+      | sort_by(-.value, .key) | .[0:50][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null)
   return 0
 }
@@ -356,6 +358,7 @@ coedit_suggest_once() {
   # The same per-session lock as coedit_record: a parallel PostToolUse
   # rewrite of this session file must not drop `surfaced` (or `last`).
   slock="${store}/coedit-sessions/.${sid}.lock"
+  _coedit_tries_left=$COEDIT_LOCK_TRIES
   coedit_lock_path "$slock" || return 0
   seen=0
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then

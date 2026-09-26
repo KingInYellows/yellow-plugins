@@ -206,3 +206,15 @@ assert_allow_json() {
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
+
+@test "coedit-related.sh --stdin takes exactly one line and never evaluates it" {
+  run --separate-stderr bash -c 'cd "$1" && printf "%s\n" "src/a.ts" | bash "$2" --stdin 10' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+  marker="$PROJECT_ROOT/pwned"
+  run --separate-stderr bash -c 'cd "$1" && printf "%s\n" "src/a.ts'"'"'; touch $3; echo '"'"'" | bash "$2" --stdin' _ "$PROJECT_ROOT" "$RELATED" "$marker"
+  [ "$status" -eq 2 ]
+  [ ! -e "$marker" ]
+  run --separate-stderr bash -c 'cd "$1" && printf "src/a.ts\nsrc/b.ts\n" | bash "$2" --stdin' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 2 ]
+}

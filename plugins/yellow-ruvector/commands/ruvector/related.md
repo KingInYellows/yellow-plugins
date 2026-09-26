@@ -24,17 +24,21 @@ file path:
 - Empty → report "Usage: `/ruvector:related <file path>`, e.g.
   `/ruvector:related src/auth/session.ts`" and stop.
 - Reject (report "Invalid path" and stop) when it is longer than 512
-  characters, spans more than one line, contains a control character or a
-  single quote (`'`), is absolute (starts with `/`), starts with `-`, or has a
-  `..` component. Paths are relative to the project root, e.g.
-  `src/auth/session.ts`. The script enforces the same rules.
+  characters, spans more than one line, contains a control character, is
+  absolute (starts with `/`), starts with `-`, or has a `..` component, or
+  when a line of it is exactly `RUVECTOR_RELATED_PATH_END`. Paths are
+  relative to the project root, e.g. `src/auth/session.ts`. The script
+  enforces the same rules.
 
 ### Step 2: Look up partners (ONE Bash call)
 
-Run, with the validated path inside single quotes:
+Pass the path on stdin through a quoted heredoc (no expansion, and a
+single-line path can never end it early), never inside the command line:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" '<path>' 10
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 10 <<'RUVECTOR_RELATED_PATH_END'
+<path>
+RUVECTOR_RELATED_PATH_END
 ```
 
 The script re-validates the path (it must resolve inside the project, not in

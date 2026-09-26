@@ -3,6 +3,11 @@
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
+#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin [limit] <<'EOF'
+#        <path>
+#        EOF
+# --stdin reads exactly one line (the command passes user input this way, so
+# it is never spliced into shell syntax); more than one line is rejected.
 # <path> is relative to the project root; absolute paths, a leading
 # `-`, `..` components, and control characters are rejected. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
@@ -18,8 +23,16 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${here}/hooks/scripts/lib/coedit.sh"
 
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
-[ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path> [limit]\n' >&2; exit 2; }
-path="$1"
+[ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path>|--stdin [limit]\n' >&2; exit 2; }
+if [ "$1" = "--stdin" ]; then
+  path=""
+  IFS= read -r path || [ -n "$path" ] || { printf 'coedit-related: no path on stdin\n' >&2; exit 2; }
+  if IFS= read -r _extra || [ -n "${_extra:-}" ]; then
+    printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2
+  fi
+else
+  path="$1"
+fi
 limit="${2:-10}"
 case "$limit" in ''|*[!0-9]*) limit=10 ;; esac
 [ "$limit" -ge 1 ] && [ "$limit" -le 50 ] || limit=10
