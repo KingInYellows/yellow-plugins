@@ -4,7 +4,8 @@ description: "List files most often edited together with a given file, from this
 argument-hint: '<file path>'
 allowed-tools:
   - Read
-  - Write
+  - Write(//tmp/ruvector-related.*/query)
+  - Write(//private/tmp/ruvector-related.*/query)
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh":*)
 ---
 
@@ -46,15 +47,18 @@ Write tool instead (see
    It prints `QUERY_FILE=<path>` — a file that does not exist yet, inside a
    fresh private temp directory.
 2. Use the Write tool to write exactly the path (one line, nothing else) to
-   that `QUERY_FILE`. `Write` is granted for this one file only.
+   that `QUERY_FILE`. The frontmatter pre-approves `Write` only for
+   `/tmp/ruvector-related.*/query` (and its macOS `/private/tmp` form); a
+   write anywhere else falls back to a normal permission prompt.
 3. Run the lookup on it:
 
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file "<QUERY_FILE>" 50
    ```
 
-   The script only accepts a query file inside a directory `--stage`
-   created, reads exactly one line, and deletes the staging directory.
+   The script only accepts a regular `query` file inside a
+   `/tmp/ruvector-related.*` directory you own, reads exactly one line, and
+   removes just that file and then the empty directory.
 
 The script re-validates the path (it must resolve inside the project, not in
 `.ruvector/`, `.git/`, or `docs/solutions/`) and prints one

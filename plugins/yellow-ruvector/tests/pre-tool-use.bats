@@ -237,12 +237,23 @@ related_staged() {
   : > "$BATS_TEST_TMPDIR/query"
   run --separate-stderr bash "$RELATED" --file "$BATS_TEST_TMPDIR/query"
   [ "$status" -eq 2 ]
-  run --separate-stderr bash "$RELATED" --file "${TMPDIR:-/tmp}/ruvector-related.x/../../etc/query"
+  run --separate-stderr bash "$RELATED" --file "/tmp/ruvector-related.x/../../etc/query"
   [ "$status" -eq 2 ]
-  d=$(mktemp -d "${TMPDIR:-/tmp}/ruvector-related.XXXXXXXX")
+  d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
   ln -s /etc/hostname "$d/query"
   run --separate-stderr bash "$RELATED" --file "$d/query"
   [ "$status" -eq 2 ]
+  rm -rf "$d"
+}
+
+@test "coedit-related.sh --file removes only the query file, never other contents" {
+  d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
+  mkdir -p "$d/valuable"; echo keep > "$d/valuable/data"
+  printf 'src/a.ts' > "$d/query"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED" "$d/query"
+  [ "$status" -eq 0 ]
+  [ ! -e "$d/query" ]
+  [ "$(cat "$d/valuable/data")" = keep ]
   rm -rf "$d"
 }
 

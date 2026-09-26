@@ -27,9 +27,11 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
 [ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path>|--stage|--file <query-file> [limit]\n' >&2; exit 2; }
-STAGE_PREFIX="ruvector-related."
+# Always /tmp (not $TMPDIR): /ruvector:related's Write grant is scoped to
+# //tmp/ruvector-related.*/query, so the staged file must live there.
+STAGE_PREFIX="/tmp/ruvector-related."
 if [ "$1" = "--stage" ]; then
-  sdir=$(mktemp -d "${TMPDIR:-/tmp}/${STAGE_PREFIX}XXXXXXXX") || exit 1
+  sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
   printf 'QUERY_FILE=%s/query\n' "$sdir"
   exit 0
 fi
@@ -38,14 +40,17 @@ if [ "$1" = "--file" ]; then
   shift
   # Only a query file inside a staging dir --stage made (owned by us, not a
   # symlink), so --file cannot be pointed at arbitrary files.
-  case "$qf" in "${TMPDIR:-/tmp}/${STAGE_PREFIX}"*/query) ;; *) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
+  case "$qf" in "${STAGE_PREFIX}"*/query) ;; *) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
   qdir="${qf%/query}"
-  case "${qdir#"${TMPDIR:-/tmp}/${STAGE_PREFIX}"}" in ''|*/*) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
+  case "${qdir#"${STAGE_PREFIX}"}" in ''|*/*) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
   [ -d "$qdir" ] && [ ! -L "$qdir" ] && [ -O "$qdir" ] && [ -f "$qf" ] && [ ! -L "$qf" ] \
     || { printf 'coedit-related: not a staged query file\n' >&2; exit 2; }
   path="" _extra="" rc=1
   { IFS= read -r path || true; IFS= read -r _extra && rc=0 || true; } < "$qf"
-  rm -rf -- "$qdir"
+  # Remove only what --stage and the Write produced: the query file, then
+  # the (now empty) dir. Anything else in there stays put.
+  rm -f -- "$qf"
+  rmdir -- "$qdir" 2>/dev/null || true
   [ -n "$path" ] || { printf 'coedit-related: no path in the query file\n' >&2; exit 2; }
   if [ "$rc" -eq 0 ] || [ -n "$_extra" ]; then
     printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2
