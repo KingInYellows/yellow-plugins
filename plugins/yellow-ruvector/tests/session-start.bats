@@ -510,3 +510,16 @@ exit 0'
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
   [ -e "$RUVECTOR_DIR/coedit-sessions/new" ]
 }
+
+@test "never prunes through a symlinked co-edit session dir" {
+  make_ruvector_stub 'exit 0'
+  victim="$BATS_TEST_TMPDIR/victim"
+  mkdir -p "$victim"
+  echo keep > "$victim/old-file"
+  touch -d '10 days ago' "$victim/old-file" 2>/dev/null \
+    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$victim/old-file"
+  ln -s "$victim" "$RUVECTOR_DIR/coedit-sessions"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ -e "$victim/old-file" ]
+}
