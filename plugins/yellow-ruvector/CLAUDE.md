@@ -26,7 +26,9 @@ ruvector.
      `RUVECTOR_MCP_ALLOW` for the session. The server's write paths
      swallow ONNX failures and fall back to hash, which would stamp the
      store hash/64d and lock out every later write (ADR-210);
-  4. `exec`s `node <data>/current/node_modules/ruvector/bin/cli.js mcp start`.
+  4. `exec`s `node <data>/install-<hash>/node_modules/ruvector/bin/cli.js mcp start`
+     (the resolved `current` target, so pruning can skip installs a live
+     server still loads modules from).
 - Data dir: `$CLAUDE_PLUGIN_DATA`, or `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector`
   when the host does not set it. Install primitives live in
   `lib/install-ruvector.sh` (adapted from yellow-morph's install lib).

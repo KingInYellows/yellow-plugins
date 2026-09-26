@@ -58,7 +58,13 @@ if yellow_ruvector_needs_install; then
   yellow_ruvector_release_install_lock
   trap - EXIT INT TERM
 fi
+# Exec the resolved install-<hash> path, not `current`, so prune can see
+# which install this server still uses after a later upgrade.
 entry=$(yellow_ruvector_entry)
+current=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || true)
+case "$current" in
+  install-*) entry="${RUVECTOR_DATA}/${current}/node_modules/ruvector/bin/cli.js" ;;
+esac
 
 # --- 2. Project root ---
 root=$(ruvector_resolve_root "$PWD")

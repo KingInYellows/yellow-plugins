@@ -8,8 +8,6 @@ allowed-tools:
   - Glob
   - Grep
   - Read
-  - Bash(bash *scripts/ruvector-cli.sh --version)
-  - Bash(bash *scripts/ruvector-cli.sh hooks reembed*)
   - Bash(pgrep -f:*)
   - Bash(grep -o *)
   - Bash(wc -l:*)
