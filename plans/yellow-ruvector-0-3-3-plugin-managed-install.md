@@ -85,7 +85,7 @@ npm install by hand.
 ```text
 ${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector}/
   install-<lockhash12>/node_modules/ruvector/bin/cli.js   # one dir per lockfile
-  current -> install-<lockhash12>                         # atomic symlink swap
+  current -> install-<lockhash12>                         # swap: mv -T, else ln -sfn
   .install.lock/                                          # mkdir lock + pid
 
 bin/start-ruvector.sh (MCP command)
