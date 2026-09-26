@@ -6,7 +6,7 @@
 # fresh store hash (ADR-210). Only those hook entries are touched; other
 # hooks, including git-ai and this plugin's own, are kept.
 #
-# Usage: remove-legacy-hooks.sh <settings.json> [--apply]
+# Usage: remove-legacy-hooks.sh <settings.json>|--user|--project [--apply]
 #   <settings.json> must be $HOME/.claude/settings.json or the project's
 #   <git toplevel or cwd>/.claude/settings.json (the same allowlist as
 #   repair-cursor-pretooluse.sh). The project file arrives with a clone, so
@@ -23,8 +23,7 @@ set -uo pipefail
 f="${1:-}"
 apply="${2:-}"
 command -v jq >/dev/null 2>&1 || { printf 'remove-legacy-hooks: jq is required\n' >&2; exit 2; }
-[ -n "$f" ] && [ -f "$f" ] || { printf 'remove-legacy-hooks: no settings file %s\n' "$f" >&2; exit 2; }
-case "$apply" in ''|--apply) ;; *) printf 'usage: remove-legacy-hooks.sh <settings.json> [--apply]\n' >&2; exit 2 ;; esac
+case "$apply" in ''|--apply) ;; *) printf 'usage: remove-legacy-hooks.sh <settings.json>|--user|--project [--apply]\n' >&2; exit 2 ;; esac
 
 resolve_path() {
   realpath -- "$1" 2>/dev/null \
@@ -33,6 +32,16 @@ resolve_path() {
 root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 user_settings="${HOME:-/__unset__}/.claude/settings.json"
 project_settings="${root}/.claude/settings.json"
+# --user / --project select the allowlisted file by name, so callers (the
+# /ruvector:setup command) never pass a project-controlled path through the
+# model or a shell command line.
+# A selected file that does not exist simply has no legacy entries (exit 1);
+# an explicit path that does not exist is a caller error (exit 2).
+case "$f" in
+  --user) f="$user_settings"; [ -f "$f" ] || exit 1 ;;
+  --project) f="$project_settings"; [ -f "$f" ] || exit 1 ;;
+esac
+[ -n "$f" ] && [ -f "$f" ] || { printf 'remove-legacy-hooks: no settings file %s\n' "$f" >&2; exit 2; }
 if [ "$f" = "$project_settings" ]; then
   # Checked first: when HOME is the project the two strings are equal, and a
   # cloned .claude symlink must still be refused rather than followed.

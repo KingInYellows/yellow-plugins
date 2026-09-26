@@ -29,6 +29,8 @@ if yellow_ruvector_validate_paths; then
   # not `current`, which another session's plugin version may have moved.
   rv_entry=$(yellow_ruvector_pinned_entry) || rv_entry=""
   if [ ! -f "$rv_entry" ]; then printf 'install: missing or out of date\n'
+  elif ! yellow_ruvector_install_healthy; then
+    printf 'install: %s is broken (cli --version fails) — run /ruvector:setup to reinstall\n' "$(basename -- "${rv_entry%/node_modules/*}")"
   else
     rv_dir="${rv_entry%/node_modules/*}"
     printf 'install: %s, version %s\ncli: %s\n' "${rv_dir##*/}" "$(node "$rv_entry" --version 2>/dev/null)" "$rv_entry"

@@ -56,6 +56,15 @@ yellow_ruvector_acquire_install_lock 2 \
 sub_pid=$!
 disown
 
-printf '%s' "$sub_pid" > "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null || true
+# Hand the lock to the child. If that write fails the lock would name this
+# exiting shell (or nothing) and a waiter would reclaim it mid-install: stop
+# the child and release the lock instead.
+if ! printf '%s' "$sub_pid" > "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null; then
+  pkill -TERM -P "$sub_pid" 2>/dev/null
+  kill -TERM "$sub_pid" 2>/dev/null
+  rm -f "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null
+  rmdir "${RUVECTOR_DATA}/.install.lock" 2>/dev/null
+  json_exit "could not hand the install lock to the background job; skipping prewarm"
+fi
 
 json_exit
