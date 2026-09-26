@@ -13,7 +13,8 @@
 #   it must resolve to the real .claude/settings.json inside the project (a
 #   symlinked file or .claude dir is refused); a symlinked user file is
 #   followed to its regular-file target.
-#   Without --apply: print one "<event>: <command>" line per legacy entry.
+#   Without --apply: print one "<event>: <command>" line per legacy entry
+#   (flattened to one line; the caller fences it as reference-only data).
 #   With --apply: also copy the file to a new <file>.bak-XXXXXX (mktemp, so
 #   never a pre-planted path) and rewrite the resolved file in place.
 # Exit: 0 = entries found (listed or removed), 1 = none, 2 = error.
@@ -59,7 +60,10 @@ list=$(jq -r --arg re "$re" '
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
   | select((.command // "" | tostring) | test($re))
-  | "\($e): \(.command)"' "$f" 2>/dev/null) || { printf 'remove-legacy-hooks: %s is not valid JSON\n' "$f" >&2; exit 2; }
+  # Commands come from a settings file (a cloned project ships one): print
+  # each on one line, control characters as spaces, dash runs shortened, so
+  # the listing can never forge a fence line in the caller.
+  | "\($e): \(.command | tostring | gsub("[[:cntrl:]]"; " ") | gsub("-{3,}"; "--"))"' "$f" 2>/dev/null) || { printf 'remove-legacy-hooks: %s is not valid JSON\n' "$f" >&2; exit 2; }
 [ -n "$list" ] || exit 1
 printf '%s\n' "$list"
 [ "$apply" = --apply ] || exit 0
