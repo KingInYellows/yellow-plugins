@@ -1985,7 +1985,10 @@ rl_refresh_state_locked() {
     printf 'none: PR #%s has no ledger\n' "$pr"
     return 0
   fi
-  rl_write_state "$d" "$pr" "$RL_R_STATE" || return 1
+  rl_write_state "$d" "$pr" "$RL_R_STATE" || {
+    rl_err "refresh-state: could not write PR #$pr state"
+    return 1
+  }
   printf '%s\n' "$RL_R_STATE"
 }
 
@@ -2422,6 +2425,8 @@ review-ledger.sh <subcommand> [args]
   publication <pr> <finding_id> --remote-head <sha>
   validate-path <anchor|dependency|restore> <rev> <path> [<base>]
   prune <pr> | refresh-state <pr> | summary [--all | <pr>] | new-run-id
+          (refresh-state records the live gh state in <pr>.state and prints it,
+          or "none: ..." without writing when the PR has no ledger)
 Exit codes: 0 ok, 2 usage, 3 invalid / illegal transition, 4 lock timeout,
 5 PR closed, 6 unverifiable. Most subcommands print JSON; reverify,
 publication, restore, prune and refresh-state print one token or line.

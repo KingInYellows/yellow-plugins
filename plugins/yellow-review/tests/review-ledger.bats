@@ -131,6 +131,8 @@ setup() {
 }
 
 @test "refresh-state records the live PR state and never creates a ledger" {
+  MOCK_GH_FAIL=1 run -6 "$RL" refresh-state "$LEDGER_PR"
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
   run -0 "$RL" refresh-state "$LEDGER_PR"
   [ "$output" = "none: PR #$LEDGER_PR has no ledger" ]
   [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
@@ -146,6 +148,30 @@ setup() {
   MOCK_GH_PR_STATE=CLOSED "$RL" prune "$LEDGER_PR" >/dev/null
   MOCK_GH_PR_STATE=CLOSED run -0 "$RL" refresh-state "$LEDGER_PR"
   [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
+}
+
+@test "refresh-state rewrites a state-only ledger left by a refused write" {
+  MOCK_GH_PR_STATE=MERGED run -5 observe "$BASE" "[$(finding a.sh 2)]"
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.jsonl" ]
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = MERGED ]
+  MOCK_GH_PR_STATE=CLOSED run -0 "$RL" refresh-state "$LEDGER_PR"
+  [ "$output" = CLOSED ]
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = CLOSED ]
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.jsonl" ]
+}
+
+@test "refresh-state writes only under the PR lock" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  flock "$LEDGER_DIR/$LEDGER_PR.lock" sleep 5 3>&- &
+  holder=$!
+  for _ in $(seq 1 50); do
+    flock -n "$LEDGER_DIR/$LEDGER_PR.lock" true 2>/dev/null || break
+    sleep 0.1
+  done
+  RL_LOCK_WAIT=0 MOCK_GH_PR_STATE=CLOSED run -4 "$RL" refresh-state "$LEDGER_PR"
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = OPEN ]
 }
 
 @test "a tombstoned PR refuses writes; reopening starts a fresh ledger" {
