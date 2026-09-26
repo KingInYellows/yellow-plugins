@@ -1414,7 +1414,7 @@ behaviour, so every PR passes the CI gate on its own.
   docs/architecture-overview.md, docs/security.md,
   plugins/yellow-review/README.md, plugins/yellow-review/CLAUDE.md,
   .changeset/review-ledger-session-hook.md
-- **Tasks:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+- **Tasks:** 6.1, 6.2, 6.3, 6.4, 6.5a, 6.5b, 6.6
 - **Depends on:** #5
 
 ## Stack Progress
