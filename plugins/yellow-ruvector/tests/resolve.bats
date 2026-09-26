@@ -208,6 +208,20 @@ fake_install() {
   [ -L "$WORK/wtsp/.ruvector" ]
 }
 
+@test "heal_store: 50 locally modified files before a clean one still link" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q
+  for i in $(seq -w 1 51); do echo "$i" > "$WORK/f$i"; done
+  git -C "$WORK" add .
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
+  for i in $(seq -w 1 50); do echo changed >> "$WORK/f$i"; done
+  mkdir "$WORK/.ruvector"
+  git -C "$WORK" worktree add -q "$WORK/wtm" -b modified
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtm"
+  [ "$status" -eq 0 ]
+  [ -L "$WORK/wtm/.ruvector" ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q
