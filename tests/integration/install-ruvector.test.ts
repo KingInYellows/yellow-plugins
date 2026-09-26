@@ -159,6 +159,27 @@ describe('yellow-ruvector install lib', () => {
     });
   });
 
+  it('accepts a host data dir under a relocated CLAUDE_CONFIG_DIR, never a system one', () => {
+    const ok = runBash('yellow_ruvector_validate_paths', {
+      ...env,
+      CLAUDE_CONFIG_DIR: '/mnt/claude',
+      CLAUDE_PLUGIN_DATA: '/mnt/claude/plugins/data/yellow-ruvector-x',
+    });
+    expect(ok.status).toBe(0);
+    for (const [cfg, dataDir] of [
+      ['/mnt/claude', '/mnt/claude/other/yellow-ruvector'],
+      ['/etc', '/etc/plugins/data/yellow-ruvector'],
+      ['/mnt/claude', '/mnt/claude/plugins/data/../../../etc/x'],
+    ]) {
+      const r = runBash('yellow_ruvector_validate_paths', {
+        ...env,
+        CLAUDE_CONFIG_DIR: cfg,
+        CLAUDE_PLUGIN_DATA: dataDir,
+      });
+      expect(r.status).not.toBe(0);
+    }
+  });
+
   it('accepts the XDG fallback outside HOME, but never a system XDG_DATA_HOME', () => {
     const ok = runBash(
       'yellow_ruvector_validate_paths && printf %s "$RUVECTOR_DATA"',
