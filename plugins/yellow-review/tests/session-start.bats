@@ -87,6 +87,15 @@ hook() { run --separate-stderr bash "$HOOK"; }
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"pending unknown: #12"* ]]
 }
 
+@test "a non-canonical decimal sidecar falls back to a fold instead of aborting arithmetic" {
+  observe "$BASE" "[$(finding a.sh 1)]" >/dev/null
+  read -r _ a b <"$LEDGER_DIR/$LEDGER_PR.pending"
+  printf '08 %s %s\n' "$a" "$b" >|"$LEDGER_DIR/$LEDGER_PR.pending"
+  hook
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '.continue == true and (.systemMessage | test(": 1 pending"))' >/dev/null
+}
+
 @test "a lock held by a writer gives pending unknown within budget" {
   observe "$BASE" "[$(finding a.sh 1)]" >/dev/null
   flock "$LEDGER_DIR/$LEDGER_PR.lock" sleep 5 3>&- &

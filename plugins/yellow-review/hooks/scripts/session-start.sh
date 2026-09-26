@@ -88,7 +88,7 @@ list_show() {
 read_counts() {
   local pr="$1" p a b size t0 t1 out
   if [ -f "$DIR/$pr.pending" ] && read -r p a b <"$DIR/$pr.pending" 2>/dev/null &&
-    [[ "$p" =~ ^[0-9]+$ && "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+    [[ "$p" =~ ^([1-9][0-9]*|0)$ && "$a" =~ ^([1-9][0-9]*|0)$ && "$b" =~ ^([1-9][0-9]*|0)$ ]]; then
     size=$(wc -c <"$DIR/$pr.jsonl")
     size=${size//[!0-9]/}
     if [ "$b" = "$size" ]; then
