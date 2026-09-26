@@ -158,11 +158,13 @@ reopened, pending, need attention).
 
 `/review:triage [PR]` works the ledger down. It first reconciles every
 finding against the fetched PR head. An `applied` fix becomes `fixed` once
-it is proved published, and becomes `reopened` if it was reverted or
-abandoned. Findings whose anchor is gone become `stale`, and a `stale`
-finding whose anchor matches again becomes `reopened`. Anything
-unverifiable (a shallow clone, missing objects) is listed rather than
-changed. After that it walks the remaining findings one card at a time:
+it is proved published, or once its defect is gone from the PR head when a
+restack rewrote the fix commit; it becomes `reopened` if the fix commit was
+abandoned and the defect is still there. Findings whose anchor is gone
+become `stale`, and a `stale` finding whose anchor matches again becomes
+`reopened`. Anything unverifiable (a shallow clone, missing objects, a
+partial clone offline) is listed rather than changed. After that it walks
+the remaining findings one card at a time:
 
 - **Apply** — only when HEAD is the PR head and the tree is clean.
 - **Dismiss** — with a reason and optional dependency paths. The dismissal

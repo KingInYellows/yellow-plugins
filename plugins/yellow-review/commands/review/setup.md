@@ -66,7 +66,7 @@ if [ -x "$ledger" ]; then
   ledger_bash=$(awk 'NR == 1 { sub(/^#![ \t]*/, ""); print (($1 ~ /\/env$/) ? $2 : $1); exit }' "$ledger")
   case "$ledger_bash" in /*) ;; *) ledger_bash=$(command -v "$ledger_bash" 2>/dev/null) ;; esac
   bash_ver=$("$ledger_bash" -c 'printf "%s.%s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"' 2>/dev/null)
-  if [ "${bash_ver%%.*}" -ge 4 ] 2>/dev/null; then
+  if [ "${bash_ver%%.*}" -ge 4 ] 2>/dev/null || [ "$bash_ver" = 3.2 ]; then
     printf 'ledger_bash:   ok (%s %s)\n' "$ledger_bash" "$bash_ver"
   else
     printf 'ledger_bash:   TOO OLD (%s %s)\n' "${ledger_bash:-none}" "${bash_ver:-unknown}"
@@ -107,9 +107,9 @@ Stop after reporting all required failures:
 - `ledger_lib` not found: "The yellow-review install is incomplete —
   reinstall the plugin."
 - `ledger_bash` too old: "The review-findings ledger runs under the bash
-  named in its shebang (reported above), and this version needs Bash 4 or
-  newer; stock macOS `/bin/bash` is 3.2." Reviews still run, but every
-  ledger write fails and is reported in Coverage.
+  named in its shebang (reported above), and needs Bash 3.2 or newer (stock
+  macOS `/bin/bash` 3.2 is supported)." Reviews still run, but every ledger
+  write fails and is reported in Coverage.
 
 If `yellow_core` is not installed, warn but continue:
 

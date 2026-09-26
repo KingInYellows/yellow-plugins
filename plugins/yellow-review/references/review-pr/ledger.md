@@ -149,10 +149,8 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
-   FIX=$(git rev-parse HEAD)
-   for id in <finding_id> <finding_id>; do
-     "$RL" transition <PR> "$id" applied --fix-sha "$FIX" --actor <SOURCE>
-   done
+   "$RL" transition <PR> - applied --fix-sha "$(git rev-parse HEAD)" --actor <SOURCE> \
+     --ids-json '["<finding_id>", "<finding_id>"]'
    ```
 
    Then run the provider's submit command.
@@ -163,9 +161,8 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
    if REMOTE=$("$RL" remote-head <PR>); then
-     for id in <finding_id> <finding_id>; do
-       "$RL" transition <PR> "$id" applied --published-head "$REMOTE" --actor <SOURCE>
-     done
+     "$RL" transition <PR> - applied --published-head "$REMOTE" --actor <SOURCE> \
+       --ids-json '["<finding_id>", "<finding_id>"]'
      "$RL" settle <PR> --remote-head "$REMOTE" --actor <SOURCE> \
        --ids-json '["<finding_id>", "<finding_id>"]'
    else
@@ -174,14 +171,23 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    fi
    ```
 
+   A `--fix-sha` or `--published-head` batch skips any id that is no longer
+   `applied` (for example a finding a concurrent triage already moved) and lists
+   it under `skipped`; add those ids to Coverage. Exit 3 names the offending id.
+
    `remote-head` fetches `refs/pull/<PR>/head` (fork PRs included) and retries
    until it equals `headRefOid`; exit 6 means it never matched (or `gh` could
    not read `headRefOid`), so leave the findings `applied` and route the
    failure through Conventions' failure policy — add "Ledger: write failed at
    remote-head (exit N)" to Coverage instead of exiting silently. `settle`
-   moves each finding to `fixed` only when the fix is proved published
-   (ancestor or `git patch-id`) and no longer reproduces at the remote head; an
-   abandoned fix (unreachable from any ref) becomes `reopened`; a proved fix
+   moves each finding to `fixed` when the fix is proved published (ancestor
+   or `git patch-id`) and no longer reproduces at the remote head. When
+   neither proof holds (a restack rewrote the fix, even if the old commit
+   survives on a local branch), the re-verify decides: no longer reproducing
+   is the content-check fallback proof and gives `fixed`
+   (`unproved-content-check`); still reproducing gives `reopened`
+   (`fix-abandoned`) only when the fix commit is unreachable from every ref,
+   and otherwise stays `applied` (possibly not yet published). A proved fix
    whose anchor still matches, and anything unverifiable, stays `applied` for
    `/review:triage`.
 
@@ -200,8 +206,10 @@ Add one line to Step 10's Coverage section, built from the `observe` and
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention
 ```
 
-Also add, when non-zero: "Dismissed findings injected: N (M filtered)", the
-rejected ordinals, and every "Ledger: write failed" line.
+Also add, when non-zero: "Dismissed findings injected: N (M filtered)",
+"Re-detections suppressed by an applicable dismissal: N" (`observe`'s
+`suppressed_dismissed`), the rejected ordinals, and every "Ledger: write failed"
+line.
 
 When Step 3e marked the head unverifiable, none of the above ran: emit only
 "Ledger: head unverifiable" (already added to Coverage at Step 3e) and skip

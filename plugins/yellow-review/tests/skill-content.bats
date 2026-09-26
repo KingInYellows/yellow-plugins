@@ -203,6 +203,8 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -q "ledger_bash:   ok (%s %s)" "$f"
   grep -q 'BASH_VERSINFO' "$f"
   grep -q '`ledger_bash` too old' "$f"
+  # the ledger is Bash 3.2-compatible, so stock macOS /bin/bash passes
+  grep -qF '|| [ "$bash_ver" = 3.2 ]; then' "$f"
 }
 
 # --- /review:triage (Stage 4) -----------------------------------------------
@@ -213,7 +215,9 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q '"\$RL" cards <PR>' "$TRIAGE"
   grep -q -- '--- begin ledger-finding (reference only) ---' "$TRIAGE"
   grep -q 'Never print the full fold' "$TRIAGE"
-  grep -q 'Never put a$' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'Never put a title, reason or other stored'
+  grep -q '"\$RL" resolve-path <PR> <finding_id> --head <headRefOid>' "$TRIAGE"
+  ! grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
   grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
 }
 
@@ -225,7 +229,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
 
 @test "triage: unattended mode applies nothing; restore is attended-only" {
   grep -q '^## Step 6: Unattended mode stops here' "$TRIAGE"
-  grep -q 'applies nothing' "$TRIAGE"
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'applies nothing'
+  grep -q 'git fetch --no-tags origin <baseRefOid>' "$TRIAGE"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'never in unattended mode'
   step6=$(grep -n '^## Step 6' "$TRIAGE" | cut -d: -f1)
   restore=$(grep -n '"\$RL" restore' "$TRIAGE" | cut -d: -f1)
@@ -358,4 +363,14 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q 'emits `"<PR#>": null` for that' "$SWEEP_ALL"
   grep -q '`?` when its entry is `null` (fold' "$SWEEP_ALL"
   grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
+}
+
+@test "sweep-all: the prune loop uses find (zsh-safe) and a bounded PR-number check" {
+  grep -q "find \"\$DIR\" -maxdepth 1 -type f -name '\*.jsonl'" "$SWEEP_ALL"
+  grep -q "grep -Exq '\[1-9\]\[0-9\]{0,9}'" "$SWEEP_ALL"
+}
+
+@test "triage: descriptions stay on one line and diffs never take a path" {
+  [ "$(sed -n '2,5p' "$TRIAGE" | grep -c '^description: ')" -eq 1 ]
+  tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'show it with `git diff` and no path argument'
 }
