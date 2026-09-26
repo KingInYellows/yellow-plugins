@@ -320,6 +320,8 @@ coedit_prune_sessions() {
   store=$(coedit_store_dir "${1:-}") || return 0
   sdir="${store}/coedit-sessions"
   [ -d "$sdir" ] && [ ! -L "$sdir" ] || return 0
-  find "$sdir" -mindepth 1 -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null
+  # POSIX-only primaries (no -mindepth/-maxdepth/-delete): the top level
+  # of $sdir, regular files older than 7 days.
+  find "$sdir/." ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + 2>/dev/null
   return 0
 }
