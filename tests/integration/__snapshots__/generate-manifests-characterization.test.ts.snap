@@ -914,7 +914,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
         "--python",
         "3.13",
         "--from",
-        "git+https://github.com/ast-grep/ast-grep-mcp@674272f1adb56fd1fe48a546952c7ffbe72c09e6",
+        "git+https://github.com/ast-grep/ast-grep-mcp@149e20d47bb7125fb0c1451feea2f48a98742034",
         "ast-grep-server"
       ]
     }
