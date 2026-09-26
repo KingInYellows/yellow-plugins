@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.5.1
+
+### Patch Changes
+
+- [`97eeb48`](https://github.com/KingInYellows/yellow-plugins/commit/97eeb48c5a6152019ca969b3d41ab233c4d2fe5a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:triage` now records a closed or merged PR's state in the ledger (new
+  `review-ledger.sh refresh-state <pr>`), so the SessionStart notice stops
+  counting a PR that closed with findings still pending. Before, `<pr>.state`
+  was only refreshed by a ledger write, and the notice kept counting the PR as
+  pending for up to 7 days. `/review:sweep` (when the PR closed mid-sweep) and
+  `/review:sweep-all` (for every closed-PR ledger it lists, kept or not) now
+  record the state too. Found during the manual check for task 6.5a.
+
 ## 3.5.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "gt-workflow",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "interface": {
     "displayName": "Graphite Workflow",
     "category": "Developer Tools"
