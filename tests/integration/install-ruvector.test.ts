@@ -436,14 +436,24 @@ describe('yellow-ruvector install lib', () => {
   });
 
   describe('model_cached', () => {
-    it('is true only when model.onnx and tokenizer.json are non-empty', () => {
+    it('is true only for non-empty files a warm-up verified', () => {
       const dir = join(home, '.ruvector', 'models', 'all-MiniLM-L6-v2');
-      expect(runBash('yellow_ruvector_model_cached', env).status).not.toBe(0);
+      const cached = () =>
+        runBash('yellow_ruvector_data_dir; yellow_ruvector_model_cached', env)
+          .status;
+      expect(cached()).not.toBe(0);
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'model.onnx'), 'x');
-      expect(runBash('yellow_ruvector_model_cached', env).status).not.toBe(0);
+      expect(cached()).not.toBe(0);
       writeFileSync(join(dir, 'tokenizer.json'), '{}');
-      expect(runBash('yellow_ruvector_model_cached', env).status).toBe(0);
+      // Present but never verified (e.g. an interrupted download).
+      expect(cached()).not.toBe(0);
+      mkdirSync(data, { recursive: true });
+      writeFileSync(join(data, 'model-verified'), '1:2');
+      expect(cached()).toBe(0);
+      // A later truncation no longer matches the verified sizes.
+      writeFileSync(join(dir, 'tokenizer.json'), '{');
+      expect(cached()).not.toBe(0);
     });
 
     it('honors RUVECTOR_CACHE_DIR', () => {
@@ -452,8 +462,10 @@ describe('yellow-ruvector install lib', () => {
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'model.onnx'), 'x');
       writeFileSync(join(dir, 'tokenizer.json'), '{}');
+      mkdirSync(data, { recursive: true });
+      writeFileSync(join(data, 'model-verified'), '1:2');
       expect(
-        runBash('yellow_ruvector_model_cached', {
+        runBash('yellow_ruvector_data_dir; yellow_ruvector_model_cached', {
           ...env,
           RUVECTOR_CACHE_DIR: cache,
         }).status

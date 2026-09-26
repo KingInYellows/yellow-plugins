@@ -134,8 +134,9 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/repair-cursor-pretooluse.sh" || printf 'FAIL
 printf '\n=== Leftover global ruvector hooks ===\n'
 found=0
 for f in "$HOME/.claude/settings.json" "$ROOT/.claude/settings.json"; do
-  if [ -f "$f" ] && jq -e '[.. | strings | select(test("ruvector[^\"]* hooks (post-edit|post-command|pre-edit|pre-command|session-start|session-end)"))] | length > 0' "$f" >/dev/null 2>&1; then
-    printf 'WARNING: %s still runs `ruvector hooks …` commands from a past `ruvector hooks init`. They use the global binary and write edit/command memories that stamp a fresh store hash (ADR-210). Remove those hook entries.\n' "$f"
+  [ -f "$f" ] || continue
+  if entries=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" "$f" 2>/dev/null); then
+    printf 'LEGACY HOOKS in %s:\n%s\n' "$f" "$(printf '%s\n' "$entries" | sed 's/^/  /')"
     found=1
   fi
 done
@@ -153,6 +154,25 @@ else
 fi
 ```
 
+If the check printed `LEGACY HOOKS in <file>`, those entries come from a
+past `ruvector hooks init`: they run the global binary and write
+edit/command memories that stamp a fresh store hash (ADR-210), so this
+plugin's hooks replace them. Ask with AskUserQuestion, once per file, showing
+the listed entries: "Remove these N leftover ruvector hook entries from
+<file>? A backup is kept next to it." Options: "Remove them (Recommended)" /
+"Keep them". On Remove, run:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" '<file>' --apply
+```
+
+It removes only hook entries whose command runs `ruvector hooks
+post-edit|post-command|pre-edit|pre-command|session-start|session-end`,
+drops matcher groups and events left empty, and prints the backup path.
+Other hooks (git-ai, your own) are untouched. On Keep, report the manual
+fix: delete those `command` entries from `<file>`'s `hooks` object, then
+restart Claude Code.
+
 Summarize results in a table:
 
 ```
@@ -167,7 +187,7 @@ Summarize results in a table:
 | .gitignore entry      | Present                                 |
 | Hook events (5)       | Active via plugin.json                  |
 | Cursor PreToolUse     | Repaired / already safe / skipped       |
-| Leftover global hooks | None / WARNING (see above)              |
+| Leftover global hooks | None / Removed (backup) / Kept          |
 | Smoke test            | Passed / Failed / Skipped               |
 ```
 

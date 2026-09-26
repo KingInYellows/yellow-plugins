@@ -60,7 +60,9 @@ fake_install() {
 
 cache_model() {
   local d="$HOME/.ruvector/models/all-MiniLM-L6-v2"
-  mkdir -p "$d"; echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
+  mkdir -p "$d" "$DATA"; echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
+  # Verified by an earlier warm-up (sizes of model.onnx and tokenizer.json).
+  printf '2:3' > "$DATA/model-verified"
 }
 
 stamp_store() {
@@ -129,7 +131,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
 
 @test "model warm-up waits for the install lock and releases it" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
-  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=1
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=6
   fake_install
   mkdir -p "$DATA/.install.lock"; printf '%s' "$$" > "$DATA/.install.lock/pid"
   export FAKE_EMBED_OK=1
@@ -266,4 +268,47 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   launch "$REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
+}
+
+@test "unverified model files (an interrupted download) do not enable writes on a fresh store" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  d="$HOME/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
+  echo x > "$d/model.onnx"; echo '{' > "$d/tokenizer.json"
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  # A successful warm-up verifies them and restores writes.
+  export FAKE_EMBED_OK=1
+  launch "$REPO"
+  [[ "$output" == *"allow=$ALL5 "* ]]
+  [ -s "$DATA/model-verified" ]
+}
+
+@test "the warm-up never runs past the startup budget" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=4 FAKE_EMBED_OK=1 FAKE_EMBED_SLEEP=10
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  start=$(date +%s)
+  launch "$REPO"
+  [ $(( $(date +%s) - start )) -le 4 ]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+}
+
+@test "an install removed after the check is restored (or the launch fails), never exec'd missing" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store
+  # jq runs between the install check and the exec: have it prune our install.
+  real_jq=$(command -v jq)
+  printf '#!/bin/sh\nrm -rf "%s/install-%s"\nexec "%s" "$@"\n' "$DATA" "$(lock_hash)" "$real_jq" > "$STUBS/jq"
+  chmod +x "$STUBS/jq"
+  printf '#!/bin/sh\nexit 1\n' > "$STUBS/npm"; chmod +x "$STUBS/npm"
+  launch "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *EXEC* ]]
 }
