@@ -992,12 +992,14 @@ rl_reverify_finding() {
   case "$res" in
     unverifiable | unmapped) printf 'unverifiable'; return 0 ;;
     deleted) printf 'not_reproduced'; return 0 ;;
-    exact | shifted) printf 'reproduced'; return 0 ;;
   esac
   entry=$(rl_tree_lookup "$T" "$np")
   case "$entry" in
     unverifiable) printf 'unverifiable'; return 0 ;;
     absent) printf 'not_reproduced'; return 0 ;;
+  esac
+  case "$res" in
+    exact | shifted) printf 'reproduced'; return 0 ;;
   esac
   entry=${entry#present }
   rl_regular_mode "${entry%% *}" || { printf 'not_reproduced'; return 0; }
