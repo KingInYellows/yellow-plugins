@@ -38,7 +38,7 @@ that do not occur anywhere in the path, so no argument can end the heredoc
 early:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 10 <<'RVPATH_<16 random hex>'
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 50 <<'RVPATH_<16 random hex>'
 <path>
 RVPATH_<16 random hex>
 ```
@@ -80,4 +80,4 @@ Offer to open the top files with Read if the user is about to change
   repo share the history through the shared `.ruvector/` store.
 - The PreToolUse hook already mentions up to 3 partners (seen together at
   least 3 times) the first time a session edits a file; this command shows
-  the full list, including rarer pairs.
+  up to 50 partners by count, including rarer pairs.

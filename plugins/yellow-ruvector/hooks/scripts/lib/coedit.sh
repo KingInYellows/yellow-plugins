@@ -416,7 +416,7 @@ coedit_suggest_once() {
   if [ -f "$sfile" ] && [ "$(wc -c < "$sfile" | tr -d ' ')" -gt 65536 ]; then
     return 0
   fi
-  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
+  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced | if type == "array" then map(select(type == "string")) else [] end) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     return 0
   fi
   lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT")
@@ -428,7 +428,7 @@ coedit_suggest_once() {
   _coedit_tries_left=$COEDIT_LOCK_TRIES
   coedit_lock_path "$slock" || return 0
   seen=0
-  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
+  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced | if type == "array" then map(select(type == "string")) else [] end) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     seen=1
   else
     { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
@@ -436,7 +436,7 @@ coedit_suggest_once() {
         # Newest last, at most 200 entries and 32 KB serialized (UTF-8
         # bytes of each JSON string plus its comma), so the session file
         # stays well under the 64 KB its readers accept.
-        .surfaced = ((.surfaced // []) | map(select(. != $r)) + [$r] | reverse
+        .surfaced = ((.surfaced | if type == "array" then map(select(type == "string")) else [] end) | map(select(. != $r)) + [$r] | reverse
           | reduce .[] as $p ({a: [], n: 0};
               (($p | tojson | utf8bytelength) + 1) as $c
               | if (.a | length) < 200 and .n + $c <= 32768

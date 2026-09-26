@@ -255,6 +255,18 @@ assert_allow_json() {
   jq -e '.surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s9" >/dev/null
 }
 
+@test "a malformed surfaced field is reset, so the suggestion is recorded once" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  for bad in '"src/a.ts is here"' '{"x":1}' '[1, null, "src/z.ts"]'; do
+    jq -n --argjson v "$bad" '{surfaced: $v}' > "$RUVECTOR_DIR/coedit-sessions/s10"
+    run --separate-stderr run_hook "$(event s10 Edit "$PROJECT_ROOT/src/a.ts")"
+    [ -n "$(ctx "$output")" ]
+    jq -e '.surfaced | type == "array" and all(type == "string") and .[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s10" >/dev/null
+    run --separate-stderr run_hook "$(event s10 Edit "$PROJECT_ROOT/src/a.ts")"
+    [ -z "$(ctx "$output")" ]
+  done
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done

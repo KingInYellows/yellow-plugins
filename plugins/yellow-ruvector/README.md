@@ -79,7 +79,7 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   pairs in `.ruvector/coedit.json` (plugin-owned, jq only). The first time a
   session edits a file, `PreToolUse` mentions up to 3 files usually edited
   with it (seen together at least 3 times); `/ruvector:related <file>` lists
-  them all. Hooks no longer write memories; recalled and suggested text is
+  up to 50 by count. Hooks no longer write memories; recalled and suggested text is
   untrusted reference context.
 - **Error→fix memory:** `/ruvector:seed-solutions` imports a repo's
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
