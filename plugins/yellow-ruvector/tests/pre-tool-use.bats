@@ -141,7 +141,7 @@ assert_allow_json() {
   rm "$PROJECT_ROOT/src/e.ts"
   run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf '8\tsrc/b.ts\n3\tsrc/c.ts\n2\tsrc/d.ts')" ]
+  [ "$output" = "$(printf -- '--- begin co-edit history (reference only) ---\n8\tsrc/b.ts\n3\tsrc/c.ts\n2\tsrc/d.ts\n--- end co-edit history ---')" ]
 }
 
 @test "coedit-related.sh rejects a path outside the project and is empty without history" {

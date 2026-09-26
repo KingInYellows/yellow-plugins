@@ -5,7 +5,8 @@
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
 # <path> is absolute or relative to the current directory. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
-# highest count first; nothing when there is no history. Exit 2 on a path
+# highest count first, between reference-only fence lines (partner names come
+# from a project data file); nothing when there is no history. Exit 2 on a path
 # that is outside the project, unreadable, or otherwise rejected.
 set -euo pipefail
 
@@ -34,4 +35,8 @@ fi
 if [ ! -f "${root}/.ruvector/coedit.json" ]; then
   exit 0
 fi
-coedit_partners "$root" "$rel" "$limit" 1
+lines=$(coedit_partners "$root" "$rel" "$limit" 1)
+[ -n "$lines" ] || exit 0
+printf -- '--- begin co-edit history (reference only) ---\n'
+printf '%s\n' "$lines"
+printf -- '--- end co-edit history ---\n'
