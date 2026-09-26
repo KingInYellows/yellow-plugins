@@ -184,3 +184,17 @@ assert_allow_json() {
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
+
+@test "an oversized coedit.json is not parsed for suggestions" {
+  run --separate-stderr bash -c 'printf "%s" "$1" | PATH="$2:$PATH" CLAUDE_PROJECT_DIR="$3" COEDIT_MAX_BYTES=10 bash "$4"' \
+    _ "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")" "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  assert_allow_json "$output"
+  [ -z "$(ctx "$output")" ]
+}
+
+@test "suggesting never drops the session's last edit written in parallel" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -cn --argjson e "$(date +%s)" '{last:"src/c.ts", epoch:$e}' > "$RUVECTOR_DIR/coedit-sessions/s9"
+  run_hook "$(event s9 Edit "$PROJECT_ROOT/src/a.ts")" >/dev/null
+  jq -e '.last == "src/c.ts" and (.surfaced | index("src/a.ts")) != null' "$RUVECTOR_DIR/coedit-sessions/s9" >/dev/null
+}

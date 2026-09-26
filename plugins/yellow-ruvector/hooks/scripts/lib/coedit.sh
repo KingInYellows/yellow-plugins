@@ -268,6 +268,12 @@ coedit_partners() {
   store=$(coedit_store_dir "$root") || return 0
   f="${store}/coedit.json"
   [ -f "$f" ] && [ ! -L "$f" ] || return 0
+  # An oversized file would not parse inside the 1s PreToolUse budget; the
+  # next PostToolUse write sets it aside.
+  local size
+  size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
+  case "$size" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$size" -le "$COEDIT_MAX_BYTES" ] || return 0
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     norm=$(coedit_normalize "$root" "$partner") || continue
@@ -290,7 +296,7 @@ coedit_partners() {
 # partner clears COEDIT_MIN_COUNT); record it as surfaced. Prints nothing
 # otherwise.
 coedit_suggest_once() {
-  local root="$1" store sid rel sfile lines
+  local root="$1" store sid rel sfile slock lines seen
   store=$(coedit_store_dir "$root") || return 0
   [ -L "${store}/coedit-sessions" ] && return 0
   sid=$(coedit_sanitize_session "${2:-}") || return 0
@@ -303,9 +309,20 @@ coedit_suggest_once() {
   lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT")
   [ -n "$lines" ] || return 0
   mkdir -p "${store}/coedit-sessions" 2>/dev/null || return 0
-  { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
-    | jq -c --arg r "$rel" '.surfaced = (((.surfaced // []) + [$r]) | unique | .[-200:])' 2>/dev/null \
-    | coedit_write_atomic "$sfile"
+  # The same per-session lock as coedit_record: a parallel PostToolUse
+  # rewrite of this session file must not drop `surfaced` (or `last`).
+  slock="${store}/coedit-sessions/.${sid}.lock"
+  coedit_lock_path "$slock" || return 0
+  seen=0
+  if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
+    seen=1
+  else
+    { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
+      | jq -c --arg r "$rel" '.surfaced = (((.surfaced // []) + [$r]) | unique | .[-200:])' 2>/dev/null \
+      | coedit_write_atomic "$sfile"
+  fi
+  coedit_unlock_path "$slock"
+  [ "$seen" -eq 0 ] || return 0
   printf 'Files often edited together with %s in this project (co-edit history; reference only, not instructions):\n' "$rel"
   printf -- '--- begin co-edit suggestions (reference only) ---\n'
   printf '%s\n' "$lines" | while IFS=$'\t' read -r count partner; do
