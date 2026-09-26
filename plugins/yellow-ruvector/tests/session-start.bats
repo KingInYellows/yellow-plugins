@@ -462,7 +462,7 @@ exit 0'
   echo "$output" | jq -e '.systemMessage | contains("ERR_LEGACY_STORE_READONLY")' > /dev/null
 }
 
-@test "provenance: no GNU-compatible timeout skips the parse instead of running it unbounded" {
+@test "provenance: without GNU timeout the parse still runs, bounded by the portable watcher" {
   # Shadow any real timeout/gtimeout on PATH with BusyBox-style stubs (no
   # --kill-after support, like the TIMEOUT_CMD probe at the top of the
   # script) so TIMEOUT_CMD resolves to "" without hiding the rest of PATH —
@@ -477,9 +477,10 @@ exit 0'
   run --separate-stderr run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
-  # The note must never surface without a bounded parse to produce it.
-  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
-  echo "$stderr" | grep -q 'provenance check skipped: no GNU-compatible timeout'
+  # run_budgeted's portable watcher bounds the parse, so macOS users still
+  # get the write-refusal note.
+  echo "$output" | jq -e '.systemMessage | contains("hash")' > /dev/null
+  ! echo "$stderr" | grep -q 'provenance check skipped'
 }
 
 @test "provenance: stamped store plus a hanging ruvector still emits JSON within the 6s budget" {
