@@ -8,11 +8,13 @@
 #   2. Resolve the project root (git toplevel first — ruvector picks its
 #      store from process.cwd() only), heal a linked worktree's .ruvector
 #      symlink, and cd there.
-#   3. Guard a fresh store: when .ruvector exists but has no embedding
-#      stamp, warm the ONNX model first. If the model still is not cached
-#      (offline), start without hooks_remember so the server's hash
-#      fallback cannot stamp the store hash/64d (ADR-210). Recall still
-#      works; the next session with network restores writes.
+#   3. Guard a fresh store: when the store is missing or has no embedding
+#      stamp, warm the ONNX model first (under the install lock — ruvector's
+#      model temp files have fixed names). If the model still is not cached
+#      (offline), start without the write tools (hooks_remember,
+#      hooks_pretrain) so the server's hash fallback cannot stamp the store
+#      hash/64d (ADR-210). Recall still works; the next session with
+#      network restores writes.
 #   4. exec the server (no wrapper process left behind).
 #
 # Env: CLAUDE_PLUGIN_ROOT (required), CLAUDE_PLUGIN_DATA (optional; XDG
@@ -34,10 +36,11 @@ if ! ruvector_node_ok; then
 fi
 yellow_ruvector_validate_paths || exit 1
 
+wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
+case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
+
 # --- 1. Install ---
 if yellow_ruvector_needs_install; then
-  wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
-  case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
   if ! yellow_ruvector_acquire_install_lock "$wait_secs"; then
     log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
     log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
@@ -65,17 +68,21 @@ cd "$root"
 # --- 3. Fresh-store guard ---
 allow="${RUVECTOR_MCP_ALLOW:-hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats}"
 intel=".ruvector/intelligence.json"
-if [ -d .ruvector ]; then
-  stamp=""
-  if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
-    stamp=$(jq -r '.embeddingProvenance.embedderKind // empty' "$intel" 2>/dev/null || true)
+# A missing store counts as unstamped: the first write would create it.
+stamp=""
+if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
+  stamp=$(jq -r '.embeddingProvenance.embedderKind // empty' "$intel" 2>/dev/null || true)
+fi
+if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
+  if yellow_ruvector_acquire_install_lock "$wait_secs"; then
+    trap 'yellow_ruvector_release_install_lock' EXIT INT TERM
+    yellow_ruvector_model_cached || yellow_ruvector_warm_model 15 || true
+    yellow_ruvector_release_install_lock
+    trap - EXIT INT TERM
   fi
-  if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
-    yellow_ruvector_warm_model 15 || true
-    if ! yellow_ruvector_model_cached; then
-      allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vx 'hooks_remember' | paste -sd, -)
-      log "ONNX model unavailable (offline?) and the store has no embedding stamp: starting read-only (hooks_remember disabled) so the store is not stamped hash. The next session with network restores writes."
-    fi
+  if ! yellow_ruvector_model_cached; then
+    allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_remember|hooks_pretrain' | paste -sd, - || true)
+    log "ONNX model unavailable (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
   fi
 fi
 export RUVECTOR_MCP_ALLOW="$allow"

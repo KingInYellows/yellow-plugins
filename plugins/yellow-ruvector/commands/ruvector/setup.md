@@ -146,7 +146,7 @@ if [ ! -f "$ENTRY" ]; then
 elif [ ! -d "$ROOT/.ruvector" ]; then
   printf 'Skipped: .ruvector/ not initialized\n'
 else
-  ( cd "$ROOT" && timeout 10 node "$ENTRY" hooks recall --top-k 1 "setup-test" >/dev/null 2>&1 ) \
+  ( cd "$ROOT" && yellow_ruvector_run_bounded 10 node "$ENTRY" hooks recall --top-k 1 "setup-test" >/dev/null 2>&1 ) \
     && printf 'Passed (recall through the plugin-managed CLI)\n' \
     || printf 'FAILED: recall errored or took >10s\n'
 fi

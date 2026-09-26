@@ -247,15 +247,40 @@ yellow_ruvector_model_cached() {
   [ -s "${dir}/model.onnx" ] && [ -s "${dir}/tokenizer.json" ]
 }
 
+# yellow_ruvector_run_bounded <secs> <cmd...> — run <cmd> for at most <secs>
+# (fractions allowed). Uses GNU timeout when it supports --kill-after;
+# otherwise (stock macOS) a background watcher sends TERM (to the command
+# and its children), then KILL 1s later. The watcher's stdio goes to /dev/null so a caller's $(...) is not
+# held open by it.
+yellow_ruvector_run_bounded() {
+  local secs="$1" pid watcher rc=0 t
+  shift
+  for t in timeout gtimeout; do
+    if command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
+      "$t" --kill-after=1 "$secs" "$@"
+      return
+    fi
+  done
+  "$@" &
+  pid=$!
+  ( sleep "$secs"; pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
+    sleep 1; pkill -KILL -P "$pid" 2>/dev/null; kill -KILL "$pid" 2>/dev/null ) \
+    </dev/null >/dev/null 2>&1 &
+  watcher=$!
+  wait "$pid" 2>/dev/null || rc=$?
+  kill "$watcher" 2>/dev/null
+  return "$rc"
+}
+
 # Download/load the ONNX model once via `ruvector embed text`, which never
 # touches a .ruvector store. It exits 0 even on failure, so judge success by
-# the "Dimension: 384" line. $1 = optional timeout seconds (needs `timeout`).
+# the "Dimension: 384" line. $1 = optional time limit in seconds.
 yellow_ruvector_warm_model() {
   local secs="${1:-}" entry out
   entry=$(yellow_ruvector_entry)
   [ -f "$entry" ] || return 1
-  if [ -n "$secs" ] && command -v timeout >/dev/null 2>&1; then
-    out=$( cd "${TMPDIR:-/tmp}" && timeout "$secs" node "$entry" embed text "warmup" 2>&1 )
+  if [ -n "$secs" ]; then
+    out=$( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" 2>&1 )
   else
     out=$( cd "${TMPDIR:-/tmp}" && node "$entry" embed text "warmup" 2>&1 )
   fi
