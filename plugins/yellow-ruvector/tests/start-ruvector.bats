@@ -148,7 +148,8 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
   fake_install; stamp_store; cache_model
-  git -C "$REPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  echo x > "$REPO/f.txt"; git -C "$REPO" add f.txt
+  git -C "$REPO" -c user.email=t@t -c user.name=t commit -q -m init
   git -C "$REPO" worktree add -q "$REPO/wt" -b launcher-heal
   launch "$REPO/wt"
   [ "$status" -eq 0 ]
@@ -219,6 +220,32 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   ln -sfn install-newer "$DATA/current"
   run --separate-stderr bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/scripts/ruvector-cli.sh" mcp start' \
     _ "$REPO" "$STUBS" "$PLUGIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
+}
+
+@test "never execs another version's install when this version's is gone" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  stamp_store
+  mkdir -p "$DATA/install-newer/node_modules/ruvector/bin"
+  : > "$DATA/install-newer/node_modules/ruvector/bin/cli.js"
+  ln -sfn install-newer "$DATA/current"
+  printf '#!/bin/sh\nexit 1\n' > "$STUBS/npm"; chmod +x "$STUBS/npm"
+  launch "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *EXEC* ]]
+  [ ! -e "$DATA/.install.lock" ]
+}
+
+@test "execs this version's install when current points at another version" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store
+  mkdir -p "$DATA/install-newer/node_modules/ruvector/bin"
+  : > "$DATA/install-newer/node_modules/ruvector/bin/cli.js"
+  ln -sfn install-newer "$DATA/current"
+  launch "$REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
 }

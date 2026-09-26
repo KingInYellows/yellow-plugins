@@ -38,7 +38,8 @@ make_worktree() {
   # $1 = branch name. Shared setup for the heal tests: init a repo in
   # PROJECT_ROOT, add a linked worktree at wt/, strip its .ruvector.
   git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  echo x > "$PROJECT_ROOT/f.txt"; git -C "$PROJECT_ROOT" add f.txt
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
   git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b "$1"
   rm -rf "$PROJECT_ROOT/wt/.ruvector"
 }
