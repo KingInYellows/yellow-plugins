@@ -413,6 +413,20 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1" ]
 }
 
+@test "a busy store never makes the session's next edit lose its place" {
+  edit q1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  ( edit q1 "$PROJECT_ROOT/src/b.ts" ) &
+  sleep 0.02
+  ( edit q1 "$PROJECT_ROOT/src/c.ts" ) &
+  wait
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  [ "$(jq -r .last "$RUVECTOR_DIR/coedit-sessions/q1")" = "src/c.ts" ]
+  edit q1 "$PROJECT_ROOT/src/d.ts"
+  [ "$(pair src/c.ts src/d.ts)" -eq 1 ]
+  [ "$(pair src/b.ts src/d.ts)" -eq 0 ]
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
