@@ -80,6 +80,8 @@ coedit_store_dir() {
   if [ "$phys" != "${rroot}/.ruvector" ]; then
     [ -f "${root}/.git" ] || return 1
     common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+    # A bare repo's common dir (/repos/foo.git) has no main checkout beside it.
+    [ "${common##*/}" = ".git" ] || return 1
     main=$(CDPATH= cd -- "$(dirname -- "$common")" 2>/dev/null && pwd -P) || return 1
     [ "$phys" = "${main}/.ruvector" ] || return 1
   fi
@@ -116,7 +118,8 @@ coedit_bump() {
   fi
   cur='{"version":1,"pairs":{}}'
   if [ -f "$f" ]; then
-    if jq -e 'type == "object" and (.pairs | type) == "object"' "$f" >/dev/null 2>&1; then
+    if jq -e 'type == "object" and (.pairs | type) == "object"
+              and all(.pairs[]; type == "object" and all(.[]; type == "number"))' "$f" >/dev/null 2>&1; then
       cur=$(cat "$f")
     else
       mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
