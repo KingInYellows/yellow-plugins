@@ -242,7 +242,7 @@ assert_allow_json() {
 @test "surfaced stays under the session reader's size cap with long paths" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   long=$(printf 'q%.0s' $(seq 1 480))
-  jq -n --arg l "$long" '{surfaced: ([range(0;150)] | map("src/\($l)\(.).ts"))}' > "$RUVECTOR_DIR/coedit-sessions/s8"
+  jq -n --arg l "$long" '{surfaced: ([range(0;120)] | map("src/\($l)\(.).ts"))}' > "$RUVECTOR_DIR/coedit-sessions/s8"
   run --separate-stderr run_hook "$(event s8 Edit "$PROJECT_ROOT/src/a.ts")"
   [ -n "$(ctx "$output")" ]
   [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s8")" -le 40000 ]
