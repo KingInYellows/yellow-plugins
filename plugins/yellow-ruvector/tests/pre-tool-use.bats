@@ -228,3 +228,34 @@ assert_allow_json() {
   run --separate-stderr run_hook "$(event s7 Edit "$PROJECT_ROOT/src/a.ts")"
   [ -z "$(ctx "$output")" ]
 }
+
+@test "fifty stale partners are checked well inside the hook timeout" {
+  jq -n '{version:1, pairs:{"src/a.ts": ([range(0;60)] | map({key:"src/gone/d\(.)/f.ts", value:9}) | from_entries)}}' > "$RUVECTOR_DIR/coedit.json"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [ -z "$(ctx "$output")" ]
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+}
+
+@test "surfaced stays under the session reader's size cap with long paths" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  long=$(printf 'q%.0s' $(seq 1 480))
+  jq -n --arg l "$long" '{surfaced: ([range(0;150)] | map("src/\($l)\(.).ts"))}' > "$RUVECTOR_DIR/coedit-sessions/s8"
+  run --separate-stderr run_hook "$(event s8 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s8")" -le 40000 ]
+  jq -e '.surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s8" >/dev/null
+}
+
+@test "a partner reached through a symlinked directory is not shown" {
+  outside="$(mktemp -d)"; : > "$outside/x.ts"
+  ln -s "$outside" "$PROJECT_ROOT/linked"
+  jq -n '{version:1, pairs:{"src/a.ts": {"linked/x.ts": 9, "src/b.ts": 4}}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  c=$(ctx "$output")
+  [[ "$c" != *"linked/x.ts"* ]]
+  [[ "$c" == *"src/b.ts"* ]]
+  rm -rf "$outside"
+}

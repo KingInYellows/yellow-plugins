@@ -321,6 +321,29 @@ COEDIT_MAX_SUGGESTIONS="${COEDIT_MAX_SUGGESTIONS:-3}"
 # project data (a cloned repo could ship one), so a partner that does not
 # normalize to itself, or no longer exists as a file under the root, is
 # dropped and never printed.
+# coedit_partner_ok <root> <physical-root> <rel> — a stored partner is shown
+# only if it is exactly a path coedit_normalize could have produced: lexically
+# safe and root-relative, an existing regular file that is not a symlink,
+# under a directory that physically resolves to the same place inside the
+# root. Cheap (at most one subshell) so 50 candidates fit the hook budget.
+coedit_partner_ok() {
+  local root="$1" rroot="$2" p="$3" d phys
+  [ -n "$p" ] && [ "${#p}" -le 512 ] || return 1
+  case "$p" in
+    /*|-*|./*|../*|*/./*|*/../*|*/.|*/..|.|..|*//*) return 1 ;;
+    .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
+  esac
+  case "$p" in *[[:cntrl:]]*) return 1 ;; esac
+  [ -f "${root}/${p}" ] && [ ! -L "${root}/${p}" ] || return 1
+  case "$p" in
+    */*)
+      d="${p%/*}"
+      phys=$(CDPATH= cd -- "${root}/${d}" 2>/dev/null && pwd -P) || return 1
+      [ "$phys" = "${rroot}/${d}" ] || return 1 ;;
+  esac
+  return 0
+}
+
 coedit_partners() {
   local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store f count partner norm n=0
   store=$(coedit_store_dir "$root") || return 0
@@ -334,11 +357,11 @@ coedit_partners() {
   [ "$size" -le "$COEDIT_MAX_BYTES" ] || return 0
   # jq is time-bounded (COEDIT_JQ_SECS) and yields at most the top 50
   # candidates, so a hostile store cannot keep the loop below busy.
+  local rroot
+  rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
-    norm=$(coedit_normalize "$root" "$partner") || continue
-    [ "$norm" = "$partner" ] || continue
-    [ -f "${root}/${partner}" ] || continue
+    coedit_partner_ok "$root" "$rroot" "$partner" || continue
     printf '%s\t%s\n' "$count" "$partner"
     n=$((n + 1))
     [ "$n" -ge "$limit" ] && break
@@ -379,7 +402,14 @@ coedit_suggest_once() {
     seen=1
   else
     { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
-      | jq -c --arg r "$rel" '.surfaced = ((.surfaced // []) | map(select(. != $r)) + [$r] | .[-200:])' 2>/dev/null \
+      | jq -c --arg r "$rel" '
+        # Newest last, at most 200 entries and 32 KB, so the session file
+        # stays well under the 64 KB its readers accept.
+        .surfaced = ((.surfaced // []) | map(select(. != $r)) + [$r] | reverse
+          | reduce .[] as $p ({a: [], n: 0};
+              if (.a | length) < 200 and .n + ($p | length) + 3 <= 32768
+              then .a += [$p] | .n += ($p | length) + 3 else . end)
+          | .a | reverse)' 2>/dev/null \
       | coedit_write_atomic "$sfile"
   fi
   coedit_unlock_path "$slock"
