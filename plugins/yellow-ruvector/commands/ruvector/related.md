@@ -4,6 +4,7 @@ description: "List files most often edited together with a given file, from this
 argument-hint: '<file path>'
 allowed-tools:
   - Read
+  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh":*)
 ---
 
 # Related Files (co-edit history)

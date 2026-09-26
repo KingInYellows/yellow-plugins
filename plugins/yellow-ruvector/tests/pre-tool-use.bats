@@ -198,3 +198,11 @@ assert_allow_json() {
   run_hook "$(event s9 Edit "$PROJECT_ROOT/src/a.ts")" >/dev/null
   jq -e '.last == "src/c.ts" and (.surfaced | index("src/a.ts")) != null' "$RUVECTOR_DIR/coedit-sessions/s9" >/dev/null
 }
+
+@test "coedit-related.sh resolves paths from the project root, even from a subdirectory" {
+  git -C "$PROJECT_ROOT" init -q 2>/dev/null || skip "git not available"
+  mkdir -p "$PROJECT_ROOT/pkg/app"
+  run --separate-stderr bash -c 'cd "$1/pkg/app" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+}

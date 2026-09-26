@@ -3,7 +3,7 @@
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
-# <path> is relative to the current directory; absolute paths, a leading
+# <path> is relative to the project root; absolute paths, a leading
 # `-`, `..` components, and control characters are rejected. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
 # highest count first, between reference-only fence lines (partner names come
@@ -35,8 +35,10 @@ esac
 [ "${#path}" -le 512 ] || reject "path too long"
 case "$path" in *[[:cntrl:]]*) reject "a path may not contain control characters" ;; esac
 
+# Paths are project-root-relative (the command's contract), wherever the
+# session was started.
 root=$(ruvector_resolve_root "$PWD")
-path="${PWD}/${path}"
+path="${root}/${path}"
 if ! rel=$(coedit_normalize "$root" "$path"); then
   printf 'coedit-related: path is outside the project, or not a trackable file\n' >&2
   exit 2
