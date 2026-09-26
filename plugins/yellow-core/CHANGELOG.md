@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.4
+
+### Patch Changes
+
+- [`d5b22d6`](https://github.com/KingInYellows/yellow-plugins/commit/d5b22d60c45236217a4c0d03e4a9f2d9e4b3d666)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop
+  `/flow:plan` from re-emitting untrusted Linear issue titles into plan
+  metadata; emit validated issue IDs only and teach `/gt-stack-plan` to parse
+  ID-only `## Linear Issues` lines.
+
 ## 2.4.3
 
 ### Patch Changes
