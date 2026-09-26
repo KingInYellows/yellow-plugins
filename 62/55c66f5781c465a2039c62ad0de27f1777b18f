@@ -1,0 +1,21 @@
+plans/review-findings-ledger.md
+  s_a3aab638e2255a::t_eb0921ee7a7f27 1173-1174
+  s_a3aab638e2255a::t_44cf6823d95e56 1429
+  s_a3aab638e2255a::t_46625d34b3b94b 1169-1172,1175-1180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6255c66f5781c465a2039c62ad0de27f1777b18f",
+  "prompts": {},
+  "sessions": {
+    "s_a3aab638e2255a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14469bb1-d102-4e18-8b8b-5db22585795e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
