@@ -49,8 +49,15 @@ _COEDIT_BUMP_JQ='
           then map(if .k == $k and .o == $o then .n += 1 else . end)
           else . + [{k: $k, o: $o, n: 1}] end
       else . end
-    # Cap: keep the highest counts, whole pairs at a time.
+    # Cap: keep the highest counts, whole pairs at a time, within both the
+    # pair cap and a byte budget (80% of COEDIT_MAX_BYTES; each undirected
+    # pair costs about 2 * (both path lengths) + 24 bytes written), so the
+    # writer never produces a file the size check would set aside.
     | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
+    | reduce .[] as $e ({acc: [], used: 0};
+        (2 * (($e.k | length) + ($e.o | length)) + 24) as $c
+        | if .used + $c <= ($maxbytes * 0.8) then .acc += [$e] | .used += $c else . end)
+    | .acc
     | {version: 1,
        pairs: (reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n | .[$e.o][$e.k] = $e.n))}
 '
@@ -225,15 +232,15 @@ coedit_bump() {
   # rewrites: a malformed store is set aside; a timeout skips the increment.
   local out rc=0
   if [ -n "$cur" ]; then
-    out=$(coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" "$_COEDIT_BUMP_JQ" "$cur" 2>/dev/null) || rc=$?
+    out=$(coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" "$cur" 2>/dev/null) || rc=$?
   else
-    out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" "$_COEDIT_BUMP_JQ" 2>/dev/null) || rc=$?
+    out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || rc=$?
   fi
   # jq exits 2 on unparseable input, 3 on our validation failure, 5 on a
   # runtime type error: all malformed. 124/137/143 are the time bound.
   if [ "$rc" -eq 2 ] || [ "$rc" -eq 3 ] || [ "$rc" -eq 5 ]; then
     mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
-    out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" "$_COEDIT_BUMP_JQ" 2>/dev/null) || return 0
+    out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || return 0
   elif [ "$rc" -ne 0 ]; then
     return 0
   fi

@@ -411,12 +411,13 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
 }
 
 @test "an oversized coedit.json is set aside unparsed" {
-  jq -n '{version:1, pairs:{"src/x.ts":{"src/y.ts":3}, "src/y.ts":{"src/x.ts":3}}}' > "$COEDIT"
+  jq -n '{version:1, pairs:([range(0;20)] | map({key:"src/x\(.).ts", value:{"src/y.ts":3}}) | from_entries)}' > "$COEDIT"
+  [ "$(wc -c < "$COEDIT")" -gt 200 ]
   edit o1 "$PROJECT_ROOT/src/a.ts"
-  COEDIT_MAX_BYTES=10 edit o1 "$PROJECT_ROOT/src/b.ts"
+  COEDIT_MAX_BYTES=200 edit o1 "$PROJECT_ROOT/src/b.ts"
   ls -d "$RUVECTOR_DIR"/coedit.json.corrupt-* >/dev/null
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
-  [ "$(pair src/x.ts src/y.ts)" -eq 0 ]
+  [ "$(pair src/x0.ts src/y.ts)" -eq 0 ]
 }
 
 @test "one-sided or mismatched pairs are rebuilt symmetric on the next write" {
@@ -486,4 +487,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   COEDIT_JQ_SECS=0.01 edit t1 "$PROJECT_ROOT/src/b.ts"
   [ "$(cksum < "$COEDIT")" = "$before" ]
   ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
+}
+
+@test "the writer keeps coedit.json under the byte cap, so a store it wrote is never set aside" {
+  long=$(printf 'p%.0s' $(seq 1 400))
+  jq -n --arg l "$long" '{version:1, pairs:([range(0;200)] | map({key:"src/\($l)\(.).ts", value:{"src/x.ts": 3}}) | from_entries)}' > "$COEDIT"
+  edit c1 "$PROJECT_ROOT/src/a.ts"
+  COEDIT_MAX_BYTES=40000 edit c1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(wc -c < "$COEDIT")" -le 40000 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  COEDIT_MAX_BYTES=40000 edit c1 "$PROJECT_ROOT/src/c.ts"
+  ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
+  [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
 }
