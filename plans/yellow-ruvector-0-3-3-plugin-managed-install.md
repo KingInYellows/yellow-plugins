@@ -428,8 +428,9 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
 - [ ] 1.5d: Update `agents/ruvector/memory-manager.md:95`,
       `skills/memory-query/SKILL.md:114` (no `CLAUDE_PLUGIN_DATA` paths in skill
       prose), `README.md`, `CLAUDE.md` (MCP Server, Hooks, Known Limitations,
-      Maintenance, Testing), and `docs/security.md` (15, 22-23, 140-142, 209,
-      462).
+      Maintenance, Testing), `docs/security.md` (15, 22-23, 140-142, 209,
+      462), and the root `README.md` rows for yellow-ruvector (setup text and
+      the command/hook counts, updated again in PR 2 and PR 3).
 - [ ] 1.5e: Update `plugins/yellow-core/commands/setup/all.md`:
   - replace the line 63 probe and the READY rule at 435-439 with a DATA
     `current` + lockfile check, modeled on morph's block at 441-461;
@@ -581,9 +582,13 @@ Adding a changeset for yellow-core is part of this task.
   - Update the header comment and the `hook-json.sh:27-28` comment.
 - [ ] 3.2: New command `commands/ruvector/related.md`
       (`/ruvector:related <file>`):
-  - validate the argument through `lib/validate.sh`;
+  - validate the argument locally with `coedit_normalize` (the same
+    root-containment check the hooks use), so the command does not depend on
+    yellow-core's `validate-fs.sh`;
   - normalize it to a root-relative path;
-  - print the top 10 partners with counts from `coedit.json`;
+  - print the top 10 partners with counts from `coedit.json`, each
+    re-validated, between reference-only fence lines (partner names are
+    project data);
   - handle a missing file ("no co-edit history yet").
 
 <!-- deepen-plan: external -->
