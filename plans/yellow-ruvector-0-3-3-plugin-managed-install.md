@@ -430,10 +430,16 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     entry whose command runs `ruvector hooks
     post-edit|post-command|pre-edit|pre-command|session-start|session-end`
     and, with `--apply`, removes only those (dropping emptied matcher groups
-    and events) after a `<file>.bak-<epoch>` backup, writing in place so a
-    symlinked settings file stays a symlink. Setup lists the entries and asks
-    before applying; on "keep" it prints the manual removal steps. Status
-    flags them and points to setup.
+    and events). It validates paths the way `repair-cursor-pretooluse.sh`
+    does: only `$HOME/.claude/settings.json` and the project's
+    `.claude/settings.json` are accepted; the project file (which arrives
+    with a clone) must resolve to the real `.claude/settings.json` inside the
+    resolved project root, so a symlinked file or `.claude` directory is
+    refused; a symlinked user file is followed to its regular-file target
+    and rewritten in place. The backup is a new `mktemp` file next to the
+    target, never a fixed name a checkout could pre-plant as a symlink.
+    Setup lists the entries and asks before applying; on "keep" it prints
+    the manual removal steps. Status flags them and points to setup.
 - [ ] 1.5b: Update `commands/ruvector/status.md`:
   - Step 1: install dir, version, lockfile sync, Node version;
   - Step 6 (line 155): the dry-run uses the resolved binary instead of `npx`.
@@ -585,6 +591,15 @@ Adding a changeset for yellow-core is part of this task.
        increment is skipped, which leaves half the 1 s PostToolUse timeout
        for normalization, the jq update and the allow JSON. Test that N concurrent sessions yield a count
        of N, not just valid JSON.
+       A hook killed while holding a lock (the 1 s timeout) must not
+       disable recording: a lock older than a minute is stale and is
+       reclaimed once per lock generation (the reclaimer first creates
+       `<lock>.reclaim.<inode>` with mkdir and re-checks the inode and age,
+       so two waiters never both act and a fresh replacement lock is never
+       deleted; markers are pruned after 10 minutes). The session file has
+       its own per-session lock, so a busy store lock loses only that
+       increment, never the session's latest edit. Cover an abandoned lock,
+       an already-claimed generation, and store-lock contention in bats.
     3. Rewrite the session file atomically.
   - Cap `coedit.json` at 5 000 pairs, evicting the lowest counts.
   - Prune session files older than 7 days on SessionStart.
