@@ -1,0 +1,21 @@
+plugins/yellow-research/CLAUDE.md
+  s_37c0875242a535::t_25031fe26989b9 73-74
+plugins/yellow-research/commands/research/setup.md
+  s_37c0875242a535::t_7fd19f45b38592 732-733
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "539fb3807020779c449fc3c6cbfa1145e661ab75",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
