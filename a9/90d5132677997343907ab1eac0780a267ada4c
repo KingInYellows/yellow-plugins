@@ -1,0 +1,21 @@
+scratch/review-ledger-6-5/README.md
+  s_a3aab638e2255a::t_8e49475b93ed7a 1-12
+scratch/review-ledger-6-5/summarize-log.sh
+  s_a3aab638e2255a::t_0d383815696326 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a990d5132677997343907ab1eac0780a267ada4c",
+  "prompts": {},
+  "sessions": {
+    "s_a3aab638e2255a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14469bb1-d102-4e18-8b8b-5db22585795e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
