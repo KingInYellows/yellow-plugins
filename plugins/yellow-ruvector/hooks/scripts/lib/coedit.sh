@@ -67,6 +67,25 @@ coedit_normalize() {
   printf '%s' "$rel"
 }
 
+# coedit_store_dir <root> — print the physical store dir for <root>, or fail.
+# The store is <root>/.ruvector, or, in a linked worktree, the main
+# worktree's .ruvector that ruvector_heal_store links to. Anything else (a
+# checkout shipping .ruvector as a symlink to elsewhere) is refused, so the
+# hooks never write to or prune files outside the project's store.
+coedit_store_dir() {
+  local root="${1:-}" phys rroot common main
+  [ -n "$root" ] && [ -d "${root}/.ruvector" ] || return 1
+  phys=$(CDPATH= cd -- "${root}/.ruvector" 2>/dev/null && pwd -P) || return 1
+  rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 1
+  if [ "$phys" != "${rroot}/.ruvector" ]; then
+    [ -f "${root}/.git" ] || return 1
+    common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+    main=$(CDPATH= cd -- "$(dirname -- "$common")" 2>/dev/null && pwd -P) || return 1
+    [ "$phys" = "${main}/.ruvector" ] || return 1
+  fi
+  printf '%s' "$phys"
+}
+
 # coedit_write_atomic <file> — write stdin to <file> via a same-dir temp file
 # and rename, so a concurrent reader sees the old or the new file, never a
 # torn one.
@@ -125,10 +144,9 @@ coedit_bump() {
 # pair. Needs <root>/.ruvector to exist (the project opted in).
 coedit_record() {
   local root="$1" sid rel dir sdir sfile now last="" epoch=0 state
-  [ -d "${root}/.ruvector" ] || return 0
+  dir=$(coedit_store_dir "$root") || return 0
   sid=$(coedit_sanitize_session "${2:-}") || return 0
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
-  dir="${root}/.ruvector"
   sdir="${dir}/coedit-sessions"
   # A symlinked session dir (from a hostile checkout) could point anywhere.
   [ -L "$sdir" ] && return 0
@@ -151,9 +169,12 @@ coedit_record() {
 }
 
 # coedit_prune_sessions <root> — delete session files untouched for 7+ days.
-# Never follows a symlinked session dir: it could point at unrelated files.
+# Never follows a symlinked store or session dir: it could point at
+# unrelated files.
 coedit_prune_sessions() {
-  local sdir="${1:-}/.ruvector/coedit-sessions"
+  local store sdir
+  store=$(coedit_store_dir "${1:-}") || return 0
+  sdir="${store}/coedit-sessions"
   [ -d "$sdir" ] && [ ! -L "$sdir" ] || return 0
   find "$sdir" -mindepth 1 -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null
   return 0
