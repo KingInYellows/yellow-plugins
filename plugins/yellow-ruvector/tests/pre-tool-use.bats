@@ -164,3 +164,12 @@ assert_allow_json() {
   [ "$(ls -A "$victim")" = "$before" ]
   rm -rf "$victim"
 }
+
+@test "a symlinked coedit.json is never read for suggestions" {
+  other="$(mktemp -d)"
+  mv "$RUVECTOR_DIR/coedit.json" "$other/coedit.json"
+  ln -s "$other/coedit.json" "$RUVECTOR_DIR/coedit.json"
+  out=$(run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")")
+  [ -z "$(ctx "$out")" ]
+  rm -rf "$other"
+}

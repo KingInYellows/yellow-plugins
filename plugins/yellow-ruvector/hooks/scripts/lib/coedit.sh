@@ -199,7 +199,7 @@ coedit_partners() {
   local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store f count partner norm n=0
   store=$(coedit_store_dir "$root") || return 0
   f="${store}/coedit.json"
-  [ -f "$f" ] || return 0
+  [ -f "$f" ] && [ ! -L "$f" ] || return 0
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     norm=$(coedit_normalize "$root" "$partner") || continue
@@ -228,6 +228,7 @@ coedit_suggest_once() {
   sid=$(coedit_sanitize_session "${2:-}") || return 0
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
   sfile="${store}/coedit-sessions/${sid}"
+  [ -L "$sfile" ] && return 0
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     return 0
   fi
