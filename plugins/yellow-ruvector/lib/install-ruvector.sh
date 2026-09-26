@@ -175,11 +175,12 @@ yellow_ruvector_entry() {
 # yellow_ruvector_install_healthy — this version's install actually runs
 # (`cli.js --version`, bounded): a tree that lost or corrupted a dependency
 # while bin/cli.js survived is not healthy and gets reinstalled.
+# $1 = seconds to allow (default 10; ~70 ms when healthy).
 yellow_ruvector_install_healthy() {
   local entry
   entry=$(yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
-  yellow_ruvector_run_bounded 10 node "$entry" --version >/dev/null 2>&1
+  yellow_ruvector_run_bounded "${1:-10}" node "$entry" --version >/dev/null 2>&1
 }
 
 # Returns 0 when an install is needed: no entry, or `current` does not point
