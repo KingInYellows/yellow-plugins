@@ -365,7 +365,12 @@ coedit_prune_sessions() {
   # of $sdir, regular files older than 7 days.
   # Detached and time-bounded: a huge or slow session dir must never delay
   # the SessionStart response (the hook prints its JSON without waiting).
-  ( run_budgeted 5 find "$sdir/." ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + ) \
+  # The worker first enters the dir and checks it is physically the
+  # validated session dir ($sdir is built from the physical store path);
+  # from then on `find .` works on that directory itself, so a symlink
+  # swapped in afterwards cannot redirect the deletes.
+  ( CDPATH= cd -P -- "$sdir" 2>/dev/null && [ "$(pwd -P)" = "$sdir" ] \
+      && run_budgeted 5 find . ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

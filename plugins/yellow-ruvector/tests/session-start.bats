@@ -553,6 +553,24 @@ exit 0'
   [ $(( (end - start) / 1000000 )) -lt 2500 ]
 }
 
+@test "a session dir swapped for a symlink before the worker starts is not pruned through" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/victim"
+  echo x > "$BATS_TEST_TMPDIR/victim/old"
+  touch -d '10 days ago' "$BATS_TEST_TMPDIR/victim/old" 2>/dev/null || skip "touch -d unsupported"
+  # A find that first swaps the validated dir for a symlink, then runs: the
+  # worker already sits inside the original directory.
+  mkdir -p "$BATS_TEST_TMPDIR/swapbin"
+  printf '#!/bin/sh\nrm -rf "%s" && ln -s "%s" "%s"\nexec "%s" "$@"\n' \
+    "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/victim" "$RUVECTOR_DIR/coedit-sessions" \
+    "$(command -v find)" > "$BATS_TEST_TMPDIR/swapbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/swapbin/find"
+  PATH="$BATS_TEST_TMPDIR/swapbin:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ -e "$BATS_TEST_TMPDIR/victim/old" ]
+}
+
 @test "never prunes through a symlinked co-edit session dir" {
   make_ruvector_stub 'exit 0'
   victim="$BATS_TEST_TMPDIR/victim"
