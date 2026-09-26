@@ -138,7 +138,7 @@ yellow_ruvector_needs_install() {
 yellow_ruvector_acquire_install_lock() {
   local max_attempts="${1:-20}"
   local lock_dir="${RUVECTOR_DATA}/.install.lock"
-  local stale_recovered=0 i owner_pid
+  local stale_recovered=0 i owner_pid prev_invalid="unset"
 
   mkdir -p "$RUVECTOR_DATA" 2>/dev/null || return 1
   for ((i=1; i<=max_attempts; i++)); do
@@ -150,24 +150,45 @@ yellow_ruvector_acquire_install_lock() {
       owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
       case "$owner_pid" in
         '' | *[!0-9]* | 0)
-          printf 'yellow-ruvector: lock pid file invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
-          rm -f "${lock_dir}/pid" 2>/dev/null
-          rmdir "$lock_dir" 2>/dev/null
-          stale_recovered=1
-          continue
+          # A new owner writes its pid just after mkdir, so an invalid pid is
+          # only stale when it is still the same on the next attempt.
+          if [ "$owner_pid" = "$prev_invalid" ]; then
+            printf 'yellow-ruvector: lock pid file invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
+            yellow_ruvector_reclaim_lock "$owner_pid"
+            stale_recovered=1
+            continue
+          fi
+          prev_invalid="$owner_pid"
+          ;;
+        *)
+          if ! kill -0 "$owner_pid" 2>/dev/null; then
+            printf 'yellow-ruvector: stale lock owner PID %s no longer running; clearing\n' "$owner_pid" >&2
+            yellow_ruvector_reclaim_lock "$owner_pid"
+            stale_recovered=1
+            continue
+          fi
           ;;
       esac
-      if ! kill -0 "$owner_pid" 2>/dev/null; then
-        printf 'yellow-ruvector: stale lock owner PID %s no longer running; clearing\n' "$owner_pid" >&2
-        rm -f "${lock_dir}/pid" 2>/dev/null
-        rmdir "$lock_dir" 2>/dev/null
-        stale_recovered=1
-        continue
-      fi
     fi
     sleep 1
   done
   return 1
+}
+
+# yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
+# if it still carries the pid judged stale. The lock is renamed first (atomic)
+# and checked afterwards, so a lock a new owner took in the meantime is put
+# back instead of deleted.
+yellow_ruvector_reclaim_lock() {
+  local lock_dir="${RUVECTOR_DATA}/.install.lock" grave
+  grave="${lock_dir}.stale.$$.${RANDOM}"
+  mv -- "$lock_dir" "$grave" 2>/dev/null || return 0
+  if [ "$(cat "${grave}/pid" 2>/dev/null)" = "${1:-}" ]; then
+    rm -rf -- "$grave" 2>/dev/null
+  else
+    mv -- "$grave" "$lock_dir" 2>/dev/null || rm -rf -- "$grave" 2>/dev/null
+  fi
+  return 0
 }
 
 # Idempotent; safe from traps and again before exec.
