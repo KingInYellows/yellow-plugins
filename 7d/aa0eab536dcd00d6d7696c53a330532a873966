@@ -1,0 +1,33 @@
+plugins/yellow-review/CLAUDE.md
+  s_520e182b5f7c63::t_1cefcd7d4e8cba 219-221
+plugins/yellow-review/commands/review/triage.md
+  s_520e182b5f7c63::t_1d3acff6112b3d 3-4,164-170
+plugins/yellow-review/hooks/scripts/session-start.sh
+  s_520e182b5f7c63::t_e93cac65090a31 48-49,104-110,124
+plugins/yellow-review/lib/review-ledger.sh
+  s_520e182b5f7c63::t_a62fe48f28703a 228-232,370,388,393,395,398-399,636-638,640-641,728-730,733-736,1014-1015,1019-1020,1026,1031-1032,1070-1072,1076-1077,1098-1099,1109,1122-1123,1163,1172-1187,1244,1281-1282,1299,1334-1337,1343,1346-1348,1359,1362,1375,1387-1389,1393,1405,1478,1494,1496,1501-1509,1598-1603,1614-1619,1652-1657,1666,1699,1701,1703-1709,1715,1719-1721,1724-1725,1728-1729,1744-1751,1777,1815,1847,1852,1862,1867,1980,2063-2065,2170-2172,2202-2203,2215,2240,2286,2288-2289,2296-2298,2303-2305
+plugins/yellow-review/references/review-pr/ledger.md
+  s_520e182b5f7c63::t_9ffc15b0da7dcb 174-177
+plugins/yellow-review/tests/review-ledger.bats
+  s_520e182b5f7c63::t_1eda3acbc70e47 233-237,1317-1322,1334-1445
+plugins/yellow-review/tests/session-start.bats
+  s_520e182b5f7c63::t_a4571a821dd79b 178-183
+plugins/yellow-review/tests/skill-content.bats
+  s_520e182b5f7c63::t_29770b828a5699 365-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7daa0eab536dcd00d6d7696c53a330532a873966",
+  "prompts": {},
+  "sessions": {
+    "s_520e182b5f7c63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e589187c-6828-4b65-9f66-e2d2b51bdfef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

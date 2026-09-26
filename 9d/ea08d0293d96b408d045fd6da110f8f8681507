@@ -1,0 +1,25 @@
+plugins/yellow-review/commands/review/triage.md
+  s_58268e9f7cfc1b::t_65203736949172 96-101
+plugins/yellow-review/lib/review-ledger.sh
+  s_58268e9f7cfc1b::t_6bf1499939d779 1162,2025-2030,2048-2054
+plugins/yellow-review/references/review-pr/ledger.md
+  s_58268e9f7cfc1b::t_c40b44ad9bc670 183-189
+plugins/yellow-review/tests/review-ledger.bats
+  s_58268e9f7cfc1b::t_6c437bc445ddf9 976-1001
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9dea08d0293d96b408d045fd6da110f8f8681507",
+  "prompts": {},
+  "sessions": {
+    "s_58268e9f7cfc1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14563f14-9aec-4400-9358-58d0a3e648dc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
