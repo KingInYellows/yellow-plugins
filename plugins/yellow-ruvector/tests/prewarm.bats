@@ -56,3 +56,14 @@ npm_called_within() {
   [ "$status" -eq 0 ]
   npm_called_within 5
 }
+
+@test "with the hash embedder selected, an uncached model is not warmed" {
+  cli 'console.log("0.3.3")'
+  rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
+  RUVECTOR_EMBEDDER=hash run bash "$HOOK" </dev/null
+  [ "$status" -eq 0 ]
+  # The fast path exits without taking the install lock.
+  [ ! -e "$CLAUDE_PLUGIN_DATA/.install.lock" ]
+  RUVECTOR_ONNX=0 run bash "$HOOK" </dev/null
+  [ ! -e "$CLAUDE_PLUGIN_DATA/.install.lock" ]
+}

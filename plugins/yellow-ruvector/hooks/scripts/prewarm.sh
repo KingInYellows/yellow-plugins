@@ -36,10 +36,15 @@ export CLAUDE_PLUGIN_ROOT
 ruvector_node_ok || json_exit "Node.js 20+ not found; ruvector hooks inactive"
 yellow_ruvector_validate_paths || json_exit "path validation failed; skipping prewarm"
 
+# The ONNX model only matters when the env does not select the hash
+# embedder (same rule as the launcher); with hash selected there is nothing
+# to warm and no verification marker would ever be written.
+model_ready() { ruvector_hash_selected || yellow_ruvector_model_cached; }
+
 # Nothing to do when installed, healthy (a 2s --version probe inside the 5s
-# hook), and the model is cached.
+# hook), and the model is ready.
 if ! yellow_ruvector_needs_install && yellow_ruvector_install_healthy 2 \
-   && yellow_ruvector_model_cached; then
+   && model_ready; then
   json_exit
 fi
 
@@ -51,7 +56,7 @@ yellow_ruvector_acquire_install_lock 2 \
   if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then
     yellow_ruvector_do_install || exit 0
   fi
-  yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 || true
+  model_ready || yellow_ruvector_warm_model 300 || true
 ) >/dev/null 2>&1 &
 sub_pid=$!
 disown
@@ -60,10 +65,21 @@ disown
 # exiting shell (or nothing) and a waiter would reclaim it mid-install: stop
 # the child and release the lock instead.
 if ! printf '%s' "$sub_pid" > "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null; then
+  # Stop the job and wait (up to ~2s, then KILL) until it and its direct
+  # children are gone before the lock path is released, so nothing the lock
+  # protects can still be running when another installer takes it.
   pkill -TERM -P "$sub_pid" 2>/dev/null
   kill -TERM "$sub_pid" 2>/dev/null
-  rm -f "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null
-  rmdir "${RUVECTOR_DATA}/.install.lock" 2>/dev/null
+  for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    kill -0 "$sub_pid" 2>/dev/null || pgrep -P "$sub_pid" >/dev/null 2>&1 || break
+    sleep 0.1
+  done
+  pkill -KILL -P "$sub_pid" 2>/dev/null
+  kill -KILL "$sub_pid" 2>/dev/null
+  if ! kill -0 "$sub_pid" 2>/dev/null; then
+    rm -f "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null
+    rmdir "${RUVECTOR_DATA}/.install.lock" 2>/dev/null
+  fi
   json_exit "could not hand the install lock to the background job; skipping prewarm"
 fi
 

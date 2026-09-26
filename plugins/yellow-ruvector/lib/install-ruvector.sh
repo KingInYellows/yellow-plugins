@@ -133,8 +133,19 @@ yellow_ruvector_validate_paths() {
         "$RUVECTOR_DATA" >&2
       return 1 ;;
   esac
+  # Claude Code installs plugins under ${CLAUDE_CONFIG_DIR}/plugins/, which a
+  # relocated config dir moves outside HOME: allow that subtree when
+  # CLAUDE_CONFIG_DIR is an absolute, non-system path.
+  local cfg_plugins="/__unset__"
+  case "${CLAUDE_CONFIG_DIR:-}" in
+    /*)
+      if canonical=$(realpath -m -- "$CLAUDE_CONFIG_DIR" 2>/dev/null) \
+           || canonical=$(yellow_ruvector_canon "$CLAUDE_CONFIG_DIR"); then
+        yellow_ruvector_system_dir "$canonical" || cfg_plugins="${canonical%/}/plugins"
+      fi ;;
+  esac
   case "$CLAUDE_PLUGIN_ROOT" in
-    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|/usr/*|/opt/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|/usr/*|/opt/*|"$cfg_plugins"/?*) ;;
     *)
       printf 'yellow-ruvector: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
         "$CLAUDE_PLUGIN_ROOT" >&2
