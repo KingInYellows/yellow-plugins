@@ -964,6 +964,20 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
     "graphite"
   ],
   "outputStyles": "./output-styles",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
   "dependencies": [
     {
       "name": "yellow-core",

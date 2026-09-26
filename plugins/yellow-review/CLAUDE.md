@@ -201,6 +201,22 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   commands read it, so keep them in parity through that file. A ledger
   error never aborts a review — it is reported in Coverage.
 
+### Hooks (1)
+
+- `SessionStart` → `hooks/scripts/session-start.sh` (timeout 3 s, declared in
+  `catalog/plugins/yellow-review.json`, emitted by `pnpm generate:manifests`).
+  Sums the review ledger's `<pr>.pending` sidecars for PRs whose
+  `<pr>.state` is OPEN and under 7 days old. It names the other PRs as
+  unverified, folds a sidecar whose byte count no longer matches (1.5 s total
+  budget), and reports a PR as "pending unknown" when its lock is busy. It
+  prints `systemMessage` plus a factual `additionalContext` only when
+  something is pending, needs attention, or is unverified or unknown. Each
+  category names at most 10 PRs, then `+N more`; past its 2.3 s deadline
+  the hook only counts the remaining ledgers as unknown (no per-file clock
+  reads, locks or folds).
+  Integers and PR numbers only; never ledger text. Always
+  `{"continue": true}`, no `set -e`.
+
 ## When to Use What
 
 - **`/review:setup`** — First install, after auth issues, or when review
@@ -306,7 +322,9 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 `targets.codex.enabled: true` and `targets.cursor.enabled: true` in
 `catalog/plugins/yellow-review.json`, each with a `skillAllowlist` of exactly
 one entry: `yellow-thermonuclear-review`. Every command, agent, and other skill
-in this plugin stays Claude-only, and the plugin ships no hooks. See
+in this plugin stays Claude-only, including the SessionStart hook
+(`targets.codex.includeHooks: false`; the generator has no Cursor hook path).
+See
 [`docs/codex-distribution.md`](../../docs/codex-distribution.md) and
 [`docs/cursor-distribution.md`](../../docs/cursor-distribution.md).
 
@@ -330,7 +348,8 @@ explicit-invocation wording live in the skill body and description.
 invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
-absent), and `skill-content.bats`.
+absent), `session-start.bats` (the hook's counts, orphan and stale-state
+handling, fold fallback, held-lock and 5 MB budget), and `skill-content.bats`.
 
 ## Known Limitations
 
