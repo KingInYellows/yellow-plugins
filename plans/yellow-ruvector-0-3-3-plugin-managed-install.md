@@ -184,7 +184,10 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 >   target of `current`.
 > - Morph passes no proxy or CA variables and doesn't use `--ignore-scripts`
 >   (`:172-182`).
-> - BSD `realpath` lacks `-m`. Reuse morph's capability probe (`:38-72`).
+> - BSD `realpath` lacks `-m`. Morph's capability probe (`:38-72`) leaves
+>   the raw path in place there, so fail closed instead: canonicalize
+>   portably (`cd -P` on the longest existing ancestor) and refuse `.`/`..`
+>   components.
 
 <!-- /deepen-plan -->
 
@@ -545,9 +548,12 @@ Adding a changeset for yellow-core is part of this task.
     `docs/solutions/`.
   - `coedit_record`:
     1. Read `coedit-sessions/<session_id>` (last path and epoch).
-    2. If the path differs and the edit is within 60 s, increment the symmetric
-       pair in `coedit.json` under a non-blocking mkdir lock, using jq with a
-       temp file and `mv`. Skip on contention.
+    2. If the path differs and the edit is within 0–60 s, increment the
+       symmetric pair in `coedit.json` under a mkdir lock, using jq with a
+       temp file and `mv`. Wait up to ~1 s (20 × 50 ms) for the lock so
+       concurrent sessions queue rather than drop increments; only past that
+       is an increment skipped. Test that N concurrent sessions yield a count
+       of N, not just valid JSON.
     3. Rewrite the session file atomically.
   - Cap `coedit.json` at 5 000 pairs, evicting the lowest counts.
   - Prune session files older than 7 days on SessionStart.
@@ -573,7 +579,9 @@ Adding a changeset for yellow-core is part of this task.
 - [ ] 2.6: Measure noise before and after (memories added per 10 edits plus 10
       commands on a fresh store) and put it in the PR body.
 - [ ] 2.7: `CLAUDE.md` / `README.md`: update the hooks section and the component
-      counts.
+      counts. Update `docs/security.md` in this PR too (the hook-event table
+      and the post-tool-use/stop rows), since PR 2 is what removes Stop and
+      PostToolUseFailure and changes PostToolUse to co-edit writes.
 
 ### PR 3 — Co-edit surfacing (minor)
 
@@ -609,8 +617,12 @@ Adding a changeset for yellow-core is part of this task.
 >
 > - Add task 3.0: verify on the current Claude Code with a throwaway hook.
 > - If it is not shown, emit the note from PostToolUse (after the edit, "files
->   usually edited with X"). The timing is arguably as useful, and the rest of
->   PR 3 is unchanged.
+>   usually edited with X"). The timing is arguably as useful. Then retarget
+>   3.1 to `post-tool-use.sh` and move 3.4's suggestion, fencing and
+>   once-per-session assertions into `post-tool-use.bats`.
+>
+> Outcome: the current hooks reference documents PreToolUse
+> `additionalContext` as shown to Claude, so PR 3 shipped on PreToolUse.
 
 <!-- /deepen-plan -->
 
