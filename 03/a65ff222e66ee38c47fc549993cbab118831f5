@@ -1,0 +1,44 @@
+plugins/yellow-composio/commands/composio/setup.md
+  s_37c0875242a535::t_de091a3c7189c6 56-59
+  s_37c0875242a535::t_91b5ecb4b0e923 62-63,66-82,84-97,100-105
+  s_37c0875242a535::t_dfd29483c74d2c 260-266
+  s_cde573e8b7efda::t_49469de45f7a3d 64
+plugins/yellow-core/commands/setup/all.md
+  s_37c0875242a535::t_ad0bab604f86f6 640-642
+plugins/yellow-composio/commands/composio/status.md
+  s_37c0875242a535::t_16b8064ce834e0 141-145
+.changeset/composio-wsl-no-browser-login.md
+  s_37c0875242a535::t_42d4c6f106844a 1-14
+plans/mcp-auth-fixes-astgrep-composio-ceramic.md
+  s_37c0875242a535::t_a2941f315755b8 126,132-134,149,173,180,186,194,205
+plugins/yellow-composio/CLAUDE.md
+  s_37c0875242a535::t_d5d12fe2b69287 15-19
+plugins/yellow-composio/README.md
+  s_37c0875242a535::t_517d5f5ab2fcfc 19-27,103-104
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_37c0875242a535::t_0da563e027a0dc 34-36,292-293
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "03a65ff222e66ee38c47fc549993cbab118831f5",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_cde573e8b7efda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c802e626-0714-4643-af4d-3a3809c6112c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
