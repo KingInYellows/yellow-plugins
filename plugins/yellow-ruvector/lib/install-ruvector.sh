@@ -47,6 +47,17 @@ yellow_ruvector_canon() {
   printf '%s%s' "${head%/}" "$tail"
 }
 
+# yellow_ruvector_system_dir <canonical-path> — true for an empty path, a
+# path with . or .. components, or a system directory (or anything below
+# one) that a data dir must never live in.
+yellow_ruvector_system_dir() {
+  case "/${1:-}/" in */../*|*/./*) return 0 ;; esac
+  case "${1:-}" in
+    ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) return 0 ;;
+  esac
+  return 1
+}
+
 # Validate CLAUDE_PLUGIN_ROOT and the data dir. Canonicalizes both (GNU
 # `realpath -m`, else yellow_ruvector_canon, so a symlinked ancestor cannot
 # point outside the allowed prefixes) and rejects unexpected prefixes so
@@ -95,19 +106,30 @@ yellow_ruvector_validate_paths() {
       /*)
         if canonical=$(realpath -m -- "$XDG_DATA_HOME" 2>/dev/null) \
              || canonical=$(yellow_ruvector_canon "$XDG_DATA_HOME"); then
-          case "/${canonical}/" in */../*|*/./*) canonical="" ;; esac
-          case "$canonical" in
-            ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) ;;
-            *) xdg_dir="${canonical%/}/yellow-ruvector" ;;
-          esac
+          yellow_ruvector_system_dir "$canonical" || xdg_dir="${canonical%/}/yellow-ruvector"
+        fi ;;
+    esac
+  fi
+
+  # Claude Code puts CLAUDE_PLUGIN_DATA under its config dir
+  # (${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/data/<id>), which a relocated
+  # config dir moves outside HOME: allow <canonical CLAUDE_CONFIG_DIR>/plugins/data/*
+  # when CLAUDE_CONFIG_DIR is an absolute, non-system path.
+  local cfg_data="/__unset__"
+  if [ "${RUVECTOR_DATA_FALLBACK:-0}" = 0 ]; then
+    case "${CLAUDE_CONFIG_DIR:-}" in
+      /*)
+        if canonical=$(realpath -m -- "$CLAUDE_CONFIG_DIR" 2>/dev/null) \
+             || canonical=$(yellow_ruvector_canon "$CLAUDE_CONFIG_DIR"); then
+          yellow_ruvector_system_dir "$canonical" || cfg_data="${canonical%/}/plugins/data"
         fi ;;
     esac
   fi
 
   case "$RUVECTOR_DATA" in
-    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|"$xdg_dir") ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|"$xdg_dir"|"$cfg_data"/?*) ;;
     *)
-      printf 'yellow-ruvector: refusing — data dir outside HOME/tmp (or a system XDG_DATA_HOME): %s\n' \
+      printf 'yellow-ruvector: refusing — data dir outside HOME/tmp (and not under a non-system XDG_DATA_HOME or CLAUDE_CONFIG_DIR/plugins/data): %s\n' \
         "$RUVECTOR_DATA" >&2
       return 1 ;;
   esac

@@ -471,7 +471,8 @@ env -i HOME=… PATH=… [proxy/CA/npm_config_* passthrough] \
 so API keys and tokens never reach npm (only proxy, CA, and `npm_config_*`
 settings pass through), a data-dir prefix check (HOME or /tmp, or exactly
 `<XDG_DATA_HOME>/yellow-ruvector` for a user-set, non-system absolute
-`XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset), one
+`XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset, or a host-provided
+`CLAUDE_PLUGIN_DATA` under a non-system `<CLAUDE_CONFIG_DIR>/plugins/data/`), one
 install dir per lockfile hash with an atomic `current` symlink, and a
 `ruvector mcp start --help` smoke test before the swap. The MCP server and all
 hooks run this one install, so there is no second (global or npx) copy to
