@@ -450,6 +450,22 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
 }
 
+@test "hundreds of stale reclaim markers never push the hook past its budget" {
+  edit k1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  for i in $(seq 1 500); do
+    mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.$i-$i/keep"
+    touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.reclaim.$i-$i"
+  done
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event k1 Edit "$PROJECT_ROOT/src/b.ts")"
+  end=$(date +%s%N)
+  printf '%s' "$output" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
