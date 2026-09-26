@@ -32,10 +32,25 @@ yellow_ruvector_data_dir() {
   export RUVECTOR_DATA RUVECTOR_DATA_FALLBACK
 }
 
-# Validate CLAUDE_PLUGIN_ROOT and the data dir. Canonicalizes both (when
-# `realpath -m` is available — BSD realpath lacks -m, so this is a
-# capability test, fail-open as in yellow-morph) and rejects unexpected
-# prefixes so cp / npm ci / rm -rf can never target /etc, /var, etc.
+# yellow_ruvector_canon <abs-path> — portable stand-in for `realpath -m`
+# (BSD/macOS lack -m): resolve symlinks in the longest existing ancestor with
+# `cd -P`, then append the components that do not exist yet.
+yellow_ruvector_canon() {
+  local head="$1" tail=""
+  case "$head" in /*) ;; *) return 1 ;; esac
+  while [ ! -d "$head" ]; do
+    tail="/${head##*/}${tail}"
+    head="${head%/*}"
+    [ -n "$head" ] || head="/"
+  done
+  head=$(CDPATH= cd -P -- "$head" 2>/dev/null && pwd -P) || return 1
+  printf '%s%s' "${head%/}" "$tail"
+}
+
+# Validate CLAUDE_PLUGIN_ROOT and the data dir. Canonicalizes both (GNU
+# `realpath -m`, else yellow_ruvector_canon, so a symlinked ancestor cannot
+# point outside the allowed prefixes) and rejects unexpected prefixes so
+# cp / npm ci / rm -rf can never target /etc, /var, etc.
 yellow_ruvector_validate_paths() {
   if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
     printf 'yellow-ruvector: CLAUDE_PLUGIN_ROOT unset\n' >&2
@@ -44,10 +59,12 @@ yellow_ruvector_validate_paths() {
   yellow_ruvector_data_dir
 
   local canonical
-  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null); then
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null) \
+     || canonical=$(yellow_ruvector_canon "$CLAUDE_PLUGIN_ROOT"); then
     CLAUDE_PLUGIN_ROOT="$canonical"
   fi
-  if canonical=$(realpath -m -- "$RUVECTOR_DATA" 2>/dev/null); then
+  if canonical=$(realpath -m -- "$RUVECTOR_DATA" 2>/dev/null) \
+     || canonical=$(yellow_ruvector_canon "$RUVECTOR_DATA"); then
     RUVECTOR_DATA="$canonical"
   fi
   export CLAUDE_PLUGIN_ROOT RUVECTOR_DATA
@@ -64,7 +81,8 @@ yellow_ruvector_validate_paths() {
   done
 
   local home_canonical="${HOME:-/__unset__}"
-  if [ -n "${HOME:-}" ] && canonical=$(realpath -m -- "$HOME" 2>/dev/null); then
+  if [ -n "${HOME:-}" ] && { canonical=$(realpath -m -- "$HOME" 2>/dev/null) \
+       || canonical=$(yellow_ruvector_canon "$HOME"); }; then
     home_canonical="$canonical"
   fi
 
