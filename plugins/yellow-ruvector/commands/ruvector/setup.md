@@ -87,7 +87,7 @@ if ! yellow_ruvector_acquire_install_lock 60; then
   exit 1
 fi
 trap 'yellow_ruvector_release_install_lock' EXIT
-if yellow_ruvector_needs_install; then
+if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then
   yellow_ruvector_do_install || { printf 'FAILED: install failed (see output above)\n'; exit 1; }
 fi
 yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \

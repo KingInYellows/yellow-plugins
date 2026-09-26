@@ -48,7 +48,8 @@ budget_left() { echo $(( wait_secs - (SECONDS - t0) )); }
 # Needed when `current` is not this lockfile's install, or when this
 # version's install-<hash> is gone (another plugin version's prune removed it).
 needs_install() {
-  yellow_ruvector_needs_install || [ ! -f "$(yellow_ruvector_pinned_entry)" ]
+  yellow_ruvector_needs_install || [ ! -f "$(yellow_ruvector_pinned_entry)" ] \
+    || ! yellow_ruvector_install_healthy
 }
 # ensure_pinned_install — set `entry` to this plugin version's install-<hash>
 # CLI, installing or restoring it under the lock. Never `current` or another
