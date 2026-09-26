@@ -305,3 +305,57 @@ assert_head_ref_checkout() {
   grep -q 'exactly as `review-pr.md`' "$REVIEW_ALL"
   grep -qF '# Graphite; GitHub: git checkout "$head_ref"' "$REVIEW_ALL"
 }
+
+# --- sweep integration (Stage 5) --------------------------------------------
+
+SWEEP="$COMMANDS_DIR/sweep.md"
+SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
+
+@test "sweep: unattended triage runs after resolve and before the summary, skipped when not open" {
+  resolve=$(grep -n '^### Step 3: Run /review:resolve' "$SWEEP" | cut -d: -f1)
+  triage=$(grep -n '^### Step 3b: Reconcile the review-findings ledger' "$SWEEP" | cut -d: -f1)
+  summary=$(grep -n '^### Step 4: Final summary' "$SWEEP" | cut -d: -f1)
+  [ "$resolve" -lt "$triage" ] && [ "$triage" -lt "$summary" ]
+  grep -q '`<PR#> --non-interactive`' "$SWEEP"
+  grep -q 'skill: "review:triage"' "$SWEEP"
+  grep -q 'longer `OPEN`, skip this step' "$SWEEP"
+  grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
+}
+
+@test "sweep-all: the empty-list exit always prints and stops; only the prune prompt is conditional" {
+  block=$(awk '/^\*\*Empty-list early exit\.\*\*/ { p = 1 } /^### Step 3: Upfront confirmation gate/ { p = 0 } p' "$SWEEP_ALL" | tr -s ' \n' ' ')
+  grep -qF 'If the resulting array is empty (`[]` or length 0), run both steps below in order, then stop:' <<<"$block"
+  grep -qF 'Prune prompt — only when the prune list is non-empty.** With an empty prune list or `skip`, go straight to step 2.' <<<"$block"
+  grep -qF 'Always, whatever step 1 did:** print' <<<"$block"
+  grep -qF '[review:sweep-all] No open non-draft PRs found. Nothing to sweep.' <<<"$block"
+  # the exit is not conjoined with the prune condition
+  ! grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+}
+
+@test "sweep: unattended triage never prunes a PR that closed after the state check" {
+  norm=$(tr -s ' \n' ' ' <"$SWEEP")
+  grep -qF 'never edits, commits, prompts or prunes' <<<"$norm"
+  grep -qF 'reports `Ledger: retained (PR <state>)`' <<<"$norm"
+}
+
+@test "sweep-all: pruning skips on a failed or possibly truncated open-PR query" {
+  grep -q '^### Step 2b: Find ledgers of closed PRs' "$SWEEP_ALL"
+  # deletion only after a confirmation: Step 3b follows the Step 3 gate
+  gate=$(grep -n '^### Step 3: Upfront confirmation gate' "$SWEEP_ALL" | cut -d: -f1)
+  prune=$(grep -n '^### Step 3b: Prune ledgers of closed PRs' "$SWEEP_ALL" | cut -d: -f1)
+  [ "$gate" -lt "$prune" ]
+  grep -q 'Delete the review-findings ledgers of <K> closed or merged PRs' "$SWEEP_ALL"
+  grep -q "gh pr list --state open --limit 1000 --json number) || { printf 'skip" "$SWEEP_ALL"
+  grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
+  grep -q '`--prune <PR#>`' "$SWEEP_ALL"
+  # the prune query covers every author, not the --author @me sweep list
+  ! grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+}
+
+@test "sweep-all: the summary table carries a Residual column from the ledger" {
+  grep -q 'review-ledger.sh" summary --all' "$SWEEP_ALL"
+  grep -q '^| PR# | Title .*| Outcome   | Residual |' "$SWEEP_ALL"
+  grep -q 'emits `"<PR#>": null` for that' "$SWEEP_ALL"
+  grep -q '`?` when its entry is `null` (fold' "$SWEEP_ALL"
+  grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
+}
