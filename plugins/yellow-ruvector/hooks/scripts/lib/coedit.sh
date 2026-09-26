@@ -117,6 +117,10 @@ coedit_bump() {
     return 0
   fi
   cur='{"version":1,"pairs":{}}'
+  # A symlinked store file could import another project's pairs: set it aside.
+  if [ -L "$f" ]; then
+    mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
+  fi
   if [ -f "$f" ]; then
     if jq -e 'type == "object" and (.pairs | type) == "object"
               and all(.pairs[]; type == "object" and all(.[]; type == "number"))' "$f" >/dev/null 2>&1; then
@@ -157,13 +161,13 @@ coedit_record() {
   sfile="${sdir}/${sid}"
   now=$(date +%s)
   state='{}'
-  if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then
+  if [ -f "$sfile" ] && [ ! -L "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then
     state=$(cat "$sfile")
     last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" then .last else "" end')
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
-  if [ -n "$last" ] && [ "$last" != "$rel" ] && [ $((now - epoch)) -le "$COEDIT_WINDOW_SECS" ]; then
+  if [ -n "$last" ] && [ "$last" != "$rel" ] && [ $((now - epoch)) -ge 0 ] && [ $((now - epoch)) -le "$COEDIT_WINDOW_SECS" ]; then
     coedit_bump "$dir" "$last" "$rel"
   fi
   printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \

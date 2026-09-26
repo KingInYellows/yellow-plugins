@@ -270,3 +270,23 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ -z "$(ls -A "$base/repos/.ruvector")" ]
   rm -rf "$base"
 }
+
+@test "a symlinked coedit.json is set aside, never imported" {
+  other="$(mktemp -d)"
+  jq -n '{version:1, pairs:{"elsewhere/x.ts":{"elsewhere/y.ts":9}, "elsewhere/y.ts":{"elsewhere/x.ts":9}}}' > "$other/coedit.json"
+  ln -s "$other/coedit.json" "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ ! -L "$COEDIT" ]
+  [ "$(jq '.pairs | has("elsewhere/x.ts")' "$COEDIT")" = "false" ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(jq '.pairs["elsewhere/x.ts"]["elsewhere/y.ts"]' "$other/coedit.json")" -eq 9 ]
+  rm -rf "$other"
+}
+
+@test "a session timestamp in the future never pairs" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -cn --argjson e "$(( $(date +%s) + 3600 ))" '{last:"src/a.ts", epoch:$e}' > "$RUVECTOR_DIR/coedit-sessions/s1"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+}
