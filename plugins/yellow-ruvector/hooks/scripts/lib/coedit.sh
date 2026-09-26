@@ -362,15 +362,28 @@ coedit_prune_sessions() {
   sdir="${store}/coedit-sessions"
   [ -d "$sdir" ] && [ ! -L "$sdir" ] || return 0
   # POSIX-only primaries (no -mindepth/-maxdepth/-delete): the top level
-  # of $sdir, regular files older than 7 days.
+  # of $sdir, regular session files older than 7 days.
   # Detached and time-bounded: a huge or slow session dir must never delay
   # the SessionStart response (the hook prints its JSON without waiting).
   # The worker first enters the dir and checks it is physically the
   # validated session dir ($sdir is built from the physical store path);
   # from then on `find .` works on that directory itself, so a symlink
   # swapped in afterwards cannot redirect the deletes.
-  ( CDPATH= cd -P -- "$sdir" 2>/dev/null && [ "$(pwd -P)" = "$sdir" ] \
-      && run_budgeted 5 find . ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + ) \
+  # Each candidate is deleted only under its per-session lock (the one
+  # coedit_record holds) after its age is checked again, so a session that
+  # was resumed and rewritten after `find` listed it is never removed.
+  ( CDPATH= cd -P -- "$sdir" 2>/dev/null && [ "$(pwd -P)" = "$sdir" ] || exit 0
+    SECONDS=0
+    run_budgeted 5 find . ! -name . -prune -type f -mtime +7 ! -name '.*' 2>/dev/null \
+      | while IFS= read -r f && [ "$SECONDS" -lt 5 ]; do
+          f="${f#./}"
+          sid=$(coedit_sanitize_session "$f") && [ "$sid" = "$f" ] || continue
+          mkdir ".${sid}.lock" 2>/dev/null || continue
+          if [ -f "$f" ] && [ ! -L "$f" ] && coedit_older_than "$(coedit_mtime "$f")" 604800; then
+            rm -f -- "$f"
+          fi
+          rmdir ".${sid}.lock" 2>/dev/null
+        done ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

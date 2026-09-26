@@ -143,7 +143,9 @@ progress.
   launcher installs synchronously when needed.
 - `session-start.sh` (SessionStart, 6s) — one semantic `hooks recall
   --top-k 5` (4.5s budget; 0.3.3 recall loads the ONNX model, 1.2–2.1s warm)
-  returned as `additionalContext`, plus a jq-only embedder-provenance check:
+  returned as `additionalContext` (skipped until prewarm has verified the
+  ONNX model, so the two never download it concurrently; always run when
+  the env selects hash), plus a jq-only embedder-provenance check:
   a `hash`-stamped store with the default (onnx-minilm) embedder, or a
   stamp-less store that already holds vectors (`ERR_LEGACY_STORE_READONLY`),
   adds one `[ruvector] …` line to `systemMessage`; silent for fresh stores
