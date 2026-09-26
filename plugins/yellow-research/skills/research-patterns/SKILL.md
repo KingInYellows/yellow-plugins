@@ -142,16 +142,6 @@ The **Parallel Task** and **Ceramic** servers use OAuth (no API key
 needed). Claude Code handles authentication automatically — you'll be
 prompted to authorize on first use of each.
 
-`CERAMIC_API_KEY` is the one remaining shell-env var. It is optional and
-powers only the `/research:setup` REST live-probe (the Ceramic MCP uses
-OAuth). Get a REST key at https://platform.ceramic.ai/keys if you want
-that probe to run.
-
-```sh
-# Optional, REST live-probe only
-export CERAMIC_API_KEY="your-key-here"
-```
-
 Power users who want a fully shell-env-driven setup can wrap each MCP in a
 per-MCP launcher script (see `plugins/yellow-morph/bin/start-morph.sh`).
 The plugin no longer reads `*_API_KEY` from shell env directly.
