@@ -79,9 +79,19 @@ for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*
   esac
   _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"; break
 done
-[ -n "$_rv_cli" ] && printf 'ruvector:           OK (plugin-managed %s)\n' "$(node "$_rv_cli" --version 2>/dev/null)" || printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'
+# OK only when the entry actually runs (a missing or corrupt dependency
+# makes --version fail); a broken install counts as not installed so the
+# classification offers /ruvector:setup, which repairs it.
+_rv_ver=""
+if [ -n "$_rv_cli" ]; then
+  if command -v timeout >/dev/null 2>&1; then _rv_ver=$(timeout 10 node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""
+  else _rv_ver=$(node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""; fi
+fi
+if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n' "$_rv_ver"
+elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-managed install broken; /ruvector:setup repairs it)\n'
+else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
 [ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
-unset _rv_cli _rv_d _rv_p _rv_b _rv_home
+unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver
 unset -f _rv_sys _rv_base_ok
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'

@@ -296,19 +296,24 @@ coedit_record() {
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
+  local pair=""
   if [ -n "$last" ] && [ "$last" != "$rel" ] && [ $((now - epoch)) -ge 0 ] && [ $((now - epoch)) -le "$COEDIT_WINDOW_SECS" ]; then
     # The stored path is project data: re-resolve it (symlinks included)
     # exactly as a fresh edit would be before it can enter the store.
     if last=$(coedit_normalize "$root" "$last") && [ "$last" != "$rel" ]; then
-      if coedit_lock_path "${dir}/.coedit.lock"; then
-        coedit_bump "$dir" "$last" "$rel"
-        coedit_unlock_path "${dir}/.coedit.lock"
-      fi
+      pair=1
     fi
   fi
+  # Persist this edit and release the session lock BEFORE waiting on the
+  # store lock, so the session's next edit never queues behind a busy store
+  # and always sees this path as its predecessor.
   printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
     | coedit_write_atomic "$sfile"
   coedit_unlock_path "$slock"
+  if [ -n "$pair" ] && coedit_lock_path "${dir}/.coedit.lock"; then
+    coedit_bump "$dir" "$last" "$rel"
+    coedit_unlock_path "${dir}/.coedit.lock"
+  fi
   return 0
 }
 
