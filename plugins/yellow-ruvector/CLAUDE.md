@@ -195,6 +195,9 @@ progress.
   PreToolUse commands in `~/.claude/settings.json` / project
   `.claude/settings.json` so Cursor gets valid allow JSON. Idempotent;
   does not touch git-ai or PostToolUse entries.
+- `scripts/remove-legacy-hooks.sh` — list (and with `--apply`, remove with
+  a backup) the `ruvector hooks …` entries a past `ruvector hooks init` left
+  in a settings.json; `/ruvector:setup` asks before applying.
 
 ## When to Use What
 
@@ -283,7 +286,8 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
   `docs/solutions/integration-issues/ruvector-hook-writes-poison-provenance-and-coedit.md`
 - MCP cold start adds 300-1500ms on first tool call after session start
 - Hooks registered by a past `ruvector hooks init` in `settings.json` still
-  run the global binary; `/ruvector:setup` and `/ruvector:status` flag them
+  run the global binary; `/ruvector:status` flags them and `/ruvector:setup`
+  lists them and, after asking, removes them (backup kept)
 - A store stamped by the pre-0.2.34 hash embedder refuses every
   `hooks_remember` (ADR-210) while `hooks_recall` keeps answering — the
   write loss is silent. `session-start.sh` and `/ruvector:status` surface
@@ -312,6 +316,7 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 `bats tests/` from the plugin directory — one suite per hook
 (`session-start`, `pre-tool-use`, `post-tool-use` — co-edit recording,
 including a 20-way concurrency check — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
+`remove-legacy-hooks.bats`,
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
 `memory-manager-flush.bats`, and `status-provenance.bats` (extracts the
 provenance bash block from `commands/ruvector/status.md` at run time and

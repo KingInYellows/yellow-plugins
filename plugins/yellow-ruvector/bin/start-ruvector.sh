@@ -38,6 +38,11 @@ yellow_ruvector_validate_paths || exit 1
 
 wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
 case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
+# Everything before the MCP handshake (lock waits, warm-up) shares one
+# budget of wait_secs, kept under Claude Code's MCP startup timeout; only a
+# first `npm ci` can run past it.
+t0=$SECONDS
+budget_left() { echo $(( wait_secs - (SECONDS - t0) )); }
 
 # --- 1. Install ---
 # Needed when `current` is not this lockfile's install, or when this
@@ -45,37 +50,41 @@ case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
 needs_install() {
   yellow_ruvector_needs_install || [ ! -f "$(yellow_ruvector_pinned_entry)" ]
 }
-# Exec this plugin version's install-<hash> path, never `current` or another
+# ensure_pinned_install — set `entry` to this plugin version's install-<hash>
+# CLI, installing or restoring it under the lock. Never `current` or another
 # version's install: the server must match this session's hooks, and prune
 # must see which install it still uses. Two passes: a newer plugin in another
-# session can prune this install between our check and the exec.
-entry=""
-for _pass in 1 2; do
-  if needs_install; then
-    if ! yellow_ruvector_acquire_install_lock "$wait_secs"; then
-      log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
-      log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
-      exit 1
-    fi
-    yellow_ruvector_trap_release
+# session can prune this install between the check and the exec.
+ensure_pinned_install() {
+  local _pass wait
+  entry=""
+  for _pass in 1 2; do
     if needs_install; then
-      log "installing ruvector into ${RUVECTOR_DATA}..."
-      if ! yellow_ruvector_do_install; then
-        log "install failed. Run /ruvector:setup to diagnose."
+      wait=$(budget_left); [ "$wait" -ge 1 ] || wait=1
+      if ! yellow_ruvector_acquire_install_lock "$wait"; then
+        log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
+        log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
         exit 1
       fi
+      yellow_ruvector_trap_release
+      if needs_install; then
+        log "installing ruvector into ${RUVECTOR_DATA}..."
+        if ! yellow_ruvector_do_install; then
+          log "install failed. Run /ruvector:setup to diagnose."
+          exit 1
+        fi
+      fi
+      # An EXIT trap does not fire on exec — release explicitly.
+      yellow_ruvector_release_install_lock
+      trap - EXIT INT TERM
     fi
-    # An EXIT trap does not fire on exec — release explicitly.
-    yellow_ruvector_release_install_lock
-    trap - EXIT INT TERM
-  fi
-  entry=$(yellow_ruvector_pinned_entry) || entry=""
-  [ -f "$entry" ] && break
-done
-if [ ! -f "$entry" ]; then
+    entry=$(yellow_ruvector_pinned_entry) || entry=""
+    [ -f "$entry" ] && return 0
+  done
   log "this plugin version's ruvector install is missing (${entry:-no lockfile hash}). Run /ruvector:setup."
   exit 1
-fi
+}
+ensure_pinned_install
 
 # --- 2. Project root ---
 root=$(ruvector_resolve_root "$PWD")
@@ -92,19 +101,28 @@ if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
 fi
 # An explicitly selected hash embedder (RUVECTOR_EMBEDDER=hash, or
 # RUVECTOR_ONNX=0) needs no model and stamping hash is intended: no guard.
+# "Cached" means a warm-up verified these exact model files (a truncated
+# download is not cached). The warm-up only runs while the startup budget
+# lasts (2s kept for the handshake); otherwise start read-only.
 if [ -z "$stamp" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
-  if yellow_ruvector_acquire_install_lock "$wait_secs"; then
+  left=$(( $(budget_left) - 2 ))
+  if [ "$left" -ge 3 ] && yellow_ruvector_acquire_install_lock "$left"; then
     yellow_ruvector_trap_release
-    yellow_ruvector_model_cached || yellow_ruvector_warm_model 15 || true
+    left=$(( $(budget_left) - 2 ))
+    [ "$left" -le 15 ] || left=15
+    yellow_ruvector_model_cached || { [ "$left" -ge 3 ] && yellow_ruvector_warm_model "$left"; } || true
     yellow_ruvector_release_install_lock
     trap - EXIT INT TERM
   fi
   if ! yellow_ruvector_model_cached; then
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_remember|hooks_pretrain' | paste -sd, - || true)
-    log "ONNX model unavailable (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
+    log "ONNX model unavailable or unverified (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
   fi
 fi
 export RUVECTOR_MCP_ALLOW="$allow"
 
 # --- 4. Run ---
+# Re-check right before exec: root heal and the store parse take time, and
+# another plugin version's prune may have removed this install meanwhile.
+[ -f "$entry" ] || ensure_pinned_install
 exec node "$entry" mcp start

@@ -71,7 +71,8 @@ Report: store exists/missing and disk usage. Warn on each `nested store:`
 line (a store below the root that a pre-launcher session created — merge its
 memories with `/ruvector:memory` or delete it), on `mcp mode: read-only`, and
 on `leftover global ruvector hooks` (entries from a past `ruvector hooks init`
-that run the global binary and can stamp a fresh store hash — remove them).
+that run the global binary and can stamp a fresh store hash — run
+`/ruvector:setup`, which lists them and removes them with a backup).
 
 ### Step 3: MCP Server Health Check
 

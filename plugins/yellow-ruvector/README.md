@@ -125,7 +125,10 @@ external services or API keys required.
 `ruvector hooks init` writes empty-stdout PreToolUse commands into
 `~/.claude/settings.json`. Cursor treats that as invalid JSON and blocks
 Shell and file edits. `/ruvector:setup` wraps those commands with dual-client
-allow JSON. Do not re-run `ruvector hooks init` afterward.
+allow JSON. Do not re-run `ruvector hooks init` afterward. Its other entries
+(`hooks post-edit`, `post-command`, `session-start`, …) run the global binary
+and can stamp a fresh store hash; `/ruvector:setup` lists them and, after
+asking, removes them (a `settings.json.bak-<time>` backup is kept).
 
 ## License
 

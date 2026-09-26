@@ -344,9 +344,20 @@ yellow_ruvector_prune() {
 # Returns 0 when the ONNX model files are already in ruvector's disk cache
 # (${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/<model>/, see ruvector
 # dist/core/onnx/loader.js _diskCacheDir).
-yellow_ruvector_model_cached() {
+yellow_ruvector_model_fingerprint() {
   local dir="${RUVECTOR_CACHE_DIR:-${HOME:-/tmp}}/.ruvector/models/${YELLOW_RUVECTOR_MODEL}"
-  [ -s "${dir}/model.onnx" ] && [ -s "${dir}/tokenizer.json" ]
+  [ -s "${dir}/model.onnx" ] && [ -s "${dir}/tokenizer.json" ] || return 1
+  printf '%s:%s' "$(wc -c < "${dir}/model.onnx" | tr -d ' ')" "$(wc -c < "${dir}/tokenizer.json" | tr -d ' ')"
+}
+
+# True when the model files exist AND a warm-up verified these exact files
+# (a 384-dimensional embed; the sizes are recorded in the data dir). Present
+# but unverified files (an interrupted download) count as not cached: the
+# auto embedder would fall back to hash on them and stamp a fresh store.
+yellow_ruvector_model_cached() {
+  local fp
+  fp=$(yellow_ruvector_model_fingerprint) || return 1
+  [ -n "${RUVECTOR_DATA:-}" ] && [ "$(cat "${RUVECTOR_DATA}/model-verified" 2>/dev/null)" = "$fp" ]
 }
 
 # yellow_ruvector_run_bounded <secs> <cmd...> — run <cmd> for at most <secs>
@@ -378,13 +389,17 @@ yellow_ruvector_run_bounded() {
 # touches a .ruvector store. It exits 0 even on failure, so judge success by
 # the "Dimension: 384" line. $1 = optional time limit in seconds.
 yellow_ruvector_warm_model() {
-  local secs="${1:-}" entry out
-  entry=$(yellow_ruvector_entry)
+  local secs="${1:-}" entry out fp
+  entry=$(yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
   if [ -n "$secs" ]; then
     out=$( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" 2>&1 )
   else
     out=$( cd "${TMPDIR:-/tmp}" && node "$entry" embed text "warmup" 2>&1 )
   fi
-  printf '%s' "$out" | grep -q 'Dimension: 384'
+  printf '%s' "$out" | grep -q 'Dimension: 384' || return 1
+  # Record which files were verified (see yellow_ruvector_model_cached).
+  fp=$(yellow_ruvector_model_fingerprint) || return 1
+  [ -n "${RUVECTOR_DATA:-}" ] && printf '%s' "$fp" > "${RUVECTOR_DATA}/model-verified" 2>/dev/null
+  return 0
 }
