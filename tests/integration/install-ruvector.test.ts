@@ -341,6 +341,29 @@ describe('yellow-ruvector install lib', () => {
       ).not.toBe(0);
     });
 
+    it('reclaim never removes a lock a new owner took after the stale check', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), String(process.pid));
+      // The waiter judged pid 999999999 stale, but a live owner now holds it.
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
+    });
+
+    it('clears a lock whose pid file stays empty', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), '');
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_acquire_install_lock 4 && cat "$RUVECTOR_DATA/.install.lock/pid"',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout).toMatch(/^[0-9]+$/);
+    });
+
     it('recovers a stale lock and acquires it', () => {
       mkdirSync(join(data, '.install.lock'), { recursive: true });
       writeFileSync(join(data, '.install.lock', 'pid'), '999999999');
