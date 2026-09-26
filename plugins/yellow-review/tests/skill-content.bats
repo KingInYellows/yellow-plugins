@@ -272,6 +272,7 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   ask=$(grep -n 'Delete the ledger for closed PR' <<<"$step3" | cut -d: -f1)
   [ -n "$rs" ] && [ -n "$ni" ] && [ -n "$ask" ] && [ "$rs" -lt "$ni" ] && [ "$rs" -lt "$ask" ]
   grep -qF 'state not recorded, exit <N>' <<<"$step3"
+  grep -qF 'When it prints `OPEN`, the PR reopened after the query above' <<<"$(tr -s ' \n' ' ' <<<"$step3")"
 }
 
 @test "sweep and sweep-all record a closed PR's state they skip or keep" {

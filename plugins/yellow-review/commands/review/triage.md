@@ -67,7 +67,9 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
   "$RL" refresh-state <PR>
   ```
 
-  It prints the recorded state, or `none: …` when the PR has no ledger. Any
+  It prints the recorded state, or `none: …` when the PR has no ledger. When
+  it prints `OPEN`, the PR reopened after the query above: skip the rest of
+  this bullet and continue with the fetch below as for any open PR. Any
   non-zero exit leaves `<pr>.state` unchanged — 6: `gh` could not read the
   state; 4: another run holds the PR's lock; 1: the state file could not be
   written. Do not stop on it: the hook would keep counting the PR, so carry
