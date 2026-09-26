@@ -1,0 +1,166 @@
+#!/usr/bin/env bats
+# start-ruvector.bats — bin/start-ruvector.sh (the MCP launcher): project-root
+# cd, worktree heal, the fresh-store read-only guard, install waiting, the
+# Node floor, and the data-dir fallback. `node` is a stub on PATH: it answers
+# `--version`, fakes `embed text`, and for `mcp start` prints what it was
+# exec'd with instead of starting a server. The plugin is copied under the
+# test tmpdir because the launcher only accepts plugin/data dirs under
+# HOME, /tmp, /usr, or /opt.
+
+bats_require_minimum_version 1.5.0
+
+SRC="$BATS_TEST_DIRNAME/.."
+
+setup() {
+  command -v jq >/dev/null || skip "jq not installed"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  PLUGIN="$BATS_TEST_TMPDIR/plugin"
+  DATA="$BATS_TEST_TMPDIR/data"
+  STUBS="$BATS_TEST_TMPDIR/stubs"
+  REPO="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$HOME" "$PLUGIN/hooks/scripts" "$DATA" "$STUBS" "$REPO"
+  cp -r "$SRC/bin" "$SRC/lib" "$PLUGIN/"
+  cp -r "$SRC/hooks/scripts/lib" "$PLUGIN/hooks/scripts/"
+  cp "$SRC/package.json" "$SRC/package-lock.json" "$PLUGIN/"
+  cat > "$STUBS/node" <<'NODE'
+#!/bin/sh
+case "$1" in
+  --version) echo "${FAKE_NODE_VERSION:-v22.1.0}"; exit 0 ;;
+esac
+case "$2 $3" in
+  "embed text")
+    if [ -n "${FAKE_EMBED_OK:-}" ]; then
+      d="$HOME/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
+      echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
+      echo "Dimension: 384"
+    else
+      echo "Embedding failed: fetch failed"
+    fi
+    exit 0 ;;
+  "mcp start")
+    printf 'EXEC pwd=%s allow=%s entry=%s\n' "$(pwd -P)" "$RUVECTOR_MCP_ALLOW" "$1"
+    exit 0 ;;
+esac
+exit 0
+NODE
+  chmod +x "$STUBS/node"
+  git -C "$REPO" init -q 2>/dev/null || true
+}
+
+lock_hash() { sha256sum "$PLUGIN/package-lock.json" | cut -c1-12; }
+
+fake_install() {
+  local dir="${1:-$DATA}" h
+  h=$(lock_hash)
+  mkdir -p "$dir/install-$h/node_modules/ruvector/bin"
+  : > "$dir/install-$h/node_modules/ruvector/bin/cli.js"
+  ln -sfn "install-$h" "$dir/current"
+}
+
+cache_model() {
+  local d="$HOME/.ruvector/models/all-MiniLM-L6-v2"
+  mkdir -p "$d"; echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
+}
+
+stamp_store() {
+  mkdir -p "$REPO/.ruvector"
+  echo '{"memories":[],"embeddingProvenance":{"embedderKind":"onnx-minilm","modelId":"all-MiniLM-L6-v2","dimension":384,"normalize":true,"prefixPolicy":"none"}}' \
+    > "$REPO/.ruvector/intelligence.json"
+}
+
+# $1 = directory to launch from; extra env via exported vars
+launch() {
+  run --separate-stderr bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/bin/start-ruvector.sh"' \
+    _ "$1" "$STUBS" "$PLUGIN"
+}
+
+ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
+
+@test "execs the installed CLI from the git toplevel when launched in a subdirectory" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store
+  mkdir -p "$REPO/src/deep"
+  launch "$REPO/src/deep"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "EXEC pwd=$(cd "$REPO" && pwd -P) allow=$ALL5 entry=$DATA/current/node_modules/ruvector/bin/cli.js" ]]
+  [ ! -e "$REPO/src/deep/.ruvector" ]
+}
+
+@test "fresh store + no cached model + failed warm-up starts read-only (no hooks_remember)" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_pretrain,hooks_recall,hooks_stats "* ]]
+  [[ "$stderr" == *"starting read-only (hooks_remember disabled)"* ]]
+}
+
+@test "fresh store whose warm-up succeeds keeps all five tools" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_OK=1
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=$ALL5 "* ]]
+}
+
+@test "a stamped store keeps all five tools even with no cached model" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store
+  launch "$REPO"
+  [[ "$output" == *"allow=$ALL5 "* ]]
+}
+
+@test "heals a linked worktree's .ruvector before exec" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store; cache_model
+  git -C "$REPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$REPO" worktree add -q "$REPO/wt" -b launcher-heal
+  launch "$REPO/wt"
+  [ "$status" -eq 0 ]
+  [ -L "$REPO/wt/.ruvector" ]
+  [[ "$output" == "EXEC pwd=$(cd "$REPO/wt" && pwd -P) "* ]]
+}
+
+@test "waits for a live installer, then fails with a hint" {
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_INSTALL_WAIT=1
+  mkdir -p "$DATA/.install.lock"
+  sleep 30 &
+  owner=$!
+  printf '%s' "$owner" > "$DATA/.install.lock/pid"
+  launch "$REPO"
+  kill "$owner" 2>/dev/null || true
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"waiting for another ruvector install"* ]]
+  [[ "$stderr" == *"MCP_TIMEOUT"* ]]
+}
+
+@test "Node older than 20 exits with a clear message" {
+  export CLAUDE_PLUGIN_DATA="$DATA" FAKE_NODE_VERSION=v18.19.0
+  launch "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"Node.js 20 or later is required"* ]]
+}
+
+@test "uses the XDG data dir when CLAUDE_PLUGIN_DATA is unset" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  unset CLAUDE_PLUGIN_DATA
+  export XDG_DATA_HOME="$BATS_TEST_TMPDIR/xdg" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install "$XDG_DATA_HOME/yellow-ruvector"; stamp_store
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"entry=$XDG_DATA_HOME/yellow-ruvector/current/node_modules/ruvector/bin/cli.js" ]]
+}
+
+@test "refuses a data dir outside HOME and /tmp" {
+  export CLAUDE_PLUGIN_DATA="/etc/yellow-ruvector-test"
+  launch "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"outside HOME/tmp"* ]]
+}

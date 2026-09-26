@@ -81,15 +81,15 @@ const HELPERS_BODY = `readonly RED='\\033[0;31m'\nerror() { printf '%s\\n' "$1" 
 const VERSION_GTE_BODY = `version_gte() { [ "$1" = "$2" ]; }`;
 
 // Match the script's TARGETS manifest exactly so the per-target loop
-// finds every entry. Focus drift tests on the ruvector target (single
+// finds every entry. Focus drift tests on the ast-grep target (single
 // snippet, easiest to mutate cleanly).
-const FOCUS_TARGET = 'plugins/yellow-ruvector/scripts/install.sh';
+const FOCUS_TARGET = 'plugins/yellow-research/scripts/install-ast-grep.sh';
 
 function buildSimpleTarget(blocks: string[]): string {
   return ['#!/bin/bash', 'set -Eeuo pipefail', '', ...blocks, ''].join('\n');
 }
 
-function seedAllTargets(tmp: string, ruvectorBlock: string): void {
+function seedAllTargets(tmp: string, focusBlock: string): void {
   // Snippets — canonical content the script will compare against.
   write(tmp, 'scripts/snippets/install-helpers.sh', `${HELPERS_BODY}\n`);
   write(tmp, 'scripts/snippets/install-version-gte.sh', `${VERSION_GTE_BODY}\n`);
@@ -107,14 +107,9 @@ function seedAllTargets(tmp: string, ruvectorBlock: string): void {
     'plugins/yellow-semgrep/scripts/install-semgrep.sh',
     buildSimpleTarget([helpersBlock, versionBlock])
   );
-  write(
-    tmp,
-    'plugins/yellow-research/scripts/install-ast-grep.sh',
-    buildSimpleTarget([helpersBlock])
-  );
   // The focus target uses the caller-supplied block so individual tests
   // can drift it without touching the other targets.
-  write(tmp, FOCUS_TARGET, buildSimpleTarget([ruvectorBlock]));
+  write(tmp, FOCUS_TARGET, buildSimpleTarget([focusBlock]));
 }
 
 describe('sync-shell-snippets.js', () => {
@@ -160,12 +155,12 @@ describe('sync-shell-snippets.js', () => {
     const result = run(tmp, ['--check']);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('snippet not found');
-    // All four targets reference install-helpers, so the error must
-    // appear at least four times — proves the loop did not short-circuit.
+    // All three targets reference install-helpers, so the error must
+    // appear at least three times — proves the loop did not short-circuit.
     const errorLines = result.stderr
       .split('\n')
       .filter((l) => l.includes('snippet not found'));
-    expect(errorLines.length).toBeGreaterThanOrEqual(4);
+    expect(errorLines.length).toBeGreaterThanOrEqual(3);
   });
 
   it('apply mode (no flag) rewrites a drifted block back to canonical content', () => {

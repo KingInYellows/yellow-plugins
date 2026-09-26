@@ -1,0 +1,263 @@
+#!/bin/false
+# yellow-ruvector install primitives. Sourced by:
+#   - bin/start-ruvector.sh              (synchronous correctness gate)
+#   - hooks/scripts/prewarm.sh           (SessionStart pre-warmer)
+#   - hooks/scripts/lib/resolve.sh       (read-only: data dir + entry path)
+#   - commands/ruvector/{setup,status}.md
+#
+# Adapted from plugins/yellow-morph/lib/install-morphmcp.sh. Differences:
+#   - CLAUDE_PLUGIN_DATA may be unset (older Claude Code, Cursor bridge);
+#     fall back to ${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector.
+#   - One install dir per lockfile hash (install-<hash12>) plus an atomic
+#     `current` symlink, so a version bump never deletes node_modules from
+#     under a running MCP server (ruvector's ONNX modules load lazily).
+#   - npm ci runs with --ignore-scripts and passes proxy/CA settings through.
+#
+# This file MUST NOT set -e or call exit. Functions return non-zero on
+# failure and print diagnostics to stderr. All names are prefixed
+# yellow_ruvector_ to avoid collisions when sourced.
+
+YELLOW_RUVECTOR_MODEL='all-MiniLM-L6-v2'
+
+# Set RUVECTOR_DATA (and RUVECTOR_DATA_FALLBACK=1 when CLAUDE_PLUGIN_DATA is
+# unset). Does not validate; see yellow_ruvector_validate_paths.
+yellow_ruvector_data_dir() {
+  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
+    RUVECTOR_DATA="$CLAUDE_PLUGIN_DATA"
+    RUVECTOR_DATA_FALLBACK=0
+  else
+    RUVECTOR_DATA="${XDG_DATA_HOME:-${HOME:-/__unset__}/.local/share}/yellow-ruvector"
+    RUVECTOR_DATA_FALLBACK=1
+  fi
+  export RUVECTOR_DATA RUVECTOR_DATA_FALLBACK
+}
+
+# Validate CLAUDE_PLUGIN_ROOT and the data dir. Canonicalizes both (when
+# `realpath -m` is available — BSD realpath lacks -m, so this is a
+# capability test, fail-open as in yellow-morph) and rejects unexpected
+# prefixes so cp / npm ci / rm -rf can never target /etc, /var, etc.
+yellow_ruvector_validate_paths() {
+  if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+    printf 'yellow-ruvector: CLAUDE_PLUGIN_ROOT unset\n' >&2
+    return 1
+  fi
+  yellow_ruvector_data_dir
+
+  local canonical
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null); then
+    CLAUDE_PLUGIN_ROOT="$canonical"
+  fi
+  if canonical=$(realpath -m -- "$RUVECTOR_DATA" 2>/dev/null); then
+    RUVECTOR_DATA="$canonical"
+  fi
+  export CLAUDE_PLUGIN_ROOT RUVECTOR_DATA
+
+  local home_canonical="${HOME:-/__unset__}"
+  if [ -n "${HOME:-}" ] && canonical=$(realpath -m -- "$HOME" 2>/dev/null); then
+    home_canonical="$canonical"
+  fi
+
+  case "$RUVECTOR_DATA" in
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*) ;;
+    *)
+      printf 'yellow-ruvector: refusing — data dir outside HOME/tmp: %s\n' \
+        "$RUVECTOR_DATA" >&2
+      return 1 ;;
+  esac
+  case "$CLAUDE_PLUGIN_ROOT" in
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/usr/*|/opt/*) ;;
+    *)
+      printf 'yellow-ruvector: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
+        "$CLAUDE_PLUGIN_ROOT" >&2
+      return 1 ;;
+  esac
+  return 0
+}
+
+# Print the first 12 hex chars of the committed lockfile's sha256.
+yellow_ruvector_lock_hash() {
+  local lock="${CLAUDE_PLUGIN_ROOT}/package-lock.json" sum
+  [ -f "$lock" ] || return 1
+  if command -v sha256sum >/dev/null 2>&1; then
+    sum=$(sha256sum "$lock" 2>/dev/null) || return 1
+  elif command -v shasum >/dev/null 2>&1; then
+    sum=$(shasum -a 256 "$lock" 2>/dev/null) || return 1
+  else
+    return 1
+  fi
+  printf '%s' "${sum%% *}" | cut -c1-12
+}
+
+# Path of the installed CLI entry through the `current` symlink.
+yellow_ruvector_entry() {
+  printf '%s/current/node_modules/ruvector/bin/cli.js' "$RUVECTOR_DATA"
+}
+
+# Returns 0 when an install is needed: no entry, or `current` does not point
+# at the install dir for the committed lockfile. Fail-open (any error means
+# "needs install").
+yellow_ruvector_needs_install() {
+  local hash target
+  hash=$(yellow_ruvector_lock_hash) || return 0
+  [ -f "$(yellow_ruvector_entry)" ] || return 0
+  target=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null) || return 0
+  [ "${target##*/}" != "install-${hash}" ]
+}
+
+# Atomic mkdir lock with one stale-owner recovery, as in yellow-morph.
+# $1 = max attempts (1s apart).
+yellow_ruvector_acquire_install_lock() {
+  local max_attempts="${1:-20}"
+  local lock_dir="${RUVECTOR_DATA}/.install.lock"
+  local stale_recovered=0 i owner_pid
+
+  mkdir -p "$RUVECTOR_DATA" 2>/dev/null || return 1
+  for ((i=1; i<=max_attempts; i++)); do
+    if mkdir "$lock_dir" 2>/dev/null; then
+      printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null || true
+      return 0
+    fi
+    if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then
+      owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+      case "$owner_pid" in
+        '' | *[!0-9]* | 0)
+          printf 'yellow-ruvector: lock pid file invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
+          rm -f "${lock_dir}/pid" 2>/dev/null
+          rmdir "$lock_dir" 2>/dev/null
+          stale_recovered=1
+          continue
+          ;;
+      esac
+      if ! kill -0 "$owner_pid" 2>/dev/null; then
+        printf 'yellow-ruvector: stale lock owner PID %s no longer running; clearing\n' "$owner_pid" >&2
+        rm -f "${lock_dir}/pid" 2>/dev/null
+        rmdir "$lock_dir" 2>/dev/null
+        stale_recovered=1
+        continue
+      fi
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+# Idempotent; safe from traps and again before exec.
+yellow_ruvector_release_install_lock() {
+  local lock_dir="${RUVECTOR_DATA}/.install.lock"
+  rm -f "${lock_dir}/pid" 2>/dev/null
+  rmdir "$lock_dir" 2>/dev/null || true
+}
+
+# Returns 0 when the lock is held by a live process (install in progress).
+yellow_ruvector_install_in_progress() {
+  local pid_file="${RUVECTOR_DATA}/.install.lock/pid" owner_pid
+  [ -d "${RUVECTOR_DATA}/.install.lock" ] || return 1
+  owner_pid=$(cat "$pid_file" 2>/dev/null)
+  case "$owner_pid" in '' | *[!0-9]* | 0) return 1 ;; esac
+  kill -0 "$owner_pid" 2>/dev/null
+}
+
+# Install the committed lockfile into install-<hash>, smoke-test it, swap
+# `current`, and prune old installs. Caller holds the install lock.
+yellow_ruvector_do_install() {
+  local hash final tmp prev
+  hash=$(yellow_ruvector_lock_hash) || {
+    printf 'yellow-ruvector: cannot hash %s/package-lock.json\n' "$CLAUDE_PLUGIN_ROOT" >&2
+    return 1
+  }
+  final="${RUVECTOR_DATA}/install-${hash}"
+  tmp="${RUVECTOR_DATA}/.install-${hash}.tmp.$$"
+  rm -rf -- "$tmp" 2>/dev/null
+  mkdir -p "$tmp" || return 1
+  cp "${CLAUDE_PLUGIN_ROOT}/package.json" "${tmp}/package.json" || return 1
+  cp "${CLAUDE_PLUGIN_ROOT}/package-lock.json" "${tmp}/package-lock.json" || return 1
+
+  # env -i keeps secrets (API keys, tokens) out of npm; pass through only
+  # what npm needs to reach the registry from behind a proxy or custom CA.
+  local -a env_args=(
+    "HOME=${HOME:-/}"
+    "PATH=${PATH:-/usr/local/bin:/usr/bin:/bin}"
+  )
+  local var
+  for var in HTTPS_PROXY HTTP_PROXY NO_PROXY https_proxy http_proxy no_proxy \
+             NODE_EXTRA_CA_CERTS SSL_CERT_FILE; do
+    [ -n "${!var:-}" ] && env_args+=("${var}=${!var}")
+  done
+  while IFS='=' read -r var _; do
+    case "$var" in
+      NPM_CONFIG_*|npm_config_*) env_args+=("${var}=${!var}") ;;
+    esac
+  done < <(env)
+
+  if ! ( cd "$tmp" && env -i "${env_args[@]}" \
+         npm ci --ignore-scripts --omit=dev --no-audit --no-fund --loglevel=error ) >&2; then
+    printf 'yellow-ruvector: npm ci failed in %s\n' "$tmp" >&2
+    rm -rf -- "$tmp" 2>/dev/null
+    return 1
+  fi
+
+  local out
+  if ! out=$(node "${tmp}/node_modules/ruvector/bin/cli.js" mcp start --help 2>&1); then
+    printf 'yellow-ruvector: smoke test `ruvector mcp start --help` failed:\n%s\n' "$out" >&2
+    rm -rf -- "$tmp" 2>/dev/null
+    return 1
+  fi
+
+  rm -rf -- "$final" 2>/dev/null
+  mv "$tmp" "$final" || { rm -rf -- "$tmp" 2>/dev/null; return 1; }
+
+  prev=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || true)
+  yellow_ruvector_swap_current "install-${hash}" || return 1
+  yellow_ruvector_prune "install-${hash}" "${prev##*/}"
+  return 0
+}
+
+# Point `current` at $1 (a sibling dir name). Atomic with GNU mv -T;
+# otherwise ln -sfn (a tiny unlink/symlink window, acceptable on BSD).
+yellow_ruvector_swap_current() {
+  local target="$1" tmp_link="${RUVECTOR_DATA}/.current.tmp.$$"
+  rm -f -- "$tmp_link" 2>/dev/null
+  if ln -s "$target" "$tmp_link" 2>/dev/null \
+     && mv -T "$tmp_link" "${RUVECTOR_DATA}/current" 2>/dev/null; then
+    return 0
+  fi
+  rm -f -- "$tmp_link" 2>/dev/null
+  ln -sfn "$target" "${RUVECTOR_DATA}/current"
+}
+
+# Remove install dirs other than $1 (current) and $2 (previous), plus stale
+# temp dirs from crashed installs. Caller holds the install lock.
+yellow_ruvector_prune() {
+  local keep_current="$1" keep_prev="${2:-}" d name
+  for d in "${RUVECTOR_DATA}"/install-* "${RUVECTOR_DATA}"/.install-*.tmp.*; do
+    [ -e "$d" ] || continue
+    name="${d##*/}"
+    [ "$name" = "$keep_current" ] && continue
+    [ -n "$keep_prev" ] && [ "$name" = "$keep_prev" ] && continue
+    rm -rf -- "$d" 2>/dev/null
+  done
+  return 0
+}
+
+# Returns 0 when the ONNX model files are already in ruvector's disk cache
+# (${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/<model>/, see ruvector
+# dist/core/onnx/loader.js _diskCacheDir).
+yellow_ruvector_model_cached() {
+  local dir="${RUVECTOR_CACHE_DIR:-${HOME:-/tmp}}/.ruvector/models/${YELLOW_RUVECTOR_MODEL}"
+  [ -s "${dir}/model.onnx" ] && [ -s "${dir}/tokenizer.json" ]
+}
+
+# Download/load the ONNX model once via `ruvector embed text`, which never
+# touches a .ruvector store. It exits 0 even on failure, so judge success by
+# the "Dimension: 384" line. $1 = optional timeout seconds (needs `timeout`).
+yellow_ruvector_warm_model() {
+  local secs="${1:-}" entry out
+  entry=$(yellow_ruvector_entry)
+  [ -f "$entry" ] || return 1
+  if [ -n "$secs" ] && command -v timeout >/dev/null 2>&1; then
+    out=$( cd "${TMPDIR:-/tmp}" && timeout "$secs" node "$entry" embed text "warmup" 2>&1 )
+  else
+    out=$( cd "${TMPDIR:-/tmp}" && node "$entry" embed text "warmup" 2>&1 )
+  fi
+  printf '%s' "$out" | grep -q 'Dimension: 384'
+}

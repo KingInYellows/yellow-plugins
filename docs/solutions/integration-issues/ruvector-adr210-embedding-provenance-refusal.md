@@ -61,11 +61,13 @@ created earlier keeps its hash stamp until reembedded.
 
 1. Quiesce writes — finish or abandon any ruvector-writing command in the
    session (`/ruvector:seed-solutions`, `/ruvector:learn`).
-2. Reembed with the pinned CLI (the same version the MCP server runs):
+2. Reembed with the pinned CLI (the same install the MCP server runs; since
+   yellow-ruvector 0.3.3 support that is the plugin-managed install, reached
+   through `scripts/ruvector-cli.sh`, which also `cd`s to the project root):
 
    ```bash
-   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run   # expect wouldDrop: 0
-   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed             # ~1 min / 750 vectors, 6 workers
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed --dry-run   # expect wouldDrop: 0
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed             # ~1 min / 750 vectors, 6 workers
    ```
 
    The dry-run's `wouldReembed` is the store's re-embeddable vector count
@@ -157,7 +159,24 @@ concurrent reader can observe torn JSON mid-write; upstream also needs the
 reader-side quarantine/retry path that 0.2.41+ ships for the CLI.
 
 **Upstream.** Filed as [RuVector#995](https://github.com/ruvnet/RuVector/issues/995)
-(follow-up to #634 / #698, which fixed `cli.js` only).
+(follow-up to #634 / #698, which fixed `cli.js` only). **Fixed in ruvector
+0.3.3** (upstream commit 33cad21): `bin/mcp-server.js` now saves through
+`atomicWriteFileSync` (`:430`) and quarantines a corrupt store as
+`.corrupt-<epoch>` instead of degrading to an empty one (`:286-296`).
+yellow-ruvector pins 0.3.3 from the plugin-managed-install change on. Saves
+are still last-writer-wins: the MCP server writes back its in-memory snapshot
+without re-reading, so a CLI write between two MCP saves is lost, but no
+reader sees torn JSON any more.
+
+**Second stamp path (closed by the same change set).** yellow-ruvector's own
+PostToolUse hook called `hooks post-edit` / `hooks post-command`, and each of
+those calls `tryRemember` with a hash-embedded (64d) memory. On a store with
+no stamp yet, that first hook write stamps it `hash`/64d — the ADR-210 lock
+this doc describes, reached without any old CLI at all. On an ONNX-stamped
+store the same writes are refused on every tool call. The follow-up hygiene
+change removes those calls. Until it ships, the first edit in a fresh
+project can still stamp the store hash; `/ruvector:status` reports that as
+`MISMATCH`, and the reembed above fixes it.
 
 ## Related
 

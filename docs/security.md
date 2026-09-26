@@ -12,16 +12,15 @@ enterprise deployment.
 | yellow-composio | composio-server | `https://connect.composio.dev/mcp`          | HTTP      | OAuth (browser); headless consumer key is plaintext | Connected-app tool calls |
 | yellow-research | deepwiki   | `https://mcp.deepwiki.com/mcp`                   | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`                       | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio     | None (local)                | Code embeddings (local only)  |
+| yellow-ruvector | ruvector   | Local stdio (`bin/start-ruvector.sh` → plugin-managed `ruvector@0.3.3 mcp start`) | stdio     | None (local)                | Code embeddings (local only)  |
 
-The `ruvector` stdio command is only network-free once `npx` has a warm npm
-exec-cache entry for the pinned version — `npx` resolves from local project
-dependencies, then the npm exec cache, and does **not** consult global installs,
-so the global binary from [Local npm Dependencies](#local-npm-dependencies) does
-not by itself prevent this fetch. On a cold-cache machine it fetches
-`ruvector@0.2.34` from the npm registry first; warm the cache with a one-time
-online run (`npx -y --ignore-scripts ruvector@0.2.34 --version`) or by starting
-the MCP server once while online.
+The `ruvector` stdio server is network-free once the plugin-managed install
+exists in the plugin data dir and the ONNX model is cached. The first session
+fetches the pinned package tree from the npm registry (`npm ci` against the
+plugin's committed `package-lock.json`, see
+[Local npm Dependencies](#local-npm-dependencies)) and the first model load
+downloads all-MiniLM-L6-v2 from huggingface.co. The SessionStart prewarm hook
+does both in the background; `/ruvector:setup` does them in the foreground.
 
 ### Plugins Without MCP Servers
 
@@ -137,13 +136,10 @@ These plugins work entirely offline with no external network calls:
 - `gt-workflow` — Graphite CLI wrapper
 - `yellow-debt` — Local codebase analysis
 - `yellow-ruvector` — Local vector search (stdio MCP, no network at runtime).
-  Exception: MCP startup runs `npx -y ruvector@0.2.34`, which hits the npm
-  registry on first use unless the npm exec cache already holds
-  `ruvector@0.2.34` from a prior online run. The global install that
-  `install.sh` performs serves the CLI-hook path only — it does **not** satisfy
-  this npx resolution, so a cold-cache offline machine fails MCP startup even
-  with the global binary present. Warm the cache once while online (see the
-  "Local npm Dependencies" section below) to avoid the fetch at MCP startup.
+  Exceptions: the first install (npm registry) and the first ONNX model load
+  (huggingface.co); see "Local npm Dependencies" below. Offline with a fresh
+  store and no cached model, the launcher starts the server without
+  `hooks_remember` so the store is not stamped with the hash embedder.
 
 ## Hook Safety
 
@@ -156,7 +152,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, UserPromptSubmit, SessionStart, Stop | Memory recall, edit tracking, session lifecycle                              |
+| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, SessionStart, Stop | Install prewarm, memory recall, edit tracking, session lifecycle             |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
@@ -206,9 +202,9 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 | Hook               | Event            | Script                  | Time Budget | What It Does                                           |
 | ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
-| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit context and coedit suggestions                |
-| session-start      | SessionStart     | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
-| user-prompt-submit | UserPromptSubmit | `user-prompt-submit.sh` | 1s          | Recall memories into additionalContext                 |
+| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit / pre-command side effects                    |
+| prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
+| session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
 | post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | Record explicit edit/bash outcomes; unknown is not saved |
 | stop               | Stop             | `stop.sh`               | 10s         | Run ruvector hooks session-end                         |
 
@@ -216,14 +212,18 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 - All scripts validate input via shared `lib/validate.sh`
 - Path traversal rejected (`..`, `/`, `~` in arguments)
-- `session-start.sh`'s worktree store-heal creates a symlink
+- Hooks run only the plugin-managed CLI (`<data>/current/…/cli.js`), never a
+  `ruvector` found on PATH, and run it from the git toplevel
+- The worktree store-heal (`lib/resolve.sh`, run by the MCP launcher and
+  `session-start.sh`) creates a symlink
   `<worktree>/.ruvector -> <main-checkout>/.ruvector` only when the session runs
   in a linked git worktree (`.git` is a file), the local entry is absent or a
   dangling symlink, and the main checkout has a store. The link target derives
   from `git rev-parse --git-common-dir` (never user input); a pre-existing
   non-symlink path (directory or regular file) is never replaced (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
-- No network calls in any hook script
+- No network calls in any hook script except `prewarm.sh`'s detached
+  background install (`npm ci`) and model download
 - Scripts run with user's permissions (no escalation)
 
 ### Hook Review Process
@@ -422,7 +422,7 @@ Plugins that execute shell commands:
 | yellow-linear       | `git`, `gh`                                  | Branch detection, PR context                      |
 | yellow-devin        | `curl`, `jq`, `git`, `gh`                    | Devin API calls, JSON construction                |
 | yellow-review       | `gt`, `gh`, `git`, `jq`                      | PR management, GraphQL queries                    |
-| yellow-ruvector     | `npx`, `npm`, `jq`, `git`, `pgrep`, `grep`   | ruvector CLI, hook scripts, seed-solutions guards |
+| yellow-ruvector     | `node`, `npm`, `jq`, `git`, `pgrep`, `grep`  | ruvector CLI, install, hook scripts, seed-solutions guards |
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                         |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation              |
 | gt-workflow         | `gt`, `git`                                  | Branch and PR management                          |
@@ -455,20 +455,25 @@ include prompt injection defenses:
 
 ### yellow-ruvector
 
-Installs `ruvector` globally via npm, version-pinned (an unpinned global was the
-root cause of a machine-global store-pollution incident):
+Installs `ruvector` into the plugin data dir (not globally), pinned by the
+plugin's own `package.json` dependency and committed `package-lock.json`
+(integrity hashes for the full 197-package tree; ruvector's releases are
+frequent, and 0.2.40 was once published from an unmerged branch):
 
 ```bash
-npm install -g ruvector@0.2.34 --ignore-scripts
+# lib/install-ruvector.sh, run by bin/start-ruvector.sh, hooks/scripts/prewarm.sh,
+# and /ruvector:setup
+env -i HOME=… PATH=… [proxy/CA/npm_config_* passthrough] \
+  npm ci --ignore-scripts --omit=dev --no-audit --no-fund
 ```
 
-**Mitigation:** Review package before installation. The `install.sh` script
-performs dependency checks and error handling and installs with
-`--ignore-scripts`; the MCP server's own npx launch spec (catalog →
-`plugin.json` args) and the `seed-solutions` reembed commands carry
-`--ignore-scripts` as well, so the lazily-fetched npx path is covered, not just
-the global install. The pinned default (`RUVECTOR_DEFAULT_VERSION`) must match
-the catalog npx spec — bats tests enforce the sync.
+**Mitigation:** `--ignore-scripts` (the tree has no install scripts), `env -i`
+so API keys and tokens never reach npm (only proxy, CA, and `npm_config_*`
+settings pass through), a data-dir prefix check (HOME or /tmp only), one
+install dir per lockfile hash with an atomic `current` symlink, and a
+`ruvector mcp start --help` smoke test before the swap. The MCP server and all
+hooks run this one install, so there is no second (global or npx) copy to
+drift from the pin. Bats and vitest tests pin the package.json/lockfile sync.
 
 ### yellow-browser-test
 

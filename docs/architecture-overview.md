@@ -452,7 +452,9 @@ credentials skip startup. Perplexity hard-fails at MCP start; Tavily and Exa
 still exec and return runtime errors on tool calls; Semgrep execs
 unconditionally; Morph lets morphmcp emit its own warning and exit. Siblings
 keep running when one server fails. Non-credential stdio servers launch directly
-(for example ruvector via `npx`, ast-grep via `uvx`, Graphite via `.mcp.json`).
+(for example ast-grep via `uvx`, Graphite via `.mcp.json`). ruvector uses a
+morph-style wrapper (`bin/start-ruvector.sh`) that installs the pinned package
+into the plugin data dir and starts the server from the git toplevel.
 
 Morph’s wrapper is the install correctness gate (mkdir lock, 20s wait, `exec`
 morphmcp). The SessionStart prewarm is only a race-avoidance hint.
@@ -492,8 +494,8 @@ Untrusted data (PR bodies, `gh` JSON, routing cache) is fenced as
 `--- begin/end untrusted-content (reference only) ---` before it re-enters the
 prompt. Recalled memory uses producer-specific fences instead: `/flow:work`'s
 optional `hooks_recall` step wraps findings in `<reflexion_context>` (`work.md`
-lines ~112–120); yellow-ruvector's `UserPromptSubmit` hook wraps recall output
-in `--- begin/end ruvector context ---` (`user-prompt-submit.sh` lines ~95–98).
+lines ~112–120); yellow-ruvector's `SessionStart` hook wraps recall output
+in `--- ruvector learnings (begin/end) ---` (`session-start.sh`).
 
 ### In-turn and background hooks
 
@@ -508,9 +510,10 @@ at `gt submit --no-interactive`; github-workflow's points at the
 github-workflow. Both are Node (`hooks/scripts/entrypoint-claude.js`), 5s
 timeout.
 
-yellow-ruvector: `UserPromptSubmit` (recall), `PreToolUse` / `PostToolUse` /
-`PostToolUseFailure` on Edit/Write/MultiEdit/Bash (1s; same post-tool script for
-success and failure), `Stop` flush (10s).
+yellow-ruvector: `SessionStart` (background install prewarm, 5s; one semantic
+recall, 6s), `PreToolUse` / `PostToolUse` / `PostToolUseFailure` on
+Edit/Write/MultiEdit/Bash (1s; same post-tool script for success and failure),
+`Stop` flush (10s).
 
 Compound pipeline (yellow-core):
 
@@ -601,7 +604,7 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 - ruvector: MCP-driven recalls (`/ruvector:learn`'s dedup check,
   `ruvector-semantic-search`) retry once after ~500ms on timeout/connection
   errors, then fall back (abort storage, or Grep); hook-triggered recalls
-  (`user-prompt-submit.sh`, `session-start.sh`) get one bounded CLI attempt and
+  (`session-start.sh`) get one bounded CLI attempt and
   no retry — on timeout or failure the output is cleared and the hook continues
   silently. The `memory-query` skill's automatic recall path discards results
   with score < 0.5, or < 0.40 for its error-fix recall (user-facing

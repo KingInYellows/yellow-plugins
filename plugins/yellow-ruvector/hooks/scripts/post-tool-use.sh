@@ -30,7 +30,11 @@ command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping post
 INPUT=$(cat)
 CWD=$(printf '%s' "$INPUT" | jq -r 'if (.cwd | type) == "string" then .cwd else "" end' 2>/dev/null) || CWD=""
 
-PROJECT_DIR="${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}"
+# shellcheck source=lib/resolve.sh
+. "$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/resolve.sh"
+# Git toplevel of the session cwd: a subdirectory session still uses the
+# root store.
+PROJECT_DIR=$(ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
 # Exit silently if ruvector is not initialized
@@ -38,14 +42,11 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
-# Resolve ruvector command: require direct binary for PostToolUse (1s budget).
-# npx resolution (~2700ms) exceeds the timeout and would be killed, so skip
-# entirely when the binary is absent (same pattern as pre-tool-use.sh).
-if command -v ruvector >/dev/null 2>&1; then
-  RUVECTOR_CMD=(ruvector)
-else
-  json_exit
-fi
+# Plugin-managed ruvector CLI (never a global binary, which can skew from the
+# pin). Missing install, Node < 20, or an install in progress: skip silently.
+ruvector_resolve_bin || json_exit
+# ruvector picks its store from process.cwd().
+cd "$PROJECT_DIR" 2>/dev/null || json_exit
 
 # Parse fields using NUL-delimited output (avoids eval). Strings only —
 # a non-string tool_input.command is not command text.

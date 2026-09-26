@@ -111,15 +111,16 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 
 ## Hook Architecture
 
-Hooks delegate to ruvector's built-in CLI hooks. There is no manual queue
-management inside the plugin:
+Hooks delegate to ruvector's built-in CLI hooks through the plugin-managed
+install (`hooks/scripts/lib/resolve.sh`; never a global binary) and run it
+from the git toplevel. There is no manual queue management inside the plugin:
 
-- `session-start.sh` → `ruvector hooks session-start --resume` plus
-  `ruvector hooks recall --top-k N "query"` when the global binary is in PATH.
-  Recall is `hookSpecificOutput.additionalContext` for `SessionStart`. The
-  embedder-provenance warning stays on `systemMessage`
-- `user-prompt-submit.sh` reads the string field `prompt` and returns
-  recall as `hookSpecificOutput.additionalContext` for `UserPromptSubmit`
+- `prewarm.sh` (SessionStart) → installs the pinned ruvector into the plugin
+  data dir and downloads the ONNX model in the background
+- `session-start.sh` → one semantic `ruvector hooks recall --top-k 5 "query"`
+  (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
+  `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
+  There is no per-prompt recall
 - `post-tool-use.sh` (PostToolUse and PostToolUseFailure) →
   `ruvector hooks post-edit --success <path>` only for a PostToolUse
   success, or `ruvector hooks post-command --success|--error <cmd>` only

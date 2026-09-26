@@ -39,9 +39,10 @@ const CHECK_MODE = process.argv.slice(2).includes('--check');
 
 // Manifest: each install script → the ordered list of snippet names it
 // embeds. install-helpers (colors + error/warning/success) is shared by
-// codex + semgrep + ruvector + yellow-research's install-ast-grep.sh;
-// install-version-gte is shared by codex + semgrep (ruvector keeps its own
-// version_lt).
+// codex + semgrep + yellow-research's install-ast-grep.sh;
+// install-version-gte is shared by codex + semgrep. (yellow-ruvector no
+// longer ships an install script: it installs into the plugin data dir via
+// lib/install-ruvector.sh.)
 //
 // Known additional consumers not yet onboarded to this generator (codex P2
 // review #534, threadId PRRT_kwDOQ3SUys6CmtOZ):
@@ -56,7 +57,6 @@ const TARGETS = {
     'install-helpers',
     'install-version-gte',
   ],
-  'plugins/yellow-ruvector/scripts/install.sh': ['install-helpers'],
   'plugins/yellow-research/scripts/install-ast-grep.sh': ['install-helpers'],
 };
 

@@ -19,16 +19,9 @@
   ],
   "mcpServers": {
     "ruvector": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "--ignore-scripts",
-        "ruvector@0.2.34",
-        "mcp",
-        "start"
-      ],
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-ruvector.sh",
+      "args": [],
       "env": {
-        "RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/",
         "RUVECTOR_MCP_ALLOW": "hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
       }
     }
@@ -46,26 +39,19 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit.sh\"",
-            "timeout": 1
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "*",
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm.sh\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh\"",
-            "timeout": 3
+            "timeout": 6
           }
         ]
       }

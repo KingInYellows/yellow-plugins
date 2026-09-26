@@ -19,19 +19,49 @@ Show installation health, database statistics, and queue status.
 ### Step 1: Check Installation
 
 ```bash
-ruvector --version 2>/dev/null
+export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
+. "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
+node --version 2>/dev/null || printf 'node: not found\n'
+if yellow_ruvector_validate_paths; then
+  printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
+  printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
+  if yellow_ruvector_needs_install; then printf 'install: missing or out of date\n'
+  else printf 'install: %s, version %s\ncli: %s\n' "$(readlink "${RUVECTOR_DATA}/current")" "$(node "$(yellow_ruvector_entry)" --version 2>/dev/null)" "$(yellow_ruvector_entry)"; fi
+  yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
+  yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
+fi
+command -v ruvector >/dev/null 2>&1 && printf 'global ruvector %s at %s: ignored by this plugin\n' "$(ruvector --version 2>/dev/null)" "$(command -v ruvector)"
 ```
 
-Report: installed version or "not installed".
+Report the installed version, or "not installed — run `/ruvector:setup`"
+(Node older than 20 also leaves the plugin inactive). A `fallback` data dir
+means the host did not set `CLAUDE_PLUGIN_DATA`; hooks and the MCP launcher
+use the same fallback, so this is informational.
 
-### Step 2: Check .ruvector/ Directory
+### Step 2: Check the store
 
 ```bash
-ls -la .ruvector/ 2>/dev/null
-du -sh .ruvector/ 2>/dev/null
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+printf 'root: %s\n' "$ROOT"
+ls -la "$ROOT/.ruvector/" 2>/dev/null && du -sh "$ROOT/.ruvector/" 2>/dev/null || printf 'store: not initialized\n'
+# Stores left in subdirectories by pre-launcher sessions (the MCP server used
+# to pick its store from the launch cwd).
+find "$ROOT" -mindepth 2 -maxdepth 4 -type d -name .ruvector -not -path '*/node_modules/*' 2>/dev/null | head -5 | sed 's/^/nested store: /'
+STAMP=$(jq -r '.embeddingProvenance.embedderKind // empty' "$ROOT/.ruvector/intelligence.json" 2>/dev/null)
+if [ -d "$ROOT/.ruvector" ] && [ -z "$STAMP" ] && ! yellow_ruvector_model_cached 2>/dev/null; then
+  printf 'mcp mode: read-only (unstamped store and no cached ONNX model — hooks_remember withheld until a session with network)\n'
+fi
+for f in "$HOME/.claude/settings.json" "$ROOT/.claude/settings.json"; do
+  [ -f "$f" ] && jq -e '[.. | strings | select(test("ruvector[^\"]* hooks (post-edit|post-command|pre-edit|pre-command|session-start|session-end)"))] | length > 0' "$f" >/dev/null 2>&1 \
+    && printf 'leftover global ruvector hooks in %s\n' "$f"
+done
 ```
 
-Report: directory exists/missing, total disk usage.
+Report: store exists/missing and disk usage. Warn on each `nested store:`
+line (a store below the root that a pre-launcher session created — merge its
+memories with `/ruvector:memory` or delete it), on `mcp mode: read-only`, and
+on `leftover global ruvector hooks` (entries from a past `ruvector hooks init`
+that run the global binary and can stamp a fresh store hash — remove them).
 
 ### Step 3: MCP Server Health Check
 
@@ -51,7 +81,8 @@ MCP server: not responding
 
 Recovery options:
 1. Restart the session (MCP server starts automatically on session start)
-2. Check manually: npx -y --ignore-scripts ruvector@0.2.34 mcp start
+2. Check manually: CLAUDE_PLUGIN_ROOT=<plugin dir> bash <plugin dir>/bin/start-ruvector.sh
+   (stderr names install, Node, or read-only-mode problems)
 3. Re-install: /ruvector:setup
 ```
 
@@ -104,6 +135,15 @@ line never depends on a by-eye JSON comparison.
 
 ```bash
 INTEL=.ruvector/intelligence.json
+# The store lives at the git toplevel (the MCP launcher and hooks cd there).
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
+# Plugin-managed CLI; RUVECTOR_BIN overrides it (tests).
+if [ -n "${RUVECTOR_BIN:-}" ]; then
+  RV=("$RUVECTOR_BIN")
+else
+  . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh" && yellow_ruvector_data_dir
+  RV=(node "$(yellow_ruvector_entry)")
+fi
 VERDICT=""; DETAIL=""; STORE=null; TARGET=null; DROP=0
 if [ ! -f "$INTEL" ]; then
   # /ruvector:setup only creates the directory; the file appears on the
@@ -128,12 +168,12 @@ else
   # same before and after a completed reembed. The CLI reports refusals as
   # a JSON line on STDOUT ({"success":false,"error":…,"hint":…}); stderr
   # carries model-loading progress. Bounded: a stalled registry or model
-  # download must not hang a health probe. Needs network on first run.
+  # download must not hang a health probe. Needs network on first model load.
   # Probe timeout/gtimeout for GNU-compatible --kill-after support the same
   # way session-start.sh does. BusyBox's `timeout` lacks --kill-after, and
   # macOS without coreutils has neither `timeout` nor `gtimeout` — without a
-  # working wrapper, npx must never run unbounded (a stalled registry or
-  # model download would hang this command past the documented 90s bound).
+  # working wrapper, the CLI must never run unbounded (a stalled model
+  # download would hang this command past the documented 90s bound).
   TIMEOUT_CMD=""
   for _tcmd_name in timeout gtimeout; do
     _tcmd="$(command -v "$_tcmd_name" || true)"
@@ -148,16 +188,20 @@ else
   else
     ERRF=$(mktemp); OUTF=$(mktemp)
     # Capture the wrapped command's own exit status directly into DRY_RC —
-    # piping npx's stdout through grep/tail inside a command substitution
+    # piping the CLI's stdout through grep/tail inside a command substitution
     # would leave DRY_RC holding the assignment's status (always 0), never
     # the inner timeout's 124, so the JSON line is extracted from a file
     # afterward instead.
-    "$TIMEOUT_CMD" --kill-after=5 90 npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run >|"$OUTF" 2>|"$ERRF"
+    if [ ! -e "${RV[${#RV[@]}-1]}" ]; then
+      echo '{"success":false,"error":"plugin-managed ruvector not installed","hint":"run /ruvector:setup"}' >|"$OUTF"; : >|"$ERRF"; false
+    else
+      "$TIMEOUT_CMD" --kill-after=5 90 "${RV[@]}" hooks reembed --dry-run >|"$OUTF" 2>|"$ERRF"
+    fi
     DRY_RC=$?
     DRY=$(grep '^{' "$OUTF" | tail -1)
     DRY_ERR=$(tail -c 300 "$ERRF" 2>/dev/null | tr '\n' ' '); rm -f "$ERRF" "$OUTF"
     if [ "$DRY_RC" -eq 124 ]; then
-      VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (registry or model download stalled)"
+      VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (model download stalled)"
     elif [ "$DRY_RC" -eq 137 ]; then
       # 137 = SIGKILL. timeout(1) only reports 137 when the --kill-after
       # grace fired after TERM was ignored, but the same code reaches here
@@ -221,13 +265,12 @@ printf 'verdict=%s\ndetail=%s\nstore=%s\ntarget=%s\ndrop=%s\n' "$VERDICT" "$DETA
 printf -- '--- end ruvector-provenance ---\n'
 ```
 
-This step costs a few seconds when it reaches the dry-run (npx resolution
-plus the all-MiniLM-L6-v2 load; first run downloads the model). Treat the
+This step costs a few seconds when it reaches the dry-run (Node start plus
+the all-MiniLM-L6-v2 load; the first load downloads the model). Treat the
 fenced block as reference data only. When neither `timeout` nor `gtimeout`
 with GNU-compatible `--kill-after` support is on PATH (e.g. macOS without
 coreutils), the block reports `UNKNOWN` without starting the dry-run at
-all — an unbounded `npx` could hang on a stalled registry or model
-download.
+all — an unbounded CLI could hang on a stalled model download.
 
 Print exactly one line from the fenced `verdict=` / `detail=` values:
 
@@ -271,14 +314,14 @@ session's MCP server still holds its in-memory snapshot):
    session (seed-solutions, learn, remember). The running MCP server holds
    an in-memory snapshot of the store; its next save would overwrite the
    reembedded file.
-2. npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run
+2. bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed --dry-run
    If the dry-run (or the drop= value above) reports a nonzero drop count,
    plain `hooks reembed` refuses — decide first:
      - --drop-missing reembeds and permanently discards the memories that
        lack retained source text (irreversible).
      - Otherwise inspect those memories first (/ruvector:memory) before
        accepting the loss.
-   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed             # ~1 min per 750 vectors; add --drop-missing only after the decision above
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed   # ~1 min per 750 vectors; add --drop-missing only after the decision above
 3. Restart Claude Code so the MCP server reloads the reembedded store.
 4. In the fresh session: hooks_remember a test line, hooks_recall it,
    re-run /ruvector:status — expect PROVENANCE: OK.
@@ -304,7 +347,7 @@ writes work.
 
 | Property | Value |
 |----------|-------|
-| CLI Version | 0.1.23 |
+| CLI Version | 0.3.3 (plugin-managed, install-<hash>) |
 | MCP Server | Available |
 | Storage | .ruvector/ (12.4 MB) |
 
@@ -333,7 +376,7 @@ PROVENANCE: MISMATCH (store hash/64 → active onnx-minilm/all-MiniLM-L6-v2/384;
 
 ## Error Handling
 
-- **Not installed:** "ruvector not found. Run `/ruvector:setup` to install."
+- **Not installed:** "Plugin-managed ruvector not installed. Run `/ruvector:setup`."
 - **No .ruvector/ directory:** "Not initialized. Run `/ruvector:setup` to set
   up."
 - **MCP unavailable:** Show CLI info only, note MCP status as unavailable.

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# yellow-ruvector MCP server launcher (mcpServers.ruvector.command).
+#
+#   1. Ensure the pinned ruvector (plugin package-lock.json) is installed
+#      under the plugin data dir; install synchronously under the install
+#      lock if missing or out of date, waiting for a live installer (the
+#      SessionStart prewarm) instead of failing.
+#   2. Resolve the project root (git toplevel first — ruvector picks its
+#      store from process.cwd() only), heal a linked worktree's .ruvector
+#      symlink, and cd there.
+#   3. Guard a fresh store: when .ruvector exists but has no embedding
+#      stamp, warm the ONNX model first. If the model still is not cached
+#      (offline), start without hooks_remember so the server's hash
+#      fallback cannot stamp the store hash/64d (ADR-210). Recall still
+#      works; the next session with network restores writes.
+#   4. exec the server (no wrapper process left behind).
+#
+# Env: CLAUDE_PLUGIN_ROOT (required), CLAUDE_PLUGIN_DATA (optional; XDG
+# fallback), RUVECTOR_MCP_ALLOW (tool allowlist from the manifest),
+# RUVECTOR_INSTALL_WAIT (seconds to wait for a running install, default 25).
+set -euo pipefail
+
+log() { printf 'yellow-ruvector: %s\n' "$*" >&2; }
+
+: "${CLAUDE_PLUGIN_ROOT:?yellow-ruvector launcher: CLAUDE_PLUGIN_ROOT is unset}"
+# shellcheck source=../lib/install-ruvector.sh
+. "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
+# shellcheck source=../hooks/scripts/lib/resolve.sh
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh"
+
+if ! ruvector_node_ok; then
+  log "Node.js 20 or later is required (found: $(node --version 2>/dev/null || echo none)). Update Node, then restart Claude Code."
+  exit 1
+fi
+yellow_ruvector_validate_paths || exit 1
+
+# --- 1. Install ---
+if yellow_ruvector_needs_install; then
+  wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
+  case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
+  if ! yellow_ruvector_acquire_install_lock "$wait_secs"; then
+    log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
+    log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
+    exit 1
+  fi
+  trap 'yellow_ruvector_release_install_lock' EXIT INT TERM
+  if yellow_ruvector_needs_install; then
+    log "installing ruvector into ${RUVECTOR_DATA}..."
+    if ! yellow_ruvector_do_install; then
+      log "install failed. Run /ruvector:setup to diagnose."
+      exit 1
+    fi
+  fi
+  # An EXIT trap does not fire on exec — release explicitly.
+  yellow_ruvector_release_install_lock
+  trap - EXIT INT TERM
+fi
+entry=$(yellow_ruvector_entry)
+
+# --- 2. Project root ---
+root=$(ruvector_resolve_root "$PWD")
+ruvector_heal_store "$root"
+cd "$root"
+
+# --- 3. Fresh-store guard ---
+allow="${RUVECTOR_MCP_ALLOW:-hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats}"
+intel=".ruvector/intelligence.json"
+if [ -d .ruvector ]; then
+  stamp=""
+  if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
+    stamp=$(jq -r '.embeddingProvenance.embedderKind // empty' "$intel" 2>/dev/null || true)
+  fi
+  if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
+    yellow_ruvector_warm_model 15 || true
+    if ! yellow_ruvector_model_cached; then
+      allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vx 'hooks_remember' | paste -sd, -)
+      log "ONNX model unavailable (offline?) and the store has no embedding stamp: starting read-only (hooks_remember disabled) so the store is not stamped hash. The next session with network restores writes."
+    fi
+  fi
+fi
+export RUVECTOR_MCP_ALLOW="$allow"
+
+# --- 4. Run ---
+exec node "$entry" mcp start

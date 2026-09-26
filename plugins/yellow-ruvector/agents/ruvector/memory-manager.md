@@ -92,7 +92,7 @@ When called to flush `pending-updates.jsonl`:
    command — this agent has no way to run a slash command and check its
    result. The call is batch-level (no per-file result): if it errors, mark
    every `file_change` entry it covered as failed so step 8 retains them
-   for the next flush. For `ruvector@0.2.34`, treat a result with
+   for the next flush. For `ruvector@0.3.3` (unchanged since 0.2.34), treat a result with
    `success: true` as an acknowledged write. The response has the shape
    `{success: true, output, new_stats}` and has no separate `persisted`
    field. Retain entries when the call errors, returns `success: false`,

@@ -33,7 +33,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 | Command                         | Description                                            |
 | ------------------------------- | ------------------------------------------------------ |
-| `/ruvector:setup`               | Install ruvector and initialize `.ruvector/` directory |
+| `/ruvector:setup`               | Verify/install the plugin-managed ruvector and initialize `.ruvector/` |
 | `/ruvector:index [path]`        | Index codebase for semantic search (always repo-wide; `path` only narrows the preview) |
 | `/ruvector:search <query>`      | Search codebase by meaning using vector similarity     |
 | `/ruvector:status`              | Show health, DB stats, queue, and embedder provenance  |
@@ -81,13 +81,23 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
   review flows can recall past fixes semantically. Seeding is manual —
   re-run it after new solution docs land.
+- **Session recall:** at session start, one semantic `hooks recall` injects
+  past learnings as untrusted reference context.
 - **MCP integration:** ruvector runs as a stdio MCP server, discovered via
-  ToolSearch.
+  ToolSearch. `bin/start-ruvector.sh` starts it from the git toplevel, so
+  sessions launched from a subdirectory or a new worktree use the project
+  store.
+- **Plugin-managed install:** the plugin pins ruvector in its own
+  `package.json`/`package-lock.json` and installs it into the plugin data
+  dir on first use (a SessionStart hook does this in the background). The MCP
+  server and every hook run that one copy — no global `npm install -g`, and
+  no version skew between them.
 
 ## Requirements
 
-- Node.js 22.22.0 or later
-- npm
+- Node.js 20 or later (ruvector 0.3.3)
+- npm (for the first install) and network access for the first install and
+  the first ONNX model download (~90MB)
 - jq
 
 ## Configuration
@@ -99,7 +109,9 @@ external services or API keys required.
 
 | Issue                | Solution                                                 |
 | -------------------- | -------------------------------------------------------- |
-| "ruvector not found" | Run `/ruvector:setup`                                    |
+| "ruvector not found" / hooks do nothing | Run `/ruvector:setup` (installs into the plugin data dir; Node 20+) |
+| "starting read-only (hooks_remember disabled)" | The ONNX model could not download for a fresh store; the next session with network restores writes |
+| Old memories missing after upgrading | A store in a subdirectory from older sessions — `/ruvector:status` lists it as `nested store:` |
 | Empty search results | Run `/ruvector:index` first                              |
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |
 | Queue growing large  | Check `/ruvector:status`, queue flushes on session start |

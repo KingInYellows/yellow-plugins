@@ -60,7 +60,16 @@ fi
 command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
-command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
+# yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
+# ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
+# host does not set CLAUDE_PLUGIN_DATA.
+_rv_cli=""
+for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/"; do
+  [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] && { _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"; break; }
+done
+[ -n "$_rv_cli" ] && printf 'ruvector:           OK (plugin-managed %s)\n' "$(node "$_rv_cli" --version 2>/dev/null)" || printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'
+[ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
+unset _rv_cli _rv_d
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
@@ -434,9 +443,12 @@ stacks as well.
 
 **yellow-ruvector:**
 
-- READY: `node18_check` ok AND `npx` OK AND `.ruvector/` exists AND global
-  `ruvector` binary OK
-- NEEDS SETUP: any READY condition not met
+- READY: `node20_check` ok AND `ruvector` OK (plugin-managed install) AND
+  `.ruvector/` exists
+- PARTIAL: `node20_check` ok AND `.ruvector/` exists AND `ruvector` NOT
+  INSTALLED — the plugin installs it on the next session start (prewarm hook)
+  or via `/ruvector:setup`; detail: "plugin-managed ruvector not installed yet"
+- NEEDS SETUP: `node20_check` not ok, or `.ruvector/` missing
 
 **yellow-morph:**
 
@@ -686,7 +698,7 @@ Marketplace Setup Dashboard
   -------------------  -----------     ------------------------------------------
   gt-workflow          READY           Graphite auth detected, repo initialized
   github-workflow      PARTIAL         gh authenticated, github/gh-stack not installed
-  yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
+  yellow-ruvector      PARTIAL         Plugin-managed ruvector not installed yet
   yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
   yellow-cursor        READY           CLI resolved, credentials configured (alternative provider — not enabled)
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set

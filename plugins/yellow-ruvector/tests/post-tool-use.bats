@@ -28,7 +28,7 @@ teardown() {
 }
 
 run_hook() {
-  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
+  printf '%s' "$1" | RUVECTOR_BIN="$MOCK_BIN/ruvector" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
 }
 
 run_hook_failing_ruvector() {
@@ -36,7 +36,7 @@ run_hook_failing_ruvector() {
   printf '#!/bin/sh\nexit 127\n' > "$FAIL_BIN/ruvector"
   printf '#!/bin/sh\nexit 127\n' > "$FAIL_BIN/npx"
   chmod +x "$FAIL_BIN/ruvector" "$FAIL_BIN/npx"
-  printf '%s' "$1" | PATH="$FAIL_BIN:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
+  printf '%s' "$1" | RUVECTOR_BIN="$FAIL_BIN/ruvector" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
   local exit_code=$?
   rm -rf "$FAIL_BIN"
   return $exit_code
@@ -106,15 +106,16 @@ run_hook_failing_ruvector() {
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
-@test "skips silently when binary absent even if npx present (no npx fallback)" {
+@test "skips silently without the plugin-managed install, never using npx or a global ruvector" {
   # npx resolution (~2700ms) would blow the 1s PostToolUse budget; the hook
   # must skip entirely, never invoking npx.
   NPX_BIN="$(mktemp -d)"
   MARKER="$NPX_BIN/npx-was-called"
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$NPX_BIN/npx"
-  chmod +x "$NPX_BIN/npx"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$NPX_BIN/ruvector"
+  chmod +x "$NPX_BIN/npx" "$NPX_BIN/ruvector"
   input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
-  run bash -c 'printf "%s" "$1" | PATH="$2:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$3" bash "$4"' \
+  run bash -c 'printf "%s" "$1" | RUVECTOR_BIN= CLAUDE_PLUGIN_DATA=/nonexistent/no-install PATH="$2:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$3" bash "$4"' \
     _ "$input" "$NPX_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null

@@ -50,6 +50,7 @@ yarn.lock
 # their lockfile so `npm ci` pins the full transitive dependency tree
 # (supply-chain guarantee). Add new plugins here as they adopt the pattern.
 !plugins/yellow-morph/package-lock.json
+!plugins/yellow-ruvector/package-lock.json
 
 # Build outputs (Task I1.T1: pnpm workspace)
 dist/

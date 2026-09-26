@@ -4,6 +4,10 @@ State: `READY_FOR_SUBMISSION_APPROVAL` for the plugin fixes.
 Upgrade decision: `UPGRADE_BLOCKED_UPSTREAM` (RuVector #995). The
 shipping pin stays `ruvector@0.2.34`.
 
+> **Superseded (2026-09-26):** RuVector #995 is fixed in ruvector 0.3.3
+> (commit 33cad21). The upgrade — to a plugin-managed 0.3.3 install — is
+> planned in `plans/yellow-ruvector-0-3-3-plugin-managed-install.md`.
+
 ## Baseline
 
 - Repo: `KingInYellows/yellow-plugins`

@@ -154,8 +154,8 @@ spawning command logs a warning if the target agent's plugin is not installed.
 
 | Event | When | Plugins Using It |
 |---|---|---|
-| SessionStart | Session begins | yellow-ci, yellow-debt, yellow-ruvector |
-| UserPromptSubmit | Before each user prompt | yellow-ruvector (memory recall) |
+| SessionStart | Session begins | yellow-ci, yellow-debt, yellow-ruvector (install prewarm + memory recall) |
+| UserPromptSubmit | Before each user prompt | (none in this marketplace) |
 | PreToolUse | Before tool executes | gt-workflow (blocks `git push`) |
 | PostToolUse | After tool executes | gt-workflow (commit message check), yellow-ruvector (records edits/commands) |
 | Stop | Session ends | yellow-ruvector |

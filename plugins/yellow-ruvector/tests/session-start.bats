@@ -29,7 +29,9 @@ make_ruvector_stub() {
 
 run_hook() {
   # $1 = hook stdin JSON; $2 (optional) = CLAUDE_PROJECT_DIR override
-  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="${2:-$PROJECT_ROOT}" bash "$HOOK_SCRIPT"
+  # RUVECTOR_BIN selects the stub CLI; MOCK_BIN also stays first on PATH so
+  # tests can shadow git/timeout. A `ruvector` on PATH is never used.
+  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" RUVECTOR_BIN="$MOCK_BIN/ruvector" CLAUDE_PROJECT_DIR="${2:-$PROJECT_ROOT}" bash "$HOOK_SCRIPT"
 }
 
 make_worktree() {
@@ -107,6 +109,26 @@ exit 0'
   echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
 }
 
+@test "makes exactly one recall call and no session-start --resume" {
+  CALLS="$MOCK_BIN/calls.log"
+  make_ruvector_stub "printf '%s\\n' \"\$*\" >> '$CALLS'; exit 0"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^hooks recall ' "$CALLS")" -eq 1 ]
+  ! grep -q 'session-start' "$CALLS"
+}
+
+@test "a session launched from a subdirectory recalls from the git toplevel" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  mkdir -p "$PROJECT_ROOT/src/deep"
+  PWD_LOG="$MOCK_BIN/pwd.log"
+  make_ruvector_stub "pwd -P > '$PWD_LOG'; exit 0"
+  run run_hook "{\"cwd\":\"$PROJECT_ROOT/src/deep\"}"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$PWD_LOG")" = "$(cd "$PROJECT_ROOT" && pwd -P)" ]
+}
+
 @test "exits silently when .ruvector does not exist" {
   rm -rf "$RUVECTOR_DIR"
   make_ruvector_stub 'exit 0'
@@ -115,24 +137,24 @@ exit 0'
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
 }
 
-@test "skips silently when binary absent even if npx present (no npx fallback)" {
-  # npx resolution (~2700ms) would eat the 3s SessionStart budget before the
-  # three CLI calls run; the hook must skip entirely, never invoking npx.
+@test "skips silently without the plugin-managed install, never using npx or a global ruvector" {
+  # A global ruvector on PATH can skew from the pin, and npx would eat the
+  # budget; with no plugin-managed install the hook must skip recall.
   MARKER="$MOCK_BIN/npx-was-called"
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$MOCK_BIN/npx"
-  chmod +x "$MOCK_BIN/npx"
-  run bash -c 'printf "%s" "{}" | PATH="$1:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$2" bash "$3"' \
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$MOCK_BIN/ruvector"
+  chmod +x "$MOCK_BIN/npx" "$MOCK_BIN/ruvector"
+  run bash -c 'printf "%s" "{}" | RUVECTOR_BIN= CLAUDE_PLUGIN_DATA="$2/no-install" PATH="$1:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$2" bash "$3"' \
     _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   [ ! -f "$MARKER" ]
 }
 
-@test "emits continue:true within 3s budget when ruvector hangs" {
-  # A hanging binary must be killed per-call (0.2s provenance parse + 0.9s
-  # resume + 0.65s x2 recall, 2.8s worst case including --kill-after
-  # escalation) so JSON lands before the 3s hooks.json watchdog would kill
-  # the process.
+@test "emits continue:true within the 6s budget when ruvector hangs" {
+  # A hanging binary must be killed at its cap (0.2s provenance parse + one
+  # 4.5s recall, 4.9s worst case including --kill-after escalation) so JSON
+  # lands before the 6s SessionStart watchdog would kill the process.
   gnu_timeout_available || \
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'sleep 30'
@@ -142,12 +164,11 @@ exit 0'
   elapsed_ms=$(( end_ms - start_ms ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
-  [ "$elapsed_ms" -le 3000 ]
+  [ "$elapsed_ms" -le 5500 ]
 }
 
-@test "hanging recall still emits continue:true when session-start succeeds fast" {
-  # Mixed case: resume returns instantly, both recalls hang — the per-call
-  # caps must bound each recall independently.
+@test "a hanging recall is killed at its 4.5s cap" {
+  # The single semantic recall is the only CLI call; its cap must bound it.
   gnu_timeout_available || \
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'case "$2" in recall) sleep 30;; esac
@@ -158,7 +179,7 @@ exit 0'
   elapsed_ms=$(( end_ms - start_ms ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
-  [ "$elapsed_ms" -le 3000 ]
+  [ "$elapsed_ms" -le 5500 ]
 }
 
 @test "worktree store-heal links .ruvector from the main checkout" {
@@ -188,56 +209,40 @@ exit 0'
   [ ! -e "$RUVECTOR_DIR" ]
 }
 
-@test "version pin is synchronized between install.sh and the catalog npx spec" {
-  # The MCP server (catalog npx args) and the CLI-hook path (install.sh
-  # global default) must run the same ruvector version — skew lets a
-  # pre-ADR-210 binary clobber the store's embedding-provenance stamp.
-  install_default=$(grep -oE '^RUVECTOR_DEFAULT_VERSION="[^"]+"' \
-    "$BATS_TEST_DIRNAME/../scripts/install.sh" | cut -d'"' -f2)
-  catalog_spec=$(grep -oE '"ruvector@[0-9][^"]*"' \
-    "$BATS_TEST_DIRNAME/../../../catalog/plugins/yellow-ruvector.json" | tr -d '"')
-  [ -n "$install_default" ]
-  [ -n "$catalog_spec" ]
-  [ "ruvector@${install_default}" = "$catalog_spec" ]
-}
-
-@test "version pin in seed-solutions.md command doc matches install.sh" {
-  # The command doc hardcodes concrete npx specs (it ships to installs
-  # that have no catalog/ to reference) — every occurrence must match the
-  # single source default in install.sh.
-  install_default=$(grep -oE '^RUVECTOR_DEFAULT_VERSION="[^"]+"' \
-    "$BATS_TEST_DIRNAME/../scripts/install.sh" | cut -d'"' -f2)
-  [ -n "$install_default" ]
-  doc="$BATS_TEST_DIRNAME/../commands/ruvector/seed-solutions.md"
-  specs=$(grep -oE 'ruvector@[0-9][0-9.]*' "$doc" | sort -u)
-  [ -n "$specs" ]
-  [ "$specs" = "ruvector@${install_default}" ]
-}
-
-@test "setup, status, and plugin docs do not prescribe an unpinned ruvector install" {
-  install_default=$(grep -oE '^RUVECTOR_DEFAULT_VERSION="[^"]+"' \
-    "$BATS_TEST_DIRNAME/../scripts/install.sh" | cut -d'"' -f2)
-  [ -n "$install_default" ]
+@test "ruvector pin is exact and identical in package.json, package-lock.json, and pnpm-lock.yaml" {
+  # One pin, three lockfile views: the plugin-managed install (npm ci against
+  # package-lock.json) must install exactly the version package.json names,
+  # and the root workspace lockfile must agree (CI runs --frozen-lockfile).
   root="$BATS_TEST_DIRNAME/.."
-  for doc in \
-    "$root/commands/ruvector/setup.md" \
-    "$root/commands/ruvector/status.md" \
-    "$root/CLAUDE.md" \
-    "$root/README.md"
-  do
-    # An unpinned global install or update reintroduces CLI/MCP skew.
-    # Lines that forbid the unpinned form ("do not") are the warning, not a path.
-    if grep -nE 'npm (install|update) -g ruvector([^@0-9]|$)' "$doc" | grep -viE 'do not'; then
-      echo "unpinned npm ruvector command in $doc"
-      return 1
-    fi
-    if grep -nE 'npx( -y)?( --ignore-scripts)? ruvector([^@0-9]|$)' "$doc" | grep -viE 'do not'; then
-      echo "unpinned npx ruvector command in $doc"
-      return 1
-    fi
-  done
-  setup_pins=$(grep -oE 'ruvector@[0-9][0-9.]*' "$root/commands/ruvector/setup.md" | sort -u)
-  [ "$setup_pins" = "ruvector@${install_default}" ]
+  pin=$(jq -r '.dependencies.ruvector' "$root/package.json")
+  [[ "$pin" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+  [ "$(jq -r '.packages["node_modules/ruvector"].version' "$root/package-lock.json")" = "$pin" ]
+  [ "$(jq -r '.packages[""].dependencies.ruvector' "$root/package-lock.json")" = "$pin" ]
+  grep -A3 '^  plugins/yellow-ruvector:' "$root/../../pnpm-lock.yaml" | grep -q "specifier: $pin\$"
+}
+
+@test "catalog starts the MCP server through the plugin launcher, not npx" {
+  # npx (or a global binary) would resolve a second copy that can skew from
+  # the plugin-managed install the hooks use.
+  catalog="$BATS_TEST_DIRNAME/../../../catalog/plugins/yellow-ruvector.json"
+  [ "$(jq -r '.mcpServers.ruvector.command' "$catalog")" = '${CLAUDE_PLUGIN_ROOT}/bin/start-ruvector.sh' ]
+  [ "$(jq -r '.mcpServers.ruvector.args | length' "$catalog")" = 0 ]
+  ! grep -q 'ruvector@' "$catalog"
+}
+
+@test "no plugin doc or script prescribes npx, a global install, or a stale ruvector pin" {
+  root="$BATS_TEST_DIRNAME/.."
+  pin=$(jq -r '.dependencies.ruvector' "$root/package.json")
+  hits=$(grep -rnE 'npx( -y)?( --ignore-scripts)? ruvector|npm (install|update) -g ruvector' \
+      "$root/commands" "$root/agents" "$root/skills" "$root/hooks" "$root/bin" "$root/scripts" "$root/lib" \
+      "$root/CLAUDE.md" "$root/README.md" 2>/dev/null \
+    | grep -viE 'do not|never|older versions|uninstall' \
+    | grep -v 'repair-cursor-pretooluse.sh' || true)
+  if [ -n "$hits" ]; then echo "$hits"; return 1; fi
+  # Any concrete ruvector@X.Y.Z spec in docs must be the current pin.
+  stale=$(grep -rhoE 'ruvector@[0-9]+\.[0-9]+\.[0-9]+' "$root/commands" "$root/agents" "$root/skills" \
+    | sort -u | grep -vx "ruvector@${pin}" || true)
+  if [ -n "$stale" ]; then echo "stale pins: $stale"; return 1; fi
 }
 
 @test "store-heal replaces a dangling .ruvector symlink (ln -sfn)" {
@@ -403,7 +408,7 @@ exit 0'
 @test "provenance: RUVECTOR_EMBEDDER=hash on purpose stays silent" {
   write_provenance hash 64
   make_ruvector_stub 'exit 0'
-  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_EMBEDDER=hash PATH="$1:$PATH" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_EMBEDDER=hash RUVECTOR_BIN="$1/ruvector" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
@@ -413,7 +418,7 @@ exit 0'
   # The check is jq-only, so it must still surface when the CLI is absent
   # (the binary gate used to json_exit before any systemMessage was built).
   write_provenance hash 64
-  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | PATH="/usr/bin:/bin" CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_BIN= CLAUDE_PLUGIN_DATA="$1/no-install" CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
@@ -422,7 +427,7 @@ exit 0'
 @test "provenance: RUVECTOR_ONNX=0 (no RUVECTOR_EMBEDDER) selects hash on purpose and stays silent" {
   write_provenance hash 64
   make_ruvector_stub 'exit 0'
-  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_ONNX=0 PATH="$1:$PATH" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_ONNX=0 RUVECTOR_BIN="$1/ruvector" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
 }
@@ -430,7 +435,7 @@ exit 0'
 @test "provenance: RUVECTOR_EMBEDDER=minilm wins over RUVECTOR_ONNX=0 (upstream precedence) — still warns" {
   write_provenance hash 64
   make_ruvector_stub 'exit 0'
-  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_EMBEDDER=minilm RUVECTOR_ONNX=0 PATH="$1:$PATH" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  run bash -c 'printf "%s" "{\"cwd\":\"\"}" | RUVECTOR_EMBEDDER=minilm RUVECTOR_ONNX=0 RUVECTOR_BIN="$1/ruvector" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
 }
@@ -477,9 +482,8 @@ exit 0'
   echo "$stderr" | grep -q 'provenance check skipped: no GNU-compatible timeout'
 }
 
-@test "provenance: stamped store plus a hanging ruvector still emits JSON within the 3s budget" {
-  # The combined worst case (provenance parse + three hanging CLI calls) is
-  # the path the per-call caps were rebalanced for.
+@test "provenance: stamped store plus a hanging ruvector still emits JSON within the 6s budget" {
+  # The combined worst case: provenance parse + the hanging recall.
   gnu_timeout_available || \
     skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   write_provenance hash 64
@@ -491,5 +495,5 @@ exit 0'
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true and .permission == "allow"' > /dev/null
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
-  [ "$elapsed_ms" -le 3000 ]
+  [ "$elapsed_ms" -le 5500 ]
 }

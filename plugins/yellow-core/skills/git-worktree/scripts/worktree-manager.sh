@@ -159,8 +159,8 @@ copy_env_files() {
 }
 
 # Link the main repo's .ruvector/ into a worktree so the ruvector MCP server
-# (RUVECTOR_STORAGE_PATH=${PWD}/.ruvector/) reaches the project DB instead of a
-# missing directory. Idempotent.
+# (started from the worktree's git toplevel by yellow-ruvector's launcher)
+# reaches the project DB instead of a missing directory. Idempotent.
 #
 # Skips with info if a symlink already exists.
 # Skips with warning if a real .ruvector/ directory exists (preserves user's

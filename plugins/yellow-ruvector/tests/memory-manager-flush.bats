@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # memory-manager-flush.bats — pins hooks_pretrain persistence acknowledgement for
-# agents/ruvector/memory-manager.md Queue Flush Mode step 6 (ruvector@0.2.34).
+# agents/ruvector/memory-manager.md Queue Flush Mode step 6 (ruvector@0.3.3).
 
 bats_require_minimum_version 1.5.0
 
@@ -16,7 +16,7 @@ pretrain_acknowledged() {
   jq -e 'type == "object" and .success == true' <<< "$result" >/dev/null 2>&1
 }
 
-@test "memory-manager documents ruvector@0.2.34 pretrain success acknowledgement" {
+@test "memory-manager documents ruvector@0.3.3 pretrain success acknowledgement" {
   grep -q 'success: true' "$MEMORY_MANAGER_MD"
   grep -q 'new_stats' "$MEMORY_MANAGER_MD"
   grep -q 'no separate `persisted`' "$MEMORY_MANAGER_MD"

@@ -2,5 +2,8 @@
   "name": "yellow-ruvector",
   "version": "1.3.3",
   "private": true,
-  "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector"
+  "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
+  "dependencies": {
+    "ruvector": "0.3.3"
+  }
 }
