@@ -187,8 +187,9 @@ yellow_ruvector_acquire_install_lock() {
 
 # yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
 # if it still carries the pid judged stale. The lock is renamed first (atomic)
-# and checked afterwards, so a lock a new owner took in the meantime is put
-# back instead of deleted.
+# and checked afterwards. A lock a new owner took in the meantime is put back
+# with mkdir (fails rather than nesting if the path was taken again) plus
+# its pid file, never by renaming the directory onto the path.
 yellow_ruvector_reclaim_lock() {
   local lock_dir="${RUVECTOR_DATA}/.install.lock" grave
   grave="${lock_dir}.stale.$$.${RANDOM}"
@@ -196,14 +197,25 @@ yellow_ruvector_reclaim_lock() {
   if [ "$(cat "${grave}/pid" 2>/dev/null)" = "${1:-}" ]; then
     rm -rf -- "$grave" 2>/dev/null
   else
-    mv -- "$grave" "$lock_dir" 2>/dev/null || rm -rf -- "$grave" 2>/dev/null
+    if mkdir "$lock_dir" 2>/dev/null; then
+      mv -f -- "${grave}/pid" "${lock_dir}/pid" 2>/dev/null
+    fi
+    rm -rf -- "$grave" 2>/dev/null
   fi
   return 0
 }
 
 # Idempotent; safe from traps and again before exec.
 yellow_ruvector_release_install_lock() {
-  local lock_dir="${RUVECTOR_DATA}/.install.lock"
+  local lock_dir="${RUVECTOR_DATA}/.install.lock" owner
+  # Only the owner releases: a lock that now carries another pid belongs to
+  # someone else. ($$ is the parent shell inside prewarm's subshell, whose
+  # pid the parent writes into the lock; BASHPID is the subshell itself.)
+  owner=$(cat "${lock_dir}/pid" 2>/dev/null) || return 0
+  case "$owner" in
+    "$$"|"${BASHPID:-$$}") ;;
+    *) return 0 ;;
+  esac
   rm -f "${lock_dir}/pid" 2>/dev/null
   rmdir "$lock_dir" 2>/dev/null || true
 }

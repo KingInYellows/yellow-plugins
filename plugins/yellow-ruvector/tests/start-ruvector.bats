@@ -208,3 +208,17 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ ! -e "$DATA/.install.lock" ]
   ! grep -q EXEC "$out"
 }
+
+@test "ruvector-cli.sh runs this version's install even when current moved" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA"
+  cp -r "$SRC/scripts" "$PLUGIN/"
+  fake_install
+  mkdir -p "$DATA/install-newer/node_modules/ruvector/bin"
+  : > "$DATA/install-newer/node_modules/ruvector/bin/cli.js"
+  ln -sfn install-newer "$DATA/current"
+  run --separate-stderr bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/scripts/ruvector-cli.sh" mcp start' \
+    _ "$REPO" "$STUBS" "$PLUGIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
+}

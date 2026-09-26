@@ -5,8 +5,10 @@
 #   e.g. ... --version
 #        ... hooks reembed --dry-run
 #
-# Resolves the same install the MCP launcher and hooks use (the plugin data
-# dir's `current` install; never a global `ruvector` on PATH) and cds to the
+# Resolves the same install the MCP launcher and hooks use (this plugin
+# version's install-<lockhash> in the data dir, not `current`, which a newer
+# plugin in another session may have moved; never a global `ruvector` on
+# PATH) and cds to the
 # git toplevel first, because ruvector picks its store from process.cwd().
 # Exits 1 with a hint when Node < 20 or nothing is installed yet.
 set -euo pipefail
@@ -23,9 +25,9 @@ if ! ruvector_node_ok; then
   exit 1
 fi
 yellow_ruvector_data_dir
-entry=$(yellow_ruvector_entry)
+entry=$(yellow_ruvector_pinned_entry) || entry=""
 if [ ! -f "$entry" ]; then
-  printf 'yellow-ruvector: ruvector is not installed in %s — run /ruvector:setup\n' "$RUVECTOR_DATA" >&2
+  printf 'yellow-ruvector: ruvector for this plugin version is not installed in %s — run /ruvector:setup\n' "$RUVECTOR_DATA" >&2
   exit 1
 fi
 cd "$(ruvector_resolve_root "$PWD")"
