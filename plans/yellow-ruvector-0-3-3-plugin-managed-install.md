@@ -56,6 +56,15 @@ Delivered as three stacked PRs. Source brainstorm:
    `tool_input.edits[].file_path`. Claude Code's MultiEdit carries a single
    top-level `tool_input.file_path`.
 
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Pain point 3) Correction: `getIntelPath` is at
+> `mcp-server.js:269`. Before falling back to `~/.ruvector` it also returns the
+> project path when `cwd/.claude` exists, and it returns the project path again
+> when there is no home store.
+
+<!-- /deepen-plan -->
+
 ### User Impact
 
 Memory injection returns noise. Real learnings can be silently refused. Worktree
@@ -128,10 +137,19 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
    - The UserPromptSubmit hook and its tests are deleted.
    - The prewarm downloads the ONNX model once, detached, under the install
      lock, so SessionStart does not pay the 6.4 s cold download.
-6. **Embedder for the MCP server.** Set `RUVECTOR_EMBEDDER=minilm` in the
-   launcher. An offline first session then fails loudly instead of falling back
-   to hash and stamping a fresh store `hash`/64d. `/ruvector:status` explains
-   the failure. This must be verified in task 1.1.
+6. **An offline first session can't stamp the store `hash`.** This decision was
+   revised after deepen-plan (user decision): `RUVECTOR_EMBEDDER=minilm` does
+   not help, because the MCP server swallows the engine error and falls back to
+   hash (see the note below).
+   - When the store has no `embeddingProvenance` stamp, the launcher first warms
+     the model with `node cli.js embed text "warmup"`, bounded at about 15 s and
+     judged by its output rather than its rc.
+   - If the model is still not cached (offline), the launcher starts MCP with
+     `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
+     server is read-only and cannot stamp the store.
+   - A stamped store, or a warm model, keeps the normal five-tool allowlist.
+   - `/ruvector:status` reports the read-only mode and how to leave it (the next
+     session with network).
 7. **Co-edit is plugin-owned, not ruvector-owned.**
    - Pairs live in `.ruvector/coedit.json`, which only the plugin writes, using
      jq plus a temp file and `mv`, under a non-blocking mkdir lock (skip if
@@ -150,6 +168,71 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
    - The `Stop` hook goes: `session-end` only exports metrics, yet it rewrites
      the whole store every turn and races the MCP server's saves.
    - The `PostToolUseFailure` registration goes: co-edit only needs successes.
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Decision 3) Morph can't be copied as is:
+>
+> - `yellow_morph_validate_paths` hard-fails when `CLAUDE_PLUGIN_DATA` is unset
+>   (`install-morphmcp.sh:23-26`), so the XDG fallback is new code.
+> - `needs_install` diffs the lockfile at the DATA root (`:80-85`). The
+>   hash-directory scheme needs its own sync check: the lockfile hash vs the
+>   target of `current`.
+> - Morph passes no proxy or CA variables and doesn't use `--ignore-scripts`
+>   (`:172-182`).
+> - BSD `realpath` lacks `-m`. Reuse morph's capability probe (`:38-72`).
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: external -->
+
+> **Research:** (Decision 4) `MCP_TIMEOUT` is in milliseconds, but its default
+> and the on-timeout behavior (retry vs failed for the session) are not
+> documented (https://code.claude.com/docs/en/mcp.md). Measure it on the current
+> Claude Code during task 1.1 before fixing the 25 s wait.
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Decision 6) **This decision does not work for the MCP server.**
+>
+> - `bin/mcp-server.js:490-496` wraps `engine.remember()` in `try {} catch {}`
+>   and then falls back to hash at `:511-518`.
+> - On a store with no stamp yet, `checkVectorWrite` (`:369-371`) stamps it
+>   `hash`.
+> - Under minilm the engine throws (`dist/core/intelligence-engine.js:111`,
+>   `:269`), and a constructor throw sets `engine = null` (`mcp-server.js:239`).
+> - The MCP server never reads `RUVECTOR_EMBEDDER`. Only the CLI does
+>   (`cli.js:3495`).
+>
+> Proposed replacement:
+>
+> 1. When the store has no stamp, the launcher first warms the model with
+>    `embed text` (bounded).
+> 2. If the model still isn't cached (offline), the launcher starts MCP with
+>    `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
+>    server is read-only and cannot stamp the store.
+> 3. `/ruvector:status` explains the read-only mode.
+>
+> This needs a user decision.
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: external -->
+
+> **Research:** (Decision 7) `session_id` is a documented common field in
+> PreToolUse, PostToolUse and SessionStart input
+> (https://code.claude.com/docs/en/hooks-guide.md). Its stability across
+> `--resume` is not documented.
+>
+> - No yellow-ruvector hook or fixture reads `session_id` today. Add it to every
+>   fixture, and skip pairing when it is missing.
+> - Reuse `yellow-core/hooks/scripts/_stop-capture-subshell.sh:31-36` (sanitize
+>   with `tr -c 'A-Za-z0-9._-' '_'`, reject `.` and `..`) and the per-session
+>   temp+rename writes in `yellow-core/lib/compound-staging.sh:12-22`.
+
+<!-- /deepen-plan -->
 
 ### Trade-offs Considered
 
@@ -171,8 +254,8 @@ provider (`/stack:status`). Each PR gets its own changeset.
 **Phase 1.1: Discovery (before writing code)**
 
 - [ ] 1.1a: In a scratch dir with 0.3.3, check each of these:
-  - `RUVECTOR_EMBEDDER=minilm` behavior offline for `hooks_remember` and
-    `hooks_recall`.
+  - Offline `hooks_recall` behavior on 0.3.3 (read-only mode must still answer
+    recall).
   - Whether `ruvector embed "warmup"` (`cli.js:2231`) loads ONNX without
     creating or touching a `.ruvector/` store.
   - The model cache path `${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/`
@@ -181,6 +264,20 @@ provider (`/stack:status`). Each PR gets its own changeset.
       path). Record the result in Migration & Rollback.
 - [ ] 1.1c: Confirm `hooks reembed --dry-run` output in 0.3.3 still has the
       `targetProvenance` object that `status-provenance.bats` expects.
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.1a) The warm-up command is `embed text "warmup"`
+> (`cli.js:2234`); `embed` alone is a parent command (`:2231`).
+>
+> - It loads ONNX and never constructs `Intelligence`, so it only writes
+>   `~/.ruvector/models`.
+> - Its catch at `:2288` logs without setting an exit code, so check stdout for
+>   an embedding, not rc.
+> - `hooks recall` does not save the store (`:4888-4898`), and
+>   `targetProvenance` is still emitted (`:4985`). That confirms 1.1c.
+
+<!-- /deepen-plan -->
 
 **Phase 1.2: Packaging**
 
@@ -225,8 +322,9 @@ provider (`/stack:status`). Each PR gets its own changeset.
   3. installs under the lock, with the live-owner wait from decision 4;
   4. releases the lock explicitly before `exec`;
   5. resolves the root, heals the store and `cd`s there;
-  6. exports `RUVECTOR_MCP_ALLOW`, keeping the same five tools, and
-     `RUVECTOR_EMBEDDER` per decision 6;
+  6. exports `RUVECTOR_MCP_ALLOW`: the same five tools, or four
+     (`hooks_remember` removed) in decision 6's read-only case, after the
+     bounded model warm-up for an unstamped store;
   7. runs
      `exec node "$DATA/current/node_modules/ruvector/bin/cli.js" mcp start`.
 - [ ] 1.3c: Create `hooks/scripts/prewarm.sh` (SessionStart, catalog timeout 5),
@@ -234,6 +332,26 @@ provider (`/stack:status`). Each PR gets its own changeset.
       output carries `permission` for Cursor. It runs a detached install, then
       the one-time model warm-up from 1.1a, and writes the subshell pid to the
       lock.
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.3a) The heal block (`session-start.sh:47-89`) works on
+> the globals `PROJECT_DIR`/`RUVECTOR_DIR` at top level. Moving it into a
+> function means passing those in as arguments, not copying it verbatim.
+> `worktree-manager.sh` handles only the `.ruvector` symlink (`:169-244`,
+> `:401-411`). `coedit.json` and `coedit-sessions/` live inside the shared
+> target, so worktree removal needs no change.
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.3b) Keep `npx` out of `bin/start-ruvector.sh`:
+> `scripts/check-upstream-pins.js:239-260` scans `bin/*.sh` for `npx pkg@ver`.
+> Morph's catalog shape (`command: "${CLAUDE_PLUGIN_ROOT}/bin/start-morph.sh"`,
+> `args: []`) already passes the validators.
+
+<!-- /deepen-plan -->
 
 **Phase 1.4: Hooks**
 
@@ -259,8 +377,18 @@ provider (`/stack:status`). Each PR gets its own changeset.
   - add the prewarm SessionStart entry;
   - quote every command as `bash "${CLAUDE_PLUGIN_ROOT}/…"`.
 
-  Then run `pnpm generate:manifests` and refresh the snapshot with
-  `pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`.
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.4d) The hook commands are already quoted this way, so
+> that sub-step is a no-op. The `plugin.json` snapshot (`...snap:993-1024`)
+> includes `RUVECTOR_STORAGE_PATH`, so expect it in the snapshot diff.
+> `scripts/lib/plugin-paths.js:28` only lists valid event names, so dropping
+> `PostToolUseFailure` (PR 2) is harmless.
+
+<!-- /deepen-plan -->
+
+Then run `pnpm generate:manifests` and refresh the snapshot with
+`pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`.
 
 **Phase 1.5: Commands, docs and cross-plugin**
 
@@ -301,7 +429,51 @@ provider (`/stack:status`). Each PR gets its own changeset.
     `current` + lockfile check, modeled on morph's block at 441-461;
   - update the example output at 689.
 
-  Adding a changeset for yellow-core is part of this task.
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.5a) Corrections to `setup.md` line numbers:
+>
+> - The PATH exports are at 104 and 122.
+> - The hook-script list is at 128.
+> - The Global Binary block is 144-169.
+>
+> Also update:
+>
+> - 192 ("Hook events (6)");
+> - 198-225 ("global binary REQUIRED" plus the `npm -g` fix);
+> - the Node `< 22.22.0` rows at 59 and 240. These conflict with the plan's Node
+>   20; pick one floor (20 is ruvector's `engines`).
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.5b) `status.md` also pins `npx` at 54, 274 and 281, and
+> Step 1 is at line 22. `tests/status-provenance.bats:38-40,57-98` stubs `npx`
+> on PATH, so switching Step 6 to the resolved binary needs a new stub seam
+> (e.g. `RUVECTOR_BIN`). Add this to 1.6.
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.5d) The plan misses these:
+>
+> - `docs/security.md` 159 (hook-event list), 210-213 (UPS, post-tool-use and
+>   stop rows), 425 (tool table) and 456-470 (the "Local npm Dependencies"
+>   section);
+> - `skills/ruvector-conventions/SKILL.md:121-122,128`;
+> - `commands/ruvector/seed-solutions.md:180` (user-prompt-submit fence);
+> - `docs/architecture-overview.md:495`;
+> - plugin `CLAUDE.md:55,110-113,137,141,208,271`;
+> - `yellow-core/skills/git-worktree/SKILL.md:147` and `worktree-manager.sh:162`
+>   (`RUVECTOR_STORAGE_PATH`).
+>
+> The last two are in yellow-core, which then needs its changeset.
+
+<!-- /deepen-plan -->
+
+Adding a changeset for yellow-core is part of this task.
 
 - [ ] 1.5f: Delete `scripts/install.sh`, since setup now uses the lib. Remove
       its entry from `scripts/sync-shell-snippets.js:59` and update
@@ -311,6 +483,17 @@ provider (`/stack:status`). Each PR gets its own changeset.
       (the write race is fixed in 0.3.3, and the hook stamp path closes in PR 2)
       and `plans/yellow-ruvector-hook-contract-a.md` (the upgrade block is
       cleared).
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Task 1.5f) `FOCUS_TARGET` feeds `seedAllTargets`
+> (`sync-shell-snippets.test.ts:92-117`), so the whole ruvector-focused drift
+> fixture must be retargeted to another plugin's install script. Also update the
+> comments at `scripts/sync-shell-snippets.js:42-44`. The three pin tests in
+> `session-start.bats` grep `scripts/install.sh` for `RUVECTOR_DEFAULT_VERSION`;
+> 1.6b already repoints them.
+
+<!-- /deepen-plan -->
 
 **Phase 1.6: Tests**
 
@@ -327,7 +510,9 @@ provider (`/stack:status`). Each PR gets its own changeset.
   - fallback DATA when `CLAUDE_PLUGIN_DATA` is unset;
   - the wait-then-hint behavior when the lock is held by a live pid;
   - Node below 20 gives a clear error;
-  - `RUVECTOR_MCP_ALLOW` and `RUVECTOR_EMBEDDER` are passed through.
+  - `RUVECTOR_MCP_ALLOW` holds the five tools for a stamped store. For an
+    unstamped store with a failing `embed` stub it holds four (`hooks_remember`
+    removed).
 - [ ] 1.6d: New `tests/resolve.bats`, covering root order, the `RUVECTOR_BIN`
       seam, the lock-held skip and a missing `current`.
 - [ ] 1.6e: `session-start.bats` asserts one recall call, no `--resume`, and a
@@ -395,9 +580,24 @@ provider (`/stack:status`). Each PR gets its own changeset.
   - print the top 10 partners with counts from `coedit.json`;
   - handle a missing file ("no co-edit history yet").
 
-  Register it in `CLAUDE.md`, `README.md` and the command counts.
-  `hooks_coedit_suggest` stays out of the allowlist, so
-  `tests/mcp-allowlist.bats` is unchanged.
+<!-- deepen-plan: external -->
+
+> **Research:** (Task 3.1) The two docs passes disagree on whether PreToolUse
+> `hookSpecificOutput.additionalContext` reaches the model. One read the hooks
+> reference as supporting it; the other found it documented only for
+> UserPromptSubmit and SessionStart
+> (https://code.claude.com/docs/en/hooks-guide.md).
+>
+> - Add task 3.0: verify on the current Claude Code with a throwaway hook.
+> - If it is not shown, emit the note from PostToolUse (after the edit, "files
+>   usually edited with X"). The timing is arguably as useful, and the rest of
+>   PR 3 is unchanged.
+
+<!-- /deepen-plan -->
+
+Register it in `CLAUDE.md`, `README.md` and the command counts.
+`hooks_coedit_suggest` stays out of the allowlist, so `tests/mcp-allowlist.bats`
+is unchanged.
 
 - [ ] 3.3: Mention `/ruvector:related` in the `ruvector-semantic-search` agent
       ("files usually edited together").
@@ -484,7 +684,7 @@ These are listed per task above. The main ones:
     `/ruvector:status` is green.
   - Launch from `src/`: the store is at the root.
   - A linked worktree shares the main store in the same session.
-  - An offline first session fails loudly without stamping hash.
+  - An offline first session runs read-only and leaves the store unstamped.
   - Time SessionStart with a cold model and with a warm one.
 - **Manual (PR 2/3):** edit two files together three times, then see the
   suggestion on the next edit and in `/ruvector:related`. Call `hooks_remember`
@@ -504,13 +704,39 @@ These are listed per task above. The main ones:
    a cold model or offline, it fails open with the allow JSON.
 5. 20 edits plus 20 Bash commands on a fresh store leave `embeddingProvenance`
    null and add no memories.
-6. Co-edit pairs in `coedit.json` survive an MCP `hooks_remember` save.
+6. Co-edit pairs in `coedit.json` survive an MCP `hooks_remember` save. 6a. An
+   offline first session on a fresh store leaves `embeddingProvenance` null (MCP
+   ran read-only).
 7. PreToolUse and PostToolUse p95 stay under 1 s. Every PreToolUse path prints
    valid allow JSON.
 8. A version bump of the pin installs into a new `install-<hash>` without
    disturbing a running MCP server.
 9. CI is green, including `security-audit`, `changeset-check` and
    `plugin-shell-tests`.
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Acceptance criterion 1) `tests/mcp-allowlist.bats:3` and
+> `agents/ruvector/memory-manager.md:95` also match. They describe 0.2.34
+> behavior, so reword them rather than delete them.
+
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: codebase -->
+
+> **Codebase:** (Acceptance criterion 9) CI does not enforce these gates:
+>
+> - The yellow-ruvector bats suite runs in the advisory `continue-on-error` step
+>   (`.github/workflows/validate-schemas.yml:1473-1493`).
+> - `security-audit` runs `pnpm audit … || echo warning` (`:1029`), so it never
+>   fails.
+>
+> The criterion should require running `bats tests/` and `pnpm audit` locally,
+> with the output in the PR body. `pnpm install` also pulls ruvector's 12
+> optional deps (`@metaharness/*` and others) into the workspace. Run the audit
+> on that tree.
+
+<!-- /deepen-plan -->
 
 ## Edge Cases & Error Handling
 
@@ -520,6 +746,9 @@ These are listed per task above. The main ones:
 - **An install is in progress:** the launcher waits for up to 25 s while the
   owner is alive. Hooks skip. A stale lock (dead pid) is recovered once, as in
   morph.
+- **Offline with a fresh (unstamped) store and no cached model:** MCP starts
+  read-only (`hooks_remember` withheld). Recall still answers, and the store
+  stays unstamped until a session with network warms the model.
 - **`CLAUDE_PLUGIN_DATA` is unset:** use the XDG fallback. Status notes this.
 - **Node older than 20:** the launcher prints a clear error. Hooks exit
   silently. Setup blocks with an upgrade hint.
