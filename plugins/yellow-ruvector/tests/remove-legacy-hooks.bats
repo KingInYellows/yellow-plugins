@@ -9,7 +9,11 @@ SCRIPT="$BATS_TEST_DIRNAME/../scripts/remove-legacy-hooks.sh"
 
 setup() {
   command -v jq >/dev/null || skip "jq not installed"
-  S="$BATS_TEST_TMPDIR/settings.json"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  PROJ="$BATS_TEST_TMPDIR/proj"
+  mkdir -p "$HOME/.claude" "$PROJ/.claude"
+  git -C "$PROJ" init -q 2>/dev/null || true
+  S="$HOME/.claude/settings.json"
   jq -n '{model: "x", hooks: {
     PreToolUse: [{matcher: "Edit", hooks: [
       {type: "command", command: "npx ruvector hooks pre-edit \"$FILE\""},
@@ -46,8 +50,39 @@ setup() {
   run --separate-stderr bash "$SCRIPT" "$S" --apply
   [ "$status" -eq 0 ]
   [ -L "$S" ]
-  run --separate-stderr bash "$SCRIPT" "$real"
-  [ "$status" -eq 1 ]
+  jq -e '.hooks | has("PostToolUse") | not' "$real" >/dev/null
+}
+
+@test "project settings: a real file is cleaned; a symlinked file or .claude dir is refused" {
+  P="$PROJ/.claude/settings.json"
+  cp "$S" "$P"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" "$3" --apply' _ "$PROJ" "$SCRIPT" "$P"
+  [ "$status" -eq 0 ]
+  jq -e '.hooks | has("PostToolUse") | not' "$P" >/dev/null
+  # Symlinked settings.json pointing outside the project.
+  outside="$BATS_TEST_TMPDIR/outside.json"; cp "$S" "$outside"
+  rm "$P"; ln -s "$outside" "$P"
+  before=$(cat "$outside")
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" "$3" --apply' _ "$PROJ" "$SCRIPT" "$P"
+  [ "$status" -eq 2 ]
+  [ "$(cat "$outside")" = "$before" ]
+  # Symlinked .claude directory.
+  mkdir -p "$BATS_TEST_TMPDIR/evil"; cp "$S" "$BATS_TEST_TMPDIR/evil/settings.json"
+  rm -rf "$PROJ/.claude"; ln -s "$BATS_TEST_TMPDIR/evil" "$PROJ/.claude"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" "$3" --apply' _ "$PROJ" "$SCRIPT" "$P"
+  [ "$status" -eq 2 ]
+  jq -e '.hooks | has("PostToolUse")' "$BATS_TEST_TMPDIR/evil/settings.json" >/dev/null
+}
+
+@test "paths outside the allowlist are refused, and the backup is never a pre-planted path" {
+  other="$BATS_TEST_TMPDIR/other.json"; cp "$S" "$other"
+  run --separate-stderr bash "$SCRIPT" "$other" --apply
+  [ "$status" -eq 2 ]
+  victim="$BATS_TEST_TMPDIR/victim"; echo keep > "$victim"
+  ln -s "$victim" "$S.bak-000000"
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$victim")" = keep ]
 }
 
 @test "no legacy entries, a missing file, or invalid JSON never writes" {

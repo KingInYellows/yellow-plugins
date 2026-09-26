@@ -23,6 +23,7 @@ import {
   readdirSync,
   readlinkSync,
   rmSync,
+  statSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -397,32 +398,32 @@ describe('yellow-ruvector install lib', () => {
       expect(readdirSync(join(data, '.install.lock'))).toEqual(['pid']);
     });
 
-    it('reclaim waits its turn: a held reclaim mutex leaves the lock alone', () => {
-      mkdirSync(join(data, '.install.lock'), { recursive: true });
-      writeFileSync(join(data, '.install.lock', 'pid'), '999999999');
-      mkdirSync(join(data, '.install.lock.reclaim'));
+    it('reclaims a stale lock generation at most once', () => {
+      const lock = join(data, '.install.lock');
+      mkdirSync(lock, { recursive: true });
+      writeFileSync(join(lock, 'pid'), '999999999');
+      // Another waiter already claimed this exact lock (pid + inode).
+      const marker = join(
+        data,
+        `.install.lock.reclaim.999999999-${statSync(lock).ino}`
+      );
+      mkdirSync(marker);
       const r = runBash(
         'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
         env
       );
       expect(r.status).toBe(0);
-      expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
-    });
-
-    it('reclaim clears a minute-old abandoned mutex, then the stale lock', () => {
-      mkdirSync(join(data, '.install.lock'), { recursive: true });
-      writeFileSync(join(data, '.install.lock', 'pid'), '999999999');
-      const mutex = join(data, '.install.lock.reclaim');
-      mkdirSync(mutex);
-      const old = new Date(Date.now() - 5 * 60 * 1000);
-      utimesSync(mutex, old, old);
-      const r = runBash(
+      expect(existsSync(join(lock, 'pid'))).toBe(true);
+      // A marker older than 10 minutes (its reclaimer died) is pruned, and
+      // the stale lock is then reclaimed.
+      const old = new Date(Date.now() - 11 * 60 * 1000);
+      utimesSync(marker, old, old);
+      const r2 = runBash(
         'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
         env
       );
-      expect(r.status).toBe(0);
-      expect(existsSync(join(data, '.install.lock'))).toBe(false);
-      expect(existsSync(mutex)).toBe(false);
+      expect(r2.status).toBe(0);
+      expect(existsSync(lock)).toBe(false);
     });
 
     it('release never removes a lock another process now owns', () => {

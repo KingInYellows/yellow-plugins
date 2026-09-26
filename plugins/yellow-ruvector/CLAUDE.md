@@ -171,10 +171,15 @@ progress.
   `.ruvector/coedit.json`. Paths are root-relative and physical; paths
   outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
   control characters, or over 512 chars are ignored. Writes are temp file +
-  rename under one mkdir lock around the session read and pair update
-  (waits up to 0.5s, then skips that edit; stale-lock reclaim is
-  serialized on a second mutex);
-  the file is capped at 5000 directed pairs, keeping the highest counts.
+  rename. A per-session mkdir lock covers the session file's
+  read-decide-write, and the store lock only the pair update; each waits up
+  to 0.5s, then skips (a busy store loses one increment, never the
+  session's latest edit). A lock over a minute old is reclaimed once per
+  generation (`<lock>.reclaim.<inode>` markers, pruned after 10 minutes).
+  The stored previous path is re-normalized before pairing. Every write
+  rebuilds the pairs symmetric; a `coedit.json` over 4 MB is set aside
+  unparsed; the file is capped at 5000 directed pairs, keeping the highest
+  counts.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session
   files older than 7 days. MultiEdit's path is the top-level
