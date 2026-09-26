@@ -1,0 +1,31 @@
+.changeset/review-triage-command.md
+  s_0e9ca486378b02::t_75e2c0fd9f25b4 9-12
+plugins/yellow-review/CLAUDE.md
+  s_0e9ca486378b02::t_af89b885f008ed 82-85
+plugins/yellow-review/README.md
+  s_0e9ca486378b02::t_201920451c2384 173-176
+plugins/yellow-review/commands/review/review-all.md
+  s_0e9ca486378b02::t_c50cfc35d43fd1 151-173
+plugins/yellow-review/commands/review/review-pr.md
+  s_0e9ca486378b02::t_837d3bdaf9c153 89-95,98-108,111-117
+plugins/yellow-review/commands/review/triage.md
+  s_0e9ca486378b02::t_17c9bc1893393b 61-70,119-120
+plugins/yellow-review/tests/skill-content.bats
+  s_0e9ca486378b02::t_4078fd93547aa4 254-262,268-296,298-300,303-306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5ab0bfba3e9ca514f262f637fa08f85e592fffa9",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
