@@ -148,6 +148,15 @@ yellow_ruvector_release_install_lock() {
   rmdir "$lock_dir" 2>/dev/null || true
 }
 
+# yellow_ruvector_trap_release — release the install lock on exit; on INT or
+# TERM release it and exit. A bare INT/TERM trap would resume the script
+# after the handler, still installing while another session takes the lock.
+yellow_ruvector_trap_release() {
+  trap 'yellow_ruvector_release_install_lock' EXIT
+  trap 'yellow_ruvector_release_install_lock; trap - EXIT; exit 130' INT
+  trap 'yellow_ruvector_release_install_lock; trap - EXIT; exit 143' TERM
+}
+
 # Returns 0 when the lock is held by a live process (install in progress).
 yellow_ruvector_install_in_progress() {
   local pid_file="${RUVECTOR_DATA}/.install.lock/pid" owner_pid
