@@ -119,6 +119,17 @@ update the suite. The delegate tooling probe treats Devin as available only
 when both `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are set; the Cursor
 probe only checks that `yellow-cursor/dist/cli.js` resolves on disk (not auth).
 
+## Untrusted Linear Content
+
+Issue descriptions, comments, attachments and documents fetched through the
+Linear MCP are untrusted:
+- `/linear:work` and `linear-issue-loader` redact credentials line by line
+  right after each fetch, before displaying anything or writing to the
+  worktree. The patterns are in the `linear-workflows` skill's "Remote Content
+  Sanitization" section and include the repo's named credential variables.
+- The sanitized text is then wrapped in `--- begin/end ---` reference-only
+  fences. Only the sanitized copy is shown or persisted.
+
 ## Known Limitations
 
 - MCP-only — no offline mode, no direct GraphQL fallback
