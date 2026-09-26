@@ -94,8 +94,15 @@ trap 'yellow_ruvector_release_install_lock' EXIT
 if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then
   yellow_ruvector_do_install || { printf 'FAILED: install failed (see output above)\n'; exit 1; }
 fi
-yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \
-  || printf 'WARNING: ONNX model download failed (offline?). Recall works; memory writes wait for a session with network.\n'
+# The ONNX model only matters when the env does not select the hash
+# embedder (the launcher's and prewarm's rule).
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh"
+if ruvector_hash_selected; then
+  printf 'onnx model: not needed (hash embedder selected)\n'
+else
+  yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \
+    || printf 'WARNING: ONNX model download failed (offline?). Recall works; memory writes wait for a session with network.\n'
+fi
 printf 'Installed: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version)"
 ```
 
@@ -109,7 +116,7 @@ through; nothing else from the environment reaches npm).
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 mkdir -p "$ROOT/.ruvector" && \
 (grep -q '\.ruvector' "$ROOT/.gitignore" 2>/dev/null || printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> "$ROOT/.gitignore") && \
-printf 'Initialized %s/.ruvector/ and updated .gitignore\n' "$ROOT"
+printf 'Initialized .ruvector/ at the project root and updated .gitignore\n'
 ```
 
 The store lives at the git toplevel. The MCP launcher and the hooks both
