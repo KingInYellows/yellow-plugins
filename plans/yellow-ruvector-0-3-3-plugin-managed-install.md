@@ -106,11 +106,15 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 ### Key Design Decisions
 
 1. **Plugin-managed install (morph pattern), keyed by lockfile hash.**
-   - `npm ci --ignore-scripts` into `install-<hash>`, then swap `current`
-     atomically with `ln -sfn` on a temp link followed by `mv -T`.
+   - `npm ci --ignore-scripts` into `install-<hash>`, then swap `current`:
+     atomically with a temp link plus GNU `mv -T`; where `mv` lacks `-T`
+     (BSD/macOS), `ln -sfn` under the install lock (a brief unlink window that
+     unlocked readers treat as "needs install" and wait out on the lock).
    - Keying by hash means a version bump never deletes `node_modules` from under
      a running MCP server, whose ONNX imports load lazily.
-   - Prune install dirs other than `current` and the previous one.
+   - Prune install dirs other than `current`, the previous one, and any named
+     on a live process's command line (the launcher execs the resolved
+     `install-<hash>` path so a long-running server keeps its dir).
    - Pass through `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (and lowercase),
      `NODE_EXTRA_CA_CERTS` and `npm_config_*`/`NPM_CONFIG_*` into the `env -i`
      install.
@@ -357,9 +361,10 @@ provider (`/stack:status`). Each PR gets its own changeset.
 
 - [ ] 1.4a: In all hooks, replace the `command -v ruvector` blocks
       (`session-start.sh:217-221`, `pre-tool-use.sh:31-35`,
-      `post-tool-use.sh:44-48`, `stop.sh:30-34`) with sourcing `resolve.sh` and
-      calling `ruvector_resolve_bin || json_exit`. Derive PROJECT_DIR from
-      `ruvector_resolve_root "$CWD"`.
+      `post-tool-use.sh:44-48`, `stop.sh:30-34`) with sourcing `resolve.sh`.
+      Only hooks that run the CLI call `ruvector_resolve_bin || json_exit`;
+      the jq-only co-edit hooks (PR 2/3) never gate on the binary. Derive
+      PROJECT_DIR from `ruvector_resolve_root "$CWD"`.
 - [ ] 1.4b: In `session-start.sh`:
   - drop `--resume`;
   - make the two 0.65 s recalls a single
@@ -412,8 +417,9 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     fence so the `status-provenance.bats` extractor still works;
   - add checks for a nested `.ruvector/` below the root and for leftover global
     hook entries;
-  - add "hooks inactive: CLAUDE_PLUGIN_DATA unset, using fallback" when
-    applicable.
+  - report the data dir with "(fallback: CLAUDE_PLUGIN_DATA unset)" when
+    applicable (informational: hooks and the launcher use the same
+    fallback); "hooks inactive" is only for a missing Node 20+.
 - [ ] 1.5c: Update `commands/ruvector/seed-solutions.md`:
   - allowed-tools lines 11-13;
   - the Step 1.3 version gate (42-67), which checks the DATA install version
@@ -711,8 +717,9 @@ These are listed per task above. The main ones:
    valid allow JSON.
 8. A version bump of the pin installs into a new `install-<hash>` without
    disturbing a running MCP server.
-9. CI is green, including `security-audit`, `changeset-check` and
-   `plugin-shell-tests`.
+9. CI is green, including `changeset-check` and `plugin-shell-tests`, and the
+   yellow-ruvector bats suite passes locally. `security-audit` is advisory
+   (`pnpm audit` does not fail the job), so check its output by hand.
 
 <!-- deepen-plan: codebase -->
 
