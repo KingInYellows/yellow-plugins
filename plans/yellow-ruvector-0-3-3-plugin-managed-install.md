@@ -690,9 +690,9 @@ Adding a changeset for yellow-core is part of this task.
     re-validated, between reference-only fence lines (partner names are
     project data);
   - handle a missing file ("no co-edit history yet");
-  - the command passes the path on stdin (`--stdin`) through a quoted heredoc
-    whose delimiter is freshly randomized per call, never on the command
-    line.
+  - the command never puts the path into shell syntax (a heredoc, even with a
+    random delimiter, does): `--stage` makes a private temp query file, the
+    Write tool writes the path into it, and `--file` reads one line from it.
 
 <!-- deepen-plan: external -->
 
