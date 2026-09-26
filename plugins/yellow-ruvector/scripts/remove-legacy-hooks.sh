@@ -62,7 +62,11 @@ fi
   || { printf 'remove-legacy-hooks: not a regular file: %s\n' "$f" >&2; exit 2; }
 f="$target"
 
-re='ruvector[^"]* hooks (post-edit|post-command|pre-edit|pre-command|session-start|session-end)'
+# Only an actual ruvector invocation: the `ruvector` executable (bare, by
+# path, or via npx, optionally @version) starting a command word, followed by
+# `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
+# merely mentions it is not a match.
+re='(^|[;&|[:space:]])(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:]]|$)'
 
 list=$(jq -r --arg re "$re" '
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
