@@ -46,7 +46,7 @@ if yellow_ruvector_needs_install; then
     log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
     exit 1
   fi
-  trap 'yellow_ruvector_release_install_lock' EXIT INT TERM
+  yellow_ruvector_trap_release
   if yellow_ruvector_needs_install; then
     log "installing ruvector into ${RUVECTOR_DATA}..."
     if ! yellow_ruvector_do_install; then
@@ -81,7 +81,7 @@ if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
 fi
 if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
   if yellow_ruvector_acquire_install_lock "$wait_secs"; then
-    trap 'yellow_ruvector_release_install_lock' EXIT INT TERM
+    yellow_ruvector_trap_release
     yellow_ruvector_model_cached || yellow_ruvector_warm_model 15 || true
     yellow_ruvector_release_install_lock
     trap - EXIT INT TERM

@@ -130,6 +130,8 @@ coedit_record() {
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
   dir="${root}/.ruvector"
   sdir="${dir}/coedit-sessions"
+  # A symlinked session dir (from a hostile checkout) could point anywhere.
+  [ -L "$sdir" ] && return 0
   mkdir -p "$sdir" 2>/dev/null || return 0
   sfile="${sdir}/${sid}"
   now=$(date +%s)
@@ -149,10 +151,11 @@ coedit_record() {
 }
 
 # coedit_prune_sessions <root> — delete session files untouched for 7+ days.
+# Never follows a symlinked session dir: it could point at unrelated files.
 coedit_prune_sessions() {
   local sdir="${1:-}/.ruvector/coedit-sessions"
-  [ -d "$sdir" ] || return 0
-  find "${sdir}/" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null
+  [ -d "$sdir" ] && [ ! -L "$sdir" ] || return 0
+  find "$sdir" -mindepth 1 -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null
   return 0
 }
 

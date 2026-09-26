@@ -45,7 +45,7 @@ yellow_ruvector_acquire_install_lock 2 \
   || json_exit
 
 (
-  trap 'yellow_ruvector_release_install_lock' EXIT INT TERM
+  yellow_ruvector_trap_release
   if yellow_ruvector_needs_install; then
     yellow_ruvector_do_install || exit 0
   fi

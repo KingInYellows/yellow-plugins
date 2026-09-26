@@ -208,3 +208,11 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -d "$RUVECTOR_DIR/.coedit.lock" ]
   ! ls "$RUVECTOR_DIR"/coedit.json.tmp.* >/dev/null 2>&1
 }
+
+@test "a symlinked coedit-sessions dir is never written through" {
+  victim="$(mktemp -d)"
+  ln -s "$victim" "$RUVECTOR_DIR/coedit-sessions"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  [ -z "$(ls -A "$victim")" ]
+  rm -rf "$victim"
+}
