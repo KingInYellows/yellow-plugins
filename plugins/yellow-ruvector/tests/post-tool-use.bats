@@ -146,7 +146,7 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
 @test "a hostile session id cannot escape coedit-sessions" {
   edit "../../evil" "$PROJECT_ROOT/src/a.ts"
   [ ! -e "$PROJECT_ROOT/evil" ]
-  [ -f "$RUVECTOR_DIR/coedit-sessions/.._.._evil" ]
+  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null)" ]
 }
 
 @test "a missing session id records nothing" {
@@ -425,6 +425,29 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit q1 "$PROJECT_ROOT/src/d.ts"
   [ "$(pair src/c.ts src/d.ts)" -eq 1 ]
   [ "$(pair src/b.ts src/d.ts)" -eq 0 ]
+}
+
+@test "session ids are validated, never rewritten into a shared file" {
+  edit 'a/b' "$PROJECT_ROOT/src/a.ts"
+  edit 'a?b' "$PROJECT_ROOT/src/b.ts"
+  edit '.x' "$PROJECT_ROOT/src/c.ts"
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/a_b" ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null)" ]
+}
+
+@test "no pair is counted when the session state cannot be saved" {
+  edit u1 "$PROJECT_ROOT/src/a.ts"
+  # An mv that refuses only session-file writes: the store stays writable.
+  mkdir -p "$BATS_TEST_TMPDIR/mvbin"
+  printf '#!/bin/sh\ncase "$*" in *coedit-sessions/*) exit 1 ;; esac\nexec /bin/mv "$@"\n' > "$BATS_TEST_TMPDIR/mvbin/mv"
+  chmod +x "$BATS_TEST_TMPDIR/mvbin/mv"
+  PATH="$BATS_TEST_TMPDIR/mvbin:$PATH" edit u1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ "$(jq -r .last "$RUVECTOR_DIR/coedit-sessions/u1")" = "src/a.ts" ]
+  # Once saving works again, pairing resumes normally.
+  edit u1 "$PROJECT_ROOT/src/c.ts"
+  [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
 }
 
 @test "a busy store lock loses only that increment; the session still advances" {
