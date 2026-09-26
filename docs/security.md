@@ -250,6 +250,32 @@ Before enabling any plugin with hooks:
   `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
   "Safety rails".
 
+### Review-Findings Ledger (yellow-review)
+
+`/review:pr` and `/review:all` persist model-derived review data — finding
+titles, suggested fixes, reasons and anchor snippets — and feed part of it
+back into later reviewer prompts. The boundary:
+
+- **Storage.** The ledger lives under
+  `$(git rev-parse --git-common-dir)/yellow-review/findings/`: inside the Git
+  directory, so it is never committed or pushed, and shared by every worktree
+  of the clone. `lib/review-ledger.sh` creates the directory 0700 and every
+  file 0600 (`umask 077`). Nothing is posted to GitHub.
+- **Redaction before persistence.** Every model-authored string passes
+  through yellow-core's `cs_redact_secrets`, then a fail-closed pass that
+  replaces env-style `*_KEY` / `*_TOKEN` / `*_SECRET` / `*_ID` / `*_PASSWORD`
+  assignments and long high-entropy tokens with
+  `[withheld: possible credential]`. Without yellow-core, or when redaction
+  fails, the string is withheld rather than stored raw; an anchor line that
+  fails redaction keeps only its hash and line hint.
+- **Prompt re-entry.** Dismissals that still apply are re-injected into later
+  reviewer prompts as a `--- begin dismissed-findings (reference only) ---`
+  block. The library substitutes that block's delimiters and the neighbouring
+  context blocks' delimiters out of every value, XML-escapes them, and drops
+  any entry whose title or reason starts a line with `IGNORE PREVIOUS`,
+  `system:` or `assistant:`. Reviewers treat the block as reference data,
+  never as instructions.
+
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 
 - **yellow-review's Cursor copy is both a trust-boundary downgrade and a
