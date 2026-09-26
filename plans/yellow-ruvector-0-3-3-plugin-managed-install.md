@@ -156,8 +156,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
      session with network).
 7. **Co-edit is plugin-owned, not ruvector-owned.**
    - Pairs live in `.ruvector/coedit.json`, which only the plugin writes, using
-     jq plus a temp file and `mv`, under a non-blocking mkdir lock (skip if
-     busy).
+     jq plus a temp file and `mv`, under a mkdir lock with a bounded wait
+     (10 × 50 ms, then skip that edit; see task 2.2).
    - The MCP server's save would erase anything the hooks add to
      `intelligence.json` (`mcp-server.js:223`, `:418-430`), which rules that
      file out.
@@ -268,9 +268,15 @@ provider (`/stack:status`). Each PR gets its own changeset.
   - The model cache path `${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/`
     (`dist/core/onnx/loader.js:178-184`) is shared by hooks and MCP.
   - Claude Code's MCP startup timeout when `MCP_TIMEOUT` is unset: start a
-    stdio server that sleeps before its handshake and bisect the sleep. Keep
-    the `RUVECTOR_INSTALL_WAIT` default a few seconds under it (lower it from
-    25 if needed) and record the measured value in Decision 4.
+    stdio server that sleeps before its handshake and bisect the sleep. Treat
+    `RUVECTOR_INSTALL_WAIT` as the launcher's total pre-handshake budget, kept
+    a few seconds under the measured timeout (lower it from 25 if needed),
+    and record the measured value in Decision 4. Every step before the
+    handshake draws on that one budget: the install-lock wait, then the
+    fresh-store warm-up's lock wait and its bounded embed (at most 15 s, and
+    never more than what is left minus ~2 s for the handshake). When too
+    little is left, skip the warm-up and start read-only. Only a first
+    `npm ci` may run past it.
 - [ ] 1.1b: Confirm 0.2.34 can still load a store written by 0.3.3 (rollback
       path). Record the result in Migration & Rollback.
 - [ ] 1.1c: Confirm `hooks reembed --dry-run` output in 0.3.3 still has the
@@ -417,9 +423,17 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     binary;
   - remove `user-prompt-submit.sh` from the list at 127;
   - add a note that any global `ruvector` is no longer used;
-  - add detection of leftover `ruvector hooks init` entries in
-    `~/.claude/settings.json` or `.claude/settings.json`, with a warning and the
-    `scripts/repair-cursor-pretooluse.sh` pointer.
+  - add detection and removal of leftover `ruvector hooks init` entries in
+    `~/.claude/settings.json` or `.claude/settings.json`. The repair script
+    only wraps PreToolUse commands for Cursor, so it is not cleanup: add
+    `scripts/remove-legacy-hooks.sh <file> [--apply]`, which lists every hook
+    entry whose command runs `ruvector hooks
+    post-edit|post-command|pre-edit|pre-command|session-start|session-end`
+    and, with `--apply`, removes only those (dropping emptied matcher groups
+    and events) after a `<file>.bak-<epoch>` backup, writing in place so a
+    symlinked settings file stays a symlink. Setup lists the entries and asks
+    before applying; on "keep" it prints the manual removal steps. Status
+    flags them and points to setup.
 - [ ] 1.5b: Update `commands/ruvector/status.md`:
   - Step 1: install dir, version, lockfile sync, Node version;
   - Step 6 (line 155): the dry-run uses the resolved binary instead of `npx`.
@@ -452,8 +466,10 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
   - replace the line 63 probe and the READY rule at 435-439 with a check of
     yellow-ruvector's own install. `/setup:all` runs as a yellow-core command,
     so its `CLAUDE_PLUGIN_DATA` is yellow-core's: resolve yellow-ruvector's
-    data dir explicitly (`${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/data/yellow-ruvector*/`,
-    then the XDG fallback `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector/`)
+    data dir explicitly (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data/yellow-ruvector*/`,
+    then the XDG fallback `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/`;
+    write `$HOME`, not `~`, since a tilde from a parameter default is never
+    expanded)
     and look for `current/node_modules/ruvector/bin/cli.js` there. Model the
     READY/PARTIAL rules on morph's block at 441-461;
   - update the example output at 689.
@@ -604,8 +620,8 @@ Adding a changeset for yellow-core is part of this task.
   - On Edit, Write and MultiEdit (with `tool_input.file_path`), look up the
     partners of the normalized path in `coedit.json` with jq (no node start).
   - Keep up to 3 partners with a count of at least 3 that still exist under the
-    root and are not yet surfaced for that file this session (tracked in the
-    session file).
+    root, the first time this session edits that file (the edited file goes
+    into the session file's `surfaced` list; see Data formats).
   - Emit them with `emit_recall_json "PreToolUse" "<fenced block>"`: an advisory
     header, a reference-only fence, and forged-terminator scrubbing.
   - Bash stays a no-op allow. Drop the background `pre-edit` and `pre-command`
@@ -716,8 +732,14 @@ These are listed per task above. The main ones:
 // .ruvector/coedit.json
 { "version": 1, "pairs": { "src/a.ts": { "src/b.ts": 4 }, "src/b.ts": { "src/a.ts": 4 } } }
 // .ruvector/coedit-sessions/<session_id>
-{ "last": "src/a.ts", "epoch": 1790000000, "surfaced": ["src/b.ts"] }
+{ "last": "src/a.ts", "epoch": 1790000000, "surfaced": ["src/a.ts"] }
 ```
+
+`surfaced` lists the edited (source) files this session already got
+suggestions for, not the partners shown. That is what makes the contract
+"once per edited file per session": editing `src/c.ts` later still shows
+`src/b.ts` if it is a partner of `src/c.ts`, and returning to `src/a.ts`
+shows nothing again. Capped at the last 200 entries.
 
 ## Testing Strategy
 
