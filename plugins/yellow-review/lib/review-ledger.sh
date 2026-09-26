@@ -862,6 +862,11 @@ rl_redact_reason() {
 
 # Lines at <T> that belong to sibling findings (same file and anchor hash)
 # whose own line maps unchanged; the window search must not claim them.
+# Only live-state siblings (open/reopened/applied/report_only) are excluded:
+# dismissed/fixed/stale siblings are omitted deliberately so a re-appearing
+# anchor can still re-match their mapped line. Re-verification therefore errs
+# toward reproduced, not a false fixed. Follow-up: exclude every sibling whose
+# anchor maps unchanged regardless of lifecycle state.
 rl_sibling_lines() {
   local fold="$1" id="$2" T="$3" rows shead sline sfile res ln np
   rows=$(printf '%s' "$fold" | jq -r --arg id "$id" '
