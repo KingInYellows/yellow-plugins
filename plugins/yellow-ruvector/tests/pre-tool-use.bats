@@ -152,3 +152,15 @@ assert_allow_json() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+@test "a .ruvector symlink to outside the project surfaces and writes nothing" {
+  victim="$(mktemp -d)"
+  cp "$RUVECTOR_DIR/coedit.json" "$victim/" 2>/dev/null || true
+  rm -rf "$RUVECTOR_DIR"
+  ln -s "$victim" "$RUVECTOR_DIR"
+  before=$(ls -A "$victim")
+  out=$(run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")")
+  printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext == null' >/dev/null
+  [ "$(ls -A "$victim")" = "$before" ]
+  rm -rf "$victim"
+}

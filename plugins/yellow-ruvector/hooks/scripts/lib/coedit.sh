@@ -189,8 +189,9 @@ COEDIT_MAX_SUGGESTIONS="${COEDIT_MAX_SUGGESTIONS:-3}"
 # normalize to itself, or no longer exists as a file under the root, is
 # dropped and never printed.
 coedit_partners() {
-  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" f count partner norm n=0
-  f="${root}/.ruvector/coedit.json"
+  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store f count partner norm n=0
+  store=$(coedit_store_dir "$root") || return 0
+  f="${store}/coedit.json"
   [ -f "$f" ] || return 0
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
@@ -214,17 +215,18 @@ coedit_partners() {
 # partner clears COEDIT_MIN_COUNT); record it as surfaced. Prints nothing
 # otherwise.
 coedit_suggest_once() {
-  local root="$1" sid rel sfile lines
-  [ -d "${root}/.ruvector" ] || return 0
+  local root="$1" store sid rel sfile lines
+  store=$(coedit_store_dir "$root") || return 0
+  [ -L "${store}/coedit-sessions" ] && return 0
   sid=$(coedit_sanitize_session "${2:-}") || return 0
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
-  sfile="${root}/.ruvector/coedit-sessions/${sid}"
+  sfile="${store}/coedit-sessions/${sid}"
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced // []) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     return 0
   fi
   lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT")
   [ -n "$lines" ] || return 0
-  mkdir -p "${root}/.ruvector/coedit-sessions" 2>/dev/null || return 0
+  mkdir -p "${store}/coedit-sessions" 2>/dev/null || return 0
   { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
     | jq -c --arg r "$rel" '.surfaced = (((.surfaced // []) + [$r]) | unique | .[-200:])' 2>/dev/null \
     | coedit_write_atomic "$sfile"
