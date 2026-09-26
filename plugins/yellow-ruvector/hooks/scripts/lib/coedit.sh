@@ -430,7 +430,10 @@ coedit_suggest_once() {
   # The same per-session lock as coedit_record: a parallel PostToolUse
   # rewrite of this session file must not drop `surfaced` (or `last`).
   slock="${store}/coedit-sessions/.${sid}.lock"
-  _coedit_tries_left=$COEDIT_LOCK_TRIES
+  # The partner lookup has already spent part of the 1s PreToolUse budget:
+  # wait at most one 50ms retry for the session lock (a busy lock means a
+  # PostToolUse write is in flight; skipping costs one suggestion).
+  _coedit_tries_left=${COEDIT_SUGGEST_LOCK_TRIES:-1}
   coedit_lock_path "$slock" || return 0
   seen=0
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced | if type == "array" then map(select(type == "string")) else [] end) | index($r) != null' "$sfile" >/dev/null 2>&1; then

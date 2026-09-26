@@ -294,6 +294,15 @@ related_staged() {
   done
 }
 
+@test "a held session lock never pushes the hook past its budget" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.s11.lock"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s11 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [ $(( (end - start) / 1000000 )) -lt 450 ]
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done
