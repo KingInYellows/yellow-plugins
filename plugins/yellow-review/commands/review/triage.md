@@ -60,6 +60,14 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
 
 - `MERGED` or `CLOSED`: never prune implicitly — the PR may have closed
   after the caller last checked it, and deleting a ledger needs a human.
+  First record the state so the SessionStart hook stops counting the PR
+  (exit 6 means `gh` could not read it; note that and go on):
+
+  ```bash
+  RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
+  "$RL" refresh-state <PR>
+  ```
+
   - With `--non-interactive`: print `Ledger: retained (PR <state>)` and
     stop. Unattended triage never reaches Step 2.
   - Attended: ask one AskUserQuestion, "Delete the ledger for closed PR

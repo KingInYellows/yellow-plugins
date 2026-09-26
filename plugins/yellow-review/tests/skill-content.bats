@@ -265,6 +265,13 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   ! grep -q 'run Step 2 and stop' "$TRIAGE"
 }
 
+@test "triage: a closed PR's state is recorded before the prune question" {
+  step3=$(awk '/^## Step 3:/ { p = 1; next } /^## Step 4:/ { p = 0 } p' "$TRIAGE")
+  rs=$(grep -n '"\$RL" refresh-state <PR>' <<<"$step3" | cut -d: -f1)
+  ask=$(grep -n 'Delete the ledger for closed PR' <<<"$step3" | cut -d: -f1)
+  [ -n "$rs" ] && [ -n "$ask" ] && [ "$rs" -lt "$ask" ]
+}
+
 @test "triage: Step 8 explicitly Reads the shared ledger reference before using it" {
   grep -q 'Read `\${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its' "$TRIAGE"
   grep -q 'If the Read fails, stop and report the path' "$TRIAGE"

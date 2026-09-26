@@ -184,8 +184,9 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
   shared by every worktree of the clone. Subcommands `observe`, `transition`,
   `fold`, `dismissed-context`, `reverify`, `publication`, `validate-path`,
-  `prune`, `summary`, `new-run-id`, `remote-head`, `settle`, `reconcile`,
-  `restore`, `cards`, `resolve-path`; JSON on stdin/stdout, exit codes 2
+  `prune`, `refresh-state`, `summary`, `new-run-id`, `remote-head`, `settle`,
+  `reconcile`, `restore`, `cards`, `resolve-path`; JSON on stdin/stdout, exit
+  codes 2
   usage / 3 invalid / 4 lock timeout / 5 PR closed / 6 unverifiable. The
   rule vocabulary is `lib/review-ledger-vocab.json`.
 - Stored file names are PR-controlled: command prose addresses findings by

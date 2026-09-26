@@ -130,6 +130,24 @@ setup() {
   MOCK_GH_FAIL=1 run -6 "$RL" prune "$LEDGER_PR"
 }
 
+@test "refresh-state records the live PR state and never creates a ledger" {
+  run -0 "$RL" refresh-state "$LEDGER_PR"
+  [ "$output" = "none: PR #$LEDGER_PR has no ledger" ]
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = OPEN ]
+  size=$(wc -c <"$LEDGER_DIR/$LEDGER_PR.jsonl")
+  MOCK_GH_PR_STATE=CLOSED run -0 "$RL" refresh-state "$LEDGER_PR"
+  [ "$output" = CLOSED ]
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = CLOSED ]
+  [ "$(wc -c <"$LEDGER_DIR/$LEDGER_PR.jsonl")" -eq "$size" ]
+  MOCK_GH_FAIL=1 run -6 "$RL" refresh-state "$LEDGER_PR"
+  [ "$(cut -d' ' -f1 "$LEDGER_DIR/$LEDGER_PR.state")" = CLOSED ]
+  MOCK_GH_PR_STATE=CLOSED "$RL" prune "$LEDGER_PR" >/dev/null
+  MOCK_GH_PR_STATE=CLOSED run -0 "$RL" refresh-state "$LEDGER_PR"
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
+}
+
 @test "a tombstoned PR refuses writes; reopening starts a fresh ledger" {
   observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
   MOCK_GH_PR_STATE=CLOSED "$RL" prune "$LEDGER_PR" >/dev/null
