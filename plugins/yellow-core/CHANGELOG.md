@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.4.3
+
+### Patch Changes
+
+- [`e386b13`](https://github.com/KingInYellows/yellow-plugins/commit/e386b1300e80730d8e22480796e4c08128a06d71)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `rule` and
+  `scope` to the compact-return schema of every review persona (including
+  yellow-core's `security-reviewer` and `performance-reviewer`). `/review:pr`
+  and `/review:all` inject the rule vocabulary into reviewer prompts and default
+  a missing `rule`/`scope` to `unclassified`/`unscoped` instead of dropping the
+  return.
+
 ## 2.4.2
 
 ### Patch Changes
