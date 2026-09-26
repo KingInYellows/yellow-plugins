@@ -1055,6 +1055,11 @@ rl_index_row() {
 }
 # Lines at <T> that belong to sibling findings (same file and anchor hash)
 # whose own line maps unchanged; the window search must not claim them.
+# Only live-state siblings (open/reopened/applied/report_only) are excluded:
+# dismissed/fixed/stale siblings are omitted deliberately so a re-appearing
+# anchor can still re-match their mapped line. Re-verification therefore errs
+# toward reproduced, not a false fixed. Follow-up: exclude every sibling whose
+# anchor maps unchanged regardless of lifecycle state.
 rl_sibling_lines() {
   local self="$1" sfile="$2" shash="$3" T="$4" r id state file line head hash del res ln np
   local _b _c _d _e _f _g _h _i _j _k _l
