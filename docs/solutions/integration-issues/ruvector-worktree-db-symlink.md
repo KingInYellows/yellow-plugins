@@ -40,11 +40,14 @@ Three independent facts compound:
 1. **`.ruvector/` is gitignored.** `.gitignore` line 95 has
    `**/.ruvector/`. `git worktree add` creates the working directory from
    the index; gitignored entries are never present in a fresh worktree.
-2. **MCP path resolves at spawn time against the worktree's PWD.**
-   `plugins/yellow-ruvector/.claude-plugin/plugin.json:28` declares
-   `"RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/"`. Claude Code spawns one
-   MCP server process per session and expands `${PWD}` to the session's
-   working directory — the worktree path.
+2. **The MCP server picks its store from its working directory.**
+   ruvector's `getIntelPath()` only looks at `process.cwd()`; the
+   `RUVECTOR_STORAGE_PATH` env var this doc originally blamed is not read
+   by ruvector at all (the plugin no longer sets it). Since the 0.3.3
+   plugin-managed install, `bin/start-ruvector.sh` heals a linked
+   worktree's `.ruvector` symlink and then `cd`s to the git toplevel before
+   `exec`, so the server of a session started in a worktree uses the
+   worktree's (symlinked, shared) store from the first call.
 3. **Hooks fail-closed without error.** Every hook reads the same pattern
    (`session-start.sh:24`, etc.):
    ```sh
@@ -96,11 +99,12 @@ directory walk.
 - **`git rev-parse --show-toplevel` from inside a worktree.** Returns the
   worktree root, not main. Symlinking to that path produces a
   self-referential dangling link. Use `--git-common-dir` instead.
-- **MCP-spawn-time vs. process-runtime.** `RUVECTOR_STORAGE_PATH` is
-  evaluated at MCP server spawn. The symlink only helps when Claude Code
-  is launched from inside the worktree directory. A pre-existing main
-  session that `cd`s into a worktree continues writing to main directly —
-  that's actually fine, but worth understanding.
+- **Spawn-time working directory, not an env var.** The store is fixed
+  when the MCP server starts, by the launcher's `cd` to the git toplevel.
+  A pre-existing main session that later `cd`s into a worktree keeps
+  writing to main directly — that's fine (it is the same shared store),
+  but worth understanding. `RUVECTOR_STORAGE_PATH` is inert; do not
+  reintroduce it.
 - **Dangling symlink semantics in hook guards.** POSIX `[ -d X ]` on a
   dangling symlink returns false. So if the main `.ruvector/` is later
   deleted while a worktree symlink still points at it, hooks correctly

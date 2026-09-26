@@ -12,8 +12,9 @@ never recorded anything (ruvector keeps `lastEditedFile` per process). The hook
 now records "files edited together" pairs in a plugin-owned
 `.ruvector/coedit.json` with jq only (no Node start; ~3x faster), using
 per-session state so concurrent sessions and worktrees never pair each other's
-edits, atomic writes under a non-blocking lock, and a 5000-pair cap. MultiEdit
-is read from its top-level `tool_input.file_path` (the old `edits[].file_path`
-never matched). The Stop hook (`hooks session-end`, which rewrote the whole
-store every turn) and the PostToolUseFailure registration are removed; no plugin
-hook writes `intelligence.json` any more.
+edits, atomic writes under bounded locks, and a cap of 1000 file pairs (2000
+directed entries, and under 1 MB). MultiEdit is read from its top-level
+`tool_input.file_path` (the old `edits[].file_path` never matched). The Stop
+hook (`hooks session-end`, which rewrote the whole store every turn) and the
+PostToolUseFailure registration are removed; no plugin hook writes
+`intelligence.json` any more.

@@ -184,14 +184,15 @@ coedit_lock_path() {
     _coedit_tries_left=$((_coedit_tries_left - 1))
     if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
       ino=$(ls -di "$lock" 2>/dev/null | awk '{print $1}')
-      mt=$(date -r "$lock" +%s 2>/dev/null) || mt=""
-      case "$ino$mt" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
+      mt=$(coedit_mtime "$lock")
+      case "$ino" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
+      case "$mt" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
       find "$(dirname -- "$lock")" -maxdepth 1 -type d -name "$(basename -- "$lock").reclaim.*" \
         -mmin +10 -exec rmdir {} + 2>/dev/null
       marker="${lock}.reclaim.${ino}-${mt}"
       if mkdir "$marker" 2>/dev/null \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
-         && [ "$(date -r "$lock" +%s 2>/dev/null)" = "$mt" ] \
+         && [ "$(coedit_mtime "$lock")" = "$mt" ] \
          && [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
         rmdir "$lock" 2>/dev/null
       fi
@@ -200,6 +201,12 @@ coedit_lock_path() {
     sleep 0.05
   done
   return 0
+}
+
+# coedit_mtime <path> — modification time in epoch seconds, portably (GNU
+# `stat -c %Y`, BSD/macOS `stat -f %m`); prints nothing on failure.
+coedit_mtime() {
+  stat -c %Y -- "$1" 2>/dev/null || stat -f %m -- "$1" 2>/dev/null
 }
 
 coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
