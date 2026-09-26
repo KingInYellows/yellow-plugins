@@ -173,8 +173,9 @@ coedit_write_atomic() {
 # is 1s). Each stale lock generation (directory inode + mtime; inodes alone
 # are reused at once) is reclaimed at most once: the reclaimer first creates
 # the marker <lock>.reclaim.<inode>-<mtime> (atomic mkdir) and re-checks
-# the inode, mtime and age, so two waiters that judged the same lock stale
-# cannot both act and neither can delete a fresh lock that replaced it.
+# the inode and mtime (an unchanged mtime keeps it stale), so two waiters
+# that judged the same lock stale cannot both act and neither can delete a
+# fresh lock that replaced it. Ages come from stat + date, not find -mmin.
 # Markers are pruned after 10 minutes.
 coedit_lock_path() {
   local lock="$1" ino mt marker
@@ -182,18 +183,18 @@ coedit_lock_path() {
   until mkdir "$lock" 2>/dev/null; do
     [ "$_coedit_tries_left" -gt 0 ] || return 1
     _coedit_tries_left=$((_coedit_tries_left - 1))
-    if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+    mt=$(coedit_mtime "$lock")
+    if coedit_older_than "$mt" 60; then
       ino=$(ls -di "$lock" 2>/dev/null | awk '{print $1}')
-      mt=$(coedit_mtime "$lock")
       case "$ino" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
-      case "$mt" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
-      find "$(dirname -- "$lock")" -maxdepth 1 -type d -name "$(basename -- "$lock").reclaim.*" \
-        -mmin +10 -exec rmdir {} + 2>/dev/null
+      for marker in "${lock}".reclaim.*; do
+        [ -d "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600 \
+          && rmdir "$marker" 2>/dev/null
+      done
       marker="${lock}.reclaim.${ino}-${mt}"
       if mkdir "$marker" 2>/dev/null \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
-         && [ "$(coedit_mtime "$lock")" = "$mt" ] \
-         && [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+         && [ "$(coedit_mtime "$lock")" = "$mt" ]; then
         rmdir "$lock" 2>/dev/null
       fi
       continue
@@ -207,6 +208,15 @@ coedit_lock_path() {
 # `stat -c %Y`, BSD/macOS `stat -f %m`); prints nothing on failure.
 coedit_mtime() {
   stat -c %Y -- "$1" 2>/dev/null || stat -f %m -- "$1" 2>/dev/null
+}
+
+# coedit_older_than <epoch-mtime> <secs> — true when the mtime is numeric and
+# more than <secs> seconds ago (no GNU/BSD find -mmin differences).
+coedit_older_than() {
+  local now
+  case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac
+  now=$(date +%s)
+  [ $((now - $1)) -gt "$2" ]
 }
 
 coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
@@ -243,9 +253,10 @@ coedit_bump() {
   else
     out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || rc=$?
   fi
-  # jq exits 2 on unparseable input, 3 on our validation failure, 5 on a
-  # runtime type error: all malformed. 124/137/143 are the time bound.
-  if [ "$rc" -eq 2 ] || [ "$rc" -eq 3 ] || [ "$rc" -eq 5 ]; then
+  # jq exits 2 or 4 on unparseable input (by version), 3 on our validation
+  # failure, 5 on a runtime type error: all malformed. 124/137/143 are the
+  # time bound.
+  if [ "$rc" -ge 2 ] && [ "$rc" -le 5 ]; then
     mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
     out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || return 0
   elif [ "$rc" -ne 0 ]; then
