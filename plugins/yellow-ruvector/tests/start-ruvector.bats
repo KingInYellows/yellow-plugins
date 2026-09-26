@@ -99,6 +99,24 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [[ "$stderr" == *"starting read-only (hooks_remember and hooks_pretrain disabled)"* ]]
 }
 
+@test "an explicitly selected hash embedder keeps all five tools on a fresh store" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  for sel in "RUVECTOR_EMBEDDER=hash" "RUVECTOR_EMBEDDER= HASH" "RUVECTOR_ONNX=0"; do
+    run --separate-stderr env "$sel" bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/bin/start-ruvector.sh"' \
+      _ "$REPO" "$STUBS" "$PLUGIN"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"allow=$ALL5 "* ]]
+    [[ "$stderr" != *"read-only"* ]]
+  done
+  # ONNX explicitly selected wins over RUVECTOR_ONNX=0: still guarded.
+  run --separate-stderr env RUVECTOR_EMBEDDER=minilm RUVECTOR_ONNX=0 bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/bin/start-ruvector.sh"' \
+    _ "$REPO" "$STUBS" "$PLUGIN"
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+}
+
 @test "a missing store is guarded like an unstamped one" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"

@@ -54,7 +54,7 @@ if yellow_ruvector_validate_paths; then
   printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
   if yellow_ruvector_needs_install; then printf 'install: missing or out of date\n'
-  else printf 'install: %s (version %s)\n' "$(readlink "${RUVECTOR_DATA}/current")" "$(node "$(yellow_ruvector_entry)" --version 2>/dev/null)"; fi
+  else printf 'install: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null)"; fi
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
 fi
@@ -92,7 +92,7 @@ if yellow_ruvector_needs_install; then
 fi
 yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \
   || printf 'WARNING: ONNX model download failed (offline?). Recall works; memory writes wait for a session with network.\n'
-printf 'Installed: %s (version %s)\n' "$(readlink "${RUVECTOR_DATA}/current")" "$(node "$(yellow_ruvector_entry)" --version)"
+printf 'Installed: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version)"
 ```
 
 If the install fails behind a proxy, confirm `HTTPS_PROXY` / `npm_config_*`
@@ -119,7 +119,7 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 yellow_ruvector_validate_paths || exit 1
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-ENTRY=$(yellow_ruvector_entry)
+ENTRY=$(yellow_ruvector_pinned_entry)
 
 printf '=== Hook Scripts ===\n'
 for script in prewarm.sh session-start.sh pre-tool-use.sh post-tool-use.sh stop.sh; do

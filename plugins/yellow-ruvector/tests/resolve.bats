@@ -157,6 +157,25 @@ fake_install() {
   [ ! -e "$WORK/wte/.ruvector" ]
 }
 
+@test "heal_store: a main checkout missing its first tracked file (deleted or sparse) still links" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q
+  echo x > "$WORK/a-first.txt"; echo y > "$WORK/b-second.txt"
+  git -C "$WORK" add a-first.txt b-second.txt
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
+  mkdir "$WORK/.ruvector"
+  git -C "$WORK" worktree add -q "$WORK/wtd" -b del
+  rm "$WORK/a-first.txt"
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtd"
+  [ -L "$WORK/wtd/.ruvector" ]
+  rm "$WORK/wtd/.ruvector"
+  git -C "$WORK" checkout -q -- a-first.txt
+  git -C "$WORK" update-index --skip-worktree a-first.txt
+  rm "$WORK/a-first.txt"
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtd"
+  [ -L "$WORK/wtd/.ruvector" ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q

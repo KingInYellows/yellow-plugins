@@ -94,19 +94,14 @@ if [ -f "$INTEL_JSON" ]; then
     case "$store_dim" in ''|*[!0-9]*) store_dim="?";; esac
     case "$vec_count" in ''|*[!0-9]*) vec_count=0;; esac
   fi
-  embedder_sel=$(printf '%s' "${RUVECTOR_EMBEDDER:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
   hash_selected=0
-  case "$embedder_sel" in
-    hash) hash_selected=1 ;;
-    auto|minilm) hash_selected=0 ;;
-    *) [ "${RUVECTOR_ONNX:-}" = "0" ] && hash_selected=1 ;;
-  esac
+  ruvector_hash_selected && hash_selected=1
   if [ "$store_kind" = "hash" ] && [ "$hash_selected" -eq 0 ]; then
     provenance_note="[ruvector] store is hash-embedded (${store_dim}d) but the default embedder is onnx-minilm — hooks_remember is refused until the store is reembedded; run /ruvector:status for the steps (reembed + restart)"
   elif [ -z "$store_kind" ] && [ "$vec_count" -gt 0 ]; then
     provenance_note="[ruvector] store has ${vec_count} vectors but no embedding-provenance stamp — hooks_remember is refused (ERR_LEGACY_STORE_READONLY) until the store is reembedded; run /ruvector:status for the steps"
   fi
-  unset store_kind store_dim vec_count embedder_sel hash_selected prov_tsv
+  unset store_kind store_dim vec_count hash_selected prov_tsv
 fi
 
 # Emit the allow payload. Recalled learnings are model context

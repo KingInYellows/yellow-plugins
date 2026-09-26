@@ -20,7 +20,9 @@ ruvector.
      so subdirectory launches and new worktrees use the right store in the
      SAME session;
   3. guards a fresh store: if `.ruvector/` is missing or has no embedding
-     stamp and the ONNX model is not cached, it warms the model (`embed
+     stamp, the env does not select hash (`RUVECTOR_EMBEDDER=hash`, or
+     `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER` unset), and the ONNX model
+     is not cached, it warms the model (`embed
      text`, 15s, under the install lock); if that fails (offline), it drops
      the write tools `hooks_remember` and `hooks_pretrain` from
      `RUVECTOR_MCP_ALLOW` for the session. The server's write paths
