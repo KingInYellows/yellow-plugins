@@ -204,27 +204,35 @@ yellow_ruvector_acquire_install_lock() {
 }
 
 # yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
-# if it still carries the pid judged stale (and, for a real pid, that process
-# is still gone). Reclaimers serialize on a short-lived mutex, so the check
-# and the delete are atomic with respect to each other, and a live owner's
-# lock is never moved or deleted (a lock only changes hands after it is
-# removed, which only its owner or a mutex holder does). A reclaimer killed
-# while holding the mutex leaves it behind; it is held for milliseconds, so
-# one older than a minute is cleared.
+# if it is still the same lock (same directory inode) carrying the pid judged
+# stale and, for a real pid, that process is still gone. Each stale lock
+# generation (pid + inode) is reclaimed at most once: the reclaimer must first
+# create the marker .install.lock.reclaim.<pid>-<inode> (atomic mkdir), so two
+# waiters that judged the same lock stale cannot both act, and a waiter can
+# never delete the fresh lock that replaced it (different inode, or its
+# marker already exists). Markers are left behind and pruned after 10
+# minutes, long after any reclaimer that saw that generation has finished.
 yellow_ruvector_reclaim_lock() {
-  local lock_dir="${RUVECTOR_DATA}/.install.lock" mutex expected="${1:-}"
-  mutex="${lock_dir}.reclaim"
-  if ! mkdir "$mutex" 2>/dev/null; then
-    [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$mutex" 2>/dev/null
-    mkdir "$mutex" 2>/dev/null || return 0
-  fi
-  if [ -d "$lock_dir" ] && [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ]; then
-    case "$expected" in
-      '' | *[!0-9]* | 0) rm -rf -- "$lock_dir" 2>/dev/null ;;
-      *) kill -0 "$expected" 2>/dev/null || rm -rf -- "$lock_dir" 2>/dev/null ;;
-    esac
-  fi
-  rmdir "$mutex" 2>/dev/null
+  local lock_dir="${RUVECTOR_DATA}/.install.lock" expected="${1:-}" ino marker
+  # Cheap pre-check (no marker for a lock that is not stale).
+  [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
+  case "$expected" in
+    '' | *[!0-9]* | 0) ;;
+    *) kill -0 "$expected" 2>/dev/null && return 0 ;;
+  esac
+  ino=$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')
+  case "$ino" in ''|*[!0-9]*) return 0 ;; esac
+  find "$RUVECTOR_DATA" -maxdepth 1 -name '.install.lock.reclaim.*' -type d -mmin +10 \
+    -exec rmdir {} + 2>/dev/null
+  marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}"
+  mkdir "$marker" 2>/dev/null || return 0
+  [ "$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')" = "$ino" ] || return 0
+  [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
+  case "$expected" in
+    '' | *[!0-9]* | 0) ;;
+    *) kill -0 "$expected" 2>/dev/null && return 0 ;;
+  esac
+  rm -rf -- "$lock_dir" 2>/dev/null
   return 0
 }
 
