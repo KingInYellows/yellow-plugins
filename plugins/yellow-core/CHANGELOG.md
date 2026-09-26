@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.4.5
+
+### Patch Changes
+
+- [`471f786`](https://github.com/KingInYellows/yellow-plugins/commit/471f786197677f82bde63754b4605ffd75889490)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Ceramic is
+  OAuth-only: `CERAMIC_API_KEY` is no longer read anywhere. The Ceramic MCP
+  always authenticated via OAuth 2.1, but `/research:setup` still checked the
+  key, validated its `cer_sk` format and ran a REST live-probe with it, and
+  `/setup:all` listed it — suggesting a key was required. `/research:setup` and
+  `/setup:all` now decide Ceramic availability from `ceramic_search` visibility
+  alone, and the docs name EXA, Tavily and Perplexity as the only API keys. An
+  exported `CERAMIC_API_KEY` is ignored; unset it if you like. The opt-in live
+  REST test (`tests/integration/ceramic.test.ts`) is removed. The key name stays
+  on the never-commit and name-based redaction lists.
+
+- [`74ffb74`](https://github.com/KingInYellows/yellow-plugins/commit/74ffb74d2fbd7121bac2a1ab71e91593ecc981e9)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - When the
+  bundled Composio MCP is OFFLINE, `/composio:setup` now detects WSL (and its
+  networking mode) and leads with
+  `claude mcp login plugin:yellow-composio:composio-server --no-browser`: run it
+  in a separate terminal, open the printed URL anywhere, and paste the redirect
+  URL back — no inbound callback to WSL needed. On WSL2 NAT it also suggests
+  `networkingMode=mirrored`; the consumer-key `claude mcp add` path stays as the
+  last resort. When only the claude.ai Composio connector is visible, setup
+  still reports HEALTHY but notes the bundled server is not authenticated.
+  `/composio:status` and `/setup:all` point at the same login command.
+
 ## 2.4.4
 
 ### Patch Changes

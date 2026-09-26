@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.4.4",
+      "version": "2.4.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -127,7 +127,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-composio",
       "description": "Optional Composio accelerator for batch workflows with usage tracking",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -137,7 +137,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "4.1.2",
+      "version": "4.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -446,7 +446,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-composio/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-composio",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Optional Composio accelerator for batch workflows with usage tracking",
   "author": {
     "name": "KingInYellows",
@@ -476,7 +476,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.4.4",
+  "version": "2.4.5",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -829,7 +829,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-research",
-  "version": "4.1.2",
+  "version": "4.2.0",
   "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
