@@ -303,7 +303,9 @@ provider (`/stack:status`). Each PR gets its own changeset.
       `plugins/yellow-ruvector/package-lock.json`
       (`npm install --package-lock-only --ignore-scripts`), and add
       `!plugins/yellow-ruvector/package-lock.json` to `.gitignore` (lines 45-52
-      ignore lockfiles by default).
+      ignore lockfiles by default). Add it to AGENTS.md's committed npm
+      lockfile exceptions next to yellow-morph's, so later audits do not
+      treat it as forbidden generated state.
 - [ ] 1.2b: Run `pnpm install` and commit the regenerated `pnpm-lock.yaml` (the
       workspace includes `plugins/*` and CI uses `--frozen-lockfile`). Confirm
       `pnpm audit` / the `security-audit` job passes with ruvector's tree. The
@@ -477,7 +479,11 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     write `$HOME`, not `~`, since a tilde from a parameter default is never
     expanded)
     and look for `current/node_modules/ruvector/bin/cli.js` there. Model the
-    READY/PARTIAL rules on morph's block at 441-461;
+    READY/PARTIAL rules on morph's block at 441-461. The probe only checks
+    that an install exists: an install from an older lockfile is not a setup
+    need, because the launcher (and the prewarm hook) reinstall to the new
+    lockfile on the next session without user action, so /setup:all does
+    not flag it;
   - update the example output at 689.
 
 <!-- deepen-plan: codebase -->
@@ -586,22 +592,26 @@ Adding a changeset for yellow-core is part of this task.
     1. Read `coedit-sessions/<session_id>` (last path and epoch).
     2. If the path differs and the edit is within 0–60 s, increment the
        symmetric pair in `coedit.json` under a mkdir lock, using jq with a
-       temp file and `mv`. Wait up to ~0.5 s (10 × 50 ms) for the lock so
-       concurrent sessions queue rather than drop increments; past that the
-       increment is skipped, which leaves half the 1 s PostToolUse timeout
-       for normalization, the jq update and the allow JSON. Test that N concurrent sessions yield a count
+       temp file and `mv`. The session lock and the store lock share one
+       wait budget per edit (8 × 50 ms, ~0.4 s) so concurrent sessions queue
+       rather than drop increments; past that the increment is skipped. Every
+       jq over the store is killed after 0.3 s (a slow store skips the
+       increment and is not set aside), which keeps the whole hook well
+       inside the 1 s PostToolUse timeout with its allow JSON. Test that N concurrent sessions yield a count
        of N, not just valid JSON.
        A hook killed while holding a lock (the 1 s timeout) must not
        disable recording: a lock older than a minute is stale and is
        reclaimed once per lock generation (the reclaimer first creates
-       `<lock>.reclaim.<inode>` with mkdir and re-checks the inode and age,
+       `<lock>.reclaim.<inode>-<mtime>` with mkdir, since inodes alone are
+       reused at once, and re-checks the inode, mtime and age,
        so two waiters never both act and a fresh replacement lock is never
        deleted; markers are pruned after 10 minutes). The session file has
        its own per-session lock, so a busy store lock loses only that
        increment, never the session's latest edit. Cover an abandoned lock,
        an already-claimed generation, and store-lock contention in bats.
     3. Rewrite the session file atomically.
-  - Cap `coedit.json` at 5 000 pairs, evicting the lowest counts.
+  - Cap `coedit.json` at 2 000 directed pairs, evicting the lowest counts;
+    set aside a file over 1 MB unparsed.
   - Prune session files older than 7 days on SessionStart.
 - [ ] 2.3: Catalog: remove the `Stop` hook and the `PostToolUseFailure`
       registration. Delete `hooks/scripts/stop.sh` and `tests/stop.bats`. Narrow
@@ -849,11 +859,13 @@ shows nothing again. Capped at the last 200 entries.
   warn. They are never edited automatically, except through the existing repair
   script.
 - **Concurrent sessions:** `intelligence.json` stays last-writer-wins
-  (upstream). `coedit.json` waits up to ~0.5 s for its lock and then skips
-  the write, so at worst one pair increment is lost.
+  (upstream). `coedit.json` edits wait up to ~0.4 s (shared by the session
+  and store locks) and then skip, so at worst one pair increment is lost.
 - **Paths:** reject user-supplied paths that are absolute, begin with `-`,
   or contain `..` components or control characters (AGENTS.md), and anything
-  that resolves outside the root. Strip control characters from suggestions.
+  that resolves outside the root. Drop, never strip, a suggestion partner
+  with control characters or any other unsafe shape: stripping could turn it
+  into a different, valid file name.
 
 ## Performance Considerations
 
