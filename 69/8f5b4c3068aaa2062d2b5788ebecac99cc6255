@@ -1,0 +1,19 @@
+plans/review-findings-ledger.md
+  s_127f059773c31b::t_0d4724226cce81 1417
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "698f5b4c3068aaa2062d2b5788ebecac99cc6255",
+  "prompts": {},
+  "sessions": {
+    "s_127f059773c31b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "31f3c714-88c2-4528-b7e6-b9907b808bb6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
