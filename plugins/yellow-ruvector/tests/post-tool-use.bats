@@ -117,6 +117,26 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -f "$COEDIT" ] || [ "$(jq '[.pairs[] | keys[]] | length' "$COEDIT")" -eq 0 ]
 }
 
+@test "a symlink to a file outside the root is ignored" {
+  OUTSIDE="$(mktemp -d)"; : > "$OUTSIDE/secret.ts"
+  ln -s "$OUTSIDE/secret.ts" "$PROJECT_ROOT/src/link.ts"
+  ln -s link.ts "$PROJECT_ROOT/src/link2.ts"
+  for p in "$PROJECT_ROOT/src/link.ts" "$PROJECT_ROOT/src/link2.ts"; do
+    edit s1 "$PROJECT_ROOT/src/a.ts"
+    edit s1 "$p"
+  done
+  rm -rf "$OUTSIDE"
+  [ ! -f "$COEDIT" ]
+}
+
+@test "a symlink inside the root records its target" {
+  ln -s b.ts "$PROJECT_ROOT/src/alias.ts"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/alias.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(pair src/a.ts src/alias.ts)" -eq 0 ]
+}
+
 @test "a path with control characters is ignored" {
   edit s1 "$PROJECT_ROOT/src/a.ts"
   edit s1 "$PROJECT_ROOT/src/b"$'\x1b'".ts"
@@ -162,6 +182,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/c.ts")" | COEDIT_MAX_PAIRS=2 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
   [ "$(jq '[.pairs[] | length] | add' "$COEDIT")" -eq 2 ]
   [ "$(pair src/a.ts src/b.ts)" -eq 9 ]
+}
+
+@test "the cap evicts whole pairs, never one direction" {
+  jq -n '{version:1, pairs:{"a":{"b":3,"c":2,"d":2}, "b":{"a":3}, "c":{"a":2}, "d":{"a":2}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/b.ts")" | COEDIT_MAX_PAIRS=5 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
+  [ "$(jq '[.pairs[] | length] | add' "$COEDIT")" -eq 4 ]
+  jq -e '.pairs as $p | [$p | to_entries[] | .key as $k | .value | to_entries[] | $p[.key][$k] == .value] | all' "$COEDIT" > /dev/null
+  [ "$(pair a b)" -eq 3 ] && [ "$(pair a c)" -eq 2 ] && [ "$(pair c a)" -eq 2 ]
 }
 
 @test "20 parallel edits never corrupt coedit.json" {

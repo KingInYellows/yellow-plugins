@@ -30,9 +30,10 @@ coedit_sanitize_session() {
 
 # coedit_normalize <root> <path> — print <path> relative to the physical
 # root, or fail for: empty, control characters, over 512 chars, outside the
-# root, or inside .ruvector/, .git/, or docs/solutions/.
+# root (symlinks resolved, the final component included), or inside
+# .ruvector/, .git/, or docs/solutions/.
 coedit_normalize() {
-  local root="${1:-}" p="${2:-}" abs dir rroot rel
+  local root="${1:-}" p="${2:-}" abs dir rroot rel link hops=0
   [ -n "$root" ] && [ -n "$p" ] || return 1
   [ "${#p}" -le 512 ] || return 1
   if printf '%s' "$p" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
@@ -40,13 +41,26 @@ coedit_normalize() {
     /*) abs="$p" ;;
     *) abs="${root}/${p}" ;;
   esac
-  dir=$(CDPATH= cd -- "$(dirname -- "$abs")" 2>/dev/null && pwd -P) || return 1
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 1
-  abs="${dir}/$(basename -- "$abs")"
+  # pwd -P resolves the directories only; follow a symlinked final component
+  # too (bounded hops), so a link to a file outside the root is rejected.
+  while :; do
+    dir=$(CDPATH= cd -- "$(dirname -- "$abs")" 2>/dev/null && pwd -P) || return 1
+    abs="${dir}/$(basename -- "$abs")"
+    [ -L "$abs" ] || break
+    hops=$((hops + 1))
+    [ "$hops" -le 16 ] || return 1
+    link=$(readlink -- "$abs") || return 1
+    case "$link" in
+      /*) abs="$link" ;;
+      *) abs="${dir}/${link}" ;;
+    esac
+  done
   case "$abs" in
     "$rroot"/*) rel="${abs#"$rroot"/}" ;;
     *) return 1 ;;
   esac
+  if printf '%s' "$rel" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
   case "$rel" in
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
@@ -94,10 +108,12 @@ coedit_bump() {
     | .pairs[$a][$b] = ((.pairs[$a][$b] // 0) + 1)
     | .pairs[$b][$a] = ((.pairs[$b][$a] // 0) + 1)
     | if ([.pairs[] | length] | add // 0) > $cap then
+        # Evict whole undirected pairs so both directions stay in sync.
         .pairs = ([.pairs | to_entries[] | .key as $k | .value | to_entries[]
-                   | {k: $k, o: .key, n: .value}]
-                  | sort_by(-.n) | .[0:$cap]
-                  | reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n))
+                   | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: .value}]
+                  | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
+                  | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
+                  | reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n | .[$e.o][$e.k] = $e.n))
       else . end
   ' 2>/dev/null | coedit_write_atomic "$f"
   rmdir "$lock" 2>/dev/null
