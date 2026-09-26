@@ -51,11 +51,11 @@ _COEDIT_BUMP_JQ='
       else . end
     # Cap: keep the highest counts, whole pairs at a time, within both the
     # pair cap and a byte budget (80% of COEDIT_MAX_BYTES; each undirected
-    # pair costs about 2 * (both path lengths) + 24 bytes written), so the
+    # pair costs about 2 * (both paths as JSON-encoded UTF-8 bytes) + 24), so the
     # writer never produces a file the size check would set aside.
     | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
     | reduce .[] as $e ({acc: [], used: 0};
-        (2 * (($e.k | length) + ($e.o | length)) + 24) as $c
+        (2 * (($e.k | tojson | utf8bytelength) + ($e.o | tojson | utf8bytelength)) + 24) as $c
         | if .used + $c <= ($maxbytes * 0.8) then .acc += [$e] | .used += $c else . end)
     | .acc
     | {version: 1,
