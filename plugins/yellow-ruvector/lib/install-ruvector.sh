@@ -127,14 +127,14 @@ yellow_ruvector_validate_paths() {
   fi
 
   case "$RUVECTOR_DATA" in
-    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|"$xdg_dir"|"$cfg_data"/?*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|"$xdg_dir"|"$cfg_data"/?*) ;;
     *)
       printf 'yellow-ruvector: refusing — data dir outside HOME/tmp (and not under a non-system XDG_DATA_HOME or CLAUDE_CONFIG_DIR/plugins/data): %s\n' \
         "$RUVECTOR_DATA" >&2
       return 1 ;;
   esac
   case "$CLAUDE_PLUGIN_ROOT" in
-    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/usr/*|/opt/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|/usr/*|/opt/*) ;;
     *)
       printf 'yellow-ruvector: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
         "$CLAUDE_PLUGIN_ROOT" >&2
@@ -206,8 +206,11 @@ yellow_ruvector_acquire_install_lock() {
       printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null || true
       return 0
     fi
-    if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then
-      owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+    # A missing pid file (owner killed between mkdir and the pid write) reads
+    # as empty and is judged like any other invalid pid: stale when it is
+    # still missing on the next attempt.
+    if [ "$stale_recovered" -eq 0 ] && [ -d "$lock_dir" ]; then
+      owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null || true)
       case "$owner_pid" in
         '' | *[!0-9]* | 0)
           # A new owner writes its pid just after mkdir, so an invalid pid is
@@ -393,7 +396,9 @@ yellow_ruvector_swap_current() {
 # lazy-loads modules from it after later upgrades move `current`.
 yellow_ruvector_prune() {
   local keep_current="$1" keep_prev="${2:-}" d name in_use
-  in_use=$(ps -A -o args= 2>/dev/null || true)
+  # -ww: untruncated arguments (BSD/macOS ps otherwise cuts at the terminal
+  # width and could hide the /install-<hash>/ part of a live server's path).
+  in_use=$(ps -Aww -o args= 2>/dev/null || ps -A -o args= 2>/dev/null || true)
   for d in "${RUVECTOR_DATA}"/install-* "${RUVECTOR_DATA}"/.install-*.tmp.*; do
     [ -e "$d" ] || continue
     name="${d##*/}"
