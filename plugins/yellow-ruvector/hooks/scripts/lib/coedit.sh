@@ -108,25 +108,40 @@ coedit_write_atomic() {
   fi
 }
 
-# coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
-# mkdir lock with a bounded wait (10 x 50ms): concurrent sessions queue up
-# instead of dropping their increments; past ~0.5s the increment is skipped
-# (a lost count, never a corrupted file), leaving headroom under the hook's
-# 1s timeout so it still prints its allow JSON. A lock older than a minute is from
-# a killed hook and is cleared.
-coedit_bump() {
-  local dir="$1" a="$2" b="$3" f lock cur tries=0
-  f="${dir}/coedit.json"
-  lock="${dir}/.coedit.lock"
+# coedit_lock <store-dir> — take the store's mkdir lock, waiting up to
+# 10 x 50ms: concurrent edits queue up instead of dropping their work; past
+# ~0.5s the caller skips (a lost count, never a corrupted file), leaving
+# headroom under the hook's 1s timeout so it still prints its allow JSON.
+# A lock older than a minute is from a killed hook (the hook's timeout is
+# 1s). Stale-lock reclaim is serialized on a second mutex, and the age is
+# re-checked under it, so one waiter can never delete a lock another waiter
+# just took; a mutex older than a minute (its holder was killed) is cleared.
+coedit_lock() {
+  local lock="${1}/.coedit.lock" mutex="${1}/.coedit.lock.reclaim" tries=0
   until mkdir "$lock" 2>/dev/null; do
     tries=$((tries + 1))
-    [ "$tries" -le 10 ] || return 0
+    [ "$tries" -le 10 ] || return 1
     if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
-      rmdir "$lock" 2>/dev/null
+      if ! mkdir "$mutex" 2>/dev/null; then
+        [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$mutex" 2>/dev/null
+        mkdir "$mutex" 2>/dev/null || { sleep 0.05; continue; }
+      fi
+      [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
+      rmdir "$mutex" 2>/dev/null
       continue
     fi
     sleep 0.05
   done
+  return 0
+}
+
+coedit_unlock() { rmdir "${1}/.coedit.lock" 2>/dev/null; }
+
+# coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
+# The caller holds coedit_lock.
+coedit_bump() {
+  local dir="$1" a="$2" b="$3" f cur
+  f="${dir}/coedit.json"
   cur='{"version":1,"pairs":{}}'
   # A symlinked (or non-regular) store file could import another project's
   # pairs or swallow writes: set it aside.
@@ -167,7 +182,6 @@ coedit_bump() {
                   | reduce .[] as $e ({}; .[$e.k][$e.o] = $e.n | .[$e.o][$e.k] = $e.n))
       else . end
   ' 2>/dev/null | coedit_write_atomic "$f"
-  rmdir "$lock" 2>/dev/null
   return 0
 }
 
@@ -184,6 +198,9 @@ coedit_record() {
   [ -L "$sdir" ] && return 0
   mkdir -p "$sdir" 2>/dev/null || return 0
   sfile="${sdir}/${sid}"
+  # One lock around read-decide-write: parallel edits in the same session
+  # (and other sessions' pair updates) never read the same prior state.
+  coedit_lock "$dir" || return 0
   now=$(date +%s)
   state='{}'
   if [ -f "$sfile" ] && [ ! -L "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then
@@ -197,6 +214,7 @@ coedit_record() {
   fi
   printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
     | coedit_write_atomic "$sfile"
+  coedit_unlock "$dir"
   return 0
 }
 

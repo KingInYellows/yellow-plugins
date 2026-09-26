@@ -368,3 +368,27 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ $(( (end - start) / 1000000 )) -lt 800 ]
   [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
 }
+
+@test "two parallel edits in one session still count their pair" {
+  for i in $(seq 1 5); do
+    rm -f "$COEDIT" "$RUVECTOR_DIR/coedit-sessions/p$i"
+    ( edit "p$i" "$PROJECT_ROOT/src/a.ts" ) &
+    ( edit "p$i" "$PROJECT_ROOT/src/b.ts" ) &
+    wait
+    [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  done
+}
+
+@test "a stale co-edit lock is reclaimed, and a held reclaim mutex never deletes a fresh lock" {
+  edit r1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  edit r1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ] && [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim" ]
+  # Fresh lock + another waiter mid-reclaim (mutex held): nothing is deleted.
+  mkdir "$RUVECTOR_DIR/.coedit.lock" "$RUVECTOR_DIR/.coedit.lock.reclaim"
+  edit r1 "$PROJECT_ROOT/src/c.ts"
+  [ -d "$RUVECTOR_DIR/.coedit.lock" ]
+  [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
+}
