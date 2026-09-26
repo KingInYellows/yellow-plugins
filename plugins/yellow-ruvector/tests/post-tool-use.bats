@@ -392,7 +392,7 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   mkdir "$RUVECTOR_DIR/.coedit.lock"
   touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock"
   ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
-  mt=$(date -r "$RUVECTOR_DIR/.coedit.lock" +%s)
+  mt=$(stat -c %Y "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || stat -f %m "$RUVECTOR_DIR/.coedit.lock")
   mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-$mt"
   edit r1 "$PROJECT_ROOT/src/c.ts"
   [ -d "$RUVECTOR_DIR/.coedit.lock" ]
