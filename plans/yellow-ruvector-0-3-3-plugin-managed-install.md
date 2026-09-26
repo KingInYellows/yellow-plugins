@@ -326,11 +326,14 @@ provider (`/stack:status`). Each PR gets its own changeset.
   3. installs under the lock, with the live-owner wait from decision 4;
   4. releases the lock explicitly before `exec`;
   5. resolves the root, heals the store and `cd`s there;
-  6. exports `RUVECTOR_MCP_ALLOW`: the same five tools, or four
-     (`hooks_remember` removed) in decision 6's read-only case, after the
-     bounded model warm-up for an unstamped store;
-  7. runs
-     `exec node "$DATA/current/node_modules/ruvector/bin/cli.js" mcp start`.
+  6. exports `RUVECTOR_MCP_ALLOW`: the same five tools, or three
+     (`hooks_remember` and `hooks_pretrain` removed) in decision 6's
+     read-only case, after the bounded model warm-up for a missing or
+     unstamped store;
+  7. resolves `current` and runs
+     `exec node "$DATA/install-<hash>/node_modules/ruvector/bin/cli.js" mcp start`,
+     so the live command line names the concrete install that pruning must
+     keep.
 - [ ] 1.3c: Create `hooks/scripts/prewarm.sh` (SessionStart, catalog timeout 5),
       modeled on `prewarm-morph.sh`. It uses `hook-json.sh` `json_exit`, so the
       output carries `permission` for Cursor. It runs a detached install, then
@@ -417,6 +420,9 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     fence so the `status-provenance.bats` extractor still works;
   - add checks for a nested `.ruvector/` below the root and for leftover global
     hook entries;
+  - report the running server's mode: when ToolSearch finds `hooks_stats`
+    but not `hooks_remember`, this session's MCP server started read-only
+    (the launcher's allowlist is not visible to a separate shell);
   - report the data dir with "(fallback: CLAUDE_PLUGIN_DATA unset)" when
     applicable (informational: hooks and the launcher use the same
     fallback); "hooks inactive" is only for a missing Node 20+.
@@ -533,8 +539,10 @@ Adding a changeset for yellow-core is part of this task.
   - Edit, Write and MultiEdit (fixed to read `tool_input.file_path` instead of
     `edits[]`, lines 141-146) call `coedit_record "$rel"`.
 - [ ] 2.2: New `hooks/scripts/lib/coedit.sh`:
-  - `coedit_normalize`: realpath, reject paths outside the root, strip control
-    characters, cap at 512 characters, skip `.ruvector/` and `docs/solutions/`.
+  - `coedit_normalize`: resolve symlinks (the final component too), reject
+    paths outside the root, reject (never strip) control characters so no
+    two files alias, cap at 512 characters, skip `.ruvector/`, `.git/` and
+    `docs/solutions/`.
   - `coedit_record`:
     1. Read `coedit-sessions/<session_id>` (last path and epoch).
     2. If the path differs and the edit is within 60 s, increment the symmetric
