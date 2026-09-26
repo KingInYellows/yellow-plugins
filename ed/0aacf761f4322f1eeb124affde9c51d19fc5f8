@@ -1,0 +1,25 @@
+.changeset/review-sweep-ledger.md
+  s_0e9ca486378b02::t_390a5163ab298b 7-8
+plugins/yellow-review/commands/review/sweep-all.md
+  s_0e9ca486378b02::t_9d807466f8fdd1 108-124
+plugins/yellow-review/commands/review/sweep.md
+  s_0e9ca486378b02::t_dcfb330afe003e 155-158
+plugins/yellow-review/tests/skill-content.bats
+  s_0e9ca486378b02::t_53ef9aeee59561 325-340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed0aacf761f4322f1eeb124affde9c51d19fc5f8",
+  "prompts": {},
+  "sessions": {
+    "s_0e9ca486378b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8392d72-4a8f-4745-8f9d-f9c23b228ce7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
