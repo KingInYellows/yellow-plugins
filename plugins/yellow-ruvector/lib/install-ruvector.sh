@@ -238,6 +238,12 @@ yellow_ruvector_acquire_install_lock() {
   return 1
 }
 
+# yellow_ruvector_mtime <path> — modification time in epoch seconds, portably
+# (GNU `stat -c %Y`, BSD/macOS `stat -f %m`); prints nothing on failure.
+yellow_ruvector_mtime() {
+  stat -c %Y -- "$1" 2>/dev/null || stat -f %m -- "$1" 2>/dev/null
+}
+
 # yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
 # if it is still the same lock (same directory inode) carrying the pid judged
 # stale and, for a real pid, that process is still gone. Each stale lock
@@ -259,14 +265,14 @@ yellow_ruvector_reclaim_lock() {
   ino=$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')
   case "$ino" in ''|*[!0-9]*) return 0 ;; esac
   # Inodes are reused right away; inode + mtime identifies one generation.
-  mt=$(date -r "$lock_dir" +%s 2>/dev/null) || mt=0
-  case "$mt" in ''|*[!0-9]*) mt=0 ;; esac
+  mt=$(yellow_ruvector_mtime "$lock_dir")
+  case "$mt" in ''|*[!0-9]*) return 0 ;; esac
   find "$RUVECTOR_DATA" -maxdepth 1 -name '.install.lock.reclaim.*' -type d -mmin +10 \
     -exec rmdir {} + 2>/dev/null
   marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}-${mt}"
   mkdir "$marker" 2>/dev/null || return 0
   [ "$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')" = "$ino" ] || return 0
-  [ "$(date -r "$lock_dir" +%s 2>/dev/null || echo 0)" = "$mt" ] || return 0
+  [ "$(yellow_ruvector_mtime "$lock_dir")" = "$mt" ] || return 0
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
     '' | *[!0-9]* | 0) ;;
