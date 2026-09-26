@@ -341,6 +341,9 @@ coedit_prune_sessions() {
   [ -d "$sdir" ] && [ ! -L "$sdir" ] || return 0
   # POSIX-only primaries (no -mindepth/-maxdepth/-delete): the top level
   # of $sdir, regular files older than 7 days.
-  find "$sdir/." ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + 2>/dev/null
+  # Detached and time-bounded: a huge or slow session dir must never delay
+  # the SessionStart response (the hook prints its JSON without waiting).
+  ( run_budgeted 5 find "$sdir/." ! -name . -prune -type f -mtime +7 -exec rm -f -- {} + ) \
+    </dev/null >/dev/null 2>&1 &
   return 0
 }
