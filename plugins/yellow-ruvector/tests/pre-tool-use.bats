@@ -314,6 +314,16 @@ related_staged() {
   [ $(( (end - start) / 1000000 )) -lt 450 ]
 }
 
+@test "unknown session fields are dropped, so the file stays readable" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -n '{padding: ("x" * 45000), surfaced: ([range(0;30)] | map("src/f\(.).ts")), last: "src/z.ts", epoch: 1}' > "$RUVECTOR_DIR/coedit-sessions/s12"
+  run --separate-stderr run_hook "$(event s12 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  jq -e 'has("padding") | not' "$RUVECTOR_DIR/coedit-sessions/s12" >/dev/null
+  jq -e '.last == "src/z.ts" and .epoch == 1 and .surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s12" >/dev/null
+  [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s12")" -le 40000 ]
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done

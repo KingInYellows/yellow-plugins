@@ -466,6 +466,14 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "recording keeps only the known session fields" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -n '{padding: ("x" * 45000), surfaced: ["src/q.ts"]}' > "$RUVECTOR_DIR/coedit-sessions/p9"
+  edit p9 "$PROJECT_ROOT/src/a.ts"
+  jq -e 'has("padding") | not' "$RUVECTOR_DIR/coedit-sessions/p9" >/dev/null
+  jq -e '.last == "src/a.ts" and .surfaced == ["src/q.ts"]' "$RUVECTOR_DIR/coedit-sessions/p9" >/dev/null
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"

@@ -319,7 +319,13 @@ coedit_record() {
   # and always sees this path as its predecessor.
   # A session state that could not be saved keeps its old predecessor, so
   # counting this pair would seed false pairs later: skip the increment.
-  if ! printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
+  # Only the known fields are written (an unrecognized or oversized field
+  # would push the file past the 64 KB its readers accept); `surfaced` is
+  # kept when it is an array within the 32 KB its writer allows.
+  if ! printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '
+      {last: $l, epoch: $e}
+      + (if (.surfaced | type) == "array" and (.surfaced | tojson | utf8bytelength) <= 32768
+         then {surfaced: .surfaced} else {} end)' 2>/dev/null \
        | coedit_write_atomic "$sfile"; then
     pair=""
   fi
@@ -466,7 +472,12 @@ coedit_suggest_once() {
               (($p | tojson | utf8bytelength) + 1) as $c
               | if (.a | length) < 200 and .n + $c <= 32768
                 then .a += [$p] | .n += $c else . end)
-          | .a | reverse)' 2>/dev/null \
+          | .a | reverse)
+        # Write only the known fields: an unrecognized field could push the
+        # whole object past the 64 KB its readers accept.
+        | {surfaced}
+          + (if (.last | type) == "string" and (.last | length) <= 4096 then {last} else {} end)
+          + (if (.epoch | type) == "number" then {epoch} else {} end)' 2>/dev/null \
       | coedit_write_atomic "$sfile"
   fi
   coedit_unlock_path "$slock"
