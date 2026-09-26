@@ -90,7 +90,9 @@ stamp=""
 if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
   stamp=$(jq -r '.embeddingProvenance.embedderKind // empty' "$intel" 2>/dev/null || true)
 fi
-if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
+# An explicitly selected hash embedder (RUVECTOR_EMBEDDER=hash, or
+# RUVECTOR_ONNX=0) needs no model and stamping hash is intended: no guard.
+if [ -z "$stamp" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   if yellow_ruvector_acquire_install_lock "$wait_secs"; then
     yellow_ruvector_trap_release
     yellow_ruvector_model_cached || yellow_ruvector_warm_model 15 || true

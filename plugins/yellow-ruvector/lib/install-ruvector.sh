@@ -186,22 +186,27 @@ yellow_ruvector_acquire_install_lock() {
 }
 
 # yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
-# if it still carries the pid judged stale. The lock is renamed first (atomic)
-# and checked afterwards. A lock a new owner took in the meantime is put back
-# with mkdir (fails rather than nesting if the path was taken again) plus
-# its pid file, never by renaming the directory onto the path.
+# if it still carries the pid judged stale (and, for a real pid, that process
+# is still gone). Reclaimers serialize on a short-lived mutex, so the check
+# and the delete are atomic with respect to each other, and a live owner's
+# lock is never moved or deleted (a lock only changes hands after it is
+# removed, which only its owner or a mutex holder does). A reclaimer killed
+# while holding the mutex leaves it behind; it is held for milliseconds, so
+# one older than a minute is cleared.
 yellow_ruvector_reclaim_lock() {
-  local lock_dir="${RUVECTOR_DATA}/.install.lock" grave
-  grave="${lock_dir}.stale.$$.${RANDOM}"
-  mv -- "$lock_dir" "$grave" 2>/dev/null || return 0
-  if [ "$(cat "${grave}/pid" 2>/dev/null)" = "${1:-}" ]; then
-    rm -rf -- "$grave" 2>/dev/null
-  else
-    if mkdir "$lock_dir" 2>/dev/null; then
-      mv -f -- "${grave}/pid" "${lock_dir}/pid" 2>/dev/null
-    fi
-    rm -rf -- "$grave" 2>/dev/null
+  local lock_dir="${RUVECTOR_DATA}/.install.lock" mutex expected="${1:-}"
+  mutex="${lock_dir}.reclaim"
+  if ! mkdir "$mutex" 2>/dev/null; then
+    [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$mutex" 2>/dev/null
+    mkdir "$mutex" 2>/dev/null || return 0
   fi
+  if [ -d "$lock_dir" ] && [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ]; then
+    case "$expected" in
+      '' | *[!0-9]* | 0) rm -rf -- "$lock_dir" 2>/dev/null ;;
+      *) kill -0 "$expected" 2>/dev/null || rm -rf -- "$lock_dir" 2>/dev/null ;;
+    esac
+  fi
+  rmdir "$mutex" 2>/dev/null
   return 0
 }
 

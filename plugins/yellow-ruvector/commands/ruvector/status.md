@@ -25,8 +25,16 @@ node --version 2>/dev/null || printf 'node: not found\n'
 if yellow_ruvector_validate_paths; then
   printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
-  if yellow_ruvector_needs_install; then printf 'install: missing or out of date\n'
-  else printf 'install: %s, version %s\ncli: %s\n' "$(readlink "${RUVECTOR_DATA}/current")" "$(node "$(yellow_ruvector_entry)" --version 2>/dev/null)" "$(yellow_ruvector_entry)"; fi
+  # This plugin version's own install (what its MCP server and hooks run),
+  # not `current`, which another session's plugin version may have moved.
+  rv_entry=$(yellow_ruvector_pinned_entry) || rv_entry=""
+  if [ ! -f "$rv_entry" ]; then printf 'install: missing or out of date\n'
+  else
+    rv_dir="${rv_entry%/node_modules/*}"
+    printf 'install: %s, version %s\ncli: %s\n' "${rv_dir##*/}" "$(node "$rv_entry" --version 2>/dev/null)" "$rv_entry"
+    [ "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null)" = "${rv_dir##*/}" ] \
+      || printf 'current: %s (another plugin version moved it; this session keeps its own install)\n' "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || echo none)"
+  fi
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
 fi
@@ -151,7 +159,8 @@ if [ -n "${RUVECTOR_BIN:-}" ]; then
   RV=("$RUVECTOR_BIN")
 else
   . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh" && yellow_ruvector_data_dir
-  RV=(node "$(yellow_ruvector_entry)")
+  # This plugin version's install, matching its MCP server and hooks.
+  RV=(node "$(yellow_ruvector_pinned_entry)")
 fi
 VERDICT=""; DETAIL=""; STORE=null; TARGET=null; DROP=0
 if [ ! -f "$INTEL" ]; then

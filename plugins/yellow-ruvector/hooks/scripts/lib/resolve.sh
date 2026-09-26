@@ -34,7 +34,7 @@ ruvector_resolve_root() {
 # layouts look identical to git, so a repo with no tracked files has no
 # main worktree here (fail closed: no shared store).
 ruvector_main_worktree() {
-  local out block first main tracked
+  local out block first main tracked=""
   out=$(git -C "${1:-.}" worktree list --porcelain 2>/dev/null) || return 1
   block=$(printf '%s\n' "$out" | sed '/^$/q')
   case "$block" in
@@ -46,10 +46,17 @@ ruvector_main_worktree() {
     *) return 1 ;;
   esac
   # A real checkout has its tracked files; the separate git dir's parent
-  # does not.
-  tracked=$(git -C "$main" ls-files 2>/dev/null | head -n 1)
-  [ -n "$tracked" ] && [ -e "${main}/${tracked}" ] || return 1
-  printf '%s' "$main"
+  # does not. One present file among the first 50 index entries is enough,
+  # so a locally deleted file does not matter; sparse-checkout entries
+  # (skip-worktree, not "H") are not expected on disk and are skipped.
+  local n=0
+  while IFS= read -r -d '' tracked && [ "$n" -lt 50 ]; do
+    n=$((n + 1))
+    case "$tracked" in
+      "H "?*) [ -e "${main}/${tracked#H }" ] && { printf '%s' "$main"; return 0; } ;;
+    esac
+  done < <(git -C "$main" ls-files -v -z 2>/dev/null)
+  return 1
 }
 
 # ruvector_heal_store <project-root>
@@ -82,6 +89,21 @@ ruvector_heal_store() {
   ln -sfn "${main}/.ruvector" "$target" 2>/dev/null \
     || printf '[ruvector] Warning: worktree store-heal could not link %s\n' "$target" >&2
   return 0
+}
+
+# ruvector_hash_selected — true when the env explicitly selects the hash
+# embedder, with upstream resolveEmbedderSelection precedence:
+# RUVECTOR_EMBEDDER=hash selects hash; =auto|minilm selects ONNX regardless
+# of RUVECTOR_ONNX; only when RUVECTOR_EMBEDDER is unset or unrecognized does
+# RUVECTOR_ONNX=0 select hash.
+ruvector_hash_selected() {
+  local sel
+  sel=$(printf '%s' "${RUVECTOR_EMBEDDER:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+  case "$sel" in
+    hash) return 0 ;;
+    auto|minilm) return 1 ;;
+    *) [ "${RUVECTOR_ONNX:-}" = "0" ] ;;
+  esac
 }
 
 # ruvector_node_ok — Node.js >= 20 on PATH (ruvector 0.3.3 engines).
