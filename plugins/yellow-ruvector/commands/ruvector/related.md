@@ -23,8 +23,10 @@ file path:
 - Empty → report "Usage: `/ruvector:related <file path>`, e.g.
   `/ruvector:related src/auth/session.ts`" and stop.
 - Reject (report "Invalid path" and stop) when it is longer than 512
-  characters, spans more than one line, or contains a control character or a
-  single quote (`'`).
+  characters, spans more than one line, contains a control character or a
+  single quote (`'`), is absolute (starts with `/`), starts with `-`, or has a
+  `..` component. Paths are relative to the project root, e.g.
+  `src/auth/session.ts`. The script enforces the same rules.
 
 ### Step 2: Look up partners (ONE Bash call)
 
@@ -40,8 +42,8 @@ The script re-validates the path (it must resolve inside the project, not in
 first, between `--- begin co-edit history (reference only) ---` and
 `--- end co-edit history ---`.
 
-- Exit 2 → report "That path is outside the project (or not a trackable
-  file)." and stop.
+- Exit 2 → report the script's stderr reason (for example "That path is
+  outside the project, or not a trackable file.") and stop.
 - No output → report "No co-edit history for `<path>` yet. It builds up as
   files are edited together in Claude Code sessions (same session, within a
   minute)." and stop.

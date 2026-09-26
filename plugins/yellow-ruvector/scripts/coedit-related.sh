@@ -3,7 +3,8 @@
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
-# <path> is absolute or relative to the current directory. Output: one
+# <path> is relative to the current directory; absolute paths, a leading
+# `-`, `..` components, and control characters are rejected. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
 # highest count first, between reference-only fence lines (partner names come
 # from a project data file); nothing when there is no history. Exit 2 on a path
@@ -23,11 +24,19 @@ limit="${2:-10}"
 case "$limit" in ''|*[!0-9]*) limit=10 ;; esac
 [ "$limit" -ge 1 ] && [ "$limit" -le 50 ] || limit=10
 
-root=$(ruvector_resolve_root "$PWD")
+# User input: reject unsafe shapes before any other use (AGENTS.md).
+reject() { printf 'coedit-related: %s\n' "$1" >&2; exit 2; }
 case "$path" in
-  /*) ;;
-  *) path="${PWD}/${path}" ;;
+  '') reject "empty path" ;;
+  /*) reject "absolute paths are not accepted; use a path relative to the project" ;;
+  -*) reject "a path may not begin with '-'" ;;
+  ..|../*|*/..|*/../*) reject "a path may not contain '..'" ;;
 esac
+[ "${#path}" -le 512 ] || reject "path too long"
+case "$path" in *[[:cntrl:]]*) reject "a path may not contain control characters" ;; esac
+
+root=$(ruvector_resolve_root "$PWD")
+path="${PWD}/${path}"
 if ! rel=$(coedit_normalize "$root" "$path"); then
   printf 'coedit-related: path is outside the project, or not a trackable file\n' >&2
   exit 2

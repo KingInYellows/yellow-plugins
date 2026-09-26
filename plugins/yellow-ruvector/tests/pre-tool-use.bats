@@ -173,3 +173,14 @@ assert_allow_json() {
   [ -z "$(ctx "$out")" ]
   rm -rf "$other"
 }
+
+@test "coedit-related.sh rejects absolute, leading-hyphen, and .. paths before using them" {
+  for bad in "$PROJECT_ROOT/src/a.ts" "-n" "--help" "../x/src/a.ts" "src/../src/a.ts" ".." $'src/a.ts\nx'; do
+    run --separate-stderr bash -c 'cd "$1" && bash "$2" "$3"' _ "$PROJECT_ROOT" "$RELATED" "$bad"
+    [ "$status" -eq 2 ]
+    [ -z "$output" ]
+  done
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" ./src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+}
