@@ -408,9 +408,13 @@ coedit_partner_ok() {
   return 0
 }
 
+# coedit_partners <root> <rel> [limit] [min-count] [store-dir] — print up to
+# <limit> validated "<count>\t<partner>" lines, highest count first.
 coedit_partners() {
-  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store f count partner norm n=0
-  store=$(coedit_store_dir "$root") || return 0
+  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store="${5:-}" f count partner norm n=0
+  # A caller that already resolved the store passes it (in a linked worktree
+  # resolving it scans the main checkout's index; do that once per hook).
+  [ -n "$store" ] || store=$(coedit_store_dir "$root") || return 0
   f="${store}/coedit.json"
   [ -f "$f" ] && [ ! -L "$f" ] || return 0
   # An oversized file would not parse inside the 1s PreToolUse budget; the
@@ -463,7 +467,7 @@ coedit_suggest_once() {
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced | if type == "array" then map(select(type == "string")) else [] end) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     return 0
   fi
-  lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT")
+  lines=$(coedit_partners "$root" "$rel" "$COEDIT_MAX_SUGGESTIONS" "$COEDIT_MIN_COUNT" "$store")
   [ -n "$lines" ] || return 0
   mkdir -p "${store}/coedit-sessions" 2>/dev/null || return 0
   # The same per-session lock as coedit_record: a parallel PostToolUse

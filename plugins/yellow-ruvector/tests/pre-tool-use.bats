@@ -367,3 +367,21 @@ related_staged() {
   assert_allow_json "$output"
   [ $(( (end - start) / 1000000 )) -lt 800 ]
 }
+
+@test "a linked worktree resolves the shared store once per suggestion" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" add src
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b wt
+  ln -s "$PROJECT_ROOT/.ruvector" "$PROJECT_ROOT/wt/.ruvector"
+  counter="$BATS_TEST_TMPDIR/mw-calls"; : > "$counter"
+  LIBDIR="$BATS_TEST_DIRNAME/../hooks/scripts/lib"
+  run bash -c '. "$1/resolve.sh"; . "$1/coedit.sh"
+    eval "orig_$(declare -f ruvector_main_worktree)"
+    ruvector_main_worktree() { echo x >> "$MW_COUNTER"; orig_ruvector_main_worktree "$@"; }
+    MW_COUNTER="$3" coedit_suggest_once "$2" s1 "$2/src/a.ts"' _ "$LIBDIR" "$PROJECT_ROOT/wt" "$counter"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"src/b.ts"* ]]
+  [ "$(wc -l < "$counter")" -eq 1 ]
+}
