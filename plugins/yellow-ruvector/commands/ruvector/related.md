@@ -3,7 +3,6 @@ name: ruvector:related
 description: "List files most often edited together with a given file, from this project's co-edit history. Use when user says \"what files go with X\", \"what else should I change with X\", \"related files\", \"files usually edited together\", or before a change that likely spans several files."
 argument-hint: '<file path>'
 allowed-tools:
-  - Bash(bash *scripts/coedit-related.sh *)
   - Read
 ---
 
