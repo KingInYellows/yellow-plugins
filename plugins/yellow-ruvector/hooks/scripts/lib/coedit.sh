@@ -73,16 +73,17 @@ coedit_normalize() {
 # checkout shipping .ruvector as a symlink to elsewhere) is refused, so the
 # hooks never write to or prune files outside the project's store.
 coedit_store_dir() {
-  local root="${1:-}" phys rroot common main
+  local root="${1:-}" phys rroot main
   [ -n "$root" ] && [ -d "${root}/.ruvector" ] || return 1
   phys=$(CDPATH= cd -- "${root}/.ruvector" 2>/dev/null && pwd -P) || return 1
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 1
   if [ "$phys" != "${rroot}/.ruvector" ]; then
     [ -f "${root}/.git" ] || return 1
-    common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
-    # A bare repo's common dir (/repos/foo.git) has no main checkout beside it.
-    [ "${common##*/}" = ".git" ] || return 1
-    main=$(CDPATH= cd -- "$(dirname -- "$common")" 2>/dev/null && pwd -P) || return 1
+    # The main worktree as resolve.sh identifies it: never a bare repo's
+    # parent or a --separate-git-dir's parent.
+    command -v ruvector_main_worktree >/dev/null 2>&1 || return 1
+    main=$(ruvector_main_worktree "$root") || return 1
+    main=$(CDPATH= cd -- "$main" 2>/dev/null && pwd -P) || return 1
     [ "$phys" = "${main}/.ruvector" ] || return 1
   fi
   printf '%s' "$phys"
@@ -93,6 +94,11 @@ coedit_store_dir() {
 # torn one.
 coedit_write_atomic() {
   local f="$1" tmp
+  # Only ever replace a regular file: `mv` onto a directory would drop the
+  # temp file inside it, and onto a symlink would follow nothing useful.
+  if [ -e "$f" ] || [ -L "$f" ]; then
+    [ -f "$f" ] && [ ! -L "$f" ] || return 1
+  fi
   tmp="${f}.tmp.$$.${RANDOM}"
   if cat > "$tmp" && [ -s "$tmp" ]; then
     mv -f -- "$tmp" "$f"
@@ -103,22 +109,27 @@ coedit_write_atomic() {
 }
 
 # coedit_bump <store-dir> <a> <b> — add one to the symmetric pair a<->b.
-# Non-blocking mkdir lock: if another hook holds it, skip this increment
+# mkdir lock with a bounded wait (20 x 50ms): concurrent sessions queue up
+# instead of dropping their increments; only past ~1s is an increment skipped
 # (a lost count, never a corrupted file). A lock older than a minute is from
 # a killed hook and is cleared.
 coedit_bump() {
-  local dir="$1" a="$2" b="$3" f lock cur
+  local dir="$1" a="$2" b="$3" f lock cur tries=0
   f="${dir}/coedit.json"
   lock="${dir}/.coedit.lock"
-  if ! mkdir "$lock" 2>/dev/null; then
+  until mkdir "$lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -le 20 ] || return 0
     if [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
       rmdir "$lock" 2>/dev/null
+      continue
     fi
-    return 0
-  fi
+    sleep 0.05
+  done
   cur='{"version":1,"pairs":{}}'
-  # A symlinked store file could import another project's pairs: set it aside.
-  if [ -L "$f" ]; then
+  # A symlinked (or non-regular) store file could import another project's
+  # pairs or swallow writes: set it aside.
+  if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
     mv -f -- "$f" "${f}.corrupt-$(date +%s)" 2>/dev/null
   fi
   if [ -f "$f" ]; then

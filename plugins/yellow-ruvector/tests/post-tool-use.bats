@@ -290,3 +290,42 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit s1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
 }
+
+@test "a coedit.json that is a directory is set aside and recording works" {
+  mkdir "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ -f "$COEDIT" ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  ls -d "$RUVECTOR_DIR"/coedit.json.corrupt-* >/dev/null
+}
+
+@test "concurrent sessions queue for the lock instead of dropping increments" {
+  for i in $(seq 1 8); do edit "c$i" "$PROJECT_ROOT/src/a.ts"; done
+  for i in $(seq 1 8); do
+    ( edit "c$i" "$PROJECT_ROOT/src/b.ts" ) &
+  done
+  wait
+  [ "$(pair src/a.ts src/b.ts)" -eq 8 ]
+  [ "$(pair src/b.ts src/a.ts)" -eq 8 ]
+}
+
+@test "a linked worktree of a --separate-git-dir repo never records into the git dir's parent" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  base="$(cd "$(mktemp -d)" && pwd -P)"
+  mkdir -p "$base/meta" "$base/main"
+  git -C "$base/main" init -q --separate-git-dir="$base/meta/.git"
+  echo x > "$base/main/f.txt"; git -C "$base/main" add f.txt
+  git -C "$base/main" -c user.email=t@t -c user.name=t commit -q -m init
+  mkdir "$base/meta/.ruvector"
+  git -C "$base/main" worktree add -q "$base/wt" -b w 2>/dev/null
+  mkdir -p "$base/wt/src"; : > "$base/wt/src/a.ts"; : > "$base/wt/src/b.ts"
+  ln -s "$base/meta/.ruvector" "$base/wt/.ruvector"
+  for f in a b; do
+    jq -cn --arg c "$base/wt" --arg f "$base/wt/src/$f.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"m1", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+      | PATH="$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
+  done
+  [ -z "$(ls -A "$base/meta/.ruvector")" ]
+  rm -rf "$base"
+}
