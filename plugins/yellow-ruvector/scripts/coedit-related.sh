@@ -3,11 +3,14 @@
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
-#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin [limit] <<'EOF'
-#        <path>
-#        EOF
-# --stdin reads exactly one line (the command passes user input this way, so
-# it is never spliced into shell syntax); more than one line is rejected.
+#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage
+#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file <query-file> [limit]
+# --stage creates a private mktemp -d directory and prints the path of a
+# not-yet-existing query file in it (QUERY_FILE=...). /ruvector:related writes
+# the user's path there with the Write tool (a structured parameter, never
+# shell-parsed; see docs/solutions/security-issues/heredoc-delimiter-collision.md)
+# and then runs --file, which reads exactly one line from that staged file
+# (more than one line is rejected) and removes the staging directory.
 # <path> is relative to the project root; absolute paths, a leading
 # `-`, `..` components, and control characters are rejected. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
@@ -23,11 +26,28 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${here}/hooks/scripts/lib/coedit.sh"
 
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
-[ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path>|--stdin [limit]\n' >&2; exit 2; }
-if [ "$1" = "--stdin" ]; then
-  path=""
-  IFS= read -r path || [ -n "$path" ] || { printf 'coedit-related: no path on stdin\n' >&2; exit 2; }
-  if IFS= read -r _extra || [ -n "${_extra:-}" ]; then
+[ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path>|--stage|--file <query-file> [limit]\n' >&2; exit 2; }
+STAGE_PREFIX="ruvector-related."
+if [ "$1" = "--stage" ]; then
+  sdir=$(mktemp -d "${TMPDIR:-/tmp}/${STAGE_PREFIX}XXXXXXXX") || exit 1
+  printf 'QUERY_FILE=%s/query\n' "$sdir"
+  exit 0
+fi
+if [ "$1" = "--file" ]; then
+  qf="${2:-}"
+  shift
+  # Only a query file inside a staging dir --stage made (owned by us, not a
+  # symlink), so --file cannot be pointed at arbitrary files.
+  case "$qf" in "${TMPDIR:-/tmp}/${STAGE_PREFIX}"*/query) ;; *) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
+  qdir="${qf%/query}"
+  case "${qdir#"${TMPDIR:-/tmp}/${STAGE_PREFIX}"}" in ''|*/*) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
+  [ -d "$qdir" ] && [ ! -L "$qdir" ] && [ -O "$qdir" ] && [ -f "$qf" ] && [ ! -L "$qf" ] \
+    || { printf 'coedit-related: not a staged query file\n' >&2; exit 2; }
+  path="" _extra="" rc=1
+  { IFS= read -r path || true; IFS= read -r _extra && rc=0 || true; } < "$qf"
+  rm -rf -- "$qdir"
+  [ -n "$path" ] || { printf 'coedit-related: no path in the query file\n' >&2; exit 2; }
+  if [ "$rc" -eq 0 ] || [ -n "$_extra" ]; then
     printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2
   fi
 else

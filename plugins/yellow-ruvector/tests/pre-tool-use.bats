@@ -207,16 +207,43 @@ assert_allow_json() {
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
 
-@test "coedit-related.sh --stdin takes exactly one line and never evaluates it" {
-  run --separate-stderr bash -c 'cd "$1" && printf "%s\n" "src/a.ts" | bash "$2" --stdin 10' _ "$PROJECT_ROOT" "$RELATED"
+# Stage a query file the way /ruvector:related does (--stage, then the Write
+# tool writes the raw path, never through a shell), and run --file on it.
+related_staged() {
+  local q
+  q=$(cd "$PROJECT_ROOT" && bash "$RELATED" --stage | sed -n 's/^QUERY_FILE=//p')
+  [ -n "$q" ] && [ ! -e "$q" ] || return 99
+  printf '%s' "$1" > "$q"
+  STAGED_DIR="${q%/query}"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED" "$q"
+}
+
+@test "coedit-related.sh --file reads one staged line and never evaluates it" {
+  related_staged "src/a.ts"
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
+  [ ! -e "$STAGED_DIR" ]
   marker="$PROJECT_ROOT/pwned"
-  run --separate-stderr bash -c 'cd "$1" && printf "%s\n" "src/a.ts'"'"'; touch $3; echo '"'"'" | bash "$2" --stdin' _ "$PROJECT_ROOT" "$RELATED" "$marker"
+  related_staged $'src/a.ts\nEOF\ntouch '"$marker"$'\n'
   [ "$status" -eq 2 ]
   [ ! -e "$marker" ]
-  run --separate-stderr bash -c 'cd "$1" && printf "src/a.ts\nsrc/b.ts\n" | bash "$2" --stdin' _ "$PROJECT_ROOT" "$RELATED"
+  [ ! -e "$STAGED_DIR" ]
+  related_staged "src/a.ts'; touch $marker; echo '"
   [ "$status" -eq 2 ]
+  [ ! -e "$marker" ]
+}
+
+@test "coedit-related.sh --file refuses anything but a staged query file" {
+  : > "$BATS_TEST_TMPDIR/query"
+  run --separate-stderr bash "$RELATED" --file "$BATS_TEST_TMPDIR/query"
+  [ "$status" -eq 2 ]
+  run --separate-stderr bash "$RELATED" --file "${TMPDIR:-/tmp}/ruvector-related.x/../../etc/query"
+  [ "$status" -eq 2 ]
+  d=$(mktemp -d "${TMPDIR:-/tmp}/ruvector-related.XXXXXXXX")
+  ln -s /etc/hostname "$d/query"
+  run --separate-stderr bash "$RELATED" --file "$d/query"
+  [ "$status" -eq 2 ]
+  rm -rf "$d"
 }
 
 @test "the surfaced cap keeps the newest file, whatever its name sorts as" {

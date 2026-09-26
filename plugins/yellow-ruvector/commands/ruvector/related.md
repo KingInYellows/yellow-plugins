@@ -4,6 +4,7 @@ description: "List files most often edited together with a given file, from this
 argument-hint: '<file path>'
 allowed-tools:
   - Read
+  - Write
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh":*)
 ---
 
@@ -29,21 +30,31 @@ file path:
   Paths are relative to the project root, e.g. `src/auth/session.ts`. The
   script enforces the same rules.
 
-### Step 2: Look up partners (ONE Bash call)
+### Step 2: Look up partners
 
-Pass the path on stdin through a quoted heredoc (no expansion), never
-inside the command line. Make up a fresh delimiter for every call:
-`RVPATH_` followed by 16 random hex characters (e.g. `RVPATH_9f3a61c0d2b47e85`)
-that do not occur anywhere in the path, so no argument can end the heredoc
-early:
+The path never appears in a shell command: a heredoc (even with a random
+delimiter) still puts untrusted text into shell syntax. Stage it with the
+Write tool instead (see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`):
 
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 50 <<'RVPATH_<16 random hex>'
-<path>
-RVPATH_<16 random hex>
-```
+1. Create the staging file:
 
-Use the same delimiter on the `<<'…'` line and the closing line.
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage
+   ```
+
+   It prints `QUERY_FILE=<path>` — a file that does not exist yet, inside a
+   fresh private temp directory.
+2. Use the Write tool to write exactly the path (one line, nothing else) to
+   that `QUERY_FILE`. `Write` is granted for this one file only.
+3. Run the lookup on it:
+
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file "<QUERY_FILE>" 50
+   ```
+
+   The script only accepts a query file inside a directory `--stage`
+   created, reads exactly one line, and deletes the staging directory.
 
 The script re-validates the path (it must resolve inside the project, not in
 `.ruvector/`, `.git/`, or `docs/solutions/`) and prints one
