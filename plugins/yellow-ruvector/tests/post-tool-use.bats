@@ -500,3 +500,13 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
   [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
 }
+
+@test "the byte budget counts JSON-escaped, multibyte paths at their written size" {
+  mkdir -p "$PROJECT_ROOT/src/ü"; : > "$PROJECT_ROOT/src/ü/a.ts"; : > "$PROJECT_ROOT/src/ü/b.ts"
+  wide=$(printf 'é\\\\"%.0s' $(seq 1 60))
+  jq -n --arg w "$wide" '{version:1, pairs:([range(0;120)] | map({key:"src/\($w)\(.).ts", value:{"src/x.ts": 3}}) | from_entries)}' > "$COEDIT"
+  edit u1 "$PROJECT_ROOT/src/ü/a.ts"
+  COEDIT_MAX_BYTES=30000 edit u1 "$PROJECT_ROOT/src/ü/b.ts"
+  [ "$(wc -c < "$COEDIT")" -le 30000 ]
+  [ "$(pair 'src/ü/a.ts' 'src/ü/b.ts')" -eq 1 ]
+}
