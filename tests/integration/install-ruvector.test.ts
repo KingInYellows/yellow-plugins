@@ -155,6 +155,19 @@ describe('yellow-ruvector install lib', () => {
     });
   });
 
+  it('rejects `..` components when realpath -m is unavailable (BSD/macOS)', () => {
+    const bin = join(home, 'fakebin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const r = runBash('yellow_ruvector_validate_paths', {
+      ...env,
+      PATH: `${bin}:${process.env.PATH}`,
+      CLAUDE_PLUGIN_DATA: `${home}/../../etc/yellow-ruvector`,
+    });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('. or .. component');
+  });
+
   describe('data dir fallback', () => {
     it('uses XDG_DATA_HOME when CLAUDE_PLUGIN_DATA is unset', () => {
       const xdg = join(home, 'xdg');
@@ -236,6 +249,26 @@ describe('yellow-ruvector install lib', () => {
       expect(existsSync(join(data, 'install-bbb'))).toBe(true);
       expect(existsSync(join(data, 'install-aaa'))).toBe(false);
       expect(existsSync(join(data, '.install-ddd.tmp.123'))).toBe(false);
+    });
+  });
+
+  describe('rollback to an install dir that still exists', () => {
+    it('reuses it without npm ci and without deleting its files', () => {
+      const hash = lockHash(root, home);
+      fakeInstall(data, `install-${hash}`);
+      writeFileSync(join(data, `install-${hash}`, 'marker'), 'live');
+      fakeInstall(data, 'install-newer');
+      symlinkSync('install-newer', join(data, 'current'));
+      const bin = join(home, 'nonpm');
+      mkdirSync(bin, { recursive: true });
+      writeFileSync(join(bin, 'npm'), '#!/bin/sh\nexit 99\n', { mode: 0o755 });
+      const r = runBash('yellow_ruvector_data_dir; yellow_ruvector_do_install', {
+        ...env,
+        PATH: `${bin}:${process.env.PATH}`,
+      });
+      expect(r.status).toBe(0);
+      expect(readlinkSync(join(data, 'current'))).toBe(`install-${hash}`);
+      expect(existsSync(join(data, `install-${hash}`, 'marker'))).toBe(true);
     });
   });
 
