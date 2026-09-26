@@ -165,7 +165,33 @@ describe('yellow-ruvector install lib', () => {
       CLAUDE_PLUGIN_DATA: `${home}/../../etc/yellow-ruvector`,
     });
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain('. or .. component');
+    expect(r.stderr).toMatch(/outside HOME\/tmp|\. or \.\. component/);
+  });
+
+  it('rejects a symlinked ancestor escaping HOME when realpath -m is unavailable', () => {
+    const bin = join(home, 'fakebin2');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    symlinkSync('/usr', join(home, 'escape'));
+    const r = runBash('yellow_ruvector_validate_paths', {
+      ...env,
+      PATH: `${bin}:${process.env.PATH}`,
+      CLAUDE_PLUGIN_DATA: `${home}/escape/yellow-ruvector`,
+    });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('outside HOME/tmp');
+  });
+
+  it('still accepts a HOME-local data dir when realpath -m is unavailable', () => {
+    const bin = join(home, 'fakebin3');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'realpath'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const r = runBash(
+      'yellow_ruvector_validate_paths && printf "%s" "$RUVECTOR_DATA"',
+      { ...env, PATH: `${bin}:${process.env.PATH}` }
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe(data);
   });
 
   describe('data dir fallback', () => {

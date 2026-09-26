@@ -73,6 +73,12 @@ that run the global binary and can stamp a fresh store hash — remove them).
    If it errors, mark MCP as unavailable.
 3. If warmup succeeds, call `mcp__plugin_yellow-ruvector_ruvector__hooks_stats`
    to verify the server responds.
+4. Call ToolSearch with query `"hooks_remember"`. If `hooks_stats` was found
+   but `hooks_remember` is not, the running server started read-only (the
+   launcher withheld the write tools): report "MCP mode: read-only for this
+   session — restart Claude Code once online to restore writes". Step 2's
+   `mcp mode` line predicts the next launch; this check reports the current
+   one.
 
 **Healthy:** "MCP server: connected (responded in Xms)"
 
