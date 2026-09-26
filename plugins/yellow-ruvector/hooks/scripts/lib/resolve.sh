@@ -26,6 +26,30 @@ ruvector_resolve_root() {
   printf '%s' "${CLAUDE_PROJECT_DIR:-$start}"
 }
 
+# ruvector_main_worktree <dir> — print the main worktree of <dir>'s repo:
+# the first entry of `git worktree list --porcelain`, unless it is bare or is
+# not a real checkout. For a --separate-git-dir repo git reports the parent
+# of the separate git dir, which lacks the tracked files; that is refused
+# rather than mistaken for the main checkout.
+ruvector_main_worktree() {
+  local out block first main tracked
+  out=$(git -C "${1:-.}" worktree list --porcelain 2>/dev/null) || return 1
+  block=$(printf '%s\n' "$out" | sed '/^$/q')
+  case "$block" in
+    *$'\n'bare|*$'\n'bare$'\n'*) return 1 ;;
+  esac
+  first="${block%%$'\n'*}"
+  case "$first" in
+    "worktree "?*) main="${first#worktree }" ;;
+    *) return 1 ;;
+  esac
+  # A real checkout has its tracked files; the separate git dir's parent
+  # does not. (With nothing tracked yet there is nothing to tell apart.)
+  tracked=$(git -C "$main" ls-files 2>/dev/null | head -n 1)
+  [ -z "$tracked" ] || [ -e "${main}/${tracked}" ] || return 1
+  printf '%s' "$main"
+}
+
 # ruvector_heal_store <project-root>
 # In a linked git worktree whose .ruvector is missing (or a dangling
 # symlink), link it to the main checkout's store — the shared-store contract
@@ -44,10 +68,9 @@ ruvector_heal_store() {
   common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
   gitdir=$(git -C "$root" rev-parse --path-format=absolute --git-dir 2>/dev/null) || return 0
   [ -n "$common" ] && [ -n "$gitdir" ] && [ "$common" != "$gitdir" ] || return 0
-  # Only a non-bare main worktree has a common dir named .git; a worktree
-  # of a bare repo (/repos/foo.git) must not treat /repos as the main checkout.
-  [ "${common##*/}" = ".git" ] || return 0
-  main=$(dirname "$common")
+  # The main worktree as git reports it: never the parent of a bare repo or
+  # of a --separate-git-dir common dir.
+  main=$(ruvector_main_worktree "$root") || return 0
   [ "$main" != "$root" ] && [ -d "${main}/.ruvector" ] || return 0
   if [ -e "$target" ] && [ ! -L "$target" ]; then
     printf '[ruvector] Warning: %s is a non-symlink path diverged from the shared store %s/.ruvector — merge or relink manually\n' "$target" "$main" >&2
@@ -87,7 +110,8 @@ ruvector_resolve_bin() {
   yellow_ruvector_data_dir
   yellow_ruvector_install_in_progress && return 1
   local entry
-  entry=$(yellow_ruvector_entry)
+  # Pin to this plugin version's install, never whatever `current` says now.
+  entry=$(CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$RUVECTOR_PLUGIN_ROOT}" yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
   RUVECTOR_CMD=(node "$entry")
   return 0

@@ -117,6 +117,16 @@ yellow_ruvector_lock_hash() {
   printf '%s' "${sum%% *}" | cut -c1-12
 }
 
+# yellow_ruvector_pinned_entry — the CLI entry of THIS plugin version's
+# install (install-<hash of its own lockfile>), not whatever `current` points
+# at: another session running a newer plugin may have moved `current`, and
+# hooks and the server of one session must run the same ruvector.
+yellow_ruvector_pinned_entry() {
+  local hash
+  hash=$(yellow_ruvector_lock_hash) || return 1
+  printf '%s/install-%s/node_modules/ruvector/bin/cli.js' "$RUVECTOR_DATA" "$hash"
+}
+
 # Path of the installed CLI entry through the `current` symlink.
 yellow_ruvector_entry() {
   printf '%s/current/node_modules/ruvector/bin/cli.js' "$RUVECTOR_DATA"

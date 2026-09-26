@@ -20,10 +20,14 @@ rs() {
   run env CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PLUGIN_DATA="$DATA" "$@"
 }
 
+own_hash() { sha256sum "$PLUGIN_ROOT/package-lock.json" | cut -c1-12; }
+
 fake_install() {
-  mkdir -p "$DATA/install-abc/node_modules/ruvector/bin"
-  : > "$DATA/install-abc/node_modules/ruvector/bin/cli.js"
-  ln -sfn install-abc "$DATA/current"
+  local h
+  h=$(own_hash)
+  mkdir -p "$DATA/install-$h/node_modules/ruvector/bin"
+  : > "$DATA/install-$h/node_modules/ruvector/bin/cli.js"
+  ln -sfn "install-$h" "$DATA/current"
 }
 
 @test "resolve_root: git toplevel from a subdirectory" {
@@ -53,7 +57,7 @@ fake_install() {
   [ "$status" -ne 0 ]
 }
 
-@test "resolve_bin: uses node + the current install, never a global ruvector on PATH" {
+@test "resolve_bin: uses node + this plugin version's install, never a global ruvector on PATH" {
   command -v node >/dev/null 2>&1 || skip "node not available"
   ruvector_major=$(node --version | sed 's/^v//' | cut -d. -f1)
   [ "$ruvector_major" -ge 20 ] || skip "node < 20 on this host"
@@ -62,7 +66,20 @@ fake_install() {
   chmod +x "$STUBS/ruvector"
   rs bash -c 'PATH="$2:$PATH"; unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin && printf "%s" "${RUVECTOR_CMD[*]}"' _ "$LIB" "$STUBS"
   [ "$status" -eq 0 ]
-  [ "$output" = "node $DATA/current/node_modules/ruvector/bin/cli.js" ]
+  [ "$output" = "node $DATA/install-$(own_hash)/node_modules/ruvector/bin/cli.js" ]
+}
+
+@test "resolve_bin: stays on this version's install when another session moved current" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  ruvector_major=$(node --version | sed 's/^v//' | cut -d. -f1)
+  [ "$ruvector_major" -ge 20 ] || skip "node < 20 on this host"
+  fake_install
+  mkdir -p "$DATA/install-newer/node_modules/ruvector/bin"
+  : > "$DATA/install-newer/node_modules/ruvector/bin/cli.js"
+  ln -sfn install-newer "$DATA/current"
+  rs bash -c 'unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin && printf "%s" "${RUVECTOR_CMD[*]}"' _ "$LIB"
+  [ "$status" -eq 0 ]
+  [ "$output" = "node $DATA/install-$(own_hash)/node_modules/ruvector/bin/cli.js" ]
 }
 
 @test "resolve_bin: fails without an install, and while an install is in progress" {
@@ -92,7 +109,8 @@ fake_install() {
 @test "heal_store: links a linked worktree's missing .ruvector to the main store" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q
-  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  echo x > "$WORK/f.txt"; git -C "$WORK" add f.txt
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
   mkdir "$WORK/.ruvector"
   git -C "$WORK" worktree add -q "$WORK/wt" -b heal
   rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wt"
@@ -111,6 +129,20 @@ fake_install() {
   rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtb"
   [ "$status" -eq 0 ]
   [ ! -e "$WORK/wtb/.ruvector" ]
+}
+
+@test "heal_store: a --separate-git-dir repo never links to the git dir's parent" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  mkdir -p "$WORK/meta" "$WORK/main"
+  git -C "$WORK/main" init -q --separate-git-dir="$WORK/meta/.git"
+  echo x > "$WORK/main/f.txt"
+  git -C "$WORK/main" add f.txt
+  git -C "$WORK/main" -c user.email=t@t -c user.name=t commit -q -m init
+  mkdir "$WORK/meta/.ruvector"
+  git -C "$WORK/main" worktree add -q "$WORK/wts" -b sep
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wts"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/wts/.ruvector" ]
 }
 
 @test "heal_store: never replaces a real directory (warns instead)" {
