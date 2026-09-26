@@ -75,9 +75,13 @@ coedit_jq() {
 
 # coedit_sanitize_session <id> — print a filename-safe session id, or fail.
 coedit_sanitize_session() {
-  local sid
-  sid=$(printf '%s' "${1:-}" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-128)
-  case "$sid" in ''|.|..) return 1 ;; esac
+  # Validate, never rewrite: mapping characters (a/b and a?b both to a_b) or
+  # truncating would let two sessions share one state file. Claude Code
+  # session ids are UUIDs; anything else outside [A-Za-z0-9._-], over 128
+  # chars, or starting with "." (lock files are ".<sid>.lock") is refused.
+  local sid="${1:-}"
+  [ -n "$sid" ] && [ "${#sid}" -le 128 ] || return 1
+  case "$sid" in .*|*[!A-Za-z0-9._-]*) return 1 ;; esac
   printf '%s' "$sid"
 }
 
@@ -307,8 +311,12 @@ coedit_record() {
   # Persist this edit and release the session lock BEFORE waiting on the
   # store lock, so the session's next edit never queues behind a busy store
   # and always sees this path as its predecessor.
-  printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
-    | coedit_write_atomic "$sfile"
+  # A session state that could not be saved keeps its old predecessor, so
+  # counting this pair would seed false pairs later: skip the increment.
+  if ! printf '%s' "$state" | jq -c --arg l "$rel" --argjson e "$now" '.last = $l | .epoch = $e' 2>/dev/null \
+       | coedit_write_atomic "$sfile"; then
+    pair=""
+  fi
   coedit_unlock_path "$slock"
   if [ -n "$pair" ] && coedit_lock_path "${dir}/.coedit.lock"; then
     coedit_bump "$dir" "$last" "$rel"
