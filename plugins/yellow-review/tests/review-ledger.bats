@@ -1085,6 +1085,29 @@ deletion_pair() {
   [ "$("$RL" reverify "$LEDGER_PR" "$DEL_ID" --head "$H2")" = unverifiable ]
 }
 
+@test "reverify: exact line mapping against a head whose tree cannot be read is unverifiable" {
+  git config gc.auto 0
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  ID=$(ids)
+  rm_loose "$(git rev-parse "$BASE^{tree}")"
+  git cat-file -e "$BASE^{commit}"
+  ! git ls-tree "$BASE" >/dev/null 2>&1
+  [ "$("$RL" reverify "$LEDGER_PR" "$ID" --head "$BASE")" = unverifiable ]
+}
+
+@test "reconcile: a non-deletion finding whose observed head tree vanished is unverifiable" {
+  git config gc.auto 0
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  ID=$(ids)
+  rm_loose "$(git rev-parse "$BASE^{tree}")"
+  git cat-file -e "$BASE^{commit}"
+  ! git ls-tree "$BASE" >/dev/null 2>&1
+  out=$(reconcile "$BASE")
+  [ "$(printf '%s' "$out" | jq '.transitions | length')" -eq 0 ]
+  [ "$(printf '%s' "$out" | jq --arg id "$ID" '.unverifiable | index($id) != null')" = true ]
+  [ "$(state_of "$ID")" = open ]
+}
+
 @test "reconcile reports a large-ledger notice past 2 MiB" {
   observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
   head -c 2200000 /dev/zero | tr '\0' 'x' | command fold -w 1000 | sed 's/^/{"v":9,"pad":"/; s/$/"}/' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
