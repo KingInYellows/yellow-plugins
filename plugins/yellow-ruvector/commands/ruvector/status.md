@@ -143,7 +143,9 @@ QUEUE="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.ruvector/pending-upd
 if [ -f "$QUEUE" ]; then
   wc -l < "$QUEUE"
   wc -c < "$QUEUE"
-  head -1 "$QUEUE" | jq -r '.timestamp // "unknown"'
+  # The queue file is project data: print the timestamp only when it is a
+  # plain date/time string, never free text.
+  head -1 "$QUEUE" | jq -r 'if (.timestamp | type) == "string" and (.timestamp | test("^[0-9T:.+Z -]{1,40}$")) then .timestamp else "unknown" end' 2>/dev/null || printf 'unknown\n'
 fi
 ```
 
