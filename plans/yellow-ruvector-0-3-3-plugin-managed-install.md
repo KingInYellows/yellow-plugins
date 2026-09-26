@@ -235,9 +235,12 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 >
 > - No yellow-ruvector hook or fixture reads `session_id` today. Add it to every
 >   fixture, and skip pairing when it is missing.
-> - Reuse `yellow-core/hooks/scripts/_stop-capture-subshell.sh:31-36` (sanitize
->   with `tr -c 'A-Za-z0-9._-' '_'`, reject `.` and `..`) and the per-session
->   temp+rename writes in `yellow-core/lib/compound-staging.sh:12-22`.
+> - Validate the session id rather than rewrite it (unlike
+>   `yellow-core/hooks/scripts/_stop-capture-subshell.sh:31-36`, whose
+>   `tr -c 'A-Za-z0-9._-' '_'` maps `a/b` and `a?b` to the same file): accept
+>   only `[A-Za-z0-9._-]`, at most 128 chars, not starting with `.`, and skip
+>   recording otherwise. Reuse the per-session temp+rename writes in
+>   `yellow-core/lib/compound-staging.sh:12-22`.
 
 <!-- /deepen-plan -->
 
