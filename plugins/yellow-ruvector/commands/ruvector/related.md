@@ -25,21 +25,25 @@ file path:
   `/ruvector:related src/auth/session.ts`" and stop.
 - Reject (report "Invalid path" and stop) when it is longer than 512
   characters, spans more than one line, contains a control character, is
-  absolute (starts with `/`), starts with `-`, or has a `..` component, or
-  when a line of it is exactly `RUVECTOR_RELATED_PATH_END`. Paths are
-  relative to the project root, e.g. `src/auth/session.ts`. The script
-  enforces the same rules.
+  absolute (starts with `/`), starts with `-`, or has a `..` component.
+  Paths are relative to the project root, e.g. `src/auth/session.ts`. The
+  script enforces the same rules.
 
 ### Step 2: Look up partners (ONE Bash call)
 
-Pass the path on stdin through a quoted heredoc (no expansion, and a
-single-line path can never end it early), never inside the command line:
+Pass the path on stdin through a quoted heredoc (no expansion), never
+inside the command line. Make up a fresh delimiter for every call:
+`RVPATH_` followed by 16 random hex characters (e.g. `RVPATH_9f3a61c0d2b47e85`)
+that do not occur anywhere in the path, so no argument can end the heredoc
+early:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 10 <<'RUVECTOR_RELATED_PATH_END'
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stdin 10 <<'RVPATH_<16 random hex>'
 <path>
-RUVECTOR_RELATED_PATH_END
+RVPATH_<16 random hex>
 ```
+
+Use the same delimiter on the `<<'…'` line and the closing line.
 
 The script re-validates the path (it must resolve inside the project, not in
 `.ruvector/`, `.git/`, or `docs/solutions/`) and prints one

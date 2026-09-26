@@ -336,7 +336,10 @@ COEDIT_MAX_SUGGESTIONS="${COEDIT_MAX_SUGGESTIONS:-3}"
 # only if it is exactly a path coedit_normalize could have produced: lexically
 # safe and root-relative, an existing regular file that is not a symlink,
 # under a directory that physically resolves to the same place inside the
-# root. Cheap (at most one subshell) so 50 candidates fit the hook budget.
+# root. Lexical and missing-file rejections cost no subprocess; the physical
+# directory check (one subshell) runs once per directory and at most
+# _coedit_phys_left times per lookup, so a long candidate list fits the
+# hook budget.
 coedit_partner_ok() {
   local root="$1" rroot="$2" p="$3" d phys
   [ -n "$p" ] && [ "${#p}" -le 512 ] || return 1
@@ -349,8 +352,12 @@ coedit_partner_ok() {
   case "$p" in
     */*)
       d="${p%/*}"
+      case "${_coedit_ok_dirs:-}" in *$'\n'"$d"$'\n'*) return 0 ;; esac
+      [ "${_coedit_phys_left:-0}" -gt 0 ] || return 1
+      _coedit_phys_left=$((_coedit_phys_left - 1))
       phys=$(CDPATH= cd -- "${root}/${d}" 2>/dev/null && pwd -P) || return 1
-      [ "$phys" = "${rroot}/${d}" ] || return 1 ;;
+      [ "$phys" = "${rroot}/${d}" ] || return 1
+      _coedit_ok_dirs="${_coedit_ok_dirs}${d}"$'\n' ;;
   esac
   return 0
 }
@@ -366,10 +373,15 @@ coedit_partners() {
   size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
   case "$size" in ''|*[!0-9]*) return 0 ;; esac
   [ "$size" -le "$COEDIT_MAX_BYTES" ] || return 0
-  # jq is time-bounded (COEDIT_JQ_SECS) and yields at most the top 50
-  # candidates, so a hostile store cannot keep the loop below busy.
+  # jq is time-bounded (COEDIT_JQ_SECS) and yields the top 500 candidates
+  # by count. Validation runs before the limit, so deleted or unsafe
+  # partners at the top never hide valid ones below them; stale entries cost
+  # no subprocess and at most 50 directory checks run, so a hostile store
+  # cannot keep the loop busy.
   local rroot
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
+  _coedit_phys_left=50
+  _coedit_ok_dirs=$'\n'
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     coedit_partner_ok "$root" "$rroot" "$partner" || continue
@@ -380,7 +392,7 @@ coedit_partners() {
       (.pairs[$r] // {}) | to_entries
       | map(select((.value | type) == "number" and .value >= $min
                    and (.key | test("[[:cntrl:]]") | not)))
-      | sort_by(-.value, .key) | .[0:50][] | "\(.value | floor)\t\(.key)"
+      | sort_by(-.value, .key) | .[0:500][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null)
   return 0
 }

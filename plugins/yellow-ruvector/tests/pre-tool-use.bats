@@ -239,6 +239,25 @@ assert_allow_json() {
   [ $(( (end - start) / 1000000 )) -lt 800 ]
 }
 
+@test "stale partners ranked above a valid one never hide it" {
+  jq -n '{version:1, pairs:{"src/a.ts": (([range(0;60)] | map({key:"src/gone/d\(.)/f.ts", value:9}) | from_entries) + {"src/b.ts": 4})}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  [[ "$(ctx "$output")" == *"src/b.ts"* ]]
+}
+
+@test "hundreds of symlinked-dir partners stay inside the hook timeout" {
+  outside="$(mktemp -d)"
+  for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done
+  jq -n '{version:1, pairs:{"src/a.ts": ([range(0;200)] | map({key:"l\(.)/x.ts", value:9}) | from_entries)}}' > "$RUVECTOR_DIR/coedit.json"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [ -z "$(ctx "$output")" ]
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+  rm -rf "$outside"
+}
+
 @test "surfaced stays under the session reader's size cap with long paths" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   long=$(printf 'q%.0s' $(seq 1 480))
