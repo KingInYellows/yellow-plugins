@@ -524,9 +524,14 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
 > - `docs/architecture-overview.md:495`;
 > - plugin `CLAUDE.md:55,110-113,137,141,208,271`;
 > - `yellow-core/skills/git-worktree/SKILL.md:147` and `worktree-manager.sh:162`
->   (`RUVECTOR_STORAGE_PATH`).
+>   (`RUVECTOR_STORAGE_PATH`);
+> - `docs/solutions/integration-issues/ruvector-worktree-db-symlink.md:43-47,
+>   99-103`, which name the inert `RUVECTOR_STORAGE_PATH` as the spawn-time
+>   store selector: rewrite them to say the launcher's `cd` to the git
+>   toplevel (after the worktree heal) selects the store, and that the
+>   variable must not be reintroduced.
 >
-> The last two are in yellow-core, which then needs its changeset.
+> The git-worktree entries are in yellow-core, which then needs its changeset.
 
 <!-- /deepen-plan -->
 
@@ -610,8 +615,11 @@ Adding a changeset for yellow-core is part of this task.
        increment, never the session's latest edit. Cover an abandoned lock,
        an already-claimed generation, and store-lock contention in bats.
     3. Rewrite the session file atomically.
-  - Cap `coedit.json` at 2 000 directed pairs, evicting the lowest counts;
-    set aside a file over 1 MB unparsed.
+  - Cap `coedit.json` at 2 000 directed entries (1 000 undirected pairs) and
+    a byte budget below 1 MB, evicting whole undirected pairs (both
+    directions together, lowest counts first), so the store stays symmetric
+    and suggestions agree in both directions; set aside a file over 1 MB
+    unparsed.
   - Prune session files older than 7 days on SessionStart.
 - [ ] 2.3: Catalog: remove the `Stop` hook and the `PostToolUseFailure`
       registration. Delete `hooks/scripts/stop.sh` and `tests/stop.bats`. Narrow
