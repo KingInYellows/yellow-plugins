@@ -1,0 +1,30 @@
+plans/mcp-auth-fixes-astgrep-composio-ceramic.md
+  s_37c0875242a535::t_e09e61d91450db 209,221,224,227,229,235,238,243-244
+  s_37c0875242a535::t_810b01d9e9b5d7 251
+plugins/yellow-core/commands/setup/all.md
+  s_37c0875242a535::t_5fcf3927d064c0 534-535
+plugins/yellow-research/commands/research/setup.md
+  s_37c0875242a535::t_19a5e3260786eb 79,150-153,468,698,730-732
+.changeset/ceramic-oauth-only.md
+  s_37c0875242a535::t_a3efaa6c0e9b30 1-14
+plugins/yellow-research/README.md
+  s_37c0875242a535::t_50ed45c11e7819 54-55
+plugins/yellow-research/CLAUDE.md
+  s_37c0875242a535::t_f5a961bddcfc79 69-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a3c5c3f76d85a25e7aebb1427d3595cc4e637c9a",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
