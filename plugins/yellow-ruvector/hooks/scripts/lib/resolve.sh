@@ -45,19 +45,32 @@ ruvector_main_worktree() {
     "worktree "?*) main="${first#worktree }" ;;
     *) return 1 ;;
   esac
-  # A real checkout has its tracked files; the separate git dir's parent
-  # does not. One present file among the first 50 checked-out ("H") entries
-  # is enough, so a locally deleted file does not matter; sparse-checkout
-  # entries (skip-worktree, "S") are not expected on disk, so they are
-  # skipped without counting toward the 50.
-  local n=0
+  # A real checkout has its tracked files, matching the index; the separate
+  # git dir's parent does not. Take the present files among the first 50
+  # checked-out ("H") entries (sparse "S" entries are not expected on disk
+  # and do not count), then ask git which of them differ from the index. One
+  # present, unmodified file is enough, so a locally deleted or edited file
+  # does not matter, while a file that merely shares a tracked name in the
+  # git dir's parent (its stat and content will not match) is not.
+  local n=0 present=() dirty rel
   while [ "$n" -lt 50 ] && IFS= read -r -d '' tracked; do
     case "$tracked" in
       "H "?*)
         n=$((n + 1))
-        [ -e "${main}/${tracked#H }" ] && { printf '%s' "$main"; return 0; } ;;
+        [ -e "${main}/${tracked#H }" ] && present+=(":(literal)${tracked#H }") ;;
     esac
   done < <(git -C "$main" ls-files -v -z 2>/dev/null)
+  [ "${#present[@]}" -gt 0 ] || return 1
+  # Without -z git quotes only names holding a quote, backslash or control
+  # character; those are skipped as evidence rather than mis-compared.
+  dirty=$(git -c core.quotePath=false -C "$main" diff-files --name-only -- "${present[@]}" 2>/dev/null) || return 1
+  for rel in "${present[@]}"; do
+    rel="${rel#:(literal)}"
+    case "$rel" in *'"'*|*'\'*|*[[:cntrl:]]*) continue ;; esac
+    case $'\n'"$dirty"$'\n' in *$'\n'"$rel"$'\n'*) continue ;; esac
+    printf '%s' "$main"
+    return 0
+  done
   return 1
 }
 
