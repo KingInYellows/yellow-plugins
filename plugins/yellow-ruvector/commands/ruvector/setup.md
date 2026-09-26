@@ -53,7 +53,7 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set 
 if yellow_ruvector_validate_paths; then
   printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
-  if yellow_ruvector_needs_install; then printf 'install: missing or out of date\n'
+  if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then printf 'install: missing, out of date, or broken\n'
   else printf 'install: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null)"; fi
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
@@ -71,7 +71,7 @@ grep -q '\.ruvector' "$ROOT/.gitignore" 2>/dev/null && printf 'entry present\n' 
 - Node.js missing or older than 20 → stop, report the install URL
 - `npm` or `jq` missing → stop, report what to install
 - Path validation failed → stop, report the printed reason
-- `install: missing or out of date` or `onnx model: not cached` → Step 2a
+- `install: missing, out of date, or broken` or `onnx model: not cached` → Step 2a
   (it installs only when needed and always warms an uncached model)
 - `.ruvector/` missing → Step 2b
 - Otherwise → Step 3

@@ -62,14 +62,27 @@ command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' ||
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 # yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
 # ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
-# host does not set CLAUDE_PLUGIN_DATA.
+# host does not set CLAUDE_PLUGIN_DATA. Count a dir only where the launcher
+# accepts it (lib/install-ruvector.sh validate_paths): physically under HOME
+# or /tmp, or under an absolute, non-system CLAUDE_CONFIG_DIR / XDG_DATA_HOME.
+_rv_sys() { case "$1" in ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) return 0 ;; esac; return 1; }
+_rv_base_ok() { case "$1" in /*) _rv_b=$(CDPATH= cd -P -- "$1" 2>/dev/null && pwd) && ! _rv_sys "$_rv_b" ;; *) return 1 ;; esac; }
+_rv_home=$(CDPATH= cd -P -- "${HOME:-/nonexistent}" 2>/dev/null && pwd) || _rv_home="/__unset__"
 _rv_cli=""
 for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/"; do
-  [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] && { _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"; break; }
+  [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] || continue
+  _rv_p=$(CDPATH= cd -P -- "$_rv_d" 2>/dev/null && pwd) || continue
+  case "$_rv_p" in
+    "$_rv_home"/*|/tmp/*|/private/tmp/*) ;;
+    */plugins/data/*) [ -n "${CLAUDE_CONFIG_DIR:-}" ] && _rv_base_ok "$CLAUDE_CONFIG_DIR" && case "$_rv_p" in "$_rv_b"/plugins/data/?*) ;; *) false ;; esac || continue ;;
+    *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
+  esac
+  _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"; break
 done
 [ -n "$_rv_cli" ] && printf 'ruvector:           OK (plugin-managed %s)\n' "$(node "$_rv_cli" --version 2>/dev/null)" || printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'
 [ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
-unset _rv_cli _rv_d
+unset _rv_cli _rv_d _rv_p _rv_b _rv_home
+unset -f _rv_sys _rv_base_ok
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
