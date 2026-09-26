@@ -128,8 +128,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
    with the same HOME or /tmp prefix validation as morph.
 4. **Install waiting.**
    - The launcher waits while a live lock owner is installing, for up to
-     `RUVECTOR_INSTALL_WAIT` seconds (default 25, under Claude Code's MCP
-     startup timeout). If it gives up, it prints one stderr hint naming
+     `RUVECTOR_INSTALL_WAIT` seconds (default 25, which must stay under
+     Claude Code's MCP startup timeout; task 1.1a measures it). If it gives up, it prints one stderr hint naming
      `/ruvector:setup` and `MCP_TIMEOUT`.
    - Hooks never wait. If `current` is missing, or the lock exists with a live
      owner, they exit with the silent allow JSON.
@@ -149,8 +149,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
      the model with `node cli.js embed text "warmup"`, bounded at about 15 s and
      judged by its output rather than its rc.
    - If the model is still not cached (offline), the launcher starts MCP with
-     `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
-     server is read-only and cannot stamp the store.
+     `hooks_remember` and `hooks_pretrain` removed from `RUVECTOR_MCP_ALLOW`
+     for that session, so the server is read-only and cannot stamp the store.
    - A stamped store, or a warm model, keeps the normal five-tool allowlist.
    - `/ruvector:status` reports the read-only mode and how to leave it (the next
      session with network).
@@ -218,8 +218,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 > 1. When the store has no stamp, the launcher first warms the model with
 >    `embed text` (bounded).
 > 2. If the model still isn't cached (offline), the launcher starts MCP with
->    `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
->    server is read-only and cannot stamp the store.
+>    `hooks_remember` and `hooks_pretrain` removed from `RUVECTOR_MCP_ALLOW`
+>    for that session, so the server is read-only and cannot stamp the store.
 > 3. `/ruvector:status` explains the read-only mode.
 >
 > This needs a user decision.
@@ -267,6 +267,10 @@ provider (`/stack:status`). Each PR gets its own changeset.
     creating or touching a `.ruvector/` store.
   - The model cache path `${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/`
     (`dist/core/onnx/loader.js:178-184`) is shared by hooks and MCP.
+  - Claude Code's MCP startup timeout when `MCP_TIMEOUT` is unset: start a
+    stdio server that sleeps before its handshake and bisect the sleep. Keep
+    the `RUVECTOR_INSTALL_WAIT` default a few seconds under it (lower it from
+    25 if needed) and record the measured value in Decision 4.
 - [ ] 1.1b: Confirm 0.2.34 can still load a store written by 0.3.3 (rollback
       path). Record the result in Migration & Rollback.
 - [ ] 1.1c: Confirm `hooks reembed --dry-run` output in 0.3.3 still has the
@@ -439,7 +443,11 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
       prose), `README.md`, `CLAUDE.md` (MCP Server, Hooks, Known Limitations,
       Maintenance, Testing), `docs/security.md` (15, 22-23, 140-142, 209,
       462), and the root `README.md` rows for yellow-ruvector (setup text and
-      the command/hook counts, updated again in PR 2 and PR 3).
+      the command/hook counts, updated again in PR 2 and PR 3), and the hook
+      events table in `docs/guides/advanced-workflows.md` (no
+      UserPromptSubmit recall; PostToolUse becomes co-edit tracking and the
+      Stop row drops yellow-ruvector in PR 2; PreToolUse gains co-edit
+      suggestions in PR 3).
 - [ ] 1.5e: Update `plugins/yellow-core/commands/setup/all.md`:
   - replace the line 63 probe and the READY rule at 435-439 with a DATA
     `current` + lockfile check, modeled on morph's block at 441-461;
@@ -527,8 +535,9 @@ Adding a changeset for yellow-core is part of this task.
   - the wait-then-hint behavior when the lock is held by a live pid;
   - Node below 20 gives a clear error;
   - `RUVECTOR_MCP_ALLOW` holds the five tools for a stamped store. For an
-    unstamped store with a failing `embed` stub it holds four (`hooks_remember`
-    removed).
+    unstamped store with a failing `embed` stub it holds three
+    (`hooks_capabilities`, `hooks_recall`, `hooks_stats`), and neither
+    `hooks_remember` nor `hooks_pretrain` is present.
 - [ ] 1.6d: New `tests/resolve.bats`, covering root order, the `RUVECTOR_BIN`
       seam, the lock-held skip and a missing `current`.
 - [ ] 1.6e: `session-start.bats` asserts one recall call, no `--resume`, and a
