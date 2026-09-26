@@ -36,19 +36,37 @@ case "$common" in /*) ;; *) finish ;; esac
 DIR="$common/yellow-review/findings"
 [ -d "$DIR" ] || finish
 
+CLOCK_COARSE=0
 now_ms() {
-  local t
-  t=$(date +%s%N 2>/dev/null)
-  case "$t" in
-    *N | '') printf '%s000' "$(date +%s)" ;;
-    *) printf '%s' "${t:0:13}" ;;
-  esac
+  if [ -n "${EPOCHREALTIME:-}" ]; then
+    local epoch="$EPOCHREALTIME"
+    local s="${epoch%%.*}"
+    local frac="${epoch#*.}"
+    printf '%d' $(( s * 1000 + 10#${frac:0:3} ))
+  else
+    local t
+    t=$(date +%s%N 2>/dev/null)
+    case "$t" in
+      *[!0-9]*)
+        CLOCK_COARSE=1
+        printf '%d' $(( $(date +%s) * 1000 ))
+        ;;
+      *)
+        printf '%d' $(( t / 1000000 ))
+        ;;
+    esac
+  fi
 }
 FOLD_BUDGET_MS=1500
 # stop starting new PRs (and cap each fold) 0.7 s before the 3 s timeout
 DEADLINE_MS=${RL_HOOK_DEADLINE_MS:-2300}
 fold_spent=0
 start_ms=$(now_ms)
+if [ "$CLOCK_COARSE" = 1 ] && [ "$DEADLINE_MS" -gt 700 ]; then
+  # BSD date and bash <5 only resolve whole seconds; pull the cutoff in by
+  # the same 0.7 s margin the nominal deadline already keeps from timeout.
+  DEADLINE_MS=$((DEADLINE_MS - 700))
+fi
 now=$(date +%s)
 week=$((7 * 24 * 3600))
 
