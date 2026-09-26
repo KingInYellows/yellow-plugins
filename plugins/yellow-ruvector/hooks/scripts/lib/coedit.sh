@@ -191,7 +191,13 @@ coedit_lock_path() {
     if coedit_older_than "$mt" 60; then
       ino=$(ls -di "$lock" 2>/dev/null | awk '{print $1}')
       case "$ino" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
+      # Bounded: at most 5 markers are examined per reclaim, so a checkout
+      # shipping many (possibly non-removable) markers cannot eat the hook's
+      # 1s budget. Later reclaims continue the cleanup.
+      local _pruned=0
       for marker in "${lock}".reclaim.*; do
+        [ "$_pruned" -lt 5 ] || break
+        _pruned=$((_pruned + 1))
         [ -d "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600 \
           && rmdir "$marker" 2>/dev/null
       done
