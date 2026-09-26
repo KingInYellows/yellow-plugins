@@ -102,7 +102,19 @@ done
 
 `skip` means the query failed or returned 1000 rows, so the list may be
 truncated: skip pruning entirely. Otherwise the printed PR numbers are the
-prune list. Nothing is deleted yet.
+prune list. Nothing is deleted yet, but a kept ledger would still read `OPEN`
+to the SessionStart hook, so record each listed PR's live state now, whatever
+the prompts below decide:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" refresh-state <PR#>
+```
+
+Run it once per PR in the list. A non-zero exit (6: `gh` could not read the
+state; 4: another run holds the PR's lock; 1: the state file could not be
+written) leaves that PR's state unchanged: print
+`[review:sweep-all] Ledger state not recorded for PR #<PR#> (exit <N>)` and
+continue.
 
 **Empty-list early exit.** If the resulting array is empty (`[]` or
 length 0), run both steps below in order, then stop:

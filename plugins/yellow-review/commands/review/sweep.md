@@ -148,8 +148,20 @@ the thread resolved.
 
 Run this every time. It applies nothing and costs little. First re-check
 the state with `gh pr view <PR#> --json state -q .state`; when the PR is no
-longer `OPEN`, skip this step and report `Ledger: skipped (PR <state>)` in
-Step 4. Otherwise invoke the `Skill` tool with `skill: "review:triage"` and
+longer `OPEN`, record that state so the SessionStart hook stops counting the
+PR, then skip the rest of this step and report `Ledger: skipped (PR <state>)`
+in Step 4:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" refresh-state <PR#>
+```
+
+It changes nothing when the PR has no ledger. On a non-zero exit (6: `gh`
+could not read the state; 4: another run holds the PR's lock; 1: the state
+file could not be written) report `Ledger: skipped (PR <state>; state not
+recorded, exit <N>)` instead.
+
+Otherwise invoke the `Skill` tool with `skill: "review:triage"` and
 the args string `<PR#> --non-interactive`. Unattended triage re-verifies
 every ledger finding against the fetched PR head (published fixes become
 `fixed`, vanished anchors `stale`) and never edits, commits, prompts or

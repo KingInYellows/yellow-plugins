@@ -258,11 +258,31 @@ TRIAGE="$COMMANDS_DIR/triage.md"
 
 @test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
   step3=$(awk '/^## Step 3:/ { p = 1; next } /^## Step 4:/ { p = 0 } p' "$TRIAGE" | tr -s ' \n' ' ')
-  grep -qF 'With `--non-interactive`: print `Ledger: retained (PR <state>)` and stop. Unattended triage never reaches Step 2.' <<<"$step3"
-  grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep". Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
+  grep -qF 'With `--non-interactive`: print `Ledger: retained (PR <state>)`, or `Ledger: retained (PR <state>; state not recorded, exit <N>)` after a failed refresh, and stop. Unattended triage never reaches Step 2.' <<<"$step3"
+  grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep"; after a failed refresh, append "(state not recorded, exit <N>)" to the question. Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
   # Step 2 (prune) is named only by those two bullets
   [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
   ! grep -q 'run Step 2 and stop' "$TRIAGE"
+}
+
+@test "triage: a closed PR's state is recorded before the prune question" {
+  step3=$(awk '/^## Step 3:/ { p = 1; next } /^## Step 4:/ { p = 0 } p' "$TRIAGE")
+  rs=$(grep -n '"\$RL" refresh-state <PR>' <<<"$step3" | cut -d: -f1)
+  ni=$(grep -n 'With `--non-interactive`: print `Ledger: retained' <<<"$step3" | cut -d: -f1)
+  ask=$(grep -n 'Delete the ledger for closed PR' <<<"$step3" | cut -d: -f1)
+  [ -n "$rs" ] && [ -n "$ni" ] && [ -n "$ask" ] && [ "$rs" -lt "$ni" ] && [ "$rs" -lt "$ask" ]
+  grep -qF 'state not recorded, exit <N>' <<<"$step3"
+  grep -qF 'When it prints `OPEN`, the PR reopened after the query above' <<<"$(tr -s ' \n' ' ' <<<"$step3")"
+}
+
+@test "sweep and sweep-all record a closed PR's state they skip or keep" {
+  step3b=$(awk '/^### Step 3b:/ { p = 1; next } /^### Step 4:/ { p = 0 } p' "$COMMANDS_DIR/sweep.md")
+  rs=$(grep -n 'review-ledger.sh" refresh-state <PR#>' <<<"$step3b" | cut -d: -f1)
+  sk=$(grep -n 'report `Ledger: skipped (PR <state>)`' <<<"$step3b" | cut -d: -f1)
+  [ -n "$rs" ] && [ -n "$sk" ]
+  step2b=$(awk '/^### Step 2b:/ { p = 1; next } /^### Step 3:/ { p = 0 } p' "$COMMANDS_DIR/sweep-all.md")
+  grep -qF 'review-ledger.sh" refresh-state <PR#>' <<<"$step2b"
+  grep -qF 'Ledger state not recorded for PR #<PR#>' <<<"$step2b"
 }
 
 @test "triage: Step 8 explicitly Reads the shared ledger reference before using it" {
@@ -323,7 +343,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [ "$resolve" -lt "$triage" ] && [ "$triage" -lt "$summary" ]
   grep -q '`<PR#> --non-interactive`' "$SWEEP"
   grep -q 'skill: "review:triage"' "$SWEEP"
-  grep -q 'longer `OPEN`, skip this step' "$SWEEP"
+  grep -q 'longer `OPEN`, record that state' "$SWEEP"
+  grep -q 'then skip the rest of this step and report `Ledger: skipped (PR <state>)`' "$SWEEP"
   grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
 }
 

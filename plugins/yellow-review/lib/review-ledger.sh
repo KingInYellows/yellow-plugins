@@ -1975,6 +1975,35 @@ cmd_prune() {
   printf 'pruned: PR #%s (%s)\n' "$pr" "$st"
 }
 
+# Record the live PR state in <pr>.state without a ledger write. Only the
+# writer gate refreshes it otherwise, so a PR that closed after its last
+# review kept `OPEN` and the SessionStart hook went on counting it for a
+# week. The no-ledger check runs first (no gh call needed); the gh read
+# itself happens under the lock so a reopen racing this call can never be
+# clobbered by a stale CLOSED read from before the lock was acquired.
+# <pr>.state is left untouched on a gh failure.
+rl_refresh_state_locked() {
+  local d="$RL_R_DIR" pr="$RL_R_PR" st
+  if [ ! -f "$d/$pr.jsonl" ] && [ ! -f "$d/$pr.state" ]; then
+    printf 'none: PR #%s has no ledger\n' "$pr"
+    return 0
+  fi
+  st=$(rl_gh_state "$pr") || rl_die "$RL_EXIT_UNVERIFIABLE" "refresh-state: could not read PR #$pr state"
+  rl_write_state "$d" "$pr" "$st" || {
+    rl_err "refresh-state: could not write PR #$pr state"
+    return 1
+  }
+  printf '%s\n' "$st"
+}
+
+cmd_refresh_state() {
+  local pr="${1:-}"
+  rl_need_pr "$pr"
+  RL_R_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
+  RL_R_PR=$pr
+  rl_locked "$pr" rl_refresh_state_locked || exit $?
+}
+
 # Per-PR counts: the sidecar when its byte count matches, else a fold.
 rl_summary_one() {
   local d="$1" pr="$2" p a b fold
@@ -2398,10 +2427,12 @@ review-ledger.sh <subcommand> [args]
   reverify <pr> <finding_id> --head <sha>
   publication <pr> <finding_id> --remote-head <sha>
   validate-path <anchor|dependency|restore> <rev> <path> [<base>]
-  prune <pr> | summary [--all | <pr>] | new-run-id
+  prune <pr> | refresh-state <pr> | summary [--all | <pr>] | new-run-id
+          (refresh-state records the live gh state in <pr>.state and prints it,
+          or "none: ..." without writing when the PR has no ledger)
 Exit codes: 0 ok, 2 usage, 3 invalid / illegal transition, 4 lock timeout,
 5 PR closed, 6 unverifiable. Most subcommands print JSON; reverify,
-publication, restore and prune print one token or line.
+publication, restore, prune and refresh-state print one token or line.
 USAGE
 }
 
@@ -2420,7 +2451,7 @@ rl_main() {
     help | -h | --help) rl_usage ;;
     '') rl_usage >&2; exit "$RL_EXIT_USAGE" ;;
     new-run-id) rl_new_run_id; printf '\n' ;;
-    observe | transition | fold | reverify | publication | prune | summary | dismissed-context | validate-path | remote-head | settle | reconcile | restore | cards | resolve-path)
+    observe | transition | fold | reverify | publication | prune | refresh-state | summary | dismissed-context | validate-path | remote-head | settle | reconcile | restore | cards | resolve-path)
       git rev-parse --git-dir >/dev/null 2>&1 || rl_die 1 "not inside a git repository"
       "cmd_${sub//-/_}" "$@"
       ;;

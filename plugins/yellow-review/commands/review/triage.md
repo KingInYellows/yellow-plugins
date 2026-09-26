@@ -60,11 +60,28 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
 
 - `MERGED` or `CLOSED`: never prune implicitly — the PR may have closed
   after the caller last checked it, and deleting a ledger needs a human.
-  - With `--non-interactive`: print `Ledger: retained (PR <state>)` and
-    stop. Unattended triage never reaches Step 2.
+  First record the state so the SessionStart hook stops counting the PR:
+
+  ```bash
+  RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
+  "$RL" refresh-state <PR>
+  ```
+
+  It prints the recorded state, or `none: …` when the PR has no ledger. When
+  it prints `OPEN`, the PR reopened after the query above: skip the rest of
+  this bullet and continue with the fetch below as for any open PR. Any
+  non-zero exit leaves `<pr>.state` unchanged — 6: `gh` could not read the
+  state; 4: another run holds the PR's lock; 1: the state file could not be
+  written. Do not stop on it: the hook would keep counting the PR, so carry
+  `state not recorded, exit <N>` into the line or question below.
+
+  - With `--non-interactive`: print `Ledger: retained (PR <state>)`, or
+    `Ledger: retained (PR <state>; state not recorded, exit <N>)` after a
+    failed refresh, and stop. Unattended triage never reaches Step 2.
   - Attended: ask one AskUserQuestion, "Delete the ledger for closed PR
-    #<n>?", with the options "Delete" and "Keep". Run Step 2 only on
-    "Delete"; either way, stop.
+    #<n>?", with the options "Delete" and "Keep"; after a failed refresh,
+    append "(state not recorded, exit <N>)" to the question. Run Step 2
+    only on "Delete"; either way, stop.
 
   A retained ledger is cleaned up later by `/review:sweep-all`'s confirmed
   prune step or an explicit `/review:triage --prune <PR#>`.

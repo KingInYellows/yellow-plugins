@@ -177,6 +177,12 @@ a PR that has merged or closed. Attended triage of such a PR asks before
 deleting its ledger. `--prune <PR#>` deletes the ledger of a merged or
 closed PR.
 
+Triage Step 3, sweep Step 3b and sweep-all Step 2b each record a closed or
+merged PR's live state via `review-ledger.sh refresh-state`, so the
+SessionStart notice below lists that PR as unverified instead of pending. A
+failed refresh (exit 6, 4 or 1) leaves the state unchanged and is reported
+as `state not recorded, exit <N>`.
+
 A SessionStart hook prints one line when any open PR in this clone has
 pending or attention findings, for example
 `[yellow-review] Review ledger: 3 pending, 1 need attention (PRs #12, #34). Run /review:triage 12.`
