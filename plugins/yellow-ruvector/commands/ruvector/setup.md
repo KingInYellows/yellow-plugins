@@ -210,7 +210,7 @@ Use AskUserQuestion to offer:
 | Error                        | Action                                                    |
 | ---------------------------- | --------------------------------------------------------- |
 | Node.js not found or < 20    | Stop. Report: install from https://nodejs.org/            |
-| Path validation failed       | Stop. Report the printed reason (data dir outside HOME/tmp) |
+| Path validation failed       | Stop. Report the printed reason (data dir outside HOME/tmp, or `XDG_DATA_HOME` is a system directory) |
 | npm ci failed                | Show output; check network/proxy, then re-run Step 2a     |
 | Install lock held            | Another session is installing; wait and re-run            |
 | mkdir -p .ruvector failed    | Check disk space and directory permissions                |
