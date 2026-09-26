@@ -533,10 +533,24 @@ exit 0'
   done
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
+  # Pruning runs detached; give it a moment.
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/old" ] || break; sleep 0.1; done
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
   [ -e "$RUVECTOR_DIR/coedit-sessions/new" ]
   # Top level only.
   [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
+}
+
+@test "session pruning never delays the SessionStart response" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$BATS_TEST_TMPDIR/slowbin" "$RUVECTOR_DIR/coedit-sessions"
+  printf '#!/bin/sh\nsleep 3\n' > "$BATS_TEST_TMPDIR/slowbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/slowbin/find"
+  start=$(date +%s%N)
+  PATH="$BATS_TEST_TMPDIR/slowbin:$PATH" run run_hook '{"cwd":""}'
+  end=$(date +%s%N)
+  [ "$status" -eq 0 ]
+  [ $(( (end - start) / 1000000 )) -lt 2500 ]
 }
 
 @test "never prunes through a symlinked co-edit session dir" {
