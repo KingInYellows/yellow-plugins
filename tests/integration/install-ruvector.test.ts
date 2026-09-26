@@ -19,6 +19,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readlinkSync,
   rmSync,
   symlinkSync,
@@ -347,6 +348,21 @@ describe('yellow-ruvector install lib', () => {
       // The waiter judged pid 999999999 stale, but a live owner now holds it.
       const r = runBash(
         'yellow_ruvector_data_dir; yellow_ruvector_reclaim_lock 999999999',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
+      // Restored in place, never nested and no leftover grave.
+      const left = readdirSync(data).filter((n) => n.startsWith('.install.lock.stale'));
+      expect(left).toEqual([]);
+      expect(readdirSync(join(data, '.install.lock'))).toEqual(['pid']);
+    });
+
+    it('release never removes a lock another process now owns', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), String(process.pid));
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_release_install_lock',
         env
       );
       expect(r.status).toBe(0);
