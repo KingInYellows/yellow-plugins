@@ -172,6 +172,16 @@ yellow_ruvector_entry() {
   printf '%s/current/node_modules/ruvector/bin/cli.js' "$RUVECTOR_DATA"
 }
 
+# yellow_ruvector_install_healthy — this version's install actually runs
+# (`cli.js --version`, bounded): a tree that lost or corrupted a dependency
+# while bin/cli.js survived is not healthy and gets reinstalled.
+yellow_ruvector_install_healthy() {
+  local entry
+  entry=$(yellow_ruvector_pinned_entry) || return 1
+  [ -f "$entry" ] || return 1
+  yellow_ruvector_run_bounded 10 node "$entry" --version >/dev/null 2>&1
+}
+
 # Returns 0 when an install is needed: no entry, or `current` does not point
 # at the install dir for the committed lockfile. Fail-open (any error means
 # "needs install").
@@ -228,14 +238,15 @@ yellow_ruvector_acquire_install_lock() {
 # yellow_ruvector_reclaim_lock <expected-pid> — remove the install lock only
 # if it is still the same lock (same directory inode) carrying the pid judged
 # stale and, for a real pid, that process is still gone. Each stale lock
-# generation (pid + inode) is reclaimed at most once: the reclaimer must first
-# create the marker .install.lock.reclaim.<pid>-<inode> (atomic mkdir), so two
+# generation (pid + inode + mtime) is reclaimed at most once: the reclaimer
+# must first create the marker .install.lock.reclaim.<pid>-<inode>-<mtime>
+# (atomic mkdir), so two
 # waiters that judged the same lock stale cannot both act, and a waiter can
 # never delete the fresh lock that replaced it (different inode, or its
 # marker already exists). Markers are left behind and pruned after 10
 # minutes, long after any reclaimer that saw that generation has finished.
 yellow_ruvector_reclaim_lock() {
-  local lock_dir="${RUVECTOR_DATA}/.install.lock" expected="${1:-}" ino marker
+  local lock_dir="${RUVECTOR_DATA}/.install.lock" expected="${1:-}" ino mt marker
   # Cheap pre-check (no marker for a lock that is not stale).
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
@@ -244,11 +255,15 @@ yellow_ruvector_reclaim_lock() {
   esac
   ino=$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')
   case "$ino" in ''|*[!0-9]*) return 0 ;; esac
+  # Inodes are reused right away; inode + mtime identifies one generation.
+  mt=$(date -r "$lock_dir" +%s 2>/dev/null) || mt=0
+  case "$mt" in ''|*[!0-9]*) mt=0 ;; esac
   find "$RUVECTOR_DATA" -maxdepth 1 -name '.install.lock.reclaim.*' -type d -mmin +10 \
     -exec rmdir {} + 2>/dev/null
-  marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}"
+  marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}-${mt}"
   mkdir "$marker" 2>/dev/null || return 0
   [ "$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')" = "$ino" ] || return 0
+  [ "$(date -r "$lock_dir" +%s 2>/dev/null || echo 0)" = "$mt" ] || return 0
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
     '' | *[!0-9]* | 0) ;;
@@ -306,6 +321,7 @@ yellow_ruvector_do_install() {
   # install, possibly backing a live server): reuse it rather than deleting
   # node_modules from under that server.
   if [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
+     && yellow_ruvector_install_healthy \
      && node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
     yellow_ruvector_swap_current "install-${hash}" || return 1
     yellow_ruvector_prune "install-${hash}" "${prev##*/}"
@@ -395,7 +411,10 @@ yellow_ruvector_prune() {
 yellow_ruvector_model_fingerprint() {
   local dir="${RUVECTOR_CACHE_DIR:-${HOME:-/tmp}}/.ruvector/models/${YELLOW_RUVECTOR_MODEL}"
   [ -s "${dir}/model.onnx" ] && [ -s "${dir}/tokenizer.json" ] || return 1
-  printf '%s:%s' "$(wc -c < "${dir}/model.onnx" | tr -d ' ')" "$(wc -c < "${dir}/tokenizer.json" | tr -d ' ')"
+  # cksum (POSIX CRC + size) authenticates content, not just length: a
+  # same-size corrupted or replaced file no longer matches.
+  printf '%s:%s' "$(cksum < "${dir}/model.onnx" | awk '{print $1 "-" $2}')" \
+    "$(cksum < "${dir}/tokenizer.json" | awk '{print $1 "-" $2}')"
 }
 
 # True when the model files exist AND a warm-up verified these exact files

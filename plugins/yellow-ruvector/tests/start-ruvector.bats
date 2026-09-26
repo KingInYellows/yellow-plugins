@@ -27,6 +27,9 @@ setup() {
 case "$1" in
   --version) echo "${FAKE_NODE_VERSION:-v22.1.0}"; exit 0 ;;
 esac
+if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_BROKEN:-}" ]; then
+  echo "Error: Cannot find module 'commander'" >&2; exit 1
+fi
 case "$2 $3" in
   "embed text")
     [ -n "${FAKE_EMBED_SLEEP:-}" ] && sleep "$FAKE_EMBED_SLEEP"
@@ -61,8 +64,9 @@ fake_install() {
 cache_model() {
   local d="$HOME/.ruvector/models/all-MiniLM-L6-v2"
   mkdir -p "$d" "$DATA"; echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
-  # Verified by an earlier warm-up (sizes of model.onnx and tokenizer.json).
-  printf '2:3' > "$DATA/model-verified"
+  # Verified by an earlier warm-up (content fingerprint of both files).
+  printf '%s:%s' "$(cksum < "$d/model.onnx" | awk '{print $1 "-" $2}')" \
+    "$(cksum < "$d/tokenizer.json" | awk '{print $1 "-" $2}')" > "$DATA/model-verified"
 }
 
 stamp_store() {
@@ -311,4 +315,15 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   launch "$REPO"
   [ "$status" -ne 0 ]
   [[ "$output" != *EXEC* ]]
+}
+
+@test "an install whose CLI no longer runs is reinstalled, never exec'd" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_CLI_BROKEN=1
+  fake_install; stamp_store
+  printf '#!/bin/sh\necho npm-called >> "%s"\nexit 1\n' "$DATA/npm.log" > "$STUBS/npm"; chmod +x "$STUBS/npm"
+  launch "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *EXEC* ]]
+  grep -q npm-called "$DATA/npm.log"
 }
