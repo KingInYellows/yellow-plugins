@@ -158,6 +158,30 @@ describe('yellow-ruvector install lib', () => {
     });
   });
 
+  it('accepts the XDG fallback outside HOME, but never a system XDG_DATA_HOME', () => {
+    const ok = runBash(
+      'yellow_ruvector_validate_paths && printf %s "$RUVECTOR_DATA"',
+      { ...env, CLAUDE_PLUGIN_DATA: undefined, XDG_DATA_HOME: '/mnt/yr-xdg' }
+    );
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toBe('/mnt/yr-xdg/yellow-ruvector');
+    for (const sys of ['/etc', '/usr/share', '/', '/var/lib']) {
+      const r = runBash('yellow_ruvector_validate_paths', {
+        ...env,
+        CLAUDE_PLUGIN_DATA: undefined,
+        XDG_DATA_HOME: sys,
+      });
+      expect(r.status).not.toBe(0);
+    }
+    // Only the fallback gets this: an explicit CLAUDE_PLUGIN_DATA there is refused.
+    const explicit = runBash('yellow_ruvector_validate_paths', {
+      ...env,
+      CLAUDE_PLUGIN_DATA: '/mnt/yr-xdg/yellow-ruvector',
+      XDG_DATA_HOME: '/mnt/yr-xdg',
+    });
+    expect(explicit.status).not.toBe(0);
+  });
+
   it('rejects `..` components when realpath -m is unavailable (BSD/macOS)', () => {
     const bin = join(home, 'fakebin');
     mkdirSync(bin, { recursive: true });

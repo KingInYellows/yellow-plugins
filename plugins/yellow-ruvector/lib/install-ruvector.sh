@@ -86,10 +86,28 @@ yellow_ruvector_validate_paths() {
     home_canonical="$canonical"
   fi
 
+  # The documented XDG fallback may live outside HOME (XDG_DATA_HOME=/mnt/…):
+  # allow exactly <canonical XDG_DATA_HOME>/yellow-ruvector when the user set
+  # an absolute XDG_DATA_HOME that is not a system directory.
+  local xdg_dir="/__unset__"
+  if [ "${RUVECTOR_DATA_FALLBACK:-0}" = 1 ]; then
+    case "${XDG_DATA_HOME:-}" in
+      /*)
+        if canonical=$(realpath -m -- "$XDG_DATA_HOME" 2>/dev/null) \
+             || canonical=$(yellow_ruvector_canon "$XDG_DATA_HOME"); then
+          case "/${canonical}/" in */../*|*/./*) canonical="" ;; esac
+          case "$canonical" in
+            ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) ;;
+            *) xdg_dir="${canonical%/}/yellow-ruvector" ;;
+          esac
+        fi ;;
+    esac
+  fi
+
   case "$RUVECTOR_DATA" in
-    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|"$xdg_dir") ;;
     *)
-      printf 'yellow-ruvector: refusing — data dir outside HOME/tmp: %s\n' \
+      printf 'yellow-ruvector: refusing — data dir outside HOME/tmp (or a system XDG_DATA_HOME): %s\n' \
         "$RUVECTOR_DATA" >&2
       return 1 ;;
   esac
