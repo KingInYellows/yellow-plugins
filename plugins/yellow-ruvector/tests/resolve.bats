@@ -145,6 +145,21 @@ fake_install() {
   [ ! -e "$WORK/wts/.ruvector" ]
 }
 
+@test "heal_store: a tracked name that merely exists in the git dir's parent is not a checkout" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  mkdir -p "$WORK/meta" "$WORK/main"
+  git -C "$WORK/main" init -q --separate-git-dir="$WORK/meta/.git"
+  echo x > "$WORK/main/README.md"
+  git -C "$WORK/main" add README.md
+  git -C "$WORK/main" -c user.email=t@t -c user.name=t commit -q -m init
+  echo "unrelated" > "$WORK/meta/README.md"
+  mkdir "$WORK/meta/.ruvector"
+  git -C "$WORK/main" worktree add -q "$WORK/wtc" -b coinc
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtc"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/wtc/.ruvector" ]
+}
+
 @test "heal_store: an empty --separate-git-dir repo never links to the git dir's parent" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   mkdir -p "$WORK/meta" "$WORK/main"
