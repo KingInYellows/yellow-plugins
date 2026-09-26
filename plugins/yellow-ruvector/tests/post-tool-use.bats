@@ -387,12 +387,13 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit r1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
   [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
-  [ -d "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino" ]
+  ls -d "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-"* >/dev/null
   # Another waiter already claimed this stale generation: leave the lock.
   mkdir "$RUVECTOR_DIR/.coedit.lock"
   touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock"
   ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
-  mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino"
+  mt=$(date -r "$RUVECTOR_DIR/.coedit.lock" +%s)
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-$mt"
   edit r1 "$PROJECT_ROOT/src/c.ts"
   [ -d "$RUVECTOR_DIR/.coedit.lock" ]
   [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
@@ -452,4 +453,37 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ln -s "$long/zzzzzzzzzzzzzzzz.ts" "$PROJECT_ROOT/src/short.ts"
   edit z2 "$PROJECT_ROOT/src/short.ts"
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/z2" ] || ! grep -q yyyy "$RUVECTOR_DIR/coedit-sessions/z2"
+}
+
+@test "a reused inode never inherits an old generation's reclaim marker" {
+  edit g1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
+  # A marker left by an earlier generation with the same inode.
+  mkdir "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-1"
+  edit g1 "$PROJECT_ROOT/src/b.ts"
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
+@test "the session and store locks share one wait budget; the hook still answers" {
+  edit h2 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event h2 Edit "$PROJECT_ROOT/src/b.ts")"
+  end=$(date +%s%N)
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  printf '%s' "$output" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 700 ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/.h2.lock" ]
+}
+
+@test "a coedit.json that is slow to process is skipped within the time bound, not set aside" {
+  jq -n '{version:1, pairs:{"src/x.ts": ([range(0;20000)] | map({key:"src/d/f\(.).ts", value:3}) | from_entries)}}' > "$COEDIT"
+  before=$(cksum < "$COEDIT")
+  edit t1 "$PROJECT_ROOT/src/a.ts"
+  COEDIT_JQ_SECS=0.01 edit t1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(cksum < "$COEDIT")" = "$before" ]
+  ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
 }

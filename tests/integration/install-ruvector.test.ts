@@ -426,7 +426,7 @@ describe('yellow-ruvector install lib', () => {
       // Another waiter already claimed this exact lock (pid + inode).
       const marker = join(
         data,
-        `.install.lock.reclaim.999999999-${statSync(lock).ino}`
+        `.install.lock.reclaim.999999999-${statSync(lock).ino}-${Math.floor(statSync(lock).mtimeMs / 1000)}`
       );
       mkdirSync(marker);
       const r = runBash(
@@ -482,6 +482,14 @@ describe('yellow-ruvector install lib', () => {
   });
 
   describe('model_cached', () => {
+    // Record the current files as verified, the way a successful warm-up does.
+    const markVerified = (extra: Record<string, string> = {}) => {
+      const r = runBash(
+        'yellow_ruvector_data_dir; mkdir -p "$RUVECTOR_DATA"; yellow_ruvector_model_fingerprint > "$RUVECTOR_DATA/model-verified"',
+        { ...env, ...extra }
+      );
+      expect(r.status).toBe(0);
+    };
     it('is true only for non-empty files a warm-up verified', () => {
       const dir = join(home, '.ruvector', 'models', 'all-MiniLM-L6-v2');
       const cached = () =>
@@ -495,7 +503,12 @@ describe('yellow-ruvector install lib', () => {
       // Present but never verified (e.g. an interrupted download).
       expect(cached()).not.toBe(0);
       mkdirSync(data, { recursive: true });
-      writeFileSync(join(data, 'model-verified'), '1:2');
+      markVerified();
+      expect(cached()).toBe(0);
+      // Same-size different content no longer matches.
+      writeFileSync(join(dir, 'tokenizer.json'), '[]');
+      expect(cached()).not.toBe(0);
+      writeFileSync(join(dir, 'tokenizer.json'), '{}');
       expect(cached()).toBe(0);
       // A later truncation no longer matches the verified sizes.
       writeFileSync(join(dir, 'tokenizer.json'), '{');
@@ -509,7 +522,7 @@ describe('yellow-ruvector install lib', () => {
       writeFileSync(join(dir, 'model.onnx'), 'x');
       writeFileSync(join(dir, 'tokenizer.json'), '{}');
       mkdirSync(data, { recursive: true });
-      writeFileSync(join(data, 'model-verified'), '1:2');
+      markVerified({ RUVECTOR_CACHE_DIR: cache });
       expect(
         runBash('yellow_ruvector_data_dir; yellow_ruvector_model_cached', {
           ...env,
