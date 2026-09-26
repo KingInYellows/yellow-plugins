@@ -52,6 +52,17 @@ yellow_ruvector_validate_paths() {
   fi
   export CLAUDE_PLUGIN_ROOT RUVECTOR_DATA
 
+  # Without GNU `realpath -m` (BSD/macOS) the paths stay raw, and a `..`
+  # component would slip past the prefix checks below: refuse it outright.
+  local p
+  for p in "$CLAUDE_PLUGIN_ROOT" "$RUVECTOR_DATA"; do
+    case "/${p}/" in
+      */../*|*/./*)
+        printf 'yellow-ruvector: refusing — path has a . or .. component: %s\n' "$p" >&2
+        return 1 ;;
+    esac
+  done
+
   local home_canonical="${HOME:-/__unset__}"
   if [ -n "${HOME:-}" ] && canonical=$(realpath -m -- "$HOME" 2>/dev/null); then
     home_canonical="$canonical"
@@ -175,6 +186,18 @@ yellow_ruvector_do_install() {
     return 1
   }
   final="${RUVECTOR_DATA}/install-${hash}"
+  prev=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || true)
+
+  # Rolling back to a lockfile whose install dir is still here (the previous
+  # install, possibly backing a live server): reuse it rather than deleting
+  # node_modules from under that server.
+  if [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
+     && node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
+    yellow_ruvector_swap_current "install-${hash}" || return 1
+    yellow_ruvector_prune "install-${hash}" "${prev##*/}"
+    return 0
+  fi
+
   tmp="${RUVECTOR_DATA}/.install-${hash}.tmp.$$"
   rm -rf -- "$tmp" 2>/dev/null
   mkdir -p "$tmp" || return 1
@@ -215,7 +238,6 @@ yellow_ruvector_do_install() {
   rm -rf -- "$final" 2>/dev/null
   mv "$tmp" "$final" || { rm -rf -- "$tmp" 2>/dev/null; return 1; }
 
-  prev=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || true)
   yellow_ruvector_swap_current "install-${hash}" || return 1
   yellow_ruvector_prune "install-${hash}" "${prev##*/}"
   return 0
