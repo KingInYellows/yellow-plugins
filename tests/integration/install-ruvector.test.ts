@@ -458,6 +458,24 @@ describe('yellow-ruvector install lib', () => {
       expect(existsSync(join(data, '.install.lock', 'pid'))).toBe(true);
     });
 
+    it('clears a lock whose pid file is missing', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_acquire_install_lock 4 && cat "$RUVECTOR_DATA/.install.lock/pid"',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout).toMatch(/^[0-9]+$/);
+    });
+
+    it('accepts macOS canonical /private/tmp paths', () => {
+      const r = runBash('yellow_ruvector_validate_paths', {
+        ...env,
+        CLAUDE_PLUGIN_DATA: '/private/tmp/yr-data/yellow-ruvector',
+      });
+      expect(r.status).toBe(0);
+    });
+
     it('clears a lock whose pid file stays empty', () => {
       mkdirSync(join(data, '.install.lock'), { recursive: true });
       writeFileSync(join(data, '.install.lock', 'pid'), '');

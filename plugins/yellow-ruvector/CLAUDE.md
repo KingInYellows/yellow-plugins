@@ -180,7 +180,8 @@ progress.
   pairing. Every jq over the store is killed after 0.3s (the edit's
   increment is skipped), a `coedit.json` over 1 MB is set aside unparsed,
   every write rebuilds the pairs symmetric, and the file is capped at 2000
-  directed pairs, keeping the highest counts.
+  directed pairs and 80% of that 1 MB, keeping the highest counts, so the
+  writer never produces a file it would later set aside.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session
   files older than 7 days. MultiEdit's path is the top-level
