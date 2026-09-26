@@ -17,3 +17,5 @@ Re-verify no longer uses the redacted, 200-character display scope as the
 claim: a markdown scope is re-derived at the matched line and compared by hash,
 and a code scope whose display copy was truncated or redacted is unverifiable
 rather than wrongly `not_reproduced`.
+The fail-closed credential pass now reads its whole input, so a hit in large
+multi-line text is no longer lost to SIGPIPE under `pipefail` and stored.

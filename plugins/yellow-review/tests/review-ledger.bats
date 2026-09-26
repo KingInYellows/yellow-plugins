@@ -1480,6 +1480,21 @@ deleted_util() {
   run -6 "$RL" reverify "$LEDGER_PR" "$id" --head "$H2"
 }
 
+@test "the fail-closed pass still trips on large multi-line text under pipefail" {
+  # a hit on the first line of text larger than a pipe buffer: an early
+  # awk exit would SIGPIPE the writer and pipefail would turn the hit into
+  # a non-zero "not suspicious" status
+  run bash -c 'source "$1"; set -uo pipefail
+    filler=$(seq 1 20000 | sed "s/^/line of filler text /")
+    rl_suspicious "API_KEY=zzz
+$filler" && echo tripped
+    rl_suspicious "aB3dEfGhIjKlMnOpQrStUvWxYz0123456789
+$filler" && echo tripped
+    rl_suspicious "$filler" || echo clean' _ "$RL"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'tripped\ntripped\nclean' ]
+}
+
 @test "the one-at-a-time redaction fallback still redacts and keeps every finding" {
   pem='-----BEGIN RSA PRIVATE KEY----- then more'
   out=$(observe "$BASE" "[$(finding a.sh 1 "$(jq -cn --arg t "$pem" '{title: $t}')"), $(finding a.sh 2 '{"title":"plain second title"}')]")

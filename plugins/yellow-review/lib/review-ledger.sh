@@ -345,8 +345,11 @@ function susp(s,   l, t, w) {
 }'
 
 rl_suspicious() {
+  # read to EOF even after a hit: exiting early would SIGPIPE printf on
+  # input larger than a pipe buffer, and pipefail would make that 141 read
+  # as "not suspicious"
   printf '%s\n' "$1" | awk "$RL_SUSP_AWK"'
-    susp($0) { hit = 1; exit }
+    !hit && susp($0) { hit = 1 }
     END { exit !hit }'
 }
 
