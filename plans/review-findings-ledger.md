@@ -1174,10 +1174,13 @@ yellow-core changes. Each stage carries its own changeset.
       [#872](https://github.com/KingInYellows/yellow-plugins/pull/872)
       ("Manual check (task 6.5a)"). The notice and timing checks passed. One
       gap came out of it: `/review:triage` on a closed PR does not refresh
-      `<pr>.state`.
+      `<pr>.state` (fix:
+      [#883](https://github.com/KingInYellows/yellow-plugins/pull/883)).
 - [ ] 6.5b: After the first ten real `/review:pr` runs, record the
       `category_split` value (the measurement the brainstorm asks for), summed
-      over those PRs. The scratch PR gave 2.
+      over those PRs. (For reference, the 6.5a scratch PR gave 2; it does not
+      count toward the ten.) Tracked in
+      [#881](https://github.com/KingInYellows/yellow-plugins/issues/881).
 - [x] 6.6: Changeset: `yellow-review` minor.
 
 ## Testing Strategy
