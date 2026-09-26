@@ -157,8 +157,9 @@ in Step 4:
 ```
 
 It changes nothing when the PR has no ledger. On a non-zero exit (6: `gh`
-could not read the state; 4: another run holds the PR's lock) report
-`Ledger: skipped (PR <state>; state not recorded, exit <N>)` instead.
+could not read the state; 4: another run holds the PR's lock; 1: the state
+file could not be written) report `Ledger: skipped (PR <state>; state not
+recorded, exit <N>)` instead.
 
 Otherwise invoke the `Skill` tool with `skill: "review:triage"` and
 the args string `<PR#> --non-interactive`. Unattended triage re-verifies

@@ -131,7 +131,8 @@ setup() {
 }
 
 @test "refresh-state records the live PR state and never creates a ledger" {
-  MOCK_GH_FAIL=1 run -6 "$RL" refresh-state "$LEDGER_PR"
+  MOCK_GH_FAIL=1 run -0 "$RL" refresh-state "$LEDGER_PR"
+  [ "$output" = "none: PR #$LEDGER_PR has no ledger" ]
   [ ! -e "$LEDGER_DIR/$LEDGER_PR.state" ]
   run -0 "$RL" refresh-state "$LEDGER_PR"
   [ "$output" = "none: PR #$LEDGER_PR has no ledger" ]

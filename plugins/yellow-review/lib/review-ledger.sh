@@ -1978,26 +1978,29 @@ cmd_prune() {
 # Record the live PR state in <pr>.state without a ledger write. Only the
 # writer gate refreshes it otherwise, so a PR that closed after its last
 # review kept `OPEN` and the SessionStart hook went on counting it for a
-# week. Checked under the lock so a concurrent prune is not undone.
+# week. The no-ledger check runs first (no gh call needed); the gh read
+# itself happens under the lock so a reopen racing this call can never be
+# clobbered by a stale CLOSED read from before the lock was acquired.
+# <pr>.state is left untouched on a gh failure.
 rl_refresh_state_locked() {
-  local d="$RL_R_DIR" pr="$RL_R_PR"
+  local d="$RL_R_DIR" pr="$RL_R_PR" st
   if [ ! -f "$d/$pr.jsonl" ] && [ ! -f "$d/$pr.state" ]; then
     printf 'none: PR #%s has no ledger\n' "$pr"
     return 0
   fi
-  rl_write_state "$d" "$pr" "$RL_R_STATE" || {
+  st=$(rl_gh_state "$pr") || rl_die "$RL_EXIT_UNVERIFIABLE" "refresh-state: could not read PR #$pr state"
+  rl_write_state "$d" "$pr" "$st" || {
     rl_err "refresh-state: could not write PR #$pr state"
     return 1
   }
-  printf '%s\n' "$RL_R_STATE"
+  printf '%s\n' "$st"
 }
 
 cmd_refresh_state() {
-  local pr="${1:-}" st
+  local pr="${1:-}"
   rl_need_pr "$pr"
-  st=$(rl_gh_state "$pr") || rl_die "$RL_EXIT_UNVERIFIABLE" "refresh-state: could not read PR #$pr state"
   RL_R_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
-  RL_R_PR=$pr RL_R_STATE=$st
+  RL_R_PR=$pr
   rl_locked "$pr" rl_refresh_state_locked || exit $?
 }
 
