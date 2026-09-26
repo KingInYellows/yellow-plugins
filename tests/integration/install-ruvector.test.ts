@@ -497,6 +497,17 @@ describe('yellow-ruvector install lib', () => {
       expect(r.status).toBe(0);
       expect(existsSync(join(data, '.install.lock'))).toBe(false);
     });
+
+    it('gives the lock up when its pid file cannot be written', () => {
+      mkdirSync(data, { recursive: true });
+      // A zero soft file-size limit makes the pid write fail (EFBIG).
+      const r = runBash(
+        'yellow_ruvector_data_dir; trap "" XFSZ; ulimit -S -f 0; yellow_ruvector_acquire_install_lock 1; rc=$?; ulimit -S -f unlimited; exit "$rc"',
+        env
+      );
+      expect(r.status).toBe(1);
+      expect(existsSync(join(data, '.install.lock'))).toBe(false);
+    });
   });
 
   describe('model_cached', () => {

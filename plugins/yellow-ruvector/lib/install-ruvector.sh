@@ -204,8 +204,13 @@ yellow_ruvector_acquire_install_lock() {
   mkdir -p "$RUVECTOR_DATA" 2>/dev/null || return 1
   for ((i=1; i<=max_attempts; i++)); do
     if mkdir "$lock_dir" 2>/dev/null; then
-      printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null || true
-      return 0
+      # A lock without a pid would be reclaimed by the next waiter while we
+      # still work: give it up rather than hold it unrecorded.
+      if printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null; then
+        return 0
+      fi
+      rm -rf -- "$lock_dir" 2>/dev/null
+      return 1
     fi
     # A missing pid file (owner killed between mkdir and the pid write) reads
     # as empty and is judged like any other invalid pid: stale when it is
