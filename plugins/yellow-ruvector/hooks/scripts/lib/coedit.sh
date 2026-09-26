@@ -490,10 +490,11 @@ coedit_suggest_once() {
     { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
       | jq -c --arg r "$rel" '
         # Newest last, at most 200 entries and 32 KB serialized (UTF-8
-        # bytes of each JSON string plus its comma), so the session file
+        # bytes of each JSON string plus its comma, and n starts at 1: an
+        # array of k entries has k-1 commas plus 2 brackets), so the file
         # stays well under the 64 KB its readers accept.
         .surfaced = ((.surfaced | if type == "array" then map(select(type == "string")) else [] end) | map(select(. != $r)) + [$r] | reverse
-          | reduce .[] as $p ({a: [], n: 0};
+          | reduce .[] as $p ({a: [], n: 1};
               (($p | tojson | utf8bytelength) + 1) as $c
               | if (.a | length) < 200 and .n + $c <= 32768
                 then .a += [$p] | .n += $c else . end)

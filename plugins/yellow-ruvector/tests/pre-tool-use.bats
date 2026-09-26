@@ -324,6 +324,17 @@ related_staged() {
   [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s12")" -le 40000 ]
 }
 
+@test "the surfaced array's full serialization fits the 32 KB budget at the boundary" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  # Three entries charged 10919 bytes each plus "src/a.ts" (11) is exactly
+  # 32768 when brackets are not counted.
+  long=$(printf 'q%.0s' $(seq 1 10916))
+  jq -n --arg l "$long" '{surfaced: [$l, $l + "1", $l + "2"] | map(.[0:10916])}' > "$RUVECTOR_DIR/coedit-sessions/s13"
+  run --separate-stderr run_hook "$(event s13 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  jq -e '(.surfaced | tojson | utf8bytelength) <= 32768 and .surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s13" >/dev/null
+}
+
 @test "hundreds of symlinked-dir partners stay inside the hook timeout" {
   outside="$(mktemp -d)"
   for i in $(seq 0 199); do mkdir -p "$outside/d$i"; : > "$outside/d$i/x.ts"; ln -s "$outside/d$i" "$PROJECT_ROOT/l$i"; done
