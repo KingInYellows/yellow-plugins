@@ -83,7 +83,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   mkdir -p "$REPO/src/deep"
   launch "$REPO/src/deep"
   [ "$status" -eq 0 ]
-  [[ "$output" == "EXEC pwd=$(cd "$REPO" && pwd -P) allow=$ALL5 entry=$DATA/current/node_modules/ruvector/bin/cli.js" ]]
+  [[ "$output" == "EXEC pwd=$(cd "$REPO" && pwd -P) allow=$ALL5 entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
   [ ! -e "$REPO/src/deep/.ruvector" ]
 }
 
@@ -182,7 +182,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   fake_install "$XDG_DATA_HOME/yellow-ruvector"; stamp_store
   launch "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"entry=$XDG_DATA_HOME/yellow-ruvector/current/node_modules/ruvector/bin/cli.js" ]]
+  [[ "$output" == *"entry=$XDG_DATA_HOME/yellow-ruvector/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
 }
 
 @test "refuses a data dir outside HOME and /tmp" {
