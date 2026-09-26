@@ -1,0 +1,29 @@
+docs/upstream-pins.md
+  s_37c0875242a535::t_de761a9a83bdf5 36
+.changeset/ast-grep-mcp-2-pin.md
+  s_37c0875242a535::t_8b24e42884049e 1-11
+catalog/plugins/yellow-research.json
+  s_37c0875242a535::t_20fa8fe6a8c6ad 87
+plans/mcp-auth-fixes-astgrep-composio-ceramic.md
+  s_37c0875242a535::t_810b01d9e9b5d7 1-332
+plugins/yellow-research/.claude-plugin/plugin.json
+  s_37c0875242a535::t_c63bcc03b719c8 89
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_37c0875242a535::t_29bef9b6198786 917
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0209a59a1f661f945b68de277cc424051580a571",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
