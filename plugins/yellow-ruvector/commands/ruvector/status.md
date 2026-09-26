@@ -57,8 +57,12 @@ ls -la "$ROOT/.ruvector/" 2>/dev/null && du -sh "$ROOT/.ruvector/" 2>/dev/null |
 # Stores left in subdirectories by pre-launcher sessions (the MCP server used
 # to pick its store from the launch cwd).
 find "$ROOT" -mindepth 2 -maxdepth 4 -type d -name .ruvector -not -path '*/node_modules/*' 2>/dev/null | head -5 | sed 's/^/nested store: /'
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh"
+# Sets RUVECTOR_DATA, where the model-verified marker lives.
+yellow_ruvector_validate_paths >/dev/null 2>&1 || true
 STAMP=$(jq -r '.embeddingProvenance.embedderKind // empty' "$ROOT/.ruvector/intelligence.json" 2>/dev/null)
-if [ -z "$STAMP" ] && ! yellow_ruvector_model_cached; then
+# Same rule as the launcher: an explicitly selected hash embedder is never guarded.
+if [ -z "$STAMP" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   printf 'mcp mode: read-only (missing or unstamped store and no cached ONNX model — hooks_remember and hooks_pretrain withheld until a session with network)\n'
 fi
 for f in "$HOME/.claude/settings.json" "$ROOT/.claude/settings.json"; do
