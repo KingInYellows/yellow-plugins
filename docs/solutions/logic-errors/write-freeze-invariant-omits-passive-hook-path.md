@@ -19,6 +19,15 @@ components:
   ]
 ---
 
+> **Resolved (2026-09-26):** yellow-ruvector's PostToolUse hook no longer
+> calls `hooks post-command` / `hooks post-edit`; it records co-edit pairs in
+> `.ruvector/coedit.json` with jq, and no plugin hook writes
+> `intelligence.json` any more (`pre-edit` / `pre-command` were verified
+> read-only on ruvector 0.3.3). The second write path this doc describes is
+> gone for the plugin's own hooks; a leftover global `ruvector hooks init`
+> entry in `settings.json` can still reintroduce it, which
+> `/ruvector:status` flags. The general lesson below stands.
+
 ## Problem
 
 **General pattern first:** an invariant phrased as "no further writes to

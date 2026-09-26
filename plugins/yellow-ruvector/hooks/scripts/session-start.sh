@@ -37,6 +37,11 @@ ruvector_heal_store "$PROJECT_DIR"
 if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
+
+# Drop co-edit session state older than 7 days (lib/coedit.sh).
+# shellcheck source=lib/coedit.sh
+. "$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/coedit.sh"
+coedit_prune_sessions "$PROJECT_DIR"
 # ruvector picks its store from process.cwd(); run every CLI call from the
 # root so a subdirectory session reads <root>/.ruvector.
 cd "$PROJECT_DIR" 2>/dev/null || json_exit "cannot cd to project root; skipping session-start"

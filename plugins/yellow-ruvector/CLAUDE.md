@@ -60,13 +60,17 @@ ruvector.
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
-  a global `ruvector` on PATH is never used) from the git toplevel. They
-  call ruvector's built-in CLI hooks (`hooks session-end`, `hooks post-edit`,
-  `hooks post-command`, `hooks pre-edit`, `hooks pre-command`) as
-  **side effects** — stdout is discarded and the hook always prints
-  dual-client allow JSON. `hooks recall` is the exception: `session-start.sh`
-  captures its stdout and returns it in `hookSpecificOutput.additionalContext`.
-  Operator warnings stay on `systemMessage`.
+  a global `ruvector` on PATH is never used) from the git toplevel.
+  `pre-tool-use.sh` calls `hooks pre-edit` / `hooks pre-command` as
+  read-only **side effects** (stdout discarded); `session-start.sh` captures
+  `hooks recall` stdout into `hookSpecificOutput.additionalContext`; the
+  co-edit hook uses jq only. Every hook prints dual-client allow JSON.
+  Operator warnings stay on `systemMessage`. **No hook writes
+  `.ruvector/intelligence.json`** — memories come only from MCP
+  `hooks_remember`. Do not re-add `hooks post-edit` / `post-command`: each
+  writes a near-empty hash-embedded memory that stamps a fresh store
+  hash/64d (ADR-210), and their co-edit tracking never worked (ruvector's
+  `lastEditedFile` is per-process).
   Never run `ruvector hooks init` to
   register hooks — even `--minimal` writes empty-stdout PreToolUse commands
   into `.claude/settings.json` that Cursor rejects as invalid JSON. Use
@@ -117,10 +121,11 @@ ruvector.
   before acting; canonical home of the ruvector protocol constants (RULE 16
   drift lint enforces its sentinel line across the yellow-core replicas)
 
-### Hooks (5 events, 5 scripts)
+### Hooks (3 events, 4 scripts)
 
-All hooks exit silently (allow JSON) when Node < 20, the install is missing,
-or an install is in progress.
+The CLI-calling hooks (`session-start.sh`, `pre-tool-use.sh`) exit silently
+(allow JSON) when Node < 20, the install is missing, or an install is in
+progress.
 
 - `prewarm.sh` (SessionStart, 5s) — installs the pinned ruvector and
   downloads the ONNX model in a detached background job under the install
@@ -143,14 +148,21 @@ or an install is in progress.
   Edit/Write/MultiEdit/Bash (1s budget). Stdout is dual-client allow JSON
   (`continue` + `permission`) so Cursor's Claude-plugin bridge does not
   block the tool.
-- `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
-  `hooks post-edit` and `hooks post-command` (1s budget). Registered for
-  both `PostToolUse` and `PostToolUseFailure`. A Bash success is a
-  `tool_response` object whose `interrupted` field is not true
-  (`--success`). A failure whose `error` first line is `Exit code N` is
-  `--error` with that N. An interrupt, a missing status, or an edit
-  failure is not submitted. `tool_result.exit_code` is not read.
-- `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
+- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit, 1s; ~40–70ms,
+  jq only) — co-edit recording (`hooks/scripts/lib/coedit.sh`). Each
+  successful edit updates the session's last-edited file in
+  `.ruvector/coedit-sessions/<session_id>`; a different file edited by the
+  same session within 60s adds one to that symmetric pair in
+  `.ruvector/coedit.json`. Paths are root-relative and physical; paths
+  outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
+  control characters, or over 512 chars are ignored. Writes are temp file +
+  rename under a non-blocking mkdir lock (a busy lock skips one increment);
+  the file is capped at 5000 directed pairs, keeping the highest counts.
+  Per-session state keeps concurrent sessions and worktrees (which share the
+  store) from pairing each other's edits; `session-start.sh` prunes session
+  files older than 7 days. MultiEdit's path is the top-level
+  `tool_input.file_path` (its `edits[]` carry no paths — earlier versions
+  read `edits[].file_path` and never matched)
 
 ### Scripts (3) and bin (1)
 
@@ -274,8 +286,8 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 ## Testing
 
 `bats tests/` from the plugin directory — one suite per hook
-(`session-start`, `pre-tool-use`, `post-tool-use`, `stop`,
-`repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
+(`session-start`, `pre-tool-use`, `post-tool-use` — co-edit recording,
+including a 20-way concurrency check — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
 `memory-manager-flush.bats`, and `status-provenance.bats` (extracts the
 provenance bash block from `commands/ruvector/status.md` at run time and

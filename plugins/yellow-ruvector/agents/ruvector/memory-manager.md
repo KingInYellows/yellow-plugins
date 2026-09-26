@@ -33,10 +33,10 @@ assistant: "Let me query ruvector for past learnings about database migrations."
 </example>
 
 <example>
-Context: Stop hook returned a systemMessage about pending queue updates.
+Context: A legacy .ruvector/pending-updates.jsonl queue still has entries.
 user: "There are 15 pending ruvector updates in .ruvector/pending-updates.jsonl. Please flush them."
 assistant: "I'll flush the pending queue entries to ruvector."
-<commentary>Queue flushing triggered by Stop hook delegation.</commentary>
+<commentary>Queue flushing on request.</commentary>
 </example>
 </examples>
 

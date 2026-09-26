@@ -497,3 +497,16 @@ exit 0'
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
   [ "$elapsed_ms" -le 5500 ]
 }
+
+@test "prunes co-edit session files older than 7 days, keeps recent ones" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/old"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/new"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/old" 2>/dev/null \
+    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$RUVECTOR_DIR/coedit-sessions/old"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
+  [ -e "$RUVECTOR_DIR/coedit-sessions/new" ]
+}

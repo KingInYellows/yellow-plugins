@@ -152,7 +152,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, SessionStart, Stop | Install prewarm, memory recall, edit tracking, session lifecycle             |
+| yellow-ruvector | PreToolUse, PostToolUse, SessionStart             | Install prewarm, memory recall, co-edit tracking                                         |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
@@ -205,8 +205,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 | pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit / pre-command side effects                    |
 | prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
 | session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
-| post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | Record explicit edit/bash outcomes; unknown is not saved |
-| stop               | Stop             | `stop.sh`               | 10s         | Run ruvector hooks session-end                         |
+| post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 1s          | Record co-edit pairs in `.ruvector/coedit.json` (jq only) |
 
 **Security properties:**
 

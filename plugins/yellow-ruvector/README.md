@@ -73,10 +73,10 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   dims). Search queries are embedded and compared via vector similarity.
 - **Agent memory:** Learnings are stored through `hooks_remember(content, type)`
   and retrieved with `hooks_recall(query, top_k)`.
-- **Passive capture:** `PostToolUse` records a successful edit and a Bash
-  result that carries a host `tool_response`. `PostToolUseFailure` records
-  a Bash `Exit code N`. A missing status, an interrupt, or a failed recall
-  is not treated as saved. Recalled text is untrusted reference context.
+- **Co-edit tracking:** `PostToolUse` on Edit/Write/MultiEdit notes which
+  files one session edits within a minute of each other and counts those
+  pairs in `.ruvector/coedit.json` (plugin-owned, jq only). Hooks no longer
+  write memories; recalled text is untrusted reference context.
 - **Error→fix memory:** `/ruvector:seed-solutions` imports a repo's
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
   review flows can recall past fixes semantically. Seeding is manual —

@@ -26,6 +26,17 @@ severity:
 pr: direct-to-main
 ---
 
+> **Partly superseded (2026-09-26):** yellow-ruvector no longer delegates to
+> `hooks post-edit`, `hooks post-command`, or `hooks session-end`. Each
+> post-edit/post-command call wrote a near-empty hash-embedded memory (noise,
+> refused on ONNX stores, and the write that stamps a fresh store hash/64d —
+> see `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`),
+> and their co-edit tracking never recorded anything because ruvector keeps
+> `lastEditedFile` in memory per process. Co-edits are now recorded by the
+> plugin itself (`hooks/scripts/lib/coedit.sh`). The lesson — check the
+> upstream CLI before reimplementing it — still holds; so does its corollary:
+> verify the built-in actually works across one-process-per-hook calls.
+
 # ruvector hooks rewritten to delegate to built-in CLI hooks
 
 ## Problem Symptom

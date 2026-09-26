@@ -121,7 +121,7 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 ENTRY=$(yellow_ruvector_entry)
 
 printf '=== Hook Scripts ===\n'
-for script in prewarm.sh session-start.sh pre-tool-use.sh post-tool-use.sh stop.sh; do
+for script in prewarm.sh session-start.sh pre-tool-use.sh post-tool-use.sh; do
   if [ -r "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/${script}" ]; then printf '  ✓ %s\n' "$script"
   else printf '  ✗ %s (missing or unreadable)\n' "$script"; fi
 done
@@ -164,7 +164,7 @@ Summarize results in a table:
 | ONNX model            | Cached / Not cached (offline)           |
 | .ruvector/ directory  | Initialized at <root>                   |
 | .gitignore entry      | Present                                 |
-| Hook events (5)       | Active via plugin.json                  |
+| Hook events (3)       | Active via plugin.json                  |
 | Cursor PreToolUse     | Repaired / already safe / skipped       |
 | Leftover global hooks | None / WARNING (see above)              |
 | Smoke test            | Passed / Failed / Skipped               |
