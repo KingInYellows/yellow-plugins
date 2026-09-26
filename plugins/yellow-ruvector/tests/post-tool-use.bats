@@ -243,3 +243,30 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
   git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
 }
+
+@test "a coedit.json with a non-numeric count is set aside, and recording resumes" {
+  jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":"many"}, "src/b.ts":{"src/a.ts":"many"}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  ls "$RUVECTOR_DIR"/coedit.json.corrupt-* >/dev/null
+}
+
+@test "a worktree of a bare repo never records into the bare repo's parent" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  base="$(cd "$(mktemp -d)" && pwd -P)"
+  git -C "$base" init -q src
+  git -C "$base/src" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git clone -q --bare "$base/src" "$base/repos/foo.git"
+  mkdir -p "$base/repos/.ruvector"
+  git -C "$base/repos/foo.git" worktree add -q "$base/wt" -b w 2>/dev/null
+  mkdir -p "$base/wt/src"; : > "$base/wt/src/a.ts"; : > "$base/wt/src/b.ts"
+  ln -s "$base/repos/.ruvector" "$base/wt/.ruvector"
+  for f in a b; do
+    jq -cn --arg c "$base/wt" --arg f "$base/wt/src/$f.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"b1", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+      | PATH="$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
+  done
+  [ -z "$(ls -A "$base/repos/.ruvector")" ]
+  rm -rf "$base"
+}
