@@ -218,3 +218,13 @@ assert_allow_json() {
   run --separate-stderr bash -c 'cd "$1" && printf "src/a.ts\nsrc/b.ts\n" | bash "$2" --stdin' _ "$PROJECT_ROOT" "$RELATED"
   [ "$status" -eq 2 ]
 }
+
+@test "the surfaced cap keeps the newest file, whatever its name sorts as" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -n '{surfaced: ([range(0;200)] | map("zz/f\(.).ts"))}' > "$RUVECTOR_DIR/coedit-sessions/s7"
+  run --separate-stderr run_hook "$(event s7 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  jq -e '(.surfaced | length) == 200 and .surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s7" >/dev/null
+  run --separate-stderr run_hook "$(event s7 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -z "$(ctx "$output")" ]
+}

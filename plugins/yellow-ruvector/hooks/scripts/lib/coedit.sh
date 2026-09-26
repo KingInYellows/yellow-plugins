@@ -372,7 +372,7 @@ coedit_suggest_once() {
     seen=1
   else
     { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
-      | jq -c --arg r "$rel" '.surfaced = (((.surfaced // []) + [$r]) | unique | .[-200:])' 2>/dev/null \
+      | jq -c --arg r "$rel" '.surfaced = ((.surfaced // []) | map(select(. != $r)) + [$r] | .[-200:])' 2>/dev/null \
       | coedit_write_atomic "$sfile"
   fi
   coedit_unlock_path "$slock"
