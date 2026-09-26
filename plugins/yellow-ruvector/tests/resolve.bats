@@ -101,6 +101,18 @@ fake_install() {
   [ "$(cd "$WORK/wt/.ruvector" && pwd -P)" = "$(cd "$WORK/.ruvector" && pwd -P)" ]
 }
 
+@test "heal_store: a worktree of a bare repo never links to the bare repo's parent" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q src
+  git -C "$WORK/src" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git clone -q --bare "$WORK/src" "$WORK/repos/foo.git"
+  mkdir "$WORK/repos/.ruvector"
+  git -C "$WORK/repos/foo.git" worktree add -q "$WORK/wtb" -b bare-wt
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtb"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/wtb/.ruvector" ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q

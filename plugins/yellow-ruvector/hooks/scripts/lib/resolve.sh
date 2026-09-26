@@ -44,6 +44,9 @@ ruvector_heal_store() {
   common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
   gitdir=$(git -C "$root" rev-parse --path-format=absolute --git-dir 2>/dev/null) || return 0
   [ -n "$common" ] && [ -n "$gitdir" ] && [ "$common" != "$gitdir" ] || return 0
+  # Only a non-bare main worktree has a common dir named .git; a worktree
+  # of a bare repo (/repos/foo.git) must not treat /repos as the main checkout.
+  [ "${common##*/}" = ".git" ] || return 0
   main=$(dirname "$common")
   [ "$main" != "$root" ] && [ -d "${main}/.ruvector" ] || return 0
   if [ -e "$target" ] && [ ! -L "$target" ]; then
