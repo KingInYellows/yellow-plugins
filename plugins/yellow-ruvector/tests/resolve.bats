@@ -113,3 +113,24 @@ fake_install() {
   [ -d "$WORK/wt/.ruvector" ] && [ ! -L "$WORK/wt/.ruvector" ]
   [[ "$stderr" == *"non-symlink path diverged"* ]]
 }
+
+@test "run_budgeted: bounds a command without GNU timeout (stock macOS)" {
+  start=$(date +%s)
+  # sh itself reports its killed child on stderr; hooks discard stderr.
+  run --separate-stderr bash -c ". '$LIB'; TIMEOUT_CMD=''; out=\$(run_budgeted 0.3 sh -c 'echo hi; sleep 5'); rc=\$?; echo \"\$out|\$rc\""
+  [ $(( $(date +%s) - start )) -le 3 ]
+  [[ "$output" == "hi|"* ]]
+  [[ "$output" != "hi|0" ]]
+  run bash -c ". '$LIB'; TIMEOUT_CMD=''; run_budgeted 5 sh -c 'echo fast; exit 3'; echo \"rc=\$?\""
+  [ "$output" = $'fast\nrc=3' ]
+}
+
+@test "run_bounded (install lib): bounds a command when timeout is unavailable" {
+  mkdir -p "$STUBS/bin"
+  for b in sh sleep kill cat pkill; do ln -s "$(command -v "$b")" "$STUBS/bin/$b"; done
+  start=$(date +%s)
+  run env PATH="$STUBS/bin" "$BASH" -c ". '$PLUGIN_ROOT/lib/install-ruvector.sh'; yellow_ruvector_run_bounded 0.3 sleep 5; echo \"rc=\$?\""
+  [ $(( $(date +%s) - start )) -le 3 ]
+  [[ "$output" == rc=* ]]
+  [ "$output" != "rc=0" ]
+}

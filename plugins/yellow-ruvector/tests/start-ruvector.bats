@@ -87,15 +87,42 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ ! -e "$REPO/src/deep/.ruvector" ]
 }
 
-@test "fresh store + no cached model + failed warm-up starts read-only (no hooks_remember)" {
+@test "fresh store + no cached model + failed warm-up starts read-only (no write tools)" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
   fake_install
   mkdir -p "$REPO/.ruvector"
   launch "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"allow=hooks_capabilities,hooks_pretrain,hooks_recall,hooks_stats "* ]]
-  [[ "$stderr" == *"starting read-only (hooks_remember disabled)"* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [[ "$stderr" == *"starting read-only (hooks_remember and hooks_pretrain disabled)"* ]]
+}
+
+@test "a missing store is guarded like an unstamped one" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [ ! -e "$REPO/.ruvector" ]
+}
+
+@test "model warm-up waits for the install lock and releases it" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=1
+  fake_install
+  mkdir -p "$DATA/.install.lock"; printf '%s' "$$" > "$DATA/.install.lock/pid"
+  export FAKE_EMBED_OK=1
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  # A live lock holder means no concurrent download: read-only this time.
+  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [ ! -e "$HOME/.ruvector/models/all-MiniLM-L6-v2/model.onnx" ]
+  rm -rf "$DATA/.install.lock"
+  launch "$REPO"
+  [[ "$output" == *"allow=$ALL5 "* ]]
+  [ ! -e "$DATA/.install.lock" ]
 }
 
 @test "fresh store whose warm-up succeeds keeps all five tools" {

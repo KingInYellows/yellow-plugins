@@ -41,6 +41,8 @@ use the same fallback, so this is informational.
 ### Step 2: Check the store
 
 ```bash
+export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
+. "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 printf 'root: %s\n' "$ROOT"
 ls -la "$ROOT/.ruvector/" 2>/dev/null && du -sh "$ROOT/.ruvector/" 2>/dev/null || printf 'store: not initialized\n'
@@ -48,8 +50,8 @@ ls -la "$ROOT/.ruvector/" 2>/dev/null && du -sh "$ROOT/.ruvector/" 2>/dev/null |
 # to pick its store from the launch cwd).
 find "$ROOT" -mindepth 2 -maxdepth 4 -type d -name .ruvector -not -path '*/node_modules/*' 2>/dev/null | head -5 | sed 's/^/nested store: /'
 STAMP=$(jq -r '.embeddingProvenance.embedderKind // empty' "$ROOT/.ruvector/intelligence.json" 2>/dev/null)
-if [ -d "$ROOT/.ruvector" ] && [ -z "$STAMP" ] && ! yellow_ruvector_model_cached 2>/dev/null; then
-  printf 'mcp mode: read-only (unstamped store and no cached ONNX model — hooks_remember withheld until a session with network)\n'
+if [ -z "$STAMP" ] && ! yellow_ruvector_model_cached; then
+  printf 'mcp mode: read-only (missing or unstamped store and no cached ONNX model — hooks_remember and hooks_pretrain withheld until a session with network)\n'
 fi
 for f in "$HOME/.claude/settings.json" "$ROOT/.claude/settings.json"; do
   [ -f "$f" ] && jq -e '[.. | strings | select(test("ruvector[^\"]* hooks (post-edit|post-command|pre-edit|pre-command|session-start|session-end)"))] | length > 0' "$f" >/dev/null 2>&1 \
@@ -103,11 +105,12 @@ and any engine capabilities returned by `hooks_capabilities`, such as:
 ### Step 5: Queue Health
 
 ```bash
-# Check queue file
-if [ -f .ruvector/pending-updates.jsonl ]; then
-  wc -l < .ruvector/pending-updates.jsonl
-  wc -c < .ruvector/pending-updates.jsonl
-  head -1 .ruvector/pending-updates.jsonl | jq -r '.timestamp // "unknown"'
+# Check queue file (the store lives at the git toplevel)
+QUEUE="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.ruvector/pending-updates.jsonl"
+if [ -f "$QUEUE" ]; then
+  wc -l < "$QUEUE"
+  wc -c < "$QUEUE"
+  head -1 "$QUEUE" | jq -r '.timestamp // "unknown"'
 fi
 ```
 

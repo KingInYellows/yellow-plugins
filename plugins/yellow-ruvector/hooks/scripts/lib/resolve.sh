@@ -107,12 +107,25 @@ ruvector_probe_timeout() {
   return 1
 }
 
-# run_budgeted <seconds> <cmd...> — run under TIMEOUT_CMD when available.
+# run_budgeted <seconds> <cmd...> — run for at most <seconds>: under
+# TIMEOUT_CMD when available, otherwise (stock macOS) with a background
+# watcher that sends TERM (to the command and its children), then KILL
+# 0.2s later. The watcher's stdio goes to /dev/null so the caller's $(...)
+# is not held open by it.
 run_budgeted() {
-  local cap="$1"; shift
+  local cap="$1" pid watcher rc=0
+  shift
   if [ -n "${TIMEOUT_CMD:-}" ]; then
     "$TIMEOUT_CMD" --kill-after=0.1 "$cap" "$@"
-  else
-    "$@"
+    return
   fi
+  "$@" &
+  pid=$!
+  ( sleep "$cap"; pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
+    sleep 0.2; pkill -KILL -P "$pid" 2>/dev/null; kill -KILL "$pid" 2>/dev/null ) \
+    </dev/null >/dev/null 2>&1 &
+  watcher=$!
+  wait "$pid" 2>/dev/null || rc=$?
+  kill "$watcher" 2>/dev/null
+  return "$rc"
 }
