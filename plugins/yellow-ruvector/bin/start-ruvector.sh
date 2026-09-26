@@ -40,34 +40,41 @@ wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
 case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
 
 # --- 1. Install ---
-if yellow_ruvector_needs_install; then
-  if ! yellow_ruvector_acquire_install_lock "$wait_secs"; then
-    log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
-    log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
-    exit 1
-  fi
-  yellow_ruvector_trap_release
-  if yellow_ruvector_needs_install; then
-    log "installing ruvector into ${RUVECTOR_DATA}..."
-    if ! yellow_ruvector_do_install; then
-      log "install failed. Run /ruvector:setup to diagnose."
+# Needed when `current` is not this lockfile's install, or when this
+# version's install-<hash> is gone (another plugin version's prune removed it).
+needs_install() {
+  yellow_ruvector_needs_install || [ ! -f "$(yellow_ruvector_pinned_entry)" ]
+}
+# Exec this plugin version's install-<hash> path, never `current` or another
+# version's install: the server must match this session's hooks, and prune
+# must see which install it still uses. Two passes: a newer plugin in another
+# session can prune this install between our check and the exec.
+entry=""
+for _pass in 1 2; do
+  if needs_install; then
+    if ! yellow_ruvector_acquire_install_lock "$wait_secs"; then
+      log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
+      log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
       exit 1
     fi
+    yellow_ruvector_trap_release
+    if needs_install; then
+      log "installing ruvector into ${RUVECTOR_DATA}..."
+      if ! yellow_ruvector_do_install; then
+        log "install failed. Run /ruvector:setup to diagnose."
+        exit 1
+      fi
+    fi
+    # An EXIT trap does not fire on exec — release explicitly.
+    yellow_ruvector_release_install_lock
+    trap - EXIT INT TERM
   fi
-  # An EXIT trap does not fire on exec — release explicitly.
-  yellow_ruvector_release_install_lock
-  trap - EXIT INT TERM
-fi
-# Exec this plugin version's install-<hash> path, not `current` (which a
-# newer plugin in another session may have moved), so the server matches
-# this session's hooks and prune can see which install it still uses.
-entry=$(yellow_ruvector_pinned_entry) || entry=""
+  entry=$(yellow_ruvector_pinned_entry) || entry=""
+  [ -f "$entry" ] && break
+done
 if [ ! -f "$entry" ]; then
-  current=$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || true)
-  case "$current" in
-    install-*) entry="${RUVECTOR_DATA}/${current}/node_modules/ruvector/bin/cli.js" ;;
-    *) entry=$(yellow_ruvector_entry) ;;
-  esac
+  log "this plugin version's ruvector install is missing (${entry:-no lockfile hash}). Run /ruvector:setup."
+  exit 1
 fi
 
 # --- 2. Project root ---
