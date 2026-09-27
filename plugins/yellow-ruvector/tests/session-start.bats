@@ -1016,3 +1016,21 @@ END"
   [ $(( (last - start) / 1000000 )) -lt 5400 ]
 }
 
+
+@test "slow held trees on the session side never keep the store-side held trees from their turn" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in a1 a2 a3; do mkdir -p "$sd/.coedit-stale-held/.s.lock.stale.$n"; done
+  mkdir -p "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.z1"
+  # Session-side deletions each use their whole 2s bound.
+  rb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rb"
+  printf '#!/bin/sh\necho "$(date +%%s) $*" >> "%s/rm.log"\ncase "$*" in *" ./.coedit-stale-held/"*) exec sleep 30 ;; esac\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rm)" > "$rb/rm"
+  chmod +x "$rb/rm"
+  d="$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.z1"
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    PATH="$rb:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.2; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
+}
