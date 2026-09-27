@@ -1011,9 +1011,15 @@ END"
   # A session path renamed aside (.stale.s<pid>-<epoch>) is in a shard too.
   sh_=$RUVECTOR_DIR/coedit-sessions/.coedit-stale-held; mkdir -p "$sh_/.s1.lock.stale.s98-1"
   for n in 00-1.1 01-1.1; do mkdir -p "$sh_/.coedit.lock.stale.$n"; done
-  # COEDIT_SHARD=24 pins the digit shard [89][89].
-  COEDIT_SHARD=24 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
-  for _ in $(seq 1 60); do [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break; sleep 0.1; done
+  # COEDIT_SHARD=24 pins the digit shard [89][89]. Each held dir costs a
+  # timed-out listing plus a shard pass, so under load one run's 5s phase
+  # may reach only one of them: a later run (a later SessionStart) gets the
+  # other.
+  for _ in 1 2 3; do
+    COEDIT_SHARD=24 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for _ in $(seq 1 80); do [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break; sleep 0.1; done
+    [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break
+  done
   [ ! -e "$h/.coedit.lock.stale.99-1.1" ]
   [ ! -e "$sh_/.s1.lock.stale.s98-1" ]
   [ -d "$h/.coedit.lock.stale.00-1.1" ]

@@ -214,6 +214,20 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ls -d "$sd"/.s1.lock.stale.s*/keep >/dev/null
 }
 
+@test "a NUL inside a field can never forge the event, session, or cwd" {
+  other="$(mktemp -d)"
+  for f in a b; do
+    input=$(jq -cn --arg p "$PROJECT_ROOT/src/$f.ts" --arg c "$PROJECT_ROOT" --arg o "$other" \
+      '{hook_event_name:"PostToolUseFailure", session_id:"x", cwd:$o, tool_name:"Edit",
+        tool_input:{file_path:($p + "\u0000PostToolUse\u0000s1\u0000" + $c + "\u0000")}}')
+    run --separate-stderr run_hook "$input"
+    [ "$status" -eq 0 ]
+  done
+  rm -rf "$other"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ ! -d "$RUVECTOR_DIR/coedit-sessions" ] || [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
