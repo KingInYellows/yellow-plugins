@@ -491,15 +491,16 @@ coedit_partners() {
   size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
   case "$size" in ''|*[!0-9]*) return 0 ;; esac
   [ "$size" -le "$COEDIT_MAX_BYTES" ] || return 0
-  # jq is time-bounded (COEDIT_JQ_SECS) and yields the top 500 candidates
-  # by count. Validation runs before the limit, so deleted or unsafe
-  # partners at the top never hide valid ones below them; stale entries cost
-  # no subprocess and at most 50 directory checks run, so a hostile store
-  # cannot keep the loop busy.
+  # jq is time-bounded (COEDIT_JQ_SECS) and yields the top COEDIT_SCAN
+  # candidates by count. Validation runs before the limit, so deleted or
+  # unsafe partners at the top never hide valid ones below them; stale
+  # entries cost no subprocess and the directory checks are budgeted, so a
+  # hostile store cannot keep the loop busy. The defaults fit the 1s hook;
+  # the on-demand /ruvector:related raises all four (coedit-related.sh).
   local rroot
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
-  _coedit_phys_left=50
-  _coedit_comp_left=1500
+  _coedit_phys_left=${COEDIT_PHYS_CHECKS:-50}
+  _coedit_comp_left=${COEDIT_COMP_CHECKS:-1500}
   _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
@@ -507,12 +508,12 @@ coedit_partners() {
     printf '%s\t%s\n' "$count" "$partner"
     n=$((n + 1))
     [ "$n" -ge "$limit" ] && break
-  done < <(coedit_jq -r --arg r "$rel" --argjson min "$min" '
+  done < <(coedit_jq -r --arg r "$rel" --argjson min "$min" --argjson scan "${COEDIT_SCAN:-500}" '
       (.pairs[$r] // {}) | to_entries
       | map(select((.value | type) == "number" and .value >= $min
                    and .key != $r
                    and (.key | test("[[:cntrl:]]") | not)))
-      | sort_by(-.value, .key) | .[0:500][] | "\(.value | floor)\t\(.key)"
+      | sort_by(-.value, .key) | .[0:$scan][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null)
   return 0
 }

@@ -166,6 +166,13 @@ assert_allow_json() {
   [[ "$output" == *$'2\tsrc/-- end co-edit history --.ts'* ]]
 }
 
+@test "coedit-related.sh scans past the hook's 500-candidate cap" {
+  jq -n '{version:1, pairs:{"src/a.ts": (([range(0;600)] | map({key:"src/gone/f\(.).ts", value:9}) | from_entries) + {"src/b.ts": 2})}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'2\tsrc/b.ts'* ]]
+}
+
 @test "coedit-related.sh rejects a path outside the project and is empty without history" {
   run --separate-stderr bash -c 'cd "$1" && bash "$2" /etc/hosts' _ "$PROJECT_ROOT" "$RELATED"
   [ "$status" -eq 2 ]
