@@ -62,11 +62,16 @@ PTR="${PTR_DIR}/related-stage.${_key}"
 # has_nul <file> — the file holds a NUL byte, which `read` would silently
 # drop (a/<NUL>b would alias a/b): such a record is never trusted.
 has_nul() { [ "$(LC_ALL=C tr -d '\000' < "$1" | wc -c)" -ne "$(wc -c < "$1")" ]; }
-# ptr_dir <pointer> — print the one path a pointer record holds: exactly one
-# line (as --stage writes it) and no NUL, or nothing. `read` alone would take
+# ptr_dir <pointer> — print the one path a pointer record holds: at most
+# 4 KiB, exactly one line (as --stage writes it) and no NUL, or nothing. `read` alone would take
 # the first line of a tampered record and ignore the rest.
 ptr_dir() {
-  local d=""
+  local d="" n
+  # Size first (a record is one staging path, far under 4 KiB): an
+  # oversized file is never scanned or read into the shell.
+  n=$(wc -c < "$1" 2>/dev/null | tr -d ' ')
+  case "$n" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$n" -le 4096 ] || return 0
   has_nul "$1" && return 0
   [ "$(wc -l < "$1" | tr -d ' ')" = 1 ] || return 0
   IFS= read -r d < "$1" || return 0

@@ -660,6 +660,20 @@ related_staged() {
   [ ! -e "${qf%/query}" ]
 }
 
+@test "coedit-related.sh refuses an oversized pointer record before reading it" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  qv=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=victim bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$qv"
+  ptr="$XDG_CACHE_HOME/yellow-ruvector/related-stage.me"
+  { printf '%s' "${qv%/query}"; head -c 20000000 /dev/zero | tr '\0' /; printf '\n'; } > "$ptr"
+  s=$(date +%s%N)
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=me bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  e=$(date +%s%N)
+  [ "$status" -eq 2 ]
+  [ -e "$qv" ]
+  [ $(( (e - s) / 1000000 )) -lt 400 ]
+}
+
 @test "coedit-related.sh rejects a NUL byte instead of dropping it" {
   qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   printf 'src/\000a.ts\n' > "$qf"
