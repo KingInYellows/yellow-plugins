@@ -226,14 +226,16 @@ else
   # working wrapper, the CLI must never run unbounded (a stalled model
   # download would hang this command past the documented 90s bound).
   # The probe itself is bounded: a candidate that stalls (a broken wrapper,
-  # a hung mount) is killed after 1s and skipped.
+  # a hung mount) is killed after 1s, with every process it started, and
+  # skipped.
+  _tree() { local c; printf '%s\n' "$1"; for c in $(pgrep -P "$1" 2>/dev/null); do _tree "$c"; done; }
   TIMEOUT_CMD=""
   for _tcmd_name in timeout gtimeout; do
     _tcmd="$(command -v "$_tcmd_name" || true)"
     [ -n "$_tcmd" ] || continue
-    "$_tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1 &
+    "$_tcmd" --kill-after=0.1 0.1 true </dev/null >/dev/null 2>&1 &
     _tp=$!
-    ( sleep 1; kill -9 "$_tp" 2>/dev/null ) >/dev/null 2>&1 &
+    ( sleep 1; kill -9 $(_tree "$_tp") 2>/dev/null ) >/dev/null 2>&1 &
     _tw=$!
     wait "$_tp"; _trc=$?
     kill "$_tw" 2>/dev/null; wait "$_tw" 2>/dev/null
@@ -243,6 +245,7 @@ else
     fi
   done
   unset _tcmd_name _tcmd _tp _tw _trc
+  unset -f _tree
   if [ -z "$TIMEOUT_CMD" ]; then
     VERDICT=UNKNOWN; DETAIL="no GNU-compatible timeout/gtimeout on PATH; dry-run skipped (brew install coreutils)"
   else

@@ -228,3 +228,16 @@ STORE_STAMP='{"embedderKind":"onnx-minilm","modelId":"Xenova/all-MiniLM-L6-v2","
   [ "$(fenced verdict)" = "UNKNOWN" ]
   [[ "$(fenced detail)" == *"no GNU-compatible timeout"* ]]
 }
+
+@test "a stalled timeout probe leaves none of its children running" {
+  write_store "{\"embeddingProvenance\":$STORE_STAMP,\"memories\":[]}"
+  stub_cli 0 "{\"success\":true,\"targetProvenance\":$STORE_STAMP}"
+  for t in timeout gtimeout; do
+    printf '#!/bin/sh\ntrap "" TERM\nsleep 27\n' > "$BATS_TEST_TMPDIR/bin/$t"; chmod +x "$BATS_TEST_TMPDIR/bin/$t"
+  done
+  run bash -c 'cd "$1" && export RUVECTOR_BIN="$2/ruvector" PATH="$2:$PATH" && . "$3"' _ "$WORK" "$BATS_TEST_TMPDIR/bin" "$BLOCK"
+  sleep 0.3
+  left=$(pgrep -f '^sleep 27$' || true)
+  [ -n "$left" ] && kill $left 2>/dev/null
+  [ -z "$left" ]
+}
