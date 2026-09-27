@@ -382,6 +382,17 @@ coedit_record() {
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
   else
     state='{}'
+    # A symlink or other non-regular entry at the session path (a restored
+    # or corrupted store) would make every write below fail: a symlink is
+    # unlinked (never followed), and a directory is renamed aside as a stale
+    # lock tree, which the bounded SessionStart sweep deletes.
+    if [ -L "$sfile" ]; then
+      rm -f -- "$sfile" 2>/dev/null
+    elif [ -d "$sfile" ]; then
+      mv -- "$sfile" "${sdir}/.${sid}.lock.stale.s$$-${now}" 2>/dev/null
+    elif [ -e "$sfile" ] && [ ! -f "$sfile" ]; then
+      rm -f -- "$sfile" 2>/dev/null
+    fi
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
   # Bounded before any arithmetic: a huge value would wrap modulo 2^64 and
@@ -640,6 +651,9 @@ coedit_prune_sessions() {
       fi
       # Held trees get a few bounded retries per run: a random sample of
       # three, so ones that can never be removed cannot pin the retries.
+      # A listing that times out is followed by one random shard of the
+      # name suffix (the inode digits after .stale. or .stale.m), so the
+      # sample is not always drawn from the same timed-out prefix.
       # The two held dirs are visited in a random order, so slow deletions
       # in one never keep the other from its turn.
       if [ $((RANDOM % 2)) -eq 0 ]; then held=(./.coedit-stale-held ../.coedit-stale-held)
@@ -650,7 +664,10 @@ coedit_prune_sessions() {
         while IFS= read -r m; do
           [ "$SECONDS" -lt 5 ] || break
           [ -d "$m" ] && [ ! -L "$m" ] && run_budgeted 2 rm -rf -- "$m" 2>/dev/null
-        done < <(run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" 2>/dev/null \
+        done < <({ run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" \
+            || { sh=$(coedit_shard digit)
+                 LC_ALL=C run_budgeted 0.5 find "$h" ! -name "${h##*/}" -prune \( -name ".*.lock.stale.${sh}*" -o -name ".*.lock.stale.m${sh}*" \) -type d ! -name "*${nl}*"; }
+          } 2>/dev/null \
           | LC_ALL=C awk -v k=3 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }')

@@ -994,6 +994,27 @@ END"
   [ ! -e "$h/.coedit.lock.stale.z1" ]
 }
 
+@test "a timed-out held-tree listing is followed by a shard pass that reaches beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  h="$RUVECTOR_DIR/.coedit-stale-held"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.0*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # The full held listing always times out after the undeletable 0* prefix;
+  # shard passes (bracket patterns) run the real find.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *coedit-stale-held*) %s "$@" -name "*.stale.0*"; exec sleep 5 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in 00-1.1 01-1.1 02-1.1 99-1.1; do mkdir -p "$h/.coedit.lock.stale.$n"; done
+  # COEDIT_SHARD=24 pins the digit shard [89][89].
+  COEDIT_SHARD=24 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 60); do [ -e "$h/.coedit.lock.stale.99-1.1" ] || break; sleep 0.1; done
+  [ ! -e "$h/.coedit.lock.stale.99-1.1" ]
+  [ -d "$h/.coedit.lock.stale.00-1.1" ]
+}
+
 @test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"

@@ -198,6 +198,22 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a directory, symlink, or FIFO at the session path is cleared, so the session keeps recording" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd/s1/keep"
+  outside="$BATS_TEST_TMPDIR/outside"; printf 'keep\n' > "$outside"
+  ln -s "$outside" "$sd/s2"
+  mkfifo "$sd/s3" 2>/dev/null || skip "mkfifo unsupported"
+  for s in s1 s2 s3; do
+    edit "$s" "$PROJECT_ROOT/src/a.ts"
+    edit "$s" "$PROJECT_ROOT/src/b.ts"
+    [ -f "$sd/$s" ] && [ ! -L "$sd/$s" ]
+  done
+  [ "$(pair src/a.ts src/b.ts)" -eq 3 ]
+  [ "$(cat "$outside")" = keep ]
+  # The directory is renamed aside as a stale lock tree for the sweep.
+  ls -d "$sd"/.s1.lock.stale.s*/keep >/dev/null
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
