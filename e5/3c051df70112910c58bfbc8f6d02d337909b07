@@ -1,0 +1,31 @@
+.github/releases.md
+  s_37c0875242a535::t_d711037cb022ee 192-193
+CLAUDE.md
+  s_37c0875242a535::t_27d6b976db1a14 79-86
+CONTRIBUTING.md
+  s_37c0875242a535::t_54b2591354e2c1 266-274
+docs/architecture-overview.md
+  s_37c0875242a535::t_7869888e580f8a 309-312
+docs/operations/release-checklist.md
+  s_37c0875242a535::t_467e4c2ca0de85 197-198,381-384
+docs/security.md
+  s_37c0875242a535::t_0997ba0c4a07b1 251-254,269-270
+docs/solutions/workflow/version-pr-ci-held-at-action-required.md
+  s_37c0875242a535::t_09332bdf40bc8e 2-4,8-23,32-35,50-52,55-61,65-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e53c051df70112910c58bfbc8f6d02d337909b07",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
