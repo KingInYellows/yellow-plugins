@@ -1485,6 +1485,9 @@ jobs:
             [ -d "$d" ] || continue
             case "$d" in
               plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests|plugins/yellow-codex/tests) continue ;;
+              # Its own job below: its timing-heavy suite alone outlasts
+              # what this job's 10 minutes leave after the required suites.
+              plugins/yellow-ruvector/tests) continue ;;
             esac
             echo "::group::bats $d"
             bats "$d" || STATUS=$?
@@ -1493,6 +1496,34 @@ jobs:
           if [ $STATUS -ne 0 ]; then
             echo "::warning::One or more advisory bats suites failed. Track as follow-up; not blocking this PR."
           fi
+
+  # ============================================================================
+  # YELLOW-RUVECTOR SHELL TESTS (bats) — advisory, like the loop above
+  # ============================================================================
+  # A job of its own: the suite exercises real timeouts, lock waits and
+  # detached cleanup workers (several minutes of wall clock), and inside
+  # plugin-shell-tests it pushed the job past its 10-minute limit, which
+  # cancelled the job and failed ci-status. Advisory, as it was in the loop:
+  # not in ci-status's needs.
+  ruvector-shell-tests:
+    name: Plugin Shell Tests (yellow-ruvector, advisory)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-schemas]
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Install bats
+        run: sudo npm install -g bats@1.11.0
+
+      - name: Run yellow-ruvector bats suite (advisory)
+        run: bats plugins/yellow-ruvector/tests/
 
   # ============================================================================
   # AGGREGATE METRICS AND REPORT
