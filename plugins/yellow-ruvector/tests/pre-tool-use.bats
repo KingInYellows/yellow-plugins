@@ -594,9 +594,9 @@ related_staged() {
   md="$BATS_TEST_DIRNAME/../commands/ruvector/related.md"
   grep -q 'coedit-related.sh" --stage)$' "$md"
   grep -q 'coedit-related.sh" --run)$' "$md"
-  ! sed -n '/^---$/,/^---$/p' "$md" | grep 'coedit-related' | grep -q ':\*'
+  ! sed -n '/^---$/,/^---$/p' "$md" | grep 'coedit-related' | grep -q ':\*' || false
   # No unscoped grant: an injected file name must not pre-approve reads.
-  ! sed -n '/^---$/,/^---$/p' "$md" | grep -Eq '^  - (Read|Write|Bash)$'
+  ! sed -n '/^---$/,/^---$/p' "$md" | grep -Eq '^  - (Read|Write|Bash)$' || false
 }
 
 @test "coedit-related.sh keeps one staged query per session" {
@@ -720,7 +720,7 @@ related_staged() {
   # The grant names exactly that location, and nothing under shared /tmp.
   md="$BATS_TEST_DIRNAME/../commands/ruvector/related.md"
   grep -qx '  - Write(~/.cache/yellow-ruvector/related/q.\*/query)' "$md"
-  ! grep -q 'Write(//tmp\|Write(//private/tmp' "$md"
+  ! grep -q 'Write(//tmp\|Write(//private/tmp' "$md" || false
   # A symlinked staging base is refused, never followed.
   rm -rf "$STAGE_BASE"; mkdir -p "$BATS_TEST_TMPDIR/elsewhere"
   ln -s "$BATS_TEST_TMPDIR/elsewhere" "$STAGE_BASE"
