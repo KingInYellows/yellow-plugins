@@ -696,7 +696,7 @@ SH
   done
 }
 
-@test "a relative RUVECTOR_CACHE_DIR names one cache for the warm-up and the fingerprint" {
+@test "a relative RUVECTOR_CACHE_DIR names one cache under HOME for every entry point" {
   fake_install
   mkdir -p "$BATS_TEST_TMPDIR/proj"
   run bash -c '
@@ -705,7 +705,9 @@ SH
     export PATH="$5:$PATH" FAKE_EMBED_OK=1
     yellow_ruvector_warm_model 10 || exit 7
     yellow_ruvector_model_cached || exit 8
-    [ -f "$6/rel-cache/.ruvector/models/all-MiniLM-L6-v2/model.onnx" ] || exit 9' \
+    [ -f "$2/rel-cache/.ruvector/models/all-MiniLM-L6-v2/model.onnx" ] || exit 9
+    # Another entry point, sourcing from another directory, sees it too.
+    mkdir -p "$6/sub" && cd "$6/sub" && RUVECTOR_CACHE_DIR=rel-cache bash -c ". \"\$1\"; export CLAUDE_PLUGIN_DATA=\"\$2\"; yellow_ruvector_data_dir; yellow_ruvector_model_cached" _ "$1" "$4" || exit 10' \
     _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$PLUGIN" "$DATA" "$STUBS" "$BATS_TEST_TMPDIR/proj"
   [ "$status" -eq 0 ]
 }

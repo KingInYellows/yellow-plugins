@@ -19,12 +19,13 @@
 
 YELLOW_RUVECTOR_MODEL='all-MiniLM-L6-v2'
 
-# A relative RUVECTOR_CACHE_DIR is anchored here, once: the warm-up runs
-# ruvector from TMPDIR and the server from the project root, and both must
-# see the same cache the lock and fingerprint helpers check.
+# A relative RUVECTOR_CACHE_DIR is anchored under HOME (the default cache
+# root), never the current directory: the launcher, prewarm, and
+# SessionStart source this from different directories, and the warm-up runs
+# ruvector from TMPDIR, yet all must share one cache and its lock.
 case "${RUVECTOR_CACHE_DIR:-}" in
   ''|/*) ;;
-  *) RUVECTOR_CACHE_DIR="$PWD/$RUVECTOR_CACHE_DIR"; export RUVECTOR_CACHE_DIR ;;
+  *) RUVECTOR_CACHE_DIR="${HOME:-/tmp}/$RUVECTOR_CACHE_DIR"; export RUVECTOR_CACHE_DIR ;;
 esac
 
 # yellow_ruvector_flat <text> — one line for display: control characters as
