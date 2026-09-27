@@ -165,8 +165,9 @@ progress.
   adds one `[ruvector] …` line to `systemMessage`; silent for fresh stores
   and when the env selects hash the way upstream resolves it
   (`RUVECTOR_EMBEDDER=hash`, or `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER`
-  unset). The provenance parse only runs when a GNU-compatible
-  `timeout`/`gtimeout` bounds it. Also re-runs the worktree store heal.
+  unset). The provenance parse and the recall are bounded by
+  GNU `timeout`/`gtimeout` when present, otherwise by `run_budgeted`'s
+  portable TERM/KILL watcher. Also re-runs the worktree store heal.
   There is no per-prompt (UserPromptSubmit) recall: semantic recall is too
   slow for every prompt, and the old hash-embedded per-prompt recall
   compared 64d queries against 384d vectors.

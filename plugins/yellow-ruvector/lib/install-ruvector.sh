@@ -489,8 +489,13 @@ yellow_ruvector_install_in_progress() {
 
 # Install the committed lockfile into install-<hash>, smoke-test it, swap
 # `current`, and prune old installs. Caller holds the install lock.
+# $1 = optional cap in seconds on the reuse probes (the launcher passes what
+# is left of its startup budget); the npm install itself is not capped.
 yellow_ruvector_do_install() {
-  local hash final tmp prev
+  local hash final tmp prev reuse="${1:-20}"
+  case "$reuse" in ''|*[!0-9]*) reuse=20 ;; esac
+  [ "${#reuse}" -le 6 ] || reuse=20
+  reuse=$((10#$reuse)); [ "$reuse" -ge 1 ] || reuse=1
   hash=$(yellow_ruvector_lock_hash) || {
     printf 'yellow-ruvector: cannot hash %s/package-lock.json\n' "$(yellow_ruvector_flat "$CLAUDE_PLUGIN_ROOT")" >&2
     return 1
@@ -505,8 +510,8 @@ yellow_ruvector_do_install() {
   # (_YR_KNOWN_UNHEALTHY), so a hung CLI is not waited on again.
   if [ -z "${_YR_KNOWN_UNHEALTHY:-}" ] \
      && [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
-     && yellow_ruvector_install_healthy \
-     && yellow_ruvector_run_bounded 20 node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
+     && yellow_ruvector_install_healthy "$(( reuse < 10 ? reuse : 10 ))" \
+     && yellow_ruvector_run_bounded "$reuse" node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
     yellow_ruvector_swap_current "install-${hash}" || return 1
     yellow_ruvector_prune "install-${hash}" "${prev##*/}"
     return 0
