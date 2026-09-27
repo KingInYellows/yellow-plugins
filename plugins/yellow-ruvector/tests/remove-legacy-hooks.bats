@@ -345,6 +345,32 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo A=1 ruvector hooks post-edit"]' "$S" >/dev/null
 }
 
+@test "a legacy call behind env and its options or assignments is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "env FOO=1 ruvector hooks post-edit --success"},
+    {type: "command", command: "A=1 /usr/bin/env -i B=2 npx ruvector hooks post-command"},
+    {type: "command", command: "echo env ruvector hooks post-edit"},
+    {type: "command", command: "myenv ruvector hooks post-edit"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo env ruvector hooks post-edit", "myenv ruvector hooks post-edit"]' "$S" >/dev/null
+}
+
+@test "a function definition holding a legacy call is never listed or removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cleanup() { ruvector hooks post-edit --success; }; echo harmless"},
+    {type: "command", command: "function f { ruvector hooks post-command; }"},
+    {type: "command", command: "g ( ) ( ruvector hooks post-edit )"},
+    {type: "command", command: "{ ruvector hooks post-edit; }"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  [[ "$output" == *"PostToolUse: { ruvector"* ]]
+}
+
 @test "a quoted executable behind assignments or keywords is still a legacy call" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "FOO=1 \"/usr/local/bin/ruvector\" hooks post-edit --success"},
