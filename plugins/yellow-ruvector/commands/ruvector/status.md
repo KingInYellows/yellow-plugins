@@ -182,9 +182,14 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
 if [ -n "${RUVECTOR_BIN:-}" ]; then
   RV=("$RUVECTOR_BIN")
 else
-  . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh" && yellow_ruvector_data_dir
-  # This plugin version's install, matching its MCP server and hooks.
-  RV=(node "$(yellow_ruvector_pinned_entry)")
+  # This plugin version's install, matching its MCP server and hooks, and
+  # only under a data dir that passes the launcher's checks (otherwise the
+  # dry-run below fails and the verdict is UNKNOWN).
+  if . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh" && yellow_ruvector_validate_paths --data-only >/dev/null 2>&1; then
+    RV=(node "$(yellow_ruvector_pinned_entry)")
+  else
+    RV=(false)
+  fi
 fi
 VERDICT=""; DETAIL=""; STORE=null; TARGET=null; DROP=0
 if [ ! -f "$INTEL" ]; then
