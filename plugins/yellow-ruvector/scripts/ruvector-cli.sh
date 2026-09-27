@@ -28,10 +28,10 @@ fi
 # canonical, no escaping symlink): never run a CLI planted under a data dir
 # they would refuse.
 yellow_ruvector_validate_paths --data-only || exit 1
-entry=$(yellow_ruvector_pinned_entry) || entry=""
-# Lease the install (the pid survives exec, so it covers the CLI run);
-# prune sweeps it once the process is gone.
+# Lease the install before resolving its entry (the pid survives exec, so
+# it covers the CLI run; prune sweeps it once the process is gone).
 hash=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${hash}"
+entry=$(yellow_ruvector_pinned_entry) || entry=""
 if [ ! -f "$entry" ]; then
   printf 'yellow-ruvector: ruvector for this plugin version is not installed in %s — run /ruvector:setup\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")" >&2
   exit 1

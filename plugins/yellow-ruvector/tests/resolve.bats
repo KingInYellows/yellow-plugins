@@ -367,3 +367,27 @@ fake_install() {
   [ "$status" -eq 0 ]
   [ -L "$WORK/wtdirty/.ruvector" ]
 }
+
+@test "resolve_bin: takes the lease even while a prune has the install moved aside" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -ge 20 ] || skip "node < 20 on this host"
+  fake_install
+  h=$(own_hash)
+  # Another version's prune has just moved this install aside; it restores
+  # it only if a lease shows up before its final check.
+  mv "$DATA/install-$h" "$DATA/.install-$h.tmp.prune99999"
+  rs bash -c 'unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin && exit 9
+    [ -e "$2/.lease.install-$3.$$" ] || exit 8' _ "$LIB" "$DATA" "$h"
+  [ "$status" -eq 0 ]
+}
+
+@test "canon: a dangling symlink in the data path is refused, never read lexically" {
+  ln -s "$BATS_TEST_TMPDIR/not-yet" "$WORK/link"
+  rs bash -c '. "$1"; yellow_ruvector_canon "$2/link/data"' _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$WORK"
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+  mkdir "$BATS_TEST_TMPDIR/not-yet"
+  rs bash -c '. "$1"; yellow_ruvector_canon "$2/link/data"' _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$WORK"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(cd "$BATS_TEST_TMPDIR/not-yet" && pwd -P)/data" ]
+}
