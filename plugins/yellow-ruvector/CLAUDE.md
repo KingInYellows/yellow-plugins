@@ -168,7 +168,10 @@ progress.
   slow for every prompt, and the old hash-embedded per-prompt recall
   compared 64d queries against 384d vectors.
 - `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit, 1s; jq only) — the
-  first time a session edits a file, returns up to 3 partners edited
+  first time a session edits a file (tracked for the session's 200 most
+  recently suggested files, 32 KB of paths at most, so the session file
+  stays small; a file that falls out of that list can be suggested again),
+  returns up to 3 partners edited
   together with it at least 3 times as fenced
   `hookSpecificOutput.additionalContext` (Claude Code shows PreToolUse
   additionalContext to the model as a system message). Partners are
