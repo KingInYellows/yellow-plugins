@@ -434,7 +434,8 @@ coedit_prune_sessions() {
       done
       total=${#stale[@]} tried=0 removed=0
       if [ "$total" -gt 0 ]; then
-        i=$((RANDOM % total))
+        # Two RANDOMs (15 bits each): a start anywhere in up to 2^30 entries.
+        i=$(( ((RANDOM << 15) | RANDOM) % total ))
         while [ "$tried" -lt "$total" ] && [ "$tried" -lt 50 ] && [ "$removed" -lt 10 ] && [ "$SECONDS" -lt 5 ]; do
           m=${stale[$(( (i + tried) % total ))]}
           tried=$((tried + 1))
