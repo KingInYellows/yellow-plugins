@@ -173,6 +173,16 @@ assert_allow_json() {
   [[ "$output" == *$'2\tsrc/b.ts'* ]]
 }
 
+@test "coedit-related.sh: deep rejected partners never exhaust the scan before a valid one" {
+  deep=$(printf 'd/%.0s' $(seq 1 200)); deep="src/${deep%/}"
+  mkdir -p "$PROJECT_ROOT/$deep" "$BATS_TEST_TMPDIR/out"; : > "$BATS_TEST_TMPDIR/out/f.ts"
+  for i in $(seq 0 999); do ln -s "$BATS_TEST_TMPDIR/out" "$PROJECT_ROOT/$deep/l$i"; done
+  jq -n --arg d "$deep" '{version:1, pairs:{"src/a.ts": (([range(0;1000)] | map({key:"\($d)/l\(.)/f.ts", value:9}) | from_entries) + {"src/b.ts": 2})}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'2\tsrc/b.ts'* ]]
+}
+
 @test "coedit-related.sh rejects a path outside the project and is empty without history" {
   run --separate-stderr bash -c 'cd "$1" && bash "$2" /etc/hosts' _ "$PROJECT_ROOT" "$RELATED"
   [ "$status" -eq 2 ]

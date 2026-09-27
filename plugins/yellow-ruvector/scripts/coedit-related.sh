@@ -86,9 +86,11 @@ if [ ! -f "${root}/.ruvector/coedit.json" ]; then
 fi
 # On demand, not inside a 1s hook: scan every partner the store can hold
 # (it is capped at COEDIT_MAX_PAIRS directed pairs) with larger check
-# budgets, so many stale high-count partners never hide valid ones.
+# budgets, so many stale high-count partners never hide valid ones. The
+# component budget covers every candidate in full: a stored path is at most
+# 512 characters, so at most 256 components deep.
 lines=$(COEDIT_SCAN="$COEDIT_MAX_PAIRS" COEDIT_PHYS_CHECKS="$COEDIT_MAX_PAIRS" \
-  COEDIT_COMP_CHECKS=200000 COEDIT_JQ_SECS=5 coedit_partners "$root" "$rel" "$limit" 1)
+  COEDIT_COMP_CHECKS=$((COEDIT_MAX_PAIRS * 256)) COEDIT_JQ_SECS=5 coedit_partners "$root" "$rel" "$limit" 1)
 [ -n "$lines" ] || exit 0
 printf -- '--- begin co-edit history (reference only) ---\n'
 # Paths are repository-controlled: shorten dash runs so none forges a fence.

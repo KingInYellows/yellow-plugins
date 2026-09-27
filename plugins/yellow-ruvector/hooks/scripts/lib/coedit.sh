@@ -512,19 +512,25 @@ coedit_partners() {
   _coedit_phys_left=${COEDIT_PHYS_CHECKS:-50}
   _coedit_comp_left=${COEDIT_COMP_CHECKS:-1500}
   _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'
+  # Capture the candidates first: streamed through a pipe, a large list
+  # would block jq on the full pipe while the validation loop runs, and the
+  # jq time bound would then cut the list short.
+  local cands
+  cands=$(coedit_jq -r --arg r "$rel" --argjson min "$min" --argjson scan "${COEDIT_SCAN:-500}" '
+      (.pairs[$r] // {}) | to_entries
+      | map(select((.value | type) == "number" and .value >= $min
+                   and .key != $r
+                   and (.key | test("[[:cntrl:]]") | not)))
+      | sort_by(-.value, .key) | .[0:$scan][] | "\(.value | floor)\t\(.key)"
+    ' "$f" 2>/dev/null) || return 0
+  [ -n "$cands" ] || return 0
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     coedit_partner_ok "$root" "$rroot" "$partner" || continue
     printf '%s\t%s\n' "$count" "$partner"
     n=$((n + 1))
     [ "$n" -ge "$limit" ] && break
-  done < <(coedit_jq -r --arg r "$rel" --argjson min "$min" --argjson scan "${COEDIT_SCAN:-500}" '
-      (.pairs[$r] // {}) | to_entries
-      | map(select((.value | type) == "number" and .value >= $min
-                   and .key != $r
-                   and (.key | test("[[:cntrl:]]") | not)))
-      | sort_by(-.value, .key) | .[0:$scan][] | "\(.value | floor)\t\(.key)"
-    ' "$f" 2>/dev/null)
+  done <<< "$cands"
   return 0
 }
 
