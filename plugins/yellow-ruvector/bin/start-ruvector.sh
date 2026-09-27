@@ -131,9 +131,10 @@ if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
     # store a failed load would stamp it hash. Until a warm-up verifies the
     # model, keep only the tools that never embed.
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_recall|hooks_remember|hooks_pretrain' | paste -sd, - || true)
-    # DENY wins over ALLOW and any profile in ruvector's policy, and keeps
-    # them withheld even if the filtered allowlist came out empty (which
-    # ruvector reads as allow-all).
+    # An allowlist that filtering emptied would read as allow-all (every
+    # tool): a name that matches no tool keeps the policy closed.
+    [ -n "$allow" ] || allow="yellow_ruvector_none"
+    # DENY wins over ALLOW and any profile in ruvector's policy.
     export RUVECTOR_MCP_DENY="${RUVECTOR_MCP_DENY:+${RUVECTOR_MCP_DENY},}hooks_recall,hooks_remember,hooks_pretrain"
     if yellow_ruvector_install_in_progress || yellow_ruvector_model_lock_busy; then
       log "the ONNX model is still being fetched by another session: starting without hooks_recall, hooks_remember and hooks_pretrain. Restart Claude Code once it finishes to use them."
