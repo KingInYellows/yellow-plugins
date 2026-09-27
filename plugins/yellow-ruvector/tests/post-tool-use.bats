@@ -281,6 +281,36 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
 }
 
+@test "a slow main-worktree lookup is bounded; the hook still answers in time" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  echo x > "$PROJECT_ROOT/f.txt"; git -C "$PROJECT_ROOT" add f.txt
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
+  WT="$(mktemp -d)/wt"
+  git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
+  mkdir -p "$WT/src"; : > "$WT/src/a.ts"
+  ln -s "$RUVECTOR_DIR" "$WT/.ruvector"
+  # A git whose worktree listing never finishes (a huge or slow checkout).
+  gb="$BATS_TEST_TMPDIR/gitbin"; mkdir -p "$gb"
+  printf '#!/bin/sh\ncase "$*" in *"worktree list"*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$gb" "$(command -v git)" > "$gb/git"
+  chmod +x "$gb/git"
+  start=$(date +%s%N)
+  out=$(jq -cn --arg c "$WT" --arg f "$WT/src/a.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"w2", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+    | PATH="$gb:$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT")
+  end=$(date +%s%N)
+  printf '%s' "$out" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
+  # The abandoned lookup is killed within its bound, not left running.
+  sleep 0.5
+  # (A zombie is dead: a container's PID 1 may never reap it.)
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$gb/pids"
+  git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
+}
+
 @test "a coedit.json with a non-numeric count is set aside, and recording resumes" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":"many"}, "src/b.ts":{"src/a.ts":"many"}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
