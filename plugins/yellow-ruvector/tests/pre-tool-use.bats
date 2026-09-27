@@ -21,12 +21,12 @@ teardown() {
 }
 
 run_hook() {
-  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
+  printf '%s' "$1" | RUVECTOR_BIN="$MOCK_BIN/ruvector" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
 }
 
 run_hook_no_ruvector() {
   # PATH with only system utilities — no ruvector binary
-  printf '%s' "$1" | PATH="/usr/bin:/bin" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
+  printf '%s' "$1" | RUVECTOR_BIN="" CLAUDE_PLUGIN_DATA="$PROJECT_ROOT/no-install" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
 }
 
 # --- Core output contract ---
@@ -117,7 +117,7 @@ run_hook_no_ruvector() {
   printf '#!/bin/sh\necho "LEAKED"\nexit 0\n' > "$noisy_bin/ruvector"
   chmod +x "$noisy_bin/ruvector"
   input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts"}}'
-  output=$(printf '%s' "$input" | PATH="$noisy_bin:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
+  output=$(printf '%s' "$input" | RUVECTOR_BIN="$noisy_bin/ruvector" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
   status=$?
   rm -rf "$noisy_bin"
   [ "$status" -eq 0 ]

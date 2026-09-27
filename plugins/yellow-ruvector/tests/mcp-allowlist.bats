@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 # The MCP launch spec must name only the tools this plugin calls.
-# ruvector@0.2.34 treats an empty, blank, or unknown policy as allow-all,
+# ruvector (0.2.34 through 0.3.3) treats an empty or blank allowlist, or an unknown
+# profile name, as allow-all (an unknown tool name in the allowlist matches nothing),
 # and RUVECTOR_MCP_PROFILE unions extra tools into RUVECTOR_MCP_ALLOW.
 bats_require_minimum_version 1.5.0
 

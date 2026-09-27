@@ -60,7 +60,73 @@ fi
 command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
-command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
+# yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
+# ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
+# host does not set CLAUDE_PLUGIN_DATA. Count a dir only where the launcher
+# accepts it (lib/install-ruvector.sh validate_paths): physically under HOME
+# or /tmp, or under an absolute, non-system CLAUDE_CONFIG_DIR / XDG_DATA_HOME.
+_rv_sys() { case "$1" in ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) return 0 ;; esac; return 1; }
+_rv_base_ok() { case "$1" in /*) _rv_b=$(CDPATH= cd -P -- "$1" 2>/dev/null && pwd) && ! _rv_sys "$_rv_b" ;; *) return 1 ;; esac; }
+_rv_home=$(CDPATH= cd -P -- "${HOME:-/nonexistent}" 2>/dev/null && pwd) || _rv_home="/__unset__"
+# _rv_probe <cli.js> — `node <cli.js> --version`, bounded to 10s: GNU
+# timeout or gtimeout when present, otherwise (stock macOS) a background run
+# with a watchdog that kills it, so a hanging install never stalls /setup:all.
+_rv_probe() {
+  local t out p w rc
+  # Only a timeout that supports --kill-after (GNU): a CLI that ignores
+  # TERM is then KILLed 2s later. BusyBox-style ones use the watchdog below.
+  for t in timeout gtimeout; do
+    command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=1 5 true >/dev/null 2>&1 \
+      && { "$t" --kill-after=2 10 node "$1" --version 2>/dev/null; return; }
+  done
+  out=$(mktemp) || return 1
+  node "$1" --version >"$out" 2>/dev/null &
+  p=$!
+  ( sleep 10; kill -9 "$p" 2>/dev/null ) >/dev/null 2>&1 &
+  w=$!
+  wait "$p"; rc=$?
+  kill "$w" 2>/dev/null
+  cat "$out"; rm -f "$out"
+  return "$rc"
+}
+_rv_cli=""; _rv_ver=""
+# OK only when the entry actually runs (a missing or corrupt dependency
+# makes --version fail). A broken candidate does not end the scan: a stale
+# data dir from another plugin ID may sort before the live one. Only when no
+# candidate runs is it NOT INSTALLED, so the classification offers
+# /ruvector:setup, which repairs it.
+for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/"; do
+  [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] || continue
+  _rv_p=$(CDPATH= cd -P -- "$_rv_d" 2>/dev/null && pwd) || continue
+  case "$_rv_p" in
+    "$_rv_home"/*|/tmp/*|/private/tmp/*) ;;
+    */plugins/data/*) [ -n "${CLAUDE_CONFIG_DIR:-}" ] && _rv_base_ok "$CLAUDE_CONFIG_DIR" && case "$_rv_p" in "$_rv_b"/plugins/data/?*) ;; *) false ;; esac || continue ;;
+    *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
+  esac
+  # `current` must name a sibling install-* dir, and every component down to
+  # cli.js must be a real directory or regular file inside it: a tampered
+  # candidate never makes node run a file outside its data dir.
+  _rv_t=$(readlink "${_rv_p}/current" 2>/dev/null) || continue
+  case "$_rv_t" in */*|'') continue ;; install-?*) ;; *) continue ;; esac
+  _rv_i="${_rv_p}/${_rv_t}"
+  for _rv_c in "$_rv_i" "$_rv_i/node_modules" "$_rv_i/node_modules/ruvector" "$_rv_i/node_modules/ruvector/bin"; do
+    [ -d "$_rv_c" ] && [ ! -L "$_rv_c" ] || continue 2
+  done
+  _rv_cli="$_rv_i/node_modules/ruvector/bin/cli.js"
+  [ -f "$_rv_cli" ] && [ ! -L "$_rv_cli" ] || { _rv_cli=""; continue; }
+  _rv_ver=$(_rv_probe "$_rv_cli") || _rv_ver=""
+  # The output comes from files on disk (a stale or tampered install): keep
+  # it only when its first line is a plain version string, else the install
+  # counts as broken, so nothing else reaches the dashboard.
+  _rv_ver=$(printf '%s\n' "$_rv_ver" | head -n1 | grep -E '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || true)
+  [ -n "$_rv_ver" ] && break
+done
+if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n' "$_rv_ver"
+elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-managed install broken; /ruvector:setup repairs it)\n'
+else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
+[ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
+unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver _rv_t _rv_i _rv_c
+unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
@@ -433,9 +499,12 @@ stacks as well.
 
 **yellow-ruvector:**
 
-- READY: `node18_check` ok AND `npx` OK AND `.ruvector/` exists AND global
-  `ruvector` binary OK
-- NEEDS SETUP: any READY condition not met
+- READY: `node20_check` ok AND `ruvector` OK (plugin-managed install) AND
+  `.ruvector/` exists
+- PARTIAL: `node20_check` ok AND `.ruvector/` exists AND `ruvector` NOT
+  INSTALLED — the plugin installs it on the next session start (prewarm hook)
+  or via `/ruvector:setup`; detail: "plugin-managed ruvector not installed yet"
+- NEEDS SETUP: `node20_check` not ok, or `.ruvector/` missing
 
 **yellow-morph:**
 
@@ -683,7 +752,7 @@ Marketplace Setup Dashboard
   -------------------  -----------     ------------------------------------------
   gt-workflow          READY           Graphite auth detected, repo initialized
   github-workflow      PARTIAL         gh authenticated, github/gh-stack not installed
-  yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
+  yellow-ruvector      PARTIAL         Plugin-managed ruvector not installed yet
   yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
   yellow-cursor        READY           CLI resolved, credentials configured (alternative provider — not enabled)
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set

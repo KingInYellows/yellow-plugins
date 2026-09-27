@@ -144,11 +144,12 @@ applies the same fix retroactively.
 - Removed safely on `cleanup`: `[ -L ]` check, then `rm --` (no `-r`, no `-f`,
   no trailing slash). Cannot follow into the main repo's DB.
 
-**MCP-spawn-time qualifier:** `RUVECTOR_STORAGE_PATH` is evaluated when
-Claude Code spawns the MCP server process for a session. The symlink only
-helps when Claude Code is launched (or re-launched) **from inside the
-worktree directory**. A pre-existing session started in main that later
-`cd`s into a worktree continues to write to the main repo's DB directly.
+**MCP-spawn-time qualifier:** yellow-ruvector's MCP launcher resolves the
+store from the git toplevel of the directory Claude Code was launched in,
+once, when it spawns the server (it also heals a missing worktree symlink at
+that point). The symlink only matters for sessions launched (or re-launched)
+**from inside the worktree**. A pre-existing session started in main that
+later `cd`s into a worktree continues to write to the main repo's DB directly.
 
 **Concurrent-write caveat:** When two Claude Code sessions run simultaneously
 (one in main, one in a worktree, or two worktrees), both MCP server processes

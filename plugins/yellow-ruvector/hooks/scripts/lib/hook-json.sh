@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Dual-client allow payload for Claude Code and Cursor.
 #
-# Claude Code PreToolUse / PostToolUse / SessionStart / Stop /
-# UserPromptSubmit read `continue`. Cursor's Claude-plugin bridge
+# Claude Code PreToolUse / PostToolUse / SessionStart / Stop read
+# `continue`. Cursor's Claude-plugin bridge
 # requires `permission` on PreToolUse and treats empty / non-JSON
 # stdout as a hard block. Extra keys are ignored by each host.
 # `permission` here is that bridge field. It is not Claude's
@@ -25,7 +25,7 @@ json_exit() {
 
 # emit_recall_json <hookEventName> <additionalContext> [systemMessage]
 # Model-facing recalled text goes in hookSpecificOutput.additionalContext
-# (UserPromptSubmit and SessionStart). Operator diagnostics go in
+# (SessionStart). Operator diagnostics go in
 # systemMessage, which is shown to the user. Either string may be empty;
 # an empty field is omitted. Does not emit `decision` or
 # `permissionDecision`. Falls back to the plain allow payload if jq fails

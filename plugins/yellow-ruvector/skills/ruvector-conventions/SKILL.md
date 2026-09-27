@@ -111,21 +111,21 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 
 ## Hook Architecture
 
-Hooks delegate to ruvector's built-in CLI hooks. There is no manual queue
-management inside the plugin:
+Hooks delegate to ruvector's built-in CLI hooks through the plugin-managed
+install (`hooks/scripts/lib/resolve.sh`; never a global binary) and run it
+from the git toplevel. There is no manual queue management inside the plugin:
 
-- `session-start.sh` → `ruvector hooks session-start --resume` plus
-  `ruvector hooks recall --top-k N "query"` when the global binary is in PATH.
-  Recall is `hookSpecificOutput.additionalContext` for `SessionStart`. The
-  embedder-provenance warning stays on `systemMessage`
-- `user-prompt-submit.sh` reads the string field `prompt` and returns
-  recall as `hookSpecificOutput.additionalContext` for `UserPromptSubmit`
-- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) →
-  `ruvector hooks post-edit --success <path>` only for a PostToolUse
-  success, or `ruvector hooks post-command --success|--error <cmd>` only
-  for a Bash `tool_response` success or an `Exit code N` failure. Unknown
-  and interrupt are not submitted
-- `stop.sh` → `ruvector hooks session-end`
+- `prewarm.sh` (SessionStart) → installs the pinned ruvector into the plugin
+  data dir and downloads the ONNX model in the background
+- `session-start.sh` → one semantic `ruvector hooks recall --top-k 5 "query"`
+  (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
+  `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
+  There is no per-prompt recall
+- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) → allow JSON
+  only; `hooks post-edit` / `post-command` are never called (each writes a
+  hash-embedded memory that stamps a fresh store hash/64d, ADR-210)
+- No `Stop` hook: `hooks session-end` rewrites the whole store every turn and
+  races the MCP server's saves
 
 ruvector manages its own internal queue and dedup. Plugin hooks are thin
 wrappers that parse Claude Code hook input JSON and call the right CLI command.

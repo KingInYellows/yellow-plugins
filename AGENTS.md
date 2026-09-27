@@ -175,8 +175,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   commit.
 - Do not commit generated local state such as `.claude/`, `.codex/`, `.entire/`,
   `.ruvector/`, `dist/`, `*.tsbuildinfo`, logs, or local database files. The
-  committed exception for npm lockfiles is currently
-  `plugins/yellow-morph/package-lock.json`.
+  committed exceptions for npm lockfiles are currently
+  `plugins/yellow-morph/package-lock.json` and
+  `plugins/yellow-ruvector/package-lock.json` (both pin a plugin-managed
+  install; the lockfile hash names the install dir).
 
 ## Git, Changesets, And Release Workflow
 
