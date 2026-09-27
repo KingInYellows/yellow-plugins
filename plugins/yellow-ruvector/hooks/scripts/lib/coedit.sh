@@ -424,7 +424,7 @@ coedit_record() {
 }
 
 # coedit_shard [digit] — a random -name prefix of two bracket expressions,
-# each one of eight slices of the session-id alphabet [A-Za-z0-9_-] (or,
+# each one of eight slices of the session-id alphabet [A-Za-z0-9._-] (or,
 # with `digit`, one of five pairs of digits): 64 (25) slices in all.
 # COEDIT_SHARD (an index) pins it for tests.
 coedit_shard() {
@@ -432,7 +432,7 @@ coedit_shard() {
   if [ "${1:-}" = digit ]; then
     sh=('[01]' '[23]' '[45]' '[67]' '[89]')
   else
-    sh=('[0-3]' '[4-7]' '[89ab]' '[cdef]' '[g-p]' '[q-z]' '[A-M]' '[N-Z_-]')
+    sh=('[0-3]' '[4-7]' '[89ab]' '[cdef]' '[g-p]' '[q-z]' '[A-M]' '[N-Z_.-]')
   fi
   local i="${COEDIT_SHARD:-$(( (RANDOM << 15) | RANDOM ))}" n=${#sh[@]}
   case "$i" in ''|*[!0-9]*) i=$(( (RANDOM << 15) | RANDOM )) ;; esac
@@ -464,7 +464,7 @@ coedit_prune_sessions() {
   ( CDPATH= cd -P -- "$sdir" 2>/dev/null && [ "$(pwd -P)" = "$sdir" ] || exit 0
     SECONDS=0
     # A full listing gets 3s. If it times out (a huge or slow dir), the next
-    # 2s go to one random name shard (session ids are [A-Za-z0-9_-]; -name
+    # 2s go to one random name shard (session ids are [A-Za-z0-9._-], never a leading dot; -name
     # is tested before the stat-costly primaries), so over several runs
     # every part of the dir is reached, not only the prefix a timed-out
     # listing always stops in.
@@ -678,15 +678,20 @@ coedit_prune_sessions() {
       # Temp files coedit_write_atomic left behind when a hook was killed
       # between mktemp and the rename (the 1s timeout): session and cursor
       # temps here, coedit.json temps in the store dir. Only ones over 10
-      # minutes old (no write takes that long), at most 200 per run, 1s per
-      # listing and 3s in all; regular files only (-type f matches no
-      # symlink).
+      # minutes old (no write takes that long), 1s per listing and 3s in
+      # all; regular files only (-type f matches no symlink). Each directory
+      # gets its own random sample of 100 of what its listing returned, so
+      # entries that stay (undeletable, or a timed-out listing's prefix)
+      # never pin the sweep and one directory never starves the other.
       while IFS= read -r t && [ "$SECONDS" -lt 3 ]; do
         [ -f "$t" ] && [ ! -L "$t" ] || continue
         coedit_older_than "$(coedit_mtime "$t")" 600 && rm -f -- "$t"
-      done < <({ run_budgeted 1 find . ! -name . -prune -type f -name '*.tmp.????????' ! -name "*${nl}*"
-          run_budgeted 1 find .. ! -name .. -prune -type f -name 'coedit.json.tmp.????????' ! -name "*${nl}*"
-        } 2>/dev/null | head -n 200) ) \
+      done < <(for spec in '..:coedit.json.tmp.????????' '.:*.tmp.????????'; do
+          run_budgeted 1 find "${spec%%:*}" ! -name "${spec%%:*}" -prune -type f -name "${spec#*:}" ! -name "*${nl}*" 2>/dev/null \
+            | LC_ALL=C awk -v k=100 'BEGIN { srand() }
+                { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
+                END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
+        done) ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

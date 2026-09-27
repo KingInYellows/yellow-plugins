@@ -956,6 +956,22 @@ END"
   [ -e "$sd/0recent1" ]
 }
 
+@test "a session id with a dot after its first character is in a shard too" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in 0recent1 0recent2; do : > "$sd/$n"; done
+  : > "$sd/a.old"; touch -d '10 days ago' "$sd/a.old" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *mtime*) echo ./0recent1; echo ./0recent2; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 58: [89ab] then [N-Z_.-] ("a.…").
+  COEDIT_SHARD=58 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/a.old" ] || break; sleep 0.1; done
+  [ ! -e "$sd/a.old" ]
+  [ -e "$sd/0recent1" ]
+}
+
 @test "a marker listing that always times out still reaches expired markers beyond its prefix" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
@@ -1041,6 +1057,21 @@ END"
   [ ! -e "$sd/.stale-sweep-cursor.tmp.Qq11Ww22" ]
   [ -f "$sd/s2.tmp.Fresh123" ]
   [ -L "$sd/s3.tmp.Link1234" ] && [ "$(cat "$outside")" = keep ]
+}
+
+@test "the temp sweep samples each directory, so stuck session temps never hide store temps" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # 250 old session temps rm cannot delete, listed first, in name order.
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *s*.tmp.Stuck*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  for n in $(seq 100 349); do : > "$sd/s$n.tmp.Stuck$n"; done
+  t="$RUVECTOR_DIR/coedit.json.tmp.AbCd1234"; : > "$t"
+  touch -d '20 minutes ago' "$sd"/s*.tmp.Stuck* "$t" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$t" ] || break; sleep 0.1; done
+  [ ! -e "$t" ]
 }
 
 @test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
