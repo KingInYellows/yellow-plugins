@@ -384,9 +384,24 @@ coedit_prune_sessions() {
           coedit_lock_path ".${sid}.lock" || continue
           if [ -f "$f" ] && [ ! -L "$f" ] && coedit_older_than "$(coedit_mtime "$f")" 604800; then
             rm -f -- "$f"
+            # A pruned session is never locked again, so its reclaim markers
+            # would never be swept by coedit_lock_path: drop them now.
+            coedit_unlock_path ".${sid}.lock"
+            for m in ".${sid}.lock.reclaim."*; do [ -d "$m" ] && rmdir -- "$m" 2>/dev/null; done
+            continue
           fi
           coedit_unlock_path ".${sid}.lock"
-        done ) \
+        done
+      # Expired reclaim markers of sessions that no longer exist (bounded).
+      n=0
+      for m in .*.lock.reclaim.*; do
+        [ "$n" -lt 50 ] && [ "$SECONDS" -lt 5 ] || break
+        n=$((n + 1))
+        [ -d "$m" ] && [ ! -L "$m" ] || continue
+        s="${m#.}"; s="${s%%.lock.reclaim.*}"
+        [ -e "$s" ] && continue
+        coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null
+      done ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }
