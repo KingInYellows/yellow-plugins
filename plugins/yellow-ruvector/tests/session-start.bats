@@ -608,20 +608,45 @@ exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   cursor="$RUVECTOR_DIR/coedit-sessions/.stale-sweep-cursor"
   for n in a1 a2 a3 a4 a5 a6; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
-  # Capped: only 3 of the 6 names are read before sorting, well under the
-  # window, so the scan is partial and the cursor must not wrap.
-  COEDIT_STALE_SCAN_CAP=3 COEDIT_STALE_WINDOW=10 run run_hook '{"cwd":""}'
-  for _ in $(seq 1 40); do [ -s "$cursor" ] && break; sleep 0.1; done
-  [ -s "$cursor" ]
-  rm -f "$cursor"
-  # Timed out: a find that lists what it has, then never finishes.
+  printf '%s\n' "../.coedit.lock.stale.a3" > "$cursor"
+  # Timed out: a find that lists what it has, then never finishes. Nothing
+  # proves which names it did not list, so the cursor must neither wrap nor
+  # jump ahead.
   fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
   printf '#!/bin/sh\ncase "$*" in *lock.stale*) %s "$@"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
     "$(command -v find)" "$(command -v find)" > "$fb/find"
   chmod +x "$fb/find"
-  COEDIT_STALE_WINDOW=10 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
-  for _ in $(seq 1 60); do [ -s "$cursor" ] && break; sleep 0.1; done
-  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a6" ]
+  touch -d '1 minute ago' "$cursor" 2>/dev/null || skip "touch -d unsupported"
+  before=$(stat -c %Y "$cursor" 2>/dev/null || stat -f %m "$cursor")
+  COEDIT_STALE_WINDOW=2 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 6
+  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a3" ]
+  [ "$(stat -c %Y "$cursor" 2>/dev/null || stat -f %m "$cursor")" = "$before" ]
+}
+
+@test "stale-tree discovery never skips names listed out of order" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.z*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # find lists the undeletable z* trees before a1, which sorts first.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *coedit.lock.stale*) %s "$@" | sort -r; exit 0 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in a1 z1 z2 z3 z4; do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.$n"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  for _ in 1 2 3; do
+    COEDIT_STALE_SCAN_CAP=2 COEDIT_STALE_WINDOW=2 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
 }
 
 @test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {

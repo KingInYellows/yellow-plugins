@@ -435,45 +435,74 @@ coedit_prune_sessions() {
       # 10 removed per run) and started at a random entry, so trees that
       # cannot be removed never keep the sweep from reaching later ones.
       # Discovery is bounded too: top-level-only finds (-type d never
-      # matches a symlink), 2s each, instead of expanding every match. Only
-      # names after the one the previous run's window ended on
-      # (.stale-sweep-cursor) are kept, at most COEDIT_STALE_SCAN_CAP
-      # (20000) of them before anything is sorted, and the window is the
-      # first COEDIT_STALE_WINDOW (2000) of those in sorted order. The
-      # cursor wraps to the start only after a scan that completed and
-      # whose remaining names all fit the window; after a partial scan (a
-      # find timed out or the cap was hit) it moves to the window's end, so
-      # trees that can never be removed, or a scan that never finishes,
-      # cannot pin the sweep to the same names.
+      # matches a symlink), 2s each, instead of expanding every match. One
+      # awk pass over what they list keeps O(window) memory: a max-heap of
+      # the COEDIT_STALE_WINDOW (2000) smallest names after the one the
+      # previous window ended on (.stale-sweep-cursor), and a random sample
+      # of the same size. After a complete scan the window is the heap and
+      # the cursor moves to its end (or wraps once every remaining name
+      # fitted). After a partial scan (a find timed out) nothing proves
+      # which names were not listed, so the cursor stays put and the window
+      # is the random sample: trees that can never be removed cannot pin the
+      # sweep, and no unseen name is ever skipped.
       win=${COEDIT_STALE_WINDOW:-2000}
       case "$win" in ''|*[!0-9]*|0) win=2000 ;; esac
-      cap=${COEDIT_STALE_SCAN_CAP:-20000}
-      case "$cap" in ''|*[!0-9]*|0) cap=20000 ;; esac
       cur=""
       if [ -f .stale-sweep-cursor ] && [ ! -L .stale-sweep-cursor ]; then
         IFS= read -r cur < .stale-sweep-cursor || true
         [ "${#cur}" -le 1024 ] || cur=""
       fi
-      raw=() found=() stale=() complete=0
-      # Every find result starts with "." ("./…" or "../…"), so END can
-      # only be the marker that both finds ran to completion.
+      ctl="" found=() stale=()
+      # Every find result starts with "." ("./…" or "../…"), so END can only
+      # be the marker that both finds completed, and the awk's first output
+      # line (CURSOR<TAB>… or KEEP) can only be its control line.
       while IFS= read -r m; do
-        if [ "$m" = END ]; then complete=1; else raw+=("$m"); fi
+        if [ -z "$ctl" ]; then ctl="$m"; else found+=("$m"); fi
       done < <(
         { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*'; a=$?
           run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*'; b=$?
           [ "$a" -eq 0 ] && [ "$b" -eq 0 ] && printf 'END\n'; } 2>/dev/null \
-          | COEDIT_CUR="$cur" LC_ALL=C awk '$0 > ENVIRON["COEDIT_CUR"]' | head -n "$cap"
+          | COEDIT_CUR="$cur" LC_ALL=C awk -v k="$win" '
+              function sw(i, j,  t) { t = h[i]; h[i] = h[j]; h[j] = t }
+              function push(x,  i, p) {
+                h[++n] = x; i = n
+                while (i > 1) { p = int(i / 2); if (h[p] >= h[i]) break; sw(p, i); i = p }
+              }
+              function pop(  i, c, l) {
+                h[1] = h[n]; delete h[n]; n--; i = 1
+                while (1) {
+                  l = 2 * i; c = i
+                  if (l <= n && h[l] > h[c]) c = l
+                  if (l + 1 <= n && h[l + 1] > h[c]) c = l + 1
+                  if (c == i) break
+                  sw(i, c); i = c
+                }
+              }
+              BEGIN { cur = ENVIRON["COEDIT_CUR"]; n = 0; m = 0; t = 0; done = 0; srand() }
+              $0 == "END" { done = 1; next }
+              {
+                t++
+                if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 }
+                if ($0 > cur) {
+                  m++
+                  if (n < k) push($0); else if ($0 < h[1]) { pop(); push($0) }
+                }
+              }
+              END {
+                if (done) {
+                  if (m <= k) print "CURSOR\t"; else print "CURSOR\t" h[1]
+                  for (i = 1; i <= n; i++) print h[i]
+                } else {
+                  print "KEEP"
+                  c = (t < k) ? t : k
+                  for (i = 1; i <= c; i++) print r[i]
+                }
+              }'
       )
-      if [ "${#raw[@]}" -gt 0 ]; then
-        while IFS= read -r m; do found+=("$m"); done < <(printf '%s\n' "${raw[@]}" | LC_ALL=C sort | head -n "$win")
-      fi
-      next=""
-      if [ "$complete" = 1 ] && [ "${#raw[@]}" -le "$win" ]; then
-        next=""
-      elif [ "${#found[@]}" -gt 0 ]; then
-        next=${found[$(( ${#found[@]} - 1 ))]}
-      fi
+      case "$ctl" in
+        CURSOR$'\t'*) next=${ctl#CURSOR$'\t'} ;;
+        *) next="$cur" ;;
+      esac
       if [ "$next" != "$cur" ] && ctmp=$(mktemp .stale-sweep-cursor.XXXXXX 2>/dev/null); then
         printf '%s\n' "$next" > "$ctmp" && mv -f -- "$ctmp" .stale-sweep-cursor || rm -f -- "$ctmp"
       fi
