@@ -442,7 +442,21 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit r2 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
   [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
+  # The renamed copy is removed in the background.
+  for _ in $(seq 1 30); do ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* >/dev/null 2>&1 || break; sleep 0.1; done
   ! ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* 2>/dev/null
+}
+
+@test "reclaiming a stale lock holding a large tree stays inside the hook budget" {
+  edit r3 "$PROJECT_ROOT/src/a.ts"
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock"
+  for d in $(seq 1 40); do mkdir -p "$RUVECTOR_DIR/.coedit.lock/d$d"; (cd "$RUVECTOR_DIR/.coedit.lock/d$d" && touch $(seq -f 'f%g' 1 500)); done
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  start=$(date +%s%N)
+  edit r3 "$PROJECT_ROOT/src/b.ts"
+  end=$(date +%s%N)
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
 }
 
 @test "stale-lock reclaim and marker pruning do not depend on find" {

@@ -212,13 +212,15 @@ coedit_lock_path() {
           && rmdir "$_m" 2>/dev/null
       done
       # A stale lock may not be empty (a checkout or crash can leave files
-      # in it): rename it aside atomically, then remove the renamed copy.
+      # in it): rename it aside atomically (that alone frees the lock), then
+      # remove the renamed copy in a detached job, so a large tree never
+      # holds the hook past its 1s budget.
       local aside="${lock}.stale.${ino}-${mt}.$$"
       if mkdir "$marker" 2>/dev/null \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
          && [ "$(coedit_mtime "$lock")" = "$mt" ] \
          && mv -- "$lock" "$aside" 2>/dev/null; then
-        rm -rf -- "$aside" 2>/dev/null
+        ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 &
       fi
       continue
     fi
