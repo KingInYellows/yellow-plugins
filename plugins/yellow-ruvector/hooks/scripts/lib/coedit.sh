@@ -91,9 +91,11 @@ coedit_sanitize_session() {
   # Validate, never rewrite: mapping characters (a/b and a?b both to a_b) or
   # truncating would let two sessions share one state file. Claude Code
   # session ids are UUIDs; anything else outside [A-Za-z0-9._-], over 128
-  # chars, or starting with "." (lock files are ".<sid>.lock") is refused.
+  # chars, or starting with "." (lock files are ".<sid>.lock") is refused,
+  # and so is a one-character id: the cleanup's fallback shards match the
+  # first two characters, so such an id's state could never be swept.
   local sid="${1:-}"
-  [ -n "$sid" ] && [ "${#sid}" -le 128 ] || return 1
+  [ "${#sid}" -ge 2 ] && [ "${#sid}" -le 128 ] || return 1
   case "$sid" in .*|*[!A-Za-z0-9._-]*) return 1 ;; esac
   printf '%s' "$sid"
 }
