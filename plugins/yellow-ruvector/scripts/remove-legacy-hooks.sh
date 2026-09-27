@@ -92,9 +92,10 @@ list=$(jq -r --arg re "$re" '
     # closed: never listed, never removed).
     if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
     # <<- strips leading tabs from the terminator line; plain << requires
-    # it unindented (an indented one is still body text to the shell).
-    | gsub("(?<!<)<<-[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??\\t*\\k<t>(?=\\n|$)"; "")
-    | gsub("(?<!<)<<(?![<-])[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??\\k<t>(?=\\n|$)"; "")
+    # it unindented (an indented one is still body text to the shell). The
+    # rest of the header line (cat <<EOF; next-command) is kept: it runs.
+    | gsub("(?<!<)<<-[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\t*\\k<t>(?=\\n|$)"; .rest)
+    | gsub("(?<!<)<<(?![<-])[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\k<t>(?=\\n|$)"; .rest)
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
@@ -125,9 +126,10 @@ jq --arg re "$re" '
     # closed: never listed, never removed).
     if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
     # <<- strips leading tabs from the terminator line; plain << requires
-    # it unindented (an indented one is still body text to the shell).
-    | gsub("(?<!<)<<-[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??\\t*\\k<t>(?=\\n|$)"; "")
-    | gsub("(?<!<)<<(?![<-])[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??\\k<t>(?=\\n|$)"; "")
+    # it unindented (an indented one is still body text to the shell). The
+    # rest of the header line (cat <<EOF; next-command) is kept: it runs.
+    | gsub("(?<!<)<<-[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\t*\\k<t>(?=\\n|$)"; .rest)
+    | gsub("(?<!<)<<(?![<-])[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\k<t>(?=\\n|$)"; .rest)
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
