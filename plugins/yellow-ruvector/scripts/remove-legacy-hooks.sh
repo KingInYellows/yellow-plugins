@@ -70,10 +70,14 @@ f="$target"
 re='(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:]]|$)'
 
 list=$(jq -r --arg re "$re" '
+  # Quoted text is an argument, not a command: drop it before matching, so
+  # an echo of a single- or double-quoted "x; ruvector hooks post-edit" is
+  # not a ruvector invocation (\u0027 is a single quote).
+  def unquoted: gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
-  | select((.command // "" | tostring) | test($re))
+  | select((.command // "" | tostring | unquoted) | test($re))
   # Commands come from a settings file (a cloned project ships one): print
   # each on one line, control characters as spaces, dash runs shortened, so
   # the listing can never forge a fence line in the caller.
@@ -85,10 +89,11 @@ printf '%s\n' "$list"
 tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
+  def unquoted: gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
         map(if (.hooks | type) == "array"
-            then .hooks |= map(select((.command // "" | tostring) | test($re) | not))
+            then .hooks |= map(select((.command // "" | tostring | unquoted) | test($re) | not))
             else . end)
         | map(select((.hooks | type) != "array" or (.hooks | length) > 0))
       else . end))
