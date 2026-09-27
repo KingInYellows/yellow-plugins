@@ -103,6 +103,20 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ ! -e "$REPO/src/deep/.ruvector" ]
 }
 
+@test "an install wait with a leading zero or too many digits still launches" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  fake_install; stamp_store; cache_model
+  for w in 08 09 0 99999999999999999999; do
+    RUVECTOR_INSTALL_WAIT=$w launch "$REPO"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "EXEC "* ]]
+    # The budget arithmetic never errors (octal "08", overflow).
+    [[ "$stderr" != *"value too great"* ]]
+    [[ "$stderr" != *"integer expression"* ]]
+  done
+}
+
 @test "the server runs under a lease on its install, so a concurrent prune skips it" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
