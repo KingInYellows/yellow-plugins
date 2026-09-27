@@ -80,8 +80,9 @@ ruvector.
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
   a global `ruvector` on PATH is never used) from the git toplevel. They
-  call ruvector's built-in CLI hooks (`hooks session-end`, `hooks post-edit`,
-  `hooks post-command`, `hooks pre-edit`, `hooks pre-command`) as
+  call ruvector's built-in CLI hooks (`hooks session-end`, `hooks pre-edit`,
+  `hooks pre-command`; never `hooks post-edit` / `post-command`, which write
+  hash-embedded memories) as
   **side effects** — stdout is discarded and the hook always prints
   dual-client allow JSON. `hooks recall` is the exception: `session-start.sh`
   captures its stdout and returns it in `hookSpecificOutput.additionalContext`.
@@ -164,13 +165,11 @@ or an install is in progress.
   Edit/Write/MultiEdit/Bash (1s budget). Stdout is dual-client allow JSON
   (`continue` + `permission`) so Cursor's Claude-plugin bridge does not
   block the tool.
-- `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
-  `hooks post-edit` and `hooks post-command` (1s budget). Registered for
-  both `PostToolUse` and `PostToolUseFailure`. A Bash success is a
-  `tool_response` object whose `interrupted` field is not true
-  (`--success`). A failure whose `error` first line is `Exit code N` is
-  `--error` with that N. An interrupt, a missing status, or an edit
-  failure is not submitted. `tool_result.exit_code` is not read.
+- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) — prints allow
+  JSON only. It does not call `hooks post-edit` / `hooks post-command`: in
+  0.3.3 each stores a near-empty hash-embedded memory, and on a fresh store
+  the first one stamps it hash/64d so every later `hooks_remember` is
+  refused (ADR-210).
 - `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
 
 ### Scripts (4) and bin (1)

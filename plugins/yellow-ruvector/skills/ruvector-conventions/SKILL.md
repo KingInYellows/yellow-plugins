@@ -121,11 +121,9 @@ from the git toplevel. There is no manual queue management inside the plugin:
   (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
   `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
   There is no per-prompt recall
-- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) →
-  `ruvector hooks post-edit --success <path>` only for a PostToolUse
-  success, or `ruvector hooks post-command --success|--error <cmd>` only
-  for a Bash `tool_response` success or an `Exit code N` failure. Unknown
-  and interrupt are not submitted
+- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) → allow JSON
+  only; `hooks post-edit` / `post-command` are never called (each writes a
+  hash-embedded memory that stamps a fresh store hash/64d, ADR-210)
 - `stop.sh` → `ruvector hooks session-end`
 
 ruvector manages its own internal queue and dedup. Plugin hooks are thin

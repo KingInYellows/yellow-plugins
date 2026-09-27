@@ -95,7 +95,7 @@ list=$(jq -r --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
@@ -122,7 +122,7 @@ jq --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then
