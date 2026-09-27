@@ -104,7 +104,10 @@ list=$(jq -r --arg re "$re" '
     # A double-quoted span is text, except command substitutions inside it,
     # which run: keep each $(...) / `...` body as its own command.
     | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
-    | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
+    | gsub("\\\\(.|\n)"; "_")
+    # An unquoted `...` substitution runs its body as a command too.
+    | gsub("`(?<b>[^`]*)`"; "; \(.b);")
+    | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
@@ -138,7 +141,10 @@ jq --arg re "$re" '
     # A double-quoted span is text, except command substitutions inside it,
     # which run: keep each $(...) / `...` body as its own command.
     | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
-    | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
+    | gsub("\\\\(.|\n)"; "_")
+    # An unquoted `...` substitution runs its body as a command too.
+    | gsub("`(?<b>[^`]*)`"; "; \(.b);")
+    | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
         map(if (.hooks | type) == "array"
