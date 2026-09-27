@@ -241,7 +241,7 @@ ruvector_resolve_bin() {
 # No-op when RUVECTOR_BIN overrode resolution.
 ruvector_lease_pid() {
   [ -n "${_RUVECTOR_LEASE:-}" ] && [ -n "${1:-}" ] || return 0
-  : > "${_RUVECTOR_LEASE%.*}.${1}" 2>/dev/null
+  yellow_ruvector_write_lease "${_RUVECTOR_LEASE%.*}.${1}" "$1"
   return 0
 }
 
