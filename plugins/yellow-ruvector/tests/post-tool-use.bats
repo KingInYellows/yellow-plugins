@@ -153,6 +153,14 @@ SH
   [ "$(pair src/a.ts -config)" -eq 0 ]
 }
 
+@test "a leading-dash key in an existing coedit.json is dropped on the next write" {
+  jq -n '{version:1, pairs:{"-rf":{"src/x.ts":50}, "src/x.ts":{"-rf":50, "src/y.ts":2}, "src/y.ts":{"src/x.ts":2}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"; edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(pair src/x.ts src/y.ts)" -eq 2 ]
+  jq -e '(.pairs | has("-rf") | not) and (.pairs["src/x.ts"] | has("-rf") | not)' "$COEDIT" >/dev/null
+}
+
 @test "a symlink to a file outside the root is ignored" {
   OUTSIDE="$(mktemp -d)"; : > "$OUTSIDE/secret.ts"
   ln -s "$OUTSIDE/secret.ts" "$PROJECT_ROOT/src/link.ts"

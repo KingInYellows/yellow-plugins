@@ -40,6 +40,7 @@ _COEDIT_BUMP_JQ='
     then halt_error(3) else . end
     | def safe: type == "string" and length > 0 and length <= 512
       and (test("[[:cntrl:]\u0085\u2028\u2029]") | not) and (startswith("/") | not)
+      and (startswith("-") | not)
       and ((split("/") | map(select(. == "" or . == "." or . == "..")) | length) == 0)
       and (test("^(\\.ruvector|\\.git)(/|$)|^docs/solutions/") | not);
     [.pairs | to_entries[] | select(.key | safe) | .key as $k
