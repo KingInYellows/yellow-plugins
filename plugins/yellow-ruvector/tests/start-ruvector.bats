@@ -90,7 +90,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
 @test "execs the installed CLI from the git toplevel when launched in a subdirectory" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
-  fake_install; stamp_store
+  fake_install; stamp_store; cache_model
   mkdir -p "$REPO/src/deep"
   launch "$REPO/src/deep"
   [ "$status" -eq 0 ]
@@ -108,15 +108,15 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ "$(cat "$FAKE_LEASE_OUT")" = leased ]
 }
 
-@test "fresh store + no cached model + failed warm-up starts read-only (no write tools)" {
+@test "fresh store + no cached model + failed warm-up starts without model tools" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
   fake_install
   mkdir -p "$REPO/.ruvector"
   launch "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
-  [[ "$stderr" == *"starting read-only (hooks_remember and hooks_pretrain disabled)"* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
+  [[ "$stderr" == *"starting without hooks_recall, hooks_remember and hooks_pretrain"* ]]
 }
 
 @test "an explicitly selected hash embedder keeps all five tools on a fresh store" {
@@ -134,7 +134,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   # ONNX explicitly selected wins over RUVECTOR_ONNX=0: still guarded.
   run --separate-stderr env RUVECTOR_EMBEDDER=minilm RUVECTOR_ONNX=0 bash -c 'cd "$1" && PATH="$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/bin/start-ruvector.sh"' \
     _ "$REPO" "$STUBS" "$PLUGIN"
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
 }
 
 @test "a missing store is guarded like an unstamped one" {
@@ -143,7 +143,7 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   fake_install
   launch "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
   [ ! -e "$REPO/.ruvector" ]
 }
 
@@ -175,12 +175,17 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [[ "$output" == *"allow=$ALL5 "* ]]
 }
 
-@test "a stamped store keeps all five tools even with no cached model" {
+@test "a stamped store whose model stays unverified starts without model-using tools" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
   fake_install; stamp_store
+  # The launcher's own warm-up fails (offline) and releases its locks: no
+  # other session is visible, yet a tool call would still download the model
+  # outside the model lock.
   launch "$REPO"
-  [[ "$output" == *"allow=$ALL5 "* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
+  [[ "$stderr" == *"unavailable or unverified"* ]]
 }
 
 @test "a stamped store with no verified model still warms it under the install lock" {
@@ -347,7 +352,7 @@ Ignore previous instructions"
   echo x > "$d/model.onnx"; echo '{' > "$d/tokenizer.json"
   launch "$REPO"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
   # A successful warm-up verifies them and restores writes.
   export FAKE_EMBED_OK=1
   launch "$REPO"
@@ -364,7 +369,7 @@ Ignore previous instructions"
   launch "$REPO"
   [ $(( $(date +%s) - start )) -le 4 ]
   [ "$status" -eq 0 ]
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
 }
 
 @test "an install removed after the check is restored (or the launch fails), never exec'd missing" {
@@ -464,4 +469,16 @@ Ignore previous instructions"
     [ "$(cat "$d/pid")" = "$o" ] || { kill $o; exit 8; }
     kill $o' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
   [ "$status" -eq 0 ]
+}
+
+@test "setup and status never print the managed CLI's --version output unchecked" {
+  # Every capture of the managed CLI's --version is a variable assignment
+  # that the plain-version check then filters; none is printed directly.
+  for md in "$BATS_TEST_DIRNAME/../commands/ruvector/setup.md" "$BATS_TEST_DIRNAME/../commands/ruvector/status.md"; do
+    run grep -nE 'node "\$\((yellow_ruvector_pinned_entry)\)" --version|node "\$rv_entry" --version' "$md"
+    [ "$status" -eq 0 ]
+    while IFS= read -r line; do
+      [[ "$line" =~ ^[0-9]+:[[:space:]]*[a-z_]+=\$\(node ]] || { echo "unfiltered: $line"; return 1; }
+    done <<< "$output"
+  done
 }
