@@ -581,6 +581,22 @@ exit 0'
   [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ]
 }
 
+@test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  # A find that never finishes stands in for a huge or slow directory; it
+  # records its pid so the test can check it was stopped.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$fb" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
+  [ -s "$fb/pids" ]
+  sleep 6
+  while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
+}
+
 @test "session pruning never delays the SessionStart response" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$BATS_TEST_TMPDIR/slowbin" "$RUVECTOR_DIR/coedit-sessions"
@@ -618,7 +634,8 @@ exit 0'
   touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/resumed" 2>/dev/null || skip "touch -d unsupported"
   # find lists the stale file, then the session is resumed (rewritten
   # fresh) before the worker acts on the list.
-  printf '#!/bin/sh\n"%s" "$@" > "%s/list"\necho "{\\"last\\":\\"x\\"}" > ./resumed\ncat "%s/list"\n' \
+  # (Appends: the worker also runs find for its stale-tree scan.)
+  printf '#!/bin/sh\n"%s" "$@" >> "%s/list"\necho "{\\"last\\":\\"x\\"}" > ./resumed\ncat "%s/list"\n' \
     "$(command -v find)" "$BATS_TEST_TMPDIR" "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/rwbin/find"
   chmod +x "$BATS_TEST_TMPDIR/rwbin/find"
   PATH="$BATS_TEST_TMPDIR/rwbin:$PATH" run run_hook '{"cwd":""}'
