@@ -279,3 +279,13 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo A=1 ruvector hooks post-edit"]' "$S" >/dev/null
 }
+
+@test "a quoted executable behind assignments or keywords is still a legacy call" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "FOO=1 \"/usr/local/bin/ruvector\" hooks post-edit --success"},
+    {type: "command", command: "if true; then '"'"'ruvector'"'"' hooks post-command; fi"},
+    {type: "command", command: "echo FOO=1 \"ruvector hooks post-edit\""}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+}
