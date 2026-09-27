@@ -81,9 +81,12 @@ list=$(jq -r --arg re "$re" '
   # executable: unquote it first. A backslash-escaped character (\; \# …) is
   # a literal, never a separator or comment: neutralize it. A shell comment
   # (# at a word start, quotes already gone) runs nothing: drop it to the
-  # end of its line.
+  # end of its line. A heredoc body (<<WORD … WORD) is input to the command
+  # before it, never commands: drop it first, before newlines count as
+  # separators.
   def unquoted:
-    gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    gsub("<<-?[[:space:]]*[\"\u0027]?(?<t>[A-Za-z_][A-Za-z0-9_]*)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
@@ -102,7 +105,8 @@ tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
   def unquoted:
-    gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    gsub("<<-?[[:space:]]*[\"\u0027]?(?<t>[A-Za-z_][A-Za-z0-9_]*)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then
