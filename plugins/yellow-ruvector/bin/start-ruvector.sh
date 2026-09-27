@@ -146,7 +146,9 @@ if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
     # model, keep only the tools that never embed.
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_recall|hooks_remember|hooks_pretrain' | paste -sd, - || true)
     # An allowlist that filtering emptied would read as allow-all (every
-    # tool): a name that matches no tool keeps the policy closed.
+    # tool): a name that matches no tool keeps the policy closed (ruvector
+    # bin/mcp-policy.js: any non-empty ALLOW is the exact allowed set; only
+    # an unknown PROFILE name falls back to allow-all).
     [ -n "$allow" ] || allow="yellow_ruvector_none"
     # DENY wins over ALLOW and any profile in ruvector's policy.
     export RUVECTOR_MCP_DENY="${RUVECTOR_MCP_DENY:+${RUVECTOR_MCP_DENY},}hooks_recall,hooks_remember,hooks_pretrain"

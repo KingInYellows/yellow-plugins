@@ -70,11 +70,11 @@ f="$target"
 # path, or via npx, optionally @version) in command position (start of the
 # command or right after ; & | ( ) or a newline (never the ( of an array
 # literal, a=(…)), optionally behind shell
-# keywords and prefixes such as then, do, if, !, {, exec, and after
-# VAR=value assignments — never as an argument), followed by
+# keywords and prefixes such as then, do, if, !, {, exec, env (with its
+# options), and VAR=value assignments — never as an argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
+re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{|([^[:space:];&|"'"'"']*/)?env([[:space:]]+-[^[:space:];&|]+)*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*)[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
@@ -122,7 +122,11 @@ list=$(jq -r --arg re "$re" '
     | gsub("\\$\\(\\([^()]*\\)\\)"; "_")
     | gsub("\\$\\((?<b>[^()]*)\\)"; "; \(.b);_")
     | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
-    | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
+    | gsub("(?<![^[:space:];&|])#[^\n]*"; "")
+    # A function definition (f() { …; }, function f { …; }) runs nothing
+    # until called, and its body is not parsed here: fail closed, so an
+    # uncalled body is never listed or removed.
+    | if test("(^|[;&|\n(){}[:space:]])(function[[:space:]]+[^[:space:];&|()]+([[:space:]]*\\([[:space:]]*\\))?|[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\))[[:space:]]*[{(]") then "" else . end;
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
@@ -173,7 +177,11 @@ jq --arg re "$re" '
     | gsub("\\$\\(\\([^()]*\\)\\)"; "_")
     | gsub("\\$\\((?<b>[^()]*)\\)"; "; \(.b);_")
     | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
-    | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
+    | gsub("(?<![^[:space:];&|])#[^\n]*"; "")
+    # A function definition (f() { …; }, function f { …; }) runs nothing
+    # until called, and its body is not parsed here: fail closed, so an
+    # uncalled body is never listed or removed.
+    | if test("(^|[;&|\n(){}[:space:]])(function[[:space:]]+[^[:space:];&|()]+([[:space:]]*\\([[:space:]]*\\))?|[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\))[[:space:]]*[{(]") then "" else . end;
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
         map(if (.hooks | type) == "array"
