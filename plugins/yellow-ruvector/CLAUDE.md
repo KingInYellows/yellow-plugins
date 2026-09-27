@@ -56,7 +56,8 @@ ruvector.
 - Storage: `.ruvector/intelligence.json` (flat JSON) at the git toplevel
 - Embedding model: all-MiniLM-L6-v2 (384 dimensions, ONNX WASM runtime),
   cached at `${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/` (~90MB; the
-  prewarm hook downloads it)
+  prewarm hook downloads it; a relative `RUVECTOR_CACHE_DIR` is taken
+  under `$HOME`)
 - Lifecycle: starts on first MCP tool call (lazy init by Claude Code), shuts
   down on session end
 - If crashed mid-session: `/ruvector:status`, or run the launcher by hand —
