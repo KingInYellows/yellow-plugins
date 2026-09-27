@@ -111,9 +111,10 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 
 ## Hook Architecture
 
-Hooks delegate to ruvector's built-in CLI hooks through the plugin-managed
-install (`hooks/scripts/lib/resolve.sh`; never a global binary) and run it
-from the git toplevel. There is no manual queue management inside the plugin:
+Only `session-start.sh` calls ruvector's CLI (`hooks recall`), through the
+plugin-managed install (`hooks/scripts/lib/resolve.sh`; never a global
+binary) from the git toplevel. The edit hooks are jq-only and make no CLI
+call. There is no manual queue management inside the plugin:
 
 - `prewarm.sh` (SessionStart) → installs the pinned ruvector into the plugin
   data dir and downloads the ONNX model in the background
