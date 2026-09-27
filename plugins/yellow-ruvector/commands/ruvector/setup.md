@@ -191,7 +191,8 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" --project --apply
 
 It removes only hook entries whose command runs `ruvector hooks
 post-edit|post-command|pre-edit|pre-command|session-start|session-end`,
-drops matcher groups and events left empty, and prints the backup path.
+drops matcher groups and events left empty, and prints the backup file's
+name (it sits next to the settings file).
 Other hooks (git-ai, your own) are untouched. On Keep, report the manual
 fix: delete those `command` entries from that settings file's `hooks`
 object, then restart Claude Code.
