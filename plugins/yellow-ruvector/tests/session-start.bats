@@ -727,6 +727,22 @@ exit 0'
   [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
 }
 
+@test "reclaim markers that must stay never keep the sweep from later ones" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # 60 expired markers of live sessions sort before the vanished one.
+  for i in $(seq 10 69); do
+    : > "$sd/a$i"
+    mkdir -p "$sd/.a$i.lock.reclaim.1-1"
+    touch -d '20 minutes ago' "$sd/.a$i.lock.reclaim.1-1" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$sd/.zz.lock.reclaim.1-1"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  run run_hook '{"cwd":""}'
+  for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ -d "$sd/.a10.lock.reclaim.1-1" ]
+}
+
 @test "expired reclaim markers of vanished sessions are swept" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2"

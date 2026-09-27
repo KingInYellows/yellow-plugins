@@ -411,15 +411,20 @@ coedit_prune_sessions() {
           fi
           coedit_unlock_path ".${sid}.lock"
         done
-      # Expired reclaim markers of sessions that no longer exist (bounded).
-      n=0
-      for m in .*.lock.reclaim.*; do
-        [ "$n" -lt 50 ] && [ "$SECONDS" -lt 5 ] || break
-        n=$((n + 1))
+      # Expired reclaim markers of sessions that no longer exist. Bounded by
+      # time and by removals (50), not by entries looked at, and started at a
+      # random entry, so markers that must stay (a live session's, or one
+      # that is not empty) never keep the sweep from reaching later ones.
+      markers=( .*.lock.reclaim.* )
+      total=${#markers[@]} tried=0 removed=0
+      i=$(( ((RANDOM << 15) | RANDOM) % total ))
+      while [ "$tried" -lt "$total" ] && [ "$removed" -lt 50 ] && [ "$SECONDS" -lt 5 ]; do
+        m=${markers[$(( (i + tried) % total ))]}
+        tried=$((tried + 1))
         [ -d "$m" ] && [ ! -L "$m" ] || continue
         s="${m#.}"; s="${s%%.lock.reclaim.*}"
         [ -e "$s" ] && continue
-        coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null
+        coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null && removed=$((removed + 1))
       done
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
       # background delete was interrupted: here and in the store dir, only
