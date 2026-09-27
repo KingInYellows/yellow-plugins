@@ -78,7 +78,8 @@ f="$target"
 # merely mentions it is not a match.
 re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\{|([^[:space:];&|"'"'"']*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*)[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
-list=$(jq -r --arg re "$re" '
+# The shared parser: the listing and --apply must agree on what counts.
+unquoted_def='
   # Quoted text is an argument, not a command: drop it before matching, so
   # an echo of a single- or double-quoted "x; ruvector hooks post-edit" is
   # not a ruvector invocation (\u0027 is a single quote). A quoted single
@@ -132,9 +133,14 @@ list=$(jq -r --arg re "$re" '
     | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
     | gsub("(?<![^[:space:];&|])#[^\n]*"; "")
     # A function definition (f() { …; }, function f { …; }) runs nothing
-    # until called, and its body is not parsed here: fail closed, so an
-    # uncalled body is never listed or removed.
+    # until called: drop a simple body (no nested braces or parens) and keep
+    # scanning the commands after it. A body left unparsed fails closed, so
+    # an uncalled body is never listed or removed.
+    | gsub("(?<p>(^|[;&|\n(){}[:space:]]))(function[[:space:]]+[^[:space:];&|()]+([[:space:]]*\\([[:space:]]*\\))?|[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\))[[:space:]]*(\\{[^{}]*\\}|\\([^()]*\\))"; "\(.p)_;")
     | if test("(^|[;&|\n(){}[:space:]])(function[[:space:]]+[^[:space:];&|()]+([[:space:]]*\\([[:space:]]*\\))?|[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\))[[:space:]]*[{(]") then "" else . end;
+'
+
+list=$(jq -r --arg re "$re" "$unquoted_def"'
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
@@ -149,53 +155,7 @@ printf '%s\n' "$list"
 
 tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
-jq --arg re "$re" '
-  def unquoted:
-    # Several heredocs on one command (cat <<A <<B) take their bodies in
-    # order; rather than parse them all, such a command is data (fail
-    # closed: never listed, never removed).
-    if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
-    # <<- strips leading tabs from the terminator line; plain << requires
-    # it unindented (an indented one is still body text to the shell). The
-    # rest of the header line (cat <<EOF; next-command) is kept: it runs.
-    | gsub("(?<!<)<<-[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\t*\\k<t>(?=\\n|$)"; .rest)
-    | gsub("(?<!<)<<(?![<-])[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?(?<rest>[^\\n]*)\\n((.|\\n)*?\\n)??\\k<t>(?=\\n|$)"; .rest)
-    # A heredoc left unparsed (no terminator line) fails closed: the whole
-    # command is treated as data, never as a legacy invocation.
-    | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    # A shell wrapper in command position (sh -c \u0027…\u0027, bash -lc "…")
-    # runs its constant command string: unwrap it into its own command.
-    # A double-quoted string that expands anything is left as data.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
-    # env -S / --split-string runs its constant string as a command too.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?env([[:space:]]+-[^[:space:];&|\"\u0027S]+)*[[:space:]]+(-S|--split-string)(=|[[:space:]]+)(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
-    # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
-    # first, then the assignment prefixes cmd: its body is moved out in
-    # front and the assignment kept, so cmd stays in command position. One
-    # at a time, until none is left (A=$(x) B=`y` cmd).
-    | def asub: . as $x
-        | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
-        | if . == $x then . else asub end;
-      asub
-    | gsub("\u0027[^\u0027]*\u0027"; "")
-    # A double-quoted span is text, except command substitutions inside it,
-    # which run: keep each $(...) / `...` body as its own command. The "_"
-    # after it keeps the next word an argument (echo "$(x)" ruvector … is
-    # not an invocation).
-    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join("") | . + "_")
-    | gsub("\\\\(.|\n)"; "_")
-    # An unquoted `...` or $(...) substitution runs its body as a command
-    # too; $((...)) is arithmetic. Once they are gone, a ) left over ends a
-    # case pattern (or a subshell), so the next word is in command position.
-    | gsub("\\$\\(\\([^()]*\\)\\)"; "_")
-    | gsub("\\$\\((?<b>[^()]*)\\)"; "; \(.b);_")
-    | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
-    | gsub("(?<![^[:space:];&|])#[^\n]*"; "")
-    # A function definition (f() { …; }, function f { …; }) runs nothing
-    # until called, and its body is not parsed here: fail closed, so an
-    # uncalled body is never listed or removed.
-    | if test("(^|[;&|\n(){}[:space:]])(function[[:space:]]+[^[:space:];&|()]+([[:space:]]*\\([[:space:]]*\\))?|[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\))[[:space:]]*[{(]") then "" else . end;
+jq --arg re "$re" "$unquoted_def"'
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
         map(if (.hooks | type) == "array"
