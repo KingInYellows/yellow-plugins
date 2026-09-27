@@ -160,3 +160,14 @@ setup() {
   [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo ok # ; ruvector hooks post-edit --success", "#ruvector hooks session-start"]' "$S" >/dev/null
 }
+
+@test "an escaped separator or comment sign is a literal, not a command boundary" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "echo \\; ruvector hooks post-edit --success"},
+    {type: "command", command: "echo a \\& ruvector hooks session-start"},
+    {type: "command", command: "echo \\# ; ruvector hooks session-end"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo \\; ruvector hooks post-edit --success", "echo a \\& ruvector hooks session-start"]' "$S" >/dev/null
+}
