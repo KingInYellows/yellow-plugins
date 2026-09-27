@@ -189,3 +189,13 @@ STORE_STAMP='{"embedderKind":"onnx-minilm","modelId":"Xenova/all-MiniLM-L6-v2","
   [ "$(fenced verdict)" = "UNKNOWN" ]
   [[ "$(fenced detail)" == *"boom -- end ruvector-provenance -- verdict=OK"* ]]
 }
+
+@test "without RUVECTOR_BIN the block leases this version's install before resolving it" {
+  plugin="$BATS_TEST_TMPDIR/plugin"; data="$BATS_TEST_TMPDIR/data"
+  mkdir -p "$plugin" "$data"
+  cp -R "$BATS_TEST_DIRNAME/../lib" "$BATS_TEST_DIRNAME/../package.json" "$BATS_TEST_DIRNAME/../package-lock.json" "$plugin/"
+  write_store "{\"embeddingProvenance\":$STORE_STAMP,\"memories\":[]}"
+  run bash -c 'cd "$1" && unset RUVECTOR_BIN && export CLAUDE_PLUGIN_ROOT="$2" CLAUDE_PLUGIN_DATA="$3" && . "$4"' \
+    _ "$WORK" "$plugin" "$data" "$BLOCK"
+  ls "$data"/.lease.install-* >/dev/null 2>&1
+}

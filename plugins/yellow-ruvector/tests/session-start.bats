@@ -1035,3 +1035,20 @@ END"
   done
   [ ! -e "$d" ]
 }
+
+@test "a file or symlink planted at the held-tree path is replaced, so stuck trees are still held aside" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"
+  ln -s "$outside" "$RUVECTOR_DIR/.coedit-stale-held"
+  d="$RUVECTOR_DIR/.coedit.lock.stale.a1"; mkdir -p "$d"
+  touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 60); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a1" ] && [ ! -L "$RUVECTOR_DIR/.coedit-stale-held" ]
+  [ -z "$(ls -A "$outside")" ]
+}

@@ -27,6 +27,7 @@ if yellow_ruvector_validate_paths; then
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
   # This plugin version's own install (what its MCP server and hooks run),
   # not `current`, which another session's plugin version may have moved.
+  rv_hash=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${rv_hash}"
   rv_entry=$(yellow_ruvector_pinned_entry) || rv_entry=""
   if [ ! -f "$rv_entry" ]; then printf 'install: missing or out of date\n'
   elif ! yellow_ruvector_install_healthy; then
@@ -186,6 +187,9 @@ else
   # only under a data dir that passes the launcher's checks (otherwise the
   # dry-run below fails and the verdict is UNKNOWN).
   if . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh" && yellow_ruvector_validate_paths --data-only >/dev/null 2>&1; then
+    # Lease it first, so another version's prune keeps it while this block
+    # (and its dry-run) runs.
+    rv_hash=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${rv_hash}"
     RV=(node "$(yellow_ruvector_pinned_entry)")
   else
     RV=(false)
