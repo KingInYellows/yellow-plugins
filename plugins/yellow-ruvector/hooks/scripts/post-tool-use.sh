@@ -41,7 +41,11 @@ command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping post
 # under 1s together.
 COEDIT_PARSE_SECS="${COEDIT_PARSE_SECS:-0.15}"
 COEDIT_PARSE_TRIES="${COEDIT_PARSE_TRIES:-3}"
-_COEDIT_SPENT_TRIES=$COEDIT_PARSE_TRIES
+# The project-root lookup (git rev-parse) is bounded and charged the same
+# way: a slow checkout skips recording instead of outliving the timeout.
+COEDIT_ROOT_SECS="${COEDIT_ROOT_SECS:-0.15}"
+COEDIT_ROOT_TRIES="${COEDIT_ROOT_TRIES:-3}"
+_COEDIT_SPENT_TRIES=$((COEDIT_PARSE_TRIES + COEDIT_ROOT_TRIES))
 
 TOOL="" file_path="" event="" session_id="" CWD=""
 {
@@ -72,8 +76,10 @@ esac
 
 # Git toplevel of the session cwd, so a subdirectory session uses the root
 # store and root-relative paths.
-PROJECT_DIR=$(ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
-[ -d "${PROJECT_DIR}/.ruvector" ] || json_exit
+# TIMEOUT_CMD is cleared so run_budgeted uses its background runner
+# (timeout(1) cannot run a shell function); empty output means it ran out.
+PROJECT_DIR=$(TIMEOUT_CMD='' run_budgeted "$COEDIT_ROOT_SECS" ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
+[ -n "$PROJECT_DIR" ] && [ -d "${PROJECT_DIR}/.ruvector" ] || json_exit
 
 # Claude Code sends absolute paths; a relative one is relative to the cwd.
 case "$file_path" in
