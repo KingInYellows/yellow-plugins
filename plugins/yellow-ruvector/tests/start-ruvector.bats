@@ -518,3 +518,65 @@ SH
   [ $(( $(date +%s) - start )) -lt 40 ]
   [[ "$stderr" == *"smoke test"* ]]
 }
+
+@test "model-cache lock: a dead holder's lock that cannot be reclaimed ends the bounded wait, never spins" {
+  run timeout 20 bash -c '
+    . "$1"; export HOME="$2"
+    d=$(yellow_ruvector_model_lock_dir); mkdir -p "$d"
+    sleep 0 & dead=$!; wait $dead
+    printf "%s" "$dead" > "$d/pid"
+    # This generation'"'"'s reclaim marker is already taken, so the reclaim
+    # leaves the lock in place.
+    ino=$(ls -di "$d" | awk "{print \$1}"); mt=$(yellow_ruvector_mtime "$d")
+    mkdir "$d.reclaim.$dead-$ino-$mt"
+    start=$SECONDS
+    yellow_ruvector_acquire_model_lock 1 && exit 9
+    [ $((SECONDS - start)) -le 3 ] || exit 8' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
+  [ "$status" -eq 0 ]
+}
+
+@test "a lock whose pid was reused by another process is reclaimed (start time recorded)" {
+  run bash -c '
+    . "$1"; export HOME="$2"; export CLAUDE_PLUGIN_DATA="$3"; yellow_ruvector_data_dir
+    sleep 30 & o=$!
+    # Both locks name a live pid whose recorded start time is not its own:
+    # the owner that took them died and the OS reused the pid.
+    for d in "$(yellow_ruvector_model_lock_dir)" "$RUVECTOR_DATA/.install.lock"; do
+      mkdir -p "$d"; printf "Mon Jan  1 00:00:00 2001" > "$d/start.$o"; printf "%s" "$o" > "$d/pid"
+    done
+    yellow_ruvector_install_in_progress && { kill $o; exit 9; }
+    yellow_ruvector_model_lock_busy && { kill $o; exit 8; }
+    yellow_ruvector_acquire_model_lock 1 || { kill $o; exit 7; }
+    yellow_ruvector_acquire_install_lock 2 2>/dev/null || { kill $o; exit 6; }
+    [ "$(cat "$RUVECTOR_DATA/.install.lock/pid")" = "$$" ] || { kill $o; exit 5; }
+    # A matching start time keeps a live owner'"'"'s lock.
+    [ -e "$RUVECTOR_DATA/.install.lock/start.$$" ] || { kill $o; exit 4; }
+    yellow_ruvector_install_in_progress || { kill $o; exit 3; }
+    yellow_ruvector_release_install_lock
+    yellow_ruvector_release_model_lock
+    [ ! -e "$RUVECTOR_DATA/.install.lock" ] && [ ! -e "$(yellow_ruvector_model_lock_dir)" ] || { kill $o; exit 2; }
+    kill $o' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$DATA"
+  [ "$status" -eq 0 ]
+}
+
+@test "a symlinked install dir, package, or entry is never run" {
+  h=$(lock_hash)
+  ext="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$ext/node_modules/ruvector/bin"; : > "$ext/node_modules/ruvector/bin/cli.js"
+  entry() {
+    run env HOME="$HOME" CLAUDE_PLUGIN_ROOT="$PLUGIN" CLAUDE_PLUGIN_DATA="$DATA" \
+      bash -c '. "$1"; yellow_ruvector_data_dir; yellow_ruvector_pinned_entry' _ "$PLUGIN/lib/install-ruvector.sh"
+  }
+  ln -s "$ext" "$DATA/install-$h"
+  entry; [ "$status" -ne 0 ]; [ -z "$output" ]
+  rm "$DATA/install-$h"; mkdir -p "$DATA/install-$h/node_modules"
+  ln -s "$ext/node_modules/ruvector" "$DATA/install-$h/node_modules/ruvector"
+  entry; [ "$status" -ne 0 ]
+  rm "$DATA/install-$h/node_modules/ruvector"; mkdir -p "$DATA/install-$h/node_modules/ruvector/bin"
+  ln -s "$ext/node_modules/ruvector/bin/cli.js" "$DATA/install-$h/node_modules/ruvector/bin/cli.js"
+  entry; [ "$status" -ne 0 ]
+  rm "$DATA/install-$h/node_modules/ruvector/bin/cli.js"
+  : > "$DATA/install-$h/node_modules/ruvector/bin/cli.js"
+  entry; [ "$status" -eq 0 ]
+  [ "$output" = "$DATA/install-$h/node_modules/ruvector/bin/cli.js" ]
+}

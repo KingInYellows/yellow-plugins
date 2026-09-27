@@ -103,7 +103,17 @@ for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*
     */plugins/data/*) [ -n "${CLAUDE_CONFIG_DIR:-}" ] && _rv_base_ok "$CLAUDE_CONFIG_DIR" && case "$_rv_p" in "$_rv_b"/plugins/data/?*) ;; *) false ;; esac || continue ;;
     *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
   esac
-  _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"
+  # `current` must name a sibling install-* dir, and every component down to
+  # cli.js must be a real directory or regular file inside it: a tampered
+  # candidate never makes node run a file outside its data dir.
+  _rv_t=$(readlink "${_rv_p}/current" 2>/dev/null) || continue
+  case "$_rv_t" in */*|'') continue ;; install-?*) ;; *) continue ;; esac
+  _rv_i="${_rv_p}/${_rv_t}"
+  for _rv_c in "$_rv_i" "$_rv_i/node_modules" "$_rv_i/node_modules/ruvector" "$_rv_i/node_modules/ruvector/bin"; do
+    [ -d "$_rv_c" ] && [ ! -L "$_rv_c" ] || continue 2
+  done
+  _rv_cli="$_rv_i/node_modules/ruvector/bin/cli.js"
+  [ -f "$_rv_cli" ] && [ ! -L "$_rv_cli" ] || { _rv_cli=""; continue; }
   _rv_ver=$(_rv_probe "$_rv_cli") || _rv_ver=""
   # The output comes from files on disk (a stale or tampered install): keep
   # it only when its first line is a plain version string, else the install
@@ -115,7 +125,7 @@ if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n'
 elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-managed install broken; /ruvector:setup repairs it)\n'
 else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
 [ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
-unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver
+unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver _rv_t _rv_i _rv_c
 unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'

@@ -80,6 +80,8 @@ disown
 # Hand the lock to the child. If that write fails the lock would name this
 # exiting shell (or nothing) and a waiter would reclaim it mid-install: stop
 # the child and release the lock instead.
+# The start-time stamp goes first, so the lock never names a pid without it.
+yellow_ruvector_stamp_pid "${RUVECTOR_DATA}/.install.lock" "$sub_pid"
 if ! printf '%s' "$sub_pid" > "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null; then
   # Stop the job and wait (up to ~2s, then KILL) until it and its direct
   # children are gone before the lock path is released, so nothing the lock
@@ -93,8 +95,7 @@ if ! printf '%s' "$sub_pid" > "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null; 
   pkill -KILL -P "$sub_pid" 2>/dev/null
   kill -KILL "$sub_pid" 2>/dev/null
   if ! kill -0 "$sub_pid" 2>/dev/null; then
-    rm -f "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null
-    rmdir "${RUVECTOR_DATA}/.install.lock" 2>/dev/null
+    yellow_ruvector_unlock_dir "${RUVECTOR_DATA}/.install.lock"
   fi
   json_exit "could not hand the install lock to the background job; skipping prewarm"
 fi

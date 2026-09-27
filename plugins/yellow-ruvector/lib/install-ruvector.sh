@@ -184,10 +184,25 @@ yellow_ruvector_lock_hash() {
 # install (install-<hash of its own lockfile>), not whatever `current` points
 # at: another session running a newer plugin may have moved `current`, and
 # hooks and the server of one session must run the same ruvector.
+# Fails unless the entry is a regular file reached through real directories
+# (yellow_ruvector_install_ok), so nothing outside the data dir is ever run.
 yellow_ruvector_pinned_entry() {
   local hash
   hash=$(yellow_ruvector_lock_hash) || return 1
+  yellow_ruvector_install_ok "${RUVECTOR_DATA}/install-${hash}" || return 1
   printf '%s/install-%s/node_modules/ruvector/bin/cli.js' "$RUVECTOR_DATA" "$hash"
+}
+
+# yellow_ruvector_install_ok <install-dir> — the dir and every component down
+# to bin/cli.js are real (non-symlink) directories and a regular file: a
+# planted `install-<hash>` symlink or a linked node_modules/ruvector would
+# otherwise make node run JavaScript outside the validated data dir.
+yellow_ruvector_install_ok() {
+  local d="$1" c
+  for c in "$d" "$d/node_modules" "$d/node_modules/ruvector" "$d/node_modules/ruvector/bin"; do
+    [ -d "$c" ] && [ ! -L "$c" ] || return 1
+  done
+  [ -f "$d/node_modules/ruvector/bin/cli.js" ] && [ ! -L "$d/node_modules/ruvector/bin/cli.js" ]
 }
 
 # Path of the installed CLI entry through the `current` symlink.
@@ -217,6 +232,39 @@ yellow_ruvector_needs_install() {
   [ "${target##*/}" != "install-${hash}" ]
 }
 
+# Lock owners are recorded as a pid plus, where ps reports it, that process's
+# start time in <lock>/start.<pid> (written before the pid), so a pid the OS
+# reused for an unrelated long-lived process never keeps a dead owner's lock
+# alive. Without a recorded start time, kill -0 alone decides.
+yellow_ruvector_pid_start() {
+  ps -o lstart= -p "$1" 2>/dev/null | tr -s ' '
+}
+
+# yellow_ruvector_stamp_pid <lock-dir> <pid>
+yellow_ruvector_stamp_pid() {
+  local st
+  st=$(yellow_ruvector_pid_start "$2")
+  [ -n "$st" ] && printf '%s' "$st" > "$1/start.$2" 2>/dev/null
+  return 0
+}
+
+# yellow_ruvector_pid_alive <lock-dir> <pid> — 0 when <pid> runs and is the
+# process that took <lock-dir>.
+yellow_ruvector_pid_alive() {
+  local rec now
+  kill -0 "$2" 2>/dev/null || return 1
+  rec=$(cat "$1/start.$2" 2>/dev/null) || return 0
+  [ -n "$rec" ] || return 0
+  now=$(yellow_ruvector_pid_start "$2")
+  [ -z "$now" ] || [ "$now" = "$rec" ]
+}
+
+# yellow_ruvector_unlock_dir <lock-dir> — remove a lock this shell owns.
+yellow_ruvector_unlock_dir() {
+  rm -f "$1/pid" "$1"/start.* 2>/dev/null
+  rmdir "$1" 2>/dev/null
+}
+
 # Atomic mkdir lock with one stale-owner recovery, as in yellow-morph.
 # $1 = max attempts (1s apart).
 yellow_ruvector_acquire_install_lock() {
@@ -229,6 +277,7 @@ yellow_ruvector_acquire_install_lock() {
     if mkdir "$lock_dir" 2>/dev/null; then
       # A lock without a pid would be reclaimed by the next waiter while we
       # still work: give it up rather than hold it unrecorded.
+      yellow_ruvector_stamp_pid "$lock_dir" "$$"
       if printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null; then
         return 0
       fi
@@ -253,7 +302,7 @@ yellow_ruvector_acquire_install_lock() {
           prev_invalid="$owner_pid"
           ;;
         *)
-          if ! kill -0 "$owner_pid" 2>/dev/null; then
+          if ! yellow_ruvector_pid_alive "$lock_dir" "$owner_pid"; then
             printf 'yellow-ruvector: stale lock owner PID %s no longer running; clearing\n' "$owner_pid" >&2
             yellow_ruvector_reclaim_lock "$owner_pid"
             stale_recovered=1
@@ -296,7 +345,7 @@ yellow_ruvector_reclaim_dir() {
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
     '' | *[!0-9]* | 0) ;;
-    *) kill -0 "$expected" 2>/dev/null && return 0 ;;
+    *) yellow_ruvector_pid_alive "$lock_dir" "$expected" && return 0 ;;
   esac
   ino=$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')
   case "$ino" in ''|*[!0-9]*) return 0 ;; esac
@@ -312,7 +361,7 @@ yellow_ruvector_reclaim_dir() {
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
     '' | *[!0-9]* | 0) ;;
-    *) kill -0 "$expected" 2>/dev/null && return 0 ;;
+    *) yellow_ruvector_pid_alive "$lock_dir" "$expected" && return 0 ;;
   esac
   rm -rf -- "$lock_dir" 2>/dev/null
   return 0
@@ -359,8 +408,7 @@ yellow_ruvector_release_install_lock() {
     "$$"|"${BASHPID:-$$}"|"${_YR_LOCK_OWNER:-__none__}") ;;
     *) return 0 ;;
   esac
-  rm -f "${lock_dir}/pid" 2>/dev/null
-  rmdir "$lock_dir" 2>/dev/null || true
+  yellow_ruvector_unlock_dir "$lock_dir" || true
 }
 
 # yellow_ruvector_trap_release — release the install lock on exit; on INT or
@@ -378,7 +426,7 @@ yellow_ruvector_install_in_progress() {
   [ -d "${RUVECTOR_DATA}/.install.lock" ] || return 1
   owner_pid=$(cat "$pid_file" 2>/dev/null)
   case "$owner_pid" in '' | *[!0-9]* | 0) return 1 ;; esac
-  kill -0 "$owner_pid" 2>/dev/null
+  yellow_ruvector_pid_alive "${RUVECTOR_DATA}/.install.lock" "$owner_pid"
 }
 
 # Install the committed lockfile into install-<hash>, smoke-test it, swap
@@ -570,7 +618,7 @@ yellow_ruvector_model_lock_busy() {
   [ -d "$d" ] || return 1
   pid=$(cat "$d/pid" 2>/dev/null)
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  kill -0 "$pid" 2>/dev/null
+  yellow_ruvector_pid_alive "$d" "$pid"
 }
 
 # yellow_ruvector_acquire_model_lock [secs] — wait up to secs (default 10).
@@ -582,6 +630,7 @@ yellow_ruvector_acquire_model_lock() {
   mkdir -p "${d%/*}" 2>/dev/null || return 1
   while :; do
     if mkdir "$d" 2>/dev/null; then
+      yellow_ruvector_stamp_pid "$d" "${_YR_LOCK_OWNER:-${BASHPID:-$$}}"
       if printf '%s' "${_YR_LOCK_OWNER:-${BASHPID:-$$}}" > "$d/pid" 2>/dev/null; then
         _YR_MODEL_LOCK=${_YR_LOCK_OWNER:-${BASHPID:-$$}}
         return 0
@@ -597,10 +646,13 @@ yellow_ruvector_acquire_model_lock() {
           # Generation-safe (see yellow_ruvector_reclaim_dir): two waiters
           # that judged the same lock stale cannot both clear it, and
           # neither can clear the lock a successor took in the meantime.
-          [ $(( $(date +%s) - mt )) -gt 60 ] && { yellow_ruvector_reclaim_dir "$d" "$pid"; continue; } ;;
+          # Retry at once only when the lock is gone; a reclaim that could
+          # not remove it (read-only parent, marker taken) falls through to
+          # the bounded wait instead of spinning.
+          [ $(( $(date +%s) - mt )) -gt 60 ] && { yellow_ruvector_reclaim_dir "$d" "$pid"; [ -d "$d" ] || continue; } ;;
         esac ;;
       *)
-        kill -0 "$pid" 2>/dev/null || { yellow_ruvector_reclaim_dir "$d" "$pid"; continue; } ;;
+        yellow_ruvector_pid_alive "$d" "$pid" || { yellow_ruvector_reclaim_dir "$d" "$pid"; [ -d "$d" ] || continue; } ;;
     esac
     [ "$i" -lt $((secs * 10)) ] || return 1
     i=$((i + 1))
@@ -618,8 +670,7 @@ yellow_ruvector_release_model_lock() {
   _YR_MODEL_LOCK=""
   d=$(yellow_ruvector_model_lock_dir)
   [ "$(cat "$d/pid" 2>/dev/null)" = "$mine" ] || return 0
-  rm -f "$d/pid" 2>/dev/null
-  rmdir "$d" 2>/dev/null
+  yellow_ruvector_unlock_dir "$d"
   return 0
 }
 
@@ -669,6 +720,7 @@ yellow_ruvector_warm_model() {
   fi
   _YR_WARM_PID=$!
   # The lock now names the download itself.
+  yellow_ruvector_stamp_pid "$(yellow_ruvector_model_lock_dir)" "$_YR_WARM_PID"
   printf '%s' "$_YR_WARM_PID" > "$(yellow_ruvector_model_lock_dir)/pid" 2>/dev/null \
     && _YR_MODEL_LOCK=$_YR_WARM_PID
   wait "$_YR_WARM_PID" 2>/dev/null
