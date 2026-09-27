@@ -712,8 +712,13 @@ END"
   [ "$status" -eq 0 ]
   for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
   [ -s "$fb/pids" ]
-  sleep 6
-  while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
+  # Two 2s listings, each followed by a 1s shard pass that is slow too.
+  sleep 8
+  # (A zombie is dead: a container's PID 1 may never reap it.)
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$fb/pids"
 }
 
 @test "session pruning never delays the SessionStart response" {
@@ -821,8 +826,13 @@ END"
   [ "$status" -eq 0 ]
   for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
   [ -s "$fb/pids" ]
-  sleep 6
-  while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
+  # Two 2s listings, each followed by a 1s shard pass that is slow too.
+  sleep 8
+  # (A zombie is dead: a container's PID 1 may never reap it.)
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$fb/pids"
 }
 
 @test "a slow session-file scan never starves the marker and stale-tree sweeps" {
@@ -926,4 +936,37 @@ END"
   [ ! -e "$d" ]
   # The undeletable ones are kept (held aside), never lost.
   [ "$(ls -d "$RUVECTOR_DIR"/.coedit-stale-held/.coedit.lock.stale.a* | wc -l)" -eq 3 ]
+}
+
+@test "a session listing that always times out still reaches old files beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # The full listing only ever gets through recent files before timing out.
+  for n in 0recent1 0recent2; do : > "$sd/$n"; done
+  : > "$sd/zold"; touch -d '10 days ago' "$sd/zold" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *mtime*) echo ./0recent1; echo ./0recent2; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Shard 5 is [q-z].
+  COEDIT_SHARD=5 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/zold" ] || break; sleep 0.1; done
+  [ ! -e "$sd/zold" ]
+  [ -e "$sd/0recent1" ]
+}
+
+@test "a marker listing that always times out still reaches expired markers beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  mkdir "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1"
+  touch -d '20 minutes ago' "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 29: [q-z] for session ids (29 % 8), [89] for digits (29 % 5).
+  COEDIT_SHARD=29 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 120); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" ]
 }
