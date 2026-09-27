@@ -91,7 +91,7 @@ list=$(jq -r --arg re "$re" '
     # order; rather than parse them all, such a command is data (fail
     # closed: never listed, never removed).
     if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
-    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??[[:space:]]*\\k<t>(?=\\n|$)"; "")
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
@@ -118,7 +118,7 @@ jq --arg re "$re" '
     # order; rather than parse them all, such a command is data (fail
     # closed: never listed, never removed).
     if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
-    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n((.|\\n)*?\\n)??[[:space:]]*\\k<t>(?=\\n|$)"; "")
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
