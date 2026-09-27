@@ -104,6 +104,9 @@ coedit_sanitize_session() {
   local sid="${1:-}"
   [ "${#sid}" -ge 2 ] && [ "${#sid}" -le 128 ] || return 1
   case "$sid" in .*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  # A name the SessionStart sweep takes for an abandoned atomic-write temp
+  # (*.tmp.XXXXXXXX) would have its live state deleted after 10 minutes.
+  case "$sid" in *.tmp.????????) return 1 ;; esac
   printf '%s' "$sid"
 }
 
