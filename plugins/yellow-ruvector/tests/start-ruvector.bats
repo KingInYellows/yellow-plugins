@@ -27,6 +27,9 @@ setup() {
 case "$1" in
   --version) echo "${FAKE_NODE_VERSION:-v22.1.0}"; exit 0 ;;
 esac
+if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_HANG:-}" ]; then
+  echo x >> "$FAKE_CLI_HANG"; exec sleep 60
+fi
 if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_BROKEN:-}" ]; then
   echo "Error: Cannot find module 'commander'" >&2; exit 1
 fi
@@ -35,7 +38,7 @@ case "$2 $3" in
     [ -n "${FAKE_EMBED_PIDFILE:-}" ] && echo $$ > "$FAKE_EMBED_PIDFILE"
     [ -n "${FAKE_EMBED_SLEEP:-}" ] && sleep "$FAKE_EMBED_SLEEP"
     if [ -n "${FAKE_EMBED_OK:-}" ]; then
-      d="$HOME/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
+      d="${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
       echo x > "$d/model.onnx"; echo '{}' > "$d/tokenizer.json"
       echo "Dimension: 384"
     else
@@ -691,6 +694,35 @@ SH
       case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$PLUGIN/lib/install-ruvector.sh" "$BATS_TEST_TMPDIR/child.pid" "$var"
     [ "$status" -eq 0 ]
   done
+}
+
+@test "a relative RUVECTOR_CACHE_DIR names one cache for the warm-up and the fingerprint" {
+  fake_install
+  mkdir -p "$BATS_TEST_TMPDIR/proj"
+  run bash -c '
+    cd "$6" && export RUVECTOR_CACHE_DIR=rel-cache
+    . "$1"; export HOME="$2" CLAUDE_PLUGIN_ROOT="$3" CLAUDE_PLUGIN_DATA="$4"; yellow_ruvector_data_dir
+    export PATH="$5:$PATH" FAKE_EMBED_OK=1
+    yellow_ruvector_warm_model 10 || exit 7
+    yellow_ruvector_model_cached || exit 8
+    [ -f "$6/rel-cache/.ruvector/models/all-MiniLM-L6-v2/model.onnx" ] || exit 9' \
+    _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$PLUGIN" "$DATA" "$STUBS" "$BATS_TEST_TMPDIR/proj"
+  [ "$status" -eq 0 ]
+}
+
+@test "a same-version install whose CLI hangs is probed once, within the launcher budget" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=4
+  export FAKE_CLI_HANG="$BATS_TEST_TMPDIR/probes"
+  fake_install; stamp_store; cache_model
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  printf '#!/bin/sh\nexit 1\n' > "$nb/npm"; chmod +x "$nb/npm"
+  start=$SECONDS
+  run --separate-stderr bash -c 'cd "$1" && PATH="$4:$2:$PATH" CLAUDE_PLUGIN_ROOT="$3" bash "$3/bin/start-ruvector.sh"' \
+    _ "$REPO" "$STUBS" "$PLUGIN" "$nb"
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$FAKE_CLI_HANG")" -eq 1 ]
+  [ $((SECONDS - start)) -le 8 ]
 }
 
 @test "warm_model spends one deadline on the model-lock wait and the warm-up together" {

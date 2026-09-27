@@ -283,6 +283,11 @@ ruvector_proc_tree() {
 run_budgeted() {
   local cap="$1" pid watcher rc=0
   shift
+  # A TIMEOUT_CMD this process never probed came from the environment (a
+  # stale path, BusyBox timeout): probe it first, or every call would fail.
+  if [ -n "${TIMEOUT_CMD:-}" ] && [ -z "${_RUVECTOR_TIMEOUT_PROBED:-}" ]; then
+    ruvector_probe_timeout >/dev/null 2>&1 || true
+  fi
   if [ -n "${TIMEOUT_CMD:-}" ]; then
     "$TIMEOUT_CMD" --kill-after=0.1 "$cap" "$@"
     return

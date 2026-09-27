@@ -541,6 +541,18 @@ exit 0'
   [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
 }
 
+@test "an inherited TIMEOUT_CMD that fails is probed before the cleanup worker uses it" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/old"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/old" 2>/dev/null || skip "touch -d unsupported"
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/timeout"; chmod +x "$BATS_TEST_TMPDIR/timeout"
+  TIMEOUT_CMD="$BATS_TEST_TMPDIR/timeout" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/old" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
+}
+
 @test "session files just over seven days old are pruned; ones just under stay" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
