@@ -76,7 +76,7 @@ f="$target"
 # options), and VAR=value assignments — never as an argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\{|([^[:space:];&|"'"'"']*/)?env([[:space:]]+(-[uC][[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*)[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
+re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\{|([^[:space:];&|"'"'"']*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*)[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
@@ -105,7 +105,7 @@ list=$(jq -r --arg re "$re" '
     # A shell wrapper in command position (sh -c \u0027…\u0027, bash -lc "…")
     # runs its constant command string: unwrap it into its own command.
     # A double-quoted string that expands anything is left as data.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+(-[uC][[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
     | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
@@ -164,7 +164,7 @@ jq --arg re "$re" '
     # A shell wrapper in command position (sh -c \u0027…\u0027, bash -lc "…")
     # runs its constant command string: unwrap it into its own command.
     # A double-quoted string that expands anything is left as data.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+(-[uC][[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+((-[uC]|--unset|--chdir)[[:space:]]+[^-[:space:];&|][^[:space:];&|]*|-[^[:space:];&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
     | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command([[:space:]]+-p)?|--|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
@@ -204,7 +204,14 @@ jq --arg re "$re" '
 [ -s "$tmp" ] || exit 2
 backup=$(mktemp "${f}.bak-XXXXXX") || exit 2
 cat -- "$f" > "$backup" || exit 2
-cat "$tmp" > "$f" || { printf 'remove-legacy-hooks: could not rewrite %s (backup kept at %s)\n' "$(disp "$f")" "$(disp "$backup")" >&2; exit 2; }
+# Replace by rename, never by truncating the live file: an interrupted or
+# failed write leaves either the old document or the new one. The new file
+# sits next to the target (same filesystem) and takes the target's mode.
+new=$(mktemp "${f}.new-XXXXXX") || exit 2
+trap 'rm -f "$tmp" "$new"' EXIT
+mode=$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f" 2>/dev/null) || mode=""
+{ cat "$tmp" > "$new" && { [ -z "$mode" ] || chmod "$mode" "$new"; } && mv -f -- "$new" "$f"; } \
+  || { printf 'remove-legacy-hooks: could not rewrite %s (backup kept at %s)\n' "$(disp "$f")" "$(disp "$backup")" >&2; exit 2; }
 # Only the backup's own name (settings.json.bak-XXXXXX, safe characters):
 # it sits next to the settings file.
 printf 'removed; backup %s kept next to the settings file\n' "$(disp "${backup##*/}")"

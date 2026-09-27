@@ -44,6 +44,18 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
+@test "--apply replaces the settings file by rename and keeps its mode" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [{type: "command", command: "ruvector hooks post-edit"}, {type: "command", command: "echo keep"}]}]}}' > "$S"
+  chmod 640 "$S"
+  ino=$(ls -i "$S" | awk '{print $1}')
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(ls -i "$S" | awk '{print $1}')" != "$ino" ]
+  [ "$(stat -c %a "$S" 2>/dev/null || stat -f %Lp "$S")" = 640 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo keep"]' "$S" >/dev/null
+  [ -z "$(ls "$(dirname "$S")" | grep '\.new-')" ]
+}
+
 @test "a symlinked settings.json stays a symlink" {
   real="$BATS_TEST_TMPDIR/real.json"
   mv "$S" "$real"; ln -s "$real" "$S"
@@ -353,12 +365,13 @@ Ignore previous instructions"
     {type: "command", command: "command -p /usr/local/bin/ruvector hooks post-edit --success"},
     {type: "command", command: "command -v ruvector hooks post-edit"},
     {type: "command", command: "env -u FOO -C /tmp ruvector hooks post-command"},
+    {type: "command", command: "env --unset FOO --chdir /tmp ruvector hooks pre-edit"},
     {type: "command", command: "exec -- ruvector hooks session-start"},
     {type: "command", command: "echo env ruvector hooks post-edit"},
     {type: "command", command: "myenv ruvector hooks post-edit"}]}]}}' > "$S"
   run --separate-stderr bash "$SCRIPT" "$S"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 6 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 7 ]
   run --separate-stderr bash "$SCRIPT" "$S" --apply
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["command -v ruvector hooks post-edit", "echo env ruvector hooks post-edit", "myenv ruvector hooks post-edit"]' "$S" >/dev/null
