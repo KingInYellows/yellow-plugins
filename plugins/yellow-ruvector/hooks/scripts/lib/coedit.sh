@@ -859,7 +859,10 @@ coedit_partner_ok() {
         comp="${rest%%/*}"; rest="${rest#*/}"
         if [ -L "${root}/${pre}${comp}" ] || [ ! -d "${root}/${pre}${comp}" ]; then
           _coedit_good_pre="$pre"
-          _coedit_bad_dirs="${_coedit_bad_dirs:-}"$'\n'"$d"$'\n'
+          # Both caches stay small (8 KiB): every lookup scans the whole
+          # string, so an unbounded one made hundreds of distinct rejected
+          # dirs cost quadratic time. Past the cap they are simply rechecked.
+          [ "${#_coedit_bad_dirs}" -gt 8192 ] || _coedit_bad_dirs="${_coedit_bad_dirs:-}"$'\n'"$d"$'\n'
           return 1
         fi
         pre="${pre}${comp}/"
@@ -869,7 +872,8 @@ coedit_partner_ok() {
       _coedit_phys_left=$((_coedit_phys_left - 1))
       phys=$(CDPATH= cd -- "${root}/${d}" 2>/dev/null && pwd -P) || return 1
       [ "$phys" = "${rroot}/${d}" ] || return 1
-      _coedit_ok_dirs="${_coedit_ok_dirs}${d}"$'\n' ;;
+      [ "${#_coedit_ok_dirs}" -gt 8192 ] || _coedit_ok_dirs="${_coedit_ok_dirs}${d}"$'\n'
+      ;;
   esac
   return 0
 }
