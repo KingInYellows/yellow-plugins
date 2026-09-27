@@ -321,6 +321,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ! grep -q $'\xc2\x9b' "$RUVECTOR_DIR"/coedit-sessions/* 2>/dev/null
 }
 
+@test "a lock dated before 1970 is reclaimed as stale" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd/.s1.lock" "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '1960-01-01' "$sd/.s1.lock" "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  [ "$(stat -c %Y "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || stat -f %m "$RUVECTOR_DIR/.coedit.lock")" -lt 0 ] || skip "filesystem cannot store pre-1970 times"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
