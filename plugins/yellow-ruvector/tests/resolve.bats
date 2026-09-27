@@ -389,6 +389,21 @@ fake_install() {
   [ -L "$WORK/wtdirty/.ruvector" ]
 }
 
+@test "a lease whose pid was reused by another process no longer protects the install" {
+  sleep 30 >/dev/null 2>&1 &
+  other=$!
+  mkdir -p "$DATA"
+  # The lease names a live pid, but records another process's start time.
+  printf 'Mon Jan  1 00:00:00 2001' > "$DATA/.lease.install-old.$other"
+  run bash -c '. "$1"; RUVECTOR_DATA="$2"; yellow_ruvector_leased install-old' _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$DATA"
+  [ "$status" -ne 0 ]
+  [ ! -e "$DATA/.lease.install-old.$other" ]
+  # A lease this pid really took still counts.
+  run bash -c '. "$1"; RUVECTOR_DATA="$2"; yellow_ruvector_write_lease "$2/.lease.install-old.$3" "$3"; yellow_ruvector_leased install-old' _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$DATA" "$other"
+  kill "$other" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+}
+
 @test "resolve_bin: takes the lease even while a prune has the install moved aside" {
   command -v node >/dev/null 2>&1 || skip "node not available"
   [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -ge 20 ] || skip "node < 20 on this host"
