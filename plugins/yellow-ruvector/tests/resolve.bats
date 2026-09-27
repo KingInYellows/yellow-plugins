@@ -77,7 +77,7 @@ fake_install() {
     ls "$2"/.lease.install-* >/dev/null 2>&1 || exit 8
     [ -e "$2/.lease.install-$3.$$" ] || exit 7' _ "$LIB" "$DATA" "$(own_hash)"
   [ "$status" -eq 0 ]
-  ! ls "$DATA"/.lease.install-* 2>/dev/null || false
+  ! ls "$DATA"/.lease.install-* 2>/dev/null || false || false
 }
 
 @test "resolve_bin: stays on this version's install when another session moved current" {

@@ -136,7 +136,7 @@ exit 0'
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
   [ "$(grep -c '^hooks recall ' "$CALLS")" -eq 1 ]
-  ! grep -q 'session-start' "$CALLS" || false
+  ! grep -q 'session-start' "$CALLS" || false || false
 }
 
 @test "a session launched from a subdirectory recalls from the git toplevel" {
@@ -248,7 +248,7 @@ exit 0'
   catalog="$BATS_TEST_DIRNAME/../../../catalog/plugins/yellow-ruvector.json"
   [ "$(jq -r '.mcpServers.ruvector.command' "$catalog")" = '${CLAUDE_PLUGIN_ROOT}/bin/start-ruvector.sh' ]
   [ "$(jq -r '.mcpServers.ruvector.args | length' "$catalog")" = 0 ]
-  ! grep -q 'ruvector@' "$catalog" || false
+  ! grep -q 'ruvector@' "$catalog" || false || false
 }
 
 @test "no plugin doc or script prescribes npx, a global install, or a stale ruvector pin" {
@@ -501,7 +501,7 @@ exit 0'
   # run_budgeted's portable watcher bounds the parse, so macOS users still
   # get the write-refusal note.
   echo "$output" | jq -e '.systemMessage | contains("hash")' > /dev/null
-  ! echo "$stderr" | grep -q 'provenance check skipped' || false
+  ! echo "$stderr" | grep -q 'provenance check skipped' || false || false
 }
 
 @test "provenance: stamped store plus a hanging ruvector still emits JSON within the 6s budget" {

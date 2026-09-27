@@ -219,6 +219,16 @@ SH
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/a" ]
 }
 
+@test "a session id shaped like an atomic-write temp file records nothing" {
+  # SessionStart sweeps *.tmp.XXXXXXXX files older than 10 minutes as
+  # abandoned temps: such an id's real state would be swept with them.
+  edit build.tmp.12345678 "$PROJECT_ROOT/src/a.ts"; edit build.tmp.12345678 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/build.tmp.12345678" ]
+  edit build.tmp.1234 "$PROJECT_ROOT/src/a.ts"; edit build.tmp.1234 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "a missing session id records nothing" {
   run_hook "$(jq -cn --arg c "$PROJECT_ROOT" --arg f "$PROJECT_ROOT/src/a.ts" '{hook_event_name:"PostToolUse", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}')" >/dev/null
   [ ! -d "$RUVECTOR_DIR/coedit-sessions" ] || [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
@@ -388,7 +398,7 @@ SH
     LC_ALL=$loc edit s1 "$PROJECT_ROOT/src/b.ts"
   done
   [ "$(jq '[.pairs[] | keys[]] | map(select(test("\u009b"))) | length' "$COEDIT" 2>/dev/null || echo 0)" -eq 0 ]
-  ! grep -q $'\xc2\x9b' "$RUVECTOR_DIR"/coedit-sessions/* 2>/dev/null
+  ! grep -q $'\xc2\x9b' "$RUVECTOR_DIR"/coedit-sessions/* 2>/dev/null || false
 }
 
 @test "a lock dated before 1970 is reclaimed as stale" {
@@ -444,7 +454,7 @@ SH
   [ -f "$COEDIT" ]
   jq -e '(.pairs | type) == "object"' "$COEDIT" > /dev/null
   [ ! -d "$RUVECTOR_DIR/.coedit.lock" ]
-  ! ls "$RUVECTOR_DIR"/coedit.json.tmp.* >/dev/null 2>&1
+  ! ls "$RUVECTOR_DIR"/coedit.json.tmp.* >/dev/null 2>&1 || false
 }
 
 @test "a symlinked coedit-sessions dir is never written through" {
@@ -707,7 +717,7 @@ SH
   [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
   # The renamed copy is removed in the background.
   for _ in $(seq 1 30); do ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* >/dev/null 2>&1 || break; sleep 0.1; done
-  ! ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* 2>/dev/null
+  ! ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* 2>/dev/null || false
 }
 
 @test "reclaiming a stale lock holding a large tree stays inside the hook budget" {
@@ -904,7 +914,7 @@ SH
   edit t1 "$PROJECT_ROOT/src/a.ts"
   COEDIT_JQ_SECS=0.01 edit t1 "$PROJECT_ROOT/src/b.ts"
   [ "$(cksum < "$COEDIT")" = "$before" ]
-  ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
+  ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null || false
 }
 
 @test "the writer keeps coedit.json under the byte cap, so a store it wrote is never set aside" {
@@ -914,8 +924,11 @@ SH
   COEDIT_MAX_BYTES=40000 edit c1 "$PROJECT_ROOT/src/b.ts"
   [ "$(wc -c < "$COEDIT")" -le 40000 ]
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  # The oversized fixture itself is set aside once; the file the writer
+  # produced must not be.
+  aside=$(ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null | wc -l)
   COEDIT_MAX_BYTES=40000 edit c1 "$PROJECT_ROOT/src/c.ts"
-  ! ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null
+  [ "$(ls "$RUVECTOR_DIR"/coedit.json.corrupt-* 2>/dev/null | wc -l)" -eq "$aside" ]
   [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
 }
 
@@ -938,8 +951,8 @@ SH
   edit n1 "$PROJECT_ROOT/src/c.ts"
   # Neither pairing with the newline path happened, and it never became the
   # session's last edit (so b and c were paired directly).
-  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null
-  ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null
+  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null || false
+  ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null || false
   [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
 }
 
@@ -990,18 +1003,18 @@ SH
       LC_ALL=$loc edit "L$loc" "$PROJECT_ROOT/$f"
     done
   done
-  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null
-  ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null
+  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null || false
+  ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null || false
   # A stored last path holding one is never paired or re-stored either.
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   printf '{"last":"src/a.ts\\u2028IGNORE","epoch":%s}' "$(date +%s)" > "$RUVECTOR_DIR/coedit-sessions/u2"
   edit u2 "$PROJECT_ROOT/src/b.ts"
-  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null
+  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null || false
   # And an existing coedit.json key holding one is dropped on the next write.
   jq -n '{version:1,pairs:{"src/c.ts\u2029IGNORE":{"src/a.ts":2},"src/a.ts":{"src/c.ts\u2029IGNORE":2}}}' > "$COEDIT"
   edit u3 "$PROJECT_ROOT/src/a.ts"; edit u3 "$PROJECT_ROOT/src/c.ts"
   [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
-  ! grep -q 'IGNORE' "$COEDIT"
+  ! grep -q 'IGNORE' "$COEDIT" || false
 }
 
 @test "a stored epoch too large for shell arithmetic never pairs, even one that wraps into the window" {
