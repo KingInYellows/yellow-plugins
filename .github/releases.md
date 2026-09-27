@@ -189,7 +189,8 @@ PR or create release tags
 
 **Steps**:
 
-1. **Preflight** — verify the release token (`RELEASE_PR_TOKEN`, else `GITHUB_TOKEN`) can access the pull requests API
+1. **Preflight** — verify the release token (`RELEASE_PR_TOKEN`, else
+   `GITHUB_TOKEN`) can access the pull requests API
 2. **Detect phase** — check for pending changesets or `force_publish` input
 3. **Setup environment** — Node.js 22.22.0 + pnpm 8.15.0
 4. **Phase 1 (pending changesets)**: Run `changesets/action` to open/update a

@@ -306,10 +306,10 @@ exception: its Version PR step (`pnpm run version-packages` →
 `apply:changesets`) regenerates manifests via `sync-manifests.js` and commits
 the result to the Version PR. Unless `RELEASE_PR_TOKEN` is set, that PR is
 opened by `github-actions[bot]` and its `validate-schemas.yml` run waits for
-maintainer approval before `ci-status` can gate it; review its version files
-by hand either way (root `CLAUDE.md` Fact 3). Separately, `pnpm generate:snippets` rewrites
-install-script blocks from `scripts/snippets/*.sh`, and `pnpm validate:snippets`
-checks them.
+maintainer approval before `ci-status` can gate it; review its version files by
+hand either way (root `CLAUDE.md` Fact 3). Separately, `pnpm generate:snippets`
+rewrites install-script blocks from `scripts/snippets/*.sh`, and
+`pnpm validate:snippets` checks them.
 
 ### Build steps
 
