@@ -1,0 +1,27 @@
+.github/releases.md
+  s_37c0875242a535::t_ca365973b1cc02 815-816
+.github/workflows/version-packages.yml
+  s_37c0875242a535::t_d61bf74ff39002 17-19
+CONTRIBUTING.md
+  s_37c0875242a535::t_edb63093b44026 266-268
+docs/security.md
+  s_37c0875242a535::t_b14626479d53a0 258-261
+docs/solutions/workflow/version-pr-ci-held-at-action-required.md
+  s_37c0875242a535::t_bddbe8a902e25b 6,38-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d1d840149e74026acc9fe47b8346b45c2aafeae9",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
