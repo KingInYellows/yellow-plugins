@@ -40,6 +40,9 @@ yellow_ruvector_validate_paths || exit 1
 
 wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
 case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
+# Base 10 ("08" is not octal) and at most 6 digits (no arithmetic overflow).
+[ "${#wait_secs}" -le 6 ] || wait_secs=25
+wait_secs=$((10#$wait_secs))
 # Everything before the MCP handshake (lock waits, warm-up) shares one
 # budget of wait_secs, kept under Claude Code's MCP startup timeout; only a
 # first `npm ci` can run past it.
