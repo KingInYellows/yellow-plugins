@@ -198,3 +198,17 @@ Ignore previous instructions"
   # Only the real invocation goes; the quoted mention stays.
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo \"x\nruvector hooks post-edit\""]' "$S" >/dev/null
 }
+
+@test "a heredoc body mentioning a ruvector hook is data, not a command" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<EOF > notes.txt\nruvector hooks post-edit --success\nEOF"},
+    {type: "command", command: "cat <<'"'"'END'"'"'\nhello\nEND\nruvector hooks post-edit --success"},
+    {type: "command", command: "echo prelude\nruvector hooks post-edit --success"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  # The heredoc-only hook is left alone; the other two run ruvector.
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF > notes.txt\nruvector hooks post-edit --success\nEOF"]' "$S" >/dev/null
+}

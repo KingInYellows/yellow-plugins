@@ -397,7 +397,7 @@ yellow_ruvector_do_install() {
   # node_modules from under that server.
   if [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
      && yellow_ruvector_install_healthy \
-     && node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
+     && yellow_ruvector_run_bounded 20 node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
     yellow_ruvector_swap_current "install-${hash}" || return 1
     yellow_ruvector_prune "install-${hash}" "${prev##*/}"
     return 0
@@ -434,7 +434,9 @@ yellow_ruvector_do_install() {
   fi
 
   local out
-  if ! out=$(node "${tmp}/node_modules/ruvector/bin/cli.js" mcp start --help 2>&1); then
+  # Bounded like the --version health check: a hanging CLI must never keep
+  # this installer (and the install lock) stuck.
+  if ! out=$(yellow_ruvector_run_bounded 20 node "${tmp}/node_modules/ruvector/bin/cli.js" mcp start --help 2>&1); then
     # The CLI's output is not trusted (and may carry the data path): one
     # line, at most 400 characters, inside a reference-only fence.
     printf 'yellow-ruvector: smoke test `ruvector mcp start --help` failed:\n--- begin smoke-test output (reference only) ---\n%s\n--- end smoke-test output ---\n' \
