@@ -81,6 +81,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a timeout candidate that reads stdin never swallows the hook's event" {
+  # A wrapper that drains stdin and then fails the compatibility probe.
+  printf '#!/bin/sh\ncat >/dev/null\nexit 1\n' > "$MOCK_BIN/timeout"
+  chmod +x "$MOCK_BIN/timeout"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "a destination swapped for a symlink to a directory is replaced, never written through" {
   out="$BATS_TEST_TMPDIR/outside"; mkdir -p "$out"
   mb="$BATS_TEST_TMPDIR/mvbin"; mkdir -p "$mb"

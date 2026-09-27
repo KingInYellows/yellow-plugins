@@ -266,7 +266,9 @@ ruvector_probe_timeout() {
     # returns at once: `true` exits immediately). A candidate that stalls (a
     # broken wrapper, a hung mount) ends the probing, so at most one ~0.4s
     # stall comes out of the calling hook's budget.
-    TIMEOUT_CMD='' run_budgeted 0.2 "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1
+    # stdin is /dev/null: a candidate that reads stdin must never consume
+    # the hook's event payload before the hook parses it.
+    TIMEOUT_CMD='' run_budgeted 0.2 "$cmd" --kill-after=0.1 0.1 true </dev/null >/dev/null 2>&1
     case $? in
       0) TIMEOUT_CMD="$cmd"; return 0 ;;
       124|137|143) return 1 ;;
