@@ -795,7 +795,7 @@ coedit_partners() {
       if length != 1 or (.[0] | type) != "object" then empty else .[0] end
       | (.pairs[$r] // {}) | if type == "object" then . else {} end | to_entries
       | map(select((.value | type) == "number" and .value >= $min
-                   and .key != $r
+                   and .value <= 1000000000 and .key != $r
                    and (.key | test("[[:cntrl:]\u0085\u2028\u2029]") | not)))
       | sort_by(-.value, .key) | .[0:$scan][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null) || return 0

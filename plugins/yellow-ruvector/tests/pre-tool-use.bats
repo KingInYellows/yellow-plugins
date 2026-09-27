@@ -173,6 +173,16 @@ assert_allow_json() {
   done < "$gb/pids"
 }
 
+@test "an absurd count is never suggested or listed" {
+  jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":8, "src/c.ts":9007199254740993}}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"src/b.ts"* ]]
+  [[ "$output" != *"src/c.ts"* ]]
+  out=$(run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")")
+  [[ "$(ctx "$out")" != *"src/c.ts"* ]]
+}
+
 @test "a corrupt coedit.json still yields allow JSON" {
   echo 'not json' > "$RUVECTOR_DIR/coedit.json"
   run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
