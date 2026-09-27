@@ -1012,6 +1012,21 @@ END"
   [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ]
 }
 
+@test "a timed-out marker listing still reaches a one-digit marker suffix" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  mkdir "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 5002: digit shard [45][!0-9] (thousands digit 5).
+  COEDIT_SHARD=5002 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 120); do [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" ]
+}
+
 @test "held trees that can never be removed do not pin the held-tree retries" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
