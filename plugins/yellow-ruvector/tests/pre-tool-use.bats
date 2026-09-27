@@ -912,3 +912,11 @@ related_staged() {
     [ $(( (end - start) / 1000000 )) -lt 900 ]
   done
 }
+
+@test "an existing world-writable pointer dir is made private before a pointer is published" {
+  ptr_dir="$HOME/.cache/yellow-ruvector"
+  mkdir -p "$ptr_dir"; chmod 777 "$ptr_dir"
+  run bash "$RELATED_SCRIPT" --stage
+  [ "$status" -eq 0 ]
+  [ "$(stat -c %a "$ptr_dir" 2>/dev/null || stat -f %Lp "$ptr_dir")" = "700" ]
+}

@@ -106,6 +106,9 @@ if [ "$1" = "--stage" ]; then
   fail_stage() { rmdir -- "$sdir" 2>/dev/null || true; exit 1; }
   ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || fail_stage
   [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || fail_stage
+  # An existing dir may be group- or world-writable: another user could then
+  # swap the pointer between --stage and --run. Private before publishing.
+  chmod 700 "$PTR_DIR" 2>/dev/null || fail_stage
   # A stage this session never ran, and records (with their staging dirs)
   # other sessions left unrun for over a day (at most 100 per call).
   drop_stage "$PTR"
