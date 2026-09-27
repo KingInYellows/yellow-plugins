@@ -434,6 +434,24 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
 }
 
+@test "model-cache lock: a waiter that judged a dead holder never clears the lock that replaced it" {
+  run bash -c '
+    . "$1"; export HOME="$2"
+    d=$(yellow_ruvector_model_lock_dir); mkdir -p "$d"
+    sleep 0 & dead=$!; wait $dead
+    printf "%s" "$dead" > "$d/pid"
+    # Two waiters saw the dead pid. The first reclaims and a successor takes
+    # the lock; the second reclaim (same judgement, now stale) is a no-op.
+    yellow_ruvector_reclaim_dir "$d" "$dead"
+    [ ! -e "$d" ] || exit 9
+    sleep 30 & o=$!
+    mkdir "$d" && printf "%s" "$o" > "$d/pid"
+    yellow_ruvector_reclaim_dir "$d" "$dead"
+    [ "$(cat "$d/pid" 2>/dev/null)" = "$o" ] || { kill $o; exit 8; }
+    kill $o' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
+  [ "$status" -eq 0 ]
+}
+
 @test "model-cache lock: a stale holder's release never removes a successor's lock" {
   run bash -c '
     . "$1"; export HOME="$2"
