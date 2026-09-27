@@ -551,7 +551,11 @@ exit 0'
   done
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ] || break; sleep 0.1; done
+  # The sweep starts at a random entry: wait for both old trees.
+  for i in $(seq 1 30); do
+    [ -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ] || [ -e "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9" ] || break
+    sleep 0.1
+  done
   [ ! -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ]
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9" ]
   # A fresh one (a delete may still be running) is left alone.
