@@ -47,7 +47,7 @@ npm_called_within() {
   cli 'console.log("0.3.3")'
   run bash "$HOOK" </dev/null
   [ "$status" -eq 0 ]
-  ! npm_called_within 1 || false || false
+  ! npm_called_within 1 || false
 }
 
 @test "an install whose entry no longer runs is reinstalled" {
