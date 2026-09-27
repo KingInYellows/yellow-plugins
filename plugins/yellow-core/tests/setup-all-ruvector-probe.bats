@@ -25,8 +25,9 @@ NODE
 }
 
 candidate() {
-  local d="$CLAUDE_CONFIG_DIR/plugins/data/$1/current/node_modules/ruvector/bin"
-  mkdir -p "$d"; : > "$d/cli.js"
+  local d="$CLAUDE_CONFIG_DIR/plugins/data/$1"
+  mkdir -p "$d/install-abc/node_modules/ruvector/bin"; : > "$d/install-abc/node_modules/ruvector/bin/cli.js"
+  ln -s install-abc "$d/current"
 }
 
 probe() { run bash -c 'PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK"; }
@@ -55,7 +56,7 @@ probe() { run bash -c 'PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK"; }
   candidate yellow-ruvector-z
   # A PATH with the node stub and the basic tools, but no timeout/gtimeout.
   bin="$BATS_TEST_TMPDIR/bin"; mkdir -p "$bin"
-  for t in bash cat rm mktemp sleep sed head grep; do ln -s "$(command -v "$t")" "$bin/$t"; done
+  for t in bash cat rm mktemp sleep sed head grep readlink; do ln -s "$(command -v "$t")" "$bin/$t"; done
   ln -s "$STUBS/node" "$bin/node"
   start=$SECONDS
   run env PATH="$bin" bash "$BLOCK"
@@ -83,4 +84,21 @@ probe() { run bash -c 'PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK"; }
   probe
   [ $((SECONDS - start)) -le 25 ]
   [[ "$output" == *"ruvector:           OK (plugin-managed 0.3.3)"* ]]
+}
+
+@test "a candidate whose install escapes its data dir is never run" {
+  ext="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$ext/node_modules/ruvector/bin"; : > "$ext/node_modules/ruvector/bin/cli.js"
+  d="$CLAUDE_CONFIG_DIR/plugins/data"
+  # current -> an absolute path outside; current -> a symlinked install dir;
+  # a real install dir whose node_modules/ruvector is a symlink.
+  mkdir -p "$d/yellow-ruvector-a" "$d/yellow-ruvector-b" "$d/yellow-ruvector-c/install-abc/node_modules"
+  ln -s "$ext" "$d/yellow-ruvector-a/current"
+  ln -s "$ext" "$d/yellow-ruvector-b/install-abc"; ln -s install-abc "$d/yellow-ruvector-b/current"
+  ln -s "$ext/node_modules/ruvector" "$d/yellow-ruvector-c/install-abc/node_modules/ruvector"
+  ln -s install-abc "$d/yellow-ruvector-c/current"
+  probe
+  # (The node stub would answer 0.3.3 for any file it was given.)
+  [[ "$output" == *"ruvector:           NOT INSTALLED"* ]]
+  [[ "$output" != *OK* ]]
 }
