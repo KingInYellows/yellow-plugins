@@ -27,6 +27,9 @@ setup() {
 case "$1" in
   --version) echo "${FAKE_NODE_VERSION:-v22.1.0}"; exit 0 ;;
 esac
+if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_SLOW_VERSION:-}" ]; then
+  sleep "$FAKE_CLI_SLOW_VERSION"; echo 0.3.3; exit 0
+fi
 if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_HANG:-}" ]; then
   echo x >> "$FAKE_CLI_HANG"; exec sleep 60
 fi
@@ -573,6 +576,32 @@ SH
     PATH="$3:$4:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install 2' _ "$PLUGIN" "$DATA" "$nb" "$STUBS"
   [ "$status" -ne 0 ]
   [ $((SECONDS - start)) -le 8 ]
+}
+
+@test "both rollback reuse probes share one deadline" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  final="$DATA/install-$(lock_hash)"; mkdir -p "$final/node_modules/ruvector/bin"
+  : > "$final/node_modules/ruvector/bin/cli.js"
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  printf '#!/bin/sh\nexit 1\n' > "$nb/npm"; chmod +x "$nb/npm"
+  s=$(date +%s%N)
+  FAKE_CLI_SLOW_VERSION=1.5 FAKE_MCP_HANG=1 run --separate-stderr bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PLUGIN_DATA="$2"
+    PATH="$3:$4:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install 2' _ "$PLUGIN" "$DATA" "$nb" "$STUBS"
+  e=$(date +%s%N)
+  [ "$status" -ne 0 ]
+  [ $(( (e - s) / 1000000 )) -lt 3000 ]
+}
+
+@test "a real directory at current is replaced by the link, not written into" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  final="$DATA/install-$(lock_hash)"; mkdir -p "$final/node_modules/ruvector/bin"
+  : > "$final/node_modules/ruvector/bin/cli.js"
+  mkdir -p "$DATA/current/leftover"
+  run --separate-stderr bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PLUGIN_DATA="$2"
+    PATH="$3:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install' _ "$PLUGIN" "$DATA" "$STUBS"
+  [ "$status" -eq 0 ]
+  [ -L "$DATA/current" ]
+  [ "$(readlink "$DATA/current")" = "install-$(lock_hash)" ]
 }
 
 @test "an install smoke test that hangs is bounded, never holding the installer" {
