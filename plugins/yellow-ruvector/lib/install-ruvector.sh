@@ -82,14 +82,23 @@ yellow_ruvector_validate_paths() {
   fi
   yellow_ruvector_data_dir
 
+  # A path that cannot be canonicalized (e.g. it crosses a dangling
+  # symlink on BSD/macOS) is refused: its lexical form could pass the prefix
+  # checks below while the symlink later points outside them.
   local canonical
   if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null) \
      || canonical=$(yellow_ruvector_canon "$CLAUDE_PLUGIN_ROOT"); then
     CLAUDE_PLUGIN_ROOT="$canonical"
+  elif [ "${1:-}" != --data-only ]; then
+    printf 'yellow-ruvector: refusing — cannot canonicalize CLAUDE_PLUGIN_ROOT: %s\n' "$(yellow_ruvector_flat "$CLAUDE_PLUGIN_ROOT")" >&2
+    return 1
   fi
   if canonical=$(realpath -m -- "$RUVECTOR_DATA" 2>/dev/null) \
      || canonical=$(yellow_ruvector_canon "$RUVECTOR_DATA"); then
     RUVECTOR_DATA="$canonical"
+  else
+    printf 'yellow-ruvector: refusing — cannot canonicalize the data dir: %s\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")" >&2
+    return 1
   fi
   export CLAUDE_PLUGIN_ROOT RUVECTOR_DATA
 
