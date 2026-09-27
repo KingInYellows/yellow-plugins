@@ -253,12 +253,21 @@ The PR is created by the Changesets bot. Before merging, verify:
 
 The PR can be held open to batch multiple features before releasing.
 
-**Note on CI coverage:** The Version Packages PR is created by the
-`github-actions[bot]` using `GITHUB_TOKEN`. GitHub does not trigger
-`on: pull_request` CI on bot-created PRs, so `validate-schemas.yml` will not run
-on this PR. The PR content is machine-generated (version bumps and CHANGELOG
-entries only), so manual review of the three bullet points above is the primary
-verification gate before merging.
+**Note on CI coverage:** Without the `RELEASE_PR_TOKEN` secret, the Version
+Packages PR is opened by `github-actions[bot]` with `GITHUB_TOKEN`. The repo's
+Actions policy requires approval for all external contributors, and the bot
+counts as one, so every `pull_request` run on the PR — including the required
+`CI Status Summary` — waits at "action_required" until a maintainer clicks
+**Approve and run workflows** (or runs
+`gh api -X POST repos/<owner>/<repo>/actions/runs/<id>/approve`). The PR stays
+blocked, and the Graphite merge queue cannot land it, until then.
+
+To remove that step, add a `RELEASE_PR_TOKEN` repo secret: a fine-grained PAT
+for a collaborator, scoped to this repository only, with **Contents** and
+**Pull requests** set to read/write. `version-packages.yml` then opens the PR
+under that identity and CI starts on its own. Either way, the PR content is
+machine-generated (version bumps and CHANGELOG entries only), so manual review
+of the three bullet points above is still the primary gate before merging.
 
 ### Emergency manual release
 

@@ -12,6 +12,15 @@ name: Version Packages
 #
 # Manual recovery: trigger workflow_dispatch with force_publish=true to skip
 # changeset detection and go straight to the publish phase.
+#
+# RELEASE_PR_TOKEN (optional repo secret): a fine-grained PAT for a repo
+# collaborator (Contents + Pull requests: read/write on this repo only). When
+# set, the Version PR is pushed and opened under that identity, so its
+# pull_request CI (including the required "CI Status Summary") runs without
+# maintainer approval. Without it the PR comes from github-actions[bot], which
+# the repo's "require approval for all external contributors" Actions policy
+# treats as external, so every CI run on the PR waits at action_required.
+# Unset, the workflow falls back to GITHUB_TOKEN and behaves as before.
 
 on:
   push:
@@ -156,7 +165,9 @@ jobs:
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RELEASE_PR_TOKEN lets the Version PR's CI run without approval —
+          # see the header comment. Falls back to GITHUB_TOKEN when unset.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Configure git credentials (recovery)
         if: inputs.force_publish == true
