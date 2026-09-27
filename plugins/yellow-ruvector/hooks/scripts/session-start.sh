@@ -46,8 +46,8 @@ cd "$PROJECT_DIR" 2>/dev/null || json_exit "cannot cd to project root; skipping 
 # + two --kill-after=0.1 escalations = 4.9s worst case, leaving headroom for
 # node startup and jq. The prewarm hook downloads the model, so a first
 # session does not pay the ~6s cold download here. See ruvector_probe_timeout
-# for why BusyBox/non-GNU timeout is skipped; without one, calls run
-# unbudgeted and the provenance parse is skipped.
+# for why BusyBox/non-GNU timeout is skipped; without one (stock macOS),
+# run_budgeted bounds every call with its portable TERM/KILL watcher.
 ruvector_probe_timeout || true
 
 # --- Embedder provenance check (jq only; no CLI, no model load) ---
@@ -128,10 +128,6 @@ fi
 if [ -z "${RUVECTOR_BIN:-}" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   finish
 fi
-if [ -z "$TIMEOUT_CMD" ]; then
-  printf '[ruvector] no GNU-compatible timeout found; session-start recall runs without budget enforcement\n' >&2
-fi
-
 # One semantic recall. `hooks recall` does not write the store.
 recalled=$(run_budgeted 4.5 "${RUVECTOR_CMD[@]}" hooks recall --top-k 5 "recent mistakes, fixes, and useful patterns for this project" 2>/dev/null) || {
   printf '[ruvector] recall failed or timed out\n' >&2

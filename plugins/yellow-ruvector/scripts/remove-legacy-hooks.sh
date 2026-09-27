@@ -103,7 +103,7 @@ list=$(jq -r --arg re "$re" '
     # A shell wrapper in command position (sh -c \u0027…\u0027, bash -lc "…")
     # runs its constant command string: unwrap it into its own command.
     # A double-quoted string that expands anything is left as data.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+-[^[:space:];&|]+)*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+-[^[:space:];&|]+)*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
     | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
@@ -162,7 +162,7 @@ jq --arg re "$re" '
     # A shell wrapper in command position (sh -c \u0027…\u0027, bash -lc "…")
     # runs its constant command string: unwrap it into its own command.
     # A double-quoted string that expands anything is left as data.
-    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+-[^[:space:];&|]+)*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{|([^[:space:];&|\"\u0027]*/)?env([[:space:]]+-[^[:space:];&|]+)*|[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*)[[:space:]]+)*)([^[:space:];&|\"\u0027]*/)?(ba|da|z|k)?sh([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c[A-Za-z]*[[:space:]]+(--[[:space:]]+)?(\u0027(?<s>[^\u0027]*)\u0027|\"(?<d>[^\"\\\\$`]*)\")"; "\(.p)_; \(.s // .d);_")
     | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
