@@ -411,7 +411,10 @@ coedit_prune_sessions() {
       # most 500 names (O(sample) memory, never a full glob), and the sweep
       # is bounded by time and by removals (50), not by entries looked at, so
       # markers that cannot be removed (not empty) never keep it from
-      # reaching later ones.
+      # reaching later ones. Each cleanup phase gets its own 5s budget
+      # (SECONDS restarts), so a slow session-file scan above never starves
+      # the marker and stale-tree sweeps below.
+      SECONDS=0
       nl='
 '
       markers=()
@@ -431,6 +434,7 @@ coedit_prune_sessions() {
         [ -d "$m" ] && [ ! -L "$m" ] || continue
         coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null && removed=$((removed + 1))
       done
+      SECONDS=0
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
       # background delete was interrupted: here and in the store dir, only
       # when untouched for 10 minutes (a delete still in progress keeps
