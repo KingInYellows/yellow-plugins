@@ -189,6 +189,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   done
 }
 
+@test "a multi-document session file is reset, so the session keeps recording pairs" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  printf '{"last":"src/x.ts","epoch":1}\n{"last":"src/y.ts","epoch":2}\n' > "$RUVECTOR_DIR/coedit-sessions/s1"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  [ "$(wc -l < "$RUVECTOR_DIR/coedit-sessions/s1" | tr -d ' ')" -eq 1 ]
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "the pair file is capped, keeping the highest counts" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9}, "src/b.ts":{"src/a.ts":9}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
