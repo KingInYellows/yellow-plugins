@@ -2,15 +2,16 @@
 # coedit-related.sh — list files most often edited together with <path>,
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
-# Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" <path> [limit]
-#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage
+# Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage
 #        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file <query-file> [limit]
 # --stage creates a private mktemp -d directory and prints the path of a
 # not-yet-existing query file in it (QUERY_FILE=...). /ruvector:related writes
 # the user's path there with the Write tool (a structured parameter, never
 # shell-parsed; see docs/solutions/security-issues/heredoc-delimiter-collision.md)
 # and then runs --file, which reads exactly one line from that staged file
-# (more than one line is rejected) and removes the staging directory.
+# (more than one line is rejected) and removes the staging directory. There
+# is no positional <path> form: the user's path never appears in a command
+# line, so /ruvector:related can pre-approve only these two fixed shapes.
 # <path> is relative to the project root; absolute paths, a leading
 # `-`, `..` components, and control characters are rejected. Output: one
 # "<count><TAB><root-relative path>" line per partner (existing files only),
@@ -26,7 +27,7 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${here}/hooks/scripts/lib/coedit.sh"
 
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
-[ $# -ge 1 ] || { printf 'usage: coedit-related.sh <path>|--stage|--file <query-file> [limit]\n' >&2; exit 2; }
+[ $# -ge 1 ] || { printf 'usage: coedit-related.sh --stage | --file <query-file> [limit]\n' >&2; exit 2; }
 # Always /tmp (not $TMPDIR): /ruvector:related's Write grant is scoped to
 # //tmp/ruvector-related.*/query, so the staged file must live there.
 STAGE_PREFIX="/tmp/ruvector-related."
@@ -56,7 +57,8 @@ if [ "$1" = "--file" ]; then
     printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2
   fi
 else
-  path="$1"
+  printf 'usage: coedit-related.sh --stage | --file <query-file> [limit]\n' >&2
+  exit 2
 fi
 limit="${2:-10}"
 case "$limit" in ''|*[!0-9]*) limit=10 ;; esac

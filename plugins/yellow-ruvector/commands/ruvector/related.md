@@ -6,7 +6,8 @@ allowed-tools:
   - Read
   - Write(//tmp/ruvector-related.*/query)
   - Write(//private/tmp/ruvector-related.*/query)
-  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh":*)
+  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage)
+  - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file /tmp/ruvector-related.:*)
 ---
 
 # Related Files (co-edit history)
@@ -53,9 +54,13 @@ Write tool instead (see
 3. Run the lookup on it:
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file "<QUERY_FILE>" 50
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file <QUERY_FILE> 50
    ```
 
+   Pass `QUERY_FILE` exactly as `--stage` printed it, unquoted (it is
+   `/tmp/ruvector-related.XXXXXXXX/query`, made of safe characters): the
+   frontmatter pre-approves only `--stage` and `--file /tmp/ruvector-related.…`.
+   The script has no form that takes the path itself on the command line.
    The script only accepts a regular `query` file inside a
    `/tmp/ruvector-related.*` directory you own, reads exactly one line, and
    removes just that file and then the empty directory.

@@ -11,7 +11,13 @@ setup() {
   mkdir -p "$RUVECTOR_DIR" "$PROJECT_ROOT/src"
   for f in a b c d e; do : > "$PROJECT_ROOT/src/$f.ts"; done
   HOOK_SCRIPT="$BATS_TEST_DIRNAME/../hooks/scripts/pre-tool-use.sh"
-  RELATED="$BATS_TEST_DIRNAME/../scripts/coedit-related.sh"
+  RELATED_SCRIPT="$BATS_TEST_DIRNAME/../scripts/coedit-related.sh"
+  # The only interface: stage a query file, write the path, run --file.
+  RELATED="$BATS_TEST_TMPDIR/related-q.sh"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "q=\$(bash '$RELATED_SCRIPT' --stage | sed -n 's/^QUERY_FILE=//p') || exit 1" \
+    'printf "%s\n" "$1" > "$q"; shift' \
+    "exec bash '$RELATED_SCRIPT' --file \"\$q\" \"\$@\"" > "$RELATED"
   MOCK_BIN="$(mktemp -d)"
   MARKER="$MOCK_BIN/cli-called"
   for b in ruvector npx node; do
@@ -254,11 +260,11 @@ assert_allow_json() {
 # tool writes the raw path, never through a shell), and run --file on it.
 related_staged() {
   local q
-  q=$(cd "$PROJECT_ROOT" && bash "$RELATED" --stage | sed -n 's/^QUERY_FILE=//p')
+  q=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   [ -n "$q" ] && [ ! -e "$q" ] || return 99
   printf '%s' "$1" > "$q"
   STAGED_DIR="${q%/query}"
-  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED" "$q"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED_SCRIPT" "$q"
 }
 
 @test "coedit-related.sh --file reads one staged line and never evaluates it" {
@@ -278,13 +284,13 @@ related_staged() {
 
 @test "coedit-related.sh --file refuses anything but a staged query file" {
   : > "$BATS_TEST_TMPDIR/query"
-  run --separate-stderr bash "$RELATED" --file "$BATS_TEST_TMPDIR/query"
+  run --separate-stderr bash "$RELATED_SCRIPT" --file "$BATS_TEST_TMPDIR/query"
   [ "$status" -eq 2 ]
-  run --separate-stderr bash "$RELATED" --file "/tmp/ruvector-related.x/../../etc/query"
+  run --separate-stderr bash "$RELATED_SCRIPT" --file "/tmp/ruvector-related.x/../../etc/query"
   [ "$status" -eq 2 ]
   d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
   ln -s /etc/hostname "$d/query"
-  run --separate-stderr bash "$RELATED" --file "$d/query"
+  run --separate-stderr bash "$RELATED_SCRIPT" --file "$d/query"
   [ "$status" -eq 2 ]
   rm -rf "$d"
 }
@@ -293,7 +299,7 @@ related_staged() {
   d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
   mkdir -p "$d/valuable"; echo keep > "$d/valuable/data"
   printf 'src/a.ts' > "$d/query"
-  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED" "$d/query"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED_SCRIPT" "$d/query"
   [ "$status" -eq 0 ]
   [ ! -e "$d/query" ]
   [ "$(cat "$d/valuable/data")" = keep ]
@@ -500,4 +506,11 @@ related_staged() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"src/b.ts"* ]]
   [ "$(wc -l < "$counter")" -eq 1 ]
+}
+
+@test "coedit-related.sh has no positional path form" {
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"usage: coedit-related.sh --stage | --file"* ]]
 }
