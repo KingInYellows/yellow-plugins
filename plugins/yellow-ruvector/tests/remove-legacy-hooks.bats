@@ -267,6 +267,19 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF\nruvector hooks post-edit --success\nEOF"]' "$S" >/dev/null
 }
 
+@test "a legacy call after a heredoc on its header line is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<EOF; ruvector hooks post-edit --success\nbody\nEOF"},
+    {type: "command", command: "cat <<-EOF && npx ruvector hooks post-command\n\tbody\n\tEOF"},
+    {type: "command", command: "cat <<EOF; echo ok\nruvector hooks post-edit\nEOF"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF; echo ok\nruvector hooks post-edit\nEOF"]' "$S" >/dev/null
+}
+
 @test "a legacy call behind environment assignments is found and removed" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "RUVECTOR_ONNX=0 ruvector hooks post-edit --success"},

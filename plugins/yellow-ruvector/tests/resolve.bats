@@ -344,6 +344,17 @@ fake_install() {
   [ "$status" -eq 0 ]
 }
 
+@test "run_budgeted without GNU timeout kills a TERM-ignoring child before returning" {
+  run bash -c '
+    . "$1"; TIMEOUT_CMD=""
+    run_budgeted 0.3 bash -c "sh -c \"trap \\\"\\\" TERM; echo \\\$\\\$ > \$0; exec sleep 30\" \"\$0\" & wait" "$2"
+    c=$(cat "$2" 2>/dev/null)
+    [ -n "$c" ] || exit 7
+    st=$(ps -o stat= -p "$c" 2>/dev/null | tr -d " ")
+    case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$LIB" "$BATS_TEST_TMPDIR/child.pid"
+  [ "$status" -eq 0 ]
+}
+
 @test "run_bounded (install lib): bounds a command when timeout is unavailable" {
   mkdir -p "$STUBS/bin"
   for b in sh sleep kill cat pkill; do ln -s "$(command -v "$b")" "$STUBS/bin/$b"; done
