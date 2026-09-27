@@ -560,3 +560,20 @@ related_staged() {
   [[ "$output" != *"src/b.ts"* ]]
   [ ! -e "$qf" ]
 }
+
+@test "coedit-related.sh --stage cleans up stages that were never run" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  # Another session's stage, abandoned two days ago with its query written.
+  qo=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=old bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$qo"
+  touch -d '2 days ago' "$XDG_CACHE_HOME/yellow-ruvector/related-stage.old" 2>/dev/null || skip "touch -d unsupported"
+  # This session staged once and never ran it.
+  q1=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=me bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$q1"
+  q2=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=me bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  [ ! -e "${qo%/query}" ]
+  [ ! -e "$XDG_CACHE_HOME/yellow-ruvector/related-stage.old" ]
+  [ ! -e "${q1%/query}" ]
+  [ -d "${q2%/query}" ]
+  rmdir "${q2%/query}"
+}

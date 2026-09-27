@@ -46,13 +46,32 @@ _key="${CLAUDE_CODE_SESSION_ID:-}"
 _key=$(printf '%s' "$_key" | LC_ALL=C tr -cd 'A-Za-z0-9_-' | cut -c1-80)
 [ -n "$_key" ] && [ "$_key" != "ppid-" ] || _key="default"
 PTR="${PTR_DIR}/related-stage.${_key}"
+# drop_stage <pointer> — remove a pointer record and what it staged: only
+# the query file and the (then empty) dir, and only a dir --stage made
+# (under the prefix, one level, ours, not a symlink).
+drop_stage() {
+  local d=""
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 0
+  IFS= read -r d < "$1" || true
+  case "$d" in "${STAGE_PREFIX}"?*) ;; *) d="" ;; esac
+  case "${d#"${STAGE_PREFIX}"}" in */*) d="" ;; esac
+  if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
+    rm -f -- "${d}/query"
+    rmdir -- "$d" 2>/dev/null
+  fi
+  rm -f -- "$1"
+}
 if [ "$1" = "--stage" ]; then
   sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
   ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || exit 1
   [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || exit 1
-  # Records of sessions that never ran --run: drop those over a day old.
-  find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
-    -exec rm -f -- {} + 2>/dev/null || true
+  # A stage this session never ran, and records (with their staging dirs)
+  # other sessions left unrun for over a day (at most 100 per call).
+  drop_stage "$PTR"
+  while IFS= read -r old; do
+    drop_stage "$old"
+  done < <(find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
+    2>/dev/null | head -n 100)
   ptmp=$(mktemp "${PTR}.XXXXXX") || exit 1
   printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; exit 1; }
   printf 'QUERY_FILE=%s/query\n' "$sdir"
