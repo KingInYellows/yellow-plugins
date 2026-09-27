@@ -679,7 +679,20 @@ coedit_prune_sessions() {
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }')
         rmdir -- "$h" 2>/dev/null
-      done ) \
+      done
+      SECONDS=0
+      # Temp files coedit_write_atomic left behind when a hook was killed
+      # between mktemp and the rename (the 1s timeout): session and cursor
+      # temps here, coedit.json temps in the store dir. Only ones over 10
+      # minutes old (no write takes that long), at most 200 per run, 1s per
+      # listing and 3s in all; regular files only (-type f matches no
+      # symlink).
+      while IFS= read -r t && [ "$SECONDS" -lt 3 ]; do
+        [ -f "$t" ] && [ ! -L "$t" ] || continue
+        coedit_older_than "$(coedit_mtime "$t")" 600 && rm -f -- "$t"
+      done < <({ run_budgeted 1 find . ! -name . -prune -type f -name '*.tmp.????????' ! -name "*${nl}*"
+          run_budgeted 1 find .. ! -name .. -prune -type f -name 'coedit.json.tmp.????????' ! -name "*${nl}*"
+        } 2>/dev/null | head -n 200) ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

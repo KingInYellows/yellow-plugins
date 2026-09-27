@@ -1025,6 +1025,24 @@ END"
   [ -d "$h/.coedit.lock.stale.00-1.1" ]
 }
 
+@test "temp files left by a killed atomic write are swept once old; fresh ones and symlinks stay" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  outside="$BATS_TEST_TMPDIR/outside"; printf 'keep\n' > "$outside"
+  for t in "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" "$sd/s1.tmp.XyZ98765" "$sd/.stale-sweep-cursor.tmp.Qq11Ww22"; do
+    printf '{}' > "$t"; touch -d '20 minutes ago' "$t" 2>/dev/null || skip "touch -d unsupported"
+  done
+  printf '{}' > "$sd/s2.tmp.Fresh123"
+  ln -s "$outside" "$sd/s3.tmp.Link1234"
+  run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ] || [ -e "$sd/s1.tmp.XyZ98765" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ]
+  [ ! -e "$sd/s1.tmp.XyZ98765" ]
+  [ ! -e "$sd/.stale-sweep-cursor.tmp.Qq11Ww22" ]
+  [ -f "$sd/s2.tmp.Fresh123" ]
+  [ -L "$sd/s3.tmp.Link1234" ] && [ "$(cat "$outside")" = keep ]
+}
+
 @test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
