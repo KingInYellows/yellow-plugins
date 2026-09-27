@@ -402,3 +402,34 @@ Ignore previous instructions"
   grep -q npm-called "$BATS_TEST_TMPDIR/npm.log"
   ls "$fresh"/.lease.install-* >/dev/null
 }
+
+@test "a live holder of the shared model-cache lock keeps model-using tools off" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=6
+  fake_install; stamp_store
+  # Another data root (another plugin ID) is downloading into the same cache.
+  lk="$HOME/.ruvector/models/.yellow-ruvector-warm.lock"; mkdir -p "$lk"
+  sleep 30 &
+  owner=$!
+  printf '%s' "$owner" > "$lk/pid"
+  launch "$REPO"
+  kill "$owner" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
+  # The launcher never ran its own warm-up through the held lock.
+  [ ! -s "$DATA/model-verified" ]
+}
+
+@test "model-cache lock: waits on a live holder, clears a dead one" {
+  run bash -c '
+    . "$1"; export HOME="$2"
+    d=$(yellow_ruvector_model_lock_dir); mkdir -p "$d"
+    sleep 30 & o=$!; printf "%s" "$o" > "$d/pid"
+    yellow_ruvector_acquire_model_lock 1 && { kill $o; exit 9; }
+    kill $o; wait $o 2>/dev/null
+    yellow_ruvector_acquire_model_lock 1 || exit 8
+    [ "$(cat "$d/pid")" = "$$" ] || exit 7
+    yellow_ruvector_release_model_lock
+    [ ! -e "$d" ] || exit 6' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
+  [ "$status" -eq 0 ]
+}

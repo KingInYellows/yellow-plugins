@@ -25,8 +25,11 @@ ruvector.
      is not cached, it warms the model (`embed
      text`, 15s, under the install lock); if that fails (offline), it drops
      the write tools `hooks_remember` and `hooks_pretrain` from
-     `RUVECTOR_MCP_ALLOW` for the session. While another session still holds
-     the install lock fetching the model, it starts with only
+     `RUVECTOR_MCP_ALLOW` for the session. Every warm-up (launcher, prewarm,
+     setup, the status dry-run) holds a lock next to the shared model cache
+     (`<cache>/.ruvector/models/.yellow-ruvector-warm.lock`), since data roots
+     of different plugin IDs share that cache. While another session still
+     holds the install lock or that model lock, it starts with only
      `hooks_capabilities` and `hooks_stats` (no tool that loads the model
      mid-download). A TERM during the warm-up stops and reaps it before the
      lock is released. The server's write paths
