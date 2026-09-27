@@ -191,9 +191,11 @@ semver bump rules.
   # Expected: "completed" status with "success" conclusion
   ```
 
-  `validate-schemas.yml` does not run on the bot-created Version Packages PR
-  (see `CONTRIBUTING.md` "Reviewing the Version Packages PR"), so there is no
-  PR CI run to check — Section 2's `pnpm release:check` is the branch gate.
+  Without `RELEASE_PR_TOKEN`, the Version Packages PR is opened by
+  `github-actions[bot]` and every `pull_request` run on it waits at
+  "action_required" for maintainer approval (see `CONTRIBUTING.md` "Reviewing
+  the Version Packages PR"). Section 2's `pnpm release:check` is the branch gate
+  either way.
 
 **Reference**: Section 4 directive - Repository state must be clean before
 tagging.
@@ -373,12 +375,13 @@ seconds median.
   gh pr list --search "chore: version packages"
   ```
 
-  The bot-created PR does **not** trigger `on: pull_request` CI (see Section
-  1.1) — there are no PR checks to wait on. `pnpm release:check`, run locally
-  against this branch in Section 2.1, is the actual gate before merging.
-  `version-packages.yml`'s `build-and-release` job (validation, build, artifact
-  generation) only runs after this PR merges — see Section 5.3 for reviewing
-  that run.
+  Without `RELEASE_PR_TOKEN`, this PR's `on: pull_request` runs (including the
+  required `CI Status Summary`) wait at "action_required" until a maintainer
+  approves them (see Section 1.1); with it, they start on their own.
+  `pnpm release:check`, run locally against this branch in Section 2.1, is the
+  actual gate before merging. `version-packages.yml`'s `build-and-release` job
+  (validation, build, artifact generation) only runs after this PR merges — see
+  Section 5.3 for reviewing that run.
 
 **Reference**: `.github/workflows/version-packages.yml`, Iteration 4 validation
 focus.

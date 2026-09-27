@@ -66,10 +66,12 @@ The Ceramic MCP at `https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 —
 **no API key in plugin.json**, same shape as `parallel`. Browser pops on first
 `ceramic_search` use; token cached and auto-refreshed thereafter.
 
-`CERAMIC_API_KEY` is a separate env var used **only** by the REST live-probe in
-`/research:setup` (`POST https://api.ceramic.ai/search`) — not by the MCP
-server. Get a REST key at `https://platform.ceramic.ai/keys` if you want that
-probe to run.
+No Ceramic API key is read anywhere: `/research:setup` and `/setup:all` decide
+Ceramic availability from `ceramic_search` visibility alone. On WSL or headless
+hosts where the browser callback fails, authenticate with
+`claude mcp login plugin:yellow-research:ceramic --no-browser` in a separate
+terminal — it needs a TTY, so never run it through `!` or the Bash tool, and
+paste the callback URL (a one-time code) only into that terminal.
 
 Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still handle
 conversational queries and synthesis. The research-conductor and code-researcher
@@ -175,8 +177,6 @@ neither is set, the wrapper unsets the empty value so the MCP package sees
 "absent" not "explicitly empty"; behavior then differs by server. Perplexity's
 MCP hard-fails at startup so its tools are unavailable, while Tavily and EXA
 start successfully and surface a runtime error on the first tool call.
-`CERAMIC_API_KEY` remains a shell-only env var because it gates the REST
-live-probe in `/research:setup`, not the MCP server (which uses OAuth).
 
 **Scope note (security):** the resolved API key is exported into the MCP process
 environment and is therefore visible to any subprocess the MCP server spawns

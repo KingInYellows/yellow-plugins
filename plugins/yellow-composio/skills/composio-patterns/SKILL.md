@@ -31,7 +31,9 @@ checked in priority order:
 
 1. `mcp__plugin_yellow-composio_composio-server__*` -- bundled by this
    plugin (preferred). Native HTTP at `https://connect.composio.dev/mcp`,
-   authenticated by Claude Code's browser OAuth flow.
+   authenticated by Claude Code's browser OAuth flow (or
+   `claude mcp login plugin:yellow-composio:composio-server --no-browser`
+   in a separate terminal when the callback cannot reach the host, e.g. WSL2).
 2. `mcp__claude_ai_composio__*` -- Claude.ai native Composio integration
    (legacy, still supported).
 3. `mcp__composio-server__*` -- manual `claude mcp add` setup
@@ -287,7 +289,8 @@ Pattern:
 - **OAuth for the bundled server**: the plugin manifest declares
   `https://connect.composio.dev/mcp` with no headers. Claude Code runs
   the browser OAuth flow and stores the session. Do not paste a Platform
-  project API key into that flow. The headless `claude mcp add` fallback
+  project API key into that flow. On WSL or headless hosts prefer the
+  `--no-browser` login over the key fallback. The `claude mcp add` fallback
   in `/composio:setup` uses a For You consumer key (`ck_...`) as
   `x-consumer-api-key` and stores it in plaintext in `~/.claude.json`.
   Never echo, log, or commit that key.
