@@ -99,7 +99,9 @@ coedit_normalize() {
   # Edit paths arrive absolute, so only a loose raw bound here; the 512 cap
   # applies to the stored root-relative path below.
   [ "${#p}" -le 4096 ] || return 1
-  if printf '%s' "$p" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
+  # A shell pattern, not grep: grep reads line by line, so a newline in the
+  # path would split it into clean-looking records and pass.
+  case "$p" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
   case "$p" in
     /*) abs="$p" ;;
     *) abs="${root}/${p}" ;;
@@ -124,7 +126,7 @@ coedit_normalize() {
     *) return 1 ;;
   esac
   [ -n "$rel" ] && [ "${#rel}" -le 512 ] || return 1
-  if printf '%s' "$rel" | LC_ALL=C grep -q '[[:cntrl:]]'; then return 1; fi
+  case "$rel" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
   case "$rel" in
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
