@@ -245,9 +245,12 @@ else
     # afterward instead.
     # The dry-run loads the model: while it is unverified, hold the shared
     # model-cache lock so it never downloads alongside prewarm or another
-    # session (RUVECTOR_BIN stubs need no model).
+    # session (RUVECTOR_BIN stubs need no model; the hash embedder never
+    # loads it, the same rule as setup and the launcher).
     MODEL_BUSY=0
-    if [ -z "${RUVECTOR_BIN:-}" ] && ! yellow_ruvector_model_cached \
+    if [ -z "${RUVECTOR_BIN:-}" ] \
+       && { ! . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh" || ! ruvector_hash_selected; } \
+       && ! yellow_ruvector_model_cached \
        && ! yellow_ruvector_acquire_model_lock 30; then
       MODEL_BUSY=1
     fi
