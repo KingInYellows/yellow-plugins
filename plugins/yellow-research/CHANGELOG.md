@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.2.0
+
+### Minor Changes
+
+- [`da07a12`](https://github.com/KingInYellows/yellow-plugins/commit/da07a12669628964f06a305bd04bdc0c15a8def7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Bump the pinned
+  `ast-grep-mcp` commit from `674272f` to `149e20d`. The old pin's unbounded
+  `mcp[cli]>=1.6.0` dependency now resolves `mcp` 2.x, which removed
+  `mcp.server.fastmcp`, so the ast-grep MCP server crashed at startup and
+  `/research:code` / `/research:deep` lost AST search. Upstream migrated to MCP
+  2 and pins `mcp[cli]==2.1.0`; the four tools (`find_code`,
+  `find_code_by_rule`, `dump_syntax_tree`, `test_match_code_rule`) are
+  unchanged. Restart Claude Code after updating — a failed MCP connection stays
+  cached for about 15 minutes.
+
+- [`471f786`](https://github.com/KingInYellows/yellow-plugins/commit/471f786197677f82bde63754b4605ffd75889490)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Ceramic is
+  OAuth-only: `CERAMIC_API_KEY` is no longer read anywhere. The Ceramic MCP
+  always authenticated via OAuth 2.1, but `/research:setup` still checked the
+  key, validated its `cer_sk` format and ran a REST live-probe with it, and
+  `/setup:all` listed it — suggesting a key was required. `/research:setup` and
+  `/setup:all` now decide Ceramic availability from `ceramic_search` visibility
+  alone, and the docs name EXA, Tavily and Perplexity as the only API keys. An
+  exported `CERAMIC_API_KEY` is ignored; unset it if you like. The opt-in live
+  REST test (`tests/integration/ceramic.test.ts`) is removed. The key name stays
+  on the never-commit and name-based redaction lists.
+
 ## 4.1.2
 
 ### Patch Changes

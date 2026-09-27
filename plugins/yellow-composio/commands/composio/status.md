@@ -138,8 +138,11 @@ call Composio, so a visible tool is loaded but not proven authenticated:
 
 - Tools discoverable → **PRESENT (untested)** — the MCP is loaded. Run
   `/composio:setup` for a live HEALTHY / DEGRADED probe.
-- Tools not discoverable → **OFFLINE**. Run `/composio:setup`. For the
-  bundled server that means browser OAuth is not finished. A headless
+- Tools not discoverable → **OFFLINE**. For the bundled server that means
+  OAuth is not finished: run
+  `claude mcp login plugin:yellow-composio:composio-server --no-browser`
+  in a separate terminal (needs a TTY; works on WSL and headless hosts),
+  or `/composio:setup` for the full remediation. A headless
   `claude mcp add` entry can also be missing or can shadow the plugin.
 
 ### Step 5: Display dashboard

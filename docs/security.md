@@ -245,6 +245,31 @@ Before enabling any plugin with hooks:
 - OAuth tokens managed by Claude Code MCP client (not stored in plugin code)
 - No credentials or API keys stored in plugin files
 
+### Release PR token (`RELEASE_PR_TOKEN`)
+
+`version-packages.yml` optionally uses a `RELEASE_PR_TOKEN` repository secret to
+push the `changeset-release/main` branch, open the "chore: version packages" PR,
+and push release tags. It exists so the PR's CI runs without maintainer approval
+(the repo requires approval for all external contributors, and
+`github-actions[bot]` counts as one); unset, the workflow falls back to the
+ephemeral `GITHUB_TOKEN`.
+
+- **Owner**: a KingInYellows organization member with write access to this
+  repository. An outside collaborator's token is still subject to the approval
+  policy, and a PAT cannot exceed its owner's role, so a read-only member's
+  token passes the preflight but fails at the push.
+- **Scope**: fine-grained PAT, resource owner KingInYellows, this repository
+  only, Contents + Pull requests read/write, no other permissions.
+- **Exposure**: available only to the `version-or-publish` job, which runs on
+  pushes to `main` and `workflow_dispatch` — never on pull requests — and is
+  passed to the pinned `changesets/action` step and the preflight probe.
+- **Rotation**: set an expiry (90 days or less). Create the new PAT, install it
+  with `gh secret set RELEASE_PR_TOKEN`, then revoke the superseded PAT in the
+  owner's settings — replacing the secret does not invalidate the old token. An
+  expired token fails the preflight step with an explicit error.
+- **Revocation**: revoke the PAT in the owner's settings and run
+  `gh secret delete RELEASE_PR_TOKEN`; the workflow reverts to `GITHUB_TOKEN`.
+
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 
 - All processing happens locally on user's machine

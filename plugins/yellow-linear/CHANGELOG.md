@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.4
+
+### Patch Changes
+
+- [`d5b22d6`](https://github.com/KingInYellows/yellow-plugins/commit/d5b22d60c45236217a4c0d03e4a9f2d9e4b3d666)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Redact Linear
+  MCP responses immediately after fetch, including cycle-path
+  `list_cycles`/`list_issues` in `/linear:work` Step 1, before session display
+  and worktree writes.
+
 ## 2.0.3
 
 ### Patch Changes

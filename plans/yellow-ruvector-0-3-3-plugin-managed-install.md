@@ -85,7 +85,7 @@ npm install by hand.
 ```text
 ${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector}/
   install-<lockhash12>/node_modules/ruvector/bin/cli.js   # one dir per lockfile
-  current -> install-<lockhash12>                         # atomic symlink swap
+  current -> install-<lockhash12>                         # swap: mv -T, else ln -sfn
   .install.lock/                                          # mkdir lock + pid
 
 bin/start-ruvector.sh (MCP command)
@@ -106,11 +106,15 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 ### Key Design Decisions
 
 1. **Plugin-managed install (morph pattern), keyed by lockfile hash.**
-   - `npm ci --ignore-scripts` into `install-<hash>`, then swap `current`
-     atomically with `ln -sfn` on a temp link followed by `mv -T`.
+   - `npm ci --ignore-scripts` into `install-<hash>`, then swap `current`:
+     atomically with a temp link plus GNU `mv -T`; where `mv` lacks `-T`
+     (BSD/macOS), `ln -sfn` under the install lock (a brief unlink window that
+     unlocked readers treat as "needs install" and wait out on the lock).
    - Keying by hash means a version bump never deletes `node_modules` from under
      a running MCP server, whose ONNX imports load lazily.
-   - Prune install dirs other than `current` and the previous one.
+   - Prune install dirs other than `current`, the previous one, and any named
+     on a live process's command line (the launcher execs the resolved
+     `install-<hash>` path so a long-running server keeps its dir).
    - Pass through `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (and lowercase),
      `NODE_EXTRA_CA_CERTS` and `npm_config_*`/`NPM_CONFIG_*` into the `env -i`
      install.
@@ -124,8 +128,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
    with the same HOME or /tmp prefix validation as morph.
 4. **Install waiting.**
    - The launcher waits while a live lock owner is installing, for up to
-     `RUVECTOR_INSTALL_WAIT` seconds (default 25, under Claude Code's MCP
-     startup timeout). If it gives up, it prints one stderr hint naming
+     `RUVECTOR_INSTALL_WAIT` seconds (default 25, which must stay under
+     Claude Code's MCP startup timeout; task 1.1a measures it). If it gives up, it prints one stderr hint naming
      `/ruvector:setup` and `MCP_TIMEOUT`.
    - Hooks never wait. If `current` is missing, or the lock exists with a live
      owner, they exit with the silent allow JSON.
@@ -145,15 +149,15 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
      the model with `node cli.js embed text "warmup"`, bounded at about 15 s and
      judged by its output rather than its rc.
    - If the model is still not cached (offline), the launcher starts MCP with
-     `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
-     server is read-only and cannot stamp the store.
+     `hooks_remember` and `hooks_pretrain` removed from `RUVECTOR_MCP_ALLOW`
+     for that session, so the server is read-only and cannot stamp the store.
    - A stamped store, or a warm model, keeps the normal five-tool allowlist.
    - `/ruvector:status` reports the read-only mode and how to leave it (the next
      session with network).
 7. **Co-edit is plugin-owned, not ruvector-owned.**
    - Pairs live in `.ruvector/coedit.json`, which only the plugin writes, using
-     jq plus a temp file and `mv`, under a non-blocking mkdir lock (skip if
-     busy).
+     jq plus a temp file and `mv`, under a mkdir lock with a bounded wait
+     (10 × 50 ms, then skip that edit; see task 2.2).
    - The MCP server's save would erase anything the hooks add to
      `intelligence.json` (`mcp-server.js:223`, `:418-430`), which rules that
      file out.
@@ -180,7 +184,10 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 >   target of `current`.
 > - Morph passes no proxy or CA variables and doesn't use `--ignore-scripts`
 >   (`:172-182`).
-> - BSD `realpath` lacks `-m`. Reuse morph's capability probe (`:38-72`).
+> - BSD `realpath` lacks `-m`. Morph's capability probe (`:38-72`) leaves
+>   the raw path in place there, so fail closed instead: canonicalize
+>   portably (`cd -P` on the longest existing ancestor) and refuse `.`/`..`
+>   components.
 
 <!-- /deepen-plan -->
 
@@ -211,8 +218,8 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 > 1. When the store has no stamp, the launcher first warms the model with
 >    `embed text` (bounded).
 > 2. If the model still isn't cached (offline), the launcher starts MCP with
->    `hooks_remember` removed from `RUVECTOR_MCP_ALLOW` for that session, so the
->    server is read-only and cannot stamp the store.
+>    `hooks_remember` and `hooks_pretrain` removed from `RUVECTOR_MCP_ALLOW`
+>    for that session, so the server is read-only and cannot stamp the store.
 > 3. `/ruvector:status` explains the read-only mode.
 >
 > This needs a user decision.
@@ -228,9 +235,12 @@ hooks/scripts/lib/resolve.sh (sourced by every hook and the launcher)
 >
 > - No yellow-ruvector hook or fixture reads `session_id` today. Add it to every
 >   fixture, and skip pairing when it is missing.
-> - Reuse `yellow-core/hooks/scripts/_stop-capture-subshell.sh:31-36` (sanitize
->   with `tr -c 'A-Za-z0-9._-' '_'`, reject `.` and `..`) and the per-session
->   temp+rename writes in `yellow-core/lib/compound-staging.sh:12-22`.
+> - Validate the session id rather than rewrite it (unlike
+>   `yellow-core/hooks/scripts/_stop-capture-subshell.sh:31-36`, whose
+>   `tr -c 'A-Za-z0-9._-' '_'` maps `a/b` and `a?b` to the same file): accept
+>   only `[A-Za-z0-9._-]`, at most 128 chars, not starting with `.`, and skip
+>   recording otherwise. Reuse the per-session temp+rename writes in
+>   `yellow-core/lib/compound-staging.sh:12-22`.
 
 <!-- /deepen-plan -->
 
@@ -260,6 +270,16 @@ provider (`/stack:status`). Each PR gets its own changeset.
     creating or touching a `.ruvector/` store.
   - The model cache path `${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/`
     (`dist/core/onnx/loader.js:178-184`) is shared by hooks and MCP.
+  - Claude Code's MCP startup timeout when `MCP_TIMEOUT` is unset: start a
+    stdio server that sleeps before its handshake and bisect the sleep. Treat
+    `RUVECTOR_INSTALL_WAIT` as the launcher's total pre-handshake budget, kept
+    a few seconds under the measured timeout (lower it from 25 if needed),
+    and record the measured value in Decision 4. Every step before the
+    handshake draws on that one budget: the install-lock wait, then the
+    fresh-store warm-up's lock wait and its bounded embed (at most 15 s, and
+    never more than what is left minus ~2 s for the handshake). When too
+    little is left, skip the warm-up and start read-only. Only a first
+    `npm ci` may run past it.
 - [ ] 1.1b: Confirm 0.2.34 can still load a store written by 0.3.3 (rollback
       path). Record the result in Migration & Rollback.
 - [ ] 1.1c: Confirm `hooks reembed --dry-run` output in 0.3.3 still has the
@@ -286,7 +306,9 @@ provider (`/stack:status`). Each PR gets its own changeset.
       `plugins/yellow-ruvector/package-lock.json`
       (`npm install --package-lock-only --ignore-scripts`), and add
       `!plugins/yellow-ruvector/package-lock.json` to `.gitignore` (lines 45-52
-      ignore lockfiles by default).
+      ignore lockfiles by default). Add it to AGENTS.md's committed npm
+      lockfile exceptions next to yellow-morph's, so later audits do not
+      treat it as forbidden generated state.
 - [ ] 1.2b: Run `pnpm install` and commit the regenerated `pnpm-lock.yaml` (the
       workspace includes `plugins/*` and CI uses `--frozen-lockfile`). Confirm
       `pnpm audit` / the `security-audit` job passes with ruvector's tree. The
@@ -322,11 +344,14 @@ provider (`/stack:status`). Each PR gets its own changeset.
   3. installs under the lock, with the live-owner wait from decision 4;
   4. releases the lock explicitly before `exec`;
   5. resolves the root, heals the store and `cd`s there;
-  6. exports `RUVECTOR_MCP_ALLOW`: the same five tools, or four
-     (`hooks_remember` removed) in decision 6's read-only case, after the
-     bounded model warm-up for an unstamped store;
-  7. runs
-     `exec node "$DATA/current/node_modules/ruvector/bin/cli.js" mcp start`.
+  6. exports `RUVECTOR_MCP_ALLOW`: the same five tools, or three
+     (`hooks_remember` and `hooks_pretrain` removed) in decision 6's
+     read-only case, after the bounded model warm-up for a missing or
+     unstamped store;
+  7. resolves `current` and runs
+     `exec node "$DATA/install-<hash>/node_modules/ruvector/bin/cli.js" mcp start`,
+     so the live command line names the concrete install that pruning must
+     keep.
 - [ ] 1.3c: Create `hooks/scripts/prewarm.sh` (SessionStart, catalog timeout 5),
       modeled on `prewarm-morph.sh`. It uses `hook-json.sh` `json_exit`, so the
       output carries `permission` for Cursor. It runs a detached install, then
@@ -357,9 +382,10 @@ provider (`/stack:status`). Each PR gets its own changeset.
 
 - [ ] 1.4a: In all hooks, replace the `command -v ruvector` blocks
       (`session-start.sh:217-221`, `pre-tool-use.sh:31-35`,
-      `post-tool-use.sh:44-48`, `stop.sh:30-34`) with sourcing `resolve.sh` and
-      calling `ruvector_resolve_bin || json_exit`. Derive PROJECT_DIR from
-      `ruvector_resolve_root "$CWD"`.
+      `post-tool-use.sh:44-48`, `stop.sh:30-34`) with sourcing `resolve.sh`.
+      Only hooks that run the CLI call `ruvector_resolve_bin || json_exit`;
+      the jq-only co-edit hooks (PR 2/3) never gate on the binary. Derive
+      PROJECT_DIR from `ruvector_resolve_root "$CWD"`.
 - [ ] 1.4b: In `session-start.sh`:
   - drop `--resume`;
   - make the two 0.65 s recalls a single
@@ -402,9 +428,23 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     binary;
   - remove `user-prompt-submit.sh` from the list at 127;
   - add a note that any global `ruvector` is no longer used;
-  - add detection of leftover `ruvector hooks init` entries in
-    `~/.claude/settings.json` or `.claude/settings.json`, with a warning and the
-    `scripts/repair-cursor-pretooluse.sh` pointer.
+  - add detection and removal of leftover `ruvector hooks init` entries in
+    `~/.claude/settings.json` or `.claude/settings.json`. The repair script
+    only wraps PreToolUse commands for Cursor, so it is not cleanup: add
+    `scripts/remove-legacy-hooks.sh <file> [--apply]`, which lists every hook
+    entry whose command runs `ruvector hooks
+    post-edit|post-command|pre-edit|pre-command|session-start|session-end`
+    and, with `--apply`, removes only those (dropping emptied matcher groups
+    and events). It validates paths the way `repair-cursor-pretooluse.sh`
+    does: only `$HOME/.claude/settings.json` and the project's
+    `.claude/settings.json` are accepted; the project file (which arrives
+    with a clone) must resolve to the real `.claude/settings.json` inside the
+    resolved project root, so a symlinked file or `.claude` directory is
+    refused; a symlinked user file is followed to its regular-file target
+    and rewritten in place. The backup is a new `mktemp` file next to the
+    target, never a fixed name a checkout could pre-plant as a symlink.
+    Setup lists the entries and asks before applying; on "keep" it prints
+    the manual removal steps. Status flags them and points to setup.
 - [ ] 1.5b: Update `commands/ruvector/status.md`:
   - Step 1: install dir, version, lockfile sync, Node version;
   - Step 6 (line 155): the dry-run uses the resolved binary instead of `npx`.
@@ -412,8 +452,12 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
     fence so the `status-provenance.bats` extractor still works;
   - add checks for a nested `.ruvector/` below the root and for leftover global
     hook entries;
-  - add "hooks inactive: CLAUDE_PLUGIN_DATA unset, using fallback" when
-    applicable.
+  - report the running server's mode: when ToolSearch finds `hooks_stats`
+    but not `hooks_remember`, this session's MCP server started read-only
+    (the launcher's allowlist is not visible to a separate shell);
+  - report the data dir with "(fallback: CLAUDE_PLUGIN_DATA unset)" when
+    applicable (informational: hooks and the launcher use the same
+    fallback); "hooks inactive" is only for a missing Node 20+.
 - [ ] 1.5c: Update `commands/ruvector/seed-solutions.md`:
   - allowed-tools lines 11-13;
   - the Step 1.3 version gate (42-67), which checks the DATA install version
@@ -422,11 +466,36 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
 - [ ] 1.5d: Update `agents/ruvector/memory-manager.md:95`,
       `skills/memory-query/SKILL.md:114` (no `CLAUDE_PLUGIN_DATA` paths in skill
       prose), `README.md`, `CLAUDE.md` (MCP Server, Hooks, Known Limitations,
-      Maintenance, Testing), and `docs/security.md` (15, 22-23, 140-142, 209,
-      462).
+      Maintenance, Testing), `docs/security.md` (15, 22-23, 140-142, 209,
+      462), and the root `README.md` rows for yellow-ruvector (setup text and
+      the command/hook counts, updated again in PR 2 and PR 3), and the hook
+      events table in `docs/guides/advanced-workflows.md` (no
+      UserPromptSubmit recall; PostToolUse becomes co-edit tracking and the
+      Stop row drops yellow-ruvector in PR 2; PreToolUse gains co-edit
+      suggestions in PR 3).
 - [ ] 1.5e: Update `plugins/yellow-core/commands/setup/all.md`:
-  - replace the line 63 probe and the READY rule at 435-439 with a DATA
-    `current` + lockfile check, modeled on morph's block at 441-461;
+  - replace the line 63 probe and the READY rule at 435-439 with a check of
+    yellow-ruvector's own install. `/setup:all` runs as a yellow-core command,
+    so its `CLAUDE_PLUGIN_DATA` is yellow-core's: resolve yellow-ruvector's
+    data dir explicitly (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data/yellow-ruvector*/`,
+    then the XDG fallback `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/`;
+    write `$HOME`, not `~`, since a tilde from a parameter default is never
+    expanded)
+    and look for `current/node_modules/ruvector/bin/cli.js` there. Count a
+    candidate only where the launcher's `validate_paths` would accept it
+    (physically under HOME or `/tmp`, or under an absolute, non-system
+    `CLAUDE_CONFIG_DIR` / `XDG_DATA_HOME`), so `/setup:all` never reports
+    READY for an install the launcher rejects. Model the
+    READY/PARTIAL rules on morph's block at 441-461, keeping the existing
+    `.ruvector/` prerequisite (the install is shared across projects, so a
+    repo without its own store still needs `/ruvector:setup`) and replacing
+    `node18_check` with a Node 20+ check (the launcher refuses older Node):
+    READY = Node 20+, install present, and `.ruvector/` exists; PARTIAL =
+    Node 20+ and `.ruvector/` exists but no install yet. The probe only checks
+    that an install exists: an install from an older lockfile is not a setup
+    need, because the launcher (and the prewarm hook) reinstall to the new
+    lockfile on the next session without user action, so /setup:all does
+    not flag it;
   - update the example output at 689.
 
 <!-- deepen-plan: codebase -->
@@ -467,9 +536,14 @@ Then run `pnpm generate:manifests` and refresh the snapshot with
 > - `docs/architecture-overview.md:495`;
 > - plugin `CLAUDE.md:55,110-113,137,141,208,271`;
 > - `yellow-core/skills/git-worktree/SKILL.md:147` and `worktree-manager.sh:162`
->   (`RUVECTOR_STORAGE_PATH`).
+>   (`RUVECTOR_STORAGE_PATH`);
+> - `docs/solutions/integration-issues/ruvector-worktree-db-symlink.md:43-47,
+>   99-103`, which name the inert `RUVECTOR_STORAGE_PATH` as the spawn-time
+>   store selector: rewrite them to say the launcher's `cd` to the git
+>   toplevel (after the worktree heal) selects the store, and that the
+>   variable must not be reintroduced.
 >
-> The last two are in yellow-core, which then needs its changeset.
+> The git-worktree entries are in yellow-core, which then needs its changeset.
 
 <!-- /deepen-plan -->
 
@@ -511,8 +585,9 @@ Adding a changeset for yellow-core is part of this task.
   - the wait-then-hint behavior when the lock is held by a live pid;
   - Node below 20 gives a clear error;
   - `RUVECTOR_MCP_ALLOW` holds the five tools for a stamped store. For an
-    unstamped store with a failing `embed` stub it holds four (`hooks_remember`
-    removed).
+    unstamped store with a failing `embed` stub it holds three
+    (`hooks_capabilities`, `hooks_recall`, `hooks_stats`), and neither
+    `hooks_remember` nor `hooks_pretrain` is present.
 - [ ] 1.6d: New `tests/resolve.bats`, covering root order, the `RUVECTOR_BIN`
       seam, the lock-held skip and a missing `current`.
 - [ ] 1.6e: `session-start.bats` asserts one recall call, no `--resume`, and a
@@ -526,15 +601,41 @@ Adding a changeset for yellow-core is part of this task.
   - Edit, Write and MultiEdit (fixed to read `tool_input.file_path` instead of
     `edits[]`, lines 141-146) call `coedit_record "$rel"`.
 - [ ] 2.2: New `hooks/scripts/lib/coedit.sh`:
-  - `coedit_normalize`: realpath, reject paths outside the root, strip control
-    characters, cap at 512 characters, skip `.ruvector/` and `docs/solutions/`.
+  - `coedit_normalize`: resolve symlinks (the final component too), reject
+    paths outside the root, reject (never strip) control characters so no
+    two files alias, cap at 512 characters, skip `.ruvector/`, `.git/` and
+    `docs/solutions/`.
   - `coedit_record`:
     1. Read `coedit-sessions/<session_id>` (last path and epoch).
-    2. If the path differs and the edit is within 60 s, increment the symmetric
-       pair in `coedit.json` under a non-blocking mkdir lock, using jq with a
-       temp file and `mv`. Skip on contention.
+    2. If the path differs and the edit is within 0–60 s, increment the
+       symmetric pair in `coedit.json` under a mkdir lock, using jq with a
+       temp file and `mv`. The session lock and the store lock share one
+       wait budget per edit (8 × 50 ms, ~0.4 s) so concurrent sessions queue
+       rather than drop increments; past that the increment is skipped. Every
+       jq over the store is killed after 0.3 s (a slow store skips the
+       increment and is not set aside), which keeps the whole hook well
+       inside the 1 s PostToolUse timeout with its allow JSON. The contract
+       is bounded loss: under normal contention (N sessions finishing inside
+       the shared budget) N concurrent sessions yield a count of N, and a
+       test asserts exactly that, not just valid JSON; an increment is lost
+       only when a lock wait or the jq bound runs out.
+       A hook killed while holding a lock (the 1 s timeout) must not
+       disable recording: a lock older than a minute is stale and is
+       reclaimed once per lock generation (the reclaimer first creates
+       `<lock>.reclaim.<inode>-<mtime>` with mkdir, since inodes alone are
+       reused at once, and re-checks the inode and mtime, computing ages
+       from `stat` + `date` rather than `find -mmin`,
+       so two waiters never both act and a fresh replacement lock is never
+       deleted; markers are pruned after 10 minutes). The session file has
+       its own per-session lock, so a busy store lock loses only that
+       increment, never the session's latest edit. Cover an abandoned lock,
+       an already-claimed generation, and store-lock contention in bats.
     3. Rewrite the session file atomically.
-  - Cap `coedit.json` at 5 000 pairs, evicting the lowest counts.
+  - Cap `coedit.json` at 2 000 directed entries (1 000 undirected pairs) and
+    a byte budget below 1 MB, evicting whole undirected pairs (both
+    directions together, lowest counts first), so the store stays symmetric
+    and suggestions agree in both directions; set aside a file over 1 MB
+    unparsed.
   - Prune session files older than 7 days on SessionStart.
 - [ ] 2.3: Catalog: remove the `Stop` hook and the `PostToolUseFailure`
       registration. Delete `hooks/scripts/stop.sh` and `tests/stop.bats`. Narrow
@@ -553,12 +654,15 @@ Adding a changeset for yellow-core is part of this task.
   - A pair is recorded within the window. None is recorded across sessions or
     after 60 s.
   - Paths outside the root and `.ruvector/` paths are rejected.
-  - Concurrency: 20 parallel invocations never corrupt `coedit.json`.
+  - Concurrency: 20 parallel invocations never corrupt `coedit.json`, and
+    parallel edits within the budget each count (bounded loss, above).
   - The resolved binary is never invoked.
 - [ ] 2.6: Measure noise before and after (memories added per 10 edits plus 10
       commands on a fresh store) and put it in the PR body.
 - [ ] 2.7: `CLAUDE.md` / `README.md`: update the hooks section and the component
-      counts.
+      counts. Update `docs/security.md` in this PR too (the hook-event table
+      and the post-tool-use/stop rows), since PR 2 is what removes Stop and
+      PostToolUseFailure and changes PostToolUse to co-edit writes.
 
 ### PR 3 — Co-edit surfacing (minor)
 
@@ -566,8 +670,11 @@ Adding a changeset for yellow-core is part of this task.
   - On Edit, Write and MultiEdit (with `tool_input.file_path`), look up the
     partners of the normalized path in `coedit.json` with jq (no node start).
   - Keep up to 3 partners with a count of at least 3 that still exist under the
-    root and are not yet surfaced for that file this session (tracked in the
-    session file).
+    root, the first time this session edits that file (the edited file goes
+    into the session file's `surfaced` list; see Data formats). Validate
+    candidates before applying the limit, so deleted or unsafe high-count
+    partners never hide valid ones below them; keep the scan bounded (missing
+    files cost no subprocess, directory checks are cached and capped).
   - Emit them with `emit_recall_json "PreToolUse" "<fenced block>"`: an advisory
     header, a reference-only fence, and forged-terminator scrubbing.
   - Bash stays a no-op allow. Drop the background `pre-edit` and `pre-command`
@@ -575,10 +682,20 @@ Adding a changeset for yellow-core is part of this task.
   - Update the header comment and the `hook-json.sh:27-28` comment.
 - [ ] 3.2: New command `commands/ruvector/related.md`
       (`/ruvector:related <file>`):
-  - validate the argument through `lib/validate.sh`;
+  - reject, in the script (executable Bash, not only command prose), an
+    argument that is absolute, begins with `-`, has a `..` component, or
+    contains control characters, before any other use. Then validate it
+    locally with `coedit_normalize` (the same root-containment check the
+    hooks use), so the command does not depend on yellow-core's
+    `validate-fs.sh`;
   - normalize it to a root-relative path;
-  - print the top 10 partners with counts from `coedit.json`;
-  - handle a missing file ("no co-edit history yet").
+  - print up to 50 partners (top by count) from `coedit.json`, each
+    re-validated, between reference-only fence lines (partner names are
+    project data);
+  - handle a missing file ("no co-edit history yet");
+  - the command never puts the path into shell syntax (a heredoc, even with a
+    random delimiter, does): `--stage` makes a private temp query file, the
+    Write tool writes the path into it, and `--file` reads one line from it.
 
 <!-- deepen-plan: external -->
 
@@ -590,8 +707,12 @@ Adding a changeset for yellow-core is part of this task.
 >
 > - Add task 3.0: verify on the current Claude Code with a throwaway hook.
 > - If it is not shown, emit the note from PostToolUse (after the edit, "files
->   usually edited with X"). The timing is arguably as useful, and the rest of
->   PR 3 is unchanged.
+>   usually edited with X"). The timing is arguably as useful. Then retarget
+>   3.1 to `post-tool-use.sh` and move 3.4's suggestion, fencing and
+>   once-per-session assertions into `post-tool-use.bats`.
+>
+> Outcome: the current hooks reference documents PreToolUse
+> `additionalContext` as shown to Claude, so PR 3 shipped on PreToolUse.
 
 <!-- /deepen-plan -->
 
@@ -667,8 +788,14 @@ These are listed per task above. The main ones:
 // .ruvector/coedit.json
 { "version": 1, "pairs": { "src/a.ts": { "src/b.ts": 4 }, "src/b.ts": { "src/a.ts": 4 } } }
 // .ruvector/coedit-sessions/<session_id>
-{ "last": "src/a.ts", "epoch": 1790000000, "surfaced": ["src/b.ts"] }
+{ "last": "src/a.ts", "epoch": 1790000000, "surfaced": ["src/a.ts"] }
 ```
+
+`surfaced` lists the edited (source) files this session already got
+suggestions for, not the partners shown. That is what makes the contract
+"once per edited file per session": editing `src/c.ts` later still shows
+`src/b.ts` if it is a partner of `src/c.ts`, and returning to `src/a.ts`
+shows nothing again. Capped at the last 200 entries.
 
 ## Testing Strategy
 
@@ -711,8 +838,9 @@ These are listed per task above. The main ones:
    valid allow JSON.
 8. A version bump of the pin installs into a new `install-<hash>` without
    disturbing a running MCP server.
-9. CI is green, including `security-audit`, `changeset-check` and
-   `plugin-shell-tests`.
+9. CI is green, including `changeset-check` and `plugin-shell-tests`, and the
+   yellow-ruvector bats suite passes locally. `security-audit` is advisory
+   (`pnpm audit` does not fail the job), so check its output by hand.
 
 <!-- deepen-plan: codebase -->
 
@@ -758,14 +886,20 @@ These are listed per task above. The main ones:
   and offers a merge note. There is no automatic merge.
 - **A hash-stamped legacy store:** keep the existing ADR-210 detection and the
   `reembed` remediation unchanged.
-- **Leftover global `ruvector hooks init` entries:** setup and status detect and
-  warn. They are never edited automatically, except through the existing repair
+- **Leftover global `ruvector hooks init` entries:** status detects and warns;
+  `/ruvector:setup` lists them and, only after the user confirms, removes them
+  with `scripts/remove-legacy-hooks.sh --apply` (backup kept). Nothing edits
+  them without that confirmation, apart from the existing Cursor repair
   script.
 - **Concurrent sessions:** `intelligence.json` stays last-writer-wins
-  (upstream). `coedit.json` skips writes when its lock is busy, so at worst one
-  pair increment is lost.
-- **Paths:** reject anything outside the root. Prefix `./` to arguments
-  beginning with `-`. Strip control characters from suggestions.
+  (upstream). `coedit.json` edits wait up to ~0.4 s (shared by the session
+  and store locks) and then skip: loss is bounded to one pair increment per
+  timed-out wait, and none under normal contention.
+- **Paths:** reject user-supplied paths that are absolute, begin with `-`,
+  or contain `..` components or control characters (AGENTS.md), and anything
+  that resolves outside the root. Drop, never strip, a suggestion partner
+  with control characters or any other unsafe shape: stripping could turn it
+  into a different, valid file name.
 
 ## Performance Considerations
 

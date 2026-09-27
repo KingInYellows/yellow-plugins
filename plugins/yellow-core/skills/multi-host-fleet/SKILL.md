@@ -55,7 +55,6 @@ dismissing or skipping it is safe when the shell env var is set.
 | yellow-research | `PERPLEXITY_API_KEY` | `perplexity_api_key` | yes | |
 | yellow-research | `TAVILY_API_KEY` | `tavily_api_key` | yes | |
 | yellow-research | `EXA_API_KEY` | `exa_api_key` | yes | |
-| yellow-research | `CERAMIC_API_KEY` | (none) | yes | REST live-probe only; MCP uses OAuth |
 | yellow-morph | `MORPH_API_KEY` | `morph_api_key` | yes | |
 | yellow-semgrep | `SEMGREP_APP_TOKEN` | `semgrep_app_token` | yes | `sgp_` prefix |
 | yellow-devin | `DEVIN_SERVICE_USER_TOKEN` | `devin_service_user_token` | yes | HTTP MCP; commands read shell env directly |
@@ -188,7 +187,6 @@ The wrapper scripts inside each plugin will pick them up.
 # export PERPLEXITY_API_KEY="$(cat ~/.secrets/perplexity 2>/dev/null)"
 # export TAVILY_API_KEY="$(cat ~/.secrets/tavily 2>/dev/null)"
 # export EXA_API_KEY="$(cat ~/.secrets/exa 2>/dev/null)"
-# export CERAMIC_API_KEY="$(cat ~/.secrets/ceramic 2>/dev/null)"  # REST probe only
 
 # yellow-morph
 # export MORPH_API_KEY="$(cat ~/.secrets/morph 2>/dev/null)"

@@ -51,14 +51,8 @@ Claude Code prompts for each key on enable. Answer the prompts for the
 sources you want; dismiss the others. Values persist in the system keychain
 (or `~/.claude/.credentials.json` at 0600 on minimal Linux).
 
-`CERAMIC_API_KEY` is the only shell-env key still in use — it powers the
-`/research:setup` REST live-probe only (the Ceramic MCP itself authenticates
-via OAuth):
-
-```sh
-export CERAMIC_API_KEY="..."   # https://platform.ceramic.ai/keys
-                               # REST probe only; MCP uses OAuth
-```
+EXA, Tavily and Perplexity are the only API keys. Ceramic and Parallel Task
+authenticate via OAuth and need no key.
 
 Get keys at:
 
