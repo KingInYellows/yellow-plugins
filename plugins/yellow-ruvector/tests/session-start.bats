@@ -1233,3 +1233,15 @@ END"
   [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
   [ -d "$sd/.za1.lock.reclaim.1-1" ]
 }
+
+@test "a stalling timeout is probed once per SessionStart, not again after coedit.sh" {
+  mkdir -p "$PROJECT_ROOT/.ruvector"
+  make_ruvector_stub 'echo "{\"memories\":[]}"'
+  # A timeout that hangs and ignores TERM: each probe of it costs ~0.4s.
+  printf '#!/bin/sh\necho x >> "%s"\ntrap "" TERM\nsleep 5\n' "$BATS_TEST_TMPDIR/probes" > "$MOCK_BIN/timeout"
+  chmod +x "$MOCK_BIN/timeout"
+  : > "$BATS_TEST_TMPDIR/probes"
+  run run_hook '{"session_id":"s1"}'
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/probes")" -le 1 ]
+}
