@@ -152,7 +152,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, SessionStart, Stop | Install prewarm, memory recall, edit tracking, session lifecycle             |
+| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, SessionStart | Install prewarm, memory recall, edit tracking, session lifecycle             |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
@@ -206,7 +206,6 @@ yellow-ruvector has the most hooks. Its shell scripts:
 | prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
 | session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
 | post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | No-op (allow JSON only); `hooks post-edit` / `post-command` are never called — they write hash-embedded memories (ADR-210) |
-| stop               | Stop             | `stop.sh`               | 10s         | Run ruvector hooks session-end                         |
 
 **Security properties:**
 

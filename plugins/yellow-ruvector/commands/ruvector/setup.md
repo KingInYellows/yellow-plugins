@@ -146,7 +146,7 @@ RV_HASH=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${RV
 ENTRY=$(yellow_ruvector_pinned_entry)
 
 printf '=== Hook Scripts ===\n'
-for script in prewarm.sh session-start.sh pre-tool-use.sh post-tool-use.sh stop.sh; do
+for script in prewarm.sh session-start.sh pre-tool-use.sh post-tool-use.sh; do
   if [ -r "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/${script}" ]; then printf '  ✓ %s\n' "$script"
   else printf '  ✗ %s (missing or unreadable)\n' "$script"; fi
 done

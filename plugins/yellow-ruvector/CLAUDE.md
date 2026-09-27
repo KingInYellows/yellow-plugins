@@ -81,8 +81,8 @@ ruvector.
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
   a global `ruvector` on PATH is never used) from the git toplevel. They
-  call ruvector's built-in CLI hooks (`hooks session-end`, `hooks pre-edit`,
-  `hooks pre-command`; never `hooks post-edit` / `post-command`, which write
+  call ruvector's built-in CLI hooks (`hooks pre-edit`, `hooks pre-command`;
+  never `hooks session-end`, which rewrites the store every turn; never `hooks post-edit` / `post-command`, which write
   hash-embedded memories) as
   **side effects** — stdout is discarded and the hook always prints
   dual-client allow JSON. `hooks recall` is the exception: `session-start.sh`
@@ -138,7 +138,7 @@ ruvector.
   before acting; canonical home of the ruvector protocol constants (RULE 16
   drift lint enforces its sentinel line across the yellow-core replicas)
 
-### Hooks (5 events, 5 scripts)
+### Hooks (4 events, 4 scripts)
 
 All hooks exit silently (allow JSON) when Node < 20, the install is missing,
 or an install is in progress.
@@ -171,7 +171,8 @@ or an install is in progress.
   0.3.3 each stores a near-empty hash-embedded memory, and on a fresh store
   the first one stamps it hash/64d so every later `hooks_remember` is
   refused (ADR-210).
-- `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
+- No `Stop` hook: `hooks session-end` only exports metrics, yet it rewrites
+  the whole store every turn and races the MCP server's saves
 
 ### Scripts (4) and bin (1)
 

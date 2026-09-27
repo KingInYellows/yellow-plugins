@@ -551,8 +551,24 @@ yellow_ruvector_do_install() {
     return 1
   fi
 
-  rm -rf -- "$final" 2>/dev/null
-  mv "$tmp" "$final" || { rm -rf -- "$tmp" 2>/dev/null; return 1; }
+  # A same-version install already here failed the health check and is being
+  # repaired. A live server may run from it (leased, or on a command line)
+  # and still lazy-load modules by path: the old tree is renamed aside and the
+  # new one renamed in right after, so the path is missing only between two
+  # renames (never during a recursive delete) and then holds the same version
+  # again. Open files keep working after the old tree is deleted.
+  local old=""
+  if [ -e "$final" ] || [ -L "$final" ]; then
+    old="${RUVECTOR_DATA}/.install-${hash}.tmp.old$$"
+    rm -rf -- "$old" 2>/dev/null
+    mv -- "$final" "$old" 2>/dev/null || { rm -rf -- "$tmp" 2>/dev/null; return 1; }
+  fi
+  if ! mv -- "$tmp" "$final"; then
+    [ -n "$old" ] && mv -- "$old" "$final" 2>/dev/null
+    rm -rf -- "$tmp" 2>/dev/null
+    return 1
+  fi
+  [ -n "$old" ] && rm -rf -- "$old" 2>/dev/null
 
   yellow_ruvector_swap_current "install-${hash}" || return 1
   yellow_ruvector_prune "install-${hash}" "${prev##*/}"

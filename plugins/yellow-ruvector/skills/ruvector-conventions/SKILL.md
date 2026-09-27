@@ -124,7 +124,8 @@ from the git toplevel. There is no manual queue management inside the plugin:
 - `post-tool-use.sh` (PostToolUse and PostToolUseFailure) → allow JSON
   only; `hooks post-edit` / `post-command` are never called (each writes a
   hash-embedded memory that stamps a fresh store hash/64d, ADR-210)
-- `stop.sh` → `ruvector hooks session-end`
+- No `Stop` hook: `hooks session-end` rewrites the whole store every turn and
+  races the MCP server's saves
 
 ruvector manages its own internal queue and dedup. Plugin hooks are thin
 wrappers that parse Claude Code hook input JSON and call the right CLI command.

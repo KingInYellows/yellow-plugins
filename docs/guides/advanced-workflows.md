@@ -158,7 +158,7 @@ spawning command logs a warning if the target agent's plugin is not installed.
 | UserPromptSubmit | Before each user prompt | (none in this marketplace) |
 | PreToolUse | Before tool executes | gt-workflow (blocks `git push`) |
 | PostToolUse | After tool executes | gt-workflow (commit message check), yellow-ruvector (no-op; writes nothing) |
-| Stop | Session ends | yellow-ruvector |
+| Stop | Session ends | yellow-core |
 
 ### Hook Patterns
 
