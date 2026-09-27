@@ -492,8 +492,8 @@ coedit_prune_sessions() {
     # is tested before the stat-costly primaries), so over several runs
     # every part of the dir is reached, not only the prefix a timed-out
     # listing always stops in.
-    { run_budgeted 3 find . ! -name . -prune -type f -mtime +7 ! -name '.*' \
-        || LC_ALL=C run_budgeted 2 find . ! -name . -prune -name "$(coedit_shard)*" -type f -mtime +7
+    { run_budgeted 3 find . ! -name . -prune -type f -mtime +6 ! -name '.*' \
+        || LC_ALL=C run_budgeted 2 find . ! -name . -prune -name "$(coedit_shard)*" -type f -mtime +6
     } 2>/dev/null \
       | while IFS= read -r f && [ "$SECONDS" -lt 5 ]; do
           f="${f#./}"
