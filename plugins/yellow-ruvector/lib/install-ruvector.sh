@@ -300,8 +300,36 @@ yellow_ruvector_reclaim_lock() {
 }
 
 # Idempotent; safe from traps and again before exec.
+# yellow_ruvector_kill_tree <pid> <signal> — signal <pid> and every
+# descendant (pgrep -P walk; just <pid> where pgrep is missing).
+yellow_ruvector_kill_tree() {
+  local c
+  for c in $(pgrep -P "$1" 2>/dev/null); do yellow_ruvector_kill_tree "$c" "$2"; done
+  kill "-$2" "$1" 2>/dev/null
+}
+
+# yellow_ruvector_stop_warm — stop a running model warm-up (its whole process
+# tree: TERM, then KILL after ~1s) and reap it. Called before the install
+# lock is released, so a warm-up never outlives the lock that guards the
+# model cache.
+yellow_ruvector_stop_warm() {
+  local pid="${_YR_WARM_PID:-}" i
+  [ -n "$pid" ] || return 0
+  _YR_WARM_PID=""
+  kill -0 "$pid" 2>/dev/null || { wait "$pid" 2>/dev/null; return 0; }
+  yellow_ruvector_kill_tree "$pid" TERM
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -0 "$pid" 2>/dev/null && yellow_ruvector_kill_tree "$pid" KILL
+  wait "$pid" 2>/dev/null
+  return 0
+}
+
 yellow_ruvector_release_install_lock() {
   local lock_dir="${RUVECTOR_DATA}/.install.lock" owner
+  yellow_ruvector_stop_warm
   # Only the owner releases: a lock that now carries another pid belongs to
   # someone else. ($$ is the parent shell inside prewarm's subshell, whose
   # pid the parent writes into the lock; BASHPID is the subshell itself.)
@@ -527,15 +555,24 @@ yellow_ruvector_run_bounded() {
 # Download/load the ONNX model once via `ruvector embed text`, which never
 # touches a .ruvector store. It exits 0 even on failure, so judge success by
 # the "Dimension: 384" line. $1 = optional time limit in seconds.
+# The warm-up runs as a background job of this shell (not inside $(...),
+# where bash defers traps until the child exits): its pid is kept in
+# _YR_WARM_PID so a TERM/INT trap, via the lock release, stops and reaps it
+# at once instead of leaving it writing the cache after the lock is gone.
 yellow_ruvector_warm_model() {
-  local secs="${1:-}" entry out fp
+  local secs="${1:-}" entry out fp tmp
   entry=$(yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
+  tmp=$(mktemp "${TMPDIR:-/tmp}/rv-warm.XXXXXX") || return 1
   if [ -n "$secs" ]; then
-    out=$( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" 2>&1 )
+    ( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" ) >"$tmp" 2>&1 &
   else
-    out=$( cd "${TMPDIR:-/tmp}" && node "$entry" embed text "warmup" 2>&1 )
+    ( cd "${TMPDIR:-/tmp}" && exec node "$entry" embed text "warmup" ) >"$tmp" 2>&1 &
   fi
+  _YR_WARM_PID=$!
+  wait "$_YR_WARM_PID" 2>/dev/null
+  _YR_WARM_PID=""
+  out=$(cat "$tmp" 2>/dev/null); rm -f "$tmp"
   printf '%s' "$out" | grep -q 'Dimension: 384' || return 1
   # Record which files were verified (see yellow_ruvector_model_cached).
   fp=$(yellow_ruvector_model_fingerprint) || return 1
