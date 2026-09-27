@@ -633,6 +633,24 @@ SH
   [ "$status" -eq 0 ]
 }
 
+@test "stopping a warm-up or npm ci kills a TERM-ignoring child even after the root exits" {
+  for var in _YR_WARM_PID _YR_NPM_PID; do
+    rm -f "$BATS_TEST_TMPDIR/child.pid"
+    run bash -c '
+      . "$1"
+      # The root exits on TERM; its child ignores TERM and would be reparented.
+      bash -c "sh -c \"trap \\\"\\\" TERM; echo \\\$\\\$ > \$0; exec sleep 30\" \"\$0\" & wait" "$2" &
+      printf -v "$3" %s "$!"
+      for _ in $(seq 1 50); do [ -s "$2" ] && break; sleep 0.1; done
+      c=$(cat "$2" 2>/dev/null); [ -n "$c" ] || exit 7
+      if [ "$3" = _YR_WARM_PID ]; then yellow_ruvector_stop_warm; else yellow_ruvector_stop_npm; fi
+      sleep 0.2
+      st=$(ps -o stat= -p "$c" 2>/dev/null | tr -d " ")
+      case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$PLUGIN/lib/install-ruvector.sh" "$BATS_TEST_TMPDIR/child.pid" "$var"
+    [ "$status" -eq 0 ]
+  done
+}
+
 @test "warm_model spends one deadline on the model-lock wait and the warm-up together" {
   fake_install
   run bash -c '
