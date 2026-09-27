@@ -429,15 +429,33 @@ coedit_prune_sessions() {
       # 10 removed per run) and started at a random entry, so trees that
       # cannot be removed never keep the sweep from reaching later ones.
       # Discovery is bounded too: top-level-only finds (-type d never
-      # matches a symlink), 2s each, at most 2000 names each (head closes
-      # the pipe, which ends find), instead of expanding every match.
-      stale=()
-      while IFS= read -r m; do
-        [ -d "$m" ] && [ ! -L "$m" ] && stale+=("$m")
-      done < <(
-        run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' 2>/dev/null | head -n 2000
-        run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' 2>/dev/null | head -n 2000
+      # matches a symlink), 2s each, instead of expanding every match. Each
+      # run takes a window of at most COEDIT_STALE_WINDOW (2000) names, in
+      # sorted order, after the last name the previous run's window ended
+      # on (.stale-sweep-cursor), wrapping to the start once a window comes
+      # back short, so trees that can never be removed cannot pin the sweep
+      # to the same names forever.
+      win=${COEDIT_STALE_WINDOW:-2000}
+      case "$win" in ''|*[!0-9]*|0) win=2000 ;; esac
+      cur=""
+      if [ -f .stale-sweep-cursor ] && [ ! -L .stale-sweep-cursor ]; then
+        IFS= read -r cur < .stale-sweep-cursor || true
+        [ "${#cur}" -le 1024 ] || cur=""
+      fi
+      found=() stale=()
+      while IFS= read -r m; do found+=("$m"); done < <(
+        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' 2>/dev/null
+          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' 2>/dev/null
+        } | LC_ALL=C sort | COEDIT_CUR="$cur" LC_ALL=C awk '$0 > ENVIRON["COEDIT_CUR"]' | head -n "$win"
       )
+      next=""
+      [ "${#found[@]}" -lt "$win" ] || next=${found[$(( ${#found[@]} - 1 ))]}
+      if [ "$next" != "$cur" ] && ctmp=$(mktemp .stale-sweep-cursor.XXXXXX 2>/dev/null); then
+        printf '%s\n' "$next" > "$ctmp" && mv -f -- "$ctmp" .stale-sweep-cursor || rm -f -- "$ctmp"
+      fi
+      for m in ${found[@]+"${found[@]}"}; do
+        [ -d "$m" ] && [ ! -L "$m" ] && stale+=("$m")
+      done
       total=${#stale[@]} tried=0 removed=0
       if [ "$total" -gt 0 ]; then
         # Two RANDOMs (15 bits each): a start anywhere in up to 2^30 entries.

@@ -581,6 +581,28 @@ exit 0'
   [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ]
 }
 
+@test "stale-tree discovery rotates past a full window of undeletable trees" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # 2000 a* trees that can never be removed fill a whole discovery window;
+  # z99 sorts after all of them.
+  (cd "$RUVECTOR_DIR" && seq -f '.coedit.lock.stale.a%04g' 1 2000 | xargs mkdir \
+    && seq -f '.coedit.lock.stale.a%04g' 1 2000 | xargs touch -d '20 minutes ago') 2>/dev/null \
+    || skip "touch -d unsupported"
+  d="$RUVECTOR_DIR/.coedit.lock.stale.z99"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  for _ in 1 2 3; do
+    PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a0001" ]
+}
+
 @test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
