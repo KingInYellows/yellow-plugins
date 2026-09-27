@@ -90,6 +90,13 @@ if [ "$1" = "--run" ]; then
   [ -f "$PTR" ] && [ ! -L "$PTR" ] && [ -O "$PTR" ] \
     || { printf 'coedit-related: nothing staged (run --stage first)\n' >&2; exit 2; }
   IFS= read -r _sdir < "$PTR" || _sdir=""
+  # No query written (the Write step failed or never ran): drop the record
+  # together with its empty staging dir, so nothing is left unreachable.
+  if [ ! -f "${_sdir}/query" ] || [ -L "${_sdir}/query" ]; then
+    drop_stage "$PTR"
+    printf 'coedit-related: no query was written (run --stage again)\n' >&2
+    exit 2
+  fi
   rm -f -- "$PTR"
   # Same checks as --file below; the limit is fixed at 50.
   set -- --file "${_sdir}/query" 50

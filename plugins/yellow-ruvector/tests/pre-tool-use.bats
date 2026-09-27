@@ -642,3 +642,18 @@ related_staged() {
     [ -z "$output" ]
   done
 }
+
+@test "--run with no query written removes the record and its empty staging dir" {
+  q=$(bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  [ -d "${q%/query}" ]
+  run --separate-stderr bash "$RELATED_SCRIPT" --run
+  [ "$status" -eq 2 ]
+  [ ! -e "${q%/query}" ]
+  [ -z "$(ls -A "$STAGE_BASE")" ]
+  # And the next stage/run cycle works.
+  q=$(bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$q"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+}
