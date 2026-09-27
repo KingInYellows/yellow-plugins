@@ -1,0 +1,25 @@
+.github/releases.md
+  s_37c0875242a535::t_783b0084bf212d 192,813-820
+.github/workflows/version-packages.yml
+  s_37c0875242a535::t_b962c90aa433cd 16-19,80-82,86-94
+CONTRIBUTING.md
+  s_37c0875242a535::t_f91a3c043e7678 266-269
+docs/security.md
+  s_37c0875242a535::t_ab4e683a4e4f2c 249-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a200c40ae81d34aa7bc46f500a37d9ce3b9177f1",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
