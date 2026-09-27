@@ -566,7 +566,7 @@ coedit_prune_sessions() {
           run_budgeted 1 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
             || LC_ALL=C run_budgeted 0.3 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
         } 2>/dev/null \
-          | LC_ALL=C awk -v k=500 'BEGIN { srand() }
+          | LC_ALL=C awk -v k=500 -v s="$RANDOM$RANDOM" 'BEGIN { srand(s) }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
       )
@@ -620,7 +620,7 @@ coedit_prune_sessions() {
         { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*"; a=$?
           run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' ! -name "*${nl}*"; b=$?
           [ "$a" -eq 0 ] && [ "$b" -eq 0 ] && printf 'END\n'; } 2>/dev/null \
-          | COEDIT_CUR="$cur" LC_ALL=C awk -v k="$win" '
+          | COEDIT_CUR="$cur" LC_ALL=C awk -v k="$win" -v s="$RANDOM$RANDOM" '
               function sw(i, j,  t) { t = h[i]; h[i] = h[j]; h[j] = t }
               function push(x,  i, p) {
                 h[++n] = x; i = n
@@ -636,7 +636,7 @@ coedit_prune_sessions() {
                   sw(i, c); i = c
                 }
               }
-              BEGIN { cur = ENVIRON["COEDIT_CUR"]; n = 0; m = 0; t = 0; done = 0; srand() }
+              BEGIN { cur = ENVIRON["COEDIT_CUR"]; n = 0; m = 0; t = 0; done = 0; srand(s) }
               $0 == "END" { done = 1; next }
               {
                 t++
@@ -706,6 +706,8 @@ coedit_prune_sessions() {
       fi
       # Held trees get a few bounded retries per run: a random sample of
       # three, so ones that can never be removed cannot pin the retries.
+      # (Every awk sample here is seeded from $RANDOM: a bare srand() uses
+      # the clock second, so hooks started together would draw alike.)
       # A listing that times out is followed by one random shard of the
       # name suffix (the inode digits after .stale. or .stale.m, or the pid
       # after .stale.s for a session path renamed aside), so the
@@ -724,7 +726,7 @@ coedit_prune_sessions() {
             || { sh=$(coedit_shard digit)
                  LC_ALL=C run_budgeted 0.5 find "$h" ! -name "${h##*/}" -prune \( -name ".*.lock.stale.${sh}*" -o -name ".*.lock.stale.m${sh}*" -o -name ".*.lock.stale.s${sh}*" \) -type d ! -name "*${nl}*"; }
           } 2>/dev/null \
-          | LC_ALL=C awk -v k=3 'BEGIN { srand() }
+          | LC_ALL=C awk -v k=3 -v s="$RANDOM$RANDOM" 'BEGIN { srand(s) }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }')
         rmdir -- "$h" 2>/dev/null
@@ -743,7 +745,7 @@ coedit_prune_sessions() {
       # entries that stay (undeletable) never pin the sweep and one
       # directory never starves the other. At most 4s in all.
       tmp_sample() {
-        LC_ALL=C awk -v k=100 'BEGIN { srand() }
+        LC_ALL=C awk -v k=100 -v s="$RANDOM$RANDOM" 'BEGIN { srand(s) }
           { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
           END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
       }
