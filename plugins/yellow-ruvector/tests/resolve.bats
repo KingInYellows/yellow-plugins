@@ -365,6 +365,16 @@ fake_install() {
   [ "$output" -lt 450 ]
 }
 
+@test "run_bounded without GNU timeout spends no KILL grace on a command that exits on TERM" {
+  run bash -c '
+    . "$1"; timeout() { return 1; }; gtimeout() { return 1; }
+    s=$(date +%s%N); yellow_ruvector_run_bounded 0.3 sleep 5; e=$(date +%s%N)
+    echo $(( (e - s) / 1000000 ))' _ "$PLUGIN_ROOT/lib/install-ruvector.sh"
+  [ "$status" -eq 0 ]
+  # 0.3s cap plus polling slack, never the full 1s grace.
+  [ "$output" -lt 800 ]
+}
+
 @test "without GNU timeout both helpers kill a TERM-ignoring child even when the root exits 0 on TERM" {
   for fn in run_budgeted yellow_ruvector_run_bounded; do
     rm -f "$BATS_TEST_TMPDIR/child.pid"
