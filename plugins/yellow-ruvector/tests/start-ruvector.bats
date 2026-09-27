@@ -620,3 +620,15 @@ SH
   [ "$npm_gone" = 1 ]
   [ ! -e "$DATA/.install.lock" ]
 }
+
+@test "run_bounded without GNU timeout kills a TERM-ignoring child before returning" {
+  run bash -c '
+    . "$1"
+    timeout() { return 1; }; gtimeout() { return 1; }
+    yellow_ruvector_run_bounded 1 bash -c "sh -c \"trap \\\"\\\" TERM; echo \\\$\\\$ > \$0; exec sleep 30\" \"\$0\" & wait" "$2"
+    c=$(cat "$2" 2>/dev/null)
+    [ -n "$c" ] || exit 7
+    st=$(ps -o stat= -p "$c" 2>/dev/null | tr -d " ")
+    case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$PLUGIN/lib/install-ruvector.sh" "$BATS_TEST_TMPDIR/child.pid"
+  [ "$status" -eq 0 ]
+}
