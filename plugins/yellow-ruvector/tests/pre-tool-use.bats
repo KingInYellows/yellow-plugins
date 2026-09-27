@@ -534,6 +534,8 @@ related_staged() {
   grep -q 'coedit-related.sh" --stage)$' "$md"
   grep -q 'coedit-related.sh" --run)$' "$md"
   ! sed -n '/^---$/,/^---$/p' "$md" | grep 'coedit-related' | grep -q ':\*'
+  # No unscoped grant: an injected file name must not pre-approve reads.
+  ! sed -n '/^---$/,/^---$/p' "$md" | grep -Eq '^  - (Read|Write|Bash)$'
 }
 
 @test "coedit-related.sh keeps one staged query per session" {
