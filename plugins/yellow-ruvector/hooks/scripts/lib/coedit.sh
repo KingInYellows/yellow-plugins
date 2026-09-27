@@ -557,7 +557,10 @@ coedit_suggest_once() {
   sid=$(coedit_sanitize_session "${2:-}") || return 0
   rel=$(coedit_normalize "$root" "${3:-}") || return 0
   sfile="${store}/coedit-sessions/${sid}"
+  # Only a regular session file (or none) is read: a FIFO or device there
+  # would block jq past the hook's 1s budget.
   [ -L "$sfile" ] && return 0
+  { [ -e "$sfile" ] && [ ! -f "$sfile" ]; } && return 0
   # Same session-size policy as coedit_record: never parse an oversized
   # session file inside the 1s hook (the next record resets it).
   if [ -f "$sfile" ] && [ "$(wc -c < "$sfile" | tr -d ' ')" -gt 65536 ]; then

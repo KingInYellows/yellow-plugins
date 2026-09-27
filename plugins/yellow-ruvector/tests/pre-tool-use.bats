@@ -368,6 +368,17 @@ related_staged() {
   [ -z "$(ctx "$output")" ]
 }
 
+@test "a FIFO at the session path never blocks the hook" {
+  command -v mkfifo >/dev/null || skip "mkfifo not available"
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  mkfifo "$RUVECTOR_DIR/coedit-sessions/s14"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s14 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
+}
+
 @test "a malformed surfaced field is reset, so the suggestion is recorded once" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   for bad in '"src/a.ts is here"' '{"x":1}' '[1, null, "src/z.ts"]'; do
