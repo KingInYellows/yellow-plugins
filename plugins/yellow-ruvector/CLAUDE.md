@@ -303,7 +303,7 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 ## Testing
 
 `bats tests/` from the plugin directory — one suite per hook
-(`session-start`, `pre-tool-use`, `post-tool-use`, `stop`,
+(`session-start`, `pre-tool-use`, `post-tool-use`,
 `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
 `remove-legacy-hooks.bats`, `prewarm.bats` (install decision, npm stubbed),
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
