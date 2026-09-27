@@ -6,6 +6,8 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   command -v jq >/dev/null || skip "jq not installed"
+  export HOME="$BATS_TEST_TMPDIR/home"; mkdir -p "$HOME"
+  STAGE_BASE="$HOME/.cache/yellow-ruvector/related"
   PROJECT_ROOT="$(cd "$(mktemp -d)" && pwd -P)"
   RUVECTOR_DIR="$PROJECT_ROOT/.ruvector"
   mkdir -p "$RUVECTOR_DIR" "$PROJECT_ROOT/src"
@@ -286,9 +288,9 @@ related_staged() {
   : > "$BATS_TEST_TMPDIR/query"
   run --separate-stderr bash "$RELATED_SCRIPT" --file "$BATS_TEST_TMPDIR/query"
   [ "$status" -eq 2 ]
-  run --separate-stderr bash "$RELATED_SCRIPT" --file "/tmp/ruvector-related.x/../../etc/query"
+  run --separate-stderr bash "$RELATED_SCRIPT" --file "$STAGE_BASE/q.x/../../etc/query"
   [ "$status" -eq 2 ]
-  d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
+  mkdir -p "$STAGE_BASE"; d=$(mktemp -d "$STAGE_BASE/q.XXXXXXXX")
   ln -s /etc/hostname "$d/query"
   run --separate-stderr bash "$RELATED_SCRIPT" --file "$d/query"
   [ "$status" -eq 2 ]
@@ -296,7 +298,7 @@ related_staged() {
 }
 
 @test "coedit-related.sh --file removes only the query file, never other contents" {
-  d=$(mktemp -d "/tmp/ruvector-related.XXXXXXXX")
+  mkdir -p "$STAGE_BASE"; d=$(mktemp -d "$STAGE_BASE/q.XXXXXXXX")
   mkdir -p "$d/valuable"; echo keep > "$d/valuable/data"
   printf 'src/a.ts' > "$d/query"
   run --separate-stderr bash -c 'cd "$1" && bash "$2" --file "$3" 50' _ "$PROJECT_ROOT" "$RELATED_SCRIPT" "$d/query"
@@ -586,8 +588,24 @@ related_staged() {
   : > "${q1%/query}/extra"
   run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=me bash "$2" --stage' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == QUERY_FILE=/tmp/ruvector-related.* ]]
+  [[ "$output" == "QUERY_FILE=$STAGE_BASE/q."* ]]
   q2=${output#QUERY_FILE=}
   [ -f "${q1%/query}/extra" ]
   rm -rf "${q1%/query}" "${q2%/query}"
+}
+
+@test "coedit-related.sh stages in a private per-user dir the Write grant covers" {
+  q=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  [[ "$q" == "$STAGE_BASE"/q.*/query ]]
+  [ "$(stat -c %a "$STAGE_BASE" 2>/dev/null || stat -f %Lp "$STAGE_BASE")" = 700 ]
+  # The grant names exactly that location, and nothing under shared /tmp.
+  md="$BATS_TEST_DIRNAME/../commands/ruvector/related.md"
+  grep -qx '  - Write(~/.cache/yellow-ruvector/related/q.\*/query)' "$md"
+  ! grep -q 'Write(//tmp\|Write(//private/tmp' "$md"
+  # A symlinked staging base is refused, never followed.
+  rm -rf "$STAGE_BASE"; mkdir -p "$BATS_TEST_TMPDIR/elsewhere"
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" "$STAGE_BASE"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --stage' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -ne 0 ]
+  [ -z "$(ls -A "$BATS_TEST_TMPDIR/elsewhere")" ]
 }

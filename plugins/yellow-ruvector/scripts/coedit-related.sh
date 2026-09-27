@@ -30,9 +30,14 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
 USAGE='usage: coedit-related.sh --stage | --run | --file <query-file> [limit]'
 [ $# -ge 1 ] || { printf '%s\n' "$USAGE" >&2; exit 2; }
-# Always /tmp (not $TMPDIR): /ruvector:related's Write grant is scoped to
-# //tmp/ruvector-related.*/query, so the staged file must live there.
-STAGE_PREFIX="/tmp/ruvector-related."
+# Staging dirs live in a private (0700) per-user directory, never shared
+# /tmp: /ruvector:related pre-approves Write only for
+# ~/.cache/yellow-ruvector/related/q.*/query, and no other user can plant a
+# symlink there for that grant to follow. Always $HOME/.cache (not
+# XDG_CACHE_HOME), so the path matches the grant.
+case "${HOME:-}" in /?*) ;; *) printf 'coedit-related: HOME must be an absolute path\n' >&2; exit 1 ;; esac
+STAGE_BASE="${HOME%/}/.cache/yellow-ruvector/related"
+STAGE_PREFIX="${STAGE_BASE}/q."
 # --stage records the staging dir here, so --run takes no argument and
 # /ruvector:related can pre-approve both commands exactly, with no wildcard
 # tail a prompt-injected model could extend with shell syntax.
@@ -62,6 +67,10 @@ drop_stage() {
   rm -f -- "$1"
 }
 if [ "$1" = "--stage" ]; then
+  ( umask 077; mkdir -p "$STAGE_BASE" ) 2>/dev/null || exit 1
+  [ -d "$STAGE_BASE" ] && [ ! -L "$STAGE_BASE" ] && [ -O "$STAGE_BASE" ] || {
+    printf 'coedit-related: %s must be a directory you own (not a symlink)\n' "$STAGE_BASE" >&2; exit 1; }
+  chmod 700 "$STAGE_BASE" 2>/dev/null || exit 1
   sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
   ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || exit 1
   [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || exit 1

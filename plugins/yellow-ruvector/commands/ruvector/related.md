@@ -3,8 +3,7 @@ name: ruvector:related
 description: "List files most often edited together with a given file, from this project's co-edit history. Use when user says \"what files go with X\", \"what else should I change with X\", \"related files\", \"files usually edited together\", or before a change that likely spans several files."
 argument-hint: '<file path>'
 allowed-tools:
-  - Write(//tmp/ruvector-related.*/query)
-  - Write(//private/tmp/ruvector-related.*/query)
+  - Write(~/.cache/yellow-ruvector/related/q.*/query)
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage)
   - Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --run)
 ---
@@ -45,11 +44,12 @@ Write tool instead (see
    ```
 
    It prints `QUERY_FILE=<path>` — a file that does not exist yet, inside a
-   fresh private temp directory.
+   fresh directory under `~/.cache/yellow-ruvector/related/` (private to
+   you: mode 0700, never shared `/tmp`).
 2. Use the Write tool to write exactly the path (one line, nothing else) to
    that `QUERY_FILE`. The frontmatter pre-approves `Write` only for
-   `/tmp/ruvector-related.*/query` (and its macOS `/private/tmp` form); a
-   write anywhere else falls back to a normal permission prompt.
+   `~/.cache/yellow-ruvector/related/q.*/query`; a write anywhere else falls
+   back to a normal permission prompt.
 3. Run the lookup:
 
    ```bash
@@ -60,7 +60,7 @@ Write tool instead (see
    staging directory, so `--run` takes no arguments (it lists up to 50
    partners). The frontmatter pre-approves exactly these two commands.
    The script only accepts a regular `query` file inside a
-   `/tmp/ruvector-related.*` directory you own, reads exactly one line, and
+   `~/.cache/yellow-ruvector/related/q.*` directory you own, reads exactly one line, and
    removes just that file and then the empty directory.
 
 The script re-validates the path (it must resolve inside the project, not in
