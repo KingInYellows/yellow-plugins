@@ -1,0 +1,19 @@
+CONTRIBUTING.md
+  s_37c0875242a535::t_48eb9ab2b72a03 271-277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d7f947a7e2cfe676a8f47e5dce6a391b4d04a4f",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
