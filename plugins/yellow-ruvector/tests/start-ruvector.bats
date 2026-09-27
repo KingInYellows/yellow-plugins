@@ -130,6 +130,8 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   RUVECTOR_MCP_ALLOW=hooks_recall launch "$REPO"
   [ "$status" -eq 0 ]
   [ "$(cat "$FAKE_POLICY_OUT")" = "profile=unset deny=hooks_export,hooks_recall,hooks_remember,hooks_pretrain" ]
+  # Filtering emptied the allowlist: a no-match name keeps it closed.
+  [[ "$output" == *"allow=yellow_ruvector_none "* ]]
   # With the model verified, nothing is denied, and the profile still goes.
   stamp_store
   RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_OK=1 launch "$REPO"
