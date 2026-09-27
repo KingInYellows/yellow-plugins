@@ -192,6 +192,17 @@ ruvector_resolve_bin() {
   return 0
 }
 
+# ruvector_lease_pid <pid> — lease the resolved install for a background
+# worker ("${RUVECTOR_CMD[@]}" … &; the forked pid execs node and keeps it),
+# written while this shell's own lease still stands, so the hook can exit
+# without leaving the worker unleased. Prune sweeps it once the pid is gone.
+# No-op when RUVECTOR_BIN overrode resolution.
+ruvector_lease_pid() {
+  [ -n "${_RUVECTOR_LEASE:-}" ] && [ -n "${1:-}" ] || return 0
+  : > "${_RUVECTOR_LEASE%.*}.${1}" 2>/dev/null
+  return 0
+}
+
 # ruvector_probe_timeout — set TIMEOUT_CMD to the first timeout/gtimeout
 # that supports GNU --kill-after (BusyBox's applet does not and would fail
 # every call), or empty. Never use --foreground: it stops timeout from

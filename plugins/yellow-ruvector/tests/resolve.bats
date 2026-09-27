@@ -262,6 +262,22 @@ fake_install() {
   [ -L "$WORK/wtm/.ruvector" ]
 }
 
+@test "resolve_bin: a background worker keeps its own lease after the hook exits" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -ge 20 ] || skip "node < 20 on this host"
+  fake_install
+  rs bash -c 'unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin || exit 9
+    sleep 30 >/dev/null 2>&1 &
+    ruvector_lease_pid "$!"
+    printf "%s" "$!"' _ "$LIB"
+  [ "$status" -eq 0 ]
+  worker="$output"
+  [ -e "$DATA/.lease.install-$(own_hash).$worker" ]
+  run bash -c '. "$1"; RUVECTOR_DATA="$2"; yellow_ruvector_leased "install-$3"' _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$DATA" "$(own_hash)"
+  kill "$worker" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q
