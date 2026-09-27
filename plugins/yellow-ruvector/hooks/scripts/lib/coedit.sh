@@ -44,7 +44,9 @@ _COEDIT_BUMP_JQ='
       and (test("^(\\.ruvector|\\.git)(/|$)|^docs/solutions/") | not);
     [.pairs | to_entries[] | select(.key | safe) | .key as $k
      | .value | to_entries[]
-     | select((.key | safe) and .key != $k and .value > 0)
+     # A count over 10^9 is corrupt (no real history gets near it), and at
+     # 2^53 and above `+ 1` no longer changes it: such a pair is dropped.
+     | select((.key | safe) and .key != $k and .value > 0 and .value <= 1000000000)
      | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: (.value | floor)}]
     | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
     # The new pair gets the same check: a session file is project data too.

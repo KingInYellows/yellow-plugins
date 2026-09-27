@@ -228,6 +228,15 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -d "$RUVECTOR_DIR/coedit-sessions" ] || [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
 }
 
+@test "an absurd imported count is dropped, never pinned above real pairs" {
+  : > "$PROJECT_ROOT/src/x.ts"; : > "$PROJECT_ROOT/src/y.ts"
+  jq -n '{version:1, pairs:{"src/x.ts":{"src/y.ts":9007199254740993}, "src/y.ts":{"src/x.ts":9007199254740993}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(pair src/x.ts src/y.ts)" -eq 0 ]
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
