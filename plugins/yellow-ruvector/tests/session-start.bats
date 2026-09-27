@@ -949,8 +949,8 @@ END"
   printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *mtime*) echo ./0recent1; echo ./0recent2; exec sleep 30 ;; esac\nexec %s "$@"\n' \
     "$(command -v find)" "$(command -v find)" > "$fb/find"
   chmod +x "$fb/find"
-  # Shard 5 is [q-z].
-  COEDIT_SHARD=5 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  # Index 37: [q-z] then [g-p] ("zo…").
+  COEDIT_SHARD=37 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
   for _ in $(seq 1 80); do [ -e "$sd/zold" ] || break; sleep 0.1; done
   [ ! -e "$sd/zold" ]
   [ -e "$sd/0recent1" ]
@@ -959,17 +959,17 @@ END"
 @test "a marker listing that always times out still reaches expired markers beyond its prefix" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
-  mkdir "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1"
-  touch -d '20 minutes ago' "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" 2>/dev/null || skip "touch -d unsupported"
+  mkdir "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1"
+  touch -d '20 minutes ago' "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" 2>/dev/null || skip "touch -d unsupported"
   fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
   printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
     "$(command -v find)" "$(command -v find)" > "$fb/find"
   chmod +x "$fb/find"
-  # Index 29: [q-z] for session ids (29 % 8), [89] for digits (29 % 5).
-  COEDIT_SHARD=29 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
-  for _ in $(seq 1 120); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" ] || break; sleep 0.1; done
+  # Index 429: [q-z][q-z] ("zs…") for session ids, [89][01] ("91…") for digits.
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 120); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ] || break; sleep 0.1; done
   [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
-  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.9-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ]
 }
 
 @test "held trees that can never be removed do not pin the held-tree retries" {
@@ -1009,7 +1009,7 @@ END"
   printf '#!/bin/sh\ncase "$*" in *reclaim*) date +%%s%%N >> "%s/rmdir.log"; sleep 0.2 ;; esac\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rmdir)" > "$fb/rmdir"
   chmod +x "$fb/find" "$fb/rmdir"
   start=$(date +%s%N)
-  COEDIT_SHARD=29 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
   sleep 10
   [ -s "$BATS_TEST_TMPDIR/rmdir.log" ]
   last=$(tail -n 1 "$BATS_TEST_TMPDIR/rmdir.log")
@@ -1051,4 +1051,23 @@ END"
   [ ! -e "$d" ]
   [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a1" ] && [ ! -L "$RUVECTOR_DIR/.coedit-stale-held" ]
   [ -z "$(ls -A "$outside")" ]
+}
+
+@test "a first-character shard too big to list is itself split, reaching markers beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # Every marker starts with z; the zs one is past what a z-wide listing reaches.
+  for n in za1 za2 za3; do mkdir -p "$sd/.$n.lock.reclaim.1-1/keep"; done
+  mkdir "$sd/.zsess.lock.reclaim.1-1"
+  touch -d '20 minutes ago' "$sd"/.z*.lock.reclaim.1-1 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # A listing split two levels deep ("[..][..]") finishes; anything wider
+  # only ever gets through the undeletable za* prefix.
+  printf '#!/bin/sh\ncase "$*" in *"]["*) exec %s "$@" ;; *reclaim*) %s "$@" | LC_ALL=C sort | head -n 3; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 100); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
+  [ -d "$sd/.za1.lock.reclaim.1-1" ]
 }
