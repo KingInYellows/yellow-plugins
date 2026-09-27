@@ -181,8 +181,9 @@ progress.
   read-decide-write, and the store lock only the pair update; together they
   wait at most ~0.4s per edit, then skip (a busy store loses one increment,
   never the session's latest edit). A lock over a minute old is reclaimed
-  once per generation (`<lock>.reclaim.<inode>-<mtime>` markers, pruned
-  after 10 minutes). The stored previous path is re-normalized before
+  once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the
+  SessionStart worker prunes those over 10 minutes old, the hooks never
+  list them). The stored previous path is re-normalized before
   pairing. Every jq over the store is killed after 0.3s (the edit's
   increment is skipped), a `coedit.json` over 1 MB is set aside unparsed,
   every write rebuilds the pairs symmetric, and the file is capped at 2000

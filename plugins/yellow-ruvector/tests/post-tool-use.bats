@@ -470,7 +470,7 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ $(( (end - start) / 1000000 )) -lt 900 ]
 }
 
-@test "stale-lock reclaim and marker pruning do not depend on find" {
+@test "stale-lock reclaim does not depend on find, and leaves other markers to SessionStart" {
   mkdir -p "$BATS_TEST_TMPDIR/nofind"
   printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/nofind/find"
   chmod +x "$BATS_TEST_TMPDIR/nofind/find"
@@ -481,7 +481,8 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   PATH="$BATS_TEST_TMPDIR/nofind:$PATH" edit f1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
   [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
-  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1" ]
+  # Another generation's marker is never listed by the hook.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.reclaim.1-1" ]
 }
 
 @test "a busy store never makes the session's next edit lose its place" {
