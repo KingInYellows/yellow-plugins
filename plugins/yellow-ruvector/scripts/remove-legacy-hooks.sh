@@ -68,10 +68,12 @@ f="$target"
 
 # Only an actual ruvector invocation: the `ruvector` executable (bare, by
 # path, or via npx, optionally @version) in command position (start of the
-# command or right after ; & | or a newline, never as an argument), followed by
+# command or right after ; & | ( or a newline, optionally behind shell
+# keywords and prefixes such as then, do, if, !, {, exec — never as an
+# argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|\n])[[:space:]]*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:]]|$)'
+re='(^|[;&|\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so

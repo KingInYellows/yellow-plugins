@@ -592,3 +592,31 @@ SH
     [ -d "$d" ] || exit 8' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$DATA"
   [ "$status" -eq 0 ]
 }
+
+@test "TERM during a stalled npm ci stops npm and releases the install lock at once" {
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  printf '#!/bin/sh\necho $$ > "%s/npm.pid"\nexec sleep 30\n' "$BATS_TEST_TMPDIR" > "$nb/npm"
+  chmod +x "$nb/npm"
+  PATH="$nb:$PATH" HOME="$HOME" CLAUDE_PLUGIN_ROOT="$PLUGIN" CLAUDE_PLUGIN_DATA="$DATA" bash -c '
+    . "$1"; yellow_ruvector_data_dir
+    yellow_ruvector_acquire_install_lock 1 || exit 9
+    yellow_ruvector_trap_release
+    yellow_ruvector_do_install' _ "$PLUGIN/lib/install-ruvector.sh" 2>/dev/null &
+  inst=$!
+  for _ in $(seq 1 50); do [ -s "$BATS_TEST_TMPDIR/npm.pid" ] && break; sleep 0.1; done
+  [ -s "$BATS_TEST_TMPDIR/npm.pid" ]
+  kill -TERM "$inst"
+  gone=0
+  for _ in $(seq 1 30); do
+    st=$(ps -o stat= -p "$inst" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) gone=1; break ;; esac
+    sleep 0.1
+  done
+  npm_pid=$(cat "$BATS_TEST_TMPDIR/npm.pid")
+  st=$(ps -o stat= -p "$npm_pid" 2>/dev/null | tr -d ' ')
+  case "$st" in ''|Z*) npm_gone=1 ;; *) npm_gone=0; kill -9 "$npm_pid" ;; esac
+  [ "$gone" = 1 ] || kill -9 "$inst"
+  [ "$gone" = 1 ]
+  [ "$npm_gone" = 1 ]
+  [ ! -e "$DATA/.install.lock" ]
+}

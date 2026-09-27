@@ -404,9 +404,26 @@ yellow_ruvector_stop_warm() {
   return 0
 }
 
+# yellow_ruvector_stop_npm — stop an interrupted install's `npm ci` (its
+# whole tree: TERM, then KILL after ~1s) and reap it before the lock goes.
+yellow_ruvector_stop_npm() {
+  local pid="${_YR_NPM_PID:-}" i
+  [ -n "$pid" ] || return 0
+  _YR_NPM_PID=""
+  yellow_ruvector_kill_tree "$pid" TERM
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -0 "$pid" 2>/dev/null && yellow_ruvector_kill_tree "$pid" KILL
+  wait "$pid" 2>/dev/null
+  return 0
+}
+
 yellow_ruvector_release_install_lock() {
   local lock_dir="${RUVECTOR_DATA}/.install.lock" owner
   yellow_ruvector_stop_warm
+  yellow_ruvector_stop_npm
   yellow_ruvector_release_model_lock
   # Only the owner releases: a lock that now carries another pid belongs to
   # someone else. ($$ is the parent shell inside prewarm's subshell, whose
@@ -483,8 +500,17 @@ yellow_ruvector_do_install() {
     esac
   done < <(env)
 
-  if ! ( cd "$tmp" && env -i "${env_args[@]}" \
-         npm ci --ignore-scripts --omit=dev --no-audit --no-fund --loglevel=error ) >&2; then
+  # In the background and waited on: bash defers an INT/TERM trap until a
+  # foreground child returns, so a stalled registry would keep this shell
+  # (and the install lock) alive; `wait` returns at once, and the release
+  # stops this job's tree before the lock goes.
+  ( cd "$tmp" && exec env -i "${env_args[@]}" \
+      npm ci --ignore-scripts --omit=dev --no-audit --no-fund --loglevel=error ) >&2 &
+  _YR_NPM_PID=$!
+  local npm_rc=0
+  wait "$_YR_NPM_PID" || npm_rc=$?
+  _YR_NPM_PID=""
+  if [ "$npm_rc" -ne 0 ]; then
     printf 'yellow-ruvector: npm ci failed in %s\n' "$(yellow_ruvector_flat "$tmp")" >&2
     rm -rf -- "$tmp" 2>/dev/null
     return 1
