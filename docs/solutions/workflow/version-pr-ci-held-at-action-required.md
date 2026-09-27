@@ -3,7 +3,7 @@ title: 'Version Packages PR blocked: CI runs held at action_required for github-
 date: 2026-09-27
 category: workflow
 track: bug
-problem: The bot-opened "chore: version packages" PR sat BLOCKED because its pull_request runs, including the required CI Status Summary, waited at action_required for maintainer approval, so the Graphite merge queue could not land it
+problem: 'The bot-opened "chore: version packages" PR sat BLOCKED because its pull_request runs, including the required CI Status Summary, waited at action_required for maintainer approval, so the Graphite merge queue could not land it'
 tags: [release, changesets, github-actions, action-required, merge-queue, graphite, pat, version-packages]
 components: [version-packages.yml, validate-schemas.yml, graphite-merge-queue]
 ---
@@ -35,7 +35,8 @@ trigger no CI at all; the runs do exist, they are just held.
   Approving "Validate Marketplace and CI Suite" is enough to produce
   `CI Status Summary`.
 - Permanent: set the `RELEASE_PR_TOKEN` repository secret, a fine-grained PAT
-  owned by a KingInYellows organization member (resource owner KingInYellows,
+  owned by a KingInYellows organization member with write access to this
+  repository (resource owner KingInYellows,
   this repository only, Contents + Pull requests read/write).
   `version-packages.yml` passes `secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN`
   to `changesets/action`, so the PR is opened under the member's identity and

@@ -812,7 +812,8 @@ find them
 
 **RELEASE_PR_TOKEN** (optional):
 
-- **Type**: Fine-grained PAT owned by a KingInYellows organization member
+- **Type**: Fine-grained PAT owned by a KingInYellows organization member with
+  write access to this repository
 - **Scope**: This repository only; Contents + Pull requests read/write
 - **Purpose**: Opens the Version PR so its CI runs without approval; when unset,
   `GITHUB_TOKEN` is used instead

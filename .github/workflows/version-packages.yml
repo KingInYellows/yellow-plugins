@@ -14,8 +14,9 @@ name: Version Packages
 # changeset detection and go straight to the publish phase.
 #
 # RELEASE_PR_TOKEN (optional repo secret): a fine-grained PAT owned by a
-# member of the KingInYellows organization (an outside collaborator is still
-# subject to the approval policy), resource owner KingInYellows, this repo
+# member of the KingInYellows organization with write access to this repo (an
+# outside collaborator is still subject to the approval policy, and the PAT
+# cannot exceed its owner's role), resource owner KingInYellows, this repo
 # only, Contents + Pull requests: read/write. See docs/security.md. When
 # set, the Version PR is pushed and opened under that identity, so its
 # pull_request CI (including the required "CI Status Summary") runs without

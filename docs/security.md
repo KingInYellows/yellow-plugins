@@ -255,8 +255,10 @@ approval (the repo requires approval for all external contributors, and
 `github-actions[bot]` counts as one); unset, the workflow falls back to the
 ephemeral `GITHUB_TOKEN`.
 
-- **Owner**: a KingInYellows organization member. An outside collaborator's
-  token is still subject to the approval policy.
+- **Owner**: a KingInYellows organization member with write access to this
+  repository. An outside collaborator's token is still subject to the approval
+  policy, and a PAT cannot exceed its owner's role, so a read-only member's
+  token passes the preflight but fails at the push.
 - **Scope**: fine-grained PAT, resource owner KingInYellows, this repository
   only, Contents + Pull requests read/write, no other permissions.
 - **Exposure**: available only to the `version-or-publish` job, which runs on
