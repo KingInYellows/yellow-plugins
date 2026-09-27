@@ -261,12 +261,16 @@ ruvector_probe_timeout() {
   _RUVECTOR_TIMEOUT_PROBED=1
   for name in timeout gtimeout; do
     cmd="$(command -v "$name" || true)"
-    # The probe itself is bounded by the portable watcher: a candidate that
-    # stalls (a broken wrapper, a hung mount) must not eat the hook's budget.
-    if [ -n "$cmd" ] && TIMEOUT_CMD='' run_budgeted 0.5 "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
-      TIMEOUT_CMD="$cmd"
-      return 0
-    fi
+    [ -n "$cmd" ] || continue
+    # The probe itself is bounded by the portable watcher (a working one
+    # returns at once: `true` exits immediately). A candidate that stalls (a
+    # broken wrapper, a hung mount) ends the probing, so at most one ~0.4s
+    # stall comes out of the calling hook's budget.
+    TIMEOUT_CMD='' run_budgeted 0.2 "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1
+    case $? in
+      0) TIMEOUT_CMD="$cmd"; return 0 ;;
+      124|137|143) return 1 ;;
+    esac
   done
   return 1
 }
