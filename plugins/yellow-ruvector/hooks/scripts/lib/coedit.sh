@@ -620,7 +620,11 @@ coedit_prune_sessions() {
             # find that times out on a huge directory reaches further next
             # time instead of re-listing the same stuck prefix.
             h="${m%/*}/.coedit-stale-held"
-            { [ -d "$h" ] && [ ! -L "$h" ]; } || { [ ! -e "$h" ] && [ ! -L "$h" ] && mkdir "$h" 2>/dev/null; }
+            # A symlink or non-directory there (from a checkout) is removed
+            # (rm -f unlinks a symlink, never follows it) so the holding dir
+            # can be created.
+            if [ -L "$h" ] || { [ -e "$h" ] && [ ! -d "$h" ]; }; then rm -f -- "$h" 2>/dev/null; fi
+            { [ -d "$h" ] && [ ! -L "$h" ]; } || mkdir "$h" 2>/dev/null
             [ -d "$h" ] && [ ! -L "$h" ] && mv -- "$m" "$h/" 2>/dev/null
           fi
         done
