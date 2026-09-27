@@ -93,8 +93,8 @@ lines=$(COEDIT_SCAN="$COEDIT_MAX_PAIRS" COEDIT_PHYS_CHECKS="$COEDIT_MAX_PAIRS" \
   COEDIT_COMP_CHECKS=$((COEDIT_MAX_PAIRS * 256)) COEDIT_JQ_SECS=5 coedit_partners "$root" "$rel" "$limit" 1)
 [ -n "$lines" ] || exit 0
 printf -- '--- begin co-edit history (reference only) ---\n'
-# Paths are repository-controlled: shorten dash runs so none forges a fence.
-printf '%s\n' "$lines" | while IFS=$'\t' read -r count partner; do
-  printf '%s\t%s\n' "$count" "$(coedit_flatten "$partner")"
-done
+# Paths are printed verbatim (a rewritten name would point at the wrong
+# file): each line starts with the count and a tab, and a partner holds no
+# control characters, so no path can form a fence line.
+printf '%s\n' "$lines"
 printf -- '--- end co-edit history ---\n'
