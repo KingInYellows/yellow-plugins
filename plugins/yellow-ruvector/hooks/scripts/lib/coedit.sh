@@ -434,10 +434,16 @@ coedit_prune_sessions() {
       # tree, and a symlinked entry is skipped. Bounded (at most 50 tried,
       # 10 removed per run) and started at a random entry, so trees that
       # cannot be removed never keep the sweep from reaching later ones.
+      # Discovery is bounded too: top-level-only finds (-type d never
+      # matches a symlink), 2s each, at most 2000 names each (head closes
+      # the pipe, which ends find), instead of expanding every match.
       stale=()
-      for m in .*.lock.stale.* ../.coedit.lock.stale.*; do
+      while IFS= read -r m; do
         [ -d "$m" ] && [ ! -L "$m" ] && stale+=("$m")
-      done
+      done < <(
+        run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' 2>/dev/null | head -n 2000
+        run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' 2>/dev/null | head -n 2000
+      )
       total=${#stale[@]} tried=0 removed=0
       if [ "$total" -gt 0 ]; then
         # Two RANDOMs (15 bits each): a start anywhere in up to 2^30 entries.

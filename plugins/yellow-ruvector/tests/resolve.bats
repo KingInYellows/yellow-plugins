@@ -69,6 +69,17 @@ fake_install() {
   [ "$output" = "node $DATA/install-$(own_hash)/node_modules/ruvector/bin/cli.js" ]
 }
 
+@test "resolve_bin: leases the install for the hook's lifetime, then drops the lease" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -ge 20 ] || skip "node < 20 on this host"
+  fake_install
+  rs bash -c 'unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin || exit 9
+    ls "$2"/.lease.install-* >/dev/null 2>&1 || exit 8
+    [ -e "$2/.lease.install-$3.$$" ] || exit 7' _ "$LIB" "$DATA" "$(own_hash)"
+  [ "$status" -eq 0 ]
+  ! ls "$DATA"/.lease.install-* 2>/dev/null
+}
+
 @test "resolve_bin: stays on this version's install when another session moved current" {
   command -v node >/dev/null 2>&1 || skip "node not available"
   ruvector_major=$(node --version | sed 's/^v//' | cut -d. -f1)
