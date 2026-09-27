@@ -124,12 +124,13 @@ if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
     yellow_ruvector_release_install_lock
     trap - EXIT INT TERM
   fi
-  if ! yellow_ruvector_model_cached && yellow_ruvector_install_in_progress; then
+  if ! yellow_ruvector_model_cached \
+     && { yellow_ruvector_install_in_progress || yellow_ruvector_model_lock_busy; }; then
     # Another process (prewarm) still holds the lock and is fetching the
     # model: any model-using tool would load it through the same cache files
     # mid-download. Keep only the tools that never embed.
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_recall|hooks_remember|hooks_pretrain' | paste -sd, - || true)
-    log "the ONNX model is still being fetched by another session (${RUVECTOR_DATA}/.install.lock): starting without hooks_recall, hooks_remember and hooks_pretrain. Restart Claude Code once it finishes to use them."
+    log "the ONNX model is still being fetched by another session: starting without hooks_recall, hooks_remember and hooks_pretrain. Restart Claude Code once it finishes to use them."
   elif [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_remember|hooks_pretrain' | paste -sd, - || true)
     log "ONNX model unavailable or unverified (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
