@@ -578,7 +578,8 @@ exit 0'
   PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
   for i in $(seq 1 30); do [ -e "$d" ] || break; sleep 0.1; done
   [ ! -e "$d" ]
-  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ]
+  # Kept (in place, or held aside), never lost.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ] || [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a10" ]
 }
 
 @test "stale-tree discovery rotates past a full window of undeletable trees" {
@@ -690,7 +691,9 @@ END"
   [ "$status" -eq 0 ]
   for _ in $(seq 1 60); do [ -s "$rb/pids" ] && break; sleep 0.1; done
   [ -s "$rb/pids" ]
-  sleep 3
+  # Each rm (the first try, and the held-aside retries the 5s worker budget
+  # still allows) is killed 2s after it starts.
+  sleep 8
   while read -r p; do
     st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
     case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
@@ -887,4 +890,40 @@ END"
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
   [ -e "$victim/coedit-sessions/old-file" ]
+}
+
+@test "a directory planted at the sweep cursor is replaced, so the cursor advances" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd/.stale-sweep-cursor/sub"
+  for n in a1 a2 a3; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  COEDIT_STALE_WINDOW=2 run run_hook '{"cwd":""}'
+  for _ in $(seq 1 40); do [ -f "$sd/.stale-sweep-cursor" ] && break; sleep 0.1; done
+  [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ]
+  [ "$(cat "$sd/.stale-sweep-cursor")" = "../.coedit.lock.stale.a2" ]
+}
+
+@test "undeletable trees at the head of a timed-out listing are held aside, so later trees are reached" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # A listing that times out after the first three names (in name order),
+  # every time: the undeletable a* trees.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *coedit.lock.stale*) %s "$@" | LC_ALL=C sort | head -n 3; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in a1 a2 a3 b1; do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.$n"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.b1"
+  for _ in 1 2; do
+    PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 100); do [ -e "$d" ] || break; sleep 0.1; done
+  done
+  [ ! -e "$d" ]
+  # The undeletable ones are kept (held aside), never lost.
+  [ "$(ls -d "$RUVECTOR_DIR"/.coedit-stale-held/.coedit.lock.stale.a* | wc -l)" -eq 3 ]
 }

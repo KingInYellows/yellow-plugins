@@ -479,7 +479,9 @@ coedit_prune_sessions() {
       # fitted). After a partial scan (a find timed out) nothing proves
       # which names were not listed, so the cursor stays put and the window
       # is the random sample: trees that can never be removed cannot pin the
-      # sweep, and no unseen name is ever skipped.
+      # sweep, and no unseen name is ever skipped. A tree that could not be
+      # removed is moved into .coedit-stale-held (retried there a few per
+      # run), so a timed-out find never keeps re-listing the same prefix.
       win=${COEDIT_STALE_WINDOW:-2000}
       case "$win" in ''|*[!0-9]*|0) win=2000 ;; esac
       cur=""
@@ -547,6 +549,11 @@ coedit_prune_sessions() {
         # path is removed (never followed), and coedit_write_atomic replaces
         # only a regular file, so the rename cannot land outside the dir.
         [ -L .stale-sweep-cursor ] && rm -f -- .stale-sweep-cursor
+        # Anything else that is not a regular file there (a directory, a
+        # FIFO) would make the write fail forever: remove it, bounded.
+        if [ -e .stale-sweep-cursor ] && [ ! -f .stale-sweep-cursor ]; then
+          run_budgeted 2 rm -rf -- .stale-sweep-cursor 2>/dev/null
+        fi
         printf '%s\n' "$next" | coedit_write_atomic .stale-sweep-cursor || true
       fi
       for m in ${found[@]+"${found[@]}"}; do
@@ -563,9 +570,29 @@ coedit_prune_sessions() {
           # Each deletion is bounded too (a huge tree or slow filesystem);
           # what is left is picked up by a later sweep.
           run_budgeted 2 rm -rf -- "$m" 2>/dev/null
-          [ -e "$m" ] || removed=$((removed + 1))
+          if [ ! -e "$m" ]; then
+            removed=$((removed + 1))
+          else
+            # Not removable now (permissions, or too big for one bounded
+            # rm): move it out of the listing into .coedit-stale-held, so a
+            # find that times out on a huge directory reaches further next
+            # time instead of re-listing the same stuck prefix.
+            h="${m%/*}/.coedit-stale-held"
+            { [ -d "$h" ] && [ ! -L "$h" ]; } || { [ ! -e "$h" ] && [ ! -L "$h" ] && mkdir "$h" 2>/dev/null; }
+            [ -d "$h" ] && [ ! -L "$h" ] && mv -- "$m" "$h/" 2>/dev/null
+          fi
         done
-      fi ) \
+      fi
+      # Held trees get a few bounded retries per run.
+      for h in ./.coedit-stale-held ../.coedit-stale-held; do
+        [ "$SECONDS" -lt 5 ] || break
+        [ -d "$h" ] && [ ! -L "$h" ] || continue
+        while IFS= read -r m; do
+          [ "$SECONDS" -lt 5 ] || break
+          [ -d "$m" ] && [ ! -L "$m" ] && run_budgeted 2 rm -rf -- "$m" 2>/dev/null
+        done < <(run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" 2>/dev/null | head -n 3)
+        rmdir -- "$h" 2>/dev/null
+      done ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }
