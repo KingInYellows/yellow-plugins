@@ -292,6 +292,21 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo \\`ruvector hooks post-edit\\`"]' "$S" >/dev/null
 }
 
+@test "a legacy call after a case pattern is found; words after a substitution are not" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "case x in x) ruvector hooks post-edit --success;; esac"},
+    {type: "command", command: "echo $(ruvector hooks post-command)"},
+    {type: "command", command: "echo $(date) ruvector hooks post-edit"},
+    {type: "command", command: "echo $((1+2)) ruvector hooks post-edit"},
+    {type: "command", command: "echo `date` \"$(date)\" ruvector hooks post-edit"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo $(date) ruvector hooks post-edit", "echo $((1+2)) ruvector hooks post-edit", "echo `date` \"$(date)\" ruvector hooks post-edit"]' "$S" >/dev/null
+}
+
 @test "a legacy call behind environment assignments is found and removed" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "RUVECTOR_ONNX=0 ruvector hooks post-edit --success"},
