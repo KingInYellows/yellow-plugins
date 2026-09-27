@@ -603,6 +603,27 @@ exit 0'
   [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a0001" ]
 }
 
+@test "stale-tree discovery keeps its place after a partial scan" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  cursor="$RUVECTOR_DIR/coedit-sessions/.stale-sweep-cursor"
+  for n in a1 a2 a3 a4 a5 a6; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  # Capped: only 3 of the 6 names are read before sorting, well under the
+  # window, so the scan is partial and the cursor must not wrap.
+  COEDIT_STALE_SCAN_CAP=3 COEDIT_STALE_WINDOW=10 run run_hook '{"cwd":""}'
+  for _ in $(seq 1 40); do [ -s "$cursor" ] && break; sleep 0.1; done
+  [ -s "$cursor" ]
+  rm -f "$cursor"
+  # Timed out: a find that lists what it has, then never finishes.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) %s "$@"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  COEDIT_STALE_WINDOW=10 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 60); do [ -s "$cursor" ] && break; sleep 0.1; done
+  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a6" ]
+}
+
 @test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"

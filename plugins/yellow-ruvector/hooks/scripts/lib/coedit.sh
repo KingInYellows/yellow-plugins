@@ -429,27 +429,45 @@ coedit_prune_sessions() {
       # 10 removed per run) and started at a random entry, so trees that
       # cannot be removed never keep the sweep from reaching later ones.
       # Discovery is bounded too: top-level-only finds (-type d never
-      # matches a symlink), 2s each, instead of expanding every match. Each
-      # run takes a window of at most COEDIT_STALE_WINDOW (2000) names, in
-      # sorted order, after the last name the previous run's window ended
-      # on (.stale-sweep-cursor), wrapping to the start once a window comes
-      # back short, so trees that can never be removed cannot pin the sweep
-      # to the same names forever.
+      # matches a symlink), 2s each, instead of expanding every match. Only
+      # names after the one the previous run's window ended on
+      # (.stale-sweep-cursor) are kept, at most COEDIT_STALE_SCAN_CAP
+      # (20000) of them before anything is sorted, and the window is the
+      # first COEDIT_STALE_WINDOW (2000) of those in sorted order. The
+      # cursor wraps to the start only after a scan that completed and
+      # whose remaining names all fit the window; after a partial scan (a
+      # find timed out or the cap was hit) it moves to the window's end, so
+      # trees that can never be removed, or a scan that never finishes,
+      # cannot pin the sweep to the same names.
       win=${COEDIT_STALE_WINDOW:-2000}
       case "$win" in ''|*[!0-9]*|0) win=2000 ;; esac
+      cap=${COEDIT_STALE_SCAN_CAP:-20000}
+      case "$cap" in ''|*[!0-9]*|0) cap=20000 ;; esac
       cur=""
       if [ -f .stale-sweep-cursor ] && [ ! -L .stale-sweep-cursor ]; then
         IFS= read -r cur < .stale-sweep-cursor || true
         [ "${#cur}" -le 1024 ] || cur=""
       fi
-      found=() stale=()
-      while IFS= read -r m; do found+=("$m"); done < <(
-        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' 2>/dev/null
-          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' 2>/dev/null
-        } | LC_ALL=C sort | COEDIT_CUR="$cur" LC_ALL=C awk '$0 > ENVIRON["COEDIT_CUR"]' | head -n "$win"
+      raw=() found=() stale=() complete=0
+      # Every find result starts with "." ("./…" or "../…"), so END can
+      # only be the marker that both finds ran to completion.
+      while IFS= read -r m; do
+        if [ "$m" = END ]; then complete=1; else raw+=("$m"); fi
+      done < <(
+        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*'; a=$?
+          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*'; b=$?
+          [ "$a" -eq 0 ] && [ "$b" -eq 0 ] && printf 'END\n'; } 2>/dev/null \
+          | COEDIT_CUR="$cur" LC_ALL=C awk '$0 > ENVIRON["COEDIT_CUR"]' | head -n "$cap"
       )
+      if [ "${#raw[@]}" -gt 0 ]; then
+        while IFS= read -r m; do found+=("$m"); done < <(printf '%s\n' "${raw[@]}" | LC_ALL=C sort | head -n "$win")
+      fi
       next=""
-      [ "${#found[@]}" -lt "$win" ] || next=${found[$(( ${#found[@]} - 1 ))]}
+      if [ "$complete" = 1 ] && [ "${#raw[@]}" -le "$win" ]; then
+        next=""
+      elif [ "${#found[@]}" -gt 0 ]; then
+        next=${found[$(( ${#found[@]} - 1 ))]}
+      fi
       if [ "$next" != "$cur" ] && ctmp=$(mktemp .stale-sweep-cursor.XXXXXX 2>/dev/null); then
         printf '%s\n' "$next" > "$ctmp" && mv -f -- "$ctmp" .stale-sweep-cursor || rm -f -- "$ctmp"
       fi
