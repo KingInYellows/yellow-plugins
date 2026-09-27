@@ -601,7 +601,8 @@ exit 0'
     [ -e "$d" ] || break
   done
   [ ! -e "$d" ]
-  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a0001" ]
+  # Kept (in place, or held aside), never lost.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a0001" ] || [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a0001" ]
 }
 
 @test "stale-tree discovery keeps its place after a partial scan" {
