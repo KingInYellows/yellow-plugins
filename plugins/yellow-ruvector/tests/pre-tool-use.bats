@@ -535,3 +535,18 @@ related_staged() {
   grep -q 'coedit-related.sh" --run)$' "$md"
   ! sed -n '/^---$/,/^---$/p' "$md" | grep 'coedit-related' | grep -q ':\*'
 }
+
+@test "coedit-related.sh keeps one staged query per session" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  qa=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=sessA bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  qb=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=sessB bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$qa"; printf 'src/zz-missing.ts\n' > "$qb"
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=sessA bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+  # Session B's query is still staged and still its own.
+  [ -e "$qb" ]
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=sessB bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [[ "$output" != *"src/b.ts"* ]]
+  [ ! -e "$qb" ]
+}

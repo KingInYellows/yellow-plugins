@@ -36,12 +36,23 @@ STAGE_PREFIX="/tmp/ruvector-related."
 # --stage records the staging dir here, so --run takes no argument and
 # /ruvector:related can pre-approve both commands exactly, with no wildcard
 # tail a prompt-injected model could extend with shell syntax.
+# One record per Claude Code session, so concurrent sessions never consume
+# each other's query: the session id when the host exports it, else the pid
+# of the process that runs the Bash tool's shells (this script's
+# grandparent: the host -> the tool's shell -> this script).
 PTR_DIR="${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}/yellow-ruvector"
-PTR="${PTR_DIR}/related-stage"
+_key="${CLAUDE_CODE_SESSION_ID:-}"
+[ -n "$_key" ] || _key="ppid-$(ps -o ppid= -p "$PPID" 2>/dev/null | tr -d ' ')"
+_key=$(printf '%s' "$_key" | LC_ALL=C tr -cd 'A-Za-z0-9_-' | cut -c1-80)
+[ -n "$_key" ] && [ "$_key" != "ppid-" ] || _key="default"
+PTR="${PTR_DIR}/related-stage.${_key}"
 if [ "$1" = "--stage" ]; then
   sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
   ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || exit 1
   [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || exit 1
+  # Records of sessions that never ran --run: drop those over a day old.
+  find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
+    -exec rm -f -- {} + 2>/dev/null || true
   ptmp=$(mktemp "${PTR}.XXXXXX") || exit 1
   printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; exit 1; }
   printf 'QUERY_FILE=%s/query\n' "$sdir"
