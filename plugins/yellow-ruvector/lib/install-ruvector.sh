@@ -417,8 +417,11 @@ yellow_ruvector_swap_current() {
 # run from <install-name>. Prune never removes a leased install. Take it
 # BEFORE checking the install exists: prune moves an install aside before its
 # final lease check, so a lease taken after that check always finds it gone.
+# Creates the data dir on a first launch; never fails (a missing lease only
+# loses the prune protection).
 yellow_ruvector_take_lease() {
-  : > "${RUVECTOR_DATA}/.lease.${1}.$$" 2>/dev/null
+  mkdir -p "$RUVECTOR_DATA" 2>/dev/null && : > "${RUVECTOR_DATA}/.lease.${1}.$$" 2>/dev/null
+  return 0
 }
 
 # yellow_ruvector_leased <install-name> — 0 when a live process holds a lease
