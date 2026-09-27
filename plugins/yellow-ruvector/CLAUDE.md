@@ -189,7 +189,8 @@ progress.
   control characters, or over 512 chars are ignored. Writes are temp file +
   rename. A per-session mkdir lock covers the session file's
   read-decide-write, and the store lock only the pair update; together they
-  wait at most ~0.4s per edit, then skip (a busy store loses one increment,
+  wait at most ~0.4s per edit (a linked worktree's 0.15s main-worktree
+  lookup comes out of that), then skip (a busy store loses one increment,
   never the session's latest edit). A lock over a minute old is reclaimed
   once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the
   SessionStart worker prunes those over 10 minutes old, the hooks never

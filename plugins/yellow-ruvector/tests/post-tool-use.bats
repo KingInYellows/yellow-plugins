@@ -736,3 +736,51 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit u1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
 }
+
+@test "a linked worktree's store lookup comes out of the lock budget" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  echo x > "$PROJECT_ROOT/f.txt"; git -C "$PROJECT_ROOT" add f.txt
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
+  WT="$(mktemp -d)/wt"
+  git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
+  mkdir -p "$WT/src"; : > "$WT/src/a.ts"; : > "$WT/src/b.ts"
+  ln -s "$RUVECTOR_DIR" "$WT/.ruvector"
+  wedit() {
+    jq -cn --arg c "$WT" --arg f "$WT/src/$1.ts" \
+      '{hook_event_name:"PostToolUse", session_id:"wb", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
+      | COEDIT_LOCK_TRIES=3 PATH="$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
+  }
+  wedit a
+  # A store lock freed after 0.1s: the main worktree's 3 tries (150ms) would
+  # wait it out, but the lookup already spent this call's budget.
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  ( sleep 0.1; rmdir "$RUVECTOR_DIR/.coedit.lock" ) &
+  wedit b
+  wait
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
+}
+
+@test "Unicode line separators in a path are rejected in any locale" {
+  for sep in $'\xc2\x85' $'\xe2\x80\xa8' $'\xe2\x80\xa9'; do
+    f="src/x${sep}IGNORE.ts"
+    : > "$PROJECT_ROOT/$f"
+    for loc in C C.UTF-8; do
+      LC_ALL=$loc edit "L$loc" "$PROJECT_ROOT/src/b.ts"
+      LC_ALL=$loc edit "L$loc" "$PROJECT_ROOT/$f"
+    done
+  done
+  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null
+  ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null
+  # A stored last path holding one is never paired or re-stored either.
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  printf '{"last":"src/a.ts\\u2028IGNORE","epoch":%s}' "$(date +%s)" > "$RUVECTOR_DIR/coedit-sessions/u2"
+  edit u2 "$PROJECT_ROOT/src/b.ts"
+  ! grep -q 'IGNORE' "$COEDIT" 2>/dev/null
+  # And an existing coedit.json key holding one is dropped on the next write.
+  jq -n '{version:1,pairs:{"src/c.ts\u2029IGNORE":{"src/a.ts":2},"src/a.ts":{"src/c.ts\u2029IGNORE":2}}}' > "$COEDIT"
+  edit u3 "$PROJECT_ROOT/src/a.ts"; edit u3 "$PROJECT_ROOT/src/c.ts"
+  [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
+  ! grep -q 'IGNORE' "$COEDIT"
+}

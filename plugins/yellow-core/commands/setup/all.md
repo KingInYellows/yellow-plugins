@@ -73,8 +73,11 @@ _rv_home=$(CDPATH= cd -P -- "${HOME:-/nonexistent}" 2>/dev/null && pwd) || _rv_h
 # with a watchdog that kills it, so a hanging install never stalls /setup:all.
 _rv_probe() {
   local t out p w rc
+  # Only a timeout that supports --kill-after (GNU): a CLI that ignores
+  # TERM is then KILLed 2s later. BusyBox-style ones use the watchdog below.
   for t in timeout gtimeout; do
-    command -v "$t" >/dev/null 2>&1 && { "$t" 10 node "$1" --version 2>/dev/null; return; }
+    command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=1 5 true >/dev/null 2>&1 \
+      && { "$t" --kill-after=2 10 node "$1" --version 2>/dev/null; return; }
   done
   out=$(mktemp) || return 1
   node "$1" --version >"$out" 2>/dev/null &
