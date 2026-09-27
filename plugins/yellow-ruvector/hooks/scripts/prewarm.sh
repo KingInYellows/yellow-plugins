@@ -41,14 +41,23 @@ yellow_ruvector_validate_paths || json_exit "path validation failed; skipping pr
 # to warm and no verification marker would ever be written.
 model_ready() { ruvector_hash_selected || yellow_ruvector_model_cached; }
 
-# Nothing to do when installed, healthy (a 2s --version probe inside the 5s
-# hook), and the model is ready.
+# A live installer (another session's prewarm or launcher) is already doing
+# this work under the lock: probing now would only hold the hook, and the
+# lock wait after it could push past the 5s hook timeout.
+yellow_ruvector_install_in_progress && json_exit
+
+# Nothing to do when installed, healthy (a 2s --version probe, plus its 1s
+# KILL grace, inside the 5s hook), and the model is ready.
+_probe_start=$SECONDS
 if ! yellow_ruvector_needs_install && yellow_ruvector_install_healthy 2 \
    && model_ready; then
   json_exit
 fi
 
-yellow_ruvector_acquire_install_lock 2 \
+# One shared budget: after a slow probe, try the lock once instead of twice.
+_attempts=2
+[ $(( SECONDS - _probe_start )) -lt 2 ] || _attempts=1
+yellow_ruvector_acquire_install_lock "$_attempts" \
   || json_exit
 
 (
