@@ -97,6 +97,16 @@ coedit_sanitize_session() {
   printf '%s' "$sid"
 }
 
+# coedit_has_c1 <s> — <s> holds a UTF-8 C1 control (U+0080..U+009F, bytes
+# C2 80..C2 9F; U+009B starts a terminal control sequence). Byte-wise, so it
+# holds in any locale: under LC_ALL=C, [[:cntrl:]] only matches ASCII.
+coedit_has_c1() {
+  case "$1" in *$'\xc2'*) ;; *) return 1 ;; esac
+  local LC_ALL=C
+  case "$1" in *$'\xc2'[$'\x80'-$'\x9f']*) return 0 ;; esac
+  return 1
+}
+
 # coedit_normalize <root> <path> — print <path> relative to the physical
 # root, or fail for: empty, control characters, a root-relative result over
 # 512 chars (raw input over 4096), outside the root (symlinks resolved, the
@@ -113,6 +123,7 @@ coedit_normalize() {
   # Unicode line breaks (NEL, LINE/PARAGRAPH SEPARATOR) as raw UTF-8 bytes,
   # so the check holds in any locale.
   case "$p" in *$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
+  coedit_has_c1 "$p" && return 1
   case "$p" in
     /*) abs="$p" ;;
     *) abs="${root}/${p}" ;;
@@ -139,6 +150,7 @@ coedit_normalize() {
   [ -n "$rel" ] && [ "${#rel}" -le 512 ] || return 1
   case "$rel" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
   case "$rel" in *$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
+  coedit_has_c1 "$rel" && return 1
   case "$rel" in
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
