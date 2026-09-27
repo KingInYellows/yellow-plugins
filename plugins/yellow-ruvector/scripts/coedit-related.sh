@@ -84,6 +84,16 @@ if [ "$1" = "--stage" ]; then
     drop_stage "$old"
   done < <(find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
     2>/dev/null | head -n 100)
+  # A non-regular file at the pointer path (a directory would take the
+  # rename *inside* it) is removed first; PTR_DIR is ours and not a symlink.
+  if [ -L "$PTR" ] || { [ -e "$PTR" ] && [ ! -f "$PTR" ]; }; then
+    rm -rf -- "$PTR" 2>/dev/null || true
+  fi
+  if [ -L "$PTR" ] || { [ -e "$PTR" ] && [ ! -f "$PTR" ]; }; then
+    printf 'coedit-related: %s is not a regular file; remove it and retry\n' "$PTR" >&2
+    rmdir -- "$sdir" 2>/dev/null || true
+    exit 1
+  fi
   ptmp=$(mktemp "${PTR}.XXXXXX") || exit 1
   printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; exit 1; }
   printf 'QUERY_FILE=%s/query\n' "$sdir"

@@ -667,3 +667,17 @@ related_staged() {
   run --separate-stderr bash "$RELATED_SCRIPT" --stage
   [ "$status" -eq 0 ]
 }
+
+@test "a directory at the session pointer path is replaced, so --stage then --run works" {
+  export CLAUDE_CODE_SESSION_ID=ptr-test
+  bash "$RELATED_SCRIPT" --stage >/dev/null
+  ptr="$HOME/.cache/yellow-ruvector/related-stage.ptr-test"
+  [ -f "$ptr" ]
+  rm -f "$ptr"; mkdir -p "$ptr/sub"
+  q=$(bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  [ -f "$ptr" ]
+  printf 'src/a.ts\n' > "$q"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+}
