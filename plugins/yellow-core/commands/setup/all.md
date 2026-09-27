@@ -68,6 +68,24 @@ command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' ||
 _rv_sys() { case "$1" in ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) return 0 ;; esac; return 1; }
 _rv_base_ok() { case "$1" in /*) _rv_b=$(CDPATH= cd -P -- "$1" 2>/dev/null && pwd) && ! _rv_sys "$_rv_b" ;; *) return 1 ;; esac; }
 _rv_home=$(CDPATH= cd -P -- "${HOME:-/nonexistent}" 2>/dev/null && pwd) || _rv_home="/__unset__"
+# _rv_probe <cli.js> — `node <cli.js> --version`, bounded to 10s: GNU
+# timeout or gtimeout when present, otherwise (stock macOS) a background run
+# with a watchdog that kills it, so a hanging install never stalls /setup:all.
+_rv_probe() {
+  local t out p w rc
+  for t in timeout gtimeout; do
+    command -v "$t" >/dev/null 2>&1 && { "$t" 10 node "$1" --version 2>/dev/null; return; }
+  done
+  out=$(mktemp) || return 1
+  node "$1" --version >"$out" 2>/dev/null &
+  p=$!
+  ( sleep 10; kill -9 "$p" 2>/dev/null ) >/dev/null 2>&1 &
+  w=$!
+  wait "$p"; rc=$?
+  kill "$w" 2>/dev/null
+  cat "$out"; rm -f "$out"
+  return "$rc"
+}
 _rv_cli=""; _rv_ver=""
 # OK only when the entry actually runs (a missing or corrupt dependency
 # makes --version fail). A broken candidate does not end the scan: a stale
@@ -83,8 +101,7 @@ for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*
     *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
   esac
   _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"
-  if command -v timeout >/dev/null 2>&1; then _rv_ver=$(timeout 10 node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""
-  else _rv_ver=$(node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""; fi
+  _rv_ver=$(_rv_probe "$_rv_cli") || _rv_ver=""
   [ -n "$_rv_ver" ] && break
 done
 if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n' "$_rv_ver"
@@ -92,7 +109,7 @@ elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-m
 else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
 [ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
 unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver
-unset -f _rv_sys _rv_base_ok
+unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
