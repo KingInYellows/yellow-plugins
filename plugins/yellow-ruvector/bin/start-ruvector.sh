@@ -105,7 +105,11 @@ fi
 # "Cached" means a warm-up verified these exact model files (a truncated
 # download is not cached). The warm-up only runs while the startup budget
 # lasts (2s kept for the handshake); otherwise start read-only.
-if [ -z "$stamp" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
+# The warm-up runs whenever the model is needed and unverified, stamped store
+# or not: the first MCP tool call would otherwise load (download) it while
+# prewarm may be downloading through the same fixed cache file names. Only an
+# unstamped store also drops the write tools when it stays unverified.
+if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   left=$(( $(budget_left) - 2 ))
   if [ "$left" -ge 3 ] && yellow_ruvector_acquire_install_lock "$left"; then
     yellow_ruvector_trap_release
@@ -115,7 +119,7 @@ if [ -z "$stamp" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached
     yellow_ruvector_release_install_lock
     trap - EXIT INT TERM
   fi
-  if ! yellow_ruvector_model_cached; then
+  if [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_remember|hooks_pretrain' | paste -sd, - || true)
     log "ONNX model unavailable or unverified (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
   fi
