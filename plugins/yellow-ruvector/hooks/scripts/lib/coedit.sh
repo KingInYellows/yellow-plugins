@@ -48,7 +48,8 @@ _COEDIT_BUMP_JQ='
      # A count over 10^9 is corrupt (no real history gets near it), and at
      # 2^53 and above `+ 1` no longer changes it: such a pair is dropped.
      # Increments stop at 10^9, so a count this writer produced is kept.
-     | select((.key | safe) and .key != $k and .value > 0 and .value <= 1000000000)
+     # Floored first, so a fraction under 1 (0.5) is dropped, never kept as 0.
+     | select((.key | safe) and .key != $k and (.value | floor) >= 1 and .value <= 1000000000)
      | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: (.value | floor)}]
     | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
     # The new pair gets the same check: a session file is project data too.

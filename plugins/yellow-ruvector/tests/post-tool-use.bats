@@ -161,6 +161,14 @@ SH
   jq -e '(.pairs | has("-rf") | not) and (.pairs["src/x.ts"] | has("-rf") | not)' "$COEDIT" >/dev/null
 }
 
+@test "a fractional count under 1 in an existing coedit.json is dropped, never written as 0" {
+  jq -n '{version:1, pairs:{"src/x.ts":{"src/y.ts":0.5}, "src/y.ts":{"src/x.ts":0.5}}}' > "$COEDIT"
+  edit s1 "$PROJECT_ROOT/src/a.ts"; edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  jq -e '[.pairs[][]] | all(. >= 1)' "$COEDIT" >/dev/null
+  jq -e '.pairs | has("src/x.ts") | not' "$COEDIT" >/dev/null
+}
+
 @test "a symlink to a file outside the root is ignored" {
   OUTSIDE="$(mktemp -d)"; : > "$OUTSIDE/secret.ts"
   ln -s "$OUTSIDE/secret.ts" "$PROJECT_ROOT/src/link.ts"
