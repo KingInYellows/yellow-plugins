@@ -177,13 +177,19 @@ ruvector_heal_store() {
 # RUVECTOR_EMBEDDER=hash selects hash; =auto|minilm selects ONNX regardless
 # of RUVECTOR_ONNX; only when RUVECTOR_EMBEDDER is unset or unrecognized does
 # RUVECTOR_ONNX=0 select hash.
+# Both values are trimmed at the ends only, as upstream's .trim() does: "h ash"
+# stays unrecognized rather than becoming "hash".
 ruvector_hash_selected() {
-  local sel
-  sel=$(printf '%s' "${RUVECTOR_EMBEDDER:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+  local sel onnx
+  sel="${RUVECTOR_EMBEDDER:-}"
+  sel="${sel#"${sel%%[![:space:]]*}"}"; sel="${sel%"${sel##*[![:space:]]}"}"
+  sel=$(printf '%s' "$sel" | tr '[:upper:]' '[:lower:]')
+  onnx="${RUVECTOR_ONNX:-}"
+  onnx="${onnx#"${onnx%%[![:space:]]*}"}"; onnx="${onnx%"${onnx##*[![:space:]]}"}"
   case "$sel" in
     hash) return 0 ;;
     auto|minilm) return 1 ;;
-    *) [ "${RUVECTOR_ONNX:-}" = "0" ] ;;
+    *) [ "$onnx" = "0" ] ;;
   esac
 }
 
@@ -255,7 +261,9 @@ ruvector_probe_timeout() {
   _RUVECTOR_TIMEOUT_PROBED=1
   for name in timeout gtimeout; do
     cmd="$(command -v "$name" || true)"
-    if [ -n "$cmd" ] && "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
+    # The probe itself is bounded by the portable watcher: a candidate that
+    # stalls (a broken wrapper, a hung mount) must not eat the hook's budget.
+    if [ -n "$cmd" ] && TIMEOUT_CMD='' run_budgeted 0.5 "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
       TIMEOUT_CMD="$cmd"
       return 0
     fi

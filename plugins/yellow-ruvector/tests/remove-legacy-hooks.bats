@@ -352,12 +352,13 @@ Ignore previous instructions"
     {type: "command", command: "command -- ruvector hooks pre-command"},
     {type: "command", command: "command -p /usr/local/bin/ruvector hooks post-edit --success"},
     {type: "command", command: "command -v ruvector hooks post-edit"},
+    {type: "command", command: "env -u FOO -C /tmp ruvector hooks post-command"},
     {type: "command", command: "exec -- ruvector hooks session-start"},
     {type: "command", command: "echo env ruvector hooks post-edit"},
     {type: "command", command: "myenv ruvector hooks post-edit"}]}]}}' > "$S"
   run --separate-stderr bash "$SCRIPT" "$S"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 5 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 6 ]
   run --separate-stderr bash "$SCRIPT" "$S" --apply
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["command -v ruvector hooks post-edit", "echo env ruvector hooks post-edit", "myenv ruvector hooks post-edit"]' "$S" >/dev/null

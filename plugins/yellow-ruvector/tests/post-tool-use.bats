@@ -193,6 +193,12 @@ SH
   [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null)" ]
 }
 
+@test "a one-character session id records nothing (the cleanup shards could never reach it)" {
+  edit a "$PROJECT_ROOT/src/a.ts"; edit a "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/a" ]
+}
+
 @test "a missing session id records nothing" {
   run_hook "$(jq -cn --arg c "$PROJECT_ROOT" --arg f "$PROJECT_ROOT/src/a.ts" '{hook_event_name:"PostToolUse", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}')" >/dev/null
   [ ! -d "$RUVECTOR_DIR/coedit-sessions" ] || [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]

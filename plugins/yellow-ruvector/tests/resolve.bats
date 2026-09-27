@@ -453,3 +453,21 @@ fake_install() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"cannot canonicalize the data dir"* ]]
 }
+
+@test "hash_selected trims only the ends, as upstream does" {
+  run bash -c '. "$1"
+    RUVECTOR_EMBEDDER=" HASH " ruvector_hash_selected || exit 1
+    RUVECTOR_EMBEDDER="h ash" RUVECTOR_ONNX=1 ruvector_hash_selected && exit 2
+    RUVECTOR_EMBEDDER="" RUVECTOR_ONNX=" 0 " ruvector_hash_selected || exit 3
+    RUVECTOR_EMBEDDER=minilm RUVECTOR_ONNX=0 ruvector_hash_selected && exit 4
+    exit 0' _ "$LIB"
+  [ "$status" -eq 0 ]
+}
+
+@test "probe_timeout gives up on a timeout command that stalls" {
+  for n in timeout gtimeout; do printf '#!/bin/sh\nexec sleep 10\n' > "$STUBS/$n"; chmod +x "$STUBS/$n"; done
+  start=$SECONDS
+  run bash -c '. "$1"; PATH="$2:$PATH"; ruvector_probe_timeout && exit 5; [ -z "$TIMEOUT_CMD" ] || exit 6' _ "$LIB" "$STUBS"
+  [ "$status" -eq 0 ]
+  [ $((SECONDS - start)) -le 3 ]
+}
