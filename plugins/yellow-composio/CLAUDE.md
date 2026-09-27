@@ -12,8 +12,11 @@ surfaces that challenge, so `bin/start-composio.sh` is gone. There is no
 → Authenticate. App connections (Gmail, Slack, GitHub, and the rest) stay
 on `COMPOSIO_MANAGE_CONNECTIONS` after the MCP session is authenticated.
 
-Headless hosts that cannot open a browser can register a user-level server
-with a For You consumer key (`ck_...`). Claude Code prefers that server
+When the browser callback cannot reach the host (WSL2 NAT, SSH, headless),
+`claude mcp login plugin:yellow-composio:composio-server --no-browser` in a
+separate terminal (it needs a TTY) prints the authorize URL and accepts the
+pasted redirect URL — verified on WSL2 NAT. As a last resort, register a
+user-level server with a For You consumer key (`ck_...`). Claude Code prefers that server
 over the plugin. See `/composio:setup`. That key is not a Platform project
 API key, and `https://mcp.composio.dev/<id>` is not a substitute URL.
 

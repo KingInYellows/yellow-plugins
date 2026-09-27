@@ -33,7 +33,7 @@ the per-pin `npm view` network calls would add registry flakiness to every PR.
 | yellow-research  | `@perplexity-ai/mcp-server`      | `0.8.2`  | npm      | Perplexity MCP. Requires `PERPLEXITY_API_KEY`.                          |
 | yellow-research  | `tavily-mcp`                     | `0.2.17` | npm      | Tavily research MCP. Requires `TAVILY_API_KEY`.                         |
 | yellow-research  | `exa-mcp-server`                 | `3.1.8`  | npm      | Exa MCP. Requires `EXA_API_KEY`. Tool whitelist passed as positional arg.|
-| yellow-research  | `ast-grep-mcp`                   | `674272f`| git SHA  | Installed via `uvx` from `github.com/ast-grep/ast-grep-mcp`. No npm release. |
+| yellow-research  | `ast-grep-mcp`                   | `149e20d`| git SHA  | Installed via `uvx` from `github.com/ast-grep/ast-grep-mcp`. No npm release. Bumped 2026-09-26 from `674272f`, whose unbounded `mcp[cli]>=1.6.0` resolved `mcp` 2.x and crashed on the removed `mcp.server.fastmcp`. Upstream migrated to MCP 2 (ast-grep/ast-grep-mcp#38) and pins `mcp[cli]==2.1.0`; tools/list verified identical. |
 | yellow-ruvector  | `ruvector`                       | _latest_ | npm      | No version pin — ruvector handles its own DB migration. Consider pinning after v1.0 cut. |
 
 ## Cursor Distribution Pins
