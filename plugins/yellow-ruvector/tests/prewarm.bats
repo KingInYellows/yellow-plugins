@@ -92,3 +92,16 @@ npm_called_within() {
   for _ in $(seq 1 50); do [ -e "$CLAUDE_PLUGIN_DATA/.install.lock" ] || break; sleep 0.1; done
   [ ! -e "$CLAUDE_PLUGIN_DATA/.install.lock" ]
 }
+
+@test "the background job never takes over a lock its parent did not hand it" {
+  cli 'console.log("0.3.3")'
+  rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
+  sleep 30 & foreign=$!
+  # The hook parent dies right after spawning the job, and before writing
+  # the job's pid, a concurrent launcher reclaims the lock and names itself.
+  FOREIGN=$foreign run bash -c 'disown() { printf "%s" "$FOREIGN" > "$CLAUDE_PLUGIN_DATA/.install.lock/pid"; exit 0; }; . "$1"' _ "$HOOK" </dev/null
+  [ "$status" -eq 0 ]
+  sleep 4
+  [ "$(cat "$CLAUDE_PLUGIN_DATA/.install.lock/pid" 2>/dev/null)" = "$foreign" ]
+  kill "$foreign" 2>/dev/null || true
+}

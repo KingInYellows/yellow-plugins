@@ -172,6 +172,10 @@ if [ ! -f "$ENTRY" ]; then
   printf 'FAILED: no installed ruvector at %s — run Step 2a\n' "$(yellow_ruvector_flat "$ENTRY")"
 elif [ ! -d "$ROOT/.ruvector" ]; then
   printf 'Skipped: .ruvector/ not initialized\n'
+elif . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh" && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
+  # Recall loads the model; unverified, it would download outside the
+  # shared model lock while another session may be fetching it.
+  printf 'Skipped: ONNX model not verified yet (Step 2a warns why); recall runs once it is\n'
 else
   ( cd "$ROOT" && yellow_ruvector_run_bounded 10 node "$ENTRY" hooks recall --top-k 1 "setup-test" >/dev/null 2>&1 ) \
     && printf 'Passed (recall through the plugin-managed CLI)\n' \
