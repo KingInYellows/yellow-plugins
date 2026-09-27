@@ -283,7 +283,9 @@ run_budgeted() {
     "$TIMEOUT_CMD" --kill-after=0.1 "$cap" "$@"
     return
   fi
-  "$@" &
+  # <&0: a background job would otherwise read /dev/null, not the
+  # caller's stdin.
+  "$@" <&0 &
   pid=$!
   ( sleep "$cap"; tree=$(ruvector_proc_tree "$pid")
     # shellcheck disable=SC2086

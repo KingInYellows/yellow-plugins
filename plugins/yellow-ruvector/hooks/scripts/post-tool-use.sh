@@ -33,7 +33,9 @@ unset _HOOK_LIB
 
 command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping post-tool-use"
 
-INPUT=$(cat)
+# Parsed straight from stdin under the jq bound (COEDIT_JQ_SECS), never
+# buffered first: a Write carrying megabytes of content must not keep the
+# hook past its 1s timeout (the edit is then just not recorded).
 
 TOOL="" file_path="" event="" session_id="" CWD=""
 {
@@ -42,7 +44,7 @@ TOOL="" file_path="" event="" session_id="" CWD=""
   IFS= read -r -d '' event
   IFS= read -r -d '' session_id
   IFS= read -r -d '' CWD
-} < <(printf '%s' "$INPUT" | jq -j '
+} < <(coedit_jq -j '
   def s(v): if (v|type) == "string" then v else "" end;
   s(.tool_name), "\u0000",
   s(.tool_input.file_path), "\u0000",

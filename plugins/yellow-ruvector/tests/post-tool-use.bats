@@ -814,3 +814,20 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit k1 "$PROJECT_ROOT/src/a.ts"; edit k1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
+
+@test "a multi-megabyte Write payload never keeps the hook past its budget" {
+  big="$BATS_TEST_TMPDIR/big.json"
+  { printf '{"hook_event_name":"PostToolUse","session_id":"big","cwd":"%s","tool_name":"Write","tool_input":{"file_path":"%s","content":"' "$PROJECT_ROOT" "$PROJECT_ROOT/src/a.ts"
+    head -c 30000000 /dev/zero | tr '\0' a
+    printf '"}}'; } > "$big"
+  for tc in "$(command -v timeout || true)" ""; do
+    start=$(date +%s%N)
+    out=$(TIMEOUT_CMD="$tc" PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" < "$big")
+    end=$(date +%s%N)
+    printf '%s' "$out" | jq -e '.continue == true' >/dev/null
+    [ $(( (end - start) / 1000000 )) -lt 900 ]
+  done
+  # An ordinary Write is still recorded.
+  edit big2 "$PROJECT_ROOT/src/a.ts" Write; edit big2 "$PROJECT_ROOT/src/b.ts" Write
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}

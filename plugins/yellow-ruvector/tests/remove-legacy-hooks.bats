@@ -289,3 +289,14 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
 }
+
+@test "an indented terminator ends only a <<- heredoc (tabs), never a plain << one" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<EOF\n  EOF\nruvector hooks post-edit --success\nEOF"},
+    {type: "command", command: "cat <<-EOF\n\tbody\n\tEOF\nruvector hooks post-command"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  # Only the <<- one ends at its tab-indented terminator and then runs ruvector.
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  [[ "$output" == *"<<-EOF"* ]]
+}

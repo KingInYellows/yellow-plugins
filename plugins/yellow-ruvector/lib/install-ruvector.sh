@@ -734,13 +734,32 @@ yellow_ruvector_run_bounded() {
   done
   "$@" &
   pid=$!
-  ( sleep "$secs"; pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
-    sleep 1; pkill -KILL -P "$pid" 2>/dev/null; kill -KILL "$pid" 2>/dev/null ) \
+  # The tree is captured when the time is up: once the command exits, its
+  # children are reparented and no longer found under its pid.
+  ( sleep "$secs"; tree=$(yellow_ruvector_tree "$pid")
+    # shellcheck disable=SC2086
+    kill -TERM $tree 2>/dev/null
+    sleep 1
+    # shellcheck disable=SC2086
+    kill -KILL $tree $(yellow_ruvector_tree "$pid") 2>/dev/null ) \
     </dev/null >/dev/null 2>&1 &
   watcher=$!
   wait "$pid" 2>/dev/null || rc=$?
-  kill "$watcher" 2>/dev/null
+  # Killed by the watcher (a signal status): let it finish escalating to
+  # KILL on the children it captured, so none outlives this call.
+  if [ "$rc" -gt 128 ] && kill -0 "$watcher" 2>/dev/null; then
+    wait "$watcher" 2>/dev/null
+  else
+    kill "$watcher" 2>/dev/null
+  fi
   return "$rc"
+}
+
+# yellow_ruvector_tree <pid> — <pid> and all its descendants (pgrep -P).
+yellow_ruvector_tree() {
+  local c
+  printf '%s\n' "$1"
+  for c in $(pgrep -P "$1" 2>/dev/null); do yellow_ruvector_tree "$c"; done
 }
 
 # Download/load the ONNX model once via `ruvector embed text`, which never
