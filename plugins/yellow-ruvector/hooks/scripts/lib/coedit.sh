@@ -420,6 +420,18 @@ coedit_prune_sessions() {
         s="${m#.}"; s="${s%%.lock.reclaim.*}"
         [ -e "$s" ] && continue
         coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null
+      done
+      # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
+      # background delete was interrupted: here and in the store dir, at
+      # most 10 per run, only when untouched for 10 minutes (a delete still
+      # in progress keeps updating the dir's mtime). rm -rf never follows
+      # symlinks inside the tree, and a symlinked entry is skipped.
+      n=0
+      for m in .*.lock.stale.* ../.coedit.lock.stale.*; do
+        [ "$n" -lt 10 ] && [ "$SECONDS" -lt 5 ] || break
+        [ -d "$m" ] && [ ! -L "$m" ] || continue
+        n=$((n + 1))
+        coedit_older_than "$(coedit_mtime "$m")" 600 && rm -rf -- "$m" 2>/dev/null
       done ) \
     </dev/null >/dev/null 2>&1 &
   return 0
