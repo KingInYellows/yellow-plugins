@@ -68,12 +68,12 @@ f="$target"
 
 # Only an actual ruvector invocation: the `ruvector` executable (bare, by
 # path, or via npx, optionally @version) in command position (start of the
-# command or right after ; & | ( or a newline, optionally behind shell
+# command or right after ; & | ( ) or a newline, optionally behind shell
 # keywords and prefixes such as then, do, if, !, {, exec, and after
 # VAR=value assignments — never as an argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
+re='(^|[;&|\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
@@ -99,14 +99,20 @@ list=$(jq -r --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "")
     # A double-quoted span is text, except command substitutions inside it,
-    # which run: keep each $(...) / `...` body as its own command.
-    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
+    # which run: keep each $(...) / `...` body as its own command. The "_"
+    # after it keeps the next word an argument (echo "$(x)" ruvector … is
+    # not an invocation).
+    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join("") | . + "_")
     | gsub("\\\\(.|\n)"; "_")
-    # An unquoted `...` substitution runs its body as a command too.
-    | gsub("`(?<b>[^`]*)`"; "; \(.b);")
+    # An unquoted `...` or $(...) substitution runs its body as a command
+    # too; $((...)) is arithmetic. Once they are gone, a ) left over ends a
+    # case pattern (or a subshell), so the next word is in command position.
+    | gsub("\\$\\(\\([^()]*\\)\\)"; "_")
+    | gsub("\\$\\((?<b>[^()]*)\\)"; "; \(.b);_")
+    | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
     | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
@@ -136,14 +142,20 @@ jq --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "")
     # A double-quoted span is text, except command substitutions inside it,
-    # which run: keep each $(...) / `...` body as its own command.
-    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
+    # which run: keep each $(...) / `...` body as its own command. The "_"
+    # after it keeps the next word an argument (echo "$(x)" ruvector … is
+    # not an invocation).
+    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join("") | . + "_")
     | gsub("\\\\(.|\n)"; "_")
-    # An unquoted `...` substitution runs its body as a command too.
-    | gsub("`(?<b>[^`]*)`"; "; \(.b);")
+    # An unquoted `...` or $(...) substitution runs its body as a command
+    # too; $((...)) is arithmetic. Once they are gone, a ) left over ends a
+    # case pattern (or a subshell), so the next word is in command position.
+    | gsub("\\$\\(\\([^()]*\\)\\)"; "_")
+    | gsub("\\$\\((?<b>[^()]*)\\)"; "; \(.b);_")
+    | gsub("`(?<b>[^`]*)`"; "; \(.b);_")
     | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
