@@ -466,8 +466,10 @@ fake_install() {
 
 @test "probe_timeout gives up on a timeout command that stalls" {
   for n in timeout gtimeout; do printf '#!/bin/sh\nexec sleep 10\n' > "$STUBS/$n"; chmod +x "$STUBS/$n"; done
-  start=$SECONDS
+  start=$(date +%s%N)
   run bash -c '. "$1"; PATH="$2:$PATH"; ruvector_probe_timeout && exit 5; [ -z "$TIMEOUT_CMD" ] || exit 6' _ "$LIB" "$STUBS"
+  end=$(date +%s%N)
   [ "$status" -eq 0 ]
-  [ $((SECONDS - start)) -le 3 ]
+  # One stall ends the probing: the second candidate is not waited on too.
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
 }

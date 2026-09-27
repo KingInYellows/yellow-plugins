@@ -512,7 +512,11 @@ coedit_record() {
 # coedit_shard [digit] — a random -name prefix of two bracket expressions,
 # each one of eight slices of the session-id alphabet [A-Za-z0-9._-] (or,
 # with `digit`, one of five pairs of digits): 64 (25) slices in all.
-# COEDIT_SHARD (an index) pins it for tests.
+# A digit suffix (an inode or pid) can be a single digit, so for one index
+# in six (by its thousands digit) the second digit slice is [!0-9] instead:
+# over runs, one-digit suffixes are reached too. (Session ids are at least
+# two characters, see coedit_sanitize_session.) COEDIT_SHARD (an index)
+# pins it for tests.
 coedit_shard() {
   local -a sh
   if [ "${1:-}" = digit ]; then
@@ -525,6 +529,10 @@ coedit_shard() {
   # Two levels (first and second character), so a first-character slice
   # that alone is too big to list in time is itself split, and over runs
   # every part of it is reached.
+  if [ "${1:-}" = digit ] && [ $(( (i / 1000) % 6 )) -eq 5 ]; then
+    printf '%s[!0-9]' "${sh[$(( i % n ))]}"
+    return 0
+  fi
   printf '%s%s' "${sh[$(( i % n ))]}" "${sh[$(( (i / n) % n ))]}"
 }
 
