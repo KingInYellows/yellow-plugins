@@ -478,6 +478,21 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ls "$COEDIT".corrupt-* | grep -qv -- "-[0-9]*$"
 }
 
+@test "an abandoned marker for the current stale generation is cleared despite earlier markers" {
+  edit g1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
+  mt=$(stat -c %Y "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || stat -f %m "$RUVECTOR_DIR/.coedit.lock")
+  # Five non-removable markers sorting first, then this generation's own
+  # marker left by a reclaimer that died 20 minutes ago.
+  for i in 0 1 2 3 4; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.reclaim.0$i-0/keep"; done
+  mkdir "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-$mt"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.reclaim.$ino-$mt" "$RUVECTOR_DIR"/.coedit.lock.reclaim.0*
+  edit g1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "a busy store lock loses only that increment; the session still advances" {
   edit v1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
