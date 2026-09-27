@@ -219,15 +219,17 @@ coedit_write_atomic() {
 # fresh lock that replaced it. Ages come from stat + date, not find -mmin.
 # Markers are pruned after 10 minutes.
 coedit_lock_path() {
-  local lock="$1" ino mt marker
+  local lock="$1" ino mt marker reclaim_tried=""
   : "${_coedit_tries_left:=$COEDIT_LOCK_TRIES}"
   until mkdir "$lock" 2>/dev/null; do
-    [ "$_coedit_tries_left" -gt 0 ] || return 1
-    _coedit_tries_left=$((_coedit_tries_left - 1))
     mt=$(coedit_mtime "$lock")
-    if coedit_older_than "$mt" 60; then
+    # One stale-lock check and reclaim per call, outside the wait budget:
+    # a call whose budget the parse and lookups already spent can still
+    # free a lock a killed hook left behind (only waiting costs tries).
+    if [ -z "$reclaim_tried" ] && coedit_older_than "$mt" 60; then
+      reclaim_tried=1
       ino=$(ls -di "$lock" 2>/dev/null | awk '{print $1}')
-      case "$ino" in ''|*[!0-9]*) sleep 0.05; continue ;; esac
+      case "$ino" in ''|*[!0-9]*) continue ;; esac
       marker="${lock}.reclaim.${ino}-${mt}"
       # This generation's own marker is checked first: if a reclaimer died
       # after creating it (over 10 minutes ago), it is removed so this
@@ -261,6 +263,8 @@ coedit_lock_path() {
       fi
       continue
     fi
+    [ "$_coedit_tries_left" -gt 0 ] || return 1
+    _coedit_tries_left=$((_coedit_tries_left - 1))
     sleep 0.05
   done
   return 0
