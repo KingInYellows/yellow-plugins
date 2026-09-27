@@ -382,11 +382,13 @@ Ignore previous instructions"
     {type: "command", command: "bash -lc '"'"'ruvector hooks post-edit --success'"'"'"},
     {type: "command", command: "FOO=1 /bin/sh -c \"npx ruvector hooks session-end\""},
     {type: "command", command: "sh -c -- '"'"'ruvector hooks pre-edit'"'"'"},
+    {type: "command", command: "env -S '"'"'ruvector hooks post-command'"'"'"},
+    {type: "command", command: "/usr/bin/env -i --split-string=\"npx ruvector hooks session-start\""},
     {type: "command", command: "echo sh -c '"'"'ruvector hooks post-edit'"'"'"},
     {type: "command", command: "sh -c \"$X ruvector hooks post-edit\""}]}]}}' > "$S"
   run --separate-stderr bash "$SCRIPT" "$S"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 3 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 5 ]
   run --separate-stderr bash "$SCRIPT" "$S" --apply
   [ "$status" -eq 0 ]
   [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 2 ]
