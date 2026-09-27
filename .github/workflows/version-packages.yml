@@ -76,17 +76,23 @@ jobs:
           fetch-depth: 0
 
       - name: Preflight — verify PR creation permissions
+        # force_publish recovery never opens a PR and authenticates with
+        # GITHUB_TOKEN only, so a broken RELEASE_PR_TOKEN must not block it.
+        if: inputs.force_publish != true
         env:
-          # Probe the same token changesets/action will use below.
+          # Probe the same token changesets/action will use below. This is a
+          # read probe: it catches an expired, revoked or wrong-repo token, not
+          # a missing write permission (fine-grained PATs expose no permission
+          # headers), which fails loudly at the changesets push instead.
           GITHUB_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           HAS_RELEASE_PR_TOKEN: ${{ secrets.RELEASE_PR_TOKEN != '' }}
         run: |
           if ! gh api "repos/${{ github.repository }}/pulls?state=closed&per_page=1" \
                --silent 2>/dev/null; then
             if [ "$HAS_RELEASE_PR_TOKEN" = "true" ]; then
-              echo "::error::RELEASE_PR_TOKEN cannot access the pull requests API."
-              echo "::error::It may be expired, revoked, or not granted this repository"
-              echo "::error::(Contents + Pull requests: read/write). Rotate it or delete the secret."
+              echo "::error::RELEASE_PR_TOKEN cannot read this repository's pull requests."
+              echo "::error::It may be expired, revoked, or not granted this repository."
+              echo "::error::Rotate it (Contents + Pull requests: read/write) or delete the secret."
             else
               echo "::error::GITHUB_TOKEN cannot access the pull requests API."
               echo "::error::Enable 'Allow GitHub Actions to create and approve pull requests'"

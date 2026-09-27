@@ -81,9 +81,10 @@ requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
    and `validate-versions.js` blocks drift. Codex-enabled plugins also
    two-way-check `package.json` against `.codex-plugin/plugin.json`;
    Cursor-enabled plugins against `.cursor-plugin/plugin.json`. Releases
-   are Changesets-driven (`docs/CLAUDE.md`); the bot-created "chore:
-   version packages" PR does not run `validate-schemas.yml`, so review
-   those three-way and two-way version files by hand.
+   are Changesets-driven (`docs/CLAUDE.md`); without the
+   `RELEASE_PR_TOKEN` secret, CI on the bot's "chore: version packages" PR
+   waits for maintainer approval, and either way review its three-way and
+   two-way version files by hand.
 4. **Local schema ≠ remote validator.** `schemas/plugin.schema.json` is
    stricter than Claude Code's remote validator in places and looser in
    others (`CONTRIBUTING.md` "Local vs Remote Validator Divergence"). Test on
