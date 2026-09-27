@@ -163,6 +163,15 @@ if [ "$1" = "--file" ]; then
   [ -d "$qdir" ] && [ ! -L "$qdir" ] && [ -O "$qdir" ] && [ -f "$qf" ] && [ ! -L "$qf" ] \
     || { printf 'coedit-related: not a staged query file\n' >&2; exit 2; }
   path="" _extra="" rc=1 has_nul=0
+  # Size first, from the file's metadata: a path is at most 512 characters
+  # (2048 bytes of UTF-8), so anything over 4 KiB is refused before any of
+  # it is scanned or read into the shell.
+  qsize=$(wc -c < "$qf" 2>/dev/null | tr -d ' ')
+  case "$qsize" in ''|*[!0-9]*) qsize=999999 ;; esac
+  if [ "$qsize" -gt 4096 ]; then
+    rm -f -- "$qf"; rmdir -- "$qdir" 2>/dev/null || true
+    printf 'coedit-related: path too long\n' >&2; exit 2
+  fi
   # read drops NUL bytes silently (src/a<NUL>b.ts would become src/ab.ts),
   # so count them at the byte level first.
   [ "$(LC_ALL=C tr -d '\000' < "$qf" | wc -c)" -eq "$(wc -c < "$qf")" ] || has_nul=1

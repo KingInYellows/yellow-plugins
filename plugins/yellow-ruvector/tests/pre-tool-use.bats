@@ -646,6 +646,20 @@ related_staged() {
   [ -e "$qv" ]
 }
 
+@test "coedit-related.sh refuses an oversized staged query before reading it" {
+  qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  head -c 20000000 /dev/zero | tr '\0' a > "$qf"
+  s=$(date +%s%N)
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  e=$(date +%s%N)
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"path too long"* ]]
+  # Refused from its size alone, never scanned or read (20 MB took ~0.9s).
+  [ $(( (e - s) / 1000000 )) -lt 400 ]
+  [ ! -e "$qf" ]
+  [ ! -e "${qf%/query}" ]
+}
+
 @test "coedit-related.sh rejects a NUL byte instead of dropping it" {
   qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   printf 'src/\000a.ts\n' > "$qf"
