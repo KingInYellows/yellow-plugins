@@ -82,3 +82,13 @@ npm_called_within() {
   [ "$status" -eq 0 ]
   [ -e "$BATS_TEST_TMPDIR/recall-ran" ]
 }
+
+@test "the background job releases the lock it was handed, even without BASHPID (bash 3.2)" {
+  cli 'console.log("0.3.3")'
+  rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
+  # BASHPID unset stands in for macOS's bash 3.2; the warm-up fails fast.
+  run bash -c 'unset BASHPID; . "$1"' _ "$HOOK" </dev/null
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 50); do [ -e "$CLAUDE_PLUGIN_DATA/.install.lock" ] || break; sleep 0.1; done
+  [ ! -e "$CLAUDE_PLUGIN_DATA/.install.lock" ]
+}
