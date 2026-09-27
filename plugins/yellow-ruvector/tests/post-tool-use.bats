@@ -237,6 +237,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/x.ts src/y.ts)" -eq 0 ]
 }
 
+@test "a stale session lock is reclaimed even when the wait budget is already spent" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd/.s1.lock"
+  touch -d '5 minutes ago' "$sd/.s1.lock" 2>/dev/null || skip "touch -d unsupported"
+  # The parse and root lookup's 6 tries use the whole budget.
+  export COEDIT_LOCK_TRIES=6
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
