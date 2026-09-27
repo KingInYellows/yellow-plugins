@@ -657,3 +657,13 @@ related_staged() {
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
+
+@test "an abandoned stage holding a directory named query never blocks the next --stage" {
+  q=$(bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  mkdir "$q"
+  run --separate-stderr bash "$RELATED_SCRIPT" --stage
+  [ "$status" -eq 0 ]
+  [[ "$output" == QUERY_FILE=* ]]
+  run --separate-stderr bash "$RELATED_SCRIPT" --stage
+  [ "$status" -eq 0 ]
+}

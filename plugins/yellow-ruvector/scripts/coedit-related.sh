@@ -61,7 +61,10 @@ drop_stage() {
   case "$d" in "${STAGE_PREFIX}"?*) ;; *) d="" ;; esac
   case "${d#"${STAGE_PREFIX}"}" in */*) d="" ;; esac
   if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
-    rm -f -- "${d}/query"
+    # Best effort: a `query` that is not a file (a directory) stays, and
+    # so does its dir, but the pointer below is always dropped, so the
+    # next --stage never trips over it again (set -e would abort here).
+    rm -f -- "${d}/query" 2>/dev/null || true
     rmdir -- "$d" 2>/dev/null || true
   fi
   rm -f -- "$1"
