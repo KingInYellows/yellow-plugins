@@ -136,3 +136,15 @@ setup() {
   [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 6 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] | index("npx -y ruvector@0.2 hooks post-edit --success") == null' "$S" >/dev/null
 }
+
+@test "a quoted executable word is still a ruvector invocation; a quoted phrase is not" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "\"/usr/local/bin/ruvector\" hooks post-edit --success"},
+    {type: "command", command: "cd /x && '"'"'ruvector'"'"' hooks session-start"},
+    {type: "command", command: "\"x; ruvector hooks post-edit\""},
+    {type: "command", command: "echo \"ruvector\" hooks post-edit"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["\"x; ruvector hooks post-edit\"", "echo \"ruvector\" hooks post-edit"]' "$S" >/dev/null
+}
