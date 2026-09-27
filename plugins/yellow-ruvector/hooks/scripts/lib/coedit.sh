@@ -147,8 +147,13 @@ coedit_store_dir() {
     [ -f "${root}/.git" ] || return 1
     # The main worktree as resolve.sh identifies it: never a bare repo's
     # parent or a --separate-git-dir's parent.
+    # Bounded (COEDIT_WT_SECS, 0.4s) inside the 1s hook: on a large or slow
+    # main checkout the lookup is abandoned and this edit is not recorded,
+    # but the hook still answers. TIMEOUT_CMD is cleared so run_budgeted
+    # uses its background runner (timeout(1) cannot run a shell function).
     command -v ruvector_main_worktree >/dev/null 2>&1 || return 1
-    main=$(ruvector_main_worktree "$root") || return 1
+    main=$(TIMEOUT_CMD='' run_budgeted "${COEDIT_WT_SECS:-0.4}" ruvector_main_worktree "$root") || return 1
+    [ -n "$main" ] || return 1
     main=$(CDPATH= cd -- "$main" 2>/dev/null && pwd -P) || return 1
     [ "$phys" = "${main}/.ruvector" ] || return 1
   fi
