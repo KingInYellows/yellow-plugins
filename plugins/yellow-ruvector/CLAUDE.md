@@ -66,8 +66,9 @@ ruvector.
   (`hooks_capabilities`, `hooks_pretrain`, `hooks_recall`, `hooks_remember`,
   `hooks_stats`); the launcher unsets any inherited `RUVECTOR_MCP_PROFILE`,
   and withheld model tools also go into `RUVECTOR_MCP_DENY`. Through 0.3.3 an empty
-  or misspelled policy exposes every tool and a profile unions with the
-  allowlist. 0.3.3's new `metaharness_*` / `rvf_*` tools stay hidden
+  allowlist or a misspelled profile name exposes every tool, and a profile
+  unions with the allowlist; an allowlist name that matches no tool matches
+  nothing, so the launcher's `yellow_ruvector_none` keeps it closed. 0.3.3's new `metaharness_*` / `rvf_*` tools stay hidden
 - Requires Node.js 20+ (ruvector 0.3.3 `engines`). With older Node the
   launcher exits with a message and hooks do nothing
 
