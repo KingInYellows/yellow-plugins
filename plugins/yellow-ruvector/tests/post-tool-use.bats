@@ -59,6 +59,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 2 ]
 }
 
+@test "an inherited TIMEOUT_CMD is probed, not trusted, so pairs still record" {
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/timeout"
+  chmod +x "$BATS_TEST_TMPDIR/timeout"
+  export TIMEOUT_CMD="$BATS_TEST_TMPDIR/timeout"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  unset TIMEOUT_CMD
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "never runs ruvector, npx, or node" {
   edit s1 "$PROJECT_ROOT/src/a.ts"
   edit s1 "$PROJECT_ROOT/src/b.ts"

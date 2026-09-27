@@ -78,7 +78,7 @@ _COEDIT_BUMP_JQ='
 # resolve.sh; plain jq when that is not loaded).
 coedit_jq() {
   if command -v run_budgeted >/dev/null 2>&1; then
-    [ -n "${TIMEOUT_CMD+x}" ] || ruvector_probe_timeout >/dev/null 2>&1 || true
+    [ -n "${_RUVECTOR_TIMEOUT_PROBED:-}" ] || ruvector_probe_timeout >/dev/null 2>&1 || true
     run_budgeted "$COEDIT_JQ_SECS" jq "$@"
   else
     jq "$@"
