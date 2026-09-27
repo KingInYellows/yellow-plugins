@@ -633,7 +633,11 @@ coedit_prune_sessions() {
       fi
       # Held trees get a few bounded retries per run: a random sample of
       # three, so ones that can never be removed cannot pin the retries.
-      for h in ./.coedit-stale-held ../.coedit-stale-held; do
+      # The two held dirs are visited in a random order, so slow deletions
+      # in one never keep the other from its turn.
+      if [ $((RANDOM % 2)) -eq 0 ]; then held=(./.coedit-stale-held ../.coedit-stale-held)
+      else held=(../.coedit-stale-held ./.coedit-stale-held); fi
+      for h in "${held[@]}"; do
         [ "$SECONDS" -lt 5 ] || break
         [ -d "$h" ] && [ ! -L "$h" ] || continue
         while IFS= read -r m; do

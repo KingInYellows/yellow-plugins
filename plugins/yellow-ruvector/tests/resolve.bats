@@ -391,3 +391,11 @@ fake_install() {
   [ "$status" -eq 0 ]
   [ "$output" = "$(cd "$BATS_TEST_TMPDIR/not-yet" && pwd -P)/data" ]
 }
+
+@test "validate_paths: a data dir that cannot be canonicalized is refused (no realpath -m)" {
+  ln -s "$BATS_TEST_TMPDIR/not-yet" "$WORK/link"
+  rs bash -c 'realpath() { return 1; }; . "$1"; CLAUDE_PLUGIN_DATA="$2/link/data" yellow_ruvector_validate_paths --data-only' \
+    _ "$PLUGIN_ROOT/lib/install-ruvector.sh" "$WORK"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot canonicalize the data dir"* ]]
+}
