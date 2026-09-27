@@ -115,12 +115,6 @@ cd "$root"
 
 # --- 3. Fresh-store guard ---
 allow="${RUVECTOR_MCP_ALLOW:-hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats}"
-intel=".ruvector/intelligence.json"
-# A missing store counts as unstamped: the first write would create it.
-stamp=""
-if [ -f "$intel" ] && command -v jq >/dev/null 2>&1; then
-  stamp=$(jq -r '.embeddingProvenance.embedderKind // empty' "$intel" 2>/dev/null || true)
-fi
 # An explicitly selected hash embedder (RUVECTOR_EMBEDDER=hash, or
 # RUVECTOR_ONNX=0) needs no model and stamping hash is intended: no guard.
 # "Cached" means a warm-up verified these exact model files (a truncated
@@ -167,7 +161,7 @@ export RUVECTOR_MCP_ALLOW="$allow"
 unset RUVECTOR_MCP_PROFILE
 
 # --- 4. Run ---
-# Re-check right before exec: root heal and the store parse take time, and
+# Re-check right before exec: root heal and the model warm-up take time, and
 # another plugin version's prune may have removed this install meanwhile.
 [ -f "$entry" ] || ensure_pinned_install
 exec node "$entry" mcp start
