@@ -1,0 +1,21 @@
+.github/workflows/version-packages.yml
+  s_37c0875242a535::t_adfe9d87327c3a 15-23,168-170
+CONTRIBUTING.md
+  s_37c0875242a535::t_c74807a7bad03c 256-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f11a47dd3c3b2b7ad617a5805bf07c320bd6b72c",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
