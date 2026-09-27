@@ -266,3 +266,16 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF\nruvector hooks post-edit --success\nEOF"]' "$S" >/dev/null
 }
+
+@test "a legacy call behind environment assignments is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "RUVECTOR_ONNX=0 ruvector hooks post-edit --success"},
+    {type: "command", command: "A=1 B=x/y npx ruvector hooks post-command"},
+    {type: "command", command: "echo A=1 ruvector hooks post-edit"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo A=1 ruvector hooks post-edit"]' "$S" >/dev/null
+}
