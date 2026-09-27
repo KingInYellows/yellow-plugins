@@ -19,6 +19,14 @@
 
 YELLOW_RUVECTOR_MODEL='all-MiniLM-L6-v2'
 
+# A relative RUVECTOR_CACHE_DIR is anchored here, once: the warm-up runs
+# ruvector from TMPDIR and the server from the project root, and both must
+# see the same cache the lock and fingerprint helpers check.
+case "${RUVECTOR_CACHE_DIR:-}" in
+  ''|/*) ;;
+  *) RUVECTOR_CACHE_DIR="$PWD/$RUVECTOR_CACHE_DIR"; export RUVECTOR_CACHE_DIR ;;
+esac
+
 # yellow_ruvector_flat <text> — one line for display: control characters as
 # spaces, dash runs shortened. Paths printed to a model-visible stream (the
 # data dir, the plugin root) go through it, so none can forge a fence or an
@@ -492,7 +500,10 @@ yellow_ruvector_do_install() {
   # Rolling back to a lockfile whose install dir is still here (the previous
   # install, possibly backing a live server): reuse it rather than deleting
   # node_modules from under that server.
-  if [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
+  # Skipped when the caller already saw this install's CLI fail its probe
+  # (_YR_KNOWN_UNHEALTHY), so a hung CLI is not waited on again.
+  if [ -z "${_YR_KNOWN_UNHEALTHY:-}" ] \
+     && [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
      && yellow_ruvector_install_healthy \
      && yellow_ruvector_run_bounded 20 node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
     yellow_ruvector_swap_current "install-${hash}" || return 1

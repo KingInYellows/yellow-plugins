@@ -49,9 +49,20 @@ budget_left() { echo $(( wait_secs - (SECONDS - t0) )); }
 # --- 1. Install ---
 # Needed when `current` is not this lockfile's install, or when this
 # version's install-<hash> is gone (another plugin version's prune removed it).
+# The health probe gets at most the budget left (10s cap), and an install
+# that failed it once is not probed again: a hung CLI would otherwise spend
+# the probe three times (here, after the lock, and in do_install) before
+# the repair starts.
+_YR_KNOWN_UNHEALTHY=""
 needs_install() {
-  yellow_ruvector_needs_install || [ ! -f "$(yellow_ruvector_pinned_entry)" ] \
-    || ! yellow_ruvector_install_healthy
+  local s
+  yellow_ruvector_needs_install && return 0
+  [ -f "$(yellow_ruvector_pinned_entry)" ] || return 0
+  [ -z "$_YR_KNOWN_UNHEALTHY" ] || return 0
+  s=$(budget_left); [ "$s" -le 10 ] || s=10; [ "$s" -ge 1 ] || s=1
+  yellow_ruvector_install_healthy "$s" && return 1
+  _YR_KNOWN_UNHEALTHY=1
+  return 0
 }
 # ensure_pinned_install — set `entry` to this plugin version's install-<hash>
 # CLI, installing or restoring it under the lock. Never `current` or another
