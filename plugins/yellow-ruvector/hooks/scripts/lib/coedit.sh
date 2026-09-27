@@ -453,9 +453,13 @@ coedit_partner_ok() {
       case "${_coedit_bad_dirs:-}" in *$'\n'"$d"$'\n'*) return 1 ;; esac
       # Symlinked components are rejected with builtin tests, before the
       # budgeted subshell: a store full of symlinked-dir partners must not
-      # use up the checks the real partners below them need.
+      # use up the checks the real partners below them need. The walk has
+      # its own total budget per lookup (_coedit_comp_left), so hundreds of
+      # deep candidates stay inside the hook's 1s.
       local rest="$d/" pre=""
       while [ -n "$rest" ]; do
+        [ "${_coedit_comp_left:-0}" -gt 0 ] || return 1
+        _coedit_comp_left=$((_coedit_comp_left - 1))
         pre="${pre}${rest%%/*}"; rest="${rest#*/}"
         if [ -L "${root}/${pre}" ] || [ ! -d "${root}/${pre}" ]; then
           _coedit_bad_dirs="${_coedit_bad_dirs:-}"$'\n'"$d"$'\n'
@@ -495,6 +499,7 @@ coedit_partners() {
   local rroot
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
   _coedit_phys_left=50
+  _coedit_comp_left=1500
   _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
@@ -547,7 +552,8 @@ coedit_suggest_once() {
   if [ -f "$sfile" ] && jq -e --arg r "$rel" '(.surfaced | if type == "array" then map(select(type == "string")) else [] end) | index($r) != null' "$sfile" >/dev/null 2>&1; then
     seen=1
   else
-    { if [ -f "$sfile" ] && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then cat "$sfile"; else printf '{}'; fi; } \
+    # Exactly one object, as in coedit_record; anything else starts fresh.
+    { jq -c -s 'if length == 1 and (.[0] | type) == "object" then .[0] else {} end' "$sfile" 2>/dev/null || printf '{}'; } \
       | jq -c --arg r "$rel" '
         # Newest last, at most 200 entries and 32 KB serialized (UTF-8
         # bytes of each JSON string plus its comma, and n starts at 1: an

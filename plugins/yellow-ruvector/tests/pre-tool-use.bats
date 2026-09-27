@@ -314,6 +314,19 @@ related_staged() {
   [[ "$(ctx "$output")" != *"src/l"* ]]
 }
 
+@test "deep symlinked candidates are bounded in total, inside the hook timeout" {
+  deep=$(printf 'd/%.0s' $(seq 1 120)); deep="src/${deep%/}"
+  mkdir -p "$PROJECT_ROOT/$deep" "$BATS_TEST_TMPDIR/out"; : > "$BATS_TEST_TMPDIR/out/f.ts"
+  for i in $(seq 0 499); do ln -s "$BATS_TEST_TMPDIR/out" "$PROJECT_ROOT/$deep/l$i"; done
+  jq -n --arg d "$deep" '{version:1, pairs:{"src/a.ts": ([range(0;500)] | map({key:"\($d)/l\(.)/f.ts", value:9}) | from_entries)}}' > "$RUVECTOR_DIR/coedit.json"
+  start=$(date +%s%N)
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  end=$(date +%s%N)
+  assert_allow_json "$output"
+  [[ "$(ctx "$output")" != *"/l"* ]]
+  [ $(( (end - start) / 1000000 )) -lt 800 ]
+}
+
 @test "surfaced stays under the size cap with multibyte paths" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   long=$(printf '\xe6\xbc\xa2%.0s' $(seq 1 160))
@@ -322,6 +335,16 @@ related_staged() {
   [ -n "$(ctx "$output")" ]
   [ "$(wc -c < "$RUVECTOR_DIR/coedit-sessions/s9")" -le 40000 ]
   jq -e '.surfaced[-1] == "src/a.ts"' "$RUVECTOR_DIR/coedit-sessions/s9" >/dev/null
+}
+
+@test "a multi-document session file is rewritten as one object when surfacing" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  printf '{"surfaced":[]}\n{"surfaced":[]}\n' > "$RUVECTOR_DIR/coedit-sessions/s13"
+  run --separate-stderr run_hook "$(event s13 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -n "$(ctx "$output")" ]
+  [ "$(wc -l < "$RUVECTOR_DIR/coedit-sessions/s13" | tr -d ' ')" -eq 1 ]
+  run --separate-stderr run_hook "$(event s13 Edit "$PROJECT_ROOT/src/a.ts")"
+  [ -z "$(ctx "$output")" ]
 }
 
 @test "a malformed surfaced field is reset, so the suggestion is recorded once" {
