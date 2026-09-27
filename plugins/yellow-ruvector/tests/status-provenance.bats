@@ -215,3 +215,16 @@ STORE_STAMP='{"embedderKind":"onnx-minilm","modelId":"Xenova/all-MiniLM-L6-v2","
   [[ "$(fenced detail)" != *"still downloading"* ]]
   [[ "$(fenced detail)" == *"not installed"* ]]
 }
+
+@test "a timeout that stalls on its compatibility probe cannot hang the status block" {
+  write_store "{\"embeddingProvenance\":$STORE_STAMP,\"memories\":[]}"
+  stub_cli 0 "{\"success\":true,\"targetProvenance\":$STORE_STAMP}"
+  for t in timeout gtimeout; do
+    printf '#!/bin/sh\ntrap "" TERM\nsleep 30\n' > "$BATS_TEST_TMPDIR/bin/$t"; chmod +x "$BATS_TEST_TMPDIR/bin/$t"
+  done
+  start=$(date +%s)
+  run bash -c 'cd "$1" && export RUVECTOR_BIN="$2/ruvector" PATH="$2:$PATH" && . "$3"' _ "$WORK" "$BATS_TEST_TMPDIR/bin" "$BLOCK"
+  [ $(( $(date +%s) - start )) -lt 6 ]
+  [ "$(fenced verdict)" = "UNKNOWN" ]
+  [[ "$(fenced detail)" == *"no GNU-compatible timeout"* ]]
+}

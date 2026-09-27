@@ -605,6 +605,17 @@ SH
   [ "$(readlink "$DATA/current")" = "install-$(lock_hash)" ]
 }
 
+@test "a failed swap puts a real directory at current back, never losing it" {
+  mkdir -p "$DATA/current/leftover"; : > "$DATA/current/leftover/keep"
+  lb="$BATS_TEST_TMPDIR/lnbin"; mkdir -p "$lb"
+  printf '#!/bin/sh\nexit 1\n' > "$lb/ln"; chmod +x "$lb/ln"
+  run bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_DATA="$2"
+    yellow_ruvector_data_dir; PATH="$3:$PATH" yellow_ruvector_swap_current "install-x"' _ "$PLUGIN" "$DATA" "$lb"
+  [ "$status" -ne 0 ]
+  [ -f "$DATA/current/leftover/keep" ]
+  [ -z "$(ls -A "$DATA" | grep '^\.current\.old\.' || true)" ]
+}
+
 @test "an install smoke test that hangs is bounded, never holding the installer" {
   command -v node >/dev/null 2>&1 || skip "node not available"
   nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"

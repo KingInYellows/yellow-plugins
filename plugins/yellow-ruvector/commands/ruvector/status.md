@@ -225,15 +225,24 @@ else
   # macOS without coreutils has neither `timeout` nor `gtimeout` — without a
   # working wrapper, the CLI must never run unbounded (a stalled model
   # download would hang this command past the documented 90s bound).
+  # The probe itself is bounded: a candidate that stalls (a broken wrapper,
+  # a hung mount) is killed after 1s and skipped.
   TIMEOUT_CMD=""
   for _tcmd_name in timeout gtimeout; do
     _tcmd="$(command -v "$_tcmd_name" || true)"
-    if [ -n "$_tcmd" ] && "$_tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
+    [ -n "$_tcmd" ] || continue
+    "$_tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1 &
+    _tp=$!
+    ( sleep 1; kill -9 "$_tp" 2>/dev/null ) >/dev/null 2>&1 &
+    _tw=$!
+    wait "$_tp"; _trc=$?
+    kill "$_tw" 2>/dev/null; wait "$_tw" 2>/dev/null
+    if [ "$_trc" -eq 0 ]; then
       TIMEOUT_CMD="$_tcmd"
       break
     fi
   done
-  unset _tcmd_name _tcmd
+  unset _tcmd_name _tcmd _tp _tw _trc
   if [ -z "$TIMEOUT_CMD" ]; then
     VERDICT=UNKNOWN; DETAIL="no GNU-compatible timeout/gtimeout on PATH; dry-run skipped (brew install coreutils)"
   else
