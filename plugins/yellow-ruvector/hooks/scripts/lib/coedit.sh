@@ -413,9 +413,10 @@ coedit_record() {
   return 0
 }
 
-# coedit_shard [digit] — a random -name bracket expression covering one of
-# eight slices of the session-id alphabet [A-Za-z0-9_-] (or, with `digit`,
-# one of five pairs of digits). COEDIT_SHARD (an index) pins it for tests.
+# coedit_shard [digit] — a random -name prefix of two bracket expressions,
+# each one of eight slices of the session-id alphabet [A-Za-z0-9_-] (or,
+# with `digit`, one of five pairs of digits): 64 (25) slices in all.
+# COEDIT_SHARD (an index) pins it for tests.
 coedit_shard() {
   local -a sh
   if [ "${1:-}" = digit ]; then
@@ -423,9 +424,12 @@ coedit_shard() {
   else
     sh=('[0-3]' '[4-7]' '[89ab]' '[cdef]' '[g-p]' '[q-z]' '[A-M]' '[N-Z_-]')
   fi
-  local i="${COEDIT_SHARD:-$RANDOM}"
-  case "$i" in ''|*[!0-9]*) i=$RANDOM ;; esac
-  printf '%s' "${sh[$(( i % ${#sh[@]} ))]}"
+  local i="${COEDIT_SHARD:-$(( (RANDOM << 15) | RANDOM ))}" n=${#sh[@]}
+  case "$i" in ''|*[!0-9]*) i=$(( (RANDOM << 15) | RANDOM )) ;; esac
+  # Two levels (first and second character), so a first-character slice
+  # that alone is too big to list in time is itself split, and over runs
+  # every part of it is reached.
+  printf '%s%s' "${sh[$(( i % n ))]}" "${sh[$(( (i / n) % n ))]}"
 }
 
 # coedit_prune_sessions <root> — delete session files untouched for 7+ days.
