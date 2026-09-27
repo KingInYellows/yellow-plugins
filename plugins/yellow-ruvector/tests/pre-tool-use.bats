@@ -765,3 +765,17 @@ related_staged() {
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
+
+@test "a relative XDG_CACHE_HOME is ignored: the pointer never lands in the checkout" {
+  export CLAUDE_CODE_SESSION_ID=relxdg
+  mkdir -p "$PROJECT_ROOT/rel/yellow-ruvector"
+  : > "$PROJECT_ROOT/rel/yellow-ruvector/related-stage.relxdg"
+  q=$(cd "$PROJECT_ROOT" && XDG_CACHE_HOME=rel bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  # The checkout's file is untouched; the pointer is under HOME.
+  [ -e "$PROJECT_ROOT/rel/yellow-ruvector/related-stage.relxdg" ] && [ ! -s "$PROJECT_ROOT/rel/yellow-ruvector/related-stage.relxdg" ]
+  [ -f "$HOME/.cache/yellow-ruvector/related-stage.relxdg" ]
+  printf 'src/a.ts\n' > "$q"
+  run --separate-stderr bash -c 'cd /tmp && XDG_CACHE_HOME=rel bash "$1" --run' _ "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ] || [ "$status" -eq 2 ]
+  [ ! -e "$q" ]
+}

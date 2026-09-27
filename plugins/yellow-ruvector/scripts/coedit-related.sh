@@ -45,7 +45,12 @@ STAGE_PREFIX="${STAGE_BASE}/q."
 # each other's query: the session id when the host exports it, else the pid
 # of the process that runs the Bash tool's shells (this script's
 # grandparent: the host -> the tool's shell -> this script).
-PTR_DIR="${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}/yellow-ruvector"
+# XDG_CACHE_HOME counts only when absolute (the XDG spec says to ignore a
+# relative value); otherwise the pointer would land under the cwd.
+case "${XDG_CACHE_HOME:-}" in
+  /*) PTR_DIR="${XDG_CACHE_HOME%/}/yellow-ruvector" ;;
+  *) PTR_DIR="${HOME:-/nonexistent}/.cache/yellow-ruvector" ;;
+esac
 _key="${CLAUDE_CODE_SESSION_ID:-}"
 [ -n "$_key" ] || _key="ppid-$(ps -o ppid= -p "$PPID" 2>/dev/null | tr -d ' ')"
 _key=$(printf '%s' "$_key" | LC_ALL=C tr -cd 'A-Za-z0-9_-' | cut -c1-80)
