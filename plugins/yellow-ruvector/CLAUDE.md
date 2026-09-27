@@ -31,8 +31,11 @@ ruvector.
   4. `exec`s `node <data>/install-<hash>/node_modules/ruvector/bin/cli.js mcp start`
      (this plugin version's own lockfile hash, never `current`, so the
      server matches this session's hooks and pruning can skip installs a
-     live server still loads modules from). If that install is gone, it
-     reinstalls it under the lock or exits; it never runs another
+     live server still loads modules from). Before checking the install it
+     takes a lease (`<data>/.lease.install-<hash>.<pid>`; the pid survives
+     exec), and prune skips leased installs, so another version's prune
+     cannot remove it between the check and exec. If that install is gone,
+     it reinstalls it under the lock or exits; it never runs another
      version's install.
 - Data dir: `$CLAUDE_PLUGIN_DATA`, or `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector`
   when the host does not set it. Install primitives live in

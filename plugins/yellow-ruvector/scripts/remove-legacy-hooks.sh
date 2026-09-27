@@ -72,8 +72,12 @@ re='(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvect
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
   # an echo of a single- or double-quoted "x; ruvector hooks post-edit" is
-  # not a ruvector invocation (\u0027 is a single quote).
-  def unquoted: gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
+  # not a ruvector invocation (\u0027 is a single quote). A quoted single
+  # word in command position ("/usr/local/bin/ruvector" hooks …) IS the
+  # executable: unquote it first.
+  def unquoted:
+    gsub("(?<p>(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
   | (.hooks | if type == "array" then .[] else empty end)
@@ -89,7 +93,9 @@ printf '%s\n' "$list"
 tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
-  def unquoted: gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
+  def unquoted:
+    gsub("(?<p>(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "");
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then
         map(if (.hooks | type) == "array"

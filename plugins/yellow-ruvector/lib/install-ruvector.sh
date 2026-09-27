@@ -412,13 +412,43 @@ yellow_ruvector_swap_current() {
   ln -sfn "$target" "${RUVECTOR_DATA}/current"
 }
 
+# yellow_ruvector_take_lease <install-name> — mark that this process (its
+# pid survives exec, so the lease covers the server it becomes) is about to
+# run from <install-name>. Prune never removes a leased install. Take it
+# BEFORE checking the install exists: prune moves an install aside before its
+# final lease check, so a lease taken after that check always finds it gone.
+yellow_ruvector_take_lease() {
+  : > "${RUVECTOR_DATA}/.lease.${1}.$$" 2>/dev/null
+}
+
+# yellow_ruvector_leased <install-name> — 0 when a live process holds a lease
+# on it. Leases of dead processes are removed on the way.
+yellow_ruvector_leased() {
+  local l pid rc=1
+  for l in "${RUVECTOR_DATA}/.lease.${1}."*; do
+    [ -e "$l" ] || continue
+    pid=${l##*.}
+    case "$pid" in ''|*[!0-9]*) rm -f -- "$l" 2>/dev/null; continue ;; esac
+    if kill -0 "$pid" 2>/dev/null; then rc=0; else rm -f -- "$l" 2>/dev/null; fi
+  done
+  return $rc
+}
+
 # Remove install dirs other than $1 (current) and $2 (previous), plus stale
 # temp dirs from crashed installs. Caller holds the install lock. An install
 # dir named on a live process's command line is kept too: the launcher execs
 # the resolved install-<hash> path, and a long-running MCP server still
-# lazy-loads modules from it after later upgrades move `current`.
+# lazy-loads modules from it after later upgrades move `current`. So is a
+# leased one (a launcher between its install check and exec, not yet in ps):
+# the dir is moved aside first and restored if a lease shows up by then.
 yellow_ruvector_prune() {
-  local keep_current="$1" keep_prev="${2:-}" d name in_use
+  local keep_current="$1" keep_prev="${2:-}" d name in_use l aside
+  # Drop leases of processes that are gone.
+  for l in "${RUVECTOR_DATA}"/.lease.*; do
+    [ -e "$l" ] || continue
+    case "${l##*.}" in ''|*[!0-9]*) rm -f -- "$l" 2>/dev/null; continue ;; esac
+    kill -0 "${l##*.}" 2>/dev/null || rm -f -- "$l" 2>/dev/null
+  done
   # -ww: untruncated arguments (BSD/macOS ps otherwise cuts at the terminal
   # width and could hide the /install-<hash>/ part of a live server's path).
   in_use=$(ps -Aww -o args= 2>/dev/null || ps -A -o args= 2>/dev/null || true)
@@ -428,6 +458,17 @@ yellow_ruvector_prune() {
     [ "$name" = "$keep_current" ] && continue
     [ -n "$keep_prev" ] && [ "$name" = "$keep_prev" ] && continue
     case "$in_use" in *"/${name}/"*) continue ;; esac
+    case "$name" in
+      install-*)
+        yellow_ruvector_leased "$name" && continue
+        aside="${RUVECTOR_DATA}/.${name}.tmp.prune$$"
+        mv -- "$d" "$aside" 2>/dev/null || continue
+        if yellow_ruvector_leased "$name"; then
+          mv -- "$aside" "$d" 2>/dev/null || rm -rf -- "$aside" 2>/dev/null
+          continue
+        fi
+        d=$aside ;;
+    esac
     rm -rf -- "$d" 2>/dev/null
   done
   return 0

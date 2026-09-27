@@ -54,11 +54,14 @@ needs_install() {
 # ensure_pinned_install — set `entry` to this plugin version's install-<hash>
 # CLI, installing or restoring it under the lock. Never `current` or another
 # version's install: the server must match this session's hooks, and prune
-# must see which install it still uses. Two passes: a newer plugin in another
-# session can prune this install between the check and the exec.
+# must see which install it still uses. Two passes: a prune that ran before
+# the lease was taken can still have removed it.
 ensure_pinned_install() {
-  local _pass wait
+  local _pass wait hash
   entry=""
+  # Lease this version's install before any existence check, so a prune in
+  # another session cannot remove it between the check and exec.
+  hash=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${hash}"
   for _pass in 1 2; do
     if needs_install; then
       wait=$(budget_left); [ "$wait" -ge 1 ] || wait=1
