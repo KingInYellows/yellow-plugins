@@ -47,7 +47,7 @@ npm_called_within() {
   cli 'console.log("0.3.3")'
   run bash "$HOOK" </dev/null
   [ "$status" -eq 0 ]
-  ! npm_called_within 1
+  ! npm_called_within 1 || false || false
 }
 
 @test "an install whose entry no longer runs is reinstalled" {
@@ -104,4 +104,23 @@ npm_called_within() {
   sleep 4
   [ "$(cat "$CLAUDE_PLUGIN_DATA/.install.lock/pid" 2>/dev/null)" = "$foreign" ]
   kill "$foreign" 2>/dev/null || true
+}
+
+@test "a live installer's lock ends prewarm at once, inside its 5s hook timeout" {
+  # A CLI that ignores TERM would hold the health probe for its full budget
+  # plus the KILL grace, and the lock wait would come on top.
+  cli "process.on('SIGTERM', () => {}); setTimeout(() => {}, 10000);"
+  rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
+  sleep 30 & holder=$!
+  bash -c '. "$1"; yellow_ruvector_data_dir; mkdir "$RUVECTOR_DATA/.install.lock"
+    yellow_ruvector_stamp_pid "$RUVECTOR_DATA/.install.lock" "$2"
+    printf %s "$2" > "$RUVECTOR_DATA/.install.lock/pid"' _ "$LIB" "$holder"
+  start=$(date +%s%N)
+  run bash "$HOOK" < /dev/null
+  elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
+  kill "$holder" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' >/dev/null
+  [ "$elapsed" -lt 1500 ]
+  [ ! -e "$BATS_TEST_TMPDIR/npm-called" ]
 }

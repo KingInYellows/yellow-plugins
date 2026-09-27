@@ -199,3 +199,19 @@ STORE_STAMP='{"embedderKind":"onnx-minilm","modelId":"Xenova/all-MiniLM-L6-v2","
     _ "$WORK" "$plugin" "$data" "$BLOCK"
   ls "$data"/.lease.install-* >/dev/null 2>&1
 }
+
+@test "with the hash embedder selected, a busy model lock is never waited on" {
+  write_store "{\"embeddingProvenance\":$STORE_STAMP,\"memories\":[]}"
+  home="$BATS_TEST_TMPDIR/home"; mkdir -p "$home"
+  sleep 60 & holder=$!
+  HOME="$home" bash -c '. "$1/lib/install-ruvector.sh"; d=$(yellow_ruvector_model_lock_dir); mkdir -p "$d"
+    yellow_ruvector_stamp_pid "$d" "$2"; printf %s "$2" > "$d/pid"' _ "$BATS_TEST_DIRNAME/.." "$holder"
+  start=$(date +%s)
+  run bash -c 'cd "$1" && unset RUVECTOR_BIN && export HOME="$2" RUVECTOR_EMBEDDER=hash CLAUDE_PLUGIN_ROOT="$3" CLAUDE_PLUGIN_DATA="$4" && . "$5"' \
+    _ "$WORK" "$home" "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/no-install" "$BLOCK"
+  elapsed=$(( $(date +%s) - start ))
+  kill "$holder" 2>/dev/null || true
+  [ "$elapsed" -lt 10 ]
+  [[ "$(fenced detail)" != *"still downloading"* ]]
+  [[ "$(fenced detail)" == *"not installed"* ]]
+}

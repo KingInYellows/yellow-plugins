@@ -76,8 +76,9 @@ installation:
 
 - **context7** (yellow-core) — public library documentation endpoint
 - **ruvector** (yellow-ruvector) — local stdio server, no auth configuration
-  (its `npx` startup command can still reach the npm registry on a cold machine
-  — see [MCP Servers Inventory](#mcp-servers-inventory) above)
+  (on first use its launcher, `bin/start-ruvector.sh`, installs the pinned
+  ruvector from the npm registry and downloads the ONNX model — see
+  [MCP Servers Inventory](#mcp-servers-inventory) above)
 - **deepwiki** (yellow-research) — public repository documentation endpoint
 
 ### CLI keyring auth (yellow-council)
