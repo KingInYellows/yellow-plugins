@@ -368,6 +368,9 @@ coedit_record() {
     state='{}'
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
+  # Bounded before any arithmetic: a huge value would wrap modulo 2^64 and
+  # could land inside the window (12 digits covers any real timestamp).
+  [ "${#epoch}" -le 12 ] || epoch=0
   local pair=""
   if [ -n "$last" ] && [ "$last" != "$rel" ] && [ $((now - epoch)) -ge 0 ] && [ $((now - epoch)) -le "$COEDIT_WINDOW_SECS" ]; then
     # The stored path is project data: re-resolve it (symlinks included)
@@ -613,14 +616,18 @@ coedit_prune_sessions() {
           fi
         done
       fi
-      # Held trees get a few bounded retries per run.
+      # Held trees get a few bounded retries per run: a random sample of
+      # three, so ones that can never be removed cannot pin the retries.
       for h in ./.coedit-stale-held ../.coedit-stale-held; do
         [ "$SECONDS" -lt 5 ] || break
         [ -d "$h" ] && [ ! -L "$h" ] || continue
         while IFS= read -r m; do
           [ "$SECONDS" -lt 5 ] || break
           [ -d "$m" ] && [ ! -L "$m" ] && run_budgeted 2 rm -rf -- "$m" 2>/dev/null
-        done < <(run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" 2>/dev/null | head -n 3)
+        done < <(run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" 2>/dev/null \
+          | LC_ALL=C awk -v k=3 'BEGIN { srand() }
+              { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
+              END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }')
         rmdir -- "$h" 2>/dev/null
       done ) \
     </dev/null >/dev/null 2>&1 &
