@@ -599,7 +599,7 @@ coedit_partner_ok() {
     /*|-*|./*|../*|*/./*|*/../*|*/.|*/..|.|..|*//*) return 1 ;;
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
-  case "$p" in *[[:cntrl:]]*) return 1 ;; esac
+  case "$p" in *[[:cntrl:]]*|*$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
   [ -f "${root}/${p}" ] && [ ! -L "${root}/${p}" ] || return 1
   case "$p" in
     */*)
@@ -665,7 +665,7 @@ coedit_partners() {
       (.pairs[$r] // {}) | to_entries
       | map(select((.value | type) == "number" and .value >= $min
                    and .key != $r
-                   and (.key | test("[[:cntrl:]]") | not)))
+                   and (.key | test("[[:cntrl:]\u0085\u2028\u2029]") | not)))
       | sort_by(-.value, .key) | .[0:$scan][] | "\(.value | floor)\t\(.key)"
     ' "$f" 2>/dev/null) || return 0
   [ -n "$cands" ] || return 0

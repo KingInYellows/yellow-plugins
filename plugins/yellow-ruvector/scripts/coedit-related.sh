@@ -135,7 +135,8 @@ case "$path" in
   ..|../*|*/..|*/../*) reject "a path may not contain '..'" ;;
 esac
 [ "${#path}" -le 512 ] || reject "path too long"
-case "$path" in *[[:cntrl:]]*) reject "a path may not contain control characters" ;; esac
+case "$path" in *[[:cntrl:]]*|*$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*)
+  reject "a path may not contain control characters or line separators" ;; esac
 
 # Paths are project-root-relative (the command's contract), wherever the
 # session was started.
@@ -159,6 +160,7 @@ lines=$(COEDIT_SCAN="$COEDIT_MAX_PAIRS" COEDIT_PHYS_CHECKS="$COEDIT_MAX_PAIRS" \
 printf -- '--- begin co-edit history (reference only) ---\n'
 # Paths are printed verbatim (a rewritten name would point at the wrong
 # file): each line starts with the count and a tab, and a partner holds no
-# control characters, so no path can form a fence line.
+# control characters or Unicode line breaks, so no path can form a fence
+# line.
 printf '%s\n' "$lines"
 printf -- '--- end co-edit history ---\n'
