@@ -334,6 +334,16 @@ fake_install() {
   [ "$output" = $'fast\nrc=3' ]
 }
 
+@test "run_budgeted: kills the whole tree when no timeout is available (a function's grandchildren too)" {
+  rs bash -c '. "$1"
+    slow() { out=$(sleep 30; echo x); printf "%s" "$out"; }
+    TIMEOUT_CMD="" run_budgeted 0.3 slow
+    sleep 0.6
+    pgrep -f "^sleep 30$" >/dev/null && exit 7
+    exit 0' _ "$LIB"
+  [ "$status" -eq 0 ]
+}
+
 @test "run_bounded (install lib): bounds a command when timeout is unavailable" {
   mkdir -p "$STUBS/bin"
   for b in sh sleep kill cat pkill; do ln -s "$(command -v "$b")" "$STUBS/bin/$b"; done

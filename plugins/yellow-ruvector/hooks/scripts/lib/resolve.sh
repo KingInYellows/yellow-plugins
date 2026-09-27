@@ -224,11 +224,20 @@ ruvector_probe_timeout() {
   return 1
 }
 
+# ruvector_proc_tree <pid> — print <pid> and all its descendants (pgrep -P
+# walk; just <pid> where pgrep is missing).
+ruvector_proc_tree() {
+  local c
+  printf '%s\n' "$1"
+  for c in $(pgrep -P "$1" 2>/dev/null); do ruvector_proc_tree "$c"; done
+}
+
 # run_budgeted <seconds> <cmd...> — run for at most <seconds>: under
 # TIMEOUT_CMD when available, otherwise (stock macOS) with a background
-# watcher that sends TERM (to the command and its children), then KILL
-# 0.2s later. The watcher's stdio goes to /dev/null so the caller's $(...)
-# is not held open by it.
+# watcher that sends TERM to the command's whole process tree (a function or
+# $(...) runs its programs as grandchildren), then KILL 0.2s later to every
+# process it found. The watcher's stdio goes to /dev/null so the caller's
+# $(...) is not held open by it.
 run_budgeted() {
   local cap="$1" pid watcher rc=0
   shift
@@ -238,8 +247,12 @@ run_budgeted() {
   fi
   "$@" &
   pid=$!
-  ( sleep "$cap"; pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
-    sleep 0.2; pkill -KILL -P "$pid" 2>/dev/null; kill -KILL "$pid" 2>/dev/null ) \
+  ( sleep "$cap"; tree=$(ruvector_proc_tree "$pid")
+    # shellcheck disable=SC2086
+    kill -TERM $tree 2>/dev/null
+    sleep 0.2
+    # shellcheck disable=SC2086
+    kill -KILL $tree $(ruvector_proc_tree "$pid") 2>/dev/null ) \
     </dev/null >/dev/null 2>&1 &
   watcher=$!
   wait "$pid" 2>/dev/null || rc=$?
