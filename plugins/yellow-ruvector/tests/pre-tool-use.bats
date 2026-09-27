@@ -594,6 +594,23 @@ related_staged() {
   [ ! -e "$qb" ]
 }
 
+@test "coedit-related.sh never trusts a pointer record holding a NUL byte" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  # A real staged query (the victim) and a pointer that aliases it via a NUL.
+  qv=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=victim bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$qv"
+  d="${qv%/query}"; ptr="$XDG_CACHE_HOME/yellow-ruvector/related-stage.me"
+  printf '%s\000%s\n' "${d%/*}/q." "${d##*/q.}" > "$ptr"
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=me bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"src/b.ts"* ]]
+  [ -e "$qv" ]
+  # --stage drops the bad pointer without touching the victim's query.
+  printf '%s\000%s\n' "${d%/*}/q." "${d##*/q.}" > "$ptr"
+  (cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=me bash "$RELATED_SCRIPT" --stage >/dev/null)
+  [ -e "$qv" ]
+}
+
 @test "coedit-related.sh rejects a NUL byte instead of dropping it" {
   qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   printf 'src/\000a.ts\n' > "$qf"

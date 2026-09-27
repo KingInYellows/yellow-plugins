@@ -59,10 +59,13 @@ PTR="${PTR_DIR}/related-stage.${_key}"
 # drop_stage <pointer> — remove a pointer record and what it staged: only
 # the query file and the (then empty) dir, and only a dir --stage made
 # (under the prefix, one level, ours, not a symlink).
+# has_nul <file> — the file holds a NUL byte, which `read` would silently
+# drop (a/<NUL>b would alias a/b): such a record is never trusted.
+has_nul() { [ "$(LC_ALL=C tr -d '\000' < "$1" | wc -c)" -ne "$(wc -c < "$1")" ]; }
 drop_stage() {
   local d=""
   [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 0
-  IFS= read -r d < "$1" || true
+  has_nul "$1" || { IFS= read -r d < "$1" || true; }
   case "$d" in "${STAGE_PREFIX}"?*) ;; *) d="" ;; esac
   case "${d#"${STAGE_PREFIX}"}" in */*) d="" ;; esac
   if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
@@ -126,7 +129,8 @@ fi
 if [ "$1" = "--run" ]; then
   [ -f "$PTR" ] && [ ! -L "$PTR" ] && [ -O "$PTR" ] \
     || { printf 'coedit-related: nothing staged (run --stage first)\n' >&2; exit 2; }
-  IFS= read -r _sdir < "$PTR" || _sdir=""
+  _sdir=""
+  has_nul "$PTR" || { IFS= read -r _sdir < "$PTR" || _sdir=""; }
   # No query written (the Write step failed or never ran): drop the record
   # together with its empty staging dir, so nothing is left unreachable.
   if [ ! -f "${_sdir}/query" ] || [ -L "${_sdir}/query" ]; then
