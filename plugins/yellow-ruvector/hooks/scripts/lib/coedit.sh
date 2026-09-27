@@ -241,9 +241,11 @@ coedit_lock_path() {
       # renamed aside and deleted in the background, like a stale lock).
       if { [ -e "$marker" ] || [ -L "$marker" ]; } && coedit_older_than "$(coedit_mtime "$marker")" 600; then
         if [ -d "$marker" ] && [ ! -L "$marker" ]; then
+          # The rename runs in the foreground (the reclaim below needs the
+          # path free); only the delete of the renamed tree is detached.
           rmdir "$marker" 2>/dev/null \
             || { mv -- "$marker" "${lock}.stale.m${ino}-${mt}.$$" 2>/dev/null \
-                 && ( rm -rf -- "${lock}.stale.m${ino}-${mt}.$$" ) </dev/null >/dev/null 2>&1 & }
+                 && { ( rm -rf -- "${lock}.stale.m${ino}-${mt}.$$" ) </dev/null >/dev/null 2>&1 & }; }
         else
           rm -f -- "$marker" 2>/dev/null
         fi

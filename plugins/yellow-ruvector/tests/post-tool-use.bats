@@ -272,6 +272,21 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a non-empty expired marker is renamed before the reclaim, not in the background" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; l="$sd/.s1.lock"; mkdir -p "$l"
+  touch -d '5 minutes ago' "$l" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$l" | awk '{print $1}'); mt=$(stat -c %Y "$l" 2>/dev/null || stat -f %m "$l")
+  m="$l.reclaim.$ino-$mt"; mkdir -p "$m/keep"; touch -d '20 minutes ago' "$m"
+  # A slow rename of the marker: a detached one would lose the race.
+  mb="$BATS_TEST_TMPDIR/mvbin"; mkdir -p "$mb"
+  printf '#!/bin/sh\ncase "$*" in *.reclaim.*) sleep 0.3 ;; esac\nexec %s "$@"\n' "$(command -v mv)" > "$mb/mv"
+  chmod +x "$mb/mv"
+  export COEDIT_LOCK_TRIES=6
+  PATH="$mb:$PATH" edit s1 "$PROJECT_ROOT/src/a.ts"
+  PATH="$mb:$PATH" edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
