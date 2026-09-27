@@ -338,6 +338,7 @@ yellow_ruvector_stop_warm() {
 yellow_ruvector_release_install_lock() {
   local lock_dir="${RUVECTOR_DATA}/.install.lock" owner
   yellow_ruvector_stop_warm
+  yellow_ruvector_release_model_lock
   # Only the owner releases: a lock that now carries another pid belongs to
   # someone else. ($$ is the parent shell inside prewarm's subshell, whose
   # pid the parent writes into the lock; BASHPID is the subshell itself.)
@@ -536,6 +537,73 @@ yellow_ruvector_model_cached() {
   [ -n "${RUVECTOR_DATA:-}" ] && [ "$(cat "${RUVECTOR_DATA}/model-verified" 2>/dev/null)" = "$fp" ]
 }
 
+# Model-cache lock. ruvector downloads the model through fixed file names in
+# ${RUVECTOR_CACHE_DIR:-$HOME}/.ruvector/models/, which every data root (and
+# every plugin ID) shares, so the per-data-dir install lock cannot serialize
+# downloads: this lock lives next to the cache. Its pid file names the
+# warm-up job itself while it runs, so the lock is live exactly as long as a
+# download can be writing.
+yellow_ruvector_model_lock_dir() {
+  printf '%s/.ruvector/models/.yellow-ruvector-warm.lock' "${RUVECTOR_CACHE_DIR:-${HOME:-/tmp}}"
+}
+
+# yellow_ruvector_model_lock_busy — 0 when a live process holds it.
+yellow_ruvector_model_lock_busy() {
+  local d pid
+  d=$(yellow_ruvector_model_lock_dir)
+  [ -d "$d" ] || return 1
+  pid=$(cat "$d/pid" 2>/dev/null)
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  kill -0 "$pid" 2>/dev/null
+}
+
+# yellow_ruvector_acquire_model_lock [secs] — wait up to secs (default 10).
+# A lock whose pid is dead, or that has no valid pid after 60s, is cleared.
+yellow_ruvector_acquire_model_lock() {
+  local d secs="${1:-10}" i=0 pid mt
+  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
+  d=$(yellow_ruvector_model_lock_dir)
+  mkdir -p "${d%/*}" 2>/dev/null || return 1
+  while :; do
+    if mkdir "$d" 2>/dev/null; then
+      if printf '%s' "${_YR_LOCK_OWNER:-${BASHPID:-$$}}" > "$d/pid" 2>/dev/null; then
+        _YR_MODEL_LOCK=1
+        return 0
+      fi
+      rmdir "$d" 2>/dev/null
+      return 1
+    fi
+    pid=$(cat "$d/pid" 2>/dev/null)
+    case "$pid" in
+      ''|*[!0-9]*)
+        mt=$(yellow_ruvector_mtime "$d")
+        case "$mt" in ''|*[!0-9]*) ;; *)
+          if [ $(( $(date +%s) - mt )) -gt 60 ]; then
+            rm -f "$d/pid" 2>/dev/null; rmdir "$d" 2>/dev/null; continue
+          fi ;;
+        esac ;;
+      *)
+        if ! kill -0 "$pid" 2>/dev/null; then
+          rm -f "$d/pid" 2>/dev/null; rmdir "$d" 2>/dev/null; continue
+        fi ;;
+    esac
+    [ "$i" -lt $((secs * 10)) ] || return 1
+    i=$((i + 1))
+    sleep 0.1
+  done
+}
+
+# yellow_ruvector_release_model_lock — only a holder (this shell took it).
+yellow_ruvector_release_model_lock() {
+  local d
+  [ -n "${_YR_MODEL_LOCK:-}" ] || return 0
+  _YR_MODEL_LOCK=""
+  d=$(yellow_ruvector_model_lock_dir)
+  rm -f "$d/pid" 2>/dev/null
+  rmdir "$d" 2>/dev/null
+  return 0
+}
+
 # yellow_ruvector_run_bounded <secs> <cmd...> — run <cmd> for at most <secs>
 # (fractions allowed). Uses GNU timeout when it supports --kill-after;
 # otherwise (stock macOS) a background watcher sends TERM (to the command
@@ -572,16 +640,21 @@ yellow_ruvector_warm_model() {
   local secs="${1:-}" entry out fp tmp
   entry=$(yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
-  tmp=$(mktemp "${TMPDIR:-/tmp}/rv-warm.XXXXXX") || return 1
+  # Serialize with every other warm-up sharing this model cache.
+  yellow_ruvector_acquire_model_lock "${secs:-60}" || return 1
+  tmp=$(mktemp "${TMPDIR:-/tmp}/rv-warm.XXXXXX") || { yellow_ruvector_release_model_lock; return 1; }
   if [ -n "$secs" ]; then
     ( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" ) >"$tmp" 2>&1 &
   else
     ( cd "${TMPDIR:-/tmp}" && exec node "$entry" embed text "warmup" ) >"$tmp" 2>&1 &
   fi
   _YR_WARM_PID=$!
+  # The lock now names the download itself.
+  printf '%s' "$_YR_WARM_PID" > "$(yellow_ruvector_model_lock_dir)/pid" 2>/dev/null
   wait "$_YR_WARM_PID" 2>/dev/null
   _YR_WARM_PID=""
   out=$(cat "$tmp" 2>/dev/null); rm -f "$tmp"
+  yellow_ruvector_release_model_lock
   printf '%s' "$out" | grep -q 'Dimension: 384' || return 1
   # Record which files were verified (see yellow_ruvector_model_cached).
   fp=$(yellow_ruvector_model_fingerprint) || return 1

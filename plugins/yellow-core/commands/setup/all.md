@@ -102,6 +102,10 @@ for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*
   esac
   _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"
   _rv_ver=$(_rv_probe "$_rv_cli") || _rv_ver=""
+  # The output comes from files on disk (a stale or tampered install): keep
+  # it only when its first line is a plain version string, else the install
+  # counts as broken, so nothing else reaches the dashboard.
+  _rv_ver=$(printf '%s\n' "$_rv_ver" | head -n1 | grep -E '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || true)
   [ -n "$_rv_ver" ] && break
 done
 if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n' "$_rv_ver"

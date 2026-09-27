@@ -231,15 +231,28 @@ else
     # would leave DRY_RC holding the assignment's status (always 0), never
     # the inner timeout's 124, so the JSON line is extracted from a file
     # afterward instead.
-    if [ ! -e "${RV[${#RV[@]}-1]}" ]; then
+    # The dry-run loads the model: while it is unverified, hold the shared
+    # model-cache lock so it never downloads alongside prewarm or another
+    # session (RUVECTOR_BIN stubs need no model).
+    MODEL_BUSY=0
+    if [ -z "${RUVECTOR_BIN:-}" ] && ! yellow_ruvector_model_cached \
+       && ! yellow_ruvector_acquire_model_lock 30; then
+      MODEL_BUSY=1
+    fi
+    if [ "$MODEL_BUSY" = 1 ]; then
+      : >|"$OUTF"; : >|"$ERRF"; false
+    elif [ ! -e "${RV[${#RV[@]}-1]}" ]; then
       echo '{"success":false,"error":"plugin-managed ruvector not installed","hint":"run /ruvector:setup"}' >|"$OUTF"; : >|"$ERRF"; false
     else
       "$TIMEOUT_CMD" --kill-after=5 90 "${RV[@]}" hooks reembed --dry-run >|"$OUTF" 2>|"$ERRF"
     fi
     DRY_RC=$?
+    [ -n "${RUVECTOR_BIN:-}" ] || yellow_ruvector_release_model_lock
     DRY=$(grep '^{' "$OUTF" | tail -1)
     DRY_ERR=$(tail -c 300 "$ERRF" 2>/dev/null | tr '\n' ' '); rm -f "$ERRF" "$OUTF"
-    if [ "$DRY_RC" -eq 124 ]; then
+    if [ "$MODEL_BUSY" = 1 ]; then
+      VERDICT=UNKNOWN; DETAIL="another session is still downloading the ONNX model; run /ruvector:status again in a minute"
+    elif [ "$DRY_RC" -eq 124 ]; then
       VERDICT=UNKNOWN; DETAIL="dry-run timed out after 90s (model download stalled)"
     elif [ "$DRY_RC" -eq 137 ]; then
       # 137 = SIGKILL. timeout(1) only reports 137 when the --kill-after
