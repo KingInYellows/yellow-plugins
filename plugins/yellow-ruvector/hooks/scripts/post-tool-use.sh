@@ -33,9 +33,15 @@ unset _HOOK_LIB
 
 command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping post-tool-use"
 
-# Parsed straight from stdin under the jq bound (COEDIT_JQ_SECS), never
-# buffered first: a Write carrying megabytes of content must not keep the
-# hook past its 1s timeout (the edit is then just not recorded).
+# Parsed straight from stdin, never buffered first, and bounded by
+# COEDIT_PARSE_SECS (0.15s): a Write carrying megabytes of content must not
+# keep the hook past its 1s timeout (the edit is then just not recorded).
+# That time is charged against the lock budget (COEDIT_PARSE_TRIES of the
+# 50ms tries), so parse + lock waits + the bounded store rewrite stay
+# under 1s together.
+COEDIT_PARSE_SECS="${COEDIT_PARSE_SECS:-0.15}"
+COEDIT_PARSE_TRIES="${COEDIT_PARSE_TRIES:-3}"
+_COEDIT_SPENT_TRIES=$COEDIT_PARSE_TRIES
 
 TOOL="" file_path="" event="" session_id="" CWD=""
 {
@@ -44,7 +50,7 @@ TOOL="" file_path="" event="" session_id="" CWD=""
   IFS= read -r -d '' event
   IFS= read -r -d '' session_id
   IFS= read -r -d '' CWD
-} < <(coedit_jq -j '
+} < <(COEDIT_JQ_SECS=$COEDIT_PARSE_SECS coedit_jq -j '
   def s(v): if (v|type) == "string" then v else "" end;
   s(.tool_name), "\u0000",
   s(.tool_input.file_path), "\u0000",
