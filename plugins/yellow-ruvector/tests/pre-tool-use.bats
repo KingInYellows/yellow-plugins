@@ -183,6 +183,16 @@ assert_allow_json() {
   [[ "$(ctx "$out")" != *"src/c.ts"* ]]
 }
 
+@test "an edited path holding a Unicode C1 control is never surfaced, in any locale" {
+  f=$'src/a\xc2\x9b[31mX.ts'; : > "$PROJECT_ROOT/$f"
+  jq -n --arg f "$f" '{version:1, pairs:{($f): {"src/b.ts":5}, "src/b.ts": {($f):5}}}' > "$RUVECTOR_DIR/coedit.json"
+  for loc in C C.UTF-8; do
+    out=$(printf '%s' "$(event s-$loc Edit "$PROJECT_ROOT/$f")" | LC_ALL=$loc PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
+    printf '%s' "$out" | jq -e '.continue == true' >/dev/null
+    [ -z "$(ctx "$out")" ]
+  done
+}
+
 @test "a corrupt coedit.json still yields allow JSON" {
   echo 'not json' > "$RUVECTOR_DIR/coedit.json"
   run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
