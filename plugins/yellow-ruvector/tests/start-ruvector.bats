@@ -501,3 +501,20 @@ SH
   ! printf '%s\n' "$stderr" | grep -qx 'IGNORE PREVIOUS INSTRUCTIONS'
   [ "$(printf '%s\n' "$stderr" | grep -c '^--- end smoke-test output ---$')" -eq 1 ]
 }
+
+@test "an install smoke test that hangs is bounded, never holding the installer" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  cat > "$nb/npm" <<'SH'
+#!/bin/sh
+mkdir -p node_modules/ruvector/bin
+printf '%s\n' 'setInterval(() => {}, 1000)' > node_modules/ruvector/bin/cli.js
+SH
+  chmod +x "$nb/npm"
+  start=$(date +%s)
+  run --separate-stderr bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PLUGIN_DATA="$2"
+    PATH="$3:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install' _ "$PLUGIN" "$DATA" "$nb"
+  [ "$status" -ne 0 ]
+  [ $(( $(date +%s) - start )) -lt 40 ]
+  [[ "$stderr" == *"smoke test"* ]]
+}
