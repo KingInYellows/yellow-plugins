@@ -342,8 +342,9 @@ yellow_ruvector_release_install_lock() {
   # someone else. ($$ is the parent shell inside prewarm's subshell, whose
   # pid the parent writes into the lock; BASHPID is the subshell itself.)
   owner=$(cat "${lock_dir}/pid" 2>/dev/null) || return 0
+  # _YR_LOCK_OWNER: the pid a background job was handed (prewarm).
   case "$owner" in
-    "$$"|"${BASHPID:-$$}") ;;
+    "$$"|"${BASHPID:-$$}"|"${_YR_LOCK_OWNER:-__none__}") ;;
     *) return 0 ;;
   esac
   rm -f "${lock_dir}/pid" 2>/dev/null
