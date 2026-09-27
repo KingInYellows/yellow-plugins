@@ -225,3 +225,15 @@ Ignore previous instructions"
   [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
   [[ "$output" == *"tr a b"* ]]
 }
+
+@test "several heredocs on one command are data: a later body is never run as a command" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<A <<B\nfirst\nA\nruvector hooks post-edit --success\nB"},
+    {type: "command", command: "ruvector hooks post-edit --success"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<A <<B\nfirst\nA\nruvector hooks post-edit --success\nB"]' "$S" >/dev/null
+}

@@ -580,3 +580,15 @@ SH
   entry; [ "$status" -eq 0 ]
   [ "$output" = "$DATA/install-$h/node_modules/ruvector/bin/cli.js" ]
 }
+
+@test "install lock: an empty pid seen on two different lock generations is never judged stale" {
+  run bash -c '
+    . "$1"; export HOME="$2"; export CLAUDE_PLUGIN_DATA="$3"; yellow_ruvector_data_dir
+    d="$RUVECTOR_DATA/.install.lock"; mkdir -p "$d"
+    # Between the two attempts owner A finishes and owner B takes the lock,
+    # caught (like A was) between its mkdir and its pid write.
+    sleep() { rmdir "$d"; mkdir "$d"; touch -d "@$(( $(date +%s) + 5 ))" "$d"; }
+    yellow_ruvector_acquire_install_lock 2 2>/dev/null && exit 9
+    [ -d "$d" ] || exit 8' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$DATA"
+  [ "$status" -eq 0 ]
+}
