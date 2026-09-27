@@ -631,6 +631,21 @@ related_staged() {
   [ -e "$qv" ]
 }
 
+@test "coedit-related.sh never trusts a pointer record with more than one line" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  qv=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=victim bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$qv"
+  ptr="$XDG_CACHE_HOME/yellow-ruvector/related-stage.me"
+  printf '%s\nJUNK\n' "${qv%/query}" > "$ptr"
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=me bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"src/b.ts"* ]]
+  [ -e "$qv" ]
+  printf '%s\nJUNK\n' "${qv%/query}" > "$ptr"
+  (cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=me bash "$RELATED_SCRIPT" --stage >/dev/null)
+  [ -e "$qv" ]
+}
+
 @test "coedit-related.sh rejects a NUL byte instead of dropping it" {
   qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   printf 'src/\000a.ts\n' > "$qf"

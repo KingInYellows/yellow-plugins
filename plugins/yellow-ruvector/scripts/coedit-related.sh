@@ -62,10 +62,21 @@ PTR="${PTR_DIR}/related-stage.${_key}"
 # has_nul <file> — the file holds a NUL byte, which `read` would silently
 # drop (a/<NUL>b would alias a/b): such a record is never trusted.
 has_nul() { [ "$(LC_ALL=C tr -d '\000' < "$1" | wc -c)" -ne "$(wc -c < "$1")" ]; }
+# ptr_dir <pointer> — print the one path a pointer record holds: exactly one
+# line (as --stage writes it) and no NUL, or nothing. `read` alone would take
+# the first line of a tampered record and ignore the rest.
+ptr_dir() {
+  local d=""
+  has_nul "$1" && return 0
+  [ "$(wc -l < "$1" | tr -d ' ')" = 1 ] || return 0
+  IFS= read -r d < "$1" || return 0
+  [ "$(cat "$1")" = "$d" ] || return 0
+  printf '%s' "$d"
+}
 drop_stage() {
   local d=""
   [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 0
-  has_nul "$1" || { IFS= read -r d < "$1" || true; }
+  d=$(ptr_dir "$1")
   case "$d" in "${STAGE_PREFIX}"?*) ;; *) d="" ;; esac
   case "${d#"${STAGE_PREFIX}"}" in */*) d="" ;; esac
   if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
@@ -129,8 +140,7 @@ fi
 if [ "$1" = "--run" ]; then
   [ -f "$PTR" ] && [ ! -L "$PTR" ] && [ -O "$PTR" ] \
     || { printf 'coedit-related: nothing staged (run --stage first)\n' >&2; exit 2; }
-  _sdir=""
-  has_nul "$PTR" || { IFS= read -r _sdir < "$PTR" || _sdir=""; }
+  _sdir=$(ptr_dir "$PTR")
   # No query written (the Write step failed or never ran): drop the record
   # together with its empty staging dir, so nothing is left unreachable.
   if [ ! -f "${_sdir}/query" ] || [ -L "${_sdir}/query" ]; then
