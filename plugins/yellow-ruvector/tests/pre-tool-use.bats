@@ -156,6 +156,23 @@ assert_allow_json() {
   [ -z "$(ctx "$output")" ]
 }
 
+@test "a slow project-root lookup is bounded; the hook still answers in time" {
+  gb="$BATS_TEST_TMPDIR/gitbin"; mkdir -p "$gb"
+  printf '#!/bin/sh\ncase "$*" in *"rev-parse --show-toplevel"*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$gb" "$(command -v git)" > "$gb/git"
+  chmod +x "$gb/git"
+  start=$(date +%s%N)
+  out=$(event s1 Edit "$PROJECT_ROOT/src/a.ts" | PATH="$gb:$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
+  end=$(date +%s%N)
+  printf '%s' "$out" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
+  sleep 0.5
+  [ -s "$gb/pids" ]
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$gb/pids"
+}
+
 @test "a corrupt coedit.json still yields allow JSON" {
   echo 'not json' > "$RUVECTOR_DIR/coedit.json"
   run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"

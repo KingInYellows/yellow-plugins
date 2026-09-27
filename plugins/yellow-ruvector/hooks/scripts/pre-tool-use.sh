@@ -54,8 +54,15 @@ case "$TOOL" in
 esac
 [ -n "$file_path" ] || json_exit
 
-PROJECT_DIR=$(ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
-[ -f "${PROJECT_DIR}/.ruvector/coedit.json" ] || json_exit
+# The project-root lookup (git rev-parse) is bounded and charged against
+# the lock budget, so a slow checkout skips the suggestion instead of
+# outliving the hook timeout. TIMEOUT_CMD is cleared so run_budgeted uses
+# its background runner (timeout(1) cannot run a shell function).
+COEDIT_ROOT_SECS="${COEDIT_ROOT_SECS:-0.15}"
+COEDIT_ROOT_TRIES="${COEDIT_ROOT_TRIES:-3}"
+_COEDIT_SPENT_TRIES=$COEDIT_ROOT_TRIES
+PROJECT_DIR=$(TIMEOUT_CMD='' run_budgeted "$COEDIT_ROOT_SECS" ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
+[ -n "$PROJECT_DIR" ] && [ -f "${PROJECT_DIR}/.ruvector/coedit.json" ] || json_exit
 
 case "$file_path" in
   /*) ;;
