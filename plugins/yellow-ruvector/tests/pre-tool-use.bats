@@ -719,3 +719,11 @@ related_staged() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+@test "--stage leaves no staging dir behind when the pointer dir cannot be set up" {
+  # XDG_CACHE_HOME points at a regular file: the pointer dir cannot exist.
+  : > "$BATS_TEST_TMPDIR/not-a-dir"
+  run --separate-stderr env XDG_CACHE_HOME="$BATS_TEST_TMPDIR/not-a-dir" bash "$RELATED_SCRIPT" --stage
+  [ "$status" -ne 0 ]
+  [ -z "$(ls -A "$STAGE_BASE" 2>/dev/null)" ]
+}

@@ -75,8 +75,11 @@ if [ "$1" = "--stage" ]; then
     printf 'coedit-related: %s must be a directory you own (not a symlink)\n' "$STAGE_BASE" >&2; exit 1; }
   chmod 700 "$STAGE_BASE" 2>/dev/null || exit 1
   sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
-  ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || exit 1
-  [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || exit 1
+  # No pointer is published on any failure below, so nothing could ever
+  # find this staging dir again: remove it before exiting.
+  fail_stage() { rmdir -- "$sdir" 2>/dev/null || true; exit 1; }
+  ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || fail_stage
+  [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || fail_stage
   # A stage this session never ran, and records (with their staging dirs)
   # other sessions left unrun for over a day (at most 100 per call).
   drop_stage "$PTR"
@@ -95,11 +98,10 @@ if [ "$1" = "--stage" ]; then
   fi
   if [ -L "$PTR" ] || { [ -e "$PTR" ] && [ ! -f "$PTR" ]; }; then
     printf 'coedit-related: %s is not a regular file; remove it and retry\n' "$PTR" >&2
-    rmdir -- "$sdir" 2>/dev/null || true
-    exit 1
+    fail_stage
   fi
-  ptmp=$(mktemp "${PTR}.XXXXXX") || exit 1
-  printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; exit 1; }
+  ptmp=$(mktemp "${PTR}.XXXXXX") || fail_stage
+  printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; fail_stage; }
   printf 'QUERY_FILE=%s/query\n' "$sdir"
   exit 0
 fi
