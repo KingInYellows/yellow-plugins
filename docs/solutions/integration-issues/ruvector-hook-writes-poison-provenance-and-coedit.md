@@ -78,11 +78,12 @@ components:
   the root or with control characters. No plugin hook writes `intelligence.json`
   any more.
 - PreToolUse surfaces up to 3 partners (count ≥ 3, still existing, once per file
-  per session) as fenced `hookSpecificOutput.additionalContext`. Partner names
-  from `coedit.json` are project data, so each is re-validated (normalizes to
-  itself, exists under the root) and keys with control characters are dropped
-  inside jq — a multi-line key would otherwise split into a forged
-  `count<TAB>path` line when read line by line.
+  per session for its 200 most recently suggested files, 32 KB of paths) as
+  fenced `hookSpecificOutput.additionalContext`. Partner names from
+  `coedit.json` are project data, so each is re-validated (normalizes to itself,
+  exists under the root) and keys with control characters are dropped inside jq
+  — a multi-line key would otherwise split into a forged `count<TAB>path` line
+  when read line by line.
 - `/ruvector:related <file>` lists the full partner list.
 - Recall happens once per session at SessionStart (semantic, 4.5s budget); the
   UserPromptSubmit hook is gone.

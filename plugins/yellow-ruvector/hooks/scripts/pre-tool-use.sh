@@ -2,7 +2,8 @@
 # pre-tool-use.sh — surface co-edit suggestions before an edit.
 # Receives hook input as JSON on stdin. Budget: <1s (jq only, no ruvector CLI).
 #
-# On Edit/Write/MultiEdit, the first time a session edits a file, look up
+# On Edit/Write/MultiEdit, the first time a session edits a file (tracked for
+# the session's 200 most recently suggested files), look up
 # files that were edited together with it at least COEDIT_MIN_COUNT (3) times
 # (.ruvector/coedit.json, recorded by post-tool-use.sh) and return up to 3 as
 # hookSpecificOutput.additionalContext, fenced as reference data. Claude Code

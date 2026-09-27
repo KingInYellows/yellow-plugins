@@ -122,7 +122,8 @@ from the git toplevel. There is no manual queue management inside the plugin:
   `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
   There is no per-prompt recall
 - `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit) → up to 3 co-edit
-  partners (count ≥ 3, existing files, once per file per session) as fenced
+  partners (count ≥ 3, existing files, once per file per session for the
+  session's 200 most recently suggested files; an older one can repeat) as fenced
   `hookSpecificOutput.additionalContext`; jq only
 - `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit
   recording in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`);

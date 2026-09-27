@@ -98,5 +98,6 @@ permission prompt.
 - Counts come from this developer's sessions only; worktrees of the same
   repo share the history through the shared `.ruvector/` store.
 - The PreToolUse hook already mentions up to 3 partners (seen together at
-  least 3 times) the first time a session edits a file; this command shows
+  least 3 times) the first time a session edits a file (tracked for the
+  session's 200 most recently suggested files); this command shows
   up to 50 partners by count, including rarer pairs.
