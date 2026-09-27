@@ -652,7 +652,8 @@ coedit_prune_sessions() {
       # Held trees get a few bounded retries per run: a random sample of
       # three, so ones that can never be removed cannot pin the retries.
       # A listing that times out is followed by one random shard of the
-      # name suffix (the inode digits after .stale. or .stale.m), so the
+      # name suffix (the inode digits after .stale. or .stale.m, or the pid
+      # after .stale.s for a session path renamed aside), so the
       # sample is not always drawn from the same timed-out prefix.
       # The two held dirs are visited in a random order, so slow deletions
       # in one never keep the other from its turn.
@@ -666,7 +667,7 @@ coedit_prune_sessions() {
           [ -d "$m" ] && [ ! -L "$m" ] && run_budgeted 2 rm -rf -- "$m" 2>/dev/null
         done < <({ run_budgeted 1 find "$h" ! -name "${h##*/}" -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*" \
             || { sh=$(coedit_shard digit)
-                 LC_ALL=C run_budgeted 0.5 find "$h" ! -name "${h##*/}" -prune \( -name ".*.lock.stale.${sh}*" -o -name ".*.lock.stale.m${sh}*" \) -type d ! -name "*${nl}*"; }
+                 LC_ALL=C run_budgeted 0.5 find "$h" ! -name "${h##*/}" -prune \( -name ".*.lock.stale.${sh}*" -o -name ".*.lock.stale.m${sh}*" -o -name ".*.lock.stale.s${sh}*" \) -type d ! -name "*${nl}*"; }
           } 2>/dev/null \
           | LC_ALL=C awk -v k=3 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
