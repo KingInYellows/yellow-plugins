@@ -39,7 +39,9 @@ TOOL="" file_path="" session_id="" CWD=""
   IFS= read -r -d '' session_id
   IFS= read -r -d '' CWD
 } < <(printf '%s' "$INPUT" | jq -j '
-  def s(v): if (v|type) == "string" then v else "" end;
+  # A NUL inside a value would read as a field separator (a crafted
+  # file_path could forge the session and cwd): such a value is "".
+  def s(v): if (v|type) == "string" and (v | test("\u0000") | not) then v else "" end;
   s(.tool_name), "\u0000",
   s(.tool_input.file_path), "\u0000",
   s(.session_id), "\u0000",

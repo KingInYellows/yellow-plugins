@@ -144,6 +144,18 @@ assert_allow_json() {
   [ ! -e "$MARKER" ]
 }
 
+@test "a NUL inside a field can never forge the session or cwd" {
+  other="$(mktemp -d)"
+  input=$(jq -cn --arg p "$PROJECT_ROOT/src/a.ts" --arg c "$PROJECT_ROOT" --arg o "$other" \
+    '{hook_event_name:"PreToolUse", session_id:"", cwd:$o, tool_name:"Edit",
+      tool_input:{file_path:($p + "\u0000s1\u0000" + $c + "\u0000")}}')
+  run --separate-stderr run_hook "$input"
+  rm -rf "$other"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' >/dev/null
+  [ -z "$(ctx "$output")" ]
+}
+
 @test "a corrupt coedit.json still yields allow JSON" {
   echo 'not json' > "$RUVECTOR_DIR/coedit.json"
   run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
