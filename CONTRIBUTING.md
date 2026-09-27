@@ -268,10 +268,13 @@ repository** (an outside collaborator is still subject to the approval policy,
 and a PAT cannot exceed its owner's role), with resource owner KingInYellows,
 this repository only, and **Contents** and **Pull requests** set to read/write.
 See `docs/security.md` for rotation and revocation. `version-packages.yml` then
-opens the PR under that identity and CI starts on its own. Either way, the PR
-content is machine-generated (version bumps and CHANGELOG entries only), so
-manual review of the three bullet points above is still the primary gate before
-merging.
+opens the PR under that identity and CI starts on its own. The token applies
+only to newly opened Version PRs: Changesets updates an already-open
+`changeset-release/main` PR in place, so a bot-authored one stays subject to
+approval — approve it once, or close it and delete its branch so the next push
+to `main` reopens it under the token. Either way, the PR content is
+machine-generated (version bumps and CHANGELOG entries only), so manual review
+of the three bullet points above is still the primary gate before merging.
 
 ### Emergency manual release
 
