@@ -286,7 +286,12 @@ coedit_bump() {
   fi
   # jq exits 2 or 4 on unparseable input (by version), 3 on our validation
   # failure, 5 on a runtime type error: all malformed. 124/137/143 are the
-  # time bound.
+  # time bound. A clean exit with no document (an empty or whitespace-only
+  # file) or with several (concatenated JSON values) is malformed too.
+  if [ "$rc" -eq 0 ]; then
+    case "$out" in ''|*"
+"*) rc=3 ;; esac
+  fi
   if [ "$rc" -ge 2 ] && [ "$rc" -le 5 ]; then
     coedit_quarantine "$f"
     out=$(printf '{"version":1,"pairs":{}}' | coedit_jq -c --arg a "$a" --arg b "$b" --argjson cap "$COEDIT_MAX_PAIRS" --argjson maxbytes "$COEDIT_MAX_BYTES" "$_COEDIT_BUMP_JQ" 2>/dev/null) || return 0
