@@ -311,6 +311,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -e "$l/keep" ]
 }
 
+@test "a path holding a Unicode C1 control is never recorded, in any locale" {
+  f="$PROJECT_ROOT/src/a"$'\xc2\x9b'"[31mX.ts"; : > "$f"
+  for loc in C C.UTF-8; do
+    LC_ALL=$loc edit s1 "$f"
+    LC_ALL=$loc edit s1 "$PROJECT_ROOT/src/b.ts"
+  done
+  [ "$(jq '[.pairs[] | keys[]] | map(select(test("\u009b"))) | length' "$COEDIT" 2>/dev/null || echo 0)" -eq 0 ]
+  ! grep -q $'\xc2\x9b' "$RUVECTOR_DIR"/coedit-sessions/* 2>/dev/null
+}
+
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
