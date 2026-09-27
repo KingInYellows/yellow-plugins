@@ -809,6 +809,14 @@ SH
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "recording keeps only the known session fields" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  jq -n '{padding: ("x" * 45000), surfaced: ["src/q.ts"]}' > "$RUVECTOR_DIR/coedit-sessions/p9"
+  edit p9 "$PROJECT_ROOT/src/a.ts"
+  jq -e 'has("padding") | not' "$RUVECTOR_DIR/coedit-sessions/p9" >/dev/null
+  jq -e '.last == "src/a.ts" and .surfaced == ["src/q.ts"]' "$RUVECTOR_DIR/coedit-sessions/p9" >/dev/null
+}
+
 @test "a planted quarantine symlink never receives the store" {
   outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"; echo keep > "$outside/coedit.json"
   printf 'not json' > "$COEDIT"

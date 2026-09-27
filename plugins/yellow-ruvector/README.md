@@ -39,6 +39,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:status`              | Show health, DB stats, queue, and embedder provenance  |
 | `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
 | `/ruvector:memory [filter]`     | Browse and search stored memories                      |
+| `/ruvector:related <file>`      | Files most often edited together with a file (co-edit history) |
 | `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
 ## Embedder provenance (`/ruvector:status`)
@@ -75,8 +76,13 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   and retrieved with `hooks_recall(query, top_k)`.
 - **Co-edit tracking:** `PostToolUse` on Edit/Write/MultiEdit notes which
   files one session edits within a minute of each other and counts those
-  pairs in `.ruvector/coedit.json` (plugin-owned, jq only). Hooks no longer
-  write memories; recalled text is untrusted reference context.
+  pairs in `.ruvector/coedit.json` (plugin-owned, jq only). The first time a
+  session edits a file, `PreToolUse` mentions up to 3 files usually edited
+  with it (seen together at least 3 times). "First time" is tracked for the
+  session's 200 most recently suggested files, so a file edited again after
+  more than 200 others were suggested can be mentioned again. `/ruvector:related <file>` lists
+  up to 50 by count. Hooks no longer write memories; recalled and suggested text is
+  untrusted reference context.
 - **Error→fix memory:** `/ruvector:seed-solutions` imports a repo's
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
   review flows can recall past fixes semantically. Seeding is manual —

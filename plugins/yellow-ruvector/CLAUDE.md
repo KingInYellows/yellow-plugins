@@ -83,10 +83,9 @@ ruvector.
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
   a global `ruvector` on PATH is never used) from the git toplevel.
-  `pre-tool-use.sh` calls `hooks pre-edit` / `hooks pre-command` as
-  read-only **side effects** (stdout discarded); `session-start.sh` captures
-  `hooks recall` stdout into `hookSpecificOutput.additionalContext`; the
-  co-edit hook uses jq only. Every hook prints dual-client allow JSON.
+  `session-start.sh` captures `hooks recall` stdout into
+  `hookSpecificOutput.additionalContext`; the co-edit hooks
+  (`pre-tool-use.sh`, `post-tool-use.sh`) use jq only. Every hook prints dual-client allow JSON.
   Operator warnings stay on `systemMessage`. **No hook writes
   `.ruvector/intelligence.json`** — memories come only from MCP
   `hooks_remember`. Do not re-add `hooks post-edit` / `post-command`: each
@@ -106,7 +105,7 @@ ruvector.
 
 ## Plugin Components
 
-### Commands (7)
+### Commands (8)
 
 - `/ruvector:setup` — Install ruvector and initialize `.ruvector/` directory
 - `/ruvector:index` — Index codebase for semantic search
@@ -122,6 +121,9 @@ ruvector.
   without assuming the deadline elapsed)
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
+- `/ruvector:related <file>` — Files most often edited together with a file,
+  from `.ruvector/coedit.json` (via `scripts/coedit-related.sh`; no MCP or
+  install needed)
 - `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
   repo's `track: bug` solution docs into recall memory (idempotent;
   gated on `intel_path` resolving inside the project root). Re-run
@@ -145,7 +147,7 @@ ruvector.
 
 ### Hooks (3 events, 4 scripts)
 
-The CLI-calling hooks (`session-start.sh`, `pre-tool-use.sh`) exit silently
+The CLI-calling hook (`session-start.sh`) exits silently
 (allow JSON) when Node < 20, the install is missing, or an install is in
 progress.
 
@@ -169,8 +171,16 @@ progress.
   There is no per-prompt (UserPromptSubmit) recall: semantic recall is too
   slow for every prompt, and the old hash-embedded per-prompt recall
   compared 64d queries against 384d vectors.
-- `pre-tool-use.sh` — Pre-edit and pre-command side effects for
-  Edit/Write/MultiEdit/Bash (1s budget). Stdout is dual-client allow JSON
+- `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit, 1s; jq only) — the
+  first time a session edits a file (tracked for the session's 200 most
+  recently suggested files, 32 KB of paths at most, so the session file
+  stays small; a file that falls out of that list can be suggested again),
+  returns up to 3 partners edited
+  together with it at least 3 times as fenced
+  `hookSpecificOutput.additionalContext` (Claude Code shows PreToolUse
+  additionalContext to the model as a system message). Partners are
+  re-validated as existing files under the root before they are shown
+  (`coedit.json` is project data). Stdout is always dual-client allow JSON
   (`continue` + `permission`) so Cursor's Claude-plugin bridge does not
   block the tool.
 - `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit, 1s; ~40–70ms,
@@ -207,6 +217,8 @@ progress.
 - `scripts/ruvector-cli.sh` — run the plugin-managed CLI from the project
   root (`--version`, `hooks reembed --dry-run`, …); used by
   `/ruvector:seed-solutions`, `/ruvector:status` remediation, and by hand
+- `scripts/coedit-related.sh` — list a file's co-edit partners (used by
+  `/ruvector:related`)
 - `lib/install-ruvector.sh` — sourced install primitives (data dir, path
   validation, lock, `npm ci`, `current` swap, prune, model cache/warm-up)
 - `scripts/repair-cursor-pretooluse.sh` — Wrap leftover `ruvector hooks init`
@@ -230,6 +242,7 @@ progress.
   learnings. Handles bulk memory operations and memory curation.
 - **`/ruvector:memory`** — Browse stored memories. Use for viewing and
   filtering entries.
+- **`/ruvector:related`** — Which files usually change together with a file.
 - **`/ruvector:index`** — Manual full or incremental index. Use after major code
   changes.
 - **`/ruvector:status`** — Health check. Use to verify ruvector is working and
@@ -297,6 +310,10 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
   in-memory snapshot without re-reading, so a CLI write between two MCP
   saves is lost. Avoid simultaneous sessions with active `hooks_remember` or
   `/ruvector:index` on the same project
+- ruvector's own co-edit data (`file_sequences`, `hooks coedit-*`) is not
+  used: `lastEditedFile` is per-process and the MCP server overwrites CLI
+  writes. Upstream issue drafts for both are in
+  `docs/solutions/integration-issues/ruvector-hook-writes-poison-provenance-and-coedit.md`
 - MCP cold start adds 300-1500ms on first tool call after session start
 - Hooks registered by a past `ruvector hooks init` in `settings.json` still
   run the global binary; `/ruvector:status` flags them and `/ruvector:setup`

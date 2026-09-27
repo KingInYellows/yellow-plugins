@@ -1022,7 +1022,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Bash",
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",

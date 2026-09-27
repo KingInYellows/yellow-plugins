@@ -203,7 +203,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 | Hook               | Event            | Script                  | Time Budget | What It Does                                           |
 | ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
-| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit / pre-command side effects                    |
+| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Fenced co-edit suggestions (jq only; partners re-validated as files under the root) |
 | prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
 | session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
 | post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 1s          | Record co-edit pairs in `.ruvector/coedit.json` (jq only) |

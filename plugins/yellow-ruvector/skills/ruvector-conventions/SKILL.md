@@ -111,9 +111,10 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 
 ## Hook Architecture
 
-Hooks delegate to ruvector's built-in CLI hooks through the plugin-managed
-install (`hooks/scripts/lib/resolve.sh`; never a global binary) and run it
-from the git toplevel. There is no manual queue management inside the plugin:
+Only `session-start.sh` calls ruvector's CLI (`hooks recall`), through the
+plugin-managed install (`hooks/scripts/lib/resolve.sh`; never a global
+binary) from the git toplevel. The edit hooks are jq-only and make no CLI
+call. There is no manual queue management inside the plugin:
 
 - `prewarm.sh` (SessionStart) → installs the pinned ruvector into the plugin
   data dir and downloads the ONNX model in the background
@@ -121,8 +122,10 @@ from the git toplevel. There is no manual queue management inside the plugin:
   (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
   `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
   There is no per-prompt recall
-- `pre-tool-use.sh` → background `ruvector hooks pre-edit` / `pre-command`
-  (read-only side effects)
+- `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit) → up to 3 co-edit
+  partners (count ≥ 3, existing files, once per file per session for the
+  session's 200 most recently suggested files; an older one can repeat) as fenced
+  `hookSpecificOutput.additionalContext`; jq only
 - `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit
   recording in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`);
   no ruvector CLI call
