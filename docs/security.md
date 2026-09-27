@@ -493,8 +493,9 @@ env -i HOME=… PATH=… [proxy/CA/npm_config_* passthrough] \
 ```
 
 **Mitigation:** `--ignore-scripts` (the tree has no install scripts), `env -i`
-so API keys and tokens never reach npm (only proxy, CA, and `npm_config_*`
-settings pass through), a data-dir prefix check (HOME or /tmp, or exactly
+so no other API keys or tokens reach npm: only proxy, CA, and
+`NPM_CONFIG_*`/`npm_config_*` settings pass through, and those can carry a
+registry auth token the user configured for npm, a data-dir prefix check (HOME or /tmp, or exactly
 `<XDG_DATA_HOME>/yellow-ruvector` for a user-set, non-system absolute
 `XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset, or a host-provided
 `CLAUDE_PLUGIN_DATA` under a non-system `<CLAUDE_CONFIG_DIR>/plugins/data/`), one
