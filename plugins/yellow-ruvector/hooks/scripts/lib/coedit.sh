@@ -341,7 +341,9 @@ coedit_record() {
   if [ -f "$sfile" ] && [ ! -L "$sfile" ] && [ "$(wc -c < "$sfile" | tr -d ' ')" -le 65536 ] \
      && state=$(jq -c -s 'if length == 1 and (.[0] | type) == "object" then .[0] else error("malformed") end' "$sfile" 2>/dev/null) \
      && [ -n "$state" ]; then
-    last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" then .last else "" end')
+    # Control characters are rejected inside jq, before the shell sees the
+    # string: a NUL would be dropped by $(...) and alias another path.
+    last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" and (.last | test("[[:cntrl:]]") | not) then .last else "" end')
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
   else
     state='{}'
@@ -545,7 +547,9 @@ coedit_prune_sessions() {
           m=${stale[$(( (i + tried) % total ))]}
           tried=$((tried + 1))
           coedit_older_than "$(coedit_mtime "$m")" 600 || continue
-          rm -rf -- "$m" 2>/dev/null
+          # Each deletion is bounded too (a huge tree or slow filesystem);
+          # what is left is picked up by a later sweep.
+          run_budgeted 2 rm -rf -- "$m" 2>/dev/null
           [ -e "$m" ] || removed=$((removed + 1))
         done
       fi ) \

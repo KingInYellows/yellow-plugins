@@ -81,11 +81,14 @@ list=$(jq -r --arg re "$re" '
   # executable: unquote it first. A backslash-escaped character (\; \# …) is
   # a literal, never a separator or comment: neutralize it. A shell comment
   # (# at a word start, quotes already gone) runs nothing: drop it to the
-  # end of its line. A heredoc body (<<WORD … WORD) is input to the command
-  # before it, never commands: drop it first, before newlines count as
-  # separators.
+  # end of its line. A heredoc body (<<WORD … WORD, any valid delimiter
+  # word, quoted or not) is input to the command before it, never commands:
+  # drop it first, before newlines count as separators.
   def unquoted:
-    gsub("<<-?[[:space:]]*[\"\u0027]?(?<t>[A-Za-z_][A-Za-z0-9_]*)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    # A heredoc left unparsed (no terminator line) fails closed: the whole
+    # command is treated as data, never as a legacy invocation.
+    | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
@@ -105,7 +108,10 @@ tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
   def unquoted:
-    gsub("<<-?[[:space:]]*[\"\u0027]?(?<t>[A-Za-z_][A-Za-z0-9_]*)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    # A heredoc left unparsed (no terminator line) fails closed: the whole
+    # command is treated as data, never as a legacy invocation.
+    | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");

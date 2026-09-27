@@ -212,3 +212,16 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF > notes.txt\nruvector hooks post-edit --success\nEOF"]' "$S" >/dev/null
 }
+
+@test "heredocs with non-identifier delimiters, and unterminated ones, are never legacy" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<'"'"'END-HOOK'"'"'\nruvector hooks post-edit --success\nEND-HOOK"},
+    {type: "command", command: "cat <<END.1 >x\nruvector hooks post-edit\nEND.1"},
+    {type: "command", command: "cat <<EOF\nruvector hooks post-edit --success"},
+    {type: "command", command: "tr a b <<< x\nruvector hooks post-edit --success"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  # Only the here-string one really runs ruvector on its second line.
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  [[ "$output" == *"tr a b"* ]]
+}
