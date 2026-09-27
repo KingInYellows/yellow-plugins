@@ -353,3 +353,17 @@ fake_install() {
   [[ "$output" == rc=* ]]
   [ "$output" != "rc=0" ]
 }
+
+@test "heal_store: a main checkout with every tracked file edited still links" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q
+  echo x > "$WORK/f.txt"; git -C "$WORK" add f.txt
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
+  # Edited in place (same inode), so no tracked file matches the index.
+  echo edited >> "$WORK/f.txt"
+  mkdir "$WORK/.ruvector"
+  git -C "$WORK" worktree add -q "$WORK/wtdirty" -b dirty
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtdirty"
+  [ "$status" -eq 0 ]
+  [ -L "$WORK/wtdirty/.ruvector" ]
+}
