@@ -45,7 +45,7 @@ ruvector.
      cannot remove it between the check and exec. If that install is gone,
      it reinstalls it under the lock or exits; it never runs another
      version's install.
-- Data dir: `$CLAUDE_PLUGIN_DATA`, or `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector`
+- Data dir: `$CLAUDE_PLUGIN_DATA`, or `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector` (a relative `XDG_DATA_HOME` is ignored)
   when the host does not set it. Install primitives live in
   `lib/install-ruvector.sh` (adapted from yellow-morph's install lib).
 - **Bumping the pin:** change `dependencies.ruvector` in `package.json`,
