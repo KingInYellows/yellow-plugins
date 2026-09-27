@@ -881,7 +881,7 @@ coedit_partner_ok() {
 # coedit_partners <root> <rel> [limit] [min-count] [store-dir] — print up to
 # <limit> validated "<count>\t<partner>" lines, highest count first.
 coedit_partners() {
-  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store="${5:-}" f count partner norm n=0
+  local root="$1" rel="$2" limit="${3:-10}" min="${4:-1}" store="${5:-}" f count partner n=0
   # A caller that already resolved the store passes it (in a linked worktree
   # resolving it scans the main checkout's index; do that once per hook).
   [ -n "$store" ] || store=$(coedit_store_dir "$root") || return 0
