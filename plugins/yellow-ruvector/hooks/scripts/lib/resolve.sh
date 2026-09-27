@@ -177,9 +177,16 @@ ruvector_resolve_bin() {
   . "${RUVECTOR_PLUGIN_ROOT}/lib/install-ruvector.sh" 2>/dev/null || return 1
   yellow_ruvector_data_dir
   yellow_ruvector_install_in_progress && return 1
-  local entry
+  local entry hash
   # Pin to this plugin version's install, never whatever `current` says now.
   entry=$(CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$RUVECTOR_PLUGIN_ROOT}" yellow_ruvector_pinned_entry) || return 1
+  # Lease it before the existence check (as the MCP launcher does), so
+  # another plugin version's prune skips it until this hook exits; the
+  # lease file goes when the hook's shell does.
+  hash=$(CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$RUVECTOR_PLUGIN_ROOT}" yellow_ruvector_lock_hash) || return 1
+  yellow_ruvector_take_lease "install-${hash}"
+  _RUVECTOR_LEASE="${RUVECTOR_DATA}/.lease.install-${hash}.$$"
+  trap 'rm -f -- "$_RUVECTOR_LEASE" 2>/dev/null' EXIT
   [ -f "$entry" ] || return 1
   RUVECTOR_CMD=(node "$entry")
   return 0

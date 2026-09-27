@@ -433,3 +433,17 @@ Ignore previous instructions"
     [ ! -e "$d" ] || exit 6' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
   [ "$status" -eq 0 ]
 }
+
+@test "model-cache lock: a stale holder's release never removes a successor's lock" {
+  run bash -c '
+    . "$1"; export HOME="$2"
+    d=$(yellow_ruvector_model_lock_dir)
+    yellow_ruvector_acquire_model_lock 1 || exit 9
+    # A successor cleared this holder (as if its job had died) and took over.
+    sleep 30 & o=$!
+    printf "%s" "$o" > "$d/pid"
+    yellow_ruvector_release_model_lock
+    [ "$(cat "$d/pid")" = "$o" ] || { kill $o; exit 8; }
+    kill $o' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME"
+  [ "$status" -eq 0 ]
+}

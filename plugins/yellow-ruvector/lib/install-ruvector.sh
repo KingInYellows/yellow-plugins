@@ -567,7 +567,7 @@ yellow_ruvector_acquire_model_lock() {
   while :; do
     if mkdir "$d" 2>/dev/null; then
       if printf '%s' "${_YR_LOCK_OWNER:-${BASHPID:-$$}}" > "$d/pid" 2>/dev/null; then
-        _YR_MODEL_LOCK=1
+        _YR_MODEL_LOCK=${_YR_LOCK_OWNER:-${BASHPID:-$$}}
         return 0
       fi
       rmdir "$d" 2>/dev/null
@@ -583,7 +583,9 @@ yellow_ruvector_acquire_model_lock() {
           fi ;;
         esac ;;
       *)
-        if ! kill -0 "$pid" 2>/dev/null; then
+        # Clear a dead holder only if the lock still names it: a successor
+        # may have replaced it since the pid was read.
+        if ! kill -0 "$pid" 2>/dev/null && [ "$(cat "$d/pid" 2>/dev/null)" = "$pid" ]; then
           rm -f "$d/pid" 2>/dev/null; rmdir "$d" 2>/dev/null; continue
         fi ;;
     esac
@@ -593,12 +595,16 @@ yellow_ruvector_acquire_model_lock() {
   done
 }
 
-# yellow_ruvector_release_model_lock — only a holder (this shell took it).
+# yellow_ruvector_release_model_lock — only a holder, and only while the
+# lock still names the pid this shell last wrote (its own, or the download
+# job's): once a waiter has cleared a dead job's lock and taken it, the
+# successor's lock is left alone.
 yellow_ruvector_release_model_lock() {
-  local d
-  [ -n "${_YR_MODEL_LOCK:-}" ] || return 0
+  local d mine="${_YR_MODEL_LOCK:-}"
+  [ -n "$mine" ] || return 0
   _YR_MODEL_LOCK=""
   d=$(yellow_ruvector_model_lock_dir)
+  [ "$(cat "$d/pid" 2>/dev/null)" = "$mine" ] || return 0
   rm -f "$d/pid" 2>/dev/null
   rmdir "$d" 2>/dev/null
   return 0
@@ -650,7 +656,8 @@ yellow_ruvector_warm_model() {
   fi
   _YR_WARM_PID=$!
   # The lock now names the download itself.
-  printf '%s' "$_YR_WARM_PID" > "$(yellow_ruvector_model_lock_dir)/pid" 2>/dev/null
+  printf '%s' "$_YR_WARM_PID" > "$(yellow_ruvector_model_lock_dir)/pid" 2>/dev/null \
+    && _YR_MODEL_LOCK=$_YR_WARM_PID
   wait "$_YR_WARM_PID" 2>/dev/null
   _YR_WARM_PID=""
   out=$(cat "$tmp" 2>/dev/null); rm -f "$tmp"
