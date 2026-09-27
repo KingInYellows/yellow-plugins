@@ -368,6 +368,9 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
 }
 
 @test "concurrent sessions queue for the lock instead of dropping increments" {
+  # What is tested is queueing, not the default budget: give the eight
+  # writers room to wait for each other even on a loaded runner.
+  export COEDIT_LOCK_TRIES=40
   for i in $(seq 1 8); do edit "c$i" "$PROJECT_ROOT/src/a.ts"; done
   for i in $(seq 1 8); do
     ( edit "c$i" "$PROJECT_ROOT/src/b.ts" ) &
