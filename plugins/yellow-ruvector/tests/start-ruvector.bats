@@ -522,6 +522,28 @@ SH
   [ "$(printf '%s\n' "$stderr" | grep -c '^--- end smoke-test output ---$')" -eq 1 ]
 }
 
+@test "repairing a same-version install swaps it by rename, never deleting it in place" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  cat > "$nb/npm" <<'SH'
+#!/bin/sh
+mkdir -p node_modules/ruvector/bin
+printf '%s\n' 'process.exit(0)' > node_modules/ruvector/bin/cli.js
+SH
+  printf '#!/bin/sh\necho "$*" >> "%s/rm.log"\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rm)" > "$nb/rm"
+  chmod +x "$nb/npm" "$nb/rm"
+  # The existing same-version install is broken (no CLI): it gets repaired.
+  final="$DATA/install-$(lock_hash)"; mkdir -p "$final/old-marker"
+  run --separate-stderr bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PLUGIN_DATA="$2"
+    PATH="$3:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install' _ "$PLUGIN" "$DATA" "$nb"
+  [ "$status" -eq 0 ]
+  [ -f "$final/node_modules/ruvector/bin/cli.js" ]
+  [ ! -e "$final/old-marker" ]
+  # The live path is never the target of a recursive delete.
+  ! grep -qx -- "-rf -- $final" "$BATS_TEST_TMPDIR/rm.log"
+}
+
 @test "an install smoke test that hangs is bounded, never holding the installer" {
   command -v node >/dev/null 2>&1 || skip "node not available"
   nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"

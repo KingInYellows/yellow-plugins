@@ -29,5 +29,6 @@ and leftover-global-hook checks), and `/ruvector:seed-solutions` use the
 plugin-managed CLI through the new `scripts/ruvector-cli.sh`;
 `scripts/install.sh` is removed. Requires Node.js 20+.
 
-Also fixes `stop.sh` printing ruvector's `Session ended…` line to stdout ahead
-of the allow JSON on every Stop event.
+The `Stop` hook is removed: `hooks session-end` only exported metrics, yet it
+rewrote the whole store every turn and raced the MCP server's saves, and with
+the plugin-managed CLI it would now run for every user.
