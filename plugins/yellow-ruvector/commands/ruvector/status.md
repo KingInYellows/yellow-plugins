@@ -33,7 +33,10 @@ if yellow_ruvector_validate_paths; then
     printf 'install: %s is broken (cli --version fails) — run /ruvector:setup to reinstall\n' "$(basename -- "${rv_entry%/node_modules/*}")"
   else
     rv_dir="${rv_entry%/node_modules/*}"
-    printf 'install: %s, version %s\ncli: %s\n' "${rv_dir##*/}" "$(node "$rv_entry" --version 2>/dev/null)" "$(yellow_ruvector_flat "$rv_entry")"
+    # The CLI's output is not trusted: only a plain version string is shown.
+    rv_ver=$(node "$rv_entry" --version 2>/dev/null | head -n 1)
+    printf '%s' "$rv_ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || rv_ver="unrecognized"
+    printf 'install: %s, version %s\ncli: %s\n' "${rv_dir##*/}" "$rv_ver" "$(yellow_ruvector_flat "$rv_entry")"
     [ "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null)" = "${rv_dir##*/}" ] \
       || printf 'current: %s (another plugin version moved it; this session keeps its own install)\n' "$(yellow_ruvector_flat "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || echo none)")"
   fi

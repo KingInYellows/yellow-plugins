@@ -280,7 +280,14 @@ yellow_ruvector_mtime() {
 # marker already exists). Markers are left behind and pruned after 10
 # minutes, long after any reclaimer that saw that generation has finished.
 yellow_ruvector_reclaim_lock() {
-  local lock_dir="${RUVECTOR_DATA}/.install.lock" expected="${1:-}" ino mt marker
+  yellow_ruvector_reclaim_dir "${RUVECTOR_DATA}/.install.lock" "${1:-}"
+}
+
+# yellow_ruvector_reclaim_dir <lock-dir> <expected-pid> — the generation-safe
+# reclaim above for any mkdir lock (the install lock, the model-cache lock).
+# Markers sit next to the lock and are pruned after 10 minutes.
+yellow_ruvector_reclaim_dir() {
+  local lock_dir="$1" expected="${2:-}" ino mt marker
   # Cheap pre-check (no marker for a lock that is not stale).
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
   case "$expected" in
@@ -292,7 +299,7 @@ yellow_ruvector_reclaim_lock() {
   # Inodes are reused right away; inode + mtime identifies one generation.
   mt=$(yellow_ruvector_mtime "$lock_dir")
   case "$mt" in ''|*[!0-9]*) return 0 ;; esac
-  find "$RUVECTOR_DATA" -maxdepth 1 -name '.install.lock.reclaim.*' -type d -mmin +10 \
+  find "${lock_dir%/*}" -maxdepth 1 -name "${lock_dir##*/}.reclaim.*" -type d -mmin +10 \
     -exec rmdir {} + 2>/dev/null
   marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}-${mt}"
   mkdir "$marker" 2>/dev/null || return 0
@@ -578,16 +585,13 @@ yellow_ruvector_acquire_model_lock() {
       ''|*[!0-9]*)
         mt=$(yellow_ruvector_mtime "$d")
         case "$mt" in ''|*[!0-9]*) ;; *)
-          if [ $(( $(date +%s) - mt )) -gt 60 ]; then
-            rm -f "$d/pid" 2>/dev/null; rmdir "$d" 2>/dev/null; continue
-          fi ;;
+          # Generation-safe (see yellow_ruvector_reclaim_dir): two waiters
+          # that judged the same lock stale cannot both clear it, and
+          # neither can clear the lock a successor took in the meantime.
+          [ $(( $(date +%s) - mt )) -gt 60 ] && { yellow_ruvector_reclaim_dir "$d" "$pid"; continue; } ;;
         esac ;;
       *)
-        # Clear a dead holder only if the lock still names it: a successor
-        # may have replaced it since the pid was read.
-        if ! kill -0 "$pid" 2>/dev/null && [ "$(cat "$d/pid" 2>/dev/null)" = "$pid" ]; then
-          rm -f "$d/pid" 2>/dev/null; rmdir "$d" 2>/dev/null; continue
-        fi ;;
+        kill -0 "$pid" 2>/dev/null || { yellow_ruvector_reclaim_dir "$d" "$pid"; continue; } ;;
     esac
     [ "$i" -lt $((secs * 10)) ] || return 1
     i=$((i + 1))

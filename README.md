@@ -184,8 +184,12 @@ slug, and verify MCP tools.
 
 ### ruvector (yellow-ruvector)
 
-Runs locally as a stdio MCP server via `npx`. No external services or API keys
-required. Run `/ruvector:setup` on first use to install.
+Runs locally as a stdio MCP server through the plugin's own launcher, which
+installs the pinned ruvector into the plugin data directory on first use (no
+global or `npx` install; the first run needs network for the npm packages and
+the ~90MB embedding model). Requires Node.js 20+. No external services or API
+keys required. Run `/ruvector:setup` to install ahead of time and initialize
+the project's `.ruvector/` store.
 
 ## Usage
 
