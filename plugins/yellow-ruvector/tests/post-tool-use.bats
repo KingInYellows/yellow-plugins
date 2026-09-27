@@ -784,3 +784,17 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
   ! grep -q 'IGNORE' "$COEDIT"
 }
+
+@test "a stored epoch too large for shell arithmetic never pairs, even one that wraps into the window" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  now=$(date +%s)
+  # 2^64 + v, with v a few minutes back and ending in 384 so that jq's
+  # 17-significant-digit output (…000) is exactly this number: shell
+  # arithmetic would wrap it to v.
+  v=$(( now - ((now - 384) % 1000) ))
+  big="1844674407$(printf '%010d' $(( 3709551616 + v )))"
+  [ "$(printf '{"e":%s}' "$big" | jq -r '.e | floor')" = "$big" ] || skip "jq prints this number differently"
+  printf '{"last":"src/a.ts","epoch":%s}' "$big" > "$RUVECTOR_DIR/coedit-sessions/w1"
+  COEDIT_WINDOW_SECS=2000 edit w1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+}

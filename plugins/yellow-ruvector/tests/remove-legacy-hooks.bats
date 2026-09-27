@@ -254,3 +254,15 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo then ruvector hooks post-edit", "done-ruvector hooks post-edit"]' "$S" >/dev/null
 }
+
+@test "a legacy call after an empty heredoc is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "cat <<EOF\nEOF\nruvector hooks post-edit --success"},
+    {type: "command", command: "cat <<EOF\nruvector hooks post-edit --success\nEOF"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<EOF\nruvector hooks post-edit --success\nEOF"]' "$S" >/dev/null
+}
