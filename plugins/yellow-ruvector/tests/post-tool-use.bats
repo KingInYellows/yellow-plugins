@@ -341,6 +341,23 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
 }
 
+@test "a slow project-root lookup is bounded; the hook still answers in time" {
+  gb="$BATS_TEST_TMPDIR/gitbin"; mkdir -p "$gb"
+  printf '#!/bin/sh\ncase "$*" in *"rev-parse --show-toplevel"*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$gb" "$(command -v git)" > "$gb/git"
+  chmod +x "$gb/git"
+  start=$(date +%s%N)
+  out=$(event s1 Edit "$PROJECT_ROOT/src/a.ts" | PATH="$gb:$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
+  end=$(date +%s%N)
+  printf '%s' "$out" | jq -e '.continue == true' >/dev/null
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
+  sleep 0.5
+  [ -s "$gb/pids" ]
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$gb/pids"
+}
+
 @test "a coedit.json with a non-numeric count is set aside, and recording resumes" {
   jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":"many"}, "src/b.ts":{"src/a.ts":"many"}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
@@ -881,7 +898,7 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   jq -e '.version == 1' "$RUVECTOR_DIR/coedit.json" >/dev/null
 }
 
-@test "the input parse is charged against the lock budget" {
+@test "the input parse and root lookup are charged against the lock budget" {
   sb="$BATS_TEST_TMPDIR/sleepbin"; mkdir -p "$sb"
   printf '#!/bin/sh\n[ "$1" = 0.05 ] && echo x >> "%s/waits"\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v sleep)" > "$sb/sleep"
   chmod +x "$sb/sleep"
@@ -890,6 +907,6 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   rm -f "$BATS_TEST_TMPDIR/waits"
   event pc Edit "$PROJECT_ROOT/src/b.ts" | PATH="$sb:$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
   rmdir "$RUVECTOR_DIR/.coedit.lock"
-  # 8 tries less the parse's 3.
-  [ "$(wc -l < "$BATS_TEST_TMPDIR/waits")" -eq 5 ]
+  # 8 tries less the parse's 3 and the root lookup's 3.
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/waits")" -eq 2 ]
 }
