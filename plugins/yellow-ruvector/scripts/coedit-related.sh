@@ -3,6 +3,7 @@
 # from this project's .ruvector/coedit.json (recorded by post-tool-use.sh).
 #
 # Usage: bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --stage
+#        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --run
 #        bash "${CLAUDE_PLUGIN_ROOT}/scripts/coedit-related.sh" --file <query-file> [limit]
 # --stage creates a private mktemp -d directory and prints the path of a
 # not-yet-existing query file in it (QUERY_FILE=...). /ruvector:related writes
@@ -27,14 +28,32 @@ here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${here}/hooks/scripts/lib/coedit.sh"
 
 command -v jq >/dev/null 2>&1 || { printf 'coedit-related: jq is required\n' >&2; exit 1; }
-[ $# -ge 1 ] || { printf 'usage: coedit-related.sh --stage | --file <query-file> [limit]\n' >&2; exit 2; }
+USAGE='usage: coedit-related.sh --stage | --run | --file <query-file> [limit]'
+[ $# -ge 1 ] || { printf '%s\n' "$USAGE" >&2; exit 2; }
 # Always /tmp (not $TMPDIR): /ruvector:related's Write grant is scoped to
 # //tmp/ruvector-related.*/query, so the staged file must live there.
 STAGE_PREFIX="/tmp/ruvector-related."
+# --stage records the staging dir here, so --run takes no argument and
+# /ruvector:related can pre-approve both commands exactly, with no wildcard
+# tail a prompt-injected model could extend with shell syntax.
+PTR_DIR="${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}/yellow-ruvector"
+PTR="${PTR_DIR}/related-stage"
 if [ "$1" = "--stage" ]; then
   sdir=$(mktemp -d "${STAGE_PREFIX}XXXXXXXX") || exit 1
+  ( umask 077; mkdir -p "$PTR_DIR" ) 2>/dev/null || exit 1
+  [ -d "$PTR_DIR" ] && [ ! -L "$PTR_DIR" ] && [ -O "$PTR_DIR" ] || exit 1
+  ptmp=$(mktemp "${PTR}.XXXXXX") || exit 1
+  printf '%s\n' "$sdir" > "$ptmp" && mv -f -- "$ptmp" "$PTR" || { rm -f -- "$ptmp"; exit 1; }
   printf 'QUERY_FILE=%s/query\n' "$sdir"
   exit 0
+fi
+if [ "$1" = "--run" ]; then
+  [ -f "$PTR" ] && [ ! -L "$PTR" ] && [ -O "$PTR" ] \
+    || { printf 'coedit-related: nothing staged (run --stage first)\n' >&2; exit 2; }
+  IFS= read -r _sdir < "$PTR" || _sdir=""
+  rm -f -- "$PTR"
+  # Same checks as --file below; the limit is fixed at 50.
+  set -- --file "${_sdir}/query" 50
 fi
 if [ "$1" = "--file" ]; then
   qf="${2:-}"
@@ -57,7 +76,7 @@ if [ "$1" = "--file" ]; then
     printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2
   fi
 else
-  printf 'usage: coedit-related.sh --stage | --file <query-file> [limit]\n' >&2
+  printf '%s\n' "$USAGE" >&2
   exit 2
 fi
 limit="${2:-10}"

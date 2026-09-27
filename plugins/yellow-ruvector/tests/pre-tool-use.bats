@@ -512,5 +512,26 @@ related_staged() {
   run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
   [ "$status" -eq 2 ]
   [ -z "$output" ]
-  [[ "$stderr" == *"usage: coedit-related.sh --stage | --file"* ]]
+  [[ "$stderr" == *"usage: coedit-related.sh --stage | --run | --file"* ]]
+}
+
+@test "coedit-related.sh --run reads the staged query with no argument, once" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  q=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/a.ts\n' > "$q"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+  [ ! -e "$q" ]
+  # The pointer is consumed: a second --run has nothing staged.
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nothing staged"* ]]
+}
+
+@test "the /ruvector:related grants are exact commands, with no wildcard" {
+  md="$BATS_TEST_DIRNAME/../commands/ruvector/related.md"
+  grep -q 'coedit-related.sh" --stage)$' "$md"
+  grep -q 'coedit-related.sh" --run)$' "$md"
+  ! sed -n '/^---$/,/^---$/p' "$md" | grep 'coedit-related' | grep -q ':\*'
 }
