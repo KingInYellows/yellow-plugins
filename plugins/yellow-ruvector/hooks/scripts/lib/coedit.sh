@@ -704,20 +704,31 @@ coedit_prune_sessions() {
       # Temp files coedit_write_atomic left behind when a hook was killed
       # between mktemp and the rename (the 1s timeout): session and cursor
       # temps here, coedit.json temps in the store dir. Only ones over 10
-      # minutes old (no write takes that long), 1s per listing and 3s in
-      # all; regular files only (-type f matches no symlink). Each directory
-      # gets its own random sample of 100 of what its listing returned, so
-      # entries that stay (undeletable, or a timed-out listing's prefix)
-      # never pin the sweep and one directory never starves the other.
-      while IFS= read -r t && [ "$SECONDS" -lt 3 ]; do
+      # minutes old (no write takes that long); regular files only (-type f
+      # matches no symlink; -name is tested first, before the stat). Each
+      # listing gets 1s; one that times out is followed by one random name
+      # shard (0.3s: the session id for session temps, the mktemp suffix for
+      # coedit.json temps), so over runs every part of a huge dir is
+      # reached, not only the prefix a timed-out listing stops in. Each
+      # directory gets its own random sample of 100 of what it listed, so
+      # entries that stay (undeletable) never pin the sweep and one
+      # directory never starves the other. At most 4s in all.
+      tmp_sample() {
+        LC_ALL=C awk -v k=100 'BEGIN { srand() }
+          { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
+          END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
+      }
+      while IFS= read -r t && [ "$SECONDS" -lt 4 ]; do
         [ -f "$t" ] && [ ! -L "$t" ] || continue
         coedit_older_than "$(coedit_mtime "$t")" 600 && rm -f -- "$t"
-      done < <(for spec in '..:coedit.json.tmp.????????' '.:*.tmp.????????'; do
-          run_budgeted 1 find "${spec%%:*}" ! -name "${spec%%:*}" -prune -type f -name "${spec#*:}" ! -name "*${nl}*" 2>/dev/null \
-            | LC_ALL=C awk -v k=100 'BEGIN { srand() }
-                { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
-                END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
-        done) ) \
+      done < <(
+        { run_budgeted 1 find .. ! -name .. -prune -name 'coedit.json.tmp.????????' -type f ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.3 find .. ! -name .. -prune -name "coedit.json.tmp.$(coedit_shard)*" -name 'coedit.json.tmp.????????' -type f ! -name "*${nl}*"
+        } 2>/dev/null | tmp_sample
+        { run_budgeted 1 find . ! -name . -prune -name '*.tmp.????????' -type f ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.3 find . ! -name . -prune -name "$(coedit_shard)*" -name '*.tmp.????????' -type f ! -name "*${nl}*"
+        } 2>/dev/null | tmp_sample
+      ) ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

@@ -1086,6 +1086,28 @@ END"
   [ ! -e "$t" ]
 }
 
+@test "a timed-out temp listing is followed by a shard pass that reaches beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in 1 2 3; do : > "$sd/a$n.tmp.Stuck00$n"; done
+  : > "$sd/zz.tmp.Target01"
+  touch -d '20 minutes ago' "$sd"/*.tmp.* 2>/dev/null || skip "touch -d unsupported"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.tmp.Stuck*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # Full temp listings only ever get through the stuck a* prefix, then stall;
+  # shard passes (bracket patterns) run the real find.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *.tmp.*) %s "$@" -name "a*"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 45: [q-z][q-z] ("zz…").
+  COEDIT_SHARD=45 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/zz.tmp.Target01" ] || break; sleep 0.1; done
+  [ ! -e "$sd/zz.tmp.Target01" ]
+  [ -e "$sd/a1.tmp.Stuck001" ]
+}
+
 @test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
