@@ -220,9 +220,18 @@ coedit_write_atomic() {
 # fresh lock that replaced it. Ages come from stat + date, not find -mmin.
 # Markers are pruned after 10 minutes.
 coedit_lock_path() {
-  local lock="$1" ino mt marker reclaim_tried=""
+  local lock="$1" ino mt marker reclaim_tried="" blocker_tried="" aside
   : "${_coedit_tries_left:=$COEDIT_LOCK_TRIES}"
   until mkdir "$lock" 2>/dev/null; do
+    # A symlink (dangling or not) or non-directory at the lock path, from a
+    # checkout or restore, is never a live lock (locks are directories made
+    # by mkdir), and its mtime is not the lock's: unlink it (never followed)
+    # and retry, once per call.
+    if [ -z "$blocker_tried" ] && { [ -L "$lock" ] || { [ -e "$lock" ] && [ ! -d "$lock" ]; }; }; then
+      blocker_tried=1
+      rm -f -- "$lock" 2>/dev/null
+      continue
+    fi
     mt=$(coedit_mtime "$lock")
     # One stale-lock check and reclaim per call, outside the wait budget:
     # a call whose budget the parse and lookups already spent can still
@@ -244,8 +253,8 @@ coedit_lock_path() {
           # The rename runs in the foreground (the reclaim below needs the
           # path free); only the delete of the renamed tree is detached.
           rmdir "$marker" 2>/dev/null \
-            || { mv -- "$marker" "${lock}.stale.m${ino}-${mt}.$$" 2>/dev/null \
-                 && { ( rm -rf -- "${lock}.stale.m${ino}-${mt}.$$" ) </dev/null >/dev/null 2>&1 & }; }
+            || { aside=$(coedit_move_aside "$marker" "${lock}.stale.m${ino}-${mt}.$$.") \
+                 && { ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 & }; }
         else
           rm -f -- "$marker" 2>/dev/null
         fi
@@ -257,11 +266,10 @@ coedit_lock_path() {
       # in it): rename it aside atomically (that alone frees the lock), then
       # remove the renamed copy in a detached job, so a large tree never
       # holds the hook past its 1s budget.
-      local aside="${lock}.stale.${ino}-${mt}.$$"
       if mkdir "$marker" 2>/dev/null \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
          && [ "$(coedit_mtime "$lock")" = "$mt" ] \
-         && mv -- "$lock" "$aside" 2>/dev/null; then
+         && aside=$(coedit_move_aside "$lock" "${lock}.stale.${ino}-${mt}.$$."); then
         ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 &
       fi
       continue
@@ -295,6 +303,18 @@ coedit_older_than() {
 }
 
 coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
+
+# coedit_move_aside <path> <prefix> — move <path> into a fresh directory
+# mktemp creates exclusively (<prefix>XXXXXX) and print that directory. A
+# predictable destination name could already be a planted symlink, which
+# `mv` would follow and move the tree outside the store.
+coedit_move_aside() {
+  local d
+  d=$(mktemp -d "${2}XXXXXX" 2>/dev/null) || return 1
+  if mv -- "$1" "$d/" 2>/dev/null; then printf '%s' "$d"; return 0; fi
+  rmdir -- "$d" 2>/dev/null
+  return 1
+}
 
 # coedit_quarantine <file> — set a store file aside under a fresh unique
 # name. mktemp creates the destination exclusively (never an existing path
@@ -407,7 +427,7 @@ coedit_record() {
     if [ -L "$sfile" ]; then
       rm -f -- "$sfile" 2>/dev/null
     elif [ -d "$sfile" ]; then
-      mv -- "$sfile" "${sdir}/.${sid}.lock.stale.s$$-${now}" 2>/dev/null
+      coedit_move_aside "$sfile" "${sdir}/.${sid}.lock.stale.s$$-${now}." >/dev/null
     elif [ -e "$sfile" ] && [ ! -f "$sfile" ]; then
       rm -f -- "$sfile" 2>/dev/null
     fi

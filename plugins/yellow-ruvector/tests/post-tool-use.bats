@@ -211,7 +211,7 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 3 ]
   [ "$(cat "$outside")" = keep ]
   # The directory is renamed aside as a stale lock tree for the sweep.
-  ls -d "$sd"/.s1.lock.stale.s*/keep >/dev/null
+  ls -d "$sd"/.s1.lock.stale.s*/s1/keep >/dev/null
 }
 
 @test "a NUL inside a field can never forge the event, session, or cwd" {
@@ -285,6 +285,30 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   PATH="$mb:$PATH" edit s1 "$PROJECT_ROOT/src/a.ts"
   PATH="$mb:$PATH" edit s1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
+@test "a dangling symlink at the store lock path is cleared, so pairs still count" {
+  ln -s "$BATS_TEST_TMPDIR/nowhere" "$RUVECTOR_DIR/.coedit.lock"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
+@test "a stale lock is never moved through a symlink planted at its aside name" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; l="$sd/.s1.lock"; mkdir -p "$l/keep"
+  touch -d '5 minutes ago' "$l" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$l" | awk '{print $1}'); mt=$(stat -c %Y "$l" 2>/dev/null || stat -f %m "$l")
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"
+  # Start the hook blocked on its input, so its pid is known before it runs.
+  fifo="$BATS_TEST_TMPDIR/in"; mkfifo "$fifo"
+  ( exec env PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" < "$fifo" > /dev/null ) &
+  hp=$!
+  ln -s "$outside" "$l.stale.$ino-$mt.$hp"
+  event s1 Edit "$PROJECT_ROOT/src/a.ts" > "$fifo"
+  wait "$hp" || true
+  sleep 0.3
+  [ -z "$(ls -A "$outside")" ]
+  [ ! -e "$l/keep" ]
 }
 
 @test "the pair file is capped, keeping the highest counts and the pair just seen" {
