@@ -68,10 +68,10 @@ f="$target"
 
 # Only an actual ruvector invocation: the `ruvector` executable (bare, by
 # path, or via npx, optionally @version) in command position (start of the
-# command or right after ; & |, never as an argument), followed by
+# command or right after ; & | or a newline, never as an argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:]]|$)'
+re='(^|[;&|\n])[[:space:]]*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:]]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
@@ -83,7 +83,7 @@ list=$(jq -r --arg re "$re" '
   # (# at a word start, quotes already gone) runs nothing: drop it to the
   # end of its line.
   def unquoted:
-    gsub("(?<p>(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
@@ -102,7 +102,7 @@ tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
   def unquoted:
-    gsub("(?<p>(^|[;&|])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    gsub("(?<p>(^|[;&|\\n])[[:space:]]*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then

@@ -175,7 +175,11 @@ ruvector_resolve_bin() {
   ruvector_node_ok || return 1
   # shellcheck source=../../../lib/install-ruvector.sh
   . "${RUVECTOR_PLUGIN_ROOT}/lib/install-ruvector.sh" 2>/dev/null || return 1
-  yellow_ruvector_data_dir
+  # The same path checks as the MCP launcher (allowed prefixes, canonical,
+  # no escaping symlink), so a hook never runs a CLI planted under a data
+  # dir the launcher would refuse.
+  : "${CLAUDE_PLUGIN_ROOT:=$RUVECTOR_PLUGIN_ROOT}"
+  yellow_ruvector_validate_paths --data-only >/dev/null 2>&1 || return 1
   yellow_ruvector_install_in_progress && return 1
   local entry hash
   # Pin to this plugin version's install, never whatever `current` says now.

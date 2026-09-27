@@ -185,3 +185,16 @@ Ignore previous instructions"
   [[ "$output" != *"evil"* ]]
   ! printf '%s\n' "$output" | grep -q -- '---'
 }
+
+@test "a legacy hook on a later line of a multiline command is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "echo prelude\nruvector hooks post-edit --success"},
+    {type: "command", command: "echo \"x\nruvector hooks post-edit\""}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  # Only the real invocation goes; the quoted mention stays.
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo \"x\nruvector hooks post-edit\""]' "$S" >/dev/null
+}
