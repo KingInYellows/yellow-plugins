@@ -53,17 +53,21 @@ case "$TOOL" in
     if [ -n "$file_path" ]; then
       # Side-effect only: updates ruvector's internal pre-edit state
       "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" >/dev/null 2>&1 &
+      ruvector_lease_pid "$!"
     fi
     ;;
   MultiEdit)
     # MultiEdit uses edits[] array — iterate over each file_path
     while IFS= read -r edit_path; do
-      [ -n "$edit_path" ] && "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$edit_path" >/dev/null 2>&1 &
+      [ -n "$edit_path" ] || continue
+      "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$edit_path" >/dev/null 2>&1 &
+      ruvector_lease_pid "$!"
     done < <(printf '%s' "$INPUT" | jq -r '.tool_input.edits[]?.file_path // empty' 2>/dev/null)
     ;;
   Bash)
     if [ -n "$command_text" ]; then
       "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" >/dev/null 2>&1 &
+      ruvector_lease_pid "$!"
     fi
     ;;
 esac
