@@ -111,7 +111,7 @@ npm_called_within() {
   # plus the KILL grace, and the lock wait would come on top.
   cli "process.on('SIGTERM', () => {}); setTimeout(() => {}, 10000);"
   rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
-  sleep 30 & holder=$!
+  sleep 31 & holder=$!
   bash -c '. "$1"; yellow_ruvector_data_dir; mkdir "$RUVECTOR_DATA/.install.lock"
     yellow_ruvector_stamp_pid "$RUVECTOR_DATA/.install.lock" "$2"
     printf %s "$2" > "$RUVECTOR_DATA/.install.lock/pid"' _ "$LIB" "$holder"

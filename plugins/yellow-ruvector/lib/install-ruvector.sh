@@ -7,7 +7,8 @@
 #
 # Adapted from plugins/yellow-morph/lib/install-morphmcp.sh. Differences:
 #   - CLAUDE_PLUGIN_DATA may be unset (older Claude Code, Cursor bridge);
-#     fall back to ${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector.
+#     fall back to ${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector (an
+#     absolute XDG_DATA_HOME only).
 #   - One install dir per lockfile hash (install-<hash12>) plus an atomic
 #     `current` symlink, so a version bump never deletes node_modules from
 #     under a running MCP server (ruvector's ONNX modules load lazily).
@@ -43,7 +44,12 @@ yellow_ruvector_data_dir() {
     RUVECTOR_DATA="$CLAUDE_PLUGIN_DATA"
     RUVECTOR_DATA_FALLBACK=0
   else
-    RUVECTOR_DATA="${XDG_DATA_HOME:-${HOME:-/__unset__}/.local/share}/yellow-ruvector"
+    # A relative XDG_DATA_HOME is invalid (XDG spec) and would resolve
+    # against each caller's cwd, splitting the launcher and hooks across
+    # data dirs: ignore it.
+    local xdg="${XDG_DATA_HOME:-}"
+    case "$xdg" in /*) ;; *) xdg="${HOME:-/__unset__}/.local/share" ;; esac
+    RUVECTOR_DATA="${xdg}/yellow-ruvector"
     RUVECTOR_DATA_FALLBACK=1
   fi
   export RUVECTOR_DATA RUVECTOR_DATA_FALLBACK

@@ -290,6 +290,16 @@ describe('yellow-ruvector install lib', () => {
       expect(r.stdout).toBe(`${home}/.local/share/yellow-ruvector|1`);
     });
 
+    it('ignores a relative XDG_DATA_HOME, as the XDG spec requires', () => {
+      // A relative root would resolve against each caller's cwd, so the
+      // launcher and the hooks could each pick a different data dir.
+      const r = runBash(
+        'yellow_ruvector_data_dir; printf "%s|%s" "$RUVECTOR_DATA" "$RUVECTOR_DATA_FALLBACK"',
+        { ...env, CLAUDE_PLUGIN_DATA: undefined, XDG_DATA_HOME: 'rel/xdg' }
+      );
+      expect(r.stdout).toBe(`${home}/.local/share/yellow-ruvector|1`);
+    });
+
     it('prefers CLAUDE_PLUGIN_DATA when set', () => {
       const r = runBash(
         'yellow_ruvector_data_dir; printf "%s|%s" "$RUVECTOR_DATA" "$RUVECTOR_DATA_FALLBACK"',
