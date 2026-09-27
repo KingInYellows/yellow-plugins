@@ -73,10 +73,12 @@ components:
 - PostToolUse no longer calls any ruvector CLI. It records co-edit pairs in a
   plugin-owned `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`):
   per-session last-edit state (`coedit-sessions/<session_id>`), a 60s window,
-  symmetric counts, temp-file + rename under a non-blocking mkdir lock, a
-  5000-pair cap, root-relative physical paths, and rejection of paths outside
-  the root or with control characters. No plugin hook writes `intelligence.json`
-  any more.
+  symmetric counts, temp-file + rename under a non-blocking mkdir lock, a cap of
+  2000 directed entries (`COEDIT_MAX_PAIRS`; every pair is stored in both
+  directions, so at most 1000 file pairs, fewer if the 80%-of-1 MB byte budget
+  binds first), root-relative physical paths, and rejection of paths outside the
+  root or with control characters. No plugin hook writes `intelligence.json` any
+  more.
 - PreToolUse surfaces up to 3 partners (count ≥ 3, still existing, once per file
   per session for its 200 most recently suggested files, 32 KB of paths) as
   fenced `hookSpecificOutput.additionalContext`. Partner names from
