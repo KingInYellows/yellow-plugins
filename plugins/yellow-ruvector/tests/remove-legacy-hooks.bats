@@ -359,6 +359,21 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo env ruvector hooks post-edit", "myenv ruvector hooks post-edit"]' "$S" >/dev/null
 }
 
+@test "a legacy call inside a shell wrapper's constant command string is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "bash -lc '"'"'ruvector hooks post-edit --success'"'"'"},
+    {type: "command", command: "FOO=1 /bin/sh -c \"npx ruvector hooks session-end\""},
+    {type: "command", command: "echo sh -c '"'"'ruvector hooks post-edit'"'"'"},
+    {type: "command", command: "sh -c \"$X ruvector hooks post-edit\""}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 2 ]
+  jq -e '.hooks.PostToolUse[0].hooks[0].command | startswith("echo")' "$S" >/dev/null
+}
+
 @test "a function definition holding a legacy call is never listed or removed" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "cleanup() { ruvector hooks post-edit --success; }; echo harmless"},
