@@ -681,3 +681,20 @@ related_staged() {
   [ "$status" -eq 0 ]
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
 }
+
+@test "coedit-related.sh from a linked worktree waits for a slow main-worktree lookup" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" add src
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q -m init
+  WT="$(mktemp -d)/wt"
+  git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
+  ln -s "$RUVECTOR_DIR" "$WT/.ruvector"
+  gb="$BATS_TEST_TMPDIR/gitbin"; mkdir -p "$gb"
+  printf '#!/bin/sh\ncase "$*" in *"worktree list"*) sleep 0.6 ;; esac\nexec %s "$@"\n' "$(command -v git)" > "$gb/git"
+  chmod +x "$gb/git"
+  run --separate-stderr bash -c 'cd "$1" && PATH="$3:$PATH" bash "$2" src/a.ts' _ "$WT" "$RELATED" "$gb"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+  git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
+}
