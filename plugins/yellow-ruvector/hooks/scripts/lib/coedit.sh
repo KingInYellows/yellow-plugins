@@ -287,7 +287,12 @@ coedit_lock_path() {
       # directory, from corruption or a checkout) would block every future
       # reclaim of this lock: once expired, it is removed too (a directory
       # renamed aside and deleted in the background, like a stale lock).
-      if { [ -e "$marker" ] || [ -L "$marker" ]; } && coedit_older_than "$(coedit_mtime "$marker")" 600; then
+      # A symlink (even a dangling one, which has no mtime to age) or any
+      # other non-directory there is never a marker (markers are made with
+      # mkdir): it is unlinked at once.
+      if [ -L "$marker" ] || { [ -e "$marker" ] && [ ! -d "$marker" ]; }; then
+        rm -f -- "$marker" 2>/dev/null
+      elif [ -e "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600; then
         if [ -d "$marker" ] && [ ! -L "$marker" ]; then
           # The rename runs in the foreground (the reclaim below needs the
           # path free); only the delete of the renamed tree is detached.

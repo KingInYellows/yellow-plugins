@@ -1009,6 +1009,20 @@ SH
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a dangling symlink or fresh file at the current generation's marker never blocks the reclaim" {
+  for kind in dangling file; do
+    rm -rf "$RUVECTOR_DIR"/.coedit.lock* "$COEDIT"
+    mkdir -p "$RUVECTOR_DIR/.coedit.lock"
+    touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+    ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
+    mt=$(stat -c %Y "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || stat -f %m "$RUVECTOR_DIR/.coedit.lock")
+    m="$RUVECTOR_DIR/.coedit.lock.reclaim.${ino}-${mt}"
+    case $kind in dangling) ln -s "$BATS_TEST_TMPDIR/nowhere" "$m" ;; file) : > "$m" ;; esac
+    edit "k$kind" "$PROJECT_ROOT/src/a.ts"; edit "k$kind" "$PROJECT_ROOT/src/b.ts"
+    [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  done
+}
+
 @test "a multi-megabyte Write payload never keeps the hook past its budget" {
   big="$BATS_TEST_TMPDIR/big.json"
   { printf '{"hook_event_name":"PostToolUse","session_id":"big","cwd":"%s","tool_name":"Write","tool_input":{"file_path":"%s","content":"' "$PROJECT_ROOT" "$PROJECT_ROOT/src/a.ts"
