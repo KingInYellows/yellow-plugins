@@ -86,7 +86,8 @@ components:
   exists under the root) and keys with control characters are dropped inside jq
   — a multi-line key would otherwise split into a forged `count<TAB>path` line
   when read line by line.
-- `/ruvector:related <file>` lists the full partner list.
+- `/ruvector:related <file>` lists up to 50 partners by count (rarer pairs
+  included); partners past the 50th are not shown.
 - Recall happens once per session at SessionStart (semantic, 4.5s budget); the
   UserPromptSubmit hook is gone.
 - MultiEdit is read from `tool_input.file_path`.
