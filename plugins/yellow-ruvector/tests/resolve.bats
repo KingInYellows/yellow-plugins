@@ -160,6 +160,35 @@ fake_install() {
   [ ! -e "$WORK/wtc/.ruvector" ]
 }
 
+@test "heal_store: a main checkout with every file assume-unchanged still links" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$WORK" init -q
+  echo x > "$WORK/f.txt"; git -C "$WORK" add f.txt
+  git -C "$WORK" -c user.email=t@t -c user.name=t commit -q -m init
+  git -C "$WORK" update-index --assume-unchanged f.txt
+  mkdir "$WORK/.ruvector"
+  git -C "$WORK" worktree add -q "$WORK/wtau" -b assumed
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtau"
+  [ "$status" -eq 0 ]
+  [ -L "$WORK/wtau/.ruvector" ]
+}
+
+@test "heal_store: an assume-unchanged name that merely exists in the git dir's parent is not a checkout" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  mkdir -p "$WORK/meta" "$WORK/main"
+  git -C "$WORK/main" init -q --separate-git-dir="$WORK/meta/.git"
+  echo x > "$WORK/main/README.md"
+  git -C "$WORK/main" add README.md
+  git -C "$WORK/main" -c user.email=t@t -c user.name=t commit -q -m init
+  git -C "$WORK/main" update-index --assume-unchanged README.md
+  echo "unrelated" > "$WORK/meta/README.md"
+  mkdir "$WORK/meta/.ruvector"
+  git -C "$WORK/main" worktree add -q "$WORK/wtau2" -b coinc-au
+  rs bash -c '. "$1"; ruvector_heal_store "$2"' _ "$LIB" "$WORK/wtau2"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/wtau2/.ruvector" ]
+}
+
 @test "heal_store: an empty --separate-git-dir repo never links to the git dir's parent" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   mkdir -p "$WORK/meta" "$WORK/main"

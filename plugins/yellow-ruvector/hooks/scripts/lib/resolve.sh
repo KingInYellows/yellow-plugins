@@ -53,9 +53,16 @@ ruvector_main_worktree() {
   # locally deleted or edited files do not matter, while a file that merely
   # shares a tracked name in the git dir's parent (its stat and content will
   # not match) is not. Bounded: at most 2000 entries and 10 batches.
-  local n=0 batches=0 present=()
+  # Assume-unchanged ("h") entries are checked out too, but diff-files never
+  # stats them (it would call any same-named file clean): up to 20 of them
+  # are compared by content against the index blob instead, only if no "H"
+  # entry proved the checkout.
+  local n=0 batches=0 present=() assumed=()
   while [ "$n" -lt 2000 ] && IFS= read -r -d '' tracked; do
     case "$tracked" in
+      "h "?*)
+        n=$((n + 1))
+        [ "${#assumed[@]}" -lt 20 ] && [ -f "${main}/${tracked#h }" ] && assumed+=("${tracked#h }") ;;
       "H "?*)
         n=$((n + 1))
         [ -e "${main}/${tracked#H }" ] || continue
@@ -69,6 +76,13 @@ ruvector_main_worktree() {
   done < <(git -C "$main" ls-files -v -z 2>/dev/null)
   [ "${#present[@]}" -gt 0 ] && _ruvector_any_clean "$main" "${present[@]}" \
     && { printf '%s' "$main"; return 0; }
+  local rel blob
+  for rel in ${assumed[@]+"${assumed[@]}"}; do
+    blob=$(git -C "$main" ls-files -s -z -- ":(literal)${rel}" 2>/dev/null | tr '\0' '\n' | awk 'NR == 1 {print $2}')
+    [ -n "$blob" ] || continue
+    [ "$(git -C "$main" hash-object --path="$rel" -- "${main}/${rel}" 2>/dev/null)" = "$blob" ] \
+      && { printf '%s' "$main"; return 0; }
+  done
   return 1
 }
 
