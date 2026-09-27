@@ -1,0 +1,21 @@
+docs/security.md
+  s_37c0875242a535::t_443047857a97ef 265-268
+docs/solutions/workflow/version-pr-ci-held-at-action-required.md
+  s_37c0875242a535::t_c0db1a242452db 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "807724b322864a5cd714f32a7091701a6635cbe9",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
