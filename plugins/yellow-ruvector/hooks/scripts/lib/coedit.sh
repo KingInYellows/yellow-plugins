@@ -27,6 +27,11 @@ COEDIT_MAX_BYTES="${COEDIT_MAX_BYTES:-1048576}"
 # COEDIT_JQ_SECS, so every path still prints its allow JSON.
 COEDIT_LOCK_TRIES="${COEDIT_LOCK_TRIES:-8}"
 COEDIT_JQ_SECS="${COEDIT_JQ_SECS:-0.3}"
+# A linked worktree's main-worktree lookup is bounded by COEDIT_WT_SECS and
+# charged against the same lock budget (coedit_reset_tries), so lookup +
+# lock waits + one bounded jq stay under the 1s hook timeout.
+COEDIT_WT_SECS="${COEDIT_WT_SECS:-0.15}"
+COEDIT_WT_TRIES="${COEDIT_WT_TRIES:-3}"
 
 # The validate-and-rewrite program for coedit_bump (see there).
 _COEDIT_BUMP_JQ='
@@ -34,7 +39,7 @@ _COEDIT_BUMP_JQ='
         and all(.pairs[]; type == "object" and all(.[]; type == "number"))) | not
     then halt_error(3) else . end
     | def safe: type == "string" and length > 0 and length <= 512
-      and (test("[[:cntrl:]]") | not) and (startswith("/") | not)
+      and (test("[[:cntrl:]\u0085\u2028\u2029]") | not) and (startswith("/") | not)
       and ((split("/") | map(select(. == "" or . == "." or . == "..")) | length) == 0)
       and (test("^(\\.ruvector|\\.git)(/|$)|^docs/solutions/") | not);
     [.pairs | to_entries[] | select(.key | safe) | .key as $k
@@ -102,6 +107,9 @@ coedit_normalize() {
   # A shell pattern, not grep: grep reads line by line, so a newline in the
   # path would split it into clean-looking records and pass.
   case "$p" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
+  # Unicode line breaks (NEL, LINE/PARAGRAPH SEPARATOR) as raw UTF-8 bytes,
+  # so the check holds in any locale.
+  case "$p" in *$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
   case "$p" in
     /*) abs="$p" ;;
     *) abs="${root}/${p}" ;;
@@ -127,6 +135,7 @@ coedit_normalize() {
   esac
   [ -n "$rel" ] && [ "${#rel}" -le 512 ] || return 1
   case "$rel" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
+  case "$rel" in *$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
   case "$rel" in
     .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
@@ -147,17 +156,27 @@ coedit_store_dir() {
     [ -f "${root}/.git" ] || return 1
     # The main worktree as resolve.sh identifies it: never a bare repo's
     # parent or a --separate-git-dir's parent.
-    # Bounded (COEDIT_WT_SECS, 0.4s) inside the 1s hook: on a large or slow
+    # Bounded (COEDIT_WT_SECS, 0.15s) inside the 1s hook: on a large or slow
     # main checkout the lookup is abandoned and this edit is not recorded,
     # but the hook still answers. TIMEOUT_CMD is cleared so run_budgeted
     # uses its background runner (timeout(1) cannot run a shell function).
     command -v ruvector_main_worktree >/dev/null 2>&1 || return 1
-    main=$(TIMEOUT_CMD='' run_budgeted "${COEDIT_WT_SECS:-0.4}" ruvector_main_worktree "$root") || return 1
+    main=$(TIMEOUT_CMD='' run_budgeted "$COEDIT_WT_SECS" ruvector_main_worktree "$root") || return 1
     [ -n "$main" ] || return 1
     main=$(CDPATH= cd -- "$main" 2>/dev/null && pwd -P) || return 1
     [ "$phys" = "${main}/.ruvector" ] || return 1
   fi
   printf '%s' "$phys"
+}
+
+# coedit_reset_tries <root> <store-dir> — start a hook call's lock budget:
+# COEDIT_LOCK_TRIES, less COEDIT_WT_TRIES when <store-dir> is another
+# worktree's store (coedit_store_dir spent up to COEDIT_WT_SECS finding it).
+coedit_reset_tries() {
+  _coedit_tries_left=$COEDIT_LOCK_TRIES
+  [ "$2" = "$(CDPATH= cd -- "$1" 2>/dev/null && pwd -P)/.ruvector" ] && return 0
+  _coedit_tries_left=$((COEDIT_LOCK_TRIES - COEDIT_WT_TRIES))
+  [ "$_coedit_tries_left" -ge 0 ] || _coedit_tries_left=0
 }
 
 # coedit_write_atomic <file> — write stdin to <file> via a same-dir temp file
@@ -330,7 +349,7 @@ coedit_record() {
   mkdir -p "$sdir" 2>/dev/null || return 0
   sfile="${sdir}/${sid}"
   slock="${sdir}/.${sid}.lock"
-  _coedit_tries_left=$COEDIT_LOCK_TRIES
+  coedit_reset_tries "$root" "$dir"
   coedit_lock_path "$slock" || return 0
   now=$(date +%s)
   state='{}'
@@ -343,7 +362,7 @@ coedit_record() {
      && [ -n "$state" ]; then
     # Control characters are rejected inside jq, before the shell sees the
     # string: a NUL would be dropped by $(...) and alias another path.
-    last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" and (.last | test("[[:cntrl:]]") | not) then .last else "" end')
+    last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" and (.last | test("[[:cntrl:]\u0085\u2028\u2029]") | not) then .last else "" end')
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
   else
     state='{}'
