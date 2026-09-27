@@ -541,6 +541,23 @@ exit 0'
   [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
 }
 
+@test "abandoned stale lock trees are swept once untouched for 10 minutes" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9/x" "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9/y" \
+    "$RUVECTOR_DIR/.coedit.lock.stale.3-3.9"
+  : > "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9/y/f"
+  for d in coedit-sessions/.s1.lock.stale.1-1.9 .coedit.lock.stale.2-2.9; do
+    touch -d '20 minutes ago' "$RUVECTOR_DIR/$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9" ]
+  # A fresh one (a delete may still be running) is left alone.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.3-3.9" ]
+}
+
 @test "session pruning never delays the SessionStart response" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$BATS_TEST_TMPDIR/slowbin" "$RUVECTOR_DIR/coedit-sessions"
