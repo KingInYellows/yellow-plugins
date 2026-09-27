@@ -992,3 +992,27 @@ END"
   done
   [ ! -e "$h/.coedit.lock.stale.z1" ]
 }
+
+@test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in $(seq 1 40); do
+    mkdir "$sd/.zs$n.lock.reclaim.1-1"
+    touch -d '20 minutes ago' "$sd/.zs$n.lock.reclaim.1-1" 2>/dev/null || skip "touch -d unsupported"
+  done
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # Full listings never finish; shard passes list normally; each marker
+  # removal is slow, so the sweep would run as long as it is allowed to.
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  printf '#!/bin/sh\ncase "$*" in *reclaim*) date +%%s%%N >> "%s/rmdir.log"; sleep 0.2 ;; esac\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rmdir)" > "$fb/rmdir"
+  chmod +x "$fb/find" "$fb/rmdir"
+  start=$(date +%s%N)
+  COEDIT_SHARD=29 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 10
+  [ -s "$BATS_TEST_TMPDIR/rmdir.log" ]
+  last=$(tail -n 1 "$BATS_TEST_TMPDIR/rmdir.log")
+  # No removal starts after the phase's 5s (plus the fast session phase).
+  [ $(( (last - start) / 1000000 )) -lt 5400 ]
+}
+

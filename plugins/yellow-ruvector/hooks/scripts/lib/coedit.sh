@@ -225,8 +225,19 @@ coedit_lock_path() {
       # This generation's own marker is checked first: if a reclaimer died
       # after creating it (over 10 minutes ago), it is removed so this
       # reclaim can proceed, however many other markers sort before it.
-      [ -d "$marker" ] && [ ! -L "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600 \
-        && rmdir "$marker" 2>/dev/null
+      # Anything else left at that path (a file, a symlink, a non-empty
+      # directory, from corruption or a checkout) would block every future
+      # reclaim of this lock: once expired, it is removed too (a directory
+      # renamed aside and deleted in the background, like a stale lock).
+      if { [ -e "$marker" ] || [ -L "$marker" ]; } && coedit_older_than "$(coedit_mtime "$marker")" 600; then
+        if [ -d "$marker" ] && [ ! -L "$marker" ]; then
+          rmdir "$marker" 2>/dev/null \
+            || { mv -- "$marker" "${lock}.stale.m${ino}-${mt}.$$" 2>/dev/null \
+                 && ( rm -rf -- "${lock}.stale.m${ino}-${mt}.$$" ) </dev/null >/dev/null 2>&1 & }
+        else
+          rm -f -- "$marker" 2>/dev/null
+        fi
+      fi
       # Other generations' markers are never listed here (a checkout can
       # ship any number of them, and even a glob would eat the hook's 1s
       # budget): the SessionStart worker sweeps expired ones, bounded.
@@ -465,7 +476,7 @@ coedit_prune_sessions() {
       # Expired reclaim markers (over 10 minutes old, long after any reclaim
       # of that generation finished), of the session locks here and of the
       # store lock in the store dir; the hooks never list them. Discovery is
-      # top-level finds under a 2s bound each feeding a random sample of at
+      # top-level finds under a 1.5s bound each feeding a random sample of at
       # most 500 names (O(sample) memory, never a full glob), and the sweep
       # is bounded by time and by removals (50), not by entries looked at, so
       # markers that cannot be removed (not empty) never keep it from
@@ -478,20 +489,18 @@ coedit_prune_sessions() {
       markers=()
       # A timed-out listing is followed by one random name shard (session
       # locks by the session id's first character, the store lock's by the
-      # inode's first digit), as for the session files above.
+      # inode's first digit), as for the session files above. Discovery takes
+      # at most 4s, so the sweep keeps at least 1s of the phase's real 5s.
       while IFS= read -r m; do markers+=("${m#./}"); done < <(
-        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" \
-            || LC_ALL=C run_budgeted 1 find . ! -name . -prune -name ".$(coedit_shard)*.lock.reclaim.*" -type d ! -name "*${nl}*"
-          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
-            || LC_ALL=C run_budgeted 1 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
+        { run_budgeted 1.5 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.5 find . ! -name . -prune -name ".$(coedit_shard)*.lock.reclaim.*" -type d ! -name "*${nl}*"
+          run_budgeted 1.5 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.5 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
         } 2>/dev/null \
           | LC_ALL=C awk -v k=500 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
       )
-      # Timed-out listings plus their shard passes can take 6s: the sweep
-      # itself always keeps at least 2s of the phase's 5.
-      [ "$SECONDS" -le 3 ] || SECONDS=3
       total=${#markers[@]} tried=0 removed=0 i=0
       [ "$total" -eq 0 ] || i=$(( ((RANDOM << 15) | RANDOM) % total ))
       while [ "$tried" -lt "$total" ] && [ "$removed" -lt 50 ] && [ "$SECONDS" -lt 5 ]; do
