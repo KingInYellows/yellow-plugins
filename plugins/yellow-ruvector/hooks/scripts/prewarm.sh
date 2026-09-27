@@ -52,6 +52,18 @@ yellow_ruvector_acquire_install_lock 2 \
   || json_exit
 
 (
+  # Wait for the handoff before doing (or releasing) anything: until the
+  # parent writes this job's pid, the lock names the parent ($$ here too),
+  # and a job that finished and released early could let another session
+  # take the lock just before the parent's write overwrote its pid. The
+  # handed pid is recorded, so the release matches it even on bash 3.2
+  # (no BASHPID).
+  for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    _YR_LOCK_OWNER=$(cat "${RUVECTOR_DATA}/.install.lock/pid" 2>/dev/null) || _YR_LOCK_OWNER=""
+    [ -n "$_YR_LOCK_OWNER" ] && [ "$_YR_LOCK_OWNER" != "$$" ] && break
+    sleep 0.1
+  done
+  [ -n "$_YR_LOCK_OWNER" ] && [ "$_YR_LOCK_OWNER" != "$$" ] || exit 0
   yellow_ruvector_trap_release
   if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then
     yellow_ruvector_do_install || exit 0
