@@ -30,7 +30,12 @@ unset _HOOK_LIB
 
 command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping pre-tool-use"
 
-INPUT=$(cat)
+# Parsed straight from stdin, never buffered first, and bounded by
+# COEDIT_PARSE_SECS (0.15s): a Write carrying megabytes of content must not
+# keep the hook past its 1s timeout (Cursor's bridge reads empty PreToolUse
+# stdout as a block). The time is charged against the lock budget below.
+COEDIT_PARSE_SECS="${COEDIT_PARSE_SECS:-0.15}"
+COEDIT_PARSE_TRIES="${COEDIT_PARSE_TRIES:-3}"
 
 TOOL="" file_path="" session_id="" CWD=""
 {
@@ -38,7 +43,7 @@ TOOL="" file_path="" session_id="" CWD=""
   IFS= read -r -d '' file_path
   IFS= read -r -d '' session_id
   IFS= read -r -d '' CWD
-} < <(printf '%s' "$INPUT" | jq -j '
+} < <(COEDIT_JQ_SECS=$COEDIT_PARSE_SECS coedit_jq -j '
   # A NUL inside a value would read as a field separator (a crafted
   # file_path could forge the session and cwd): such a value is "".
   def s(v): if (v|type) == "string" and (v | test("\u0000") | not) then v else "" end;
@@ -60,7 +65,7 @@ esac
 # its background runner (timeout(1) cannot run a shell function).
 COEDIT_ROOT_SECS="${COEDIT_ROOT_SECS:-0.15}"
 COEDIT_ROOT_TRIES="${COEDIT_ROOT_TRIES:-3}"
-_COEDIT_SPENT_TRIES=$COEDIT_ROOT_TRIES
+_COEDIT_SPENT_TRIES=$((COEDIT_PARSE_TRIES + COEDIT_ROOT_TRIES))
 PROJECT_DIR=$(TIMEOUT_CMD='' run_budgeted "$COEDIT_ROOT_SECS" ruvector_resolve_root "${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}")
 [ -n "$PROJECT_DIR" ] && [ -f "${PROJECT_DIR}/.ruvector/coedit.json" ] || json_exit
 
