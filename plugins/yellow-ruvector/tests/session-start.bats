@@ -786,6 +786,25 @@ END"
   while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
 }
 
+@test "a slow session-file scan never starves the marker and stale-tree sweeps" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # The session-file find (-mtime +7) spends its whole budget.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *-mtime*) exec sleep 30 ;; esac\nexec %s "$@"\n' "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  mkdir -p "$sd/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  touch -d '20 minutes ago' "$sd/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.stale.a1" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 150); do
+    [ -e "$sd/.gone.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.stale.a1" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$sd/.gone.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.stale.a1" ]
+}
+
 @test "expired reclaim markers are swept, session and store locks alike; recent ones stay" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"
