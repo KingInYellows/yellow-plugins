@@ -402,10 +402,9 @@ coedit_prune_sessions() {
           coedit_lock_path ".${sid}.lock" || continue
           if [ -f "$f" ] && [ ! -L "$f" ] && coedit_older_than "$(coedit_mtime "$f")" 604800; then
             rm -f -- "$f"
-            # A pruned session is never locked again, so its reclaim markers
-            # would never be swept by coedit_lock_path: drop them now.
+            # Its reclaim markers are left to the bounded marker sweep below
+            # (every marker over 10 minutes old), never globbed here.
             coedit_unlock_path ".${sid}.lock"
-            for m in ".${sid}.lock.reclaim."*; do [ -d "$m" ] && rmdir -- "$m" 2>/dev/null; done
             continue
           fi
           coedit_unlock_path ".${sid}.lock"

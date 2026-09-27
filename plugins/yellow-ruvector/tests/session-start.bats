@@ -753,8 +753,10 @@ END"
   for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/dead" ] || break; sleep 0.1; done
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/dead" ]
   sleep 0.3
-  # No lock or reclaim marker is left behind for the pruned session.
-  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
+  # No lock is left behind for the pruned session. The reclaim just made its
+  # generation marker; the bounded marker sweep removes it once it is 10
+  # minutes old, so only that marker may remain.
+  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" | grep -v '^\.dead\.lock\.reclaim\.')" ]
 }
 
 @test "reclaim markers that cannot be removed never keep the sweep from later ones" {
@@ -770,6 +772,22 @@ END"
   for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
   [ ! -e "$d" ]
   [ -d "$sd/.a10.lock.reclaim.1-1" ]
+}
+
+@test "pruning a session never globs its reclaim markers" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  echo '{}' > "$sd/old1"
+  touch -d '8 days ago' "$sd/old1" 2>/dev/null || skip "touch -d unsupported"
+  # A marker that cannot be removed and one that can, both recent: only the
+  # bounded sweep (10-minute age rule) may touch markers, so both stay.
+  mkdir -p "$sd/.old1.lock.reclaim.1-1/keep" "$sd/.old1.lock.reclaim.2-2"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 40); do [ -e "$sd/old1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/old1" ]
+  sleep 1
+  [ -d "$sd/.old1.lock.reclaim.2-2" ]
 }
 
 @test "reclaim-marker discovery is bounded: a slow directory listing never runs past the worker's budget" {
