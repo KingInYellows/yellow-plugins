@@ -1,6 +1,10 @@
 ---
-'yellow-ruvector': minor
+'yellow-ruvector': major
 ---
+
+**Breaking:** requires Node.js 20+; the global `ruvector` binary is no longer
+used, `scripts/install.sh` is removed, and the UserPromptSubmit and Stop hooks
+are removed.
 
 Upgrade to ruvector 0.3.3 as a plugin-managed install. The plugin now pins
 ruvector in its own `package.json` + committed `package-lock.json` and installs
