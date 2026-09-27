@@ -189,7 +189,9 @@ coedit_write_atomic() {
   if [ -e "$f" ] || [ -L "$f" ]; then
     [ -f "$f" ] && [ ! -L "$f" ] || return 1
   fi
-  tmp="${f}.tmp.$$.${RANDOM}"
+  # mktemp creates the temp file exclusively (O_EXCL): a symlink planted at
+  # a predictable temp name can never redirect the write.
+  tmp=$(mktemp "${f}.tmp.XXXXXXXX" 2>/dev/null) || return 1
   if cat > "$tmp" && [ -s "$tmp" ] && mv -f -- "$tmp" "$f"; then
     return 0
   fi

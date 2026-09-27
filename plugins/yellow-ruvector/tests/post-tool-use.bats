@@ -831,3 +831,19 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit big2 "$PROJECT_ROOT/src/a.ts" Write; edit big2 "$PROJECT_ROOT/src/b.ts" Write
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
+
+@test "temp files are created exclusively: a symlink planted at the temp name is never written through" {
+  outside="$BATS_TEST_TMPDIR/outside"; : > "$outside"
+  run bash -c '
+    . "$1"; f="$2/coedit.json"
+    # Seeding RANDOM makes a $$.$RANDOM temp name predictable: plant a
+    # symlink exactly there, then write.
+    RANDOM=42; guess="${f}.tmp.$$.${RANDOM}"
+    ln -s "$3" "$guess"
+    RANDOM=42
+    # A here-string, not a pipe: a subshell would reseed RANDOM.
+    coedit_write_atomic "$f" <<< "{\"version\":1,\"pairs\":{}}"
+    rm -f "$guess"' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh" "$RUVECTOR_DIR" "$outside"
+  [ ! -s "$outside" ]
+  jq -e '.version == 1' "$RUVECTOR_DIR/coedit.json" >/dev/null
+}

@@ -632,3 +632,19 @@ SH
     case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$PLUGIN/lib/install-ruvector.sh" "$BATS_TEST_TMPDIR/child.pid"
   [ "$status" -eq 0 ]
 }
+
+@test "warm_model spends one deadline on the model-lock wait and the warm-up together" {
+  fake_install
+  run bash -c '
+    . "$1"; export HOME="$2" CLAUDE_PLUGIN_ROOT="$3" CLAUDE_PLUGIN_DATA="$4"; yellow_ruvector_data_dir
+    export PATH="$5:$PATH" FAKE_EMBED_SLEEP=30
+    d=$(yellow_ruvector_model_lock_dir); mkdir -p "$d"
+    sleep 30 & o=$!; printf "%s" "$o" > "$d/pid"
+    # The holder lets go after 2s of a 4s budget: the warm-up gets the rest.
+    ( sleep 2; kill $o ) &
+    start=$SECONDS
+    yellow_ruvector_warm_model 4
+    el=$((SECONDS - start))
+    [ "$el" -le 5 ] || exit 9' _ "$PLUGIN/lib/install-ruvector.sh" "$HOME" "$PLUGIN" "$DATA" "$STUBS"
+  [ "$status" -eq 0 ]
+}
