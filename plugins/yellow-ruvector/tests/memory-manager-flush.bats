@@ -27,17 +27,17 @@ pretrain_acknowledged() {
 }
 
 @test "hooks_pretrain empty result is not acknowledged" {
-  ! pretrain_acknowledged '' || false || false
+  ! pretrain_acknowledged '' || false
 }
 
 @test "hooks_pretrain success false is not acknowledged" {
-  ! pretrain_acknowledged '{"success":false,"error":"disk full"}' || false || false
+  ! pretrain_acknowledged '{"success":false,"error":"disk full"}' || false
 }
 
 @test "hooks_pretrain missing success field is not acknowledged" {
-  ! pretrain_acknowledged '{"output":"indexed","new_stats":{}}' || false || false
+  ! pretrain_acknowledged '{"output":"indexed","new_stats":{}}' || false
 }
 
 @test "hooks_pretrain malformed JSON is not acknowledged" {
-  ! pretrain_acknowledged 'not-json' || false || false
+  ! pretrain_acknowledged 'not-json' || false
 }

@@ -281,5 +281,5 @@ file_mode() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"Invalid JSON"* ]]
   grep -q 'not-json{{' "$SETTINGS"
-  ! jq -e . "$SETTINGS" >/dev/null 2>&1 || false || false
+  ! jq -e . "$SETTINGS" >/dev/null 2>&1 || false
 }
