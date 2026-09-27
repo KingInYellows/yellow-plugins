@@ -62,7 +62,9 @@ if yellow_ruvector_validate_paths; then
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
 fi
-command -v ruvector >/dev/null 2>&1 && printf 'note: global ruvector %s at %s is ignored by this plugin\n' "$(ruvector --version 2>/dev/null)" "$(command -v ruvector)"
+# Its version text and path are not printed: both come from whatever is on
+# PATH, not from this plugin.
+command -v ruvector >/dev/null 2>&1 && printf 'note: a global ruvector on PATH is ignored by this plugin\n'
 
 printf '\n=== .ruvector/ ===\n'
 [ -d "$ROOT/.ruvector" ] && printf 'exists\n' || printf 'not initialized\n'

@@ -40,7 +40,7 @@ if yellow_ruvector_validate_paths; then
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
 fi
-command -v ruvector >/dev/null 2>&1 && printf 'global ruvector %s at %s: ignored by this plugin\n' "$(ruvector --version 2>/dev/null)" "$(command -v ruvector)"
+command -v ruvector >/dev/null 2>&1 && printf 'global ruvector on PATH: ignored by this plugin\n'
 ```
 
 Report the installed version, or "not installed — run `/ruvector:setup`"

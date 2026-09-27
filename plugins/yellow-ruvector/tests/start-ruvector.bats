@@ -168,6 +168,25 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [[ "$output" == *"allow=$ALL5 "* ]]
 }
 
+@test "a stamped store with no verified model still warms it under the install lock" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_OK=1
+  fake_install; stamp_store
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=$ALL5 "* ]]
+  [ -s "$DATA/model-verified" ]
+  [ ! -e "$DATA/.install.lock" ]
+  # A live installer holding the lock: the launcher does not load the model
+  # concurrently, and a stamped store still keeps its write tools.
+  rm -f "$DATA/model-verified"
+  mkdir -p "$DATA/.install.lock"; printf '%s' "$$" > "$DATA/.install.lock/pid"
+  export RUVECTOR_INSTALL_WAIT=6
+  launch "$REPO"
+  [[ "$output" == *"allow=$ALL5 "* ]]
+  rm -rf "$DATA/.install.lock"
+}
+
 @test "heals a linked worktree's .ruvector before exec" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
