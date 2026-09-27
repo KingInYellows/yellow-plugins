@@ -417,13 +417,23 @@ coedit_prune_sessions() {
           fi
           coedit_unlock_path ".${sid}.lock"
         done
-      # Expired reclaim markers of sessions that no longer exist. Bounded by
-      # time and by removals (50), not by entries looked at, and started at a
-      # random entry, so markers that must stay (a live session's, or one
-      # that is not empty) never keep the sweep from reaching later ones.
-      markers=( .*.lock.reclaim.* )
-      total=${#markers[@]} tried=0 removed=0
-      i=$(( ((RANDOM << 15) | RANDOM) % total ))
+      # Expired reclaim markers of sessions that no longer exist. Discovery
+      # is a top-level find under a 2s bound feeding a random sample of at
+      # most 500 names (O(sample) memory, never a full glob), and the sweep
+      # is bounded by time and by removals (50), not by entries looked at, so
+      # markers that must stay (a live session's, or one that is not empty)
+      # never keep it from reaching later ones.
+      nl='
+'
+      markers=()
+      while IFS= read -r m; do markers+=("${m#./}"); done < <(
+        run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" 2>/dev/null \
+          | LC_ALL=C awk -v k=500 'BEGIN { srand() }
+              { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
+              END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
+      )
+      total=${#markers[@]} tried=0 removed=0 i=0
+      [ "$total" -eq 0 ] || i=$(( ((RANDOM << 15) | RANDOM) % total ))
       while [ "$tried" -lt "$total" ] && [ "$removed" -lt 50 ] && [ "$SECONDS" -lt 5 ]; do
         m=${markers[$(( (i + tried) % total ))]}
         tried=$((tried + 1))
