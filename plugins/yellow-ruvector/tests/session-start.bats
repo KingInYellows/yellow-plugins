@@ -679,6 +679,24 @@ END"
   [ "$(cat "$cursor")" = "../.coedit.lock.stale.a3" ]
 }
 
+@test "each stale-tree deletion is bounded; a slow rm never runs past it" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.stale.a1" 2>/dev/null || skip "touch -d unsupported"
+  rb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$rb" "$(command -v rm)" > "$rb/rm"
+  chmod +x "$rb/rm"
+  PATH="$rb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 60); do [ -s "$rb/pids" ] && break; sleep 0.1; done
+  [ -s "$rb/pids" ]
+  sleep 3
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$rb/pids"
+}
+
 @test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"

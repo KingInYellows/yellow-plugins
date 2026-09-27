@@ -720,3 +720,11 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   ! grep -rq 'IGNORE' "$RUVECTOR_DIR/coedit-sessions" 2>/dev/null
   [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
 }
+
+@test "a NUL in the stored last path is rejected, never aliased to a real path" {
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  now=$(date +%s)
+  printf '{"last":"src/a.ts\\u0000","epoch":%s}' "$now" > "$RUVECTOR_DIR/coedit-sessions/u1"
+  edit u1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+}
