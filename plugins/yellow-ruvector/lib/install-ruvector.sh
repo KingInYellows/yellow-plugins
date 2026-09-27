@@ -496,6 +496,8 @@ yellow_ruvector_do_install() {
   case "$reuse" in ''|*[!0-9]*) reuse=20 ;; esac
   [ "${#reuse}" -le 6 ] || reuse=20
   reuse=$((10#$reuse)); [ "$reuse" -ge 1 ] || reuse=1
+  # Both reuse probes share this one deadline.
+  local t0=$SECONDS
   hash=$(yellow_ruvector_lock_hash) || {
     printf 'yellow-ruvector: cannot hash %s/package-lock.json\n' "$(yellow_ruvector_flat "$CLAUDE_PLUGIN_ROOT")" >&2
     return 1
@@ -511,6 +513,7 @@ yellow_ruvector_do_install() {
   if [ -z "${_YR_KNOWN_UNHEALTHY:-}" ] \
      && [ -f "${final}/node_modules/ruvector/bin/cli.js" ] \
      && yellow_ruvector_install_healthy "$(( reuse < 10 ? reuse : 10 ))" \
+     && reuse=$(( reuse - (SECONDS - t0) )) && [ "$reuse" -ge 1 ] \
      && yellow_ruvector_run_bounded "$reuse" node "${final}/node_modules/ruvector/bin/cli.js" mcp start --help >/dev/null 2>&1; then
     yellow_ruvector_swap_current "install-${hash}" || return 1
     yellow_ruvector_prune "install-${hash}" "${prev##*/}"
@@ -595,14 +598,27 @@ yellow_ruvector_do_install() {
 # Point `current` at $1 (a sibling dir name). Atomic with GNU mv -T;
 # otherwise ln -sfn (a tiny unlink/symlink window, acceptable on BSD).
 yellow_ruvector_swap_current() {
-  local target="$1" tmp_link="${RUVECTOR_DATA}/.current.tmp.$$"
-  rm -f -- "$tmp_link" 2>/dev/null
-  if ln -s "$target" "$tmp_link" 2>/dev/null \
-     && mv -T "$tmp_link" "${RUVECTOR_DATA}/current" 2>/dev/null; then
-    return 0
+  local target="$1" tmp_link="${RUVECTOR_DATA}/.current.tmp.$$" cur="${RUVECTOR_DATA}/current" old
+  # A real directory or file at `current` (a damaged or legacy data dir)
+  # would take the link *inside* it and never be replaced: move it aside
+  # first (only this plugin writes here) and delete it after.
+  old=""
+  if [ -e "$cur" ] && [ ! -L "$cur" ]; then
+    old="${RUVECTOR_DATA}/.current.old.$$"
+    rm -rf -- "$old" 2>/dev/null
+    mv -- "$cur" "$old" 2>/dev/null || return 1
   fi
   rm -f -- "$tmp_link" 2>/dev/null
-  ln -sfn "$target" "${RUVECTOR_DATA}/current"
+  if ln -s "$target" "$tmp_link" 2>/dev/null \
+     && mv -T "$tmp_link" "$cur" 2>/dev/null; then
+    :
+  else
+    rm -f -- "$tmp_link" 2>/dev/null
+    ln -sfn "$target" "$cur" 2>/dev/null
+  fi
+  [ -n "$old" ] && rm -rf -- "$old" 2>/dev/null
+  # Success only when `current` really is the link to <target> now.
+  [ -L "$cur" ] && [ "$(readlink "$cur")" = "$target" ]
 }
 
 # yellow_ruvector_take_lease <install-name> — mark that this process (its
