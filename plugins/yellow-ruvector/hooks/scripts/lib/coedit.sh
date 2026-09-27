@@ -278,11 +278,17 @@ coedit_mtime() {
 }
 
 # coedit_older_than <epoch-mtime> <secs> — true when the mtime is numeric and
-# more than <secs> seconds ago (no GNU/BSD find -mmin differences).
+# more than <secs> seconds ago, or implausibly far in the future (no GNU/BSD
+# find -mmin differences).
 coedit_older_than() {
   local now
   case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac
+  [ "${#1}" -le 12 ] || return 0
   now=$(date +%s)
+  # More than 10 minutes in the future (a clock rollback, a restored
+  # store) is not a real timestamp: counted as old, or a lock or marker
+  # with it would block its reclaim until the clock caught up.
+  [ $(($1 - now)) -le 600 ] || return 0
   [ $((now - $1)) -gt "$2" ]
 }
 
@@ -369,6 +375,9 @@ coedit_record() {
   sdir="${dir}/coedit-sessions"
   # A symlinked session dir (from a hostile checkout) could point anywhere.
   [ -L "$sdir" ] && return 0
+  # A file or FIFO there (a restored or corrupted store) would stop every
+  # edit from recording: it is unlinked so the directory can be created.
+  if [ -e "$sdir" ] && [ ! -d "$sdir" ]; then rm -f -- "$sdir" 2>/dev/null; fi
   mkdir -p "$sdir" 2>/dev/null || return 0
   sfile="${sdir}/${sid}"
   slock="${sdir}/.${sid}.lock"
