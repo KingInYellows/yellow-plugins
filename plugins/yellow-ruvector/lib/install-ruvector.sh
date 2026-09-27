@@ -42,11 +42,15 @@ yellow_ruvector_data_dir() {
 
 # yellow_ruvector_canon <abs-path> — portable stand-in for `realpath -m`
 # (BSD/macOS lack -m): resolve symlinks in the longest existing ancestor with
-# `cd -P`, then append the components that do not exist yet.
+# `cd -P`, then append the components that do not exist yet (a dangling
+# symlink among them fails).
 yellow_ruvector_canon() {
   local head="$1" tail=""
   case "$head" in /*) ;; *) return 1 ;; esac
   while [ ! -d "$head" ]; do
+    # A dangling symlink is not a missing component: its target could
+    # appear later, outside the prefix this lexical path passed. Refuse it.
+    [ -L "$head" ] && return 1
     tail="/${head##*/}${tail}"
     head="${head%/*}"
     [ -n "$head" ] || head="/"
