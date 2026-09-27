@@ -847,3 +847,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ ! -s "$outside" ]
   jq -e '.version == 1' "$RUVECTOR_DIR/coedit.json" >/dev/null
 }
+
+@test "the input parse is charged against the lock budget" {
+  sb="$BATS_TEST_TMPDIR/sleepbin"; mkdir -p "$sb"
+  printf '#!/bin/sh\n[ "$1" = 0.05 ] && echo x >> "%s/waits"\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v sleep)" > "$sb/sleep"
+  chmod +x "$sb/sleep"
+  edit pc "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  rm -f "$BATS_TEST_TMPDIR/waits"
+  event pc Edit "$PROJECT_ROOT/src/b.ts" | PATH="$sb:$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  # 8 tries less the parse's 3.
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/waits")" -eq 5 ]
+}

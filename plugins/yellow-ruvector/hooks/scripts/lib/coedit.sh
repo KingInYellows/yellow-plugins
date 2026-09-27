@@ -173,9 +173,12 @@ coedit_store_dir() {
 # COEDIT_LOCK_TRIES, less COEDIT_WT_TRIES when <store-dir> is another
 # worktree's store (coedit_store_dir spent up to COEDIT_WT_SECS finding it).
 coedit_reset_tries() {
-  _coedit_tries_left=$COEDIT_LOCK_TRIES
+  # _COEDIT_SPENT_TRIES: budget a caller already used before recording
+  # (post-tool-use.sh's bounded input parse).
+  _coedit_tries_left=$(( COEDIT_LOCK_TRIES - ${_COEDIT_SPENT_TRIES:-0} ))
+  [ "$_coedit_tries_left" -ge 0 ] || _coedit_tries_left=0
   [ "$2" = "$(CDPATH= cd -- "$1" 2>/dev/null && pwd -P)/.ruvector" ] && return 0
-  _coedit_tries_left=$((COEDIT_LOCK_TRIES - COEDIT_WT_TRIES))
+  _coedit_tries_left=$((_coedit_tries_left - COEDIT_WT_TRIES))
   [ "$_coedit_tries_left" -ge 0 ] || _coedit_tries_left=0
 }
 

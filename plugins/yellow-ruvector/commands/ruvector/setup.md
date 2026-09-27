@@ -140,6 +140,9 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 yellow_ruvector_validate_paths || exit 1
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+# Lease this version's install before resolving it (as status and the
+# CLI wrapper do), so another version's prune keeps it through the checks.
+RV_HASH=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${RV_HASH}"
 ENTRY=$(yellow_ruvector_pinned_entry)
 
 printf '=== Hook Scripts ===\n'
