@@ -205,7 +205,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 | pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit / pre-command side effects                    |
 | prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
 | session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
-| post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | Record explicit edit/bash outcomes; unknown is not saved |
+| post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | No-op (allow JSON only); `hooks post-edit` / `post-command` are never called — they write hash-embedded memories (ADR-210) |
 | stop               | Stop             | `stop.sh`               | 10s         | Run ruvector hooks session-end                         |
 
 **Security properties:**
