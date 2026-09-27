@@ -810,7 +810,14 @@ yellow_ruvector_run_bounded() {
   ( sleep "$secs"; [ -n "$flag" ] && : > "$flag/fired"; tree=$(yellow_ruvector_tree "$pid")
     # shellcheck disable=SC2086
     kill -TERM $tree 2>/dev/null
-    sleep 1
+    # The 1s grace ends as soon as the whole tree is gone (zombies count as
+    # gone), so a command that exits on TERM costs its caller no extra time.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      alive=""
+      for p in $tree; do yellow_ruvector_running "$p" && { alive=1; break; }; done
+      [ -n "$alive" ] || exit 0
+      sleep 0.05
+    done
     # shellcheck disable=SC2086
     kill -KILL $tree $(yellow_ruvector_tree "$pid") 2>/dev/null ) \
     </dev/null >/dev/null 2>&1 &
