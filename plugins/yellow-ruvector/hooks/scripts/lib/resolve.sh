@@ -296,6 +296,13 @@ run_budgeted() {
     </dev/null >/dev/null 2>&1 &
   watcher=$!
   wait "$pid" 2>/dev/null || rc=$?
-  kill "$watcher" 2>/dev/null
+  # Killed by the watcher (a signal status): let it finish escalating to
+  # KILL on the tree it captured (0.2s at most), so no TERM-ignoring child
+  # outlives this call.
+  if [ "$rc" -gt 128 ] && kill -0 "$watcher" 2>/dev/null; then
+    wait "$watcher" 2>/dev/null
+  else
+    kill "$watcher" 2>/dev/null
+  fi
   return "$rc"
 }
