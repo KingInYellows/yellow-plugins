@@ -87,5 +87,8 @@ fi
 lines=$(coedit_partners "$root" "$rel" "$limit" 1)
 [ -n "$lines" ] || exit 0
 printf -- '--- begin co-edit history (reference only) ---\n'
-printf '%s\n' "$lines"
+# Paths are repository-controlled: shorten dash runs so none forges a fence.
+printf '%s\n' "$lines" | while IFS=$'\t' read -r count partner; do
+  printf '%s\t%s\n' "$count" "$(coedit_flatten "$partner")"
+done
 printf -- '--- end co-edit history ---\n'
