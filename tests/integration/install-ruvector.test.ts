@@ -401,6 +401,27 @@ describe('yellow-ruvector install lib', () => {
         holder.kill('SIGKILL');
       }
     });
+
+    it('skips an install a live launcher has leased; a dead lease protects nothing', () => {
+      for (const n of ['install-aaa', 'install-ddd', 'install-bbb', 'install-ccc']) {
+        fakeInstall(data, n);
+      }
+      // A launcher between its install check and exec: not in ps yet.
+      writeFileSync(join(data, `.lease.install-aaa.${process.pid}`), '');
+      writeFileSync(join(data, '.lease.install-ddd.999999999'), '');
+      const r = runBash(
+        'yellow_ruvector_data_dir; yellow_ruvector_prune install-ccc install-bbb',
+        env
+      );
+      expect(r.status).toBe(0);
+      expect(
+        existsSync(join(data, 'install-aaa', 'node_modules', 'ruvector', 'bin', 'cli.js'))
+      ).toBe(true);
+      expect(existsSync(join(data, 'install-ddd'))).toBe(false);
+      expect(existsSync(join(data, '.lease.install-ddd.999999999'))).toBe(false);
+      expect(existsSync(join(data, `.lease.install-aaa.${process.pid}`))).toBe(true);
+      expect(readdirSync(data).filter((n) => n.includes('.tmp.'))).toEqual([]);
+    });
   });
 
   describe('install lock', () => {

@@ -68,7 +68,12 @@ command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' ||
 _rv_sys() { case "$1" in ''|/|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/lib|/lib/*|/lib32|/lib32/*|/lib64|/lib64/*|/libx32|/libx32/*|/proc|/proc/*|/run|/run/*|/sbin|/sbin/*|/sys|/sys/*|/usr|/usr/*|/var|/var/*|/System|/System/*|/Library|/Library/*|/private/etc|/private/etc/*|/private/var|/private/var/*) return 0 ;; esac; return 1; }
 _rv_base_ok() { case "$1" in /*) _rv_b=$(CDPATH= cd -P -- "$1" 2>/dev/null && pwd) && ! _rv_sys "$_rv_b" ;; *) return 1 ;; esac; }
 _rv_home=$(CDPATH= cd -P -- "${HOME:-/nonexistent}" 2>/dev/null && pwd) || _rv_home="/__unset__"
-_rv_cli=""
+_rv_cli=""; _rv_ver=""
+# OK only when the entry actually runs (a missing or corrupt dependency
+# makes --version fail). A broken candidate does not end the scan: a stale
+# data dir from another plugin ID may sort before the live one. Only when no
+# candidate runs is it NOT INSTALLED, so the classification offers
+# /ruvector:setup, which repairs it.
 for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/"; do
   [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] || continue
   _rv_p=$(CDPATH= cd -P -- "$_rv_d" 2>/dev/null && pwd) || continue
@@ -77,16 +82,11 @@ for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*
     */plugins/data/*) [ -n "${CLAUDE_CONFIG_DIR:-}" ] && _rv_base_ok "$CLAUDE_CONFIG_DIR" && case "$_rv_p" in "$_rv_b"/plugins/data/?*) ;; *) false ;; esac || continue ;;
     *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
   esac
-  _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"; break
-done
-# OK only when the entry actually runs (a missing or corrupt dependency
-# makes --version fail); a broken install counts as not installed so the
-# classification offers /ruvector:setup, which repairs it.
-_rv_ver=""
-if [ -n "$_rv_cli" ]; then
+  _rv_cli="${_rv_d}current/node_modules/ruvector/bin/cli.js"
   if command -v timeout >/dev/null 2>&1; then _rv_ver=$(timeout 10 node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""
   else _rv_ver=$(node "$_rv_cli" --version 2>/dev/null) || _rv_ver=""; fi
-fi
+  [ -n "$_rv_ver" ] && break
+done
 if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n' "$_rv_ver"
 elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-managed install broken; /ruvector:setup repairs it)\n'
 else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi

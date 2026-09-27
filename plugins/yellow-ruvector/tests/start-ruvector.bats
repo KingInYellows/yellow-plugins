@@ -42,6 +42,9 @@ case "$2 $3" in
     fi
     exit 0 ;;
   "mcp start")
+    # The launcher's lease names this pid (exec keeps it).
+    [ -n "${FAKE_LEASE_OUT:-}" ] && [ -e "$CLAUDE_PLUGIN_DATA/.lease.${FAKE_LEASE_NAME}.$$" ] \
+      && echo leased > "$FAKE_LEASE_OUT"
     printf 'EXEC pwd=%s allow=%s entry=%s\n' "$(pwd -P)" "$RUVECTOR_MCP_ALLOW" "$1"
     exit 0 ;;
 esac
@@ -92,6 +95,16 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ "$status" -eq 0 ]
   [[ "$output" == "EXEC pwd=$(cd "$REPO" && pwd -P) allow=$ALL5 entry=$DATA/install-$(lock_hash)/node_modules/ruvector/bin/cli.js" ]]
   [ ! -e "$REPO/src/deep/.ruvector" ]
+}
+
+@test "the server runs under a lease on its install, so a concurrent prune skips it" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
+  export FAKE_LEASE_OUT="$BATS_TEST_TMPDIR/lease" FAKE_LEASE_NAME="install-$(lock_hash)"
+  fake_install; stamp_store
+  launch "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$FAKE_LEASE_OUT")" = leased ]
 }
 
 @test "fresh store + no cached model + failed warm-up starts read-only (no write tools)" {
