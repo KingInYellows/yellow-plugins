@@ -649,6 +649,36 @@ exit 0'
   [ ! -e "$d" ]
 }
 
+@test "a symlink planted at the sweep cursor is never written through" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"
+  ln -s "$outside" "$sd/.stale-sweep-cursor"
+  for n in a1 a2 a3; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  COEDIT_STALE_WINDOW=2 run run_hook '{"cwd":""}'
+  for _ in $(seq 1 40); do [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ] && break; sleep 0.1; done
+  [ -z "$(ls -A "$outside")" ]
+  [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ]
+}
+
+@test "a stale-tree name holding a newline cannot fake a completed scan" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  cursor="$sd/.stale-sweep-cursor"
+  for n in a1 a2 a3 a4 a5 a6; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.x
+END"
+  printf '%s\n' "../.coedit.lock.stale.a3" > "$cursor"
+  # The scan times out after listing everything, the forged name included.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) %s "$@"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  COEDIT_STALE_WINDOW=2 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 6
+  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a3" ]
+}
+
 @test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"

@@ -452,14 +452,18 @@ coedit_prune_sessions() {
         [ "${#cur}" -le 1024 ] || cur=""
       fi
       ctl="" found=() stale=()
-      # Every find result starts with "." ("./…" or "../…"), so END can only
-      # be the marker that both finds completed, and the awk's first output
-      # line (CURSOR<TAB>… or KEEP) can only be its control line.
+      # Names holding a newline are never listed (every tree a reclaim renames
+      # aside has a plain name), so each find line is one whole name starting
+      # with "." ("./…" or "../…"): END can only be the marker that both
+      # finds completed, and the awk's first output line (CURSOR<TAB>… or
+      # KEEP) can only be its control line.
+      nl='
+'
       while IFS= read -r m; do
         if [ -z "$ctl" ]; then ctl="$m"; else found+=("$m"); fi
       done < <(
-        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*'; a=$?
-          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*'; b=$?
+        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.stale.*' ! -name "*${nl}*"; a=$?
+          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.stale.*' ! -name "*${nl}*"; b=$?
           [ "$a" -eq 0 ] && [ "$b" -eq 0 ] && printf 'END\n'; } 2>/dev/null \
           | COEDIT_CUR="$cur" LC_ALL=C awk -v k="$win" '
               function sw(i, j,  t) { t = h[i]; h[i] = h[j]; h[j] = t }
@@ -502,8 +506,12 @@ coedit_prune_sessions() {
         CURSOR$'\t'*) next=${ctl#CURSOR$'\t'} ;;
         *) next="$cur" ;;
       esac
-      if [ "$next" != "$cur" ] && ctmp=$(mktemp .stale-sweep-cursor.XXXXXX 2>/dev/null); then
-        printf '%s\n' "$next" > "$ctmp" && mv -f -- "$ctmp" .stale-sweep-cursor || rm -f -- "$ctmp"
+      if [ "$next" != "$cur" ]; then
+        # The session dir is project data: a symlink planted at the cursor
+        # path is removed (never followed), and coedit_write_atomic replaces
+        # only a regular file, so the rename cannot land outside the dir.
+        [ -L .stale-sweep-cursor ] && rm -f -- .stale-sweep-cursor
+        printf '%s\n' "$next" | coedit_write_atomic .stale-sweep-cursor || true
       fi
       for m in ${found[@]+"${found[@]}"}; do
         [ -d "$m" ] && [ ! -L "$m" ] && stale+=("$m")
