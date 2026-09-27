@@ -386,14 +386,6 @@ yellow_ruvector_reclaim_dir() {
 }
 
 # Idempotent; safe from traps and again before exec.
-# yellow_ruvector_kill_tree <pid> <signal> — signal <pid> and every
-# descendant (pgrep -P walk; just <pid> where pgrep is missing).
-yellow_ruvector_kill_tree() {
-  local c
-  for c in $(pgrep -P "$1" 2>/dev/null); do yellow_ruvector_kill_tree "$c" "$2"; done
-  kill "-$2" "$1" 2>/dev/null
-}
-
 # yellow_ruvector_stop_warm — stop a running model warm-up (its whole process
 # tree: TERM, then KILL after ~1s) and reap it. Called before the install
 # lock is released, so a warm-up never outlives the lock that guards the
@@ -403,13 +395,7 @@ yellow_ruvector_stop_warm() {
   [ -n "$pid" ] || return 0
   _YR_WARM_PID=""
   kill -0 "$pid" 2>/dev/null || { wait "$pid" 2>/dev/null; return 0; }
-  yellow_ruvector_kill_tree "$pid" TERM
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    kill -0 "$pid" 2>/dev/null || break
-    sleep 0.1
-  done
-  kill -0 "$pid" 2>/dev/null && yellow_ruvector_kill_tree "$pid" KILL
-  wait "$pid" 2>/dev/null
+  yellow_ruvector_stop_tree "$pid"
   return 0
 }
 
@@ -419,13 +405,41 @@ yellow_ruvector_stop_npm() {
   local pid="${_YR_NPM_PID:-}" i
   [ -n "$pid" ] || return 0
   _YR_NPM_PID=""
-  yellow_ruvector_kill_tree "$pid" TERM
+  yellow_ruvector_stop_tree "$pid"
+  return 0
+}
+
+# yellow_ruvector_stop_tree <pid> — TERM <pid> and its descendants, then
+# KILL whatever of that tree is still running ~1s later, and reap <pid>.
+# The tree is captured before TERM and escalation checks every member, not
+# only <pid>: a wrapper that exits on TERM reparents a child that ignores
+# it, and that child must not keep writing after the lock is released.
+yellow_ruvector_stop_tree() {
+  local pid="$1" tree p i alive
+  tree=$(yellow_ruvector_tree "$pid")
+  # shellcheck disable=SC2086
+  kill -TERM $tree 2>/dev/null
   for i in 1 2 3 4 5 6 7 8 9 10; do
-    kill -0 "$pid" 2>/dev/null || break
+    alive=""
+    for p in $tree; do yellow_ruvector_running "$p" && { alive=1; break; }; done
+    [ -n "$alive" ] || break
     sleep 0.1
   done
-  kill -0 "$pid" 2>/dev/null && yellow_ruvector_kill_tree "$pid" KILL
+  if [ -n "$alive" ]; then
+    # Children forked since the capture are only found while <pid> lives.
+    for p in $tree $(yellow_ruvector_tree "$pid"); do
+      yellow_ruvector_running "$p" && kill -KILL "$p" 2>/dev/null
+    done
+  fi
   wait "$pid" 2>/dev/null
+  return 0
+}
+
+# yellow_ruvector_running <pid> — <pid> exists and is not a zombie (an
+# unreaped child still answers kill -0).
+yellow_ruvector_running() {
+  kill -0 "$1" 2>/dev/null || return 1
+  case "$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')" in Z*) return 1 ;; esac
   return 0
 }
 
