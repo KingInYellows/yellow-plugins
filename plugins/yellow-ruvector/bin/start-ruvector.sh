@@ -89,7 +89,9 @@ ensure_pinned_install() {
       yellow_ruvector_trap_release
       if needs_install; then
         log "installing ruvector into ${RUVECTOR_DATA}..."
-        if ! yellow_ruvector_do_install; then
+        # The reuse probes get what is left of the budget (at least 1s).
+        left=$(budget_left); [ "$left" -ge 1 ] || left=1
+        if ! yellow_ruvector_do_install "$left"; then
           log "install failed. Run /ruvector:setup to diagnose."
           exit 1
         fi

@@ -46,6 +46,7 @@ case "$2 $3" in
     fi
     exit 0 ;;
   "mcp start")
+    [ -n "${FAKE_MCP_HANG:-}" ] && exec sleep 60
     # The launcher's lease names this pid (exec keeps it).
     [ -n "${FAKE_LEASE_OUT:-}" ] && [ -e "$CLAUDE_PLUGIN_DATA/.lease.${FAKE_LEASE_NAME}.$$" ] \
       && echo leased > "$FAKE_LEASE_OUT"
@@ -559,6 +560,19 @@ SH
   [ ! -e "$final/old-marker" ]
   # The live path is never the target of a recursive delete.
   ! grep -qx -- "-rf -- $final" "$BATS_TEST_TMPDIR/rm.log"
+}
+
+@test "the rollback reuse probes stay inside the budget the caller passes" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  final="$DATA/install-$(lock_hash)"; mkdir -p "$final/node_modules/ruvector/bin"
+  : > "$final/node_modules/ruvector/bin/cli.js"
+  nb="$BATS_TEST_TMPDIR/npmbin"; mkdir -p "$nb"
+  printf '#!/bin/sh\nexit 1\n' > "$nb/npm"; chmod +x "$nb/npm"
+  start=$SECONDS
+  FAKE_MCP_HANG=1 run --separate-stderr bash -c '. "$1/lib/install-ruvector.sh"; export CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PLUGIN_DATA="$2"
+    PATH="$3:$4:$PATH"; yellow_ruvector_validate_paths && yellow_ruvector_do_install 2' _ "$PLUGIN" "$DATA" "$nb" "$STUBS"
+  [ "$status" -ne 0 ]
+  [ $((SECONDS - start)) -le 8 ]
 }
 
 @test "an install smoke test that hangs is bounded, never holding the installer" {
