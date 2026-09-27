@@ -597,6 +597,21 @@ exit 0'
   [ "$status" -eq 0 ]
   for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/dead" ] || break; sleep 0.1; done
   [ ! -e "$RUVECTOR_DIR/coedit-sessions/dead" ]
+  sleep 0.3
+  # No lock or reclaim marker is left behind for the pruned session.
+  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
+}
+
+@test "expired reclaim markers of vanished sessions are swept" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/live"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2" 2>/dev/null || skip "touch -d unsupported"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" ]
+  [ -e "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2" ]
 }
 
 @test "never prunes through a symlinked co-edit session dir" {
