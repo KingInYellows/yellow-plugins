@@ -405,6 +405,16 @@ related_staged() {
   [ $(( (end - start) / 1000000 )) -lt 800 ]
 }
 
+@test "rejected candidates sharing a deep prefix leave budget for a valid partner below them" {
+  deep=$(printf 'd/%.0s' $(seq 1 120)); deep="src/${deep%/}"
+  mkdir -p "$PROJECT_ROOT/$deep" "$BATS_TEST_TMPDIR/out"; : > "$BATS_TEST_TMPDIR/out/f.ts"
+  for i in $(seq 0 12); do ln -s "$BATS_TEST_TMPDIR/out" "$PROJECT_ROOT/$deep/l$i"; done
+  jq -n --arg d "$deep" '{version:1, pairs:{"src/a.ts": (([range(0;13)] | map({key:"\($d)/l\(.)/f.ts", value:9}) | from_entries) + {"src/b.ts": 4})}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  [[ "$(ctx "$output")" == *"src/b.ts"* ]]
+  [[ "$(ctx "$output")" != *"/l"* ]]
+}
+
 @test "surfaced stays under the size cap with multibyte paths" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   long=$(printf '\xe6\xbc\xa2%.0s' $(seq 1 160))

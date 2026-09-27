@@ -804,18 +804,26 @@ coedit_partner_ok() {
       # budgeted subshell: a store full of symlinked-dir partners must not
       # use up the checks the real partners below them need. The walk has
       # its own total budget per lookup (_coedit_comp_left), so hundreds of
-      # deep candidates stay inside the hook's 1s.
-      local rest="$d/" pre=""
+      # deep candidates stay inside the hook's 1s. The prefix the last walk
+      # verified (_coedit_good_pre) is not walked or charged again, so
+      # rejected candidates sharing a deep prefix cannot use up the budget
+      # the partners below them need.
+      local rest="$d/" pre="" comp g="${_coedit_good_pre:-}"
+      if [ -n "$g" ] && [ "${rest#"$g"}" != "$rest" ]; then
+        pre="$g"; rest="${rest#"$g"}"
+      fi
       while [ -n "$rest" ]; do
         [ "${_coedit_comp_left:-0}" -gt 0 ] || return 1
         _coedit_comp_left=$((_coedit_comp_left - 1))
-        pre="${pre}${rest%%/*}"; rest="${rest#*/}"
-        if [ -L "${root}/${pre}" ] || [ ! -d "${root}/${pre}" ]; then
+        comp="${rest%%/*}"; rest="${rest#*/}"
+        if [ -L "${root}/${pre}${comp}" ] || [ ! -d "${root}/${pre}${comp}" ]; then
+          _coedit_good_pre="$pre"
           _coedit_bad_dirs="${_coedit_bad_dirs:-}"$'\n'"$d"$'\n'
           return 1
         fi
-        pre="${pre}/"
+        pre="${pre}${comp}/"
       done
+      _coedit_good_pre="$pre"
       [ "${_coedit_phys_left:-0}" -gt 0 ] || return 1
       _coedit_phys_left=$((_coedit_phys_left - 1))
       phys=$(CDPATH= cd -- "${root}/${d}" 2>/dev/null && pwd -P) || return 1
@@ -850,7 +858,7 @@ coedit_partners() {
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
   _coedit_phys_left=${COEDIT_PHYS_CHECKS:-50}
   _coedit_comp_left=${COEDIT_COMP_CHECKS:-1500}
-  _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'
+  _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'; _coedit_good_pre=""
   # Capture the candidates first: streamed through a pipe, a large list
   # would block jq on the full pipe while the validation loop runs, and the
   # jq time bound would then cut the list short.
