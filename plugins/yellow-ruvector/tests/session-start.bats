@@ -757,13 +757,12 @@ END"
   [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions")" ]
 }
 
-@test "reclaim markers that must stay never keep the sweep from later ones" {
+@test "reclaim markers that cannot be removed never keep the sweep from later ones" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
-  # 60 expired markers of live sessions sort before the vanished one.
+  # 60 expired markers that are not empty sort before the removable one.
   for i in $(seq 10 69); do
-    : > "$sd/a$i"
-    mkdir -p "$sd/.a$i.lock.reclaim.1-1"
+    mkdir -p "$sd/.a$i.lock.reclaim.1-1/keep"
     touch -d '20 minutes ago' "$sd/.a$i.lock.reclaim.1-1" 2>/dev/null || skip "touch -d unsupported"
   done
   d="$sd/.zz.lock.reclaim.1-1"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
@@ -783,20 +782,29 @@ END"
   [ "$status" -eq 0 ]
   for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
   [ -s "$fb/pids" ]
-  sleep 4
+  sleep 6
   while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
 }
 
-@test "expired reclaim markers of vanished sessions are swept" {
+@test "expired reclaim markers are swept, session and store locks alike; recent ones stay" {
   make_ruvector_stub 'exit 0'
-  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2"
-  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/live"
-  touch -d '20 minutes ago' "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2" 2>/dev/null || skip "touch -d unsupported"
+  sd="$RUVECTOR_DIR/coedit-sessions"
+  mkdir -p "$sd/.gone.lock.reclaim.1-1" "$sd/.live.lock.reclaim.2-2" "$sd/.live.lock.reclaim.3-3" \
+    "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4"
+  echo '{}' > "$sd/live"
+  touch -d '20 minutes ago' "$sd/.gone.lock.reclaim.1-1" "$sd/.live.lock.reclaim.2-2" \
+    "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" 2>/dev/null || skip "touch -d unsupported"
   run run_hook '{"cwd":""}'
   [ "$status" -eq 0 ]
-  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" ] || break; sleep 0.1; done
-  [ ! -e "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" ]
-  [ -e "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2" ]
+  for i in $(seq 1 40); do
+    [ -e "$sd/.gone.lock.reclaim.1-1" ] || [ -e "$sd/.live.lock.reclaim.2-2" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$sd/.gone.lock.reclaim.1-1" ]
+  [ ! -e "$sd/.live.lock.reclaim.2-2" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" ]
+  # Under 10 minutes old: a reclaim of that generation may still be running.
+  [ -d "$sd/.live.lock.reclaim.3-3" ]
 }
 
 @test "never prunes through a symlinked co-edit session dir" {

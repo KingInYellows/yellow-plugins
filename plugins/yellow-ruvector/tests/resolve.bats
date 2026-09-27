@@ -278,6 +278,22 @@ fake_install() {
   [ "$status" -eq 0 ]
 }
 
+@test "resolve_bin: never runs a CLI under a data dir the launcher would refuse" {
+  command -v node >/dev/null 2>&1 || skip "node not available"
+  [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -ge 20 ] || skip "node < 20 on this host"
+  # A data dir that escapes the allowed prefixes through a symlink.
+  out=$(mktemp -d /var/tmp/yr-outside.XXXXXX 2>/dev/null) || skip "no writable dir outside HOME and /tmp"
+  h=$(own_hash)
+  mkdir -p "$out/install-$h/node_modules/ruvector/bin"
+  : > "$out/install-$h/node_modules/ruvector/bin/cli.js"
+  ln -s "$out" "$BATS_TEST_TMPDIR/escape"
+  run env CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PLUGIN_DATA="$BATS_TEST_TMPDIR/escape" \
+    bash -c 'unset RUVECTOR_BIN; . "$1"; ruvector_resolve_bin && printf "%s" "${RUVECTOR_CMD[*]}"' _ "$LIB"
+  rm -rf "$out"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *cli.js* ]]
+}
+
 @test "heal_store: never replaces a real directory (warns instead)" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   git -C "$WORK" init -q

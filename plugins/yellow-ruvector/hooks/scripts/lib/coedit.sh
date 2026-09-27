@@ -201,16 +201,9 @@ coedit_lock_path() {
       # reclaim can proceed, however many other markers sort before it.
       [ -d "$marker" ] && [ ! -L "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600 \
         && rmdir "$marker" 2>/dev/null
-      # Other markers: bounded to 5 per reclaim, so a checkout shipping many
-      # (possibly non-removable) markers cannot eat the hook's 1s budget.
-      local _pruned=0 _m
-      for _m in "${lock}".reclaim.*; do
-        [ "$_pruned" -lt 5 ] || break
-        [ "$_m" = "$marker" ] && continue
-        _pruned=$((_pruned + 1))
-        [ -d "$_m" ] && coedit_older_than "$(coedit_mtime "$_m")" 600 \
-          && rmdir "$_m" 2>/dev/null
-      done
+      # Other generations' markers are never listed here (a checkout can
+      # ship any number of them, and even a glob would eat the hook's 1s
+      # budget): the SessionStart worker sweeps expired ones, bounded.
       # A stale lock may not be empty (a checkout or crash can leave files
       # in it): rename it aside atomically (that alone frees the lock), then
       # remove the renamed copy in a detached job, so a large tree never
@@ -417,17 +410,21 @@ coedit_prune_sessions() {
           fi
           coedit_unlock_path ".${sid}.lock"
         done
-      # Expired reclaim markers of sessions that no longer exist. Discovery
-      # is a top-level find under a 2s bound feeding a random sample of at
+      # Expired reclaim markers (over 10 minutes old, long after any reclaim
+      # of that generation finished), of the session locks here and of the
+      # store lock in the store dir; the hooks never list them. Discovery is
+      # top-level finds under a 2s bound each feeding a random sample of at
       # most 500 names (O(sample) memory, never a full glob), and the sweep
       # is bounded by time and by removals (50), not by entries looked at, so
-      # markers that must stay (a live session's, or one that is not empty)
-      # never keep it from reaching later ones.
+      # markers that cannot be removed (not empty) never keep it from
+      # reaching later ones.
       nl='
 '
       markers=()
       while IFS= read -r m; do markers+=("${m#./}"); done < <(
-        run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" 2>/dev/null \
+        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*"
+          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*"
+        } 2>/dev/null \
           | LC_ALL=C awk -v k=500 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
@@ -438,8 +435,6 @@ coedit_prune_sessions() {
         m=${markers[$(( (i + tried) % total ))]}
         tried=$((tried + 1))
         [ -d "$m" ] && [ ! -L "$m" ] || continue
-        s="${m#.}"; s="${s%%.lock.reclaim.*}"
-        [ -e "$s" ] && continue
         coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null && removed=$((removed + 1))
       done
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
