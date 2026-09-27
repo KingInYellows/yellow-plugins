@@ -541,6 +541,18 @@ exit 0'
   [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
 }
 
+@test "session files just over seven days old are pruned; ones just under stay" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  echo '{}' > "$sd/over"; echo '{}' > "$sd/under"
+  touch -d '7 days ago 12 hours ago' "$sd/over" 2>/dev/null || skip "touch -d unsupported"
+  touch -d '6 days ago 23 hours ago' "$sd/under"
+  run run_hook '{"cwd":""}'
+  for i in $(seq 1 30); do [ -e "$sd/over" ] || break; sleep 0.1; done
+  [ ! -e "$sd/over" ]
+  [ -e "$sd/under" ]
+}
+
 @test "abandoned stale lock trees are swept once untouched for 10 minutes" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9/x" "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9/y" \
