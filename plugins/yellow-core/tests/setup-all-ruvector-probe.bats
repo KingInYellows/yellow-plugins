@@ -102,3 +102,13 @@ probe() { run bash -c 'PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK"; }
   [[ "$output" == *"ruvector:           NOT INSTALLED"* ]]
   [[ "$output" != *OK* ]]
 }
+
+@test "a relative XDG_DATA_HOME is ignored, never resolved against the project dir" {
+  # The launcher ignores a relative XDG root; the dashboard must not run a
+  # cli.js that a repository placed at <cwd>/<XDG_DATA_HOME>/yellow-ruvector.
+  repo="$HOME/repo"; d="$repo/rel/yellow-ruvector"
+  mkdir -p "$d/install-abc/node_modules/ruvector/bin"; : > "$d/install-abc/node_modules/ruvector/bin/cli.js"
+  ln -s install-abc "$d/current"
+  run bash -c 'cd "$3" && XDG_DATA_HOME=rel PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK" "$repo"
+  [[ "$output" == *"ruvector:           NOT INSTALLED (plugin-managed)"* ]]
+}

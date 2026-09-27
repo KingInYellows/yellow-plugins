@@ -121,14 +121,16 @@ from the git toplevel. There is no manual queue management inside the plugin:
   (4.5s budget). Recall is `hookSpecificOutput.additionalContext` for
   `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
   There is no per-prompt recall
-- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) → allow JSON
-  only; `hooks post-edit` / `post-command` are never called (each writes a
-  hash-embedded memory that stamps a fresh store hash/64d, ADR-210)
-- No `Stop` hook: `hooks session-end` rewrites the whole store every turn and
-  races the MCP server's saves
+- `pre-tool-use.sh` → background `ruvector hooks pre-edit` / `pre-command`
+  (read-only side effects)
+- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit
+  recording in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`);
+  no ruvector CLI call
 
-ruvector manages its own internal queue and dedup. Plugin hooks are thin
-wrappers that parse Claude Code hook input JSON and call the right CLI command.
+No hook writes `.ruvector/intelligence.json`: memories come only from MCP
+`hooks_remember` (agents and commands). The removed `hooks post-edit` /
+`post-command` calls each wrote a near-empty hash-embedded memory, which on a
+fresh store stamped it hash/64d (ADR-210).
 
 ## .ruvectorignore
 

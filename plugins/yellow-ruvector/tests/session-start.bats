@@ -519,3 +519,729 @@ exit 0'
   echo "$output" | jq -e '.systemMessage | contains("store is hash-embedded")' > /dev/null
   [ "$elapsed_ms" -le 5500 ]
 }
+
+@test "prunes co-edit session files older than 7 days, keeps recent ones" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/old"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/new"
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/sub"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/sub/nested"
+  for f in old sub/nested; do
+    touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/$f" 2>/dev/null \
+      || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$RUVECTOR_DIR/coedit-sessions/$f"
+  done
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  # Pruning runs detached; give it a moment.
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/old" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
+  [ -e "$RUVECTOR_DIR/coedit-sessions/new" ]
+  # Top level only.
+  [ -e "$RUVECTOR_DIR/coedit-sessions/sub/nested" ]
+}
+
+@test "an inherited TIMEOUT_CMD that fails is probed before the cleanup worker uses it" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/old"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/old" 2>/dev/null || skip "touch -d unsupported"
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/timeout"; chmod +x "$BATS_TEST_TMPDIR/timeout"
+  TIMEOUT_CMD="$BATS_TEST_TMPDIR/timeout" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/old" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/old" ]
+}
+
+@test "session files just over seven days old are pruned; ones just under stay" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  echo '{}' > "$sd/over"; echo '{}' > "$sd/under"
+  touch -d '7 days ago 12 hours ago' "$sd/over" 2>/dev/null || skip "touch -d unsupported"
+  touch -d '6 days ago 23 hours ago' "$sd/under"
+  run run_hook '{"cwd":""}'
+  for i in $(seq 1 30); do [ -e "$sd/over" ] || break; sleep 0.1; done
+  [ ! -e "$sd/over" ]
+  [ -e "$sd/under" ]
+}
+
+@test "abandoned stale lock trees are swept once untouched for 10 minutes" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9/x" "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9/y" \
+    "$RUVECTOR_DIR/.coedit.lock.stale.3-3.9"
+  : > "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9/y/f"
+  for d in coedit-sessions/.s1.lock.stale.1-1.9 .coedit.lock.stale.2-2.9; do
+    touch -d '20 minutes ago' "$RUVECTOR_DIR/$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  # The sweep starts at a random entry: wait for both old trees.
+  for i in $(seq 1 30); do
+    [ -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ] || [ -e "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.stale.2-2.9" ]
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/.s1.lock.stale.1-1.9" ]
+  # A fresh one (a delete may still be running) is left alone.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.3-3.9" ]
+}
+
+@test "undeletable stale trees never keep the sweep from later ones" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  # An rm that cannot remove the a* trees (as a read-only tree would be).
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  for i in $(seq 10 29); do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.a$i"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.z99"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for i in $(seq 1 30); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  # Kept (in place, or held aside), never lost.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ] || [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a10" ]
+}
+
+@test "stale-tree discovery rotates past a full window of undeletable trees" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # 2000 a* trees that can never be removed fill a whole discovery window;
+  # z99 sorts after all of them.
+  (cd "$RUVECTOR_DIR" && seq -f '.coedit.lock.stale.a%04g' 1 2000 | xargs mkdir \
+    && seq -f '.coedit.lock.stale.a%04g' 1 2000 | xargs touch -d '20 minutes ago') 2>/dev/null \
+    || skip "touch -d unsupported"
+  d="$RUVECTOR_DIR/.coedit.lock.stale.z99"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  for _ in 1 2 3; do
+    PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
+  # Kept (in place, or held aside), never lost.
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a0001" ] || [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a0001" ]
+}
+
+@test "stale-tree discovery keeps its place after a partial scan" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  cursor="$RUVECTOR_DIR/coedit-sessions/.stale-sweep-cursor"
+  for n in a1 a2 a3 a4 a5 a6; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  printf '%s\n' "../.coedit.lock.stale.a3" > "$cursor"
+  # Timed out: a find that lists what it has, then never finishes. Nothing
+  # proves which names it did not list, so the cursor must neither wrap nor
+  # jump ahead.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) %s "$@"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  touch -d '1 minute ago' "$cursor" 2>/dev/null || skip "touch -d unsupported"
+  before=$(stat -c %Y "$cursor" 2>/dev/null || stat -f %m "$cursor")
+  COEDIT_STALE_WINDOW=2 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 6
+  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a3" ]
+  [ "$(stat -c %Y "$cursor" 2>/dev/null || stat -f %m "$cursor")" = "$before" ]
+}
+
+@test "stale-tree discovery never skips names listed out of order" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.z*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # find lists the undeletable z* trees before a1, which sorts first.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *coedit.lock.stale*) %s "$@" | sort -r; exit 0 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in a1 z1 z2 z3 z4; do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.$n"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  for _ in 1 2 3; do
+    COEDIT_STALE_SCAN_CAP=2 COEDIT_STALE_WINDOW=2 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
+}
+
+@test "a symlink planted at the sweep cursor is never written through" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"
+  ln -s "$outside" "$sd/.stale-sweep-cursor"
+  for n in a1 a2 a3; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  COEDIT_STALE_WINDOW=2 run run_hook '{"cwd":""}'
+  for _ in $(seq 1 40); do [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ] && break; sleep 0.1; done
+  [ -z "$(ls -A "$outside")" ]
+  [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ]
+}
+
+@test "a stale-tree name holding a newline cannot fake a completed scan" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  cursor="$sd/.stale-sweep-cursor"
+  for n in a1 a2 a3 a4 a5 a6; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.x
+END"
+  printf '%s\n' "../.coedit.lock.stale.a3" > "$cursor"
+  # The scan times out after listing everything, the forged name included.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) %s "$@"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  COEDIT_STALE_WINDOW=2 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 6
+  [ "$(cat "$cursor")" = "../.coedit.lock.stale.a3" ]
+}
+
+@test "each stale-tree deletion is bounded; a slow rm never runs past it" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.stale.a1" 2>/dev/null || skip "touch -d unsupported"
+  rb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$rb" "$(command -v rm)" > "$rb/rm"
+  chmod +x "$rb/rm"
+  PATH="$rb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 60); do [ -s "$rb/pids" ] && break; sleep 0.1; done
+  [ -s "$rb/pids" ]
+  # Each rm (the first try, and the held-aside retries the 5s worker budget
+  # still allows) is killed 2s after it starts.
+  sleep 8
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$rb/pids"
+}
+
+@test "stale-tree discovery is bounded: a slow directory listing never runs past the worker's budget" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  # A find that never finishes stands in for a huge or slow directory; it
+  # records its pid so the test can check it was stopped.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.stale*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$fb" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
+  [ -s "$fb/pids" ]
+  # Two 2s listings, each followed by a 1s shard pass that is slow too.
+  sleep 8
+  # (A zombie is dead: a container's PID 1 may never reap it.)
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$fb/pids"
+}
+
+@test "session pruning never delays the SessionStart response" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$BATS_TEST_TMPDIR/slowbin" "$RUVECTOR_DIR/coedit-sessions"
+  printf '#!/bin/sh\nsleep 3\n' > "$BATS_TEST_TMPDIR/slowbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/slowbin/find"
+  start=$(date +%s%N)
+  PATH="$BATS_TEST_TMPDIR/slowbin:$PATH" run run_hook '{"cwd":""}'
+  end=$(date +%s%N)
+  [ "$status" -eq 0 ]
+  [ $(( (end - start) / 1000000 )) -lt 2500 ]
+}
+
+@test "a session dir swapped for a symlink before the worker starts is not pruned through" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/victim"
+  echo x > "$BATS_TEST_TMPDIR/victim/old"
+  touch -d '10 days ago' "$BATS_TEST_TMPDIR/victim/old" 2>/dev/null || skip "touch -d unsupported"
+  # A find that first swaps the validated dir for a symlink, then runs: the
+  # worker already sits inside the original directory.
+  mkdir -p "$BATS_TEST_TMPDIR/swapbin"
+  printf '#!/bin/sh\nrm -rf "%s" && ln -s "%s" "%s"\nexec "%s" "$@"\n' \
+    "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/victim" "$RUVECTOR_DIR/coedit-sessions" \
+    "$(command -v find)" > "$BATS_TEST_TMPDIR/swapbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/swapbin/find"
+  PATH="$BATS_TEST_TMPDIR/swapbin:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ -e "$BATS_TEST_TMPDIR/victim/old" ]
+}
+
+@test "a session rewritten after find listed it is not pruned" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions" "$BATS_TEST_TMPDIR/rwbin"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/resumed"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/resumed" 2>/dev/null || skip "touch -d unsupported"
+  # find lists the stale file, then the session is resumed (rewritten
+  # fresh) before the worker acts on the list.
+  # (Appends: the worker also runs find for its stale-tree scan.)
+  printf '#!/bin/sh\n"%s" "$@" >> "%s/list"\necho "{\\"last\\":\\"x\\"}" > ./resumed\ncat "%s/list"\n' \
+    "$(command -v find)" "$BATS_TEST_TMPDIR" "$BATS_TEST_TMPDIR" > "$BATS_TEST_TMPDIR/rwbin/find"
+  chmod +x "$BATS_TEST_TMPDIR/rwbin/find"
+  PATH="$BATS_TEST_TMPDIR/rwbin:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  sleep 1
+  grep -q resumed "$BATS_TEST_TMPDIR/list"
+  [ -e "$RUVECTOR_DIR/coedit-sessions/resumed" ]
+}
+
+@test "a stale per-session lock left by a killed hook does not block pruning" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions/.dead.lock"
+  echo '{}' > "$RUVECTOR_DIR/coedit-sessions/dead"
+  touch -d '10 days ago' "$RUVECTOR_DIR/coedit-sessions/dead" "$RUVECTOR_DIR/coedit-sessions/.dead.lock" 2>/dev/null || skip "touch -d unsupported"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 30); do [ -e "$RUVECTOR_DIR/coedit-sessions/dead" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit-sessions/dead" ]
+  sleep 0.3
+  # No lock is left behind for the pruned session. The reclaim just made its
+  # generation marker; the bounded marker sweep removes it once it is 10
+  # minutes old, so only that marker may remain.
+  [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" | grep -v '^\.dead\.lock\.reclaim\.')" ]
+}
+
+@test "reclaim markers that cannot be removed never keep the sweep from later ones" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # 60 expired markers that are not empty sort before the removable one.
+  for i in $(seq 10 69); do
+    mkdir -p "$sd/.a$i.lock.reclaim.1-1/keep"
+    touch -d '20 minutes ago' "$sd/.a$i.lock.reclaim.1-1" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$sd/.zz.lock.reclaim.1-1"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  run run_hook '{"cwd":""}'
+  for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ -d "$sd/.a10.lock.reclaim.1-1" ]
+}
+
+@test "pruning a session never globs its reclaim markers" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  echo '{}' > "$sd/old1"
+  touch -d '8 days ago' "$sd/old1" 2>/dev/null || skip "touch -d unsupported"
+  # A marker that cannot be removed and one that can, both recent: only the
+  # bounded sweep (10-minute age rule) may touch markers, so both stay.
+  mkdir -p "$sd/.old1.lock.reclaim.1-1/keep" "$sd/.old1.lock.reclaim.2-2"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 40); do [ -e "$sd/old1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/old1" ]
+  sleep 1
+  [ -d "$sd/.old1.lock.reclaim.2-2" ]
+}
+
+@test "reclaim-marker discovery is bounded: a slow directory listing never runs past the worker's budget" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.reclaim*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$fb" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
+  [ -s "$fb/pids" ]
+  # Two 2s listings, each followed by a 1s shard pass that is slow too.
+  sleep 8
+  # (A zombie is dead: a container's PID 1 may never reap it.)
+  while read -r p; do
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    case "$st" in ''|Z*) ;; *) kill "$p"; false ;; esac
+  done < "$fb/pids"
+}
+
+@test "a slow session-file scan never starves the marker and stale-tree sweeps" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # The session-file find (-mtime +7) spends its whole budget.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *-mtime*) exec sleep 30 ;; esac\nexec %s "$@"\n' "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  mkdir -p "$sd/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.stale.a1"
+  touch -d '20 minutes ago' "$sd/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.stale.a1" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 150); do
+    [ -e "$sd/.gone.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.stale.a1" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$sd/.gone.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.stale.a1" ]
+}
+
+@test "expired reclaim markers are swept, session and store locks alike; recent ones stay" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"
+  mkdir -p "$sd/.gone.lock.reclaim.1-1" "$sd/.live.lock.reclaim.2-2" "$sd/.live.lock.reclaim.3-3" \
+    "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4"
+  echo '{}' > "$sd/live"
+  touch -d '20 minutes ago' "$sd/.gone.lock.reclaim.1-1" "$sd/.live.lock.reclaim.2-2" \
+    "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" 2>/dev/null || skip "touch -d unsupported"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 40); do
+    [ -e "$sd/.gone.lock.reclaim.1-1" ] || [ -e "$sd/.live.lock.reclaim.2-2" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$sd/.gone.lock.reclaim.1-1" ]
+  [ ! -e "$sd/.live.lock.reclaim.2-2" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.4-4" ]
+  # Under 10 minutes old: a reclaim of that generation may still be running.
+  [ -d "$sd/.live.lock.reclaim.3-3" ]
+}
+
+@test "never prunes through a symlinked co-edit session dir" {
+  make_ruvector_stub 'exit 0'
+  victim="$BATS_TEST_TMPDIR/victim"
+  mkdir -p "$victim"
+  echo keep > "$victim/old-file"
+  touch -d '10 days ago' "$victim/old-file" 2>/dev/null \
+    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$victim/old-file"
+  ln -s "$victim" "$RUVECTOR_DIR/coedit-sessions"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ -e "$victim/old-file" ]
+}
+
+@test "never prunes through a .ruvector symlink to outside the project" {
+  make_ruvector_stub 'exit 0'
+  victim="$BATS_TEST_TMPDIR/victim-store"
+  mkdir -p "$victim/coedit-sessions"
+  echo keep > "$victim/coedit-sessions/old-file"
+  touch -d '10 days ago' "$victim/coedit-sessions/old-file" 2>/dev/null \
+    || touch -t "$(date -v-10d +%Y%m%d%H%M 2>/dev/null)" "$victim/coedit-sessions/old-file"
+  rm -rf "$RUVECTOR_DIR"
+  ln -s "$victim" "$RUVECTOR_DIR"
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  [ -e "$victim/coedit-sessions/old-file" ]
+}
+
+@test "a directory planted at the sweep cursor is replaced, so the cursor advances" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd/.stale-sweep-cursor/sub"
+  for n in a1 a2 a3; do mkdir -p "$RUVECTOR_DIR/.coedit.lock.stale.$n"; done
+  COEDIT_STALE_WINDOW=2 run run_hook '{"cwd":""}'
+  for _ in $(seq 1 40); do [ -f "$sd/.stale-sweep-cursor" ] && break; sleep 0.1; done
+  [ -f "$sd/.stale-sweep-cursor" ] && [ ! -L "$sd/.stale-sweep-cursor" ]
+  [ "$(cat "$sd/.stale-sweep-cursor")" = "../.coedit.lock.stale.a2" ]
+}
+
+@test "undeletable trees at the head of a timed-out listing are held aside, so later trees are reached" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # A listing that times out after the first three names (in name order),
+  # every time: the undeletable a* trees.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *coedit.lock.stale*) %s "$@" | LC_ALL=C sort | head -n 3; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in a1 a2 a3 b1; do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.$n"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.b1"
+  for _ in 1 2; do
+    PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 100); do [ -e "$d" ] || break; sleep 0.1; done
+  done
+  [ ! -e "$d" ]
+  # The undeletable ones are kept (held aside), never lost.
+  [ "$(ls -d "$RUVECTOR_DIR"/.coedit-stale-held/.coedit.lock.stale.a* | wc -l)" -eq 3 ]
+}
+
+@test "a session listing that always times out still reaches old files beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # The full listing only ever gets through recent files before timing out.
+  for n in 0recent1 0recent2; do : > "$sd/$n"; done
+  : > "$sd/zold"; touch -d '10 days ago' "$sd/zold" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *mtime*) echo ./0recent1; echo ./0recent2; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 37: [q-z] then [g-p] ("zo…").
+  COEDIT_SHARD=37 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/zold" ] || break; sleep 0.1; done
+  [ ! -e "$sd/zold" ]
+  [ -e "$sd/0recent1" ]
+}
+
+@test "a session id with a dot after its first character is in a shard too" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in 0recent1 0recent2; do : > "$sd/$n"; done
+  : > "$sd/a.old"; touch -d '10 days ago' "$sd/a.old" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *mtime*) echo ./0recent1; echo ./0recent2; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 58: [89ab] then [N-Z_.-] ("a.…").
+  COEDIT_SHARD=58 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/a.old" ] || break; sleep 0.1; done
+  [ ! -e "$sd/a.old" ]
+  [ -e "$sd/0recent1" ]
+}
+
+@test "a marker listing that always times out still reaches expired markers beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  mkdir "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1"
+  touch -d '20 minutes ago' "$sd/.zsess.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 429: [q-z][q-z] ("zs…") for session ids, [89][01] ("91…") for digits.
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 120); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ]
+}
+
+@test "a timed-out marker listing still reaches a one-digit marker suffix" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  mkdir "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1"
+  touch -d '20 minutes ago' "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 5002: digit shard [45][!0-9] (thousands digit 5).
+  COEDIT_SHARD=5002 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 120); do [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.5-1" ]
+}
+
+@test "held trees that can never be removed do not pin the held-tree retries" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  h="$RUVECTOR_DIR/.coedit-stale-held"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # find lists the undeletable a* trees first, in name order.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *coedit-stale-held*) %s "$@" | LC_ALL=C sort; exit 0 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in a1 a2 a3 a4 a5 a6 z1; do mkdir -p "$h/.coedit.lock.stale.$n"; done
+  for _ in $(seq 1 20); do
+    PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 30); do [ -e "$h/.coedit.lock.stale.z1" ] || break; sleep 0.1; done
+    [ -e "$h/.coedit.lock.stale.z1" ] || break
+    sleep 1
+  done
+  [ ! -e "$h/.coedit.lock.stale.z1" ]
+}
+
+@test "a timed-out held-tree listing is followed by a shard pass that reaches beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  h="$RUVECTOR_DIR/.coedit-stale-held"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.0*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # The full held listing always times out after the undeletable 0* prefix;
+  # shard passes (bracket patterns) run the real find.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *coedit-stale-held*) %s "$@" -name "*.stale.0*"; exec sleep 5 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  for n in 00-1.1 01-1.1 02-1.1 99-1.1; do mkdir -p "$h/.coedit.lock.stale.$n"; done
+  # A session path renamed aside (.stale.s<pid>-<epoch>) is in a shard too.
+  sh_=$RUVECTOR_DIR/coedit-sessions/.coedit-stale-held; mkdir -p "$sh_/.s1.lock.stale.s98-1"
+  for n in 00-1.1 01-1.1; do mkdir -p "$sh_/.coedit.lock.stale.$n"; done
+  # COEDIT_SHARD=24 pins the digit shard [89][89]. Each held dir costs a
+  # timed-out listing plus a shard pass, so under load one run's 5s phase
+  # may reach only one of them: a later run (a later SessionStart) gets the
+  # other. Each run also retries a random 3 of the 4 store-side trees, so
+  # 99-1.1 is missed by a quarter of runs: allow several.
+  for _ in $(seq 1 8); do
+    COEDIT_SHARD=24 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+    for _ in $(seq 1 80); do [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break; sleep 0.1; done
+    [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break
+  done
+  [ ! -e "$h/.coedit.lock.stale.99-1.1" ]
+  [ ! -e "$sh_/.s1.lock.stale.s98-1" ]
+  [ -d "$h/.coedit.lock.stale.00-1.1" ]
+}
+
+@test "temp files left by a killed atomic write are swept once old; fresh ones and symlinks stay" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  outside="$BATS_TEST_TMPDIR/outside"; printf 'keep\n' > "$outside"
+  for t in "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" "$sd/s1.tmp.XyZ98765" "$sd/.stale-sweep-cursor.tmp.Qq11Ww22"; do
+    printf '{}' > "$t"; touch -d '20 minutes ago' "$t" 2>/dev/null || skip "touch -d unsupported"
+  done
+  printf '{}' > "$sd/s2.tmp.Fresh123"
+  ln -s "$outside" "$sd/s3.tmp.Link1234"
+  run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ] || [ -e "$sd/s1.tmp.XyZ98765" ] || break; sleep 0.1; done
+  [ ! -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ]
+  [ ! -e "$sd/s1.tmp.XyZ98765" ]
+  [ ! -e "$sd/.stale-sweep-cursor.tmp.Qq11Ww22" ]
+  [ -f "$sd/s2.tmp.Fresh123" ]
+  [ -L "$sd/s3.tmp.Link1234" ] && [ "$(cat "$outside")" = keep ]
+}
+
+@test "the temp sweep samples each directory, so stuck session temps never hide store temps" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # 250 old session temps rm cannot delete, listed first, in name order.
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *s*.tmp.Stuck*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  for n in $(seq 100 349); do : > "$sd/s$n.tmp.Stuck$n"; done
+  t="$RUVECTOR_DIR/coedit.json.tmp.AbCd1234"; : > "$t"
+  touch -d '20 minutes ago' "$sd"/s*.tmp.Stuck* "$t" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$t" ] || break; sleep 0.1; done
+  [ ! -e "$t" ]
+}
+
+@test "a timed-out temp listing is followed by a shard pass that reaches beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in 1 2 3; do : > "$sd/a$n.tmp.Stuck00$n"; done
+  : > "$sd/zz.tmp.Target01"
+  touch -d '20 minutes ago' "$sd"/*.tmp.* 2>/dev/null || skip "touch -d unsupported"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.tmp.Stuck*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  # Full temp listings only ever get through the stuck a* prefix, then stall;
+  # shard passes (bracket patterns) run the real find.
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *.tmp.*) %s "$@" -name "a*"; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  # Index 45: [q-z][q-z] ("zz…").
+  COEDIT_SHARD=45 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 80); do [ -e "$sd/zz.tmp.Target01" ] || break; sleep 0.1; done
+  [ ! -e "$sd/zz.tmp.Target01" ]
+  [ -e "$sd/a1.tmp.Stuck001" ]
+}
+
+@test "timed-out marker listings and their shard passes stay inside the phase's real 5s" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in $(seq 1 40); do
+    mkdir "$sd/.zs$n.lock.reclaim.1-1"
+    touch -d '20 minutes ago' "$sd/.zs$n.lock.reclaim.1-1" 2>/dev/null || skip "touch -d unsupported"
+  done
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # Full listings never finish; shard passes list normally; each marker
+  # removal is slow, so the sweep would run as long as it is allowed to.
+  printf '#!/bin/sh\ncase "$*" in *"["*) exec %s "$@" ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  printf '#!/bin/sh\ncase "$*" in *reclaim*) date +%%s%%N >> "%s/rmdir.log"; sleep 0.2 ;; esac\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rmdir)" > "$fb/rmdir"
+  chmod +x "$fb/find" "$fb/rmdir"
+  start=$(date +%s%N)
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  sleep 10
+  [ -s "$BATS_TEST_TMPDIR/rmdir.log" ]
+  last=$(tail -n 1 "$BATS_TEST_TMPDIR/rmdir.log")
+  # No removal starts after the phase's 5s (plus the fast session phase).
+  [ $(( (last - start) / 1000000 )) -lt 5400 ]
+}
+
+
+@test "slow marker discovery without GNU timeout still leaves the sweep time to remove markers" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  mkdir "$sd/.zs1.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1"
+  touch -d '20 minutes ago' "$sd/.zs1.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # No GNU timeout (stock macOS): run_budgeted uses its portable watcher.
+  for t in timeout gtimeout; do printf '#!/bin/sh\nexit 1\n' > "$fb/$t"; done
+  # Every marker listing uses its whole budget: full listings print nothing,
+  # shard passes print their matches and then stall too.
+  printf '#!/bin/sh\ncase "$*" in *reclaim*"["*|*"["*reclaim*) %s "$@"; exec sleep 30 ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find" "$fb/timeout" "$fb/gtimeout"
+  # Index 429: [q-z][q-z] ("zs…") for session ids, [89][01] ("91…") for digits.
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 100); do [ -e "$sd/.zs1.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zs1.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ]
+}
+
+@test "slow held trees on the session side never keep the store-side held trees from their turn" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  for n in a1 a2 a3; do mkdir -p "$sd/.coedit-stale-held/.s.lock.stale.$n"; done
+  mkdir -p "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.z1"
+  # Session-side deletions each use their whole 2s bound.
+  rb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rb"
+  printf '#!/bin/sh\necho "$(date +%%s) $*" >> "%s/rm.log"\ncase "$*" in *" ./.coedit-stale-held/"*) exec sleep 30 ;; esac\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v rm)" > "$rb/rm"
+  chmod +x "$rb/rm"
+  d="$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.z1"
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    PATH="$rb:$PATH" run run_hook '{"cwd":""}'
+    for i in $(seq 1 40); do [ -e "$d" ] || break; sleep 0.2; done
+    [ -e "$d" ] || break
+  done
+  [ ! -e "$d" ]
+}
+
+@test "a file or symlink planted at the held-tree path is replaced, so stuck trees are still held aside" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"
+  ln -s "$outside" "$RUVECTOR_DIR/.coedit-stale-held"
+  d="$RUVECTOR_DIR/.coedit.lock.stale.a1"; mkdir -p "$d"
+  touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 60); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ -d "$RUVECTOR_DIR/.coedit-stale-held/.coedit.lock.stale.a1" ] && [ ! -L "$RUVECTOR_DIR/.coedit-stale-held" ]
+  [ -z "$(ls -A "$outside")" ]
+}
+
+@test "a first-character shard too big to list is itself split, reaching markers beyond its prefix" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  # Every marker starts with z; the zs one is past what a z-wide listing reaches.
+  for n in za1 za2 za3; do mkdir -p "$sd/.$n.lock.reclaim.1-1/keep"; done
+  mkdir "$sd/.zsess.lock.reclaim.1-1"
+  touch -d '20 minutes ago' "$sd"/.z*.lock.reclaim.1-1 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # A listing split two levels deep ("[..][..]") finishes; anything wider
+  # only ever gets through the undeletable za* prefix.
+  printf '#!/bin/sh\ncase "$*" in *"]["*) exec %s "$@" ;; *reclaim*) %s "$@" | LC_ALL=C sort | head -n 3; exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 100); do [ -e "$sd/.zsess.lock.reclaim.1-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zsess.lock.reclaim.1-1" ]
+  [ -d "$sd/.za1.lock.reclaim.1-1" ]
+}
+
+@test "a stalling timeout is probed once per SessionStart, not again after coedit.sh" {
+  mkdir -p "$PROJECT_ROOT/.ruvector"
+  make_ruvector_stub 'echo "{\"memories\":[]}"'
+  # A timeout that hangs and ignores TERM: each probe of it costs ~0.4s.
+  printf '#!/bin/sh\necho x >> "%s"\ntrap "" TERM\nsleep 5\n' "$BATS_TEST_TMPDIR/probes" > "$MOCK_BIN/timeout"
+  chmod +x "$MOCK_BIN/timeout"
+  : > "$BATS_TEST_TMPDIR/probes"
+  run run_hook '{"session_id":"s1"}'
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/probes")" -le 1 ]
+}

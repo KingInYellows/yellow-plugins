@@ -173,10 +173,11 @@ PostToolUse hook called `hooks post-edit` / `hooks post-command`, and each of
 those calls `tryRemember` with a hash-embedded (64d) memory. On a store with
 no stamp yet, that first hook write stamps it `hash`/64d — the ADR-210 lock
 this doc describes, reached without any old CLI at all. On an ONNX-stamped
-store the same writes are refused on every tool call. The follow-up hygiene
-change removes those calls. Until it ships, the first edit in a fresh
-project can still stamp the store hash; `/ruvector:status` reports that as
-`MISMATCH`, and the reembed above fixes it.
+store the same writes are refused on every tool call. The hygiene change
+that followed removed those calls: the PostToolUse hook now only records
+co-edit pairs in `.ruvector/coedit.json` with jq, and no hook writes
+`intelligence.json`. A leftover global `ruvector hooks init` entry in
+`settings.json` can still do it; `/ruvector:status` flags those.
 
 ## Related
 

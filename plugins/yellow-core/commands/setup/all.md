@@ -95,13 +95,16 @@ _rv_cli=""; _rv_ver=""
 # data dir from another plugin ID may sort before the live one. Only when no
 # candidate runs is it NOT INSTALLED, so the classification offers
 # /ruvector:setup, which repairs it.
-for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ruvector/"; do
+# A relative XDG_DATA_HOME is invalid and ignored, as the launcher does:
+# resolved against the cwd it would name a directory the project controls.
+case "${XDG_DATA_HOME:-}" in /*) _rv_xdg=$XDG_DATA_HOME ;; *) _rv_xdg="$HOME/.local/share" ;; esac
+for _rv_d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/data/yellow-ruvector*/ "${_rv_xdg}/yellow-ruvector/"; do
   [ -f "${_rv_d}current/node_modules/ruvector/bin/cli.js" ] || continue
   _rv_p=$(CDPATH= cd -P -- "$_rv_d" 2>/dev/null && pwd) || continue
   case "$_rv_p" in
     "$_rv_home"/*|/tmp/*|/private/tmp/*) ;;
     */plugins/data/*) [ -n "${CLAUDE_CONFIG_DIR:-}" ] && _rv_base_ok "$CLAUDE_CONFIG_DIR" && case "$_rv_p" in "$_rv_b"/plugins/data/?*) ;; *) false ;; esac || continue ;;
-    *) [ -n "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$XDG_DATA_HOME" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
+    *) [ "$_rv_xdg" = "${XDG_DATA_HOME:-}" ] && _rv_base_ok "$_rv_xdg" && [ "$_rv_p" = "$_rv_b/yellow-ruvector" ] || continue ;;
   esac
   # `current` must name a sibling install-* dir, and every component down to
   # cli.js must be a real directory or regular file inside it: a tampered
@@ -125,7 +128,7 @@ if [ -n "$_rv_ver" ]; then printf 'ruvector:           OK (plugin-managed %s)\n'
 elif [ -n "$_rv_cli" ]; then printf 'ruvector:           NOT INSTALLED (plugin-managed install broken; /ruvector:setup repairs it)\n'
 else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
 [ "${node_major:-0}" -ge 20 ] && printf 'node20_check:       ok\n' || printf 'node20_check:       too_old_or_missing\n'
-unset _rv_cli _rv_d _rv_p _rv_b _rv_home _rv_ver _rv_t _rv_i _rv_c
+unset _rv_cli _rv_xdg _rv_d _rv_p _rv_b _rv_home _rv_ver _rv_t _rv_i _rv_c
 unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'

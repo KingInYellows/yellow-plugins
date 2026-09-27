@@ -607,7 +607,8 @@ yellow_ruvector_swap_current() {
   local target="$1" tmp_link="${RUVECTOR_DATA}/.current.tmp.$$" cur="${RUVECTOR_DATA}/current" old
   # A real directory or file at `current` (a damaged or legacy data dir)
   # would take the link *inside* it and never be replaced: move it aside
-  # first (only this plugin writes here) and delete it after.
+  # first (only this plugin writes here) and delete it once the new link is
+  # in place, or put it back if the swap failed.
   old=""
   if [ -e "$cur" ] && [ ! -L "$cur" ]; then
     old="${RUVECTOR_DATA}/.current.old.$$"
@@ -622,9 +623,16 @@ yellow_ruvector_swap_current() {
     rm -f -- "$tmp_link" 2>/dev/null
     ln -sfn "$target" "$cur" 2>/dev/null
   fi
-  [ -n "$old" ] && rm -rf -- "$old" 2>/dev/null
   # Success only when `current` really is the link to <target> now.
-  [ -L "$cur" ] && [ "$(readlink "$cur")" = "$target" ]
+  if [ -L "$cur" ] && [ "$(readlink "$cur")" = "$target" ]; then
+    [ -n "$old" ] && rm -rf -- "$old" 2>/dev/null
+    return 0
+  fi
+  if [ -n "$old" ]; then
+    [ -L "$cur" ] && rm -f -- "$cur" 2>/dev/null
+    [ -e "$cur" ] || mv -- "$old" "$cur" 2>/dev/null
+  fi
+  return 1
 }
 
 # yellow_ruvector_take_lease <install-name> — mark that this process (its

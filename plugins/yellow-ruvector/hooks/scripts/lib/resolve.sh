@@ -258,14 +258,17 @@ ruvector_lease_pid() {
 ruvector_probe_timeout() {
   local name cmd
   TIMEOUT_CMD=""
+  _RUVECTOR_TIMEOUT_PROBED=1
   for name in timeout gtimeout; do
     cmd="$(command -v "$name" || true)"
     [ -n "$cmd" ] || continue
     # The probe itself is bounded by the portable watcher (a working one
     # returns at once: `true` exits immediately). A candidate that stalls (a
-    # broken wrapper, a hung mount) ends the probing, so at most one ~0.4s
+    # broken wrapper, a hung mount) ends the probing, so at most one ~0.3s
     # stall comes out of the calling hook's budget.
-    TIMEOUT_CMD='' run_budgeted 0.2 "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1
+    # stdin is /dev/null: a candidate that reads stdin must never consume
+    # the hook's event payload before the hook parses it.
+    TIMEOUT_CMD='' run_budgeted 0.1 "$cmd" --kill-after=0.05 0.05 true </dev/null >/dev/null 2>&1
     case $? in
       0) TIMEOUT_CMD="$cmd"; return 0 ;;
       124|137|143) return 1 ;;
@@ -273,6 +276,9 @@ ruvector_probe_timeout() {
   done
   return 1
 }
+# Set only by the probe in this process: a TIMEOUT_CMD inherited from the
+# environment (a stale path, BusyBox timeout) is never trusted unprobed.
+_RUVECTOR_TIMEOUT_PROBED=""
 
 # ruvector_proc_tree <pid> — print <pid> and all its descendants (pgrep -P
 # walk; just <pid> where pgrep is missing).
@@ -291,11 +297,18 @@ ruvector_proc_tree() {
 run_budgeted() {
   local cap="$1" pid watcher rc=0
   shift
+  # A TIMEOUT_CMD this process never probed came from the environment (a
+  # stale path, BusyBox timeout): probe it first, or every call would fail.
+  if [ -n "${TIMEOUT_CMD:-}" ] && [ -z "${_RUVECTOR_TIMEOUT_PROBED:-}" ]; then
+    ruvector_probe_timeout >/dev/null 2>&1 || true
+  fi
   if [ -n "${TIMEOUT_CMD:-}" ]; then
     "$TIMEOUT_CMD" --kill-after=0.1 "$cap" "$@"
     return
   fi
-  "$@" &
+  # <&0: a background job would otherwise read /dev/null, not the
+  # caller's stdin.
+  "$@" <&0 &
   pid=$!
   # The watcher marks when it fires (in a private mktemp dir), so the caller
   # knows to let it finish escalating even when the timed command exited 0

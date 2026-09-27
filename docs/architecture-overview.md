@@ -512,10 +512,8 @@ github-workflow. Both are Node (`hooks/scripts/entrypoint-claude.js`), 5s
 timeout.
 
 yellow-ruvector: `SessionStart` (background install prewarm, 5s; one semantic
-recall, 6s), `PreToolUse` / `PostToolUse` / `PostToolUseFailure` on
-Edit/Write/MultiEdit/Bash (1s; same post-tool script for success and failure,
-which writes nothing). No `Stop` hook: `hooks session-end` rewrote the whole
-store every turn.
+recall, 6s), `PreToolUse` on Edit/Write/MultiEdit/Bash (1s), `PostToolUse` on
+Edit/Write/MultiEdit (1s; jq-only co-edit recording).
 
 Compound pipeline (yellow-core):
 

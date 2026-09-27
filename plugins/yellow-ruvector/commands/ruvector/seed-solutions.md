@@ -48,10 +48,11 @@ re-run after new solution docs land.
    differs, report "ruvector install is missing or out of date — run
    `/ruvector:setup` (it installs the pinned version into the plugin data
    dir), start a fresh session, and retry." and stop. Do not install from
-   this command. The passive hooks cannot be quiesced from inside this
-   command (see
-   docs/solutions/logic-errors/write-freeze-invariant-omits-passive-hook-path.md),
-   which is why this check runs before anything else.
+   this command. The plugin's own hooks no longer write
+   `intelligence.json` (co-edits go to `coedit.json`), so after this check
+   the only passive writer left is a leftover global `ruvector hooks init`
+   entry — `/ruvector:status` flags those (see
+   docs/solutions/logic-errors/write-freeze-invariant-omits-passive-hook-path.md).
 4. **Store-scoping check (do not skip):** call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_stats()` and inspect the
    `intel_path` field. Then resolve the local store's real location with

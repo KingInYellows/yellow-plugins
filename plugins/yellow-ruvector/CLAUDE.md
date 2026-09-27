@@ -82,14 +82,17 @@ ruvector.
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
-  a global `ruvector` on PATH is never used) from the git toplevel. They
-  call ruvector's built-in CLI hooks (`hooks pre-edit`, `hooks pre-command`;
-  never `hooks session-end`, which rewrites the store every turn; never `hooks post-edit` / `post-command`, which write
-  hash-embedded memories) as
-  **side effects** — stdout is discarded and the hook always prints
-  dual-client allow JSON. `hooks recall` is the exception: `session-start.sh`
-  captures its stdout and returns it in `hookSpecificOutput.additionalContext`.
-  Operator warnings stay on `systemMessage`.
+  a global `ruvector` on PATH is never used) from the git toplevel.
+  `pre-tool-use.sh` calls `hooks pre-edit` / `hooks pre-command` as
+  read-only **side effects** (stdout discarded); `session-start.sh` captures
+  `hooks recall` stdout into `hookSpecificOutput.additionalContext`; the
+  co-edit hook uses jq only. Every hook prints dual-client allow JSON.
+  Operator warnings stay on `systemMessage`. **No hook writes
+  `.ruvector/intelligence.json`** — memories come only from MCP
+  `hooks_remember`. Do not re-add `hooks post-edit` / `post-command`: each
+  writes a near-empty hash-embedded memory that stamps a fresh store
+  hash/64d (ADR-210), and their co-edit tracking never worked (ruvector's
+  `lastEditedFile` is per-process).
   Never run `ruvector hooks init` to
   register hooks — even `--minimal` writes empty-stdout PreToolUse commands
   into `.claude/settings.json` that Cursor rejects as invalid JSON. Use
@@ -140,10 +143,11 @@ ruvector.
   before acting; canonical home of the ruvector protocol constants (RULE 16
   drift lint enforces its sentinel line across the yellow-core replicas)
 
-### Hooks (4 events, 4 scripts)
+### Hooks (3 events, 4 scripts)
 
-All hooks exit silently (allow JSON) when Node < 20, the install is missing,
-or an install is in progress.
+The CLI-calling hooks (`session-start.sh`, `pre-tool-use.sh`) exit silently
+(allow JSON) when Node < 20, the install is missing, or an install is in
+progress.
 
 - `prewarm.sh` (SessionStart, 5s) — installs the pinned ruvector and
   downloads the ONNX model in a detached background job under the install
@@ -169,13 +173,33 @@ or an install is in progress.
   Edit/Write/MultiEdit/Bash (1s budget). Stdout is dual-client allow JSON
   (`continue` + `permission`) so Cursor's Claude-plugin bridge does not
   block the tool.
-- `post-tool-use.sh` (PostToolUse and PostToolUseFailure) — prints allow
-  JSON only. It does not call `hooks post-edit` / `hooks post-command`: in
-  0.3.3 each stores a near-empty hash-embedded memory, and on a fresh store
-  the first one stamps it hash/64d so every later `hooks_remember` is
-  refused (ADR-210).
-- No `Stop` hook: `hooks session-end` only exports metrics, yet it rewrites
-  the whole store every turn and races the MCP server's saves
+- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit, 1s; ~40–70ms,
+  jq only) — co-edit recording (`hooks/scripts/lib/coedit.sh`). Each
+  successful edit updates the session's last-edited file in
+  `.ruvector/coedit-sessions/<session_id>`; a different file edited by the
+  same session within 60s adds one to that symmetric pair in
+  `.ruvector/coedit.json`. Paths are root-relative and physical; paths
+  outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
+  control characters, or over 512 chars are ignored. Writes are temp file +
+  rename. A per-session mkdir lock covers the session file's
+  read-decide-write, and the store lock only the pair update; together they
+  wait at most ~0.4s per edit (a linked worktree's 0.15s main-worktree
+  lookup comes out of that), then skip (a busy store loses one increment,
+  never the session's latest edit). A lock over a minute old is reclaimed
+  once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the
+  SessionStart worker prunes those over 10 minutes old, the hooks never
+  list them). The stored previous path is re-normalized before
+  pairing. Every jq over the store is killed after 0.3s (the edit's
+  increment is skipped), a `coedit.json` over 1 MB is set aside unparsed,
+  every write rebuilds the pairs symmetric, and the file is capped at 2000
+  directed pairs and 80% of that 1 MB, keeping the pair just seen and then
+  the highest counts (so a new pair can accumulate at the cap), so the
+  writer never produces a file it would later set aside.
+  Per-session state keeps concurrent sessions and worktrees (which share the
+  store) from pairing each other's edits; `session-start.sh` prunes session
+  files older than 7 days. MultiEdit's path is the top-level
+  `tool_input.file_path` (its `edits[]` carry no paths — earlier versions
+  read `edits[].file_path` and never matched)
 
 ### Scripts (4) and bin (1)
 
@@ -303,8 +327,8 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 ## Testing
 
 `bats tests/` from the plugin directory — one suite per hook
-(`session-start`, `pre-tool-use`, `post-tool-use`,
-`repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
+(`session-start`, `pre-tool-use`, `post-tool-use` — co-edit recording,
+including a 20-way concurrency check — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
 `remove-legacy-hooks.bats`, `prewarm.bats` (install decision, npm stubbed),
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
 `memory-manager-flush.bats`, and `status-provenance.bats` (extracts the

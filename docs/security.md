@@ -153,7 +153,7 @@ runtime (only one of gt-workflow / github-workflow is enabled at a time):
 
 | Plugin          | Hook Events                                       | Purpose                                                                                  |
 | --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, PostToolUseFailure, SessionStart | Install prewarm, memory recall, edit tracking, session lifecycle             |
+| yellow-ruvector | PreToolUse, PostToolUse, SessionStart             | Install prewarm, memory recall, co-edit tracking                                         |
 | yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
 | yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
 | gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
@@ -206,7 +206,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 | pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Pre-edit / pre-command side effects                    |
 | prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
 | session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
-| post-tool-use      | PostToolUse, PostToolUseFailure | `post-tool-use.sh` | 1s   | No-op (allow JSON only); `hooks post-edit` / `post-command` are never called — they write hash-embedded memories (ADR-210) |
+| post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 1s          | Record co-edit pairs in `.ruvector/coedit.json` (jq only) |
 
 **Security properties:**
 
@@ -493,8 +493,9 @@ env -i HOME=… PATH=… [proxy/CA/npm_config_* passthrough] \
 ```
 
 **Mitigation:** `--ignore-scripts` (the tree has no install scripts), `env -i`
-so API keys and tokens never reach npm (only proxy, CA, and `npm_config_*`
-settings pass through), a data-dir prefix check (HOME or /tmp, or exactly
+so no other API keys or tokens reach npm: only proxy, CA, and
+`NPM_CONFIG_*`/`npm_config_*` settings pass through, and those can carry a
+registry auth token the user configured for npm, a data-dir prefix check (HOME or /tmp, or exactly
 `<XDG_DATA_HOME>/yellow-ruvector` for a user-set, non-system absolute
 `XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset, or a host-provided
 `CLAUDE_PLUGIN_DATA` under a non-system `<CLAUDE_CONFIG_DIR>/plugins/data/`), one

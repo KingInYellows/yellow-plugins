@@ -37,6 +37,11 @@ ruvector_heal_store "$PROJECT_DIR"
 if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
+
+# Drop co-edit session state older than 7 days (lib/coedit.sh).
+# shellcheck source=lib/coedit.sh
+. "$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/coedit.sh"
+coedit_prune_sessions "$PROJECT_DIR"
 # ruvector picks its store from process.cwd(); run every CLI call from the
 # root so a subdirectory session reads <root>/.ruvector.
 cd "$PROJECT_DIR" 2>/dev/null || json_exit "cannot cd to project root; skipping session-start"
@@ -48,7 +53,9 @@ cd "$PROJECT_DIR" 2>/dev/null || json_exit "cannot cd to project root; skipping 
 # session does not pay the ~6s cold download here. See ruvector_probe_timeout
 # for why BusyBox/non-GNU timeout is skipped; without one (stock macOS),
 # run_budgeted bounds every call with its portable TERM/KILL watcher.
-ruvector_probe_timeout || true
+# Sourcing lib/coedit.sh above already probed in this process: a stalling
+# candidate must not be waited on twice inside the 6s budget.
+[ -n "${_RUVECTOR_TIMEOUT_PROBED:-}" ] || ruvector_probe_timeout || true
 
 # --- Embedder provenance check (jq only; no CLI, no model load) ---
 # ruvector (0.2.34+) embeds with onnx-minilm (384d) by default. A store stamped

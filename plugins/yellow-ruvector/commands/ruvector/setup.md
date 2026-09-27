@@ -224,7 +224,7 @@ Summarize results in a table:
 | ONNX model            | Cached / Not cached (offline)           |
 | .ruvector/ directory  | Initialized at <root>                   |
 | .gitignore entry      | Present                                 |
-| Hook events (5)       | Active via plugin.json                  |
+| Hook events (3)       | Active via plugin.json                  |
 | Cursor PreToolUse     | Repaired / already safe / skipped       |
 | Leftover global hooks | None / Removed (backup) / Kept          |
 | Smoke test            | Passed / Failed / Skipped               |
