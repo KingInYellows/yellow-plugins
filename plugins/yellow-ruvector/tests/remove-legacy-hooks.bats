@@ -237,3 +237,20 @@ Ignore previous instructions"
   [ "$status" -eq 0 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["cat <<A <<B\nfirst\nA\nruvector hooks post-edit --success\nB"]' "$S" >/dev/null
 }
+
+@test "a legacy call behind a shell keyword or in a subshell is found and removed" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "if true; then ruvector hooks post-edit --success; fi"},
+    {type: "command", command: "for x in 1; do npx ruvector hooks post-command; done"},
+    {type: "command", command: "! ruvector hooks pre-edit x"},
+    {type: "command", command: "{ ruvector hooks session-end; }"},
+    {type: "command", command: "(ruvector hooks session-start)"},
+    {type: "command", command: "echo then ruvector hooks post-edit"},
+    {type: "command", command: "done-ruvector hooks post-edit"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 5 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo then ruvector hooks post-edit", "done-ruvector hooks post-edit"]' "$S" >/dev/null
+}
