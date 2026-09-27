@@ -85,7 +85,11 @@ list=$(jq -r --arg re "$re" '
   # word, quoted or not) is input to the command before it, never commands:
   # drop it first, before newlines count as separators.
   def unquoted:
-    gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    # Several heredocs on one command (cat <<A <<B) take their bodies in
+    # order; rather than parse them all, such a command is data (fail
+    # closed: never listed, never removed).
+    if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
+    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
@@ -108,7 +112,11 @@ tmp=$(mktemp "${TMPDIR:-/tmp}/rv-settings.XXXXXX") || exit 2
 trap 'rm -f "$tmp"' EXIT
 jq --arg re "$re" '
   def unquoted:
-    gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
+    # Several heredocs on one command (cat <<A <<B) take their bodies in
+    # order; rather than parse them all, such a command is data (fail
+    # closed: never listed, never removed).
+    if ([scan("(?<!<)<<(?!<)")] | length) > 1 then "" else . end
+    | gsub("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?(?<t>[^[:space:]\"\u0027;&|<>()]+)[\"\u0027]?[^\\n]*\\n(.|\\n)*?\\n[[:space:]]*\\k<t>(?=\\n|$)"; "")
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
