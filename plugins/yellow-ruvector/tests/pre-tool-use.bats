@@ -746,3 +746,22 @@ related_staged() {
   q=$(sed -n 1p "$HOME/.cache/yellow-ruvector/related-stage.rmfail")
   [ -d "$q" ]
 }
+
+@test "a staging dir orphaned by two racing --stage calls is swept once a day old" {
+  export CLAUDE_CODE_SESSION_ID=race
+  # Two concurrent stages in one session: both dirs exist, one pointer wins.
+  bash "$RELATED_SCRIPT" --stage >/dev/null & bash "$RELATED_SCRIPT" --stage >/dev/null; wait
+  orphan=$(mktemp -d "$STAGE_BASE/q.XXXXXXXX"); printf 'src/a.ts\n' > "$orphan/query"
+  touch -d '2 days ago' "$orphan" 2>/dev/null || skip "touch -d unsupported"
+  fresh=$(mktemp -d "$STAGE_BASE/q.XXXXXXXX")
+  bash "$RELATED_SCRIPT" --stage >/dev/null
+  [ ! -e "$orphan" ]
+  # A fresh one (possibly an in-flight stage) is left alone.
+  [ -d "$fresh" ]
+  # And what the pointer names still works.
+  q=$(sed -n 1p "$HOME/.cache/yellow-ruvector/related-stage.race")/query
+  printf 'src/a.ts\n' > "$q"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'8\tsrc/b.ts'* ]]
+}

@@ -89,6 +89,17 @@ if [ "$1" = "--stage" ]; then
     drop_stage "$old"
   done < <(find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
     2>/dev/null | head -n 100)
+  # Staging dirs no pointer names any more (two stages raced within one
+  # session: the later pointer wins) are swept once over a day old, the
+  # query file and the then-empty dir only (at most 100 per call).
+  while IFS= read -r old; do
+    case "${old#"${STAGE_PREFIX}"}" in ''|*/*) continue ;; esac
+    [ "$old" = "$sdir" ] && continue
+    [ -d "$old" ] && [ ! -L "$old" ] && [ -O "$old" ] || continue
+    rm -f -- "${old}/query" 2>/dev/null || true
+    rmdir -- "$old" 2>/dev/null || true
+  done < <(find "$STAGE_BASE" ! -name "${STAGE_BASE##*/}" -prune -type d -name 'q.*' -mtime +0 \
+    2>/dev/null | head -n 100)
   # A non-regular file at the pointer path would take the rename *inside*
   # it (a directory). A symlink is unlinked and an empty directory removed;
   # anything else is refused, never deleted recursively (it may hold files
