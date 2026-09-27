@@ -67,7 +67,9 @@ drop_stage() {
     rm -f -- "${d}/query" 2>/dev/null || true
     rmdir -- "$d" 2>/dev/null || true
   fi
-  rm -f -- "$1"
+  # Best effort (set -e): an unwritable pointer dir must not abort --stage
+  # before it can clean up its own staging dir.
+  rm -f -- "$1" 2>/dev/null || true
 }
 if [ "$1" = "--stage" ]; then
   ( umask 077; mkdir -p "$STAGE_BASE" ) 2>/dev/null || exit 1

@@ -727,3 +727,22 @@ related_staged() {
   [ "$status" -ne 0 ]
   [ -z "$(ls -A "$STAGE_BASE" 2>/dev/null)" ]
 }
+
+@test "--stage leaves no staging dir behind when an old pointer cannot be removed" {
+  export CLAUDE_CODE_SESSION_ID=rmfail
+  bash "$RELATED_SCRIPT" --stage >/dev/null
+  n=$(ls -A "$STAGE_BASE" | wc -l)
+  # rm cannot remove pointer files (as in a read-only pointer dir; root
+  # ignores modes, so an rm stub stands in).
+  rb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rb"
+  printf '#!/bin/sh\nfor a; do case "$a" in *related-stage.*) exit 1 ;; esac; done\nexec %s "$@"\n' "$(command -v rm)" > "$rb/rm"
+  chmod +x "$rb/rm"
+  for _ in 1 2 3; do
+    PATH="$rb:$PATH" bash "$RELATED_SCRIPT" --stage >/dev/null 2>&1 || true
+  done
+  # Each attempt drops the previous stage and publishes its own (the
+  # pointer is replaced by rename): no staging dir accumulates.
+  [ "$(ls -A "$STAGE_BASE" | wc -l)" -eq "$n" ]
+  q=$(sed -n 1p "$HOME/.cache/yellow-ruvector/related-stage.rmfail")
+  [ -d "$q" ]
+}
