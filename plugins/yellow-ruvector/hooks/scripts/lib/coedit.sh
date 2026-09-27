@@ -422,17 +422,27 @@ coedit_prune_sessions() {
         coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null
       done
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
-      # background delete was interrupted: here and in the store dir, at
-      # most 10 per run, only when untouched for 10 minutes (a delete still
-      # in progress keeps updating the dir's mtime). rm -rf never follows
-      # symlinks inside the tree, and a symlinked entry is skipped.
-      n=0
+      # background delete was interrupted: here and in the store dir, only
+      # when untouched for 10 minutes (a delete still in progress keeps
+      # updating the dir's mtime). rm -rf never follows symlinks inside the
+      # tree, and a symlinked entry is skipped. Bounded (at most 50 tried,
+      # 10 removed per run) and started at a random entry, so trees that
+      # cannot be removed never keep the sweep from reaching later ones.
+      stale=()
       for m in .*.lock.stale.* ../.coedit.lock.stale.*; do
-        [ "$n" -lt 10 ] && [ "$SECONDS" -lt 5 ] || break
-        [ -d "$m" ] && [ ! -L "$m" ] || continue
-        n=$((n + 1))
-        coedit_older_than "$(coedit_mtime "$m")" 600 && rm -rf -- "$m" 2>/dev/null
-      done ) \
+        [ -d "$m" ] && [ ! -L "$m" ] && stale+=("$m")
+      done
+      total=${#stale[@]} tried=0 removed=0
+      if [ "$total" -gt 0 ]; then
+        i=$((RANDOM % total))
+        while [ "$tried" -lt "$total" ] && [ "$tried" -lt 50 ] && [ "$removed" -lt 10 ] && [ "$SECONDS" -lt 5 ]; do
+          m=${stale[$(( (i + tried) % total ))]}
+          tried=$((tried + 1))
+          coedit_older_than "$(coedit_mtime "$m")" 600 || continue
+          rm -rf -- "$m" 2>/dev/null
+          [ -e "$m" ] || removed=$((removed + 1))
+        done
+      fi ) \
     </dev/null >/dev/null 2>&1 &
   return 0
 }

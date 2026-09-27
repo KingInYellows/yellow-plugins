@@ -558,6 +558,25 @@ exit 0'
   [ -d "$RUVECTOR_DIR/.coedit.lock.stale.3-3.9" ]
 }
 
+@test "undeletable stale trees never keep the sweep from later ones" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  # An rm that cannot remove the a* trees (as a read-only tree would be).
+  rmbin="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmbin"
+  real_rm=$(command -v rm)
+  printf '#!/bin/sh\nfor a; do case "$a" in *.coedit.lock.stale.a*) exit 1 ;; esac; done\nexec %s "$@"\n' "$real_rm" > "$rmbin/rm"
+  chmod +x "$rmbin/rm"
+  for i in $(seq 10 29); do
+    d="$RUVECTOR_DIR/.coedit.lock.stale.a$i"; mkdir -p "$d"
+    touch -d '20 minutes ago' "$d" 2>/dev/null || skip "touch -d unsupported"
+  done
+  d="$RUVECTOR_DIR/.coedit.lock.stale.z99"; mkdir -p "$d"; touch -d '20 minutes ago' "$d"
+  PATH="$rmbin:$PATH" run run_hook '{"cwd":""}'
+  for i in $(seq 1 30); do [ -e "$d" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ -d "$RUVECTOR_DIR/.coedit.lock.stale.a10" ]
+}
+
 @test "session pruning never delays the SessionStart response" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$BATS_TEST_TMPDIR/slowbin" "$RUVECTOR_DIR/coedit-sessions"
