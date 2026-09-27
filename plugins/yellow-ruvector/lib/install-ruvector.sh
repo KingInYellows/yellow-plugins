@@ -19,6 +19,14 @@
 
 YELLOW_RUVECTOR_MODEL='all-MiniLM-L6-v2'
 
+# yellow_ruvector_flat <text> — one line for display: control characters as
+# spaces, dash runs shortened. Paths printed to a model-visible stream (the
+# data dir, the plugin root) go through it, so none can forge a fence or an
+# instruction line.
+yellow_ruvector_flat() {
+  printf '%s' "$1" | LC_ALL=C tr '\000-\037\177' ' ' | sed -E 's/-{3,}/--/g'
+}
+
 # Set RUVECTOR_DATA (and RUVECTOR_DATA_FALLBACK=1 when CLAUDE_PLUGIN_DATA is
 # unset). Does not validate; see yellow_ruvector_validate_paths.
 yellow_ruvector_data_dir() {
@@ -86,7 +94,7 @@ yellow_ruvector_validate_paths() {
   for p in "$CLAUDE_PLUGIN_ROOT" "$RUVECTOR_DATA"; do
     case "/${p}/" in
       */../*|*/./*)
-        printf 'yellow-ruvector: refusing — path has a . or .. component: %s\n' "$p" >&2
+        printf 'yellow-ruvector: refusing — path has a . or .. component: %s\n' "$(yellow_ruvector_flat "$p")" >&2
         return 1 ;;
     esac
   done
@@ -130,7 +138,7 @@ yellow_ruvector_validate_paths() {
     "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|"$xdg_dir"|"$cfg_data"/?*) ;;
     *)
       printf 'yellow-ruvector: refusing — data dir outside HOME/tmp (and not under a non-system XDG_DATA_HOME or CLAUDE_CONFIG_DIR/plugins/data): %s\n' \
-        "$RUVECTOR_DATA" >&2
+        "$(yellow_ruvector_flat "$RUVECTOR_DATA")" >&2
       return 1 ;;
   esac
   # Claude Code installs plugins under ${CLAUDE_CONFIG_DIR}/plugins/, which a
@@ -148,7 +156,7 @@ yellow_ruvector_validate_paths() {
     "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/private/tmp/*|/usr/*|/opt/*|"$cfg_plugins"/?*) ;;
     *)
       printf 'yellow-ruvector: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
-        "$CLAUDE_PLUGIN_ROOT" >&2
+        "$(yellow_ruvector_flat "$CLAUDE_PLUGIN_ROOT")" >&2
       return 1 ;;
   esac
   return 0
@@ -365,7 +373,7 @@ yellow_ruvector_install_in_progress() {
 yellow_ruvector_do_install() {
   local hash final tmp prev
   hash=$(yellow_ruvector_lock_hash) || {
-    printf 'yellow-ruvector: cannot hash %s/package-lock.json\n' "$CLAUDE_PLUGIN_ROOT" >&2
+    printf 'yellow-ruvector: cannot hash %s/package-lock.json\n' "$(yellow_ruvector_flat "$CLAUDE_PLUGIN_ROOT")" >&2
     return 1
   }
   final="${RUVECTOR_DATA}/install-${hash}"
@@ -407,7 +415,7 @@ yellow_ruvector_do_install() {
 
   if ! ( cd "$tmp" && env -i "${env_args[@]}" \
          npm ci --ignore-scripts --omit=dev --no-audit --no-fund --loglevel=error ) >&2; then
-    printf 'yellow-ruvector: npm ci failed in %s\n' "$tmp" >&2
+    printf 'yellow-ruvector: npm ci failed in %s\n' "$(yellow_ruvector_flat "$tmp")" >&2
     rm -rf -- "$tmp" 2>/dev/null
     return 1
   fi

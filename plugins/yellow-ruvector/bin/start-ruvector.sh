@@ -22,7 +22,9 @@
 # RUVECTOR_INSTALL_WAIT (seconds to wait for a running install, default 25).
 set -euo pipefail
 
-log() { printf 'yellow-ruvector: %s\n' "$*" >&2; }
+# One line per message: paths inside (data dir, install) are flattened
+# (control characters as spaces, dash runs shortened).
+log() { printf 'yellow-ruvector: %s\n' "$(printf '%s' "$*" | LC_ALL=C tr '\000-\037\177' ' ' | sed -E 's/-{3,}/--/g')" >&2; }
 
 : "${CLAUDE_PLUGIN_ROOT:?yellow-ruvector launcher: CLAUDE_PLUGIN_ROOT is unset}"
 # shellcheck source=../lib/install-ruvector.sh

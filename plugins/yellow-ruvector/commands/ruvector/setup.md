@@ -55,7 +55,7 @@ printf '\n=== Plugin-managed ruvector ===\n'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set (run /ruvector:setup from within Claude Code)}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 if yellow_ruvector_validate_paths; then
-  printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
+  printf 'data dir: %s%s\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
   if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then printf 'install: missing, out of date, or broken\n'
   else printf 'install: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null)"; fi
@@ -89,7 +89,7 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 yellow_ruvector_validate_paths || exit 1
 if ! yellow_ruvector_acquire_install_lock 60; then
-  printf 'Another ruvector install still holds %s/.install.lock after 60s.\n' "$RUVECTOR_DATA"
+  printf 'Another ruvector install still holds %s/.install.lock after 60s.\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")"
   exit 1
 fi
 trap 'yellow_ruvector_release_install_lock' EXIT

@@ -23,7 +23,7 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 node --version 2>/dev/null || printf 'node: not found\n'
 if yellow_ruvector_validate_paths; then
-  printf 'data dir: %s%s\n' "$RUVECTOR_DATA" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
+  printf 'data dir: %s%s\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
   # This plugin version's own install (what its MCP server and hooks run),
   # not `current`, which another session's plugin version may have moved.
@@ -35,7 +35,7 @@ if yellow_ruvector_validate_paths; then
     rv_dir="${rv_entry%/node_modules/*}"
     printf 'install: %s, version %s\ncli: %s\n' "${rv_dir##*/}" "$(node "$rv_entry" --version 2>/dev/null)" "$rv_entry"
     [ "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null)" = "${rv_dir##*/}" ] \
-      || printf 'current: %s (another plugin version moved it; this session keeps its own install)\n' "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || echo none)"
+      || printf 'current: %s (another plugin version moved it; this session keeps its own install)\n' "$(yellow_ruvector_flat "$(readlink "${RUVECTOR_DATA}/current" 2>/dev/null || echo none)")"
   fi
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
