@@ -46,6 +46,7 @@ _COEDIT_BUMP_JQ='
      | .value | to_entries[]
      # A count over 10^9 is corrupt (no real history gets near it), and at
      # 2^53 and above `+ 1` no longer changes it: such a pair is dropped.
+     # Increments stop at 10^9, so a count this writer produced is kept.
      | select((.key | safe) and .key != $k and .value > 0 and .value <= 1000000000)
      | {k: ([$k, .key] | min), o: ([$k, .key] | max), n: (.value | floor)}]
     | group_by([.k, .o]) | map(.[0] + {n: (map(.n) | max)})
@@ -53,7 +54,7 @@ _COEDIT_BUMP_JQ='
     | if ($a | safe) and ($b | safe) and $a != $b then
         ([$a, $b] | min) as $k | ([$a, $b] | max) as $o
         | if any(.[]; .k == $k and .o == $o)
-          then map(if .k == $k and .o == $o then .n += 1 | .cur = true else . end)
+          then map(if .k == $k and .o == $o then .n = ([.n + 1, 1000000000] | min) | .cur = true else . end)
           else . + [{k: $k, o: $o, n: 1, cur: true}] end
       else . end
     # Cap: keep the highest counts, whole pairs at a time, within both the
