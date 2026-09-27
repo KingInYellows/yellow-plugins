@@ -773,6 +773,20 @@ END"
   [ -d "$sd/.a10.lock.reclaim.1-1" ]
 }
 
+@test "reclaim-marker discovery is bounded: a slow directory listing never runs past the worker's budget" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$RUVECTOR_DIR/coedit-sessions"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  printf '#!/bin/sh\ncase "$*" in *lock.reclaim*) echo $$ >> "%s/pids"; exec sleep 30 ;; esac\nexec %s "$@"\n' "$fb" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find"
+  PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  for _ in $(seq 1 50); do [ -s "$fb/pids" ] && break; sleep 0.1; done
+  [ -s "$fb/pids" ]
+  sleep 4
+  while read -r p; do ! kill -0 "$p" 2>/dev/null; done < "$fb/pids"
+}
+
 @test "expired reclaim markers of vanished sessions are swept" {
   make_ruvector_stub 'exit 0'
   mkdir -p "$RUVECTOR_DIR/coedit-sessions/.gone.lock.reclaim.1-1" "$RUVECTOR_DIR/coedit-sessions/.live.lock.reclaim.2-2"
