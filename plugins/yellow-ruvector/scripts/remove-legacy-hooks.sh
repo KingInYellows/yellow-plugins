@@ -41,25 +41,29 @@ case "$f" in
   --user) f="$user_settings"; [ -f "$f" ] || exit 1 ;;
   --project) f="$project_settings"; [ -f "$f" ] || exit 1 ;;
 esac
-[ -n "$f" ] && [ -f "$f" ] || { printf 'remove-legacy-hooks: no settings file %s\n' "$f" >&2; exit 2; }
+# Paths can come from the project (a checkout path, a symlink target): every
+# path printed here is one line, control characters as spaces and dash runs
+# shortened, so none can forge a fence or instruction line in the caller.
+disp() { printf '%s' "$1" | LC_ALL=C tr '\000-\037\177' ' ' | sed -E 's/-{3,}/--/g'; }
+[ -n "$f" ] && [ -f "$f" ] || { printf 'remove-legacy-hooks: no settings file %s\n' "$(disp "$f")" >&2; exit 2; }
 if [ "$f" = "$project_settings" ]; then
   # Checked first: when HOME is the project the two strings are equal, and a
   # cloned .claude symlink must still be refused rather than followed.
   resolved=$(resolve_path "$f") || resolved=""
   resolved_root=$(resolve_path "$root") || resolved_root=""
   if [ -z "$resolved" ] || [ -z "$resolved_root" ] || [ "$resolved" != "${resolved_root}/.claude/settings.json" ]; then
-    printf 'remove-legacy-hooks: refusing project settings that resolve outside the project: %s\n' "$f" >&2
+    printf 'remove-legacy-hooks: refusing project settings that resolve outside the project: %s\n' "$(disp "$f")" >&2
     exit 2
   fi
   target="$resolved"
 elif [ "$f" = "$user_settings" ]; then
   target=$(resolve_path "$f") || target=""
 else
-  printf 'remove-legacy-hooks: refusing a settings path outside the allowlist: %s\n' "$f" >&2
+  printf 'remove-legacy-hooks: refusing a settings path outside the allowlist: %s\n' "$(disp "$f")" >&2
   exit 2
 fi
 [ -n "$target" ] && [ -f "$target" ] && [ ! -L "$target" ] \
-  || { printf 'remove-legacy-hooks: not a regular file: %s\n' "$f" >&2; exit 2; }
+  || { printf 'remove-legacy-hooks: not a regular file: %s\n' "$(disp "$f")" >&2; exit 2; }
 f="$target"
 
 # Only an actual ruvector invocation: the `ruvector` executable (bare, by
@@ -89,7 +93,7 @@ list=$(jq -r --arg re "$re" '
   # Commands come from a settings file (a cloned project ships one): print
   # each on one line, control characters as spaces, dash runs shortened, so
   # the listing can never forge a fence line in the caller.
-  | "\($e): \(.command | tostring | gsub("[[:cntrl:]]"; " ") | gsub("-{3,}"; "--"))"' "$f" 2>/dev/null) || { printf 'remove-legacy-hooks: %s is not valid JSON\n' "$f" >&2; exit 2; }
+  | "\($e): \(.command | tostring | gsub("[[:cntrl:]]"; " ") | gsub("-{3,}"; "--"))"' "$f" 2>/dev/null) || { printf 'remove-legacy-hooks: %s is not valid JSON\n' "$(disp "$f")" >&2; exit 2; }
 [ -n "$list" ] || exit 1
 printf '%s\n' "$list"
 [ "$apply" = --apply ] || exit 0
@@ -113,6 +117,8 @@ jq --arg re "$re" '
 [ -s "$tmp" ] || exit 2
 backup=$(mktemp "${f}.bak-XXXXXX") || exit 2
 cat -- "$f" > "$backup" || exit 2
-cat "$tmp" > "$f" || { printf 'remove-legacy-hooks: could not rewrite %s (backup kept at %s)\n' "$f" "$backup" >&2; exit 2; }
-printf 'removed; backup: %s\n' "$backup"
+cat "$tmp" > "$f" || { printf 'remove-legacy-hooks: could not rewrite %s (backup kept at %s)\n' "$(disp "$f")" "$(disp "$backup")" >&2; exit 2; }
+# Only the backup's own name (settings.json.bak-XXXXXX, safe characters):
+# it sits next to the settings file.
+printf 'removed; backup %s kept next to the settings file\n' "$(disp "${backup##*/}")"
 exit 0
