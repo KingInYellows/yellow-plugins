@@ -1013,7 +1013,7 @@ END"
     "$(command -v find)" "$(command -v find)" > "$fb/find"
   chmod +x "$fb/find"
   for n in a1 a2 a3 a4 a5 a6 z1; do mkdir -p "$h/.coedit.lock.stale.$n"; done
-  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  for _ in $(seq 1 20); do
     PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
     for i in $(seq 1 30); do [ -e "$h/.coedit.lock.stale.z1" ] || break; sleep 0.1; done
     [ -e "$h/.coedit.lock.stale.z1" ] || break

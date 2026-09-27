@@ -252,6 +252,7 @@ ruvector_lease_pid() {
 ruvector_probe_timeout() {
   local name cmd
   TIMEOUT_CMD=""
+  _RUVECTOR_TIMEOUT_PROBED=1
   for name in timeout gtimeout; do
     cmd="$(command -v "$name" || true)"
     if [ -n "$cmd" ] && "$cmd" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
@@ -261,6 +262,9 @@ ruvector_probe_timeout() {
   done
   return 1
 }
+# Set only by the probe in this process: a TIMEOUT_CMD inherited from the
+# environment (a stale path, BusyBox timeout) is never trusted unprobed.
+_RUVECTOR_TIMEOUT_PROBED=""
 
 # ruvector_proc_tree <pid> — print <pid> and all its descendants (pgrep -P
 # walk; just <pid> where pgrep is missing).
@@ -321,6 +325,10 @@ run_budgeted() {
   else
     kill "$watcher" 2>/dev/null
   fi
+  # Timed out even if the command then exited 0 (it handled TERM): report
+  # it as GNU timeout does, so a caller never takes cut-off output as a
+  # success.
+  [ -n "$flag" ] && [ -e "$flag/fired" ] && rc=124
   [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }

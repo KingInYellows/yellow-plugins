@@ -378,7 +378,8 @@ fake_install() {
       st=$(ps -o stat= -p "$c" 2>/dev/null | tr -d " ")
       case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$LIB" "$BATS_TEST_TMPDIR/child.pid" "$PLUGIN_ROOT/lib/install-ruvector.sh" "$fn"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"rc=0"* ]]
+    # Timed out, even though the root exited 0: reported as GNU timeout does.
+    [[ "$output" == *"rc=124"* ]]
   done
 }
 
