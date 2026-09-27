@@ -61,7 +61,7 @@ ensure_pinned_install() {
   entry=""
   # Lease this version's install before any existence check, so a prune in
   # another session cannot remove it between the check and exec.
-  hash=$(yellow_ruvector_lock_hash) && yellow_ruvector_take_lease "install-${hash}"
+  if hash=$(yellow_ruvector_lock_hash); then yellow_ruvector_take_lease "install-${hash}"; fi
   for _pass in 1 2; do
     if needs_install; then
       wait=$(budget_left); [ "$wait" -ge 1 ] || wait=1

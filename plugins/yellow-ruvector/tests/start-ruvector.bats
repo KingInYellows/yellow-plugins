@@ -359,3 +359,14 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [[ "$output" != *EXEC* ]]
   grep -q npm-called "$DATA/npm.log"
 }
+
+@test "a first launch with no data dir yet reaches the install, not a lease failure" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  fresh="$BATS_TEST_TMPDIR/fresh-data"
+  export CLAUDE_PLUGIN_DATA="$fresh" RUVECTOR_MCP_ALLOW="$ALL5"
+  stamp_store
+  printf '#!/bin/sh\necho npm-called >> "%s"\nexit 1\n' "$BATS_TEST_TMPDIR/npm.log" > "$STUBS/npm"; chmod +x "$STUBS/npm"
+  launch "$REPO"
+  grep -q npm-called "$BATS_TEST_TMPDIR/npm.log"
+  ls "$fresh"/.lease.install-* >/dev/null
+}
