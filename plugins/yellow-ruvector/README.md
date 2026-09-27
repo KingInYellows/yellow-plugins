@@ -114,7 +114,7 @@ external services or API keys required.
 | Issue                | Solution                                                 |
 | -------------------- | -------------------------------------------------------- |
 | "ruvector not found" / hooks do nothing | Run `/ruvector:setup` (installs into the plugin data dir; Node 20+) |
-| "starting read-only (hooks_remember and hooks_pretrain disabled)" | The ONNX model could not download for a fresh store; the next session with network restores writes |
+| "ONNX model unavailable or unverified (offline?): starting without hooks_recall, hooks_remember and hooks_pretrain" | The ONNX model could not download; the next session with network restores recall and writes |
 | Old memories missing after upgrading | A store in a subdirectory from older sessions — `/ruvector:status` lists it as `nested store:` |
 | Empty search results | Run `/ruvector:index` first                              |
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |

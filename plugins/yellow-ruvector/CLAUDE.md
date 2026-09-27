@@ -19,13 +19,14 @@ ruvector.
      `process.cwd()`) after healing a linked worktree's `.ruvector` symlink,
      so subdirectory launches and new worktrees use the right store in the
      SAME session;
-  3. guards a fresh store: if `.ruvector/` is missing or has no embedding
-     stamp, the env does not select hash (`RUVECTOR_EMBEDDER=hash`, or
-     `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER` unset), and the ONNX model
-     is not cached, it warms the model (`embed
-     text`, 15s, under the install lock); if that fails (offline), it drops
-     the write tools `hooks_remember` and `hooks_pretrain` from
-     `RUVECTOR_MCP_ALLOW` for the session. Every warm-up (launcher, prewarm,
+  3. guards the model: if the env does not select hash
+     (`RUVECTOR_EMBEDDER=hash`, or `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER`
+     unset) and the ONNX model is not verified, it warms the model (`embed
+     text`, 15s, under the install lock); if it stays unverified (offline,
+     budget spent), it drops every model-using tool (`hooks_recall`,
+     `hooks_remember`, `hooks_pretrain`) from `RUVECTOR_MCP_ALLOW` for the
+     session, stamped store or not: a tool call would otherwise download the
+     model outside the model lock, and on an unstamped store stamp it hash. Every warm-up (launcher, prewarm,
      setup, the status dry-run) holds a lock next to the shared model cache
      (`<cache>/.ruvector/models/.yellow-ruvector-warm.lock`), since data roots
      of different plugin IDs share that cache. While another session still
