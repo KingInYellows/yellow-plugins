@@ -580,19 +580,38 @@ yellow_ruvector_swap_current() {
 # Creates the data dir on a first launch; never fails (a missing lease only
 # loses the prune protection).
 yellow_ruvector_take_lease() {
-  mkdir -p "$RUVECTOR_DATA" 2>/dev/null && : > "${RUVECTOR_DATA}/.lease.${1}.$$" 2>/dev/null
+  mkdir -p "$RUVECTOR_DATA" 2>/dev/null && yellow_ruvector_write_lease "${RUVECTOR_DATA}/.lease.${1}.$$" "$$"
   return 0
 }
 
+# yellow_ruvector_write_lease <lease-file> <pid> — the lease holds <pid>'s
+# start time (empty where ps cannot report it), so a pid the OS reuses for
+# an unrelated process never keeps an old install from being pruned.
+yellow_ruvector_write_lease() {
+  yellow_ruvector_pid_start "$2" > "$1" 2>/dev/null
+  return 0
+}
+
+# yellow_ruvector_lease_live <lease-file> <pid> — 0 when <pid> runs and is
+# the process that took the lease (as yellow_ruvector_pid_alive for locks).
+yellow_ruvector_lease_live() {
+  local rec now
+  kill -0 "$2" 2>/dev/null || return 1
+  rec=$(cat "$1" 2>/dev/null) || return 0
+  [ -n "$rec" ] || return 0
+  now=$(yellow_ruvector_pid_start "$2")
+  [ -z "$now" ] || [ "$now" = "$rec" ]
+}
+
 # yellow_ruvector_leased <install-name> — 0 when a live process holds a lease
-# on it. Leases of dead processes are removed on the way.
+# on it. Leases of dead (or reused) pids are removed on the way.
 yellow_ruvector_leased() {
   local l pid rc=1
   for l in "${RUVECTOR_DATA}/.lease.${1}."*; do
     [ -e "$l" ] || continue
     pid=${l##*.}
     case "$pid" in ''|*[!0-9]*) rm -f -- "$l" 2>/dev/null; continue ;; esac
-    if kill -0 "$pid" 2>/dev/null; then rc=0; else rm -f -- "$l" 2>/dev/null; fi
+    if yellow_ruvector_lease_live "$l" "$pid"; then rc=0; else rm -f -- "$l" 2>/dev/null; fi
   done
   return $rc
 }
@@ -610,7 +629,7 @@ yellow_ruvector_prune() {
   for l in "${RUVECTOR_DATA}"/.lease.*; do
     [ -e "$l" ] || continue
     case "${l##*.}" in ''|*[!0-9]*) rm -f -- "$l" 2>/dev/null; continue ;; esac
-    kill -0 "${l##*.}" 2>/dev/null || rm -f -- "$l" 2>/dev/null
+    yellow_ruvector_lease_live "$l" "${l##*.}" || rm -f -- "$l" 2>/dev/null
   done
   # -ww: untruncated arguments (BSD/macOS ps otherwise cuts at the terminal
   # width and could hide the /install-<hash>/ part of a live server's path).

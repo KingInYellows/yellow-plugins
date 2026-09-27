@@ -307,6 +307,21 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo $(date) ruvector hooks post-edit", "echo $((1+2)) ruvector hooks post-edit", "echo `date` \"$(date)\" ruvector hooks post-edit"]' "$S" >/dev/null
 }
 
+@test "a legacy call behind an assignment whose value is a command substitution is found" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "FOO=$(printf x) ruvector hooks post-edit --success"},
+    {type: "command", command: "A=$(x) B=`y` npx ruvector hooks post-command"},
+    {type: "command", command: "if true; then FOO=\"$(date)\" ruvector hooks post-edit; fi"},
+    {type: "command", command: "echo FOO=$(date) ruvector hooks post-edit"},
+    {type: "command", command: "echo \"FOO=$(date) ruvector hooks post-edit\""}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 3 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo FOO=$(date) ruvector hooks post-edit", "echo \"FOO=$(date) ruvector hooks post-edit\""]' "$S" >/dev/null
+}
+
 @test "a legacy call behind environment assignments is found and removed" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "RUVECTOR_ONNX=0 ruvector hooks post-edit --success"},

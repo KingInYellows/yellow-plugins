@@ -100,6 +100,14 @@ list=$(jq -r --arg re "$re" '
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
+    # first, then the assignment prefixes cmd: its body is moved out in
+    # front and the assignment kept, so cmd stays in command position. One
+    # at a time, until none is left (A=$(x) B=`y` cmd).
+    | def asub: . as $x
+        | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
+        | if . == $x then . else asub end;
+      asub
     | gsub("\u0027[^\u0027]*\u0027"; "")
     # A double-quoted span is text, except command substitutions inside it,
     # which run: keep each $(...) / `...` body as its own command. The "_"
@@ -143,6 +151,14 @@ jq --arg re "$re" '
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
+    # first, then the assignment prefixes cmd: its body is moved out in
+    # front and the assignment kept, so cmd stays in command position. One
+    # at a time, until none is left (A=$(x) B=`y` cmd).
+    | def asub: . as $x
+        | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
+        | if . == $x then . else asub end;
+      asub
     | gsub("\u0027[^\u0027]*\u0027"; "")
     # A double-quoted span is text, except command substitutions inside it,
     # which run: keep each $(...) / `...` body as its own command. The "_"
