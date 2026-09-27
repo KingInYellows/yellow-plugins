@@ -76,12 +76,16 @@ if [ "$1" = "--file" ]; then
   case "${qdir#"${STAGE_PREFIX}"}" in ''|*/*) printf 'coedit-related: not a staged query file\n' >&2; exit 2 ;; esac
   [ -d "$qdir" ] && [ ! -L "$qdir" ] && [ -O "$qdir" ] && [ -f "$qf" ] && [ ! -L "$qf" ] \
     || { printf 'coedit-related: not a staged query file\n' >&2; exit 2; }
-  path="" _extra="" rc=1
+  path="" _extra="" rc=1 has_nul=0
+  # read drops NUL bytes silently (src/a<NUL>b.ts would become src/ab.ts),
+  # so count them at the byte level first.
+  [ "$(LC_ALL=C tr -d '\000' < "$qf" | wc -c)" -eq "$(wc -c < "$qf")" ] || has_nul=1
   { IFS= read -r path || true; IFS= read -r _extra && rc=0 || true; } < "$qf"
   # Remove only what --stage and the Write produced: the query file, then
   # the (now empty) dir. Anything else in there stays put.
   rm -f -- "$qf"
   rmdir -- "$qdir" 2>/dev/null || true
+  [ "$has_nul" -eq 0 ] || { printf 'coedit-related: a path may not contain control characters\n' >&2; exit 2; }
   [ -n "$path" ] || { printf 'coedit-related: no path in the query file\n' >&2; exit 2; }
   if [ "$rc" -eq 0 ] || [ -n "$_extra" ]; then
     printf 'coedit-related: a path may not span more than one line\n' >&2; exit 2

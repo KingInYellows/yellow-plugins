@@ -550,3 +550,13 @@ related_staged() {
   [[ "$output" != *"src/b.ts"* ]]
   [ ! -e "$qb" ]
 }
+
+@test "coedit-related.sh rejects a NUL byte instead of dropping it" {
+  qf=$(cd "$PROJECT_ROOT" && bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  printf 'src/\000a.ts\n' > "$qf"
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" --run' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"control characters"* ]]
+  [[ "$output" != *"src/b.ts"* ]]
+  [ ! -e "$qf" ]
+}
