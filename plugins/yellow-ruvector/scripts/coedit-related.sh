@@ -84,10 +84,14 @@ if [ "$1" = "--stage" ]; then
     drop_stage "$old"
   done < <(find "$PTR_DIR" ! -name "${PTR_DIR##*/}" -prune -type f -name 'related-stage.*' -mtime +0 \
     2>/dev/null | head -n 100)
-  # A non-regular file at the pointer path (a directory would take the
-  # rename *inside* it) is removed first; PTR_DIR is ours and not a symlink.
-  if [ -L "$PTR" ] || { [ -e "$PTR" ] && [ ! -f "$PTR" ]; }; then
-    rm -rf -- "$PTR" 2>/dev/null || true
+  # A non-regular file at the pointer path would take the rename *inside*
+  # it (a directory). A symlink is unlinked and an empty directory removed;
+  # anything else is refused, never deleted recursively (it may hold files
+  # that are not ours).
+  if [ -L "$PTR" ]; then
+    rm -f -- "$PTR" 2>/dev/null || true
+  elif [ -d "$PTR" ]; then
+    rmdir -- "$PTR" 2>/dev/null || true
   fi
   if [ -L "$PTR" ] || { [ -e "$PTR" ] && [ ! -f "$PTR" ]; }; then
     printf 'coedit-related: %s is not a regular file; remove it and retry\n' "$PTR" >&2

@@ -668,12 +668,19 @@ related_staged() {
   [ "$status" -eq 0 ]
 }
 
-@test "a directory at the session pointer path is replaced, so --stage then --run works" {
+@test "a directory at the session pointer path: an empty one is replaced, a non-empty one refused, never deleted" {
   export CLAUDE_CODE_SESSION_ID=ptr-test
   bash "$RELATED_SCRIPT" --stage >/dev/null
   ptr="$HOME/.cache/yellow-ruvector/related-stage.ptr-test"
   [ -f "$ptr" ]
-  rm -f "$ptr"; mkdir -p "$ptr/sub"
+  rm -f "$ptr"; mkdir -p "$ptr/sub"; : > "$ptr/sub/keep"
+  before=$(ls -A "$STAGE_BASE" | wc -l)
+  run --separate-stderr bash "$RELATED_SCRIPT" --stage
+  [ "$status" -ne 0 ]
+  [ -e "$ptr/sub/keep" ]
+  # No staging dir is left behind by the refused attempt.
+  [ "$(ls -A "$STAGE_BASE" | wc -l)" -eq "$before" ]
+  rm -rf "$ptr"; mkdir "$ptr"
   q=$(bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
   [ -f "$ptr" ]
   printf 'src/a.ts\n' > "$q"
