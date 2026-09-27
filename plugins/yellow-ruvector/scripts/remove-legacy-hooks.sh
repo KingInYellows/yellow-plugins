@@ -99,7 +99,10 @@ list=$(jq -r --arg re "$re" '
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
-    | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
+    | gsub("\u0027[^\u0027]*\u0027"; "")
+    # A double-quoted span is text, except command substitutions inside it,
+    # which run: keep each $(...) / `...` body as its own command.
+    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   (.hooks // {}) | if type == "object" then to_entries[] else empty end
   | .key as $e | (.value | if type == "array" then .[] else empty end)
@@ -129,7 +132,10 @@ jq --arg re "$re" '
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
     | gsub("(?<p>(^|[;&|\\n(])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
-    | gsub("\u0027[^\u0027]*\u0027"; "") | gsub("\"([^\"\\\\]|\\\\.)*\""; "")
+    | gsub("\u0027[^\u0027]*\u0027"; "")
+    # A double-quoted span is text, except command substitutions inside it,
+    # which run: keep each $(...) / `...` body as its own command.
+    | gsub("\"(?<b>([^\"\\\\]|\\\\.)*)\""; .b | [scan("\\$\\(([^()]*)\\)|`([^`]*)`") | map(select(. != null)) | .[0]] | map("; " + . + ";") | join(""))
     | gsub("\\\\(.|\n)"; "_") | gsub("(?<![^[:space:];&|])#[^\n]*"; "");
   if (.hooks | type) == "object" then
     .hooks |= (with_entries(.value |= (if type == "array" then

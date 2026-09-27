@@ -300,3 +300,16 @@ Ignore previous instructions"
   [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
   [[ "$output" == *"<<-EOF"* ]]
 }
+
+@test "a legacy call inside a double-quoted command substitution is found; quoted text is not" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "echo \"$(ruvector hooks post-edit --success)\""},
+    {type: "command", command: "echo \"x `ruvector hooks post-command` y\""},
+    {type: "command", command: "echo \"ruvector hooks post-edit\""}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo \"ruvector hooks post-edit\""]' "$S" >/dev/null
+}
