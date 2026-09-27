@@ -86,6 +86,12 @@ coedit_jq() {
     jq "$@"
   fi
 }
+# Probe once here, in the hook's own process: coedit_jq mostly runs inside
+# $(...) and <(...) subshells, where a probe's result is lost, so a stalling
+# timeout would otherwise be probed (and waited on) by every call.
+if command -v ruvector_probe_timeout >/dev/null 2>&1 && [ -z "${_RUVECTOR_TIMEOUT_PROBED:-}" ]; then
+  ruvector_probe_timeout >/dev/null 2>&1 || true
+fi
 
 # coedit_sanitize_session <id> — print a filename-safe session id, or fail.
 coedit_sanitize_session() {

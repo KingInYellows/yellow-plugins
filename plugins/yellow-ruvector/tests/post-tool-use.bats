@@ -69,6 +69,18 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a stalling timeout is probed once per hook run, not in every jq subshell" {
+  # A timeout that hangs and ignores TERM: each probe of it costs ~0.4s.
+  printf '#!/bin/sh\necho x >> "%s"\ntrap "" TERM\nsleep 5\n' "$BATS_TEST_TMPDIR/probes" > "$MOCK_BIN/timeout"
+  chmod +x "$MOCK_BIN/timeout"
+  for f in a b; do
+    : > "$BATS_TEST_TMPDIR/probes"
+    edit s1 "$PROJECT_ROOT/src/$f.ts"
+    [ "$(wc -l < "$BATS_TEST_TMPDIR/probes")" -le 1 ]
+  done
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
+
 @test "a destination swapped for a symlink to a directory is replaced, never written through" {
   out="$BATS_TEST_TMPDIR/outside"; mkdir -p "$out"
   mb="$BATS_TEST_TMPDIR/mvbin"; mkdir -p "$mb"
