@@ -319,6 +319,10 @@ run_budgeted() {
   else
     kill "$watcher" 2>/dev/null
   fi
+  # Timed out even if the command then exited 0 (it handled TERM): report
+  # it as GNU timeout does, so a caller never takes cut-off output as a
+  # success.
+  [ -n "$flag" ] && [ -e "$flag/fired" ] && rc=124
   [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }
