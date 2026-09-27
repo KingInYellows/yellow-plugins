@@ -399,6 +399,21 @@ coedit_record() {
   return 0
 }
 
+# coedit_shard [digit] — a random -name bracket expression covering one of
+# eight slices of the session-id alphabet [A-Za-z0-9_-] (or, with `digit`,
+# one of five pairs of digits). COEDIT_SHARD (an index) pins it for tests.
+coedit_shard() {
+  local -a sh
+  if [ "${1:-}" = digit ]; then
+    sh=('[01]' '[23]' '[45]' '[67]' '[89]')
+  else
+    sh=('[0-3]' '[4-7]' '[89ab]' '[cdef]' '[g-p]' '[q-z]' '[A-M]' '[N-Z_-]')
+  fi
+  local i="${COEDIT_SHARD:-$RANDOM}"
+  case "$i" in ''|*[!0-9]*) i=$RANDOM ;; esac
+  printf '%s' "${sh[$(( i % ${#sh[@]} ))]}"
+}
+
 # coedit_prune_sessions <root> — delete session files untouched for 7+ days.
 # Never follows a symlinked store or session dir: it could point at
 # unrelated files.
@@ -420,7 +435,14 @@ coedit_prune_sessions() {
   # was resumed and rewritten after `find` listed it is never removed.
   ( CDPATH= cd -P -- "$sdir" 2>/dev/null && [ "$(pwd -P)" = "$sdir" ] || exit 0
     SECONDS=0
-    run_budgeted 5 find . ! -name . -prune -type f -mtime +7 ! -name '.*' 2>/dev/null \
+    # A full listing gets 3s. If it times out (a huge or slow dir), the next
+    # 2s go to one random name shard (session ids are [A-Za-z0-9_-]; -name
+    # is tested before the stat-costly primaries), so over several runs
+    # every part of the dir is reached, not only the prefix a timed-out
+    # listing always stops in.
+    { run_budgeted 3 find . ! -name . -prune -type f -mtime +7 ! -name '.*' \
+        || LC_ALL=C run_budgeted 2 find . ! -name . -prune -name "$(coedit_shard)*" -type f -mtime +7
+    } 2>/dev/null \
       | while IFS= read -r f && [ "$SECONDS" -lt 5 ]; do
           f="${f#./}"
           sid=$(coedit_sanitize_session "$f") && [ "$sid" = "$f" ] || continue
@@ -451,14 +473,22 @@ coedit_prune_sessions() {
       nl='
 '
       markers=()
+      # A timed-out listing is followed by one random name shard (session
+      # locks by the session id's first character, the store lock's by the
+      # inode's first digit), as for the session files above.
       while IFS= read -r m; do markers+=("${m#./}"); done < <(
-        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*"
-          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*"
+        { run_budgeted 2 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 1 find . ! -name . -prune -name ".$(coedit_shard)*.lock.reclaim.*" -type d ! -name "*${nl}*"
+          run_budgeted 2 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 1 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
         } 2>/dev/null \
           | LC_ALL=C awk -v k=500 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
               END { c = (t < k) ? t : k; for (i = 1; i <= c; i++) print r[i] }'
       )
+      # Timed-out listings plus their shard passes can take 6s: the sweep
+      # itself always keeps at least 2s of the phase's 5.
+      [ "$SECONDS" -le 3 ] || SECONDS=3
       total=${#markers[@]} tried=0 removed=0 i=0
       [ "$total" -eq 0 ] || i=$(( ((RANDOM << 15) | RANDOM) % total ))
       while [ "$tried" -lt "$total" ] && [ "$removed" -lt 50 ] && [ "$SECONDS" -lt 5 ]; do
