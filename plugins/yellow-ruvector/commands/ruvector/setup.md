@@ -108,7 +108,7 @@ if ruvector_hash_selected; then
   printf 'onnx model: not needed (hash embedder selected)\n'
 else
   yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \
-    || printf 'WARNING: ONNX model download failed (offline?). Recall works; memory writes wait for a session with network.\n'
+    || printf 'WARNING: ONNX model download failed (offline?). Recall and memory writes stay unavailable until a session with network verifies the model.\n'
 fi
 # The CLI's output is not trusted: only a plain version string is shown.
 ver=$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null | head -n 1)

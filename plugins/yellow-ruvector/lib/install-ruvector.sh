@@ -773,8 +773,15 @@ yellow_ruvector_warm_model() {
   local secs="${1:-}" entry out fp tmp
   entry=$(yellow_ruvector_pinned_entry) || return 1
   [ -f "$entry" ] || return 1
-  # Serialize with every other warm-up sharing this model cache.
+  # Serialize with every other warm-up sharing this model cache. One
+  # deadline covers both: time spent waiting for the lock comes out of the
+  # warm-up's own bound, so the caller's budget is never spent twice.
+  local t0=$SECONDS
   yellow_ruvector_acquire_model_lock "${secs:-60}" || return 1
+  if [ -n "$secs" ]; then
+    secs=$(( secs - (SECONDS - t0) ))
+    [ "$secs" -ge 1 ] || { yellow_ruvector_release_model_lock; return 1; }
+  fi
   tmp=$(mktemp "${TMPDIR:-/tmp}/rv-warm.XXXXXX") || { yellow_ruvector_release_model_lock; return 1; }
   if [ -n "$secs" ]; then
     ( cd "${TMPDIR:-/tmp}" && yellow_ruvector_run_bounded "$secs" node "$entry" embed text "warmup" ) >"$tmp" 2>&1 &
