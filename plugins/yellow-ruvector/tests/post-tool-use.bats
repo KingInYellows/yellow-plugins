@@ -69,6 +69,24 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "a destination swapped for a symlink to a directory is replaced, never written through" {
+  out="$BATS_TEST_TMPDIR/outside"; mkdir -p "$out"
+  mb="$BATS_TEST_TMPDIR/mvbin"; mkdir -p "$mb"
+  # The first rename finds its destination swapped for a symlink to a directory.
+  cat > "$mb/mv" <<SH
+#!/bin/sh
+for d; do :; done
+if [ ! -e "$BATS_TEST_TMPDIR/swapped" ]; then
+  : > "$BATS_TEST_TMPDIR/swapped"; rm -f "\$d"; ln -s "$out" "\$d"
+fi
+exec $(command -v mv) "\$@"
+SH
+  chmod +x "$mb/mv"
+  PATH="$mb:$PATH" edit s1 "$PROJECT_ROOT/src/a.ts"
+  [ -e "$BATS_TEST_TMPDIR/swapped" ]
+  [ -z "$(ls -A "$out")" ]
+}
+
 @test "never runs ruvector, npx, or node" {
   edit s1 "$PROJECT_ROOT/src/a.ts"
   edit s1 "$PROJECT_ROOT/src/b.ts"

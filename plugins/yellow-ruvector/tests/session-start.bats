@@ -1054,8 +1054,9 @@ END"
   # COEDIT_SHARD=24 pins the digit shard [89][89]. Each held dir costs a
   # timed-out listing plus a shard pass, so under load one run's 5s phase
   # may reach only one of them: a later run (a later SessionStart) gets the
-  # other.
-  for _ in 1 2 3; do
+  # other. Each run also retries a random 3 of the 4 store-side trees, so
+  # 99-1.1 is missed by a quarter of runs: allow several.
+  for _ in $(seq 1 8); do
     COEDIT_SHARD=24 PATH="$fb:$rmbin:$PATH" run run_hook '{"cwd":""}'
     for _ in $(seq 1 80); do [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break; sleep 0.1; done
     [ -e "$h/.coedit.lock.stale.99-1.1" ] || [ -e "$sh_/.s1.lock.stale.s98-1" ] || break

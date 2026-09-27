@@ -200,6 +200,28 @@ coedit_reset_tries() {
 # coedit_write_atomic <file> — write stdin to <file> via a same-dir temp file
 # and rename, so a concurrent reader sees the old or the new file, never a
 # torn one.
+# coedit_rename <src> <dest> — rename over <dest> as a file, never into a
+# directory a symlink swapped in at <dest> points to: GNU mv -T, BSD/macOS
+# mv -h. Another mv re-checks <dest> just before the rename (a narrower
+# window, not none). The choice is made once per process.
+coedit_rename() {
+  if [ -z "${_COEDIT_MV_OPT:-}" ]; then
+    if mv --version >/dev/null 2>&1; then _COEDIT_MV_OPT=-T
+    else
+      case "$(uname -s 2>/dev/null)" in
+        Darwin|*BSD|DragonFly) _COEDIT_MV_OPT=-h ;;
+        *) _COEDIT_MV_OPT=none ;;
+      esac
+    fi
+  fi
+  if [ "$_COEDIT_MV_OPT" = none ]; then
+    [ ! -L "$2" ] && { [ ! -e "$2" ] || [ -f "$2" ]; } || return 1
+    mv -f -- "$1" "$2"
+  else
+    mv -f "$_COEDIT_MV_OPT" -- "$1" "$2"
+  fi
+}
+
 coedit_write_atomic() {
   local f="$1" tmp
   # Only ever replace a regular file: `mv` onto a directory would drop the
@@ -210,7 +232,7 @@ coedit_write_atomic() {
   # mktemp creates the temp file exclusively (O_EXCL): a symlink planted at
   # a predictable temp name can never redirect the write.
   tmp=$(mktemp "${f}.tmp.XXXXXXXX" 2>/dev/null) || return 1
-  if cat > "$tmp" && [ -s "$tmp" ] && mv -f -- "$tmp" "$f"; then
+  if cat > "$tmp" && [ -s "$tmp" ] && coedit_rename "$tmp" "$f"; then
     return 0
   fi
   # Any failure, the rename included, leaves no temp file behind.
