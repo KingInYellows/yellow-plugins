@@ -128,9 +128,11 @@ setup() {
     {type: "command", command: "echo '"'"'ruvector hooks post-edit'"'"'"},
     {type: "command", command: "ruvector hooks post-editor"},
     {type: "command", command: "echo /usr/local/bin/ruvector hooks post-edit"},
+    {type: "command", command: "echo '"'"'hello; ruvector hooks post-edit --foo'"'"'"},
+    {type: "command", command: "echo \"hi && ruvector hooks session-end\""},
     {type: "command", command: "npx -y ruvector@0.2 hooks post-edit --success"}]}]}}' > "$S"
   run --separate-stderr bash "$SCRIPT" "$S" --apply
   [ "$status" -eq 0 ]
-  [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 4 ]
+  [ "$(jq '.hooks.PostToolUse[0].hooks | length' "$S")" -eq 6 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] | index("npx -y ruvector@0.2 hooks post-edit --success") == null' "$S" >/dev/null
 }
