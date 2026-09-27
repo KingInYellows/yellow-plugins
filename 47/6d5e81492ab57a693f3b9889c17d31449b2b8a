@@ -1,0 +1,25 @@
+.github/workflows/version-packages.yml
+  s_37c0875242a535::t_929c16972a6238 79-81,83-86,93-95
+CLAUDE.md
+  s_37c0875242a535::t_bc744e069187fd 84-87
+docs/architecture-overview.md
+  s_37c0875242a535::t_029b93452d2a3e 307-310
+docs/operations/release-checklist.md
+  s_37c0875242a535::t_2b2feab829f354 194-198,378-382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "476d5e81492ab57a693f3b9889c17d31449b2b8a",
+  "prompts": {},
+  "sessions": {
+    "s_37c0875242a535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22ab16b0-d066-46f3-9c4a-92e07fee4bbb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
