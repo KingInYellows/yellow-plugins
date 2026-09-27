@@ -145,6 +145,14 @@ SH
   [ ! -f "$COEDIT" ] || [ "$(jq '[.pairs[] | keys[]] | length' "$COEDIT")" -eq 0 ]
 }
 
+@test "a root-level file whose name starts with a dash is never recorded" {
+  : > "$PROJECT_ROOT/-config"
+  edit s1 "$PROJECT_ROOT/-config"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  [ "$(pair -config src/a.ts)" -eq 0 ]
+  [ "$(pair src/a.ts -config)" -eq 0 ]
+}
+
 @test "a symlink to a file outside the root is ignored" {
   OUTSIDE="$(mktemp -d)"; : > "$OUTSIDE/secret.ts"
   ln -s "$OUTSIDE/secret.ts" "$PROJECT_ROOT/src/link.ts"

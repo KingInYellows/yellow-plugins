@@ -151,8 +151,10 @@ coedit_normalize() {
   case "$rel" in *$'\n'*|*$'\r'*|*[[:cntrl:]]*) return 1 ;; esac
   case "$rel" in *$'\xc2\x85'*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
   coedit_has_c1 "$rel" && return 1
+  # A root-level name starting with "-" would read as an option wherever a
+  # partner is passed on, so it is never shown; never record it either.
   case "$rel" in
-    .ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
+    -*|.ruvector|.ruvector/*|.git|.git/*|docs/solutions/*) return 1 ;;
   esac
   printf '%s' "$rel"
 }
