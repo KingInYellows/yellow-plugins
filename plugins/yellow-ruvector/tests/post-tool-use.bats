@@ -435,6 +435,17 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
 }
 
+@test "a failed rename leaves no temp file behind" {
+  run bash -c '
+    . "$1"
+    d=$(mktemp -d); f="$d/coedit.json"; echo "{}" > "$f"
+    mv() { return 1; }
+    printf "{\"x\":1}\n" | coedit_write_atomic "$f" && exit 9
+    ls "$d" | grep -c "\.tmp\." || true' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = 0 ]
+}
+
 @test "a stale lock that is not empty is still reclaimed" {
   edit r2 "$PROJECT_ROOT/src/a.ts"
   mkdir -p "$RUVECTOR_DIR/.coedit.lock/junk"; : > "$RUVECTOR_DIR/.coedit.lock/file"

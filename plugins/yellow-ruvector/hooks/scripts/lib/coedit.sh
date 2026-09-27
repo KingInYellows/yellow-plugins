@@ -164,12 +164,12 @@ coedit_write_atomic() {
     [ -f "$f" ] && [ ! -L "$f" ] || return 1
   fi
   tmp="${f}.tmp.$$.${RANDOM}"
-  if cat > "$tmp" && [ -s "$tmp" ]; then
-    mv -f -- "$tmp" "$f"
-  else
-    rm -f -- "$tmp"
-    return 1
+  if cat > "$tmp" && [ -s "$tmp" ] && mv -f -- "$tmp" "$f"; then
+    return 0
   fi
+  # Any failure, the rename included, leaves no temp file behind.
+  rm -f -- "$tmp"
+  return 1
 }
 
 # coedit_lock_path <lock-dir> — take a mkdir lock, waiting 50ms per try out
