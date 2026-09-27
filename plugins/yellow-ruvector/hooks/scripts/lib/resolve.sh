@@ -45,7 +45,20 @@ ruvector_main_worktree() {
     "worktree "?*) main="${first#worktree }" ;;
     *) return 1 ;;
   esac
-  # A real checkout has its tracked files, matching the index; the separate
+  # A gitfile in the reported checkout that resolves to the common git dir
+  # proves it (a --separate-git-dir parent holds the git dir itself, never a
+  # gitfile to it). A .git directory proves nothing on its own: that parent
+  # has one too.
+  local common gd
+  common=$(git -C "${1:-.}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    && common=$(CDPATH= cd -- "$common" 2>/dev/null && pwd -P) || common=""
+  if [ -n "$common" ] && [ -f "${main}/.git" ] && [ ! -L "${main}/.git" ]; then
+    gd=$(sed -n '1s/^gitdir: //p' "${main}/.git" 2>/dev/null)
+    case "$gd" in /*) ;; ?*) gd="${main}/${gd}" ;; esac
+    gd=$(CDPATH= cd -- "$gd" 2>/dev/null && pwd -P) || gd=""
+    [ -n "$gd" ] && [ "$gd" = "$common" ] && { printf '%s' "$main"; return 0; }
+  fi
+  # Otherwise: a real checkout has its tracked files, matching the index; the separate
   # git dir's parent does not. Walk the checked-out ("H") entries (sparse
   # "S" entries are not expected on disk and are skipped), collecting the
   # files present on disk in batches of 50, and ask git which of each batch
@@ -57,7 +70,7 @@ ruvector_main_worktree() {
   # stats them (it would call any same-named file clean): up to 20 of them
   # are compared by content against the index blob instead, only if no "H"
   # entry proved the checkout.
-  local n=0 batches=0 present=() assumed=()
+  local n=0 batches=0 present=() assumed=() probe=()
   while [ "$n" -lt 2000 ] && IFS= read -r -d '' tracked; do
     case "$tracked" in
       "h "?*)
@@ -66,6 +79,7 @@ ruvector_main_worktree() {
       "H "?*)
         n=$((n + 1))
         [ -e "${main}/${tracked#H }" ] || continue
+        [ "${#probe[@]}" -lt 20 ] && [ -f "${main}/${tracked#H }" ] && probe+=("${tracked#H }")
         present+=(":(literal)${tracked#H }")
         [ "${#present[@]}" -ge 50 ] || continue
         _ruvector_any_clean "$main" "${present[@]}" && { printf '%s' "$main"; return 0; }
@@ -76,7 +90,30 @@ ruvector_main_worktree() {
   done < <(git -C "$main" ls-files -v -z 2>/dev/null)
   [ "${#present[@]}" -gt 0 ] && _ruvector_any_clean "$main" "${present[@]}" \
     && { printf '%s' "$main"; return 0; }
-  local rel blob
+  # Every present file differs from the index (a checkout with all its files
+  # edited): the index still records each file's inode, and only the real
+  # checkout's file can carry it (a same-named file in the git dir's parent
+  # never does). Editors that save by rename change the inode, so up to 20
+  # files are tried. The index keeps the low 32 bits.
+  local rel dbg ino dev disk ddev
+  for rel in ${probe[@]+"${probe[@]}"}; do
+    dbg=$(git -C "$main" ls-files --debug -- ":(literal)${rel}" 2>/dev/null | sed -n 's/.*dev: \([0-9][0-9]*\).*ino: \([0-9][0-9]*\).*/\1 \2/p' | head -n 1)
+    dev=${dbg%% *}; ino=${dbg#* }
+    disk=$(stat -c %i -- "${main}/${rel}" 2>/dev/null || stat -f %i -- "${main}/${rel}" 2>/dev/null)
+    ddev=$(stat -c %d -- "${main}/${rel}" 2>/dev/null || stat -f %d -- "${main}/${rel}" 2>/dev/null)
+    case "$dev" in ''|*[!0-9]*) continue ;; esac
+    case "$ino" in ''|0|*[!0-9]*) continue ;; esac
+    case "$disk" in ''|*[!0-9]*) continue ;; esac
+    [ "$ino" = "$(( disk % 4294967296 ))" ] || continue
+    # The device too (when the index recorded one): inode numbers repeat
+    # across filesystems.
+    if [ "$dev" != 0 ]; then
+      case "$ddev" in ''|*[!0-9]*) continue ;; esac
+      [ "$dev" = "$(( ddev % 4294967296 ))" ] || continue
+    fi
+    printf '%s' "$main"; return 0
+  done
+  local blob
   for rel in ${assumed[@]+"${assumed[@]}"}; do
     blob=$(git -C "$main" ls-files -s -z -- ":(literal)${rel}" 2>/dev/null | tr '\0' '\n' | awk 'NR == 1 {print $2}')
     [ -n "$blob" ] || continue
