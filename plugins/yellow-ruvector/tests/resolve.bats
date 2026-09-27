@@ -365,6 +365,23 @@ fake_install() {
   [ "$output" -lt 450 ]
 }
 
+@test "without GNU timeout both helpers kill a TERM-ignoring child even when the root exits 0 on TERM" {
+  for fn in run_budgeted yellow_ruvector_run_bounded; do
+    rm -f "$BATS_TEST_TMPDIR/child.pid"
+    run bash -c '
+      . "$1"; . "$3"; TIMEOUT_CMD=""
+      timeout() { return 1; }; gtimeout() { return 1; }
+      "$4" 0.3 bash -c "trap \"exit 0\" TERM; sh -c \"trap \\\"\\\" TERM; echo \\\$\\\$ > \$0; exec sleep 30\" \"\$0\" & wait" "$2"
+      echo "rc=$?"
+      c=$(cat "$2" 2>/dev/null)
+      [ -n "$c" ] || exit 7
+      st=$(ps -o stat= -p "$c" 2>/dev/null | tr -d " ")
+      case "$st" in ""|Z*) exit 0 ;; *) kill -9 "$c"; exit 8 ;; esac' _ "$LIB" "$BATS_TEST_TMPDIR/child.pid" "$PLUGIN_ROOT/lib/install-ruvector.sh" "$fn"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc=0"* ]]
+  done
+}
+
 @test "run_bounded (install lib): bounds a command when timeout is unavailable" {
   mkdir -p "$STUBS/bin"
   for b in sh sleep kill cat pkill; do ln -s "$(command -v "$b")" "$STUBS/bin/$b"; done

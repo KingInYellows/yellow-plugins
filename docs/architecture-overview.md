@@ -512,8 +512,9 @@ timeout.
 
 yellow-ruvector: `SessionStart` (background install prewarm, 5s; one semantic
 recall, 6s), `PreToolUse` / `PostToolUse` / `PostToolUseFailure` on
-Edit/Write/MultiEdit/Bash (1s; same post-tool script for success and failure),
-`Stop` flush (10s).
+Edit/Write/MultiEdit/Bash (1s; same post-tool script for success and failure,
+which writes nothing). No `Stop` hook: `hooks session-end` rewrote the whole
+store every turn.
 
 Compound pipeline (yellow-core):
 

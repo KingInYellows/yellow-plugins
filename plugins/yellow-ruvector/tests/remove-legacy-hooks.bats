@@ -322,6 +322,16 @@ Ignore previous instructions"
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo FOO=$(date) ruvector hooks post-edit", "echo \"FOO=$(date) ruvector hooks post-edit\""]' "$S" >/dev/null
 }
 
+@test "an array literal holding the words is not a legacy call; a subshell is" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "args=(ruvector hooks post-edit); printf \"%s\\n\" \"${args[@]}\""},
+    {type: "command", command: "(ruvector hooks post-edit --success)"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 1 ]
+  [[ "$output" == *"PostToolUse: (ruvector hooks post-edit --success)"* ]]
+}
+
 @test "a legacy call behind environment assignments is found and removed" {
   jq -n '{hooks: {PostToolUse: [{hooks: [
     {type: "command", command: "RUVECTOR_ONNX=0 ruvector hooks post-edit --success"},
