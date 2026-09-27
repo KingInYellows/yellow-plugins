@@ -783,9 +783,14 @@ yellow_ruvector_run_bounded() {
   done
   "$@" &
   pid=$!
+  # The watcher marks when it fires (in a private mktemp dir), so the caller
+  # knows to let it finish escalating even when the timed command exited 0
+  # after handling TERM while a descendant ignored it.
+  local flag
+  flag=$(mktemp -d "${TMPDIR:-/tmp}/rvwatch.XXXXXX" 2>/dev/null) || flag=""
   # The tree is captured when the time is up: once the command exits, its
   # children are reparented and no longer found under its pid.
-  ( sleep "$secs"; tree=$(yellow_ruvector_tree "$pid")
+  ( sleep "$secs"; [ -n "$flag" ] && : > "$flag/fired"; tree=$(yellow_ruvector_tree "$pid")
     # shellcheck disable=SC2086
     kill -TERM $tree 2>/dev/null
     sleep 1
@@ -796,11 +801,13 @@ yellow_ruvector_run_bounded() {
   wait "$pid" 2>/dev/null || rc=$?
   # Killed by the watcher (a signal status): let it finish escalating to
   # KILL on the children it captured, so none outlives this call.
-  if [ "$rc" -gt 128 ] && kill -0 "$watcher" 2>/dev/null; then
+  if { [ "$rc" -gt 128 ] || { [ -n "$flag" ] && [ -e "$flag/fired" ]; }; } \
+     && kill -0 "$watcher" 2>/dev/null; then
     wait "$watcher" 2>/dev/null
   else
     kill "$watcher" 2>/dev/null
   fi
+  [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }
 
