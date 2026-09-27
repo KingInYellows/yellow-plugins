@@ -283,6 +283,15 @@ related_staged() {
   [[ "$(ctx "$output")" == *"src/b.ts"* ]]
 }
 
+@test "symlinked-dir partners ranked above a valid one never hide it" {
+  outside="$BATS_TEST_TMPDIR/outside"; mkdir -p "$outside"; : > "$outside/f.ts"
+  for i in $(seq 0 59); do ln -s "$outside" "$PROJECT_ROOT/src/l$i"; done
+  jq -n '{version:1, pairs:{"src/a.ts": (([range(0;60)] | map({key:"src/l\(.)/f.ts", value:9}) | from_entries) + {"src/b.ts": 4})}}' > "$RUVECTOR_DIR/coedit.json"
+  run --separate-stderr run_hook "$(event s1 Edit "$PROJECT_ROOT/src/a.ts")"
+  [[ "$(ctx "$output")" == *"src/b.ts"* ]]
+  [[ "$(ctx "$output")" != *"src/l"* ]]
+}
+
 @test "surfaced stays under the size cap with multibyte paths" {
   mkdir -p "$RUVECTOR_DIR/coedit-sessions"
   long=$(printf '\xe6\xbc\xa2%.0s' $(seq 1 160))

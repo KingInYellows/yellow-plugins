@@ -445,6 +445,19 @@ coedit_partner_ok() {
     */*)
       d="${p%/*}"
       case "${_coedit_ok_dirs:-}" in *$'\n'"$d"$'\n'*) return 0 ;; esac
+      case "${_coedit_bad_dirs:-}" in *$'\n'"$d"$'\n'*) return 1 ;; esac
+      # Symlinked components are rejected with builtin tests, before the
+      # budgeted subshell: a store full of symlinked-dir partners must not
+      # use up the checks the real partners below them need.
+      local rest="$d/" pre=""
+      while [ -n "$rest" ]; do
+        pre="${pre}${rest%%/*}"; rest="${rest#*/}"
+        if [ -L "${root}/${pre}" ] || [ ! -d "${root}/${pre}" ]; then
+          _coedit_bad_dirs="${_coedit_bad_dirs:-}"$'\n'"$d"$'\n'
+          return 1
+        fi
+        pre="${pre}/"
+      done
       [ "${_coedit_phys_left:-0}" -gt 0 ] || return 1
       _coedit_phys_left=$((_coedit_phys_left - 1))
       phys=$(CDPATH= cd -- "${root}/${d}" 2>/dev/null && pwd -P) || return 1
@@ -477,7 +490,7 @@ coedit_partners() {
   local rroot
   rroot=$(CDPATH= cd -- "$root" 2>/dev/null && pwd -P) || return 0
   _coedit_phys_left=50
-  _coedit_ok_dirs=$'\n'
+  _coedit_ok_dirs=$'\n'; _coedit_bad_dirs=$'\n'
   while IFS=$'\t' read -r count partner; do
     case "$count" in ''|*[!0-9]*) continue ;; esac
     coedit_partner_ok "$root" "$rroot" "$partner" || continue
