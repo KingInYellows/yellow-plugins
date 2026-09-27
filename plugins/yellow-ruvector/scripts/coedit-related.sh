@@ -57,7 +57,7 @@ drop_stage() {
   case "${d#"${STAGE_PREFIX}"}" in */*) d="" ;; esac
   if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
     rm -f -- "${d}/query"
-    rmdir -- "$d" 2>/dev/null
+    rmdir -- "$d" 2>/dev/null || true
   fi
   rm -f -- "$1"
 }

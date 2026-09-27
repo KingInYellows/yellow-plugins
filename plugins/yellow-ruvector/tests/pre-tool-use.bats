@@ -579,3 +579,15 @@ related_staged() {
   [ -d "${q2%/query}" ]
   rmdir "${q2%/query}"
 }
+
+@test "coedit-related.sh --stage tolerates an abandoned staging dir that is not empty" {
+  export XDG_CACHE_HOME="$BATS_TEST_TMPDIR/cache"
+  q1=$(cd "$PROJECT_ROOT" && CLAUDE_CODE_SESSION_ID=me bash "$RELATED_SCRIPT" --stage | sed -n 's/^QUERY_FILE=//p')
+  : > "${q1%/query}/extra"
+  run --separate-stderr bash -c 'cd "$1" && CLAUDE_CODE_SESSION_ID=me bash "$2" --stage' _ "$PROJECT_ROOT" "$RELATED_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == QUERY_FILE=/tmp/ruvector-related.* ]]
+  q2=${output#QUERY_FILE=}
+  [ -f "${q1%/query}/extra" ]
+  rm -rf "${q1%/query}" "${q2%/query}"
+}
