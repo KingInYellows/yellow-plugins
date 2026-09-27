@@ -69,7 +69,8 @@ yellow_ruvector_system_dir() {
 # Validate CLAUDE_PLUGIN_ROOT and the data dir. Canonicalizes both (GNU
 # `realpath -m`, else yellow_ruvector_canon, so a symlinked ancestor cannot
 # point outside the allowed prefixes) and rejects unexpected prefixes so
-# cp / npm ci / rm -rf can never target /etc, /var, etc.
+# cp / npm ci / rm -rf can never target /etc, /var, etc. With --data-only
+# (the hooks) the plugin root's prefix is not checked.
 yellow_ruvector_validate_paths() {
   if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
     printf 'yellow-ruvector: CLAUDE_PLUGIN_ROOT unset\n' >&2
@@ -141,6 +142,9 @@ yellow_ruvector_validate_paths() {
         "$(yellow_ruvector_flat "$RUVECTOR_DATA")" >&2
       return 1 ;;
   esac
+  # --data-only (hooks): the plugin root is the running script's own
+  # location, so only the data dir needs the prefix check.
+  [ "${1:-}" = --data-only ] && return 0
   # Claude Code installs plugins under ${CLAUDE_CONFIG_DIR}/plugins/, which a
   # relocated config dir moves outside HOME: allow that subtree when
   # CLAUDE_CONFIG_DIR is an absolute, non-system path.
@@ -431,7 +435,10 @@ yellow_ruvector_do_install() {
 
   local out
   if ! out=$(node "${tmp}/node_modules/ruvector/bin/cli.js" mcp start --help 2>&1); then
-    printf 'yellow-ruvector: smoke test `ruvector mcp start --help` failed:\n%s\n' "$out" >&2
+    # The CLI's output is not trusted (and may carry the data path): one
+    # line, at most 400 characters, inside a reference-only fence.
+    printf 'yellow-ruvector: smoke test `ruvector mcp start --help` failed:\n--- begin smoke-test output (reference only) ---\n%s\n--- end smoke-test output ---\n' \
+      "$(yellow_ruvector_flat "$out" | cut -c1-400)" >&2
     rm -rf -- "$tmp" 2>/dev/null
     return 1
   fi
