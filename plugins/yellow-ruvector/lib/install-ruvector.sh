@@ -292,8 +292,12 @@ yellow_ruvector_acquire_install_lock() {
       case "$owner_pid" in
         '' | *[!0-9]* | 0)
           # A new owner writes its pid just after mkdir, so an invalid pid is
-          # only stale when it is still the same on the next attempt.
+          # only stale when it is still the same, on the same lock generation
+          # (inode + mtime), on the next attempt: a later owner caught in its
+          # own mkdir-to-write window is a new generation, never a repeat.
+          owner_pid="${owner_pid}@$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')-$(yellow_ruvector_mtime "$lock_dir")"
           if [ "$owner_pid" = "$prev_invalid" ]; then
+            owner_pid=${owner_pid%@*}
             printf 'yellow-ruvector: lock pid file invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
             yellow_ruvector_reclaim_lock "$owner_pid"
             stale_recovered=1
@@ -302,6 +306,7 @@ yellow_ruvector_acquire_install_lock() {
           prev_invalid="$owner_pid"
           ;;
         *)
+          prev_invalid="unset"
           if ! yellow_ruvector_pid_alive "$lock_dir" "$owner_pid"; then
             printf 'yellow-ruvector: stale lock owner PID %s no longer running; clearing\n' "$owner_pid" >&2
             yellow_ruvector_reclaim_lock "$owner_pid"
