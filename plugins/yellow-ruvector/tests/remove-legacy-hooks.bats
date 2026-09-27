@@ -148,3 +148,15 @@ setup() {
   [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
   jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["\"x; ruvector hooks post-edit\"", "echo \"ruvector\" hooks post-edit"]' "$S" >/dev/null
 }
+
+@test "text in a shell comment is not a ruvector invocation" {
+  jq -n '{hooks: {PostToolUse: [{hooks: [
+    {type: "command", command: "echo ok # ; ruvector hooks post-edit --success"},
+    {type: "command", command: "#ruvector hooks session-start"},
+    {type: "command", command: "echo a#b; ruvector hooks post-edit"},
+    {type: "command", command: "echo \"#\"; ruvector hooks session-end"}]}]}}' > "$S"
+  run --separate-stderr bash "$SCRIPT" "$S" --apply
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^PostToolUse: ')" -eq 2 ]
+  jq -e '[.hooks.PostToolUse[0].hooks[].command] == ["echo ok # ; ruvector hooks post-edit --success", "#ruvector hooks session-start"]' "$S" >/dev/null
+}
