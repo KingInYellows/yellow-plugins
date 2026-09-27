@@ -13,8 +13,10 @@ name: Version Packages
 # Manual recovery: trigger workflow_dispatch with force_publish=true to skip
 # changeset detection and go straight to the publish phase.
 #
-# RELEASE_PR_TOKEN (optional repo secret): a fine-grained PAT for a repo
-# collaborator (Contents + Pull requests: read/write on this repo only). When
+# RELEASE_PR_TOKEN (optional repo secret): a fine-grained PAT owned by a
+# member of the KingInYellows organization (an outside collaborator is still
+# subject to the approval policy), resource owner KingInYellows, this repo
+# only, Contents + Pull requests: read/write. See docs/security.md. When
 # set, the Version PR is pushed and opened under that identity, so its
 # pull_request CI (including the required "CI Status Summary") runs without
 # maintainer approval. Without it the PR comes from github-actions[bot], which
@@ -75,13 +77,21 @@ jobs:
 
       - name: Preflight — verify PR creation permissions
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Probe the same token changesets/action will use below.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          HAS_RELEASE_PR_TOKEN: ${{ secrets.RELEASE_PR_TOKEN != '' }}
         run: |
           if ! gh api "repos/${{ github.repository }}/pulls?state=closed&per_page=1" \
                --silent 2>/dev/null; then
-            echo "::error::GITHUB_TOKEN cannot access the pull requests API."
-            echo "::error::Enable 'Allow GitHub Actions to create and approve pull requests'"
-            echo "::error::in Settings > Actions > General > Workflow permissions."
+            if [ "$HAS_RELEASE_PR_TOKEN" = "true" ]; then
+              echo "::error::RELEASE_PR_TOKEN cannot access the pull requests API."
+              echo "::error::It may be expired, revoked, or not granted this repository"
+              echo "::error::(Contents + Pull requests: read/write). Rotate it or delete the secret."
+            else
+              echo "::error::GITHUB_TOKEN cannot access the pull requests API."
+              echo "::error::Enable 'Allow GitHub Actions to create and approve pull requests'"
+              echo "::error::in Settings > Actions > General > Workflow permissions."
+            fi
             exit 1
           fi
 

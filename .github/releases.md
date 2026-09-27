@@ -189,7 +189,7 @@ PR or create release tags
 
 **Steps**:
 
-1. **Preflight** — verify GITHUB_TOKEN can access the pull requests API
+1. **Preflight** — verify the release token (`RELEASE_PR_TOKEN`, else `GITHUB_TOKEN`) can access the pull requests API
 2. **Detect phase** — check for pending changesets or `force_publish` input
 3. **Setup environment** — Node.js 22.22.0 + pnpm 8.15.0
 4. **Phase 1 (pending changesets)**: Run `changesets/action` to open/update a
@@ -809,6 +809,14 @@ find them
 - **Type**: `GITHUB_TOKEN` (auto-provided by Actions)
 - **Permissions**: `contents: write` (declared in workflow)
 - **Scope**: Limited to workflow execution
+
+**RELEASE_PR_TOKEN** (optional):
+
+- **Type**: Fine-grained PAT owned by a KingInYellows organization member
+- **Scope**: This repository only; Contents + Pull requests read/write
+- **Purpose**: Opens the Version PR so its CI runs without approval; when unset,
+  `GITHUB_TOKEN` is used instead
+- **Rotation**: Expiry of 90 days or less; lifecycle in `docs/security.md`
 
 ---
 

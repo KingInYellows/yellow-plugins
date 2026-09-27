@@ -263,8 +263,10 @@ counts as one, so every `pull_request` run on the PR — including the required
 blocked, and the Graphite merge queue cannot land it, until then.
 
 To remove that step, add a `RELEASE_PR_TOKEN` repo secret: a fine-grained PAT
-for a collaborator, scoped to this repository only, with **Contents** and
-**Pull requests** set to read/write. `version-packages.yml` then opens the PR
+owned by a **member of the KingInYellows organization** (an outside
+collaborator is still subject to the approval policy), with resource owner
+KingInYellows, this repository only, and **Contents** and **Pull requests**
+set to read/write. See `docs/security.md` for rotation and revocation. `version-packages.yml` then opens the PR
 under that identity and CI starts on its own. Either way, the PR content is
 machine-generated (version bumps and CHANGELOG entries only), so manual review
 of the three bullet points above is still the primary gate before merging.
