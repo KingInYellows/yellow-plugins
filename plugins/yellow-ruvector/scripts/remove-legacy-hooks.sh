@@ -68,12 +68,13 @@ f="$target"
 
 # Only an actual ruvector invocation: the `ruvector` executable (bare, by
 # path, or via npx, optionally @version) in command position (start of the
-# command or right after ; & | ( ) or a newline, optionally behind shell
+# command or right after ; & | ( ) or a newline (never the ( of an array
+# literal, a=(…)), optionally behind shell
 # keywords and prefixes such as then, do, if, !, {, exec, and after
 # VAR=value assignments — never as an argument), followed by
 # `hooks <legacy-subcommand>`. `my-ruvector hooks …` or a quoted string that
 # merely mentions it is not a match.
-re='(^|[;&|\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
+re='(^|[;&|\n)]|(?<!=)\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*(npx +(-y +|--yes +)?)?([^[:space:];&|"'"'"']*/)?ruvector(@[^[:space:]]*)? +hooks +(post-edit|post-command|pre-edit|pre-command|session-start|session-end)([[:space:];&|)}]|$)'
 
 list=$(jq -r --arg re "$re" '
   # Quoted text is an argument, not a command: drop it before matching, so
@@ -99,13 +100,13 @@ list=$(jq -r --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
     # front and the assignment kept, so cmd stays in command position. One
     # at a time, until none is left (A=$(x) B=`y` cmd).
     | def asub: . as $x
-        | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
+        | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
         | if . == $x then . else asub end;
       asub
     | gsub("\u0027[^\u0027]*\u0027"; "")
@@ -150,13 +151,13 @@ jq --arg re "$re" '
     # A heredoc left unparsed (no terminator line) fails closed: the whole
     # command is treated as data, never as a legacy invocation.
     | if test("(?<!<)<<(?!<)-?[[:space:]]*[\"\u0027]?[^[:space:]\"\u0027;&|<>()]") and test("\\n") then "" else . end
-    | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
+    | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027]*[[:space:]]+)*(npx +(-y +|--yes +)?)?)(\"(?<d>[^\"[:space:];&|$`\\\\]*)\"|\u0027(?<s>[^\u0027[:space:];&|]*)\u0027)"; "\(.p)\(.d // "")\(.s // "")")
     # A command substitution as the value of an assignment (FOO=$(x) cmd) runs
     # first, then the assignment prefixes cmd: its body is moved out in
     # front and the assignment kept, so cmd stays in command position. One
     # at a time, until none is left (A=$(x) B=`y` cmd).
     | def asub: . as $x
-        | gsub("(?<p>(^|[;&|\\n()])[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
+        | gsub("(?<p>(^|[;&|\\n)]|(?<!=)\\()[[:space:]]*((then|do|else|elif|if|while|until|time|exec|command|!|\\{)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|\"\u0027$`]*[[:space:]]+)*)(?<a>[A-Za-z_][A-Za-z0-9_]*=)(\"?\\$\\((?<b>[^()\"]*)\\)\"?|`(?<c>[^`]*)`)(?=[[:space:]])"; "\(.p); \(.b // .c); \(.a)_")
         | if . == $x then . else asub end;
       asub
     | gsub("\u0027[^\u0027]*\u0027"; "")

@@ -287,7 +287,12 @@ run_budgeted() {
   # caller's stdin.
   "$@" <&0 &
   pid=$!
-  ( sleep "$cap"; tree=$(ruvector_proc_tree "$pid")
+  # The watcher marks when it fires (in a private mktemp dir), so the caller
+  # knows to let it finish escalating even when the timed command exited 0
+  # after handling TERM while a descendant ignored it.
+  local flag
+  flag=$(mktemp -d "${TMPDIR:-/tmp}/rvwatch.XXXXXX" 2>/dev/null) || flag=""
+  ( sleep "$cap"; [ -n "$flag" ] && : > "$flag/fired"; tree=$(ruvector_proc_tree "$pid")
     # shellcheck disable=SC2086
     kill -TERM $tree 2>/dev/null
     # The grace ends as soon as the whole tree is gone (zombies count as
@@ -310,10 +315,12 @@ run_budgeted() {
   # Killed by the watcher (a signal status): let it finish escalating to
   # KILL on the tree it captured (at most 0.2s, and only while some of it
   # ignores TERM), so no TERM-ignoring child outlives this call.
-  if [ "$rc" -gt 128 ] && kill -0 "$watcher" 2>/dev/null; then
+  if { [ "$rc" -gt 128 ] || { [ -n "$flag" ] && [ -e "$flag/fired" ]; }; } \
+     && kill -0 "$watcher" 2>/dev/null; then
     wait "$watcher" 2>/dev/null
   else
     kill "$watcher" 2>/dev/null
   fi
+  [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }

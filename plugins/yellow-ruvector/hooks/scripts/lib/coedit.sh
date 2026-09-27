@@ -304,6 +304,9 @@ coedit_mtime() {
 # find -mmin differences).
 coedit_older_than() {
   local now
+  # A pre-1970 mtime (a restored or checkout-supplied entry: stat prints a
+  # negative epoch) is older than any threshold.
+  case "${1:-}" in -[0-9]*) case "${1#-}" in *[!0-9]*) return 1 ;; esac; return 0 ;; esac
   case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac
   [ "${#1}" -le 12 ] || return 0
   now=$(date +%s)
