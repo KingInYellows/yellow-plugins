@@ -1098,6 +1098,26 @@ END"
 }
 
 
+@test "slow marker discovery without GNU timeout still leaves the sweep time to remove markers" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  mkdir "$sd/.zs1.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1"
+  touch -d '20 minutes ago' "$sd/.zs1.lock.reclaim.1-1" "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" 2>/dev/null || skip "touch -d unsupported"
+  fb="$BATS_TEST_TMPDIR/findbin"; mkdir -p "$fb"
+  # No GNU timeout (stock macOS): run_budgeted uses its portable watcher.
+  for t in timeout gtimeout; do printf '#!/bin/sh\nexit 1\n' > "$fb/$t"; done
+  # Every marker listing uses its whole budget: full listings print nothing,
+  # shard passes print their matches and then stall too.
+  printf '#!/bin/sh\ncase "$*" in *reclaim*"["*|*"["*reclaim*) %s "$@"; exec sleep 30 ;; *reclaim*) exec sleep 30 ;; esac\nexec %s "$@"\n' \
+    "$(command -v find)" "$(command -v find)" > "$fb/find"
+  chmod +x "$fb/find" "$fb/timeout" "$fb/gtimeout"
+  # Index 429: [q-z][q-z] ("zs…") for session ids, [89][01] ("91…") for digits.
+  COEDIT_SHARD=429 PATH="$fb:$PATH" run run_hook '{"cwd":""}'
+  for _ in $(seq 1 100); do [ -e "$sd/.zs1.lock.reclaim.1-1" ] || [ -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ] || break; sleep 0.1; done
+  [ ! -e "$sd/.zs1.lock.reclaim.1-1" ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock.reclaim.91-1" ]
+}
+
 @test "slow held trees on the session side never keep the store-side held trees from their turn" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
