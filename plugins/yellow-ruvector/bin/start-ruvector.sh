@@ -8,13 +8,13 @@
 #   2. Resolve the project root (git toplevel first — ruvector picks its
 #      store from process.cwd() only), heal a linked worktree's .ruvector
 #      symlink, and cd there.
-#   3. Guard a fresh store: when the store is missing or has no embedding
-#      stamp, warm the ONNX model first (under the install lock — ruvector's
-#      model temp files have fixed names). If the model still is not cached
-#      (offline), start without the write tools (hooks_remember,
-#      hooks_pretrain) so the server's hash fallback cannot stamp the store
-#      hash/64d (ADR-210). Recall still works; the next session with
-#      network restores writes.
+#   3. Guard the model: when it is not verified, warm it first (under the
+#      install lock — ruvector's model temp files have fixed names). If it
+#      still is not verified (offline), start without the model-using tools
+#      (hooks_recall, hooks_remember, hooks_pretrain): a tool call would
+#      download it outside the model lock, and the server's hash fallback
+#      could stamp a fresh store hash/64d (ADR-210). The next session with
+#      network restores them.
 #   4. exec the server (no wrapper process left behind).
 #
 # Env: CLAUDE_PLUGIN_ROOT (required), CLAUDE_PLUGIN_DATA (optional; XDG
@@ -109,11 +109,11 @@ fi
 # RUVECTOR_ONNX=0) needs no model and stamping hash is intended: no guard.
 # "Cached" means a warm-up verified these exact model files (a truncated
 # download is not cached). The warm-up only runs while the startup budget
-# lasts (2s kept for the handshake); otherwise start read-only.
+# lasts (2s kept for the handshake); otherwise start without model tools.
 # The warm-up runs whenever the model is needed and unverified, stamped store
 # or not: the first MCP tool call would otherwise load (download) it while
-# prewarm may be downloading through the same fixed cache file names. Only an
-# unstamped store also drops the write tools when it stays unverified.
+# prewarm may be downloading through the same fixed cache file names. If it
+# stays unverified, every model-using tool is withheld.
 if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
   left=$(( $(budget_left) - 2 ))
   if [ "$left" -ge 3 ] && yellow_ruvector_acquire_install_lock "$left"; then
@@ -124,16 +124,18 @@ if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
     yellow_ruvector_release_install_lock
     trap - EXIT INT TERM
   fi
-  if ! yellow_ruvector_model_cached \
-     && { yellow_ruvector_install_in_progress || yellow_ruvector_model_lock_busy; }; then
-    # Another process (prewarm) still holds the lock and is fetching the
-    # model: any model-using tool would load it through the same cache files
-    # mid-download. Keep only the tools that never embed.
+  if ! yellow_ruvector_model_cached; then
+    # Any model-using tool would load (download) the model outside the
+    # model lock, through the same fixed cache files another session's
+    # prewarm or status probe may be writing under it, and on an unstamped
+    # store a failed load would stamp it hash. Until a warm-up verifies the
+    # model, keep only the tools that never embed.
     allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_recall|hooks_remember|hooks_pretrain' | paste -sd, - || true)
-    log "the ONNX model is still being fetched by another session: starting without hooks_recall, hooks_remember and hooks_pretrain. Restart Claude Code once it finishes to use them."
-  elif [ -z "$stamp" ] && ! yellow_ruvector_model_cached; then
-    allow=$(printf '%s' "$allow" | tr ',' '\n' | grep -vxE 'hooks_remember|hooks_pretrain' | paste -sd, - || true)
-    log "ONNX model unavailable or unverified (offline?) and the store has no embedding stamp: starting read-only (hooks_remember and hooks_pretrain disabled) so the store is not stamped hash. The next session with network restores writes."
+    if yellow_ruvector_install_in_progress || yellow_ruvector_model_lock_busy; then
+      log "the ONNX model is still being fetched by another session: starting without hooks_recall, hooks_remember and hooks_pretrain. Restart Claude Code once it finishes to use them."
+    else
+      log "ONNX model unavailable or unverified (offline?): starting without hooks_recall, hooks_remember and hooks_pretrain so nothing downloads it outside the model lock or stamps the store hash. The next session with network restores them."
+    fi
   fi
 fi
 export RUVECTOR_MCP_ALLOW="$allow"

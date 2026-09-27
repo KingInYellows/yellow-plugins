@@ -110,7 +110,10 @@ else
   yellow_ruvector_model_cached || yellow_ruvector_warm_model 300 \
     || printf 'WARNING: ONNX model download failed (offline?). Recall works; memory writes wait for a session with network.\n'
 fi
-printf 'Installed: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version)"
+# The CLI's output is not trusted: only a plain version string is shown.
+ver=$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null | head -n 1)
+printf '%s' "$ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || ver="unrecognized"
+printf 'Installed: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$ver"
 ```
 
 If the install fails behind a proxy, confirm `HTTPS_PROXY` / `npm_config_*`

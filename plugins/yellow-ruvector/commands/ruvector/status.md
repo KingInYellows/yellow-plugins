@@ -77,10 +77,9 @@ fi
 . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/resolve.sh"
 # Sets RUVECTOR_DATA, where the model-verified marker lives.
 yellow_ruvector_validate_paths >/dev/null 2>&1 || true
-STAMP=$(jq -r '.embeddingProvenance.embedderKind // empty' "$ROOT/.ruvector/intelligence.json" 2>/dev/null)
 # Same rule as the launcher: an explicitly selected hash embedder is never guarded.
-if [ -z "$STAMP" ] && ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
-  printf 'mcp mode: read-only (missing or unstamped store and no cached ONNX model — hooks_remember and hooks_pretrain withheld until a session with network)\n'
+if ! ruvector_hash_selected && ! yellow_ruvector_model_cached; then
+  printf 'mcp mode: no model tools (ONNX model not verified — hooks_recall, hooks_remember and hooks_pretrain withheld until a session with network)\n'
 fi
 for scope in user project; do
   bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" "--${scope}" >/dev/null 2>&1 \
@@ -90,7 +89,7 @@ done
 
 Report: store exists/missing and disk usage. Warn on each `nested store:`
 line (a store below the root that a pre-launcher session created — merge its
-memories with `/ruvector:memory` or delete it), on `mcp mode: read-only`, and
+memories with `/ruvector:memory` or delete it), on `mcp mode: no model tools`, and
 on `leftover global ruvector hooks` (entries from a past `ruvector hooks init`
 that run the global binary and can stamp a fresh store hash — run
 `/ruvector:setup`, which lists them and removes them with a backup).
@@ -104,9 +103,10 @@ that run the global binary and can stamp a fresh store hash — run
 3. If warmup succeeds, call `mcp__plugin_yellow-ruvector_ruvector__hooks_stats`
    to verify the server responds.
 4. Call ToolSearch with query `"hooks_remember"`. If `hooks_stats` was found
-   but `hooks_remember` is not, the running server started read-only (the
-   launcher withheld the write tools): report "MCP mode: read-only for this
-   session — restart Claude Code once online to restore writes". Step 2's
+   but `hooks_remember` is not, the running server started without its
+   model tools (the launcher withheld recall and writes): report "MCP mode:
+   no model tools for this session — restart Claude Code once online to
+   restore recall and writes". Step 2's
    `mcp mode` line predicts the next launch; this check reports the current
    one.
 
