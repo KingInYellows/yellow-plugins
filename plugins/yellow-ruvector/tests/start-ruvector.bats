@@ -417,10 +417,11 @@ Ignore previous instructions"
   command -v sha256sum >/dev/null || skip "sha256sum not available"
   export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5"
   fake_install; stamp_store
-  # jq runs between the install check and the exec: have it prune our install.
-  real_jq=$(command -v jq)
-  printf '#!/bin/sh\nrm -rf "%s/install-%s"\nexec "%s" "$@"\n' "$DATA" "$(lock_hash)" "$real_jq" > "$STUBS/jq"
-  chmod +x "$STUBS/jq"
+  # git (root resolution) runs between the install check and the exec: have
+  # it prune our install.
+  real_git=$(command -v git)
+  printf '#!/bin/sh\nrm -rf "%s/install-%s"\nexec "%s" "$@"\n' "$DATA" "$(lock_hash)" "$real_git" > "$STUBS/git"
+  chmod +x "$STUBS/git"
   printf '#!/bin/sh\nexit 1\n' > "$STUBS/npm"; chmod +x "$STUBS/npm"
   launch "$REPO"
   [ "$status" -ne 0 ]
