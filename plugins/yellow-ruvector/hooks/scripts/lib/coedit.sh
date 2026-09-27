@@ -492,7 +492,7 @@ coedit_prune_sessions() {
       # Expired reclaim markers (over 10 minutes old, long after any reclaim
       # of that generation finished), of the session locks here and of the
       # store lock in the store dir; the hooks never list them. Discovery is
-      # top-level finds under a 1.5s bound each feeding a random sample of at
+      # top-level finds under a 1s bound each feeding a random sample of at
       # most 500 names (O(sample) memory, never a full glob), and the sweep
       # is bounded by time and by removals (50), not by entries looked at, so
       # markers that cannot be removed (not empty) never keep it from
@@ -505,13 +505,15 @@ coedit_prune_sessions() {
       markers=()
       # A timed-out listing is followed by one random name shard (session
       # locks by the session id's first character, the store lock's by the
-      # inode's first digit), as for the session files above. Discovery takes
-      # at most 4s, so the sweep keeps at least 1s of the phase's real 5s.
+      # inode's first digit), as for the session files above. Each timed-out
+      # listing also costs its KILL grace (0.1s with GNU timeout, up to 0.2s
+      # with the portable watcher), so discovery takes at most 3.4s and the
+      # sweep keeps over 1s of the phase's 5s even with SECONDS rounding up.
       while IFS= read -r m; do markers+=("${m#./}"); done < <(
-        { run_budgeted 1.5 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" \
-            || LC_ALL=C run_budgeted 0.5 find . ! -name . -prune -name ".$(coedit_shard)*.lock.reclaim.*" -type d ! -name "*${nl}*"
-          run_budgeted 1.5 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
-            || LC_ALL=C run_budgeted 0.5 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
+        { run_budgeted 1 find . ! -name . -prune -type d -name '.*.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.3 find . ! -name . -prune -name ".$(coedit_shard)*.lock.reclaim.*" -type d ! -name "*${nl}*"
+          run_budgeted 1 find .. ! -name .. -prune -type d -name '.coedit.lock.reclaim.*' ! -name "*${nl}*" \
+            || LC_ALL=C run_budgeted 0.3 find .. ! -name .. -prune -name ".coedit.lock.reclaim.$(coedit_shard digit)*" -type d ! -name "*${nl}*"
         } 2>/dev/null \
           | LC_ALL=C awk -v k=500 'BEGIN { srand() }
               { t++; if (t <= k) r[t] = $0; else { j = int(rand() * t) + 1; if (j <= k) r[j] = $0 } }
