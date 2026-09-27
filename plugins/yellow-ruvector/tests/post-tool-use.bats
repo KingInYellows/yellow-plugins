@@ -790,3 +790,14 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   COEDIT_WINDOW_SECS=2000 edit w1 "$PROJECT_ROOT/src/b.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
 }
+
+@test "an expired non-directory or non-empty marker at the current generation never blocks the reclaim" {
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock/junk"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$RUVECTOR_DIR/.coedit.lock" | awk '{print $1}')
+  mt=$(stat -c %Y "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || stat -f %m "$RUVECTOR_DIR/.coedit.lock")
+  m="$RUVECTOR_DIR/.coedit.lock.reclaim.${ino}-${mt}"
+  : > "$m"; touch -d '20 minutes ago' "$m"
+  edit k1 "$PROJECT_ROOT/src/a.ts"; edit k1 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+}
