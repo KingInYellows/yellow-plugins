@@ -325,11 +325,16 @@ coedit_record() {
   now=$(date +%s)
   state='{}'
   # Session files are tiny; a large one (shipped by a checkout) is ignored.
+  # Exactly one JSON object, or the state is reset: jq -e would pass a
+  # multi-document file on its last value, and writing it back would keep
+  # every later read multi-valued.
   if [ -f "$sfile" ] && [ ! -L "$sfile" ] && [ "$(wc -c < "$sfile" | tr -d ' ')" -le 65536 ] \
-     && jq -e 'type == "object"' "$sfile" >/dev/null 2>&1; then
-    state=$(cat "$sfile")
+     && state=$(jq -c -s 'if length == 1 and (.[0] | type) == "object" then .[0] else error("malformed") end' "$sfile" 2>/dev/null) \
+     && [ -n "$state" ]; then
     last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" then .last else "" end')
     epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
+  else
+    state='{}'
   fi
   case "$epoch" in ''|*[!0-9]*) epoch=0 ;; esac
   local pair=""
