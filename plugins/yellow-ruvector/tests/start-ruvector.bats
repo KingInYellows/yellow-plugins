@@ -32,6 +32,7 @@ if [ "$2" = "--version" ] && [ -n "${FAKE_CLI_BROKEN:-}" ]; then
 fi
 case "$2 $3" in
   "embed text")
+    [ -n "${FAKE_EMBED_PIDFILE:-}" ] && echo $$ > "$FAKE_EMBED_PIDFILE"
     [ -n "${FAKE_EMBED_SLEEP:-}" ] && sleep "$FAKE_EMBED_SLEEP"
     if [ -n "${FAKE_EMBED_OK:-}" ]; then
       d="$HOME/.ruvector/models/all-MiniLM-L6-v2"; mkdir -p "$d"
@@ -154,8 +155,9 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   export FAKE_EMBED_OK=1
   launch "$REPO"
   [ "$status" -eq 0 ]
-  # A live lock holder means no concurrent download: read-only this time.
-  [[ "$output" == *"allow=hooks_capabilities,hooks_recall,hooks_stats "* ]]
+  # A live lock holder means no concurrent download: no model-using tools
+  # this time.
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
   [ ! -e "$HOME/.ruvector/models/all-MiniLM-L6-v2/model.onnx" ]
   rm -rf "$DATA/.install.lock"
   launch "$REPO"
@@ -191,12 +193,12 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ -s "$DATA/model-verified" ]
   [ ! -e "$DATA/.install.lock" ]
   # A live installer holding the lock: the launcher does not load the model
-  # concurrently, and a stamped store still keeps its write tools.
+  # concurrently, and no tool that would load it is exposed either.
   rm -f "$DATA/model-verified"
   mkdir -p "$DATA/.install.lock"; printf '%s' "$$" > "$DATA/.install.lock/pid"
   export RUVECTOR_INSTALL_WAIT=6
   launch "$REPO"
-  [[ "$output" == *"allow=$ALL5 "* ]]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
   rm -rf "$DATA/.install.lock"
 }
 
@@ -250,20 +252,39 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [[ "$stderr" == *"outside HOME/tmp"* ]]
 }
 
-@test "TERM during model warm-up releases the lock and exits" {
+@test "TERM during model warm-up stops the warm-up at once, releases the lock and exits" {
   command -v sha256sum >/dev/null || skip "sha256sum not available"
-  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_SLEEP=5
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_SLEEP=10
+  export FAKE_EMBED_PIDFILE="$BATS_TEST_TMPDIR/embed.pid"
   fake_install
   out="$BATS_TEST_TMPDIR/launch.out"
   ( cd "$REPO" && PATH="$STUBS:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN" exec bash "$PLUGIN/bin/start-ruvector.sh" ) >"$out" 2>&1 &
   pid=$!
-  for _ in $(seq 1 50); do [ -d "$DATA/.install.lock" ] && break; sleep 0.1; done
+  for _ in $(seq 1 50); do [ -s "$FAKE_EMBED_PIDFILE" ] && break; sleep 0.1; done
   [ -d "$DATA/.install.lock" ]
+  start=$SECONDS
   kill -TERM "$pid"
   rc=0; wait "$pid" || rc=$?
   [ "$rc" -eq 143 ]
+  [ $((SECONDS - start)) -le 3 ]
   [ ! -e "$DATA/.install.lock" ]
+  ! kill -0 "$(cat "$FAKE_EMBED_PIDFILE")" 2>/dev/null
   ! grep -q EXEC "$out"
+}
+
+@test "while another session holds the lock fetching the model, model-using tools are off" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_ALLOW="$ALL5" RUVECTOR_INSTALL_WAIT=6
+  fake_install; stamp_store
+  mkdir -p "$DATA/.install.lock"
+  sleep 30 &
+  owner=$!
+  printf '%s' "$owner" > "$DATA/.install.lock/pid"
+  launch "$REPO"
+  kill "$owner" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
+  [[ "$stderr" == *"still being fetched by another session"* ]]
 }
 
 @test "ruvector-cli.sh runs this version's install even when current moved" {
