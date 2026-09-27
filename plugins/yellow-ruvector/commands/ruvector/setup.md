@@ -58,7 +58,12 @@ if yellow_ruvector_validate_paths; then
   printf 'data dir: %s%s\n' "$(yellow_ruvector_flat "$RUVECTOR_DATA")" "$([ "$RUVECTOR_DATA_FALLBACK" = 1 ] && printf ' (fallback: CLAUDE_PLUGIN_DATA unset)')"
   printf 'pinned: %s\n' "$(jq -r '.dependencies.ruvector' "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null)"
   if yellow_ruvector_needs_install || ! yellow_ruvector_install_healthy; then printf 'install: missing, out of date, or broken\n'
-  else printf 'install: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null)"; fi
+  else
+    # The CLI's output is not trusted: only a plain version string is shown.
+    ver=$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null | head -n 1)
+    printf '%s' "$ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || ver="unrecognized"
+    printf 'install: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$ver"
+  fi
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
   yellow_ruvector_install_in_progress && printf 'install lock: held by a running install\n'
 fi
@@ -161,7 +166,7 @@ done
 
 printf '\n=== Smoke Test ===\n'
 if [ ! -f "$ENTRY" ]; then
-  printf 'FAILED: no installed ruvector at %s — run Step 2a\n' "$ENTRY"
+  printf 'FAILED: no installed ruvector at %s — run Step 2a\n' "$(yellow_ruvector_flat "$ENTRY")"
 elif [ ! -d "$ROOT/.ruvector" ]; then
   printf 'Skipped: .ruvector/ not initialized\n'
 else
