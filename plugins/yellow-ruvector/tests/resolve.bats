@@ -355,6 +355,16 @@ fake_install() {
   [ "$status" -eq 0 ]
 }
 
+@test "run_budgeted without GNU timeout spends no KILL grace on a command that exits on TERM" {
+  run bash -c '
+    . "$1"; TIMEOUT_CMD=""
+    s=$(date +%s%N); run_budgeted 0.3 sleep 5; e=$(date +%s%N)
+    echo $(( (e - s) / 1000000 ))' _ "$LIB"
+  [ "$status" -eq 0 ]
+  # 0.3s cap plus polling slack, never the full 0.2s grace.
+  [ "$output" -lt 450 ]
+}
+
 @test "run_bounded (install lib): bounds a command when timeout is unavailable" {
   mkdir -p "$STUBS/bin"
   for b in sh sleep kill cat pkill; do ln -s "$(command -v "$b")" "$STUBS/bin/$b"; done

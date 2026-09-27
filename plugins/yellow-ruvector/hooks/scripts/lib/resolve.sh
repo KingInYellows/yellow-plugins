@@ -288,15 +288,26 @@ run_budgeted() {
   ( sleep "$cap"; tree=$(ruvector_proc_tree "$pid")
     # shellcheck disable=SC2086
     kill -TERM $tree 2>/dev/null
-    sleep 0.2
+    # The grace ends as soon as the whole tree is gone (zombies count as
+    # gone), so a command that exits on TERM costs no extra hook time;
+    # only a TERM-ignoring process waits out the 0.2s before KILL.
+    for _ in 1 2 3 4; do
+      alive=""
+      for p in $tree; do
+        kill -0 "$p" 2>/dev/null || continue
+        case "$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')" in Z*|'') ;; *) alive=1; break ;; esac
+      done
+      [ -n "$alive" ] || exit 0
+      sleep 0.05
+    done
     # shellcheck disable=SC2086
     kill -KILL $tree $(ruvector_proc_tree "$pid") 2>/dev/null ) \
     </dev/null >/dev/null 2>&1 &
   watcher=$!
   wait "$pid" 2>/dev/null || rc=$?
   # Killed by the watcher (a signal status): let it finish escalating to
-  # KILL on the tree it captured (0.2s at most), so no TERM-ignoring child
-  # outlives this call.
+  # KILL on the tree it captured (at most 0.2s, and only while some of it
+  # ignores TERM), so no TERM-ignoring child outlives this call.
   if [ "$rc" -gt 128 ] && kill -0 "$watcher" 2>/dev/null; then
     wait "$watcher" 2>/dev/null
   else
