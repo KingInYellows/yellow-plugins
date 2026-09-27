@@ -738,8 +738,11 @@ coedit_partners() {
   # would block jq on the full pipe while the validation loop runs, and the
   # jq time bound would then cut the list short.
   local cands
-  cands=$(coedit_jq -r --arg r "$rel" --argjson min "$min" --argjson scan "${COEDIT_SCAN:-500}" '
-      (.pairs[$r] // {}) | to_entries
+  # Slurped, exactly one object (as the writer produces): a multi-document
+  # file would otherwise apply the cap per document, not in total.
+  cands=$(coedit_jq -r -s --arg r "$rel" --argjson min "$min" --argjson scan "${COEDIT_SCAN:-500}" '
+      if length != 1 or (.[0] | type) != "object" then empty else .[0] end
+      | (.pairs[$r] // {}) | if type == "object" then . else {} end | to_entries
       | map(select((.value | type) == "number" and .value >= $min
                    and .key != $r
                    and (.key | test("[[:cntrl:]\u0085\u2028\u2029]") | not)))

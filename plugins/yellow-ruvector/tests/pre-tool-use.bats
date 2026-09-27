@@ -705,3 +705,17 @@ related_staged() {
   [[ "$output" == *$'8\tsrc/b.ts'* ]]
   git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
 }
+
+@test "a multi-document coedit.json is not read for suggestions (no per-document cap)" {
+  { jq -cn '{version:1,pairs:{"src/a.ts":{"src/b.ts":8}}}'
+    for i in $(seq 1 3000); do printf '{"pairs":{"src/a.ts":{"src/gone%s.ts":9}}}\n' "$i"; done; } > "$RUVECTOR_DIR/coedit.json"
+  start=$(date +%s%N)
+  out=$(run_hook "$(event m1 Edit "$PROJECT_ROOT/src/a.ts")")
+  end=$(date +%s%N)
+  assert_allow_json "$out"
+  [ -z "$(ctx "$out")" ]
+  [ $(( (end - start) / 1000000 )) -lt 900 ]
+  run --separate-stderr bash -c 'cd "$1" && bash "$2" src/a.ts' _ "$PROJECT_ROOT" "$RELATED"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
