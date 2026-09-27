@@ -262,9 +262,10 @@ ephemeral `GITHUB_TOKEN`.
 - **Exposure**: available only to the `version-or-publish` job, which runs on
   pushes to `main` and `workflow_dispatch` — never on pull requests — and is
   passed to the pinned `changesets/action` step and the preflight probe.
-- **Rotation**: set an expiry (90 days or less) and rotate with
-  `gh secret set RELEASE_PR_TOKEN`. An expired token fails the preflight step
-  with an explicit error.
+- **Rotation**: set an expiry (90 days or less). Create the new PAT, install it
+  with `gh secret set RELEASE_PR_TOKEN`, then revoke the superseded PAT in the
+  owner's settings — replacing the secret does not invalidate the old token.
+  An expired token fails the preflight step with an explicit error.
 - **Revocation**: revoke the PAT in the owner's settings and run
   `gh secret delete RELEASE_PR_TOKEN`; the workflow reverts to `GITHUB_TOKEN`.
 
