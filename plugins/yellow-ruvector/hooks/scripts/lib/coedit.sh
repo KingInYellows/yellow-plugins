@@ -46,14 +46,18 @@ _COEDIT_BUMP_JQ='
     | if ($a | safe) and ($b | safe) and $a != $b then
         ([$a, $b] | min) as $k | ([$a, $b] | max) as $o
         | if any(.[]; .k == $k and .o == $o)
-          then map(if .k == $k and .o == $o then .n += 1 else . end)
-          else . + [{k: $k, o: $o, n: 1}] end
+          then map(if .k == $k and .o == $o then .n += 1 | .cur = true else . end)
+          else . + [{k: $k, o: $o, n: 1, cur: true}] end
       else . end
     # Cap: keep the highest counts, whole pairs at a time, within both the
     # pair cap and a byte budget (80% of COEDIT_MAX_BYTES; each undirected
     # pair costs about 2 * (both paths as JSON-encoded UTF-8 bytes) + 24), so the
-    # writer never produces a file the size check would set aside.
-    | sort_by(-.n, .k, .o) | .[0:($cap / 2 | floor)]
+    # writer never produces a file the size check would set aside. The pair
+    # just updated is always kept (it goes first), so at the cap a new pair
+    # displaces the lowest-ranked one and can accumulate instead of being
+    # evicted on every observation.
+    | sort_by(-.n, .k, .o) | (map(select(.cur)) + map(select(.cur | not)))
+    | .[0:($cap / 2 | floor)]
     | reduce .[] as $e ({acc: [], used: 0};
         (2 * (($e.k | tojson | utf8bytelength) + ($e.o | tojson | utf8bytelength)) + 24) as $c
         | if .used + $c <= ($maxbytes * 0.8) then .acc += [$e] | .used += $c else . end)
@@ -207,10 +211,14 @@ coedit_lock_path() {
         [ -d "$_m" ] && coedit_older_than "$(coedit_mtime "$_m")" 600 \
           && rmdir "$_m" 2>/dev/null
       done
+      # A stale lock may not be empty (a checkout or crash can leave files
+      # in it): rename it aside atomically, then remove the renamed copy.
+      local aside="${lock}.stale.${ino}-${mt}.$$"
       if mkdir "$marker" 2>/dev/null \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
-         && [ "$(coedit_mtime "$lock")" = "$mt" ]; then
-        rmdir "$lock" 2>/dev/null
+         && [ "$(coedit_mtime "$lock")" = "$mt" ] \
+         && mv -- "$lock" "$aside" 2>/dev/null; then
+        rm -rf -- "$aside" 2>/dev/null
       fi
       continue
     fi

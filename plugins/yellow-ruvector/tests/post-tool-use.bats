@@ -198,12 +198,23 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
-@test "the pair file is capped, keeping the highest counts" {
-  jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9}, "src/b.ts":{"src/a.ts":9}}}' > "$COEDIT"
+@test "the pair file is capped, keeping the highest counts and the pair just seen" {
+  jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":9, "src/d.ts":1}, "src/b.ts":{"src/a.ts":9}, "src/d.ts":{"src/a.ts":1}}}' > "$COEDIT"
   edit s1 "$PROJECT_ROOT/src/a.ts"
-  printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/c.ts")" | COEDIT_MAX_PAIRS=2 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
-  [ "$(jq '[.pairs[] | length] | add' "$COEDIT")" -eq 2 ]
+  printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/c.ts")" | COEDIT_MAX_PAIRS=4 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
+  [ "$(jq '[.pairs[] | length] | add' "$COEDIT")" -eq 4 ]
   [ "$(pair src/a.ts src/b.ts)" -eq 9 ]
+  [ "$(pair src/a.ts src/c.ts)" -eq 1 ]
+  [ "$(pair src/a.ts src/d.ts)" -eq 0 ]
+}
+
+@test "at the cap a repeatedly seen new pair accumulates instead of being evicted" {
+  : > "$PROJECT_ROOT/src/y.ts"; : > "$PROJECT_ROOT/src/z.ts"
+  jq -n '{version:1, pairs:{"src/a.ts":{"src/b.ts":1}, "src/b.ts":{"src/a.ts":1}}}' > "$COEDIT"
+  for f in y z y; do
+    printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/$f.ts")" | COEDIT_MAX_PAIRS=2 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
+  done
+  [ "$(pair src/y.ts src/z.ts)" -eq 2 ]
 }
 
 @test "the cap evicts whole pairs, never one direction" {
@@ -212,7 +223,10 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/b.ts")" | COEDIT_MAX_PAIRS=5 PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
   [ "$(jq '[.pairs[] | length] | add' "$COEDIT")" -eq 4 ]
   jq -e '.pairs as $p | [$p | to_entries[] | .key as $k | .value | to_entries[] | $p[.key][$k] == .value] | all' "$COEDIT" > /dev/null
-  [ "$(pair a b)" -eq 3 ] && [ "$(pair a c)" -eq 2 ] && [ "$(pair c a)" -eq 2 ]
+  # The pair just seen (src/a.ts <-> src/b.ts) is kept, plus the top one.
+  [ "$(pair a b)" -eq 3 ] && [ "$(pair b a)" -eq 3 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ] && [ "$(pair src/b.ts src/a.ts)" -eq 1 ]
+  [ "$(pair a c)" -eq 0 ] && [ "$(pair c a)" -eq 0 ]
 }
 
 @test "20 parallel edits never corrupt coedit.json" {
@@ -419,6 +433,16 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   edit r1 "$PROJECT_ROOT/src/c.ts"
   [ -d "$RUVECTOR_DIR/.coedit.lock" ]
   [ "$(pair src/b.ts src/c.ts)" -eq 0 ]
+}
+
+@test "a stale lock that is not empty is still reclaimed" {
+  edit r2 "$PROJECT_ROOT/src/a.ts"
+  mkdir -p "$RUVECTOR_DIR/.coedit.lock/junk"; : > "$RUVECTOR_DIR/.coedit.lock/file"
+  touch -d '5 minutes ago' "$RUVECTOR_DIR/.coedit.lock" 2>/dev/null || skip "touch -d unsupported"
+  edit r2 "$PROJECT_ROOT/src/b.ts"
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ ! -e "$RUVECTOR_DIR/.coedit.lock" ]
+  ! ls -d "$RUVECTOR_DIR"/.coedit.lock.stale.* 2>/dev/null
 }
 
 @test "stale-lock reclaim and marker pruning do not depend on find" {
