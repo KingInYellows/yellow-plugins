@@ -24,7 +24,10 @@ if ! ruvector_node_ok; then
   printf 'yellow-ruvector: Node.js 20 or later is required (found: %s)\n' "$(node --version 2>/dev/null || echo none)" >&2
   exit 1
 fi
-yellow_ruvector_data_dir
+# The same data-dir checks as the MCP launcher and hooks (allowed prefixes,
+# canonical, no escaping symlink): never run a CLI planted under a data dir
+# they would refuse.
+yellow_ruvector_validate_paths --data-only || exit 1
 entry=$(yellow_ruvector_pinned_entry) || entry=""
 # Lease the install (the pid survives exec, so it covers the CLI run);
 # prune sweeps it once the process is gone.
