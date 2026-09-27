@@ -746,18 +746,23 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   git -C "$PROJECT_ROOT" worktree add -q "$WT" 2>/dev/null
   mkdir -p "$WT/src"; : > "$WT/src/a.ts"; : > "$WT/src/b.ts"
   ln -s "$RUVECTOR_DIR" "$WT/.ruvector"
+  # Every 50ms lock wait is a `sleep 0.05`: count them.
+  sb="$BATS_TEST_TMPDIR/sleepbin"; mkdir -p "$sb"
+  printf '#!/bin/sh\n[ "$1" = 0.05 ] && echo x >> "%s/waits"\nexec %s "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v sleep)" > "$sb/sleep"
+  chmod +x "$sb/sleep"
   wedit() {
     jq -cn --arg c "$WT" --arg f "$WT/src/$1.ts" \
       '{hook_event_name:"PostToolUse", session_id:"wb", cwd:$c, tool_name:"Edit", tool_input:{file_path:$f}}' \
-      | COEDIT_LOCK_TRIES=3 PATH="$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
+      | COEDIT_LOCK_TRIES=3 PATH="$sb:$MOCK_BIN:$PATH" bash "$HOOK_SCRIPT" >/dev/null
   }
   wedit a
-  # A store lock freed after 0.1s: the main worktree's 3 tries (150ms) would
-  # wait it out, but the lookup already spent this call's budget.
+  # A busy store lock: the main worktree would wait its 3 tries; the linked
+  # worktree's lookup already spent them (COEDIT_WT_TRIES=3).
   mkdir "$RUVECTOR_DIR/.coedit.lock"
-  ( sleep 0.1; rmdir "$RUVECTOR_DIR/.coedit.lock" ) &
+  rm -f "$BATS_TEST_TMPDIR/waits"
   wedit b
-  wait
+  rmdir "$RUVECTOR_DIR/.coedit.lock"
+  [ ! -s "$BATS_TEST_TMPDIR/waits" ]
   [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
   git -C "$PROJECT_ROOT" worktree remove --force "$WT" 2>/dev/null || true
 }
