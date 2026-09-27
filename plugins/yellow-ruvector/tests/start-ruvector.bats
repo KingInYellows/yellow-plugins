@@ -47,6 +47,8 @@ case "$2 $3" in
     [ -n "${FAKE_LEASE_OUT:-}" ] && [ -e "$CLAUDE_PLUGIN_DATA/.lease.${FAKE_LEASE_NAME}.$$" ] \
       && echo leased > "$FAKE_LEASE_OUT"
     printf 'EXEC pwd=%s allow=%s entry=%s\n' "$(pwd -P)" "$RUVECTOR_MCP_ALLOW" "$1"
+    [ -n "${FAKE_POLICY_OUT:-}" ] \
+      && printf 'profile=%s deny=%s\n' "${RUVECTOR_MCP_PROFILE-unset}" "${RUVECTOR_MCP_DENY-unset}" > "$FAKE_POLICY_OUT"
     exit 0 ;;
 esac
 exit 0
@@ -117,6 +119,22 @@ ALL5="hooks_capabilities,hooks_pretrain,hooks_recall,hooks_remember,hooks_stats"
   [ "$status" -eq 0 ]
   [[ "$output" == *"allow=hooks_capabilities,hooks_stats "* ]]
   [[ "$stderr" == *"starting without hooks_recall, hooks_remember and hooks_pretrain"* ]]
+}
+
+@test "an inherited MCP profile or empty allowlist never re-exposes withheld model tools" {
+  command -v sha256sum >/dev/null || skip "sha256sum not available"
+  export CLAUDE_PLUGIN_DATA="$DATA" RUVECTOR_MCP_PROFILE=readonly RUVECTOR_MCP_DENY=hooks_export
+  export FAKE_POLICY_OUT="$BATS_TEST_TMPDIR/policy"
+  fake_install
+  mkdir -p "$REPO/.ruvector"
+  RUVECTOR_MCP_ALLOW=hooks_recall launch "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$FAKE_POLICY_OUT")" = "profile=unset deny=hooks_export,hooks_recall,hooks_remember,hooks_pretrain" ]
+  # With the model verified, nothing is denied, and the profile still goes.
+  stamp_store
+  RUVECTOR_MCP_ALLOW="$ALL5" FAKE_EMBED_OK=1 launch "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$FAKE_POLICY_OUT")" = "profile=unset deny=hooks_export" ]
 }
 
 @test "an explicitly selected hash embedder keeps all five tools on a fresh store" {

@@ -63,7 +63,8 @@ ruvector.
   its stderr names install, Node, and read-only-mode problems
 - `RUVECTOR_MCP_ALLOW` names the five tools this plugin calls
   (`hooks_capabilities`, `hooks_pretrain`, `hooks_recall`, `hooks_remember`,
-  `hooks_stats`); `RUVECTOR_MCP_PROFILE` is not set. Through 0.3.3 an empty
+  `hooks_stats`); the launcher unsets any inherited `RUVECTOR_MCP_PROFILE`,
+  and withheld model tools also go into `RUVECTOR_MCP_DENY`. Through 0.3.3 an empty
   or misspelled policy exposes every tool and a profile unions with the
   allowlist. 0.3.3's new `metaharness_*` / `rvf_*` tools stay hidden
 - Requires Node.js 20+ (ruvector 0.3.3 `engines`). With older Node the
