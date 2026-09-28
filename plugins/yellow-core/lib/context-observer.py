@@ -18,21 +18,31 @@ Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/context-observations/<session_id>.json
     (observer_format 1) through a temp file plus os.replace, so a reader
     sees either the previous complete record or the new one, never a partial.
-    The temp name is fixed per session and created exclusively: a render that
-    finds a live temp file skips its write, and a killed writer leaves at most
-    one orphan, reclaimed once it is STALE_TEMP_SECONDS old.
+    The temp name is fixed per session and created exclusively, and it is the
+    writer lock: the previous record is read and the advisory state computed
+    only while holding it. A render that finds a live temp file skips its
+    write, and a killed writer leaves at most one orphan, reclaimed once it is
+    STALE_TEMP_SECONDS old. A record whose numbers are unchanged is rewritten
+    only once it is REWRITE_AFTER_SECONDS old, which keeps it well inside the
+    reader's 300 s staleness window. Recording is bounded by a deadline
+    (CONTEXT_OBSERVER_DEADLINE_SECONDS, default 2) so a hung filesystem cannot
+    hold the statusLine command open.
   - Tracks a provisional advisory watermark on remaining context (default
     50 %); crossing it below is counted in the record and nothing else
     happens: no stdout, no stderr, no spawn, no model call.
   - No git, no network, no subprocess; stdlib only; Python 3.7+.
   - Silent: one stderr line only when CONTEXT_OBSERVER_DEBUG=1.
+  - Run by hand with -h/--help, or with a terminal on stdin, it prints this
+    text instead of waiting for a payload.
 
 Environment:
   CLAUDE_CONFIG_DIR                          overrides ~/.claude as the record root
   YELLOW_CONTEXT_WATERMARK                   remaining-% watermark, integer 1-99 (default 50)
   CONTEXT_OBSERVER_DEBUG=1                   report a recording failure on stderr
+  CONTEXT_OBSERVER_DEADLINE_SECONDS          recording deadline in seconds (default 2, 0 disables)
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME  test only: seconds to sleep before the rename
 """
+import calendar
 import json
 import os
 import re
@@ -42,8 +52,11 @@ import time
 
 OBSERVER_FORMAT = 1
 DEFAULT_WATERMARK = 50
-SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 STALE_TEMP_SECONDS = 10
+REWRITE_AFTER_SECONDS = 60
+DEFAULT_DEADLINE_SECONDS = 2
 
 
 def parse_payload(raw):
@@ -57,7 +70,8 @@ def parse_payload(raw):
 
 def sanitize_session_id(value):
     """Accept only [A-Za-z0-9_-]{1,128}; anything else means write nothing."""
-    if isinstance(value, str) and SESSION_ID_RE.match(value):
+    # fullmatch: re's `$` would also accept a trailing newline.
+    if isinstance(value, str) and SESSION_ID_RE.fullmatch(value):
         return value
     return None
 
@@ -110,7 +124,7 @@ def build_record(payload, session_id):
     return {
         "observer_format": OBSERVER_FORMAT,
         "session_id": session_id,
-        "observed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "observed_at": time.strftime(TIMESTAMP_FORMAT, time.gmtime()),
         # Private state: stays in this untracked record and is never printed.
         "cwd": payload.get("cwd") if isinstance(payload.get("cwd"), str) else None,
         "transcript_present": bool(payload.get("transcript_path")),
@@ -198,11 +212,30 @@ def open_temp(tmp):
             return None
 
 
-def write_record(path, record):
-    """Atomic write: 0700 dir, exclusive 0600 temp sibling, os.replace.
+def age_seconds(observed_at):
+    try:
+        return time.time() - calendar.timegm(time.strptime(observed_at, TIMESTAMP_FORMAT))
+    except (TypeError, ValueError):
+        return None
 
-    No fsync: os.replace already gives readers the old or the new complete
-    record, and a record lost to a power failure reads as unknown anyway.
+
+def unchanged(previous, record):
+    """True when previous carries the same numbers and is recent enough to keep."""
+    if not isinstance(previous, dict):
+        return False
+    for key in ("context_window", "advisory", "transcript_present", "cwd"):
+        if previous.get(key) != record.get(key):
+            return False
+    age = age_seconds(previous.get("observed_at"))
+    return age is not None and 0 <= age < REWRITE_AFTER_SECONDS
+
+
+def write_record(path, record):
+    """Lock, finish the record from the previous one, and publish atomically.
+
+    0700 dir, exclusive 0600 temp sibling (the lock), os.replace. No fsync:
+    os.replace already gives readers the old or the new complete record, and
+    a record lost to a power failure reads as unknown anyway.
     """
     directory = os.path.dirname(path)
     os.makedirs(directory, mode=0o700, exist_ok=True)
@@ -215,6 +248,14 @@ def write_record(path, record):
     if fd is None:
         return
     try:
+        previous = load_previous(path, record["session_id"])
+        record["advisory"] = advisory_state(
+            previous, record["context_window"]["remaining_percentage"], watermark_remaining()
+        )
+        if unchanged(previous, record):
+            os.close(fd)
+            os.unlink(tmp)
+            return
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(record, handle, sort_keys=True)
             handle.write("\n")
@@ -239,21 +280,22 @@ def record_observation(raw):
     path = record_path(slug, session_id)
     if path is None:
         return
-    record = build_record(payload, session_id)
-    previous = load_previous(path, session_id)
-    record["advisory"] = advisory_state(
-        previous, record["context_window"]["remaining_percentage"], watermark_remaining()
-    )
-    write_record(path, record)
+    write_record(path, build_record(payload, session_id))
 
 
 def release_stdout():
     """Point fd 1 at /dev/null: the next stage sees EOF now, and the
     interpreter's exit-time flush has nowhere to fail."""
     try:
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        devnull = os.open(os.devnull, os.O_WRONLY)
+    except OSError:
+        return
+    try:
+        os.dup2(devnull, sys.stdout.fileno())
     except OSError:
         pass
+    finally:
+        os.close(devnull)
 
 
 def on_sigterm(signum, frame):
@@ -261,7 +303,28 @@ def on_sigterm(signum, frame):
     raise SystemExit(0)
 
 
+def on_deadline(signum, frame):
+    raise TimeoutError("recording deadline reached")
+
+
+def deadline_seconds():
+    raw = os.environ.get("CONTEXT_OBSERVER_DEADLINE_SECONDS", "")
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_DEADLINE_SECONDS
+    return value if 0 <= value <= 60 else DEFAULT_DEADLINE_SECONDS
+
+
+def wants_help(argv):
+    return any(arg in ("-h", "--help") for arg in argv[1:])
+
+
 def main():
+    if wants_help(sys.argv) or sys.stdin.isatty():
+        # Run by hand: explain instead of blocking on a terminal.
+        sys.stdout.write(__doc__)
+        sys.exit(0)
     signal.signal(signal.SIGTERM, on_sigterm)
     raw = b""
     try:
@@ -273,7 +336,11 @@ def main():
         # record what was read.
         pass
     release_stdout()
+    deadline = deadline_seconds()
     try:
+        if deadline and hasattr(signal, "SIGALRM"):
+            signal.signal(signal.SIGALRM, on_deadline)
+            signal.alarm(deadline)
         record_observation(raw)
     except BaseException as exc:  # never let recording affect the statusline
         if os.environ.get("CONTEXT_OBSERVER_DEBUG") == "1":

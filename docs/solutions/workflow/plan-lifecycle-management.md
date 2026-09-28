@@ -303,21 +303,26 @@ falling back to a manual `git push` + `gh pr create`, `gt merge` reported
 "The following branches do not have associated PRs" for a PR that
 demonstrably existed (PR #812).
 
-Treat either message as `gt`'s local trunk cache being stale relative to
-GitHub — not something to retry. This is a different failure mode from
-[the Graphite API outage fallback](./graphite-api-outage-fallback.md): that
-one is the Graphite API itself returning 503s with local git fully healthy;
-this one is the Graphite API reachable but local git state `gt` refuses to
-trust. The same fallback shape resolves both — skip `gt` for push/create/merge
-and go direct to GitHub:
+Treat either message as `gt`'s local trunk being stale relative to GitHub.
+This differs from [the Graphite API outage fallback](./graphite-api-outage-fallback.md),
+where the Graphite API itself fails while local git is healthy. Recover with
+`gt` first:
 
-```bash
-git push -u origin "$BRANCH"
-gh pr create --title "..." --body "..." --base main
-gh pr merge <number> --squash
-```
+1. Clear the cause: move or delete the untracked files in the main clone
+   that collide with the merged PR's paths (check `git status` first — other
+   sessions may share the clone), then run `gt repo sync` (`gt sync`) so
+   local `main` fast-forwards.
+2. Retry `gt submit --no-interactive` / `gt merge` from the archive
+   worktree.
 
-(PR #812 landed this way as squash commit `22cfd85b`.)
+Only when trunk cannot be repaired locally, and with the user's explicit
+approval, use the direct-GitHub path that
+[graphite-api-outage-fallback.md](./graphite-api-outage-fallback.md)
+documents (`git push` plus `gh pr create`). That doc remains the single
+policy for bypassing `gt`; CLAUDE.md's rule against falling back to raw
+`git push` or `gh pr create` applies everywhere else. PR #812 landed through
+that exception as squash commit `22cfd85b`, before this recovery order was
+written down.
 
 ---
 

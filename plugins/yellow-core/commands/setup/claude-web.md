@@ -384,8 +384,8 @@ If `[Merge]`: run the Python atomic-merge block below.
 
 #### Python atomic-write/merge block
 
-Mirrors the canonical pattern from `plugins/yellow-core/commands/statusline/setup.md`
-(read JSON → mutate in memory → write `.tmp` → validate → `os.replace`).
+Mirrors the canonical pattern in `plugins/yellow-core/lib/context-observer-setup.py`
+`write_settings()` (read JSON → mutate in memory → write `.tmp` → validate → `os.replace`).
 
 ```bash
 python3 - <<'__EOF_SETTINGS_MERGE__'

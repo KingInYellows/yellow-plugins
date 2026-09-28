@@ -470,3 +470,199 @@ setup_py() {
     --observer-dest '~/.claude/yellow-context-observer.py' --statusline "$STATUSLINE"
   echo "$output" | jq -e --arg c "python3 $HOME/.claude/yellow-context-observer.py | bash ~/custom.sh" '.proposed_command == $c' >/dev/null
 }
+
+# --- review round 2 (PR #912): observer ------------------------------------
+
+@test "T09: a session id with a trailing newline writes nothing" {
+  payload x 61 | jq -c '.session_id = "valid123\n"' | python3 "$OBS" >/dev/null
+  [ -z "$(find "$HOME/.claude" -type f 2>/dev/null)" ]
+}
+
+@test "T09: without workspace.project_dir the record is keyed by cwd" {
+  payload cwdonly 61 | jq -c 'del(.workspace)' | python3 "$OBS" >/dev/null
+  [ -f "$(record_for cwdonly)" ]
+}
+
+@test "T09: a downstream that closes early still gets exit 0 and a record" {
+  payload pipe 61 > "$TEST_HOME/in"
+  python3 "$OBS" < "$TEST_HOME/in" | true
+  [ "${PIPESTATUS[0]}" -eq 0 ]
+  jq -e '.context_window.remaining_percentage == 61' "$(record_for pipe)" >/dev/null
+}
+
+@test "T10: an unchanged sample is not rewritten until the record is REWRITE_AFTER_SECONDS old" {
+  local recent old
+  observe steady 61
+  recent=$(iso_ago 30)
+  set_observed_at "$(record_for steady)" "$recent"
+  observe steady 61
+  jq -e --arg ts "$recent" '.observed_at == $ts' "$(record_for steady)" >/dev/null
+  old=$(iso_ago 90)
+  set_observed_at "$(record_for steady)" "$old"
+  observe steady 61
+  jq -e --arg ts "$old" '.observed_at != $ts' "$(record_for steady)" >/dev/null
+  observe steady 40
+  jq -e '.context_window.remaining_percentage == 40' "$(record_for steady)" >/dev/null
+}
+
+@test "T10: the recording deadline bounds a hung write and keeps the previous record" {
+  local start elapsed
+  observe slow 70
+  cp "$(record_for slow)" "$TEST_HOME/before"
+  payload slow 30 > "$TEST_HOME/in"
+  start=$(date +%s)
+  CONTEXT_OBSERVER_DEADLINE_SECONDS=1 CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=5 \
+    python3 "$OBS" < "$TEST_HOME/in" > "$TEST_HOME/out"
+  elapsed=$(( $(date +%s) - start ))
+  [ "$elapsed" -lt 4 ]
+  cmp "$TEST_HOME/in" "$TEST_HOME/out"
+  cmp "$TEST_HOME/before" "$(record_for slow)"
+  [ -z "$(find "$(dirname "$(record_for slow)")" -name '*.tmp')" ]
+}
+
+@test "the observer prints its usage for --help instead of reading stdin" {
+  run --separate-stderr python3 "$OBS" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"opt-in context observer"* ]]
+  [ -z "$(find "$HOME/.claude" -type f 2>/dev/null)" ]
+}
+
+# --- review round 2: reader --------------------------------------------------
+
+@test "R20: the reader finds the record when the handoff root differs from the launch directory" {
+  observe moved 61
+  mkdir -p "$TEST_HOME/worktree"
+  run --separate-stderr co_read_observation moved "$TEST_HOME/worktree"
+  echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
+}
+
+@test "R20: with records under two project directories the newest one wins" {
+  local other
+  observe twice 70
+  other="$HOME/.claude/projects/-elsewhere/context-observations"
+  mkdir -p "$other"
+  jq '.context_window.remaining_percentage = 20' "$(record_for twice)" > "$other/twice.json"
+  touch -d '2 minutes ago' "$(record_for twice)" 2>/dev/null \
+    || python3 -c 'import os, sys, time; t = time.time() - 120; os.utime(sys.argv[1], (t, t))' "$(record_for twice)"
+  run --separate-stderr co_read_observation twice "$TEST_HOME/unrelated"
+  echo "$output" | jq -e '.remaining_percentage == 20' >/dev/null
+}
+
+@test "R20: CONTEXT_OBSERVER_DEBUG=1 says why the reading is unknown" {
+  CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr co_read_observation nobody "$PROJECT"
+  [ "$output" = "unknown" ]
+  [[ "$stderr" == *"no record for this session"* ]]
+  run --separate-stderr co_read_observation nobody "$PROJECT"
+  [ -z "$stderr" ]
+}
+
+# --- review round 2: setup helper -------------------------------------------
+
+@test "T11: every result carries the same eight keys, with error_code on refusals" {
+  local keys='["action","backup","error_code","existing_command","observer","proposed_command","reason","settings"]'
+  seed_settings "bash ~/custom.sh"
+  run --separate-stderr setup_py plan
+  echo "$output" | jq -e --argjson k "$keys" 'keys == $k and .error_code == null' >/dev/null
+  printf '[1, 2]\n' > "$SETTINGS"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e --argjson k "$keys" 'keys == $k and .error_code == "settings_not_object"' >/dev/null
+  printf '{"statusLine": "python3 x"}\n' > "$SETTINGS"
+  run --separate-stderr setup_py install
+  echo "$output" | jq -e '.error_code == "statusline_not_object"' >/dev/null
+  seed_settings "bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" install --settings "$SETTINGS" --observer-src "$TEST_HOME/missing.py" \
+    --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "observer_src_missing"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  [ ! -e "$OBS_DEST" ]
+}
+
+@test "T11: a usage error is JSON with exit 2, and --help lists every subcommand" {
+  run --separate-stderr python3 "$SETUP_PY" bogus
+  [ "$status" -eq 2 ]
+  echo "$output" | jq -e '.action == "error" and .error_code == "usage"' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"statusline"* && "$output" == *"plan"* && "$output" == *"install"* && "$output" == *"remove"* ]]
+}
+
+@test "T11: a second install over changed settings keeps the first backup and adds a numbered one" {
+  seed_settings "bash ~/custom.sh"
+  setup_py install >/dev/null
+  jq '.statusLine.command = "bash ~/other.sh" | .extra = 1' "$SETTINGS" > "$TEST_HOME/s" && mv "$TEST_HOME/s" "$SETTINGS"
+  cp "$SETTINGS" "$TEST_HOME/second.orig"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 0 ]
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
+  cmp "$TEST_HOME/second.orig" "$SETTINGS.pre-observer.backup.2"
+}
+
+@test "T11: a missing or outdated observer copy is reported by plan and refreshed by install" {
+  seed_settings "bash ~/custom.sh"
+  setup_py install >/dev/null
+  cp "$SETTINGS" "$TEST_HOME/installed"
+  rm -f "$OBS_DEST"
+  run --separate-stderr setup_py plan --observer-src "$OBS"
+  echo "$output" | jq -e '.action == "refresh"' >/dev/null
+  run --separate-stderr setup_py install
+  echo "$output" | jq -e '.action == "refreshed"' >/dev/null
+  cmp "$OBS" "$OBS_DEST"
+  printf '# old copy\n' > "$OBS_DEST"
+  run --separate-stderr setup_py install
+  echo "$output" | jq -e '.action == "refreshed"' >/dev/null
+  cmp "$OBS" "$OBS_DEST"
+  cmp "$TEST_HOME/installed" "$SETTINGS"
+}
+
+@test "T11: remove restores the wrapped command, simple or compound, and backs up settings" {
+  local cmd
+  for cmd in "bash ~/custom.sh" "cat > /dev/null && echo done # note"; do
+    seed_settings "$cmd"
+    setup_py install >/dev/null
+    run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.action == "removed" and (.backup | type == "string")' >/dev/null
+    jq -e --arg c "$cmd" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+    rm -f "$SETTINGS".pre-observer.backup*
+  done
+}
+
+@test "T11: remove handles the manual-merge form, reports not-installed, and refuses a non-prefix use" {
+  seed_settings "python3 ~/.claude/yellow-context-observer.py | bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest '~/.claude/yellow-context-observer.py'
+  echo "$output" | jq -e '.action == "removed"' >/dev/null
+  jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest '~/.claude/yellow-context-observer.py'
+  echo "$output" | jq -e '.action == "not-installed"' >/dev/null
+  seed_settings "bash ~/custom.sh | python3 $TEST_HOME/.claude/yellow-context-observer.py"
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "observer_not_removable"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+}
+
+@test "T11: statusline keeps a composed observer, writes plain otherwise, and recovers invalid JSON" {
+  seed_settings "bash ~/custom.sh"
+  setup_py install >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  jq -e --arg c "python3 $OBS_DEST | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.padding == 0' "$SETTINGS" >/dev/null
+  diff <(jq 'del(.statusLine)' "$TEST_HOME/settings.orig") <(jq 'del(.statusLine)' "$SETTINGS")
+
+  seed_settings "bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+
+  printf '{"a": ' > "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
+  jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+
+  printf '{\n  // c\n}\n' > "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "settings_jsonc"' >/dev/null
+}

@@ -120,8 +120,9 @@ reported unsupported.
   unreadable or malformed); `prev_state = advisory.last_state` else `"unknown"`.
   Compute `state` = `"below"` when `remaining_percentage` is a number in 0-100
   and `< watermark`, `"above"` when a number in 0-100 and `>= watermark`, else
-  `"unknown"`. `crossings` = previous `crossings` (default 0) + 1 only when
-  `prev_state == "above"` and `state == "below"`; carry `crossings` unchanged
+  `"unknown"`. `crossings` = previous `crossings` (default 0) + 1 whenever
+  `state` becomes `"below"` from a state that was not already `"below"`
+  (including the first sample, from `"unknown"`); carry `crossings` unchanged
   otherwise, so ten identical below samples add one, and above → below adds a
   second. Persist `advisory: {watermark_remaining, crossings, last_state}`
   where `last_state` is `state` except that `"unknown"` leaves the previous
@@ -299,21 +300,15 @@ reported unsupported.
 - `git diff --name-only main` -> expected: only paths under
   `plugins/yellow-core/lib/`, `plugins/yellow-core/skills/session-handoff/`,
   `plugins/yellow-core/tests/`, `plugins/yellow-core/commands/statusline/setup.md`,
-  `.changeset/`, and this plan (R23).
+  `.changeset/`, and this plan (R23), plus the scope widened in Results and
+  Deviations: `plugins/yellow-core/references/statusline-setup/`,
+  `plugins/yellow-core/{CLAUDE,README}.md` (PR #750 has landed),
+  `plugins/yellow-core/commands/setup/claude-web.md` (a pointer to the moved
+  settings writer), and the planning session's `docs/` learnings.
 - Manual smoke in this worktree with `HOME=$(mktemp -d)`: pipe a fixture
   through the observer, then `handoff.sh measure` with the fixture's
   `session_id` exported as `CLAUDE_CODE_SESSION_ID` -> expected:
   `context_at_capture` object; `git status` unchanged.
-- Review fixes (flow:work Phase 3): the observer releases stdout before
-  recording (the next stage sees EOF at once), drops `fsync`, writes through
-  one exclusive temp name per session (a live temp file skips the render, a
-  stale one is reclaimed after 10 s, so a killed writer leaves at most one
-  orphan), and unwinds on SIGTERM; the reader anchors `observed_at` inside
-  jq so a planted newline cannot forge its output; setup wraps a compound
-  command with the parentheses on their own lines (comments and heredocs
-  stay closed) and writes a symlinked `settings.json` through the link.
-- Follow-ups not done here: skip rewriting an unchanged record, prune old
-  observation records, and the flaky `git-worktree` teardown above.
 - Not run: installed-host smoke of the composed pipeline inside a live
   Claude Code statusline (interruption and debounce behavior is
   undocumented); reported as `not-run`. The user's `~/.claude/settings.json`
@@ -321,43 +316,56 @@ reported unsupported.
 
 ## Results and Deviations (2026-09-28)
 
-- `bats tests/context-observer.bats`: 33 of 33 pass on the Claude Code
-  2.1.284 fixtures. Observer best of five on `mid-session.json`: 18.3 ms
-  after the review fixes (28.1 ms before; budget 100 ms). Best-of-five
-  measures the observer alone, not the whole statusline pipeline.
-- `bats tests/`: 247 of 247 pass, including `handoff.bats` 53 (50 + 3).
+Counts are from the final commit, restacked on `main` at `28220d1a`.
+
+- `bats tests/context-observer.bats`: 49 of 49 pass on the Claude Code
+  2.1.284 fixtures. Observer best of five on `mid-session.json`: 18.6 ms
+  (budget 100 ms). Best-of-five measures the observer alone, not the whole
+  statusline pipeline.
+- `bats tests/handoff.bats`: 55 of 55 (50 from shell 01 + 5).
+- `bats tests/`: 273 of 273 pass.
 - `bats skills/git-worktree/tests/`: 9–11 of 11 per run. The failures are in
   teardown (`rm -rf "$REPO"`: "Directory not empty") and reproduce the same
   way on `main`; this branch does not touch that suite. Follow-up.
-- `validate:schemas`, `validate:agents`, `lint:plugins`, `validate:generated`,
-  `validate:plans`, `typecheck`, `lint`, `test:integration` (1363) pass.
-  `setup.md`'s RULE 21 length advisory predates this work (538 → 589 lines).
+- `validate:schemas`, `validate:agents`, `lint:plugins`, `validate:versions`,
+  `validate:generated`, `validate:plans`, `typecheck`, `lint` and
+  `test:integration` (1395) pass. `setup.md` is 381 lines (538 on `main`):
+  the generated statusline template moved unchanged to
+  `references/statusline-setup/statusline-template.py`.
 - Fixtures are versioned `2.1.284` (the client at capture time). Only
   `startup-null` and `mid-session` are real payloads; no post-compact payload
   was captured, so `post-compact-null.json` does not exist and
-  post-compaction behaviour has no real-host fixture.
-- Capture used `claude --settings '<json>'` for a single session instead of
-  editing `statusLine.command`, so `~/.claude/settings.json` was never
-  changed.
-- `context-observer-setup.py` also refuses an absent `statusLine` when the
-  yellow statusline script does not exist, wraps a custom command that
-  contains shell control characters in `( … )` so the payload still reaches
-  its first stage, and expands `~` before quoting paths.
-- `handoff.sh read` shape-validates a note's `context_at_capture` object
-  (numbers and timestamp only), like every other note-derived field.
-- The branch also carries `docs/CONCEPTS.md` and
-  `docs/solutions/workflow/plan-lifecycle-management.md` from the planning
-  session's compound step (outside the R23 allowlist; docs only).
-- Review fixes (flow:work Phase 3): the observer releases stdout before
-  recording (the next stage sees EOF at once), drops `fsync`, writes through
-  one exclusive temp name per session (a live temp file skips the render, a
-  stale one is reclaimed after 10 s, so a killed writer leaves at most one
-  orphan), and unwinds on SIGTERM; the reader anchors `observed_at` inside
-  jq so a planted newline cannot forge its output; setup wraps a compound
-  command with the parentheses on their own lines (comments and heredocs
-  stay closed) and writes a symlinked `settings.json` through the link.
-- Follow-ups not done here: skip rewriting an unchanged record, prune old
-  observation records, and the flaky `git-worktree` teardown above.
+  post-compaction behaviour has no real-host fixture. Capture used
+  `claude --settings '<json>'` for one session, so `~/.claude/settings.json`
+  was never changed.
+- Record lookup: the observer keys records by the session's launch
+  directory; `co_read_observation` falls back to the session id across
+  `projects/*/context-observations/`, so worktree, subdirectory and symlinked
+  sessions resolve.
+- Observer hardening (flow:work Phase 3 and /review:pr): stdout is released
+  before recording; no `fsync`; one exclusive temp file per session is the
+  writer lock, and the previous record is read and the advisory computed
+  under it; unchanged samples are rewritten only after 60 s; recording has a
+  2 s deadline; SIGTERM unwinds; `--help` or a terminal on stdin prints usage;
+  session ids use `fullmatch`.
+- `context-observer-setup.py` became the only writer of `statusLine.command`
+  (`statusline`, `plan`, `install`, `remove`): Step 5 keeps a composed
+  observer, `install` refreshes a missing or outdated copy, `remove` restores
+  the wrapped command, every run prints the same eight keys with an
+  `error_code`, usage errors are JSON, and a symlinked settings.json is
+  written through. `/statusline:setup observer` runs only Steps 1 and 5b.
+  Step 5b uses `CLAUDE_CONFIG_DIR`; its reference detail lives in
+  `references/statusline-setup/context-observer.md`.
+- `CO_CONTEXT_JQ` is the one validator for the `context_at_capture` object,
+  used by the reader and by `handoff.sh read`, anchored with `\A…\z`.
+- Scope widened beyond R23's list: `plugins/yellow-core/references/`,
+  `plugins/yellow-core/{CLAUDE,README}.md` (PR #750 has landed),
+  `commands/setup/claude-web.md` (pointer to the moved settings writer), the
+  planning session's `docs/CONCEPTS.md` and
+  `docs/solutions/workflow/plan-lifecycle-management.md` updates, and
+  `docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md`.
+- Follow-ups not done here: prune old observation records, and the flaky
+  `git-worktree` teardown above.
 - Not run: installed-host smoke of the composed pipeline inside a live
   statusline, including interruption and debounce behaviour.
 

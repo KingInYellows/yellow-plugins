@@ -704,3 +704,22 @@ observe() {
   run --separate-stderr bash "$HO" read "$path"
   echo "$output" | jq -e '.measured.context_at_capture == "unknown"' >/dev/null
 }
+
+@test "measure finds the observation when the session launched outside the handoff's toplevel" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+  local launch
+  launch=$(mktemp -d)
+  printf '{"session_id":"%s","cwd":"%s","workspace":{"project_dir":"%s"},"context_window":{"used_percentage":30,"remaining_percentage":70,"current_usage":{"input_tokens":1}}}' \
+    "$CLAUDE_CODE_SESSION_ID" "$launch" "$launch" | python3 "$OBSERVER" >/dev/null
+  run --separate-stderr bash "$HO" measure
+  echo "$output" | jq -e '.context_at_capture.remaining_percentage == 70' >/dev/null
+  rm -rf "$CLAUDE_CONFIG_DIR" "$launch"
+}
+
+@test "read rejects a context_at_capture whose observed_at ends in a newline" {
+  path=$(write_note ctxnewline)
+  sed -i 's|^context_at_capture: .*|context_at_capture: {"remaining_percentage":61,"observed_at":"2026-09-17T00:00:00Z\\n"}|' "$path"
+  run --separate-stderr bash "$HO" read "$path"
+  echo "$output" | jq -e '.measured.context_at_capture == "unknown"' >/dev/null
+}

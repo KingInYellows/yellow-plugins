@@ -535,7 +535,7 @@ ho_read_json() {
     --argjson complete "$complete" --arg id "$m_id" --arg ts "$m_ts" --arg sess "$m_sess" \
     --arg ver "$m_ver" --arg repo "$m_repo" --arg wt "$m_wt" --arg kind "$m_kind" --arg remote "$m_remote" \
     --arg branch "$m_branch" --arg head "$m_head" --arg dirty "$m_dirty" --arg task "$task_ref" \
-    --argjson ev "$evidence_json" --arg ts_re "$HANDOFF_TS_RE" '
+    --argjson ev "$evidence_json" "$CO_CONTEXT_JQ"'
     {format: "v1", reference: $ref, handoff_id: $id, title: $heading,
      measured: {captured_at: $ts, source_session: $sess, plugin_version: $ver, repository_id: $repo,
                 worktree_id: $wt, worktree_kind: $kind, remote_origin: $remote, branch: $branch, head: $head,
@@ -543,15 +543,7 @@ ho_read_json() {
                 dirty_staged: ($fm.dirty_staged | if type == "number" then . else "unknown" end),
                 dirty_unstaged: ($fm.dirty_unstaged | if type == "number" then . else "unknown" end),
                 dirty_untracked: ($fm.dirty_untracked | if type == "number" then . else "unknown" end),
-                context_at_capture: ($fm.context_at_capture
-                  | if type == "object"
-                       and (.remaining_percentage | type == "number" and . >= 0 and . <= 100)
-                       and (.observed_at | type == "string" and test($ts_re))
-                    then {remaining_percentage,
-                          used_percentage: (.used_percentage | if type == "number" then . else null end),
-                          observed_at,
-                          advisory_crossings: (.advisory_crossings | if type == "number" then . else null end)}
-                    else "unknown" end)},
+                context_at_capture: ($fm.context_at_capture | co_context)},
      body_digest_ok: $digest_ok,
      task_ref: $task,
      evidence_refs: $ev,

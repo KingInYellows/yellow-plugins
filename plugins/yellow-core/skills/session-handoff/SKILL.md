@@ -22,8 +22,15 @@ hashed `repository_id` and `worktree_id` (never raw paths), `worktree_kind`,
 unstaged / untracked counts, `task_ref`, `evidence_refs`,
 `context_at_capture`, `body_digest` — followed by the labeled narrative.
 `context_at_capture` is filled from the opt-in context observer
-(`/statusline:setup`, Step 5b) and reads `unknown` for headless `claude -p`
-sessions and whenever the observer is not enabled.
+(`/statusline:setup observer`): either the string `unknown` or an object
+`{remaining_percentage, used_percentage, observed_at, advisory_crossings}`
+(`advisory_crossings` counts drops below the 50 % remaining watermark). It is
+`unknown` when the observer is not enabled, in headless `claude -p` sessions,
+when no statusline has rendered in the last 300 s, or when the record belongs
+to another session or is out of range; `CONTEXT_OBSERVER_DEBUG=1` prints the
+reason on stderr. `unknown` is normal and never changes a preflight status.
+`handoff.sh measure` is the read-only way to check context mid-session:
+`advisory_crossings > 0` is a cue to offer a handoff.
 `preflight` re-measures the live workspace and reports
 `ready | mismatched | unsupported | blocked` with reason codes, as JSON on
 stdout and a summary on stderr, without mutating anything. Exit codes: 0
@@ -140,7 +147,9 @@ Read `status` and `reasons` from the JSON. Reason codes: `jq-missing`,
 `evidence-missing`, `already-complete`, and the informational
 `session-differs`. `plugin.identity` says whether the cached yellow-core copy
 matches the checkout (`matches-checkout`, `cache-lags-checkout`, …); report
-it but do not enable or copy a plugin to change it.
+it but do not enable or copy a plugin to change it. `context` is the
+resuming session's live reading; `handoff.sh read` shows the reading at
+capture as `measured.context_at_capture`. Both are informational only.
 
 **Step 2: Show the narrative as reference data.** Quote
 `next_action_excerpt` exactly as returned — it is already wrapped in the

@@ -11,12 +11,18 @@
 #   . "${SCRIPT_DIR}/../lib/context-observer.sh"
 #   co_read_observation "$session_id" "$toplevel"    # JSON object or "unknown"
 #
-# `unknown` is printed when the session id is "unknown" or malformed, the
-# record is missing, unreadable, or not a JSON object, its observer_format
-# is not 1, its session_id differs, observed_at is malformed or outside the
-# staleness window (CO_STALENESS_SECONDS, default 300, either direction), or
-# remaining_percentage is null, non-numeric, or outside 0-100. It is never
-# rendered as 0.
+# The record is looked up under the toplevel's project slug first, then by
+# session id across every project directory: the observer keys it by the
+# session's launch directory, which differs from the toplevel when a session
+# works in a linked worktree, a repository subdirectory, or through a symlink.
+#
+# `unknown` is printed when the session id is "unknown" or malformed, no
+# record exists for it, the record is unreadable or not a JSON object, its
+# observer_format is not 1, its session_id differs, observed_at is malformed
+# or outside the staleness window (CO_STALENESS_SECONDS, default 300, either
+# direction), or remaining_percentage is null, non-numeric, or outside 0-100.
+# It is never rendered as 0. With CONTEXT_OBSERVER_DEBUG=1 the reason is
+# printed on stderr.
 #
 # Sourced library only. MUST NOT set top-level shell options.
 
@@ -24,10 +30,43 @@
 _CONTEXT_OBSERVER_LOADED=1
 
 CO_SESSION_ID_RE='^[A-Za-z0-9_-]{1,128}$'
-CO_TS_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+
+# jq definition shared with handoff.sh: validates a reduced context object
+# and returns it rebuilt from its four known fields, or the string "unknown".
+# observed_at is anchored with \A…\z because Oniguruma's $ also matches
+# before a trailing newline.
+# shellcheck disable=SC2016
+CO_CONTEXT_JQ='def co_context:
+  if type == "object"
+     and (.remaining_percentage | type == "number" and . >= 0 and . <= 100)
+     and (.observed_at | type == "string"
+          and test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\z"))
+  then {remaining_percentage,
+        used_percentage: (.used_percentage | if type == "number" then . else null end),
+        observed_at,
+        advisory_crossings: (.advisory_crossings | if type == "number" then . else null end)}
+  else "unknown" end;'
 
 co_warn() {
   printf '[context-observer] Warning: %s\n' "$1" >&2
+}
+
+# Print `unknown`, and the reason on stderr when CONTEXT_OBSERVER_DEBUG=1.
+co_unknown() {
+  if [ "${CONTEXT_OBSERVER_DEBUG:-}" = "1" ]; then
+    printf '[context-observer] unknown: %s\n' "$1" >&2
+  fi
+  printf 'unknown\n'
+}
+
+co_config_dir() {
+  if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
+    printf '%s\n' "$CLAUDE_CONFIG_DIR"
+  elif [ -n "${HOME:-}" ]; then
+    printf '%s/.claude\n' "$HOME"
+  else
+    return 1
+  fi
 }
 
 # Record path for a session: <config dir>/projects/<slug>/context-observations/<id>.json.
@@ -42,13 +81,29 @@ co_observation_path() {
   local sid="${1:-}" root="${2:-}" config slug
   [[ "$sid" =~ $CO_SESSION_ID_RE ]] || return 1
   [ -n "$root" ] || return 1
-  config="${CLAUDE_CONFIG_DIR:-}"
-  if [ -z "$config" ]; then
-    [ -n "${HOME:-}" ] || return 1
-    config="$HOME/.claude"
-  fi
+  config=$(co_config_dir) || return 1
   slug=$(printf '%s' "$root" | tr '/' '-')
   printf '%s/projects/%s/context-observations/%s.json\n' "$config" "$slug" "$sid"
+}
+
+# The record for a session: the toplevel's path when it exists, else the
+# newest <config>/projects/*/context-observations/<id>.json. Fails when none.
+#
+# Args: as co_observation_path.
+co_find_record() {
+  local sid="${1:-}" root="${2:-}" config primary candidate newest=""
+  primary=$(co_observation_path "$sid" "$root") || return 1
+  if [ -f "$primary" ]; then
+    printf '%s\n' "$primary"
+    return 0
+  fi
+  config=$(co_config_dir) || return 1
+  for candidate in "$config"/projects/*/context-observations/"$sid".json; do
+    [ -f "$candidate" ] || continue
+    if [ -z "$newest" ] || [ "$candidate" -nt "$newest" ]; then newest="$candidate"; fi
+  done
+  [ -n "$newest" ] || return 1
+  printf '%s\n' "$newest"
 }
 
 # Args:
@@ -58,50 +113,43 @@ co_read_observation() {
   local sid="${1:-}" root="${2:-}" file
   if ! command -v cs_iso_to_epoch >/dev/null 2>&1; then
     co_warn "cs_iso_to_epoch is unavailable; source lib/compound-staging.sh before this file"
-    printf 'unknown\n'; return 0
+    co_unknown "cs_iso_to_epoch missing"; return 0
   fi
-  if [ "$sid" = "unknown" ] || ! file=$(co_observation_path "$sid" "$root"); then
-    printf 'unknown\n'; return 0
-  fi
-  if ! command -v jq >/dev/null 2>&1 || [ ! -f "$file" ] || [ ! -r "$file" ]; then
-    printf 'unknown\n'; return 0
-  fi
+  if [ "$sid" = "unknown" ]; then co_unknown "no session id"; return 0; fi
+  if ! [[ "$sid" =~ $CO_SESSION_ID_RE ]]; then co_unknown "malformed session id"; return 0; fi
+  if ! command -v jq >/dev/null 2>&1; then co_unknown "jq missing"; return 0; fi
+  if ! file=$(co_find_record "$sid" "$root"); then co_unknown "no record for this session"; return 0; fi
+  if [ ! -r "$file" ]; then co_unknown "record unreadable"; return 0; fi
 
-  # One jq pass validates the shape and emits two lines: observed_at (for the
-  # staleness check below) and the reduced object. observed_at is anchored
-  # with \A…\z inside jq (Oniguruma's $ also matches before a newline), so a
-  # planted newline cannot shift a forged object onto the second line. Any
-  # shape failure emits nothing, which becomes `unknown`.
+  # One jq pass validates the record, reduces it through co_context, and
+  # emits two lines: observed_at (for the staleness check below) and the
+  # reduced object. co_context anchors observed_at, so it cannot carry a
+  # newline. Any failure emits nothing.
   local out="" observed_at="" obj=""
-  out=$(jq -rc --arg sid "$sid" '
+  out=$(jq -rc --arg sid "$sid" "$CO_CONTEXT_JQ"'
     if type == "object" and .observer_format == 1 and .session_id == $sid
-       and (.observed_at | type == "string"
-            and test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\z"))
        and (.context_window | type) == "object"
-       and (.context_window.remaining_percentage | type == "number" and . >= 0 and . <= 100)
     then
-      .observed_at,
       {remaining_percentage: .context_window.remaining_percentage,
-       used_percentage: (.context_window.used_percentage | if type == "number" then . else null end),
-       observed_at: .observed_at,
-       advisory_crossings: (.advisory | if type == "object" then .crossings else null end
-                            | if type == "number" then . else null end)}
+       used_percentage: .context_window.used_percentage,
+       observed_at,
+       advisory_crossings: (.advisory | if type == "object" then .crossings else null end)}
+      | co_context
+      | if type == "object" then .observed_at, . else empty end
     else empty end' -- "$file" 2>/dev/null) || out=""
   { IFS= read -r observed_at; IFS= read -r obj; } <<< "$out"
-  if [ -z "$obj" ] || ! [[ "$observed_at" =~ $CO_TS_RE ]]; then
-    printf 'unknown\n'; return 0
-  fi
+  if [ -z "$obj" ]; then co_unknown "record malformed, from another session, or percentage out of range"; return 0; fi
 
   local window="${CO_STALENESS_SECONDS:-300}" now epoch age
   [[ "$window" =~ ^[0-9]{1,9}$ ]] || window=300
-  now=$(date -u +%s) || { printf 'unknown\n'; return 0; }
+  now=$(date -u +%s) || { co_unknown "clock unavailable"; return 0; }
   epoch=$(cs_iso_to_epoch "$observed_at")
   if ! [[ "$epoch" =~ ^[0-9]+$ ]] || [ "$epoch" -le 0 ]; then
-    printf 'unknown\n'; return 0
+    co_unknown "observed_at unparseable"; return 0
   fi
   age=$((now - epoch))
   if [ "$age" -gt "$window" ] || [ "$age" -lt "-$window" ]; then
-    printf 'unknown\n'; return 0
+    co_unknown "stale (${age}s old, window ${window}s)"; return 0
   fi
   printf '%s\n' "$obj"
 }

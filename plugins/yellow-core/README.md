@@ -33,7 +33,7 @@ TypeScript, Python, Rust, and Go.
 | `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence in three tiers — file-provenance (commit-to-PR lookup) first, then a strict slug match, then a loose token-coverage fallback |
 | `/stack:status`         | Report which stacked-PR provider is active and classify the state as `UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`, `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, or `PARTIAL_TOOLING` (read-only) |
 | `/stack:select`         | Select the active stacked-PR provider (`graphite` or `github`) at `user`/`project`/`local` scope — shows the exact `claude plugin` commands first, refuses managed-scope conflicts, never edits settings JSON, never falls back |
-| `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
+| `/statusline:setup`     | Generate and install an adaptive statusline for plugins; `observer` enables, refreshes or disables the opt-in context observer |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
 | `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
@@ -98,7 +98,7 @@ TypeScript, Python, Rust, and Go.
 | `optimize`            | Metric-driven optimization with parallel candidate variants and an LLM-as-judge analytic rubric (per-criterion 1-5 scoring + two-run order-swap + style-bias self-check); optional `knowledge-compounder` hand-off writes the winner to `docs/solutions/optimizations/` |
 | `plan-status`         | Canonical read-only dashboard of `plans/` (open) and `plans/complete/` (archived) with per-file checkbox progress; the `/plan:status` command is a thin wrapper over this skill |
 | `security-fencing`    | Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files) — single source of truth for the inlined `CRITICAL SECURITY RULES` block |
-| `session-handoff`     | Write a tracked session-handoff artifact at `plans/handoff/<date>-<slug>.md` — six fields (current task, workflow status, active artifact, open decisions, in-flight changes, next action), secret-redacted via `cs_redact_secrets` |
+| `session-handoff`     | Write a measured, secret-redacted handoff note at `plans/handoff/<date>-<slug>.md` (identity, HEAD, dirty fingerprint, `context_at_capture` from the opt-in context observer) and resume only from an explicitly named note after a read-only preflight |
 | `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 | `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
 | `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
