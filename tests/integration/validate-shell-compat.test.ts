@@ -137,6 +137,29 @@ describe('inline rules', () => {
     expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-001', 5]]);
   });
 
+  it('checks expansions inside multi-line double-quoted strings and unquoted heredocs', () => {
+    const text = [
+      'REPORT="',
+      '## ${reviewer^} Output',
+      '"',
+      'cat <<EOF',
+      'first ${arr[0]}',
+      'EOF',
+      "cat <<'EOF'",
+      '${name^} stays literal here',
+      'EOF',
+    ].join('\n');
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([
+      ['SHC-003', 2],
+      ['SHC-005', 5],
+    ]);
+  });
+
+  it('does not run statement rules on expanded-only text', () => {
+    const text = ['cat <<EOF', 'path=/x mapfile echo -e', 'EOF'].join('\n');
+    expect(lint(text)).toEqual([]);
+  });
+
   it('falls back to plain lines when a quote never closes', () => {
     const lines = ["echo it's", 'mapfile -t a < f'];
     expect(classifyLines(lines).map((c: { kind: string }) => c.kind)).toEqual([

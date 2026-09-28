@@ -155,8 +155,16 @@ function listShellFiles(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Line classification: code / comment / data (heredoc body or the inside of
-// a multi-line quoted string) / pinned (runs under a bash child)
+// Line classification:
+//   code     ordinary shell
+//   comment  a `#` comment line
+//   data     text the shell never expands: a quoted-tag heredoc body
+//            (`<<'EOF'`) or the inside of a multi-line single-quoted string
+//   expand   text the shell does not run but DOES expand: an unquoted-tag
+//            heredoc body or the inside of a multi-line double-quoted string.
+//            Only the expansion rules apply (`${reviewer^}` there is still a
+//            zsh `bad substitution`).
+//   pinned   runs under a bash child (`bash <<'EOF'` body, `bash -c` line)
 
 // `<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"` — but never the `<<<` here-string.
 const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
@@ -245,7 +253,7 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       } else {
         out[i] = {
           kind: heredoc.kind,
-          code: heredoc.kind === 'pinned' ? line : '',
+          code: heredoc.kind === 'data' ? '' : line,
         };
       }
       continue;
@@ -255,7 +263,10 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       const wasOpen = open;
       const scan = scanQuotes(line, open);
       if (wasOpen && scan.resume === -1) {
-        out[i] = { kind: 'data', code: '' };
+        out[i] =
+          wasOpen === '"'
+            ? { kind: 'expand', code: line }
+            : { kind: 'data', code: '' };
         continue;
       }
       if (wasOpen) code = line.slice(scan.resume);
@@ -274,11 +285,13 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
     const match = HEREDOC_RE.exec(code);
     if (match) {
       const prefix = code.slice(0, match.index);
-      heredoc = {
-        tag: match[3],
-        stripTabs: match[1] === '-',
-        kind: BASH_WRAPPER_PREFIX_RE.test(prefix) ? 'pinned' : 'data',
-      };
+      // An unquoted tag means the CURRENT shell expands the body before the
+      // command sees it — even when that command is a bash wrapper.
+      let kind = 'expand';
+      if (match[2] !== '') {
+        kind = BASH_WRAPPER_PREFIX_RE.test(prefix) ? 'pinned' : 'data';
+      }
+      heredoc = { tag: match[3], stripTabs: match[1] === '-', kind };
     }
   }
   // A quote that never closes means the scan misread the block (an
@@ -379,6 +392,24 @@ function ruleSpecialParams(code) {
   return hits;
 }
 
+// Expansion-level constructs. These break wherever the shell expands text,
+// including unquoted heredoc bodies and multi-line double-quoted strings.
+const BASH_ONLY_EXPANSIONS = [
+  [/\$\{!/, '${!…} indirection/keys'],
+  [/\$\{\w+(?:\[[^\]]*\])?(?:,,?|\^\^?)\}/, '${v,,}/${v^^} case modification'],
+  [/\$\{\w+(?:\[[^\]]*\])?@[QEPAaUuLK]\}/, '${v@op} transformation'],
+  [
+    /\$\{?(?:BASH_REMATCH|BASH_SOURCE|BASH_VERSINFO|PIPESTATUS|FUNCNAME|BASHPID)\b/,
+    'bash-only variable',
+  ],
+];
+
+function ruleBashOnlyExpansion(text) {
+  return BASH_ONLY_EXPANSIONS.filter(([re]) => re.test(text)).map(
+    ([, label]) => label
+  );
+}
+
 const BASH_ONLY_PATTERNS = [
   [/(?:^|[\s;&|(])(?:mapfile|readarray)\b/, 'mapfile/readarray'],
   [/\$\{!/, '${!…} indirection/keys'],
@@ -447,14 +478,20 @@ const BASH_ARRAYS = new Set([
   'PIPESTATUS',
   'FUNCNAME',
 ]);
-function ruleArrayIndex(rawCode, blockCode) {
+function literalIndexHits(code) {
   const hits = [];
-  const code = blankSingleQuoted(rawCode);
   const literal = /\$\{(\w+)\[(\d+)\]\}/g;
   let m;
   while ((m = literal.exec(code)) !== null) {
     if (!BASH_ARRAYS.has(m[1])) hits.push(`\${${m[1]}[${m[2]}]}`);
   }
+  return hits;
+}
+
+function ruleArrayIndex(rawCode, blockCode) {
+  const code = blankSingleQuoted(rawCode);
+  const hits = literalIndexHits(code);
+  let m;
   if (/(?:^|[\s;&|(])\w+\[0\]=/.test(code)) hits.push('assignment to [0]');
   const variable = /\$\{(\w+)\[\$?\{?([A-Za-z_]\w*)\}?\]\}/g;
   while ((m = variable.exec(code)) !== null) {
@@ -503,6 +540,21 @@ function existingFileVars(codeLines) {
     while ((m = TOUCH_RE.exec(line)) !== null) vars.add(m[1]);
   }
   return vars;
+}
+
+// `: > file` / `true > file` exists to truncate a file that may already be
+// there — exactly what noclobber refuses. /dev/* targets are exempt.
+const TRUNCATE_RE =
+  /(?:^\s*|[;&|({]\s*|\b(?:then|do|else|if|while|until)\s+)(?::|true)\s*>(?![>|&])\s*["']?([^\s"';&|)]+)/g;
+
+function truncationTargets(code) {
+  const targets = [];
+  TRUNCATE_RE.lastIndex = 0;
+  let m;
+  while ((m = TRUNCATE_RE.exec(code)) !== null) {
+    if (!m[1].startsWith('/dev/')) targets.push(m[1]);
+  }
+  return targets;
 }
 
 function* clobberRedirects(code) {
@@ -597,6 +649,13 @@ function lintShellText(
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line } = classes[i];
     if (kind === 'comment' || kind === 'data') continue;
+    if (kind === 'expand') {
+      for (const detail of ruleBashOnlyExpansion(line)) {
+        add('SHC-003', i, detail);
+      }
+      for (const detail of literalIndexHits(line)) add('SHC-005', i, detail);
+      continue;
+    }
 
     if (checkSources) {
       SOURCE_RE.lastIndex = 0;
@@ -620,7 +679,15 @@ function lintShellText(
     }
     if (kind === 'pinned') continue;
 
+    const truncated = truncationTargets(line);
+    for (const target of truncated) {
+      add('SHC-001', i, `\`: >\` truncates ${target}, which may already exist`);
+    }
     for (const target of clobberRedirects(line)) {
+      if (truncated.some((t) => t.replace(/^\$\{?|\}$/g, '') === target)) {
+        written.add(target);
+        continue;
+      }
       if (existing.has(target)) {
         add(
           'SHC-001',
