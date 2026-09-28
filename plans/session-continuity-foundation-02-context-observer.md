@@ -260,7 +260,7 @@ reported unsupported.
   further change; JSONC settings → exit 1, untouched; `hooks`,
   `autoCompactEnabled` keys survive unchanged (R2). R2 for the whole file:
   the mocks log stays empty.
-- [ ] Step 11: Extend `plugins/yellow-core/tests/handoff.bats` with two tests:
+- [x] Step 11: Extend `plugins/yellow-core/tests/handoff.bats` with two tests:
   `measure` after the observer wrote a fresh record for
   `CLAUDE_CODE_SESSION_ID` under the test HOME → `context_at_capture` is an
   object with `remaining_percentage`; with a stale or cross-session record →

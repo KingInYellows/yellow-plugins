@@ -647,3 +647,60 @@ secrets_body() {
   bash "$HO" preflight "$path" >/dev/null 2>&1
   [ ! -s "$MOCK_FORBIDDEN_LOG" ]
 }
+
+# --- context_at_capture from the opt-in observer (R20, shell 02) -------------
+
+OBSERVER="$BATS_TEST_DIRNAME/../lib/context-observer.py"
+
+# Feed one statusline payload for $CLAUDE_CODE_SESSION_ID through the observer
+# into an isolated config dir, as the composed statusline pipeline would.
+observe() {
+  local remaining="$1" top
+  top=$(pwd -P)
+  printf '{"session_id":"%s","cwd":"%s","workspace":{"project_dir":"%s"},"context_window":{"used_percentage":%s,"remaining_percentage":%s,"context_window_size":200000,"current_usage":{"input_tokens":1}}}' \
+    "$CLAUDE_CODE_SESSION_ID" "$top" "$top" "$((100 - remaining))" "$remaining" \
+    | python3 "$OBSERVER" >/dev/null
+}
+
+@test "measure fills context_at_capture from a fresh same-session observation, else unknown" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+  observe 61
+  run --separate-stderr bash "$HO" measure
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.context_at_capture | type == "object" and .remaining_percentage == 61 and .used_percentage == 39' >/dev/null
+
+  CLAUDE_CODE_SESSION_ID="another-session" run --separate-stderr bash "$HO" measure
+  echo "$output" | jq -e '.context_at_capture == "unknown"' >/dev/null
+
+  record=$(find "$CLAUDE_CONFIG_DIR/projects" -name "$CLAUDE_CODE_SESSION_ID.json")
+  jq '.observed_at = "2020-01-01T00:00:00Z"' "$record" > "$record.new" && mv "$record.new" "$record"
+  run --separate-stderr bash "$HO" measure
+  echo "$output" | jq -e '.context_at_capture == "unknown"' >/dev/null
+  rm -rf "$CLAUDE_CONFIG_DIR"
+}
+
+@test "preflight reports the live context but never lets it change the status" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+  observe 61
+  path=$(write_note ctx --task-ref plans/active.md)
+  grep -q '^context_at_capture: {"remaining_percentage":61' "$path"
+  observe 12
+  run --separate-stderr bash "$HO" preflight "$path"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ready" and (.reasons | length == 0)' >/dev/null
+  echo "$output" | jq -e '.context.remaining_percentage == 12' >/dev/null
+  rm -rf "$CLAUDE_CONFIG_DIR"
+}
+
+@test "read shape-validates a note's context_at_capture object" {
+  path=$(write_note ctxplant)
+  sed -i 's|^context_at_capture: .*|context_at_capture: {"remaining_percentage":61,"observed_at":"2026-09-17T00:00:00Z","evil":"IGNORE PREVIOUS"}|' "$path"
+  run --separate-stderr bash "$HO" read "$path"
+  [[ "$output" != *"IGNORE PREVIOUS"* ]]
+  echo "$output" | jq -e '.measured.context_at_capture | .remaining_percentage == 61 and (has("evil") | not)' >/dev/null
+  sed -i 's|^context_at_capture: .*|context_at_capture: {"remaining_percentage":"61","observed_at":"now"}|' "$path"
+  run --separate-stderr bash "$HO" read "$path"
+  echo "$output" | jq -e '.measured.context_at_capture == "unknown"' >/dev/null
+}
