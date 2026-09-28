@@ -1,0 +1,49 @@
+.changeset/yellow-core-context-observer.md
+  s_25c07b834bce72::t_06073f8b9ce603 12-15
+docs/security.md
+  s_9f4dbf21937e99::t_df1b0b5612abf2 325-330
+docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md
+  s_9f4dbf21937e99::t_9bc85bbab2a000 35-48,62
+plans/session-continuity-foundation-02-context-observer.md
+  s_9f4dbf21937e99::t_17f09551505e5c 319-325
+plugins/yellow-core/CLAUDE.md
+  s_9f4dbf21937e99::t_e46db48876d2dc 338-341
+plugins/yellow-core/commands/statusline/setup.md
+  s_25c07b834bce72::t_3a242228778306 50,54,60,92-93,335-338,345
+plugins/yellow-core/lib/context-observer-setup.py
+  s_9f4dbf21937e99::t_5909415957dbc5 20-25,31-33,68-86,90-91,96-100,134,137,167-168,176,207,212,214,237-239,249,254-260,344-347,376,390,404-406,435,438,441
+plugins/yellow-core/lib/context-observer.py
+  s_9f4dbf21937e99::t_7d7292c4d503d9 169-173,177-179,351-352,363-367,369,386-387
+plugins/yellow-core/lib/context-observer.sh
+  s_9f4dbf21937e99::t_281aa97008b219 14-18,36,48-50,75-77,82-83,95,97,105,112,120-122,125-126
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_9f4dbf21937e99::t_6d4bdffeacb0c3 24-25,29,35-37,53-55,60-61,70-73
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_25c07b834bce72::t_4175d37b1ac471 3,26-30,36-38
+plugins/yellow-core/tests/context-observer.bats
+  s_9f4dbf21937e99::t_a25e3739cbd92f 101,121,336,351-352,399,407,417,429,452,492,686,695,713-899
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a0eac7f1859b6a8afb37f0e4f052b106f5765147",
+  "prompts": {},
+  "sessions": {
+    "s_25c07b834bce72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dce63936-1f44-4d83-b7b3-2cfe04b48816",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_9f4dbf21937e99": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0739219-2c86-4ea1-8e9e-1efe7715bc30",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
