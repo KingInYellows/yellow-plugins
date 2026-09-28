@@ -1,7 +1,7 @@
 ---
 name: statusline:setup
 description: "Generate and install an adaptive Python statusline for yellow-plugins. Auto-detects installed plugins and their MCP servers, previews the result, and writes to ~/.claude/settings.json on confirmation. Re-run after installing new plugins."
-argument-hint: '[observer]'
+argument-hint: '[observer [enable|disable|status] [--yes]]'
 allowed-tools:
   - Bash
   - Read
@@ -18,6 +18,13 @@ active.
 
 With `observer` as the argument, run only Step 1 and Step 5b: enable, keep,
 refresh or disable the context observer without regenerating the statusline.
+The second word picks the action without a menu: `observer status` reports
+the state and stops; `observer enable --yes` and `observer disable --yes` run
+the change with no AskUserQuestion gate (the gates stay, and the default stays
+No, whenever `--yes` is absent). Automation can also call
+`${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py` directly (`status`, `plan`,
+`install`, `remove`, `prune`; every path has a default and `--dry-run` writes
+nothing), which the reference file lists.
 
 ## Workflow
 
@@ -85,10 +92,9 @@ else
 fi
 
 printf '\n=== Context Observer ===\n'
-python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" plan --settings "$CONFIG/settings.json" \
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" status --settings "$CONFIG/settings.json" \
   --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
-  --statusline "$HOME/.claude/yellow-statusline.py" \
   | python3 -c 'import json, sys; d = json.load(sys.stdin); print("observer:", d["action"], d.get("error_code") or "", d.get("reason") or "")' \
   || printf 'observer: error probe_failed\n'
 ```
@@ -107,7 +113,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" plan --settings "$
   "Your settings.json contains JSONC comments (// or /* */). Please remove all
   comments and re-run this command. Claude Code requires pure JSON."
 - `settings_parse: ERROR (invalid JSON)` → note for Step 5 (will need to create fresh file).
-- `observer: already-installed` → the context observer is enabled;
+- `observer: enabled` → the context observer is enabled;
   `observer: refresh` → enabled, but its installed copy is missing or
   outdated; anything else → not enabled. Carry this into Steps 4, 5b and 6.
 
@@ -261,7 +267,7 @@ except Exception as e:
 "
 ```
 
-Then point `statusLine` at the script. `context-observer-setup.py` is the only
+Then point `statusLine` at the script. `statusline-settings.py` is the only
 writer of `statusLine.command`: it keeps an already-composed context observer
 stage, writes atomically (through a symlinked settings.json), refuses JSONC,
 and backs up invalid JSON to `settings.json.corrupt.backup` before starting
@@ -269,7 +275,7 @@ fresh:
 
 ```bash
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" statusline --settings "$CONFIG/settings.json" \
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" statusline --settings "$CONFIG/settings.json" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
   --statusline "$HOME/.claude/yellow-statusline.py"
 ```
@@ -290,9 +296,17 @@ Every command below uses `CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"`,
 `--settings "$CONFIG/settings.json"`, `--observer-dest
 "$CONFIG/yellow-context-observer.py"` and `--statusline
 "$HOME/.claude/yellow-statusline.py"`; `install` also takes `--observer-src
-"${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py"`. Each prints one JSON object
+"${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py"` (all of these are the
+script's defaults, so they may be left out). Each prints one JSON object
 (`action`, `error_code`, `existing_command`, `proposed_command`, `settings`,
 `backup`, `observer`, `reason`).
+
+**Non-interactive (`observer enable --yes`, `observer disable --yes`,
+`observer status`).** `status`: run the Step 1 probe and print `enabled`,
+`refresh` or `not-enabled` with `reason`; stop. `enable --yes`: skip the
+questions and run `install` (report `installed` or `refreshed`, `backup`, and
+`proposed_command`). `disable --yes`: skip the question and run `remove`.
+Any `action: "error"` is handled as below. Without `--yes`, use the questions.
 
 **Observer not enabled (Step 1).** Ask via AskUserQuestion: "Record context
 observations for session handoffs? (opt-in, off by default)" — "No, leave it
@@ -303,7 +317,7 @@ Apply run:
 
 ```bash
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" install --settings "$CONFIG/settings.json" \
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" install --settings "$CONFIG/settings.json" \
   --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
   --statusline "$HOME/.claude/yellow-statusline.py"
@@ -332,7 +346,7 @@ echo '{"model":{"display_name":"Test","id":"test"},"context_window":{"used_perce
 If the output is non-empty and the exit code is 0, report success.
 
 Re-run Step 1's `=== Context Observer ===` probe and report the observer from
-its `action` (`already-installed` → enabled; `refresh` → enabled, but the
+its `action` (`enabled` → enabled; `refresh` → enabled, but the
 installed copy is missing or outdated, so suggest re-running
 `/statusline:setup observer`; anything else → not enabled), not from the
 Step 5b answer.

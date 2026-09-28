@@ -321,14 +321,14 @@ opt-in statusline stage, `lib/context-observer.py`, that persists one
 session-bound observation derived from externally supplied statusline
 fields (working directory, session context metrics). The boundary:
 
-- **Opt-in only.** Default is No. `lib/context-observer-setup.py` composes
+- **Opt-in only.** Default is No. `lib/statusline-settings.py` composes
   `{ python3 ~/.claude/yellow-context-observer.py || cat; } | <existing
   statusLine command>` (the `|| cat` keeps a missing observer from blanking
   the statusline), backing up `settings.json` before each change
   (`.pre-observer.backup`, with a numeric suffix when an earlier backup
   differs; an identical earlier backup is reused) and rewriting only
   `statusLine.command` — no other settings key is touched.
-  `context-observer-setup.py remove` (offered as "Disable it" by
+  `statusline-settings.py remove` (offered as "Disable it" by
   `/statusline:setup observer`) strips the stage and restores the wrapped
   command.
 - **Storage.** One record per session at
@@ -358,7 +358,7 @@ fields (working directory, session context metrics). The boundary:
 - **Retention (residual).** Records are not pruned by any code path yet
   (tracked as a residual, not fixed by this change). Delete a project's
   `context-observations/` directory to clear its history, or disable the
-  observer entirely with `context-observer-setup.py remove`.
+  observer entirely with `statusline-settings.py remove`.
 
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 

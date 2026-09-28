@@ -149,7 +149,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   back to the other provider
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health;
   Step 5b (or `/statusline:setup observer`) enables, refreshes or disables the opt-in context
-  observer. `lib/context-observer-setup.py` is the only writer of `statusLine.command`
+  observer. `lib/statusline-settings.py` is the only writer of `statusLine.command`
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
   Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`,
@@ -295,9 +295,10 @@ than sourced:
   (stdlib only, no git, 100 ms budget). Bats coverage at
   `tests/context-observer.bats` with real-host fixtures under
   `tests/fixtures/statusline/<client-version>/`
-- `context-observer-setup.py` — the only writer of `statusLine.command`
-  (`statusline`, `plan`, `install`, `remove`); one JSON object per run. Used
-  by `/statusline:setup` Steps 1, 5, 5b and 6
+- `statusline-settings.py` — the only writer of `statusLine.command`
+  (`statusline`, `status`, `plan`, `install`, `remove`, `prune`); every path
+  has a default, `--dry-run` writes nothing, one JSON object per run. Used by
+  `/statusline:setup` Steps 1, 5, 5b and 6
 
 `lib/` otherwise contains sourceable shell helpers that consumer plugins
 reach via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`
@@ -335,14 +336,14 @@ cross-plugin pattern:
   checkout. Always exits 0 and never installs anything. Used by the
   `session-handoff` preflight. Bats coverage at
   `plugins/yellow-core/tests/plugin-identity.bats`
-- `context-observer.sh` — `co_read_observation <session_id> [<toplevel>]`
-  (the toplevel is unused; the newest record for the session id wins) prints
+- `context-observer.sh` — `co_read_observation <session_id>` (the newest
+  record for the session id wins) prints
   the observer's record reduced to `{remaining_percentage, used_percentage,
   observed_at, advisory_crossings, advisory_state, watermark_remaining}`,
-  or `unknown` (missing, stale beyond `CO_STALENESS_SECONDS`, cross-session,
-  malformed, out of range). `CO_CONTEXT_JQ` is the shared jq validator for
-  that object. Runs no git; needs `compound-staging.sh` sourced first. Used
-  by `session-handoff`'s `measure`
+  or `unknown` (missing, stale beyond 300 s, cross-session, malformed, out of
+  range) with a stable reason code in `CO_REASON_FILE`. `CO_CONTEXT_JQ` is the
+  shared jq validator for that object. Runs no git; needs `compound-staging.sh`
+  sourced first. Used by `session-handoff`'s `measure` and `context`
 
 ### Optional Plugin Dependencies
 

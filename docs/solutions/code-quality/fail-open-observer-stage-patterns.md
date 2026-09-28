@@ -7,7 +7,7 @@ problem: "Opt-in observer stages that must fail open silently blank pipelines, s
 tags: [fail-open, statusline, python, signal-alarm, oserror, backup, silent-failure, observer]
 components:
   - plugins/yellow-core/lib/context-observer.py
-  - plugins/yellow-core/lib/context-observer-setup.py
+  - plugins/yellow-core/lib/statusline-settings.py
   - plugins/yellow-core/lib/context-observer.sh
 ---
 

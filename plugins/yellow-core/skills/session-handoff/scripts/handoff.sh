@@ -227,10 +227,10 @@ ho_measure() {
 
   # Context comes from the opt-in observer's record for this session (R20):
   # an object only when the record is fresh, same-session and in range;
-  # otherwise the JSON string "unknown". The reader is handed the toplevel
-  # already resolved above (or the cwd outside a repository) and runs no git.
+  # otherwise the JSON string "unknown". The reader finds the record by
+  # session id and runs no git.
   local ctx
-  ctx=$(co_read_observation "$source_session" "${toplevel:-$PWD}")
+  ctx=$(co_read_observation "$source_session")
   if ! printf '%s' "$ctx" | jq -e 'type == "object"' >/dev/null 2>&1; then ctx='"unknown"'; fi
 
   jq -nc \
@@ -251,6 +251,27 @@ ho_measure() {
 }
 
 cmd_measure() { ho_require_libs; ho_require_jq measure; ho_measure; }
+
+# --- context -----------------------------------------------------------------
+
+# Context only, no git: {"context": <object|"unknown">, "reason": <code|null>}.
+# reason is the reader's stable code (lib/context-observer.sh) when context is
+# "unknown", so a caller can tell "observer not enabled" (no-record) from
+# "stale", "format-mismatch" (re-run /statusline:setup observer) and the rest.
+cmd_context() {
+  ho_require_libs; ho_require_jq context
+  local sid="${CLAUDE_CODE_SESSION_ID:-unknown}" rf ctx reason=""
+  rf=$(mktemp) || { ho_err "cannot create a temp file"; exit 2; }
+  ctx=$(CO_REASON_FILE="$rf" co_read_observation "$sid")
+  if [ -s "$rf" ]; then reason=$(head -n 1 "$rf"); fi
+  rm -f -- "$rf"
+  if ! printf '%s' "$ctx" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    ctx='"unknown"'
+    [ -n "$reason" ] || reason=unspecified
+  fi
+  jq -nc --argjson context "$ctx" --arg reason "$reason" \
+    '{context: $context, reason: (if $reason == "" then null else $reason end)}'
+}
 
 # --- write -------------------------------------------------------------------
 
@@ -696,6 +717,7 @@ usage() {
   cat <<'__EOF_USAGE__'
 usage: handoff.sh <subcommand> [args]
   measure                                  measured workspace block as JSON
+  context                                  context only: {context, reason} as JSON (no git)
   write --slug S --title T [--task-ref P] [--evidence P]... < body
                                            publish plans/handoff/<date>-<slug>.md
   read  plans/handoff/<file>.md            parse a note (v1 or legacy) as JSON
@@ -711,6 +733,7 @@ main() {
   [ $# -gt 0 ] && shift
   case "$cmd" in
     measure) cmd_measure "$@" ;;
+    context) cmd_context "$@" ;;
     write) cmd_write "$@" ;;
     read) cmd_read "$@" ;;
     body) cmd_body "$@" ;;

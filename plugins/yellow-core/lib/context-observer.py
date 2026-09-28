@@ -18,15 +18,14 @@ Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/context-observations/<session_id>.json
     (observer_format 1) through the writer's own .<session_id>.<pid>.part
     file plus os.replace, so a reader sees either the previous complete
-    record or the new one, never a partial. The lock is .<session_id>.tmp,
-    fixed per session and created exclusively: the previous record is read
-    and the advisory state computed only while holding it. A render that
-    finds a live lock skips its write, and a killed writer leaves at most a
-    lock and a data file, reclaimed once STALE_TEMP_SECONDS old. A record whose numbers are unchanged is rewritten
-    only once it is REWRITE_AFTER_SECONDS old, which keeps it well inside the
-    reader's 300 s staleness window. Recording is bounded by a deadline
-    (CONTEXT_OBSERVER_DEADLINE_SECONDS, default 2) so a hung filesystem cannot
-    hold the statusLine command open.
+    record or the new one, never a partial. There is no lock: concurrent
+    renders race last-writer-wins, which can at worst lose or repeat one
+    advisory crossing (a hint, not a ledger). A killed writer leaves at most
+    its .part file, swept once STALE_PART_SECONDS old. A record whose numbers
+    are unchanged is rewritten only once it is REWRITE_AFTER_SECONDS old,
+    which keeps it well inside the reader's 300 s staleness window. Recording
+    is bounded by a DEADLINE_SECONDS deadline so a hung filesystem cannot hold
+    the statusLine command open.
   - Tracks a provisional advisory watermark on remaining context (default
     50 %); crossing it below is counted in the record and nothing else
     happens: no stdout, no stderr, no spawn, no model call.
@@ -39,7 +38,6 @@ Environment:
   CLAUDE_CONFIG_DIR                          overrides ~/.claude as the record root
   YELLOW_CONTEXT_WATERMARK                   remaining-% watermark, integer 1-99 (default 50)
   CONTEXT_OBSERVER_DEBUG=1                   report a recording failure on stderr
-  CONTEXT_OBSERVER_DEADLINE_SECONDS          recording deadline in seconds (default 2, 0 disables)
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME  test only: seconds to sleep before the rename
 """
 import calendar
@@ -55,9 +53,9 @@ OBSERVER_FORMAT = 1
 DEFAULT_WATERMARK = 50
 SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
 TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-STALE_TEMP_SECONDS = 10
+STALE_PART_SECONDS = 10
 REWRITE_AFTER_SECONDS = 60
-DEFAULT_DEADLINE_SECONDS = 2
+DEADLINE_SECONDS = 2
 
 
 def parse_payload(raw):
@@ -215,53 +213,20 @@ def advisory_state(previous, remaining, watermark):
     return {"watermark_remaining": watermark, "crossings": crossings, "last_state": last_state}
 
 
-def part_path(tmp):
-    """This process's data file next to the lock: .<session_id>.<pid>.part."""
-    return "%s.%d.part" % (tmp[: -len(".tmp")], os.getpid())
+def part_path(directory, session_id):
+    """This process's data file: .<session_id>.<pid>.part."""
+    return os.path.join(directory, ".%s.%d.part" % (session_id, os.getpid()))
 
 
-def remove_stale_parts(tmp):
-    """Unlink data files older than STALE_TEMP_SECONDS left by killed writers."""
-    pattern = glob.escape(tmp[: -len(".tmp")]) + ".*.part"
+def remove_stale_parts(directory, session_id):
+    """Unlink data files older than STALE_PART_SECONDS left by killed writers."""
+    pattern = os.path.join(glob.escape(directory), ".%s.*.part" % glob.escape(session_id))
     for leftover in glob.glob(pattern):
         try:
-            if time.time() - os.stat(leftover).st_mtime >= STALE_TEMP_SECONDS:
+            if time.time() - os.stat(leftover).st_mtime >= STALE_PART_SECONDS:
                 os.unlink(leftover)
         except OSError:
             pass
-
-
-def open_temp(tmp):
-    """Create the per-session lock file exclusively (0600), or return None.
-
-    An existing lock means another render is writing (skip this one) or a
-    writer was killed; a lock older than STALE_TEMP_SECONDS is reclaimed,
-    together with any data file that writer left. Reclaiming re-checks the
-    stale lock's identity (dev, ino) and renames it to a pid-unique name
-    before unlinking it, so it rarely removes a newer writer's lock. The lock
-    only serialises writers: each writer publishes its own data file, so a
-    reclaim race can at worst let two writers publish complete records.
-    """
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    try:
-        return os.open(tmp, flags, 0o600)
-    except FileExistsError:
-        try:
-            st = os.stat(tmp)
-            if time.time() - st.st_mtime < STALE_TEMP_SECONDS:
-                return None
-            recheck = os.stat(tmp)
-            if (recheck.st_dev, recheck.st_ino) == (st.st_dev, st.st_ino):
-                aside = "%s.stale.%d" % (tmp, os.getpid())
-                os.rename(tmp, aside)
-                os.unlink(aside)
-                remove_stale_parts(tmp)
-        except FileNotFoundError:
-            pass
-        try:
-            return os.open(tmp, flags, 0o600)
-        except FileExistsError:
-            return None
 
 
 def age_seconds(observed_at):
@@ -283,29 +248,25 @@ def unchanged(previous, record):
 
 
 def write_record(path, record):
-    """Lock, finish the record from the previous one, and publish atomically.
+    """Finish the record from the previous one and publish it atomically.
 
-    0700 dir; the exclusive 0600 .<session_id>.tmp sibling is the lock; the
-    record is written to this process's own .<session_id>.<pid>.part and
-    published with os.replace, so no writer can ever publish another
-    writer's partial file. No fsync: os.replace already gives readers the old
-    or the new complete record, and a record lost to a power failure reads as
-    unknown anyway.
+    0700 dir; the record is written to this process's own
+    .<session_id>.<pid>.part and published with os.replace, so no writer can
+    ever publish another writer's partial file. No fsync: os.replace already
+    gives readers the old or the new complete record, and a record lost to a
+    power failure reads as unknown anyway.
     """
     directory = os.path.dirname(path)
+    session_id = record["session_id"]
     os.makedirs(directory, mode=0o700, exist_ok=True)
     try:
         os.chmod(directory, 0o700)
     except OSError:
         pass
-    tmp = os.path.join(directory, "." + record["session_id"] + ".tmp")
-    fd = open_temp(tmp)
-    if fd is None:
-        return
-    os.close(fd)
-    part = part_path(tmp)
+    remove_stale_parts(directory, session_id)
+    part = part_path(directory, session_id)
     try:
-        previous = load_previous(path, record["session_id"])
+        previous = load_previous(path, session_id)
         record["advisory"] = advisory_state(
             previous, record["context_window"]["remaining_percentage"], watermark_remaining()
         )
@@ -316,15 +277,14 @@ def write_record(path, record):
             json.dump(record, handle, sort_keys=True)
             handle.write("\n")
         delay = os.environ.get("CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME")
-        if delay:
+        if delay:  # test only: widens the window a kill test aims at
             time.sleep(float(delay))
         os.replace(part, path)
     finally:
-        for leftover in (part, tmp):
-            try:
-                os.unlink(leftover)
-            except OSError:
-                pass
+        try:
+            os.unlink(part)
+        except OSError:
+            pass
 
 
 def record_observation(raw):
@@ -369,15 +329,6 @@ def on_deadline(signum, frame):
     raise DeadlineReached("recording deadline reached")
 
 
-def deadline_seconds():
-    raw = os.environ.get("CONTEXT_OBSERVER_DEADLINE_SECONDS", "")
-    try:
-        value = int(raw)
-    except ValueError:
-        return DEFAULT_DEADLINE_SECONDS
-    return value if 0 <= value <= 60 else DEFAULT_DEADLINE_SECONDS
-
-
 def wants_help(argv):
     return any(arg in ("-h", "--help") for arg in argv[1:])
 
@@ -399,11 +350,10 @@ def main():
         # record what was read.
         pass
     release_stdout()
-    deadline = deadline_seconds()
     try:
-        if deadline and hasattr(signal, "SIGALRM"):
+        if hasattr(signal, "SIGALRM"):
             signal.signal(signal.SIGALRM, on_deadline)
-            signal.alarm(deadline)
+            signal.alarm(DEADLINE_SECONDS)
         record_observation(raw)
     except BaseException as exc:  # never let recording affect the statusline
         if os.environ.get("CONTEXT_OBSERVER_DEBUG") == "1":

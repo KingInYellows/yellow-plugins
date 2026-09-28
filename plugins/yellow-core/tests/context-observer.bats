@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Tests for the opt-in context observer as a unit: lib/context-observer.py
 # (statusline pass-through + record writer), lib/context-observer.sh
-# (co_read_observation), and lib/context-observer-setup.py (the
+# (co_read_observation), and lib/statusline-settings.py (the
 # /statusline:setup Step 5b installer). Scenario IDs (T09..T11) refer to
 # docs/testing/session-continuity-acceptance.md; R-ids refer to
 # plans/specs/session-continuity-foundation.md.
@@ -14,7 +14,7 @@
 bats_require_minimum_version 1.5.0
 
 OBS="$BATS_TEST_DIRNAME/../lib/context-observer.py"
-SETUP_PY="$BATS_TEST_DIRNAME/../lib/context-observer-setup.py"
+SETUP_PY="$BATS_TEST_DIRNAME/../lib/statusline-settings.py"
 
 setup() {
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
@@ -23,7 +23,7 @@ setup() {
   export MOCK_FORBIDDEN_LOG="$(mktemp)"
   TEST_HOME="$(mktemp -d)"
   export HOME="$TEST_HOME"
-  unset CLAUDE_CONFIG_DIR YELLOW_CONTEXT_WATERMARK CO_STALENESS_SECONDS \
+  unset CLAUDE_CONFIG_DIR YELLOW_CONTEXT_WATERMARK CO_REASON_FILE \
     CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME CONTEXT_OBSERVER_DEBUG
   # shellcheck source=../lib/compound-staging.sh
   . "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
@@ -150,7 +150,7 @@ set_observed_at() {
 
 # --- T09: reader unknown rules (R20) -----------------------------------------
 
-@test "R20: staleness window: 600 s old is unknown, 60 s old is fresh, a 30 s window rejects it" {
+@test "R20: staleness window: 600 s old is unknown, 60 s old is fresh, the 300 s boundary holds" {
   observe stale 61
   set_observed_at "$(record_for stale)" "$(iso_ago 600)"
   run --separate-stderr co_read_observation stale "$PROJECT"
@@ -158,7 +158,11 @@ set_observed_at() {
   set_observed_at "$(record_for stale)" "$(iso_ago 60)"
   run --separate-stderr co_read_observation stale "$PROJECT"
   echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
-  CO_STALENESS_SECONDS=30 run --separate-stderr co_read_observation stale "$PROJECT"
+  set_observed_at "$(record_for stale)" "$(iso_ago 290)"
+  run --separate-stderr co_read_observation stale "$PROJECT"
+  echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
+  set_observed_at "$(record_for stale)" "$(iso_ago 310)"
+  run --separate-stderr co_read_observation stale "$PROJECT"
   [ "$output" = "unknown" ]
 }
 
@@ -250,8 +254,8 @@ set_observed_at() {
   cmp "$TEST_HOME/before" "$(record_for killed)"
   run --separate-stderr co_read_observation killed "$PROJECT"
   echo "$output" | jq -e '.remaining_percentage == 70' >/dev/null
-  # At most one orphan lock and one orphan data file.
-  [ "$(find "$(dirname "$(record_for killed)")" -name '*.tmp' | wc -l | tr -d ' ')" -eq 1 ]
+  # At most one orphan data file, and no lock file exists any more.
+  [ "$(find "$(dirname "$(record_for killed)")" -name '*.tmp' | wc -l | tr -d ' ')" -eq 0 ]
   [ "$(find "$(dirname "$(record_for killed)")" -name '*.part' | wc -l | tr -d ' ')" -le 1 ]
 }
 
@@ -267,38 +271,17 @@ set_observed_at() {
   [ -z "$(find "$(dirname "$(record_for termed)")" -name '*.tmp' -o -name '*.part')" ]
 }
 
-@test "T10: a live temp file makes the render skip its write; a stale one is reclaimed" {
-  local dir tmp
+@test "T10: a stale orphan data file is swept and a fresh one is left alone" {
+  local dir
   observe orphan 70
   dir=$(dirname "$(record_for orphan)")
-  tmp="$dir/.orphan.tmp"
-  : > "$tmp"
-  observe orphan 30
-  jq -e '.context_window.remaining_percentage == 70' "$(record_for orphan)" >/dev/null
   printf '{"partial' > "$dir/.orphan.999999.part"
-  python3 -c 'import os, sys, time; t = time.time() - 60; [os.utime(f, (t, t)) for f in sys.argv[1:]]' "$tmp" "$dir/.orphan.999999.part"
+  printf '{"partial' > "$dir/.orphan.999998.part"
+  python3 -c 'import os, sys, time; t = time.time() - 60; os.utime(sys.argv[1], (t, t))' "$dir/.orphan.999999.part"
   observe orphan 30
   jq -e '.context_window.remaining_percentage == 30' "$(record_for orphan)" >/dev/null
-  [ ! -e "$tmp" ]
-  [ -z "$(find "$dir" -name '*.part')" ]
-}
-
-@test "T10: two writers racing to reclaim the same stale temp file never publish a partial record" {
-  local dir tmp
-  observe stalerace 70
-  dir=$(dirname "$(record_for stalerace)")
-  tmp="$dir/.stalerace.tmp"
-  : > "$tmp"
-  python3 -c 'import os, sys, time; t = time.time() - 60; os.utime(sys.argv[1], (t, t))' "$tmp"
-  payload stalerace 40 > "$TEST_HOME/a"
-  payload stalerace 20 > "$TEST_HOME/b"
-  python3 "$OBS" < "$TEST_HOME/a" >/dev/null &
-  python3 "$OBS" < "$TEST_HOME/b" >/dev/null &
-  wait
-  jq -e '.session_id == "stalerace" and (.context_window.remaining_percentage == 40 or .context_window.remaining_percentage == 20)' \
-    "$(record_for stalerace)" >/dev/null
-  [ "$(find "$dir" -name '*.json' | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(find "$dir" -name '.stalerace.*' | wc -l | tr -d ' ')" -eq 0 ]
+  [ ! -e "$dir/.orphan.999999.part" ]
+  [ -e "$dir/.orphan.999998.part" ]
 }
 
 @test "T10: the next stage sees EOF before the record write finishes" {
@@ -542,10 +525,10 @@ setup_py() {
   cp "$(record_for slow)" "$TEST_HOME/before"
   payload slow 30 > "$TEST_HOME/in"
   start=$(date +%s)
-  CONTEXT_OBSERVER_DEADLINE_SECONDS=1 CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=5 \
+  CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=8 \
     python3 "$OBS" < "$TEST_HOME/in" > "$TEST_HOME/out"
   elapsed=$(( $(date +%s) - start ))
-  [ "$elapsed" -lt 4 ]
+  [ "$elapsed" -lt 6 ]
   cmp "$TEST_HOME/in" "$TEST_HOME/out"
   cmp "$TEST_HOME/before" "$(record_for slow)"
   [ -z "$(find "$(dirname "$(record_for slow)")" -name '*.tmp' -o -name '*.part')" ]
@@ -723,16 +706,6 @@ setup_py() {
   echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
 }
 
-@test "R20: an invalid CO_STALENESS_SECONDS falls back to 300 s" {
-  local v
-  observe window 61
-  set_observed_at "$(record_for window)" "$(iso_ago 60)"
-  for v in abc -5 ''; do
-    CO_STALENESS_SECONDS="$v" run --separate-stderr co_read_observation window "$PROJECT"
-    echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
-  done
-}
-
 @test "R20: the newest record for the session wins, even over the toplevel's own" {
   local other="$HOME/.claude/projects/-elsewhere/context-observations"
   observe newest 61
@@ -896,4 +869,163 @@ PY
   run --separate-stderr co_read_observation compact "$PROJECT"
   [ "$output" = "unknown" ]
   jq -e '.advisory.crossings == 1 and .advisory.last_state == "below"' "$(record_for compact)" >/dev/null
+}
+
+# --- second follow-up round -----------------------------------------------------
+
+reason_for() {
+  local rf="$TEST_HOME/reason"
+  : > "$rf"
+  CO_REASON_FILE="$rf" co_read_observation "$1" >/dev/null
+  cat "$rf"
+}
+
+@test "R20: every unknown carries a stable reason code" {
+  observe why 61
+  [ "$(reason_for nobody)" = "no-record" ]
+  [ "$(reason_for unknown)" = "no-session-id" ]
+  [ "$(reason_for 'bad id')" = "malformed-session-id" ]
+  set_observed_at "$(record_for why)" "$(iso_ago 600)"
+  [ "$(reason_for why)" = "stale" ]
+  observe why 61
+  jq '.observer_format = 2' "$(record_for why)" > "$TEST_HOME/r" && mv "$TEST_HOME/r" "$(record_for why)"
+  [ "$(reason_for why)" = "format-mismatch" ]
+  observe why2 61
+  jq '.session_id = "someone-else"' "$(record_for why2)" > "$TEST_HOME/r" && mv "$TEST_HOME/r" "$(record_for why2)"
+  [ "$(reason_for why2)" = "other-session" ]
+  observe why3 null
+  [ "$(reason_for why3)" = "no-percentage" ]
+  observe why4 101
+  [ "$(reason_for why4)" = "out-of-range" ]
+  observe why5 61
+  printf 'not json' > "$(record_for why5)"
+  [ "$(reason_for why5)" = "record-malformed" ]
+}
+
+@test "R20: handoff.sh context prints the context and the reason, and runs no git" {
+  local ho="$BATS_TEST_DIRNAME/../skills/session-handoff/scripts/handoff.sh"
+  export CLAUDE_PLUGIN_ROOT="$BATS_TEST_DIRNAME/.."
+  observe ctx1 40
+  CLAUDE_CODE_SESSION_ID=ctx1 run --separate-stderr bash "$ho" context
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.reason == null and .context.remaining_percentage == 40 and .context.advisory_state == "below"' >/dev/null
+  CLAUDE_CODE_SESSION_ID=nobody run --separate-stderr bash "$ho" context
+  echo "$output" | jq -e '.context == "unknown" and .reason == "no-record"' >/dev/null
+  run --separate-stderr env -u CLAUDE_CODE_SESSION_ID bash "$ho" context
+  echo "$output" | jq -e '.context == "unknown" and .reason == "no-session-id"' >/dev/null
+}
+
+@test "parity: the Python and bash session-id rules and config-dir rules agree" {
+  local id py sh
+  for id in a a-b_C9 '' 'x y' '../e' $'a\n' 'a/b' "$(printf 'a%.0s' $(seq 1 128))" "$(printf 'a%.0s' $(seq 1 129))"; do
+    py=$(python3 - "$OBS" "$id" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+print(1 if m.sanitize_session_id(sys.argv[2]) is not None else 0)
+PY
+)
+    if [[ "$id" =~ $CO_SESSION_ID_RE ]]; then sh=1; else sh=0; fi
+    [ "$py" = "$sh" ]
+  done
+  local pycfg
+  pycfg() {
+    python3 - "$OBS" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+print(m.config_dir())
+PY
+  }
+  [ "$(pycfg)" = "$(co_config_dir)" ]
+  CLAUDE_CONFIG_DIR="$TEST_HOME/elsewhere" [ "$(CLAUDE_CONFIG_DIR="$TEST_HOME/elsewhere" pycfg)" = "$(CLAUDE_CONFIG_DIR="$TEST_HOME/elsewhere" co_config_dir)" ]
+}
+
+@test "T11: status is read-only, never fails on a missing statusline, and reports enabled and refresh" {
+  seed_settings none
+  rm -f "$STATUSLINE"
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.action == "not-enabled"' >/dev/null
+  cmp "$SETTINGS" "$TEST_HOME/settings.orig"
+  seed_settings none
+  run --separate-stderr setup_py install
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  echo "$output" | jq -e '.action == "enabled"' >/dev/null
+  rm -f "$OBS_DEST"
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  echo "$output" | jq -e '.action == "refresh" and (.reason | length > 0)' >/dev/null
+}
+
+@test "T11: --dry-run reports the change and writes nothing" {
+  seed_settings "bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" install --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "install" and (.proposed_command | startswith("{ python3 "))' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" statusline --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "statusline"' >/dev/null
+  cmp "$SETTINGS" "$TEST_HOME/settings.orig"
+  [ ! -e "$OBS_DEST" ]
+  [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
+  run --separate-stderr setup_py install
+  cp "$SETTINGS" "$TEST_HOME/installed"
+  run --separate-stderr python3 "$SETUP_PY" remove --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  echo "$output" | jq -e '.action == "remove" and .proposed_command == "bash ~/custom.sh"' >/dev/null
+  cmp "$SETTINGS" "$TEST_HOME/installed"
+}
+
+@test "T11: every path has a default, so install and status work with no flags" {
+  seed_settings none
+  run --separate-stderr python3 "$SETUP_PY" install
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.action == "installed"' >/dev/null
+  [ -x "$OBS_DEST" ]
+  run --separate-stderr python3 "$SETUP_PY" status
+  echo "$output" | jq -e '.action == "enabled"' >/dev/null
+  CLAUDE_CONFIG_DIR="$TEST_HOME/other" run --separate-stderr python3 "$SETUP_PY" status
+  echo "$output" | jq -e --arg s "$TEST_HOME/other/settings.json" '.action == "not-enabled" and .settings == $s' >/dev/null
+}
+
+@test "T11: prune removes only old observation files" {
+  local dir="$HOME/.claude/projects/-p/context-observations"
+  mkdir -p "$dir"
+  : > "$dir/old.json"; : > "$dir/new.json"; : > "$dir/notes.txt"; : > "$dir/.old.1.part"
+  touch -d '40 days ago' "$dir/old.json" "$dir/notes.txt" "$dir/.old.1.part"
+  run --separate-stderr python3 "$SETUP_PY" prune --older-than-days 30 --dry-run
+  echo "$output" | jq -e '.action == "prune" and (.reason | test("would remove 2 "))' >/dev/null
+  [ -e "$dir/old.json" ]
+  run --separate-stderr python3 "$SETUP_PY" prune --older-than-days 30
+  echo "$output" | jq -e '.action == "pruned" and (.reason | test("removed 2 "))' >/dev/null
+  [ ! -e "$dir/old.json" ] && [ ! -e "$dir/.old.1.part" ]
+  [ -e "$dir/new.json" ] && [ -e "$dir/notes.txt" ]
+}
+
+@test "T11: settings backups keep the original and are capped" {
+  local i
+  seed_settings none
+  for i in 1 2 3 4 5 6 7 8; do
+    printf '{"n": %d}\n' "$i" > "$SETTINGS"
+    run python3 - "$SETUP_PY" "$SETTINGS" "$i" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ss", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+m.backup_settings(sys.argv[2], open(sys.argv[2]).read())
+PY
+    [ "$status" -eq 0 ]
+    sleep 0.05
+  done
+  [ "$(find "$TEST_HOME/.claude" -name 'settings.json.pre-observer.backup*' | wc -l | tr -d ' ')" -le 5 ]
+  [ "$(cat "$SETTINGS.pre-observer.backup")" = '{"n": 1}' ]
+  grep -qx '{"n": 8}' "$SETTINGS".pre-observer.backup*
+}
+
+@test "T11: a refusal also prints error_code: reason on stderr" {
+  seed_settings none
+  printf '[1, 2]\n' > "$SETTINGS"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == "settings_not_object: "* ]]
+  echo "$output" | jq -e '.error_code == "settings_not_object"' >/dev/null
 }

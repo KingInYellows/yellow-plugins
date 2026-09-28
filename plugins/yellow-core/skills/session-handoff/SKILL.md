@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: "Write a validated session-handoff note at plans/handoff/<YYYY-MM-DD>-<slug>.md, or resume from an explicitly named one after a read-only preflight. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off\", or names a plans/handoff/ file to resume, or to check remaining context mid-task via handoff.sh measure. Shell code measures repository, worktree, HEAD, dirty fingerprint and source session into the note; the narrative is model-authored reference data. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
+description: "Write a validated session-handoff note at plans/handoff/<YYYY-MM-DD>-<slug>.md, or resume from an explicitly named one after a read-only preflight. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off\", or names a plans/handoff/ file to resume, or to check remaining context mid-task via handoff.sh context. Shell code measures repository, worktree, HEAD, dirty fingerprint and source session into the note; the narrative is model-authored reference data. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
 user-invocable: true
 ---
 
@@ -14,7 +14,7 @@ by the narrative.
 ## What It Does
 
 `scripts/handoff.sh` owns the file format (`--help` lists the subcommands:
-`measure`, `write`, `read`, `body`, `preflight`). `write` publishes
+`measure`, `context`, `write`, `read`, `body`, `preflight`). `write` publishes
 `plans/handoff/<YYYY-MM-DD>-<slug>.md` with `handoff_format: 1` YAML front
 matter — `handoff_id`, `captured_at`, `source_session`, `plugin_version`,
 hashed `repository_id` and `worktree_id` (never raw paths), `worktree_kind`,
@@ -32,7 +32,12 @@ it; `watermark_remaining` is the value in effect and `advisory_state` is
 when no statusline has rendered in the last 300 s, or when the record belongs
 to another session or is out of range; `CONTEXT_OBSERVER_DEBUG=1` prints the
 reason on stderr. `unknown` is normal and never changes a preflight status.
-`handoff.sh measure` is the read-only way to check context mid-session:
+`handoff.sh context` is the read-only way to check context mid-session. It runs
+no git and prints `{"context": <object or "unknown">, "reason": <code or null>}`;
+`reason` says why the context is `unknown`: `no-record` (observer not enabled or
+no statusline render yet), `stale`, `format-mismatch` (re-run
+`/statusline:setup observer`), `no-percentage` (startup or just after
+`/compact`), and the other codes listed in `lib/context-observer.sh`.
 `advisory_state == "below"` is a cue to offer a handoff (`advisory_crossings`
 only ever grows, so it stays above 0 after context recovers, for example
 after `/compact`; offer again only when it has increased since your last offer).

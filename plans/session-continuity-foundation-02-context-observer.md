@@ -321,7 +321,12 @@ reported unsupported.
 > and `\A…\z` (jq), the writer uses an exclusive lock plus a per-pid `.part`
 > file (no `tempfile.NamedTemporaryFile`, no `fsync`), and the composed stage
 > is `{ python3 <observer> || cat; } | <existing>`. The observer's docstring is
-> authoritative.
+> authoritative. Later review rounds also removed the lock (writers are
+> last-writer-wins), made the staleness window (300 s) and deadline (2 s)
+> constants, renamed `lib/context-observer-setup.py` to
+> `lib/statusline-settings.py` (it now also has `status`, `prune`, `--dry-run`
+> and path defaults), and added `handoff.sh context`. Mentions of the old script
+> name below are historical.
 
 Counts are from the final commit, restacked on `main` at `28220d1a`.
 
