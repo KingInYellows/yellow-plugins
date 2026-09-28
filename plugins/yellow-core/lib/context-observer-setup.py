@@ -25,6 +25,11 @@ Composition (the existing command is statusLine.command):
                               heredoc stays closed)
   already contains observer -> no change to settings; the observer copy is
                               refreshed when missing or different from the source
+                              ("contains" means a leading "python3 <observer> |"
+                              stage that resolves to --observer-dest; a command
+                              that only mentions the observer's path elsewhere,
+                              e.g. in a `test -f <observer> && ...` guard, is
+                              treated as not installed)
 
 Refuses with exit 1 and no write: JSONC or otherwise invalid settings.json
 (statusline instead backs up invalid, non-JSONC settings and starts fresh),
@@ -137,11 +142,13 @@ def statusline_stage(statusline):
 
 
 def contains_observer(command, observer_dest):
-    target = normalize(observer_dest)
-    parts = tokens(command)
-    if parts is None:
-        return target in command or observer_dest in command
-    return any(normalize(part) == target for part in parts)
+    """True only when command's leading stage is 'python3 <observer_dest> |'.
+
+    A command that merely mentions the observer path elsewhere (e.g. in a
+    later stage, or in a `test -f <observer> && ...` guard) does not count:
+    that path is never executed as the observer stage.
+    """
+    return leading_observer_path(command) == normalize(observer_dest)
 
 
 def wrap(command):
@@ -166,11 +173,25 @@ def compose(existing, observer_dest, statusline):
 
 
 # Any "python3 <path ending in yellow-context-observer.py> |" prefix, quoted or not,
-# which covers both the installer's form and the documented manual merge.
+# which covers both the installer's form and the documented manual merge. The
+# "path" group captures the path token (quotes included when quoted) so
+# leading_observer_path() can normalize and compare it to --observer-dest;
+# a command that only mentions the observer elsewhere never matches here.
 OBSERVER_PREFIX_RE = re.compile(
-    r"\A\s*python3?\s+(?:'[^']*" + re.escape(OBSERVER_NAME) + r"'|\"[^\"]*" + re.escape(OBSERVER_NAME)
+    r"\A\s*python3?\s+(?P<path>'[^']*" + re.escape(OBSERVER_NAME) + r"'|\"[^\"]*" + re.escape(OBSERVER_NAME)
     + r"\"|\S*" + re.escape(OBSERVER_NAME) + r")\s*\|\s*"
 )
+
+
+def leading_observer_path(command):
+    """Return the normalized path of a leading 'python3 <observer> |' stage, or None."""
+    match = OBSERVER_PREFIX_RE.match(command)
+    if match is None:
+        return None
+    parts = tokens(match.group("path"))
+    if not parts:
+        return None
+    return normalize(parts[0])
 
 
 def decompose(existing):
@@ -213,12 +234,30 @@ def backup_settings(path, raw):
 
 
 def install_observer(src, dest):
+    """Atomic publish: sibling temp -> copy bytes -> chmod -> os.replace.
+
+    A symlinked observer destination is written through to its target, same
+    as write_settings, so a re-run or a concurrent statusline invocation
+    never sees a truncated or partial observer file.
+    """
     src, dest = normalize(src), normalize(dest)
     if not os.path.isfile(src):
         raise SetupError("observer_src_missing", "observer source %s does not exist" % src)
-    os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
-    shutil.copy2(src, dest)
-    os.chmod(dest, 0o755)
+    dest = os.path.realpath(dest)
+    directory = os.path.dirname(dest) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".observer.", suffix=".tmp")
+    os.close(fd)
+    try:
+        shutil.copyfile(src, tmp)
+        os.chmod(tmp, 0o755)
+        os.replace(tmp, dest)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return dest
 
 

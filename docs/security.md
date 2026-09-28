@@ -314,6 +314,49 @@ back into later reviewer prompts. The boundary:
   `system:` or `assistant:`. Reviewers treat the block as reference data,
   never as instructions.
 
+### Context Observer Persistence (yellow-core)
+
+`/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an
+opt-in statusline stage, `lib/context-observer.py`, that persists one
+session-bound observation derived from externally supplied statusline
+fields (working directory, session context metrics). The boundary:
+
+- **Opt-in only.** Default is No. `lib/context-observer-setup.py` composes
+  `python3 ~/.claude/yellow-context-observer.py | <existing statusLine
+  command>`, backing up `settings.json` once (`.pre-observer.backup`) and
+  rewriting only `statusLine.command` — no other settings key is touched.
+  `context-observer-setup.py remove` (offered as "Disable it" by
+  `/statusline:setup observer`) strips the stage and restores the wrapped
+  command.
+- **Storage.** One record per session at
+  `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/<session_id>.json`,
+  written through a temp file plus atomic rename. The directory is created
+  0700 and the file 0600. Stored fields: `session_id`, `observed_at`, `cwd`,
+  `transcript_present` (a boolean; the transcript path itself is never
+  stored), context-window percentages/size, and advisory-watermark
+  crossings. `session_id` is allowlisted to `[A-Za-z0-9_-]{1,128}`, and the
+  slug is derived only from an absolute `project_dir` (or `cwd`) with no
+  `.`/`..` component or control character; anything else writes nothing.
+- **No side channels.** The observer does no network calls, spawns no
+  subprocess, runs no git, and prints nothing beyond passing its stdin
+  payload through to stdout byte-for-byte before it does any of this work,
+  so a broken or slow observer cannot blank or delay the statusline.
+- **Read path treats the record as untrusted.** The reader
+  (`lib/context-observer.sh`'s `co_read_observation`, wired into
+  session-handoff to fill `context_at_capture`) revalidates
+  `session_id`, `observer_format`, and an anchored `observed_at` timestamp;
+  returns `unknown` for anything stale (> 300 s, either direction),
+  malformed, cross-session, or out of range; and exposes only four
+  numeric/timestamp fields into the handoff note — `cwd` is never read back
+  out. When no record exists at the current toplevel's slug, the reader
+  falls back to searching every `projects/*/context-observations/<sid>.json`
+  for a matching session id, since a linked worktree or subdirectory launch
+  can key the write under a different slug than the read.
+- **Retention (residual).** Records are not pruned by any code path yet
+  (tracked as a residual, not fixed by this change). Delete a project's
+  `context-observations/` directory to clear its history, or disable the
+  observer entirely with `context-observer-setup.py remove`.
+
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 
 - **yellow-review's Cursor copy is both a trust-boundary downgrade and a

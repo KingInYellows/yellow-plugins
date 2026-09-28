@@ -250,8 +250,9 @@ set_observed_at() {
   cmp "$TEST_HOME/before" "$(record_for killed)"
   run --separate-stderr co_read_observation killed "$PROJECT"
   echo "$output" | jq -e '.remaining_percentage == 70' >/dev/null
-  # At most one orphan, under the fixed per-session temp name.
+  # At most one orphan lock and one orphan data file.
   [ "$(find "$(dirname "$(record_for killed)")" -name '*.tmp' | wc -l | tr -d ' ')" -eq 1 ]
+  [ "$(find "$(dirname "$(record_for killed)")" -name '*.part' | wc -l | tr -d ' ')" -le 1 ]
 }
 
 @test "T10: SIGTERM mid-write unwinds, removes the temp file and keeps the previous record" {
@@ -263,7 +264,7 @@ set_observed_at() {
   payload termed 30 > "$TEST_HOME/in"
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=5 run "$killer" -s TERM 1 python3 "$OBS" < "$TEST_HOME/in"
   cmp "$TEST_HOME/before" "$(record_for termed)"
-  [ -z "$(find "$(dirname "$(record_for termed)")" -name '*.tmp')" ]
+  [ -z "$(find "$(dirname "$(record_for termed)")" -name '*.tmp' -o -name '*.part')" ]
 }
 
 @test "T10: a live temp file makes the render skip its write; a stale one is reclaimed" {
@@ -274,10 +275,30 @@ set_observed_at() {
   : > "$tmp"
   observe orphan 30
   jq -e '.context_window.remaining_percentage == 70' "$(record_for orphan)" >/dev/null
-  python3 -c 'import os, sys, time; t = time.time() - 60; os.utime(sys.argv[1], (t, t))' "$tmp"
+  printf '{"partial' > "$dir/.orphan.999999.part"
+  python3 -c 'import os, sys, time; t = time.time() - 60; [os.utime(f, (t, t)) for f in sys.argv[1:]]' "$tmp" "$dir/.orphan.999999.part"
   observe orphan 30
   jq -e '.context_window.remaining_percentage == 30' "$(record_for orphan)" >/dev/null
   [ ! -e "$tmp" ]
+  [ -z "$(find "$dir" -name '*.part')" ]
+}
+
+@test "T10: two writers racing to reclaim the same stale temp file never publish a partial record" {
+  local dir tmp
+  observe stalerace 70
+  dir=$(dirname "$(record_for stalerace)")
+  tmp="$dir/.stalerace.tmp"
+  : > "$tmp"
+  python3 -c 'import os, sys, time; t = time.time() - 60; os.utime(sys.argv[1], (t, t))' "$tmp"
+  payload stalerace 40 > "$TEST_HOME/a"
+  payload stalerace 20 > "$TEST_HOME/b"
+  python3 "$OBS" < "$TEST_HOME/a" >/dev/null &
+  python3 "$OBS" < "$TEST_HOME/b" >/dev/null &
+  wait
+  jq -e '.session_id == "stalerace" and (.context_window.remaining_percentage == 40 or .context_window.remaining_percentage == 20)' \
+    "$(record_for stalerace)" >/dev/null
+  [ "$(find "$dir" -name '*.json' | wc -l | tr -d ' ')" -eq 1 ]
+  [ "$(find "$dir" -name '.stalerace.*' | wc -l | tr -d ' ')" -eq 0 ]
 }
 
 @test "T10: the next stage sees EOF before the record write finishes" {
@@ -490,6 +511,16 @@ setup_py() {
   jq -e '.context_window.remaining_percentage == 61' "$(record_for pipe)" >/dev/null
 }
 
+@test "T09: an unsafe workspace.project_dir writes nothing outside projects/" {
+  local dir
+  for dir in '..' 'relative/dir'; do
+    jq -c --arg dir "$dir" '.session_id = "unsafe-dir" | .cwd = $dir | .workspace.project_dir = $dir
+      | .context_window.remaining_percentage = 61 | .context_window.used_percentage = 39' \
+      "$FIX/mid-session.json" | python3 "$OBS" >/dev/null
+  done
+  [ -z "$(find "$HOME/.claude" -type f 2>/dev/null)" ]
+}
+
 @test "T10: an unchanged sample is not rewritten until the record is REWRITE_AFTER_SECONDS old" {
   local recent old
   observe steady 61
@@ -517,7 +548,7 @@ setup_py() {
   [ "$elapsed" -lt 4 ]
   cmp "$TEST_HOME/in" "$TEST_HOME/out"
   cmp "$TEST_HOME/before" "$(record_for slow)"
-  [ -z "$(find "$(dirname "$(record_for slow)")" -name '*.tmp')" ]
+  [ -z "$(find "$(dirname "$(record_for slow)")" -name '*.tmp' -o -name '*.part')" ]
 }
 
 @test "the observer prints its usage for --help instead of reading stdin" {
@@ -629,18 +660,31 @@ setup_py() {
   done
 }
 
-@test "T11: remove handles the manual-merge form, reports not-installed, and refuses a non-prefix use" {
+@test "T11: remove handles the manual-merge form and reports not-installed for a trailing, non-leading mention" {
   seed_settings "python3 ~/.claude/yellow-context-observer.py | bash ~/custom.sh"
   run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest '~/.claude/yellow-context-observer.py'
   echo "$output" | jq -e '.action == "removed"' >/dev/null
   jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
   run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest '~/.claude/yellow-context-observer.py'
   echo "$output" | jq -e '.action == "not-installed"' >/dev/null
+  # The observer's path appears, but not as the leading stage: not "installed" per
+  # contains_observer(), so remove reports not-installed rather than refusing.
   seed_settings "bash ~/custom.sh | python3 $TEST_HOME/.claude/yellow-context-observer.py"
   run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
-  [ "$status" -eq 1 ]
-  echo "$output" | jq -e '.error_code == "observer_not_removable"' >/dev/null
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.action == "not-installed"' >/dev/null
   cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+}
+
+@test "T11: install composes ahead of a command that only tests for the observer's path" {
+  # $OBS_DEST is set inside seed_settings, so it is not yet defined here; use
+  # the path it will compute (matching the "non-leading mention" test above).
+  seed_settings "test -f $TEST_HOME/.claude/yellow-context-observer.py && python3 custom.py"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.action == "installed"' >/dev/null
+  jq -e --arg c "python3 $OBS_DEST | ("$'\n'"test -f $OBS_DEST && python3 custom.py"$'\n'")" \
+    '.statusLine.command == $c' "$SETTINGS" >/dev/null
 }
 
 @test "T11: statusline keeps a composed observer, writes plain otherwise, and recovers invalid JSON" {

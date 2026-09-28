@@ -29,6 +29,7 @@ calls to minimize round-trips.
 Run all checks in a single command:
 
 ```bash
+CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 printf '=== Prerequisites ===\n'
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -41,26 +42,26 @@ else
 fi
 
 printf '\n=== Existing State ===\n'
-[ -d ~/.claude ] && printf 'claude_dir: exists\n' || printf 'claude_dir: missing\n'
+[ -d "$CONFIG" ] && printf 'claude_dir: exists\n' || printf 'claude_dir: missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf 'script: exists\n' || printf 'script: missing\n'
-[ -f ~/.claude/settings.json ] && printf 'settings: exists\n' || printf 'settings: missing\n'
+[ -f "$CONFIG/settings.json" ] && printf 'settings: exists\n' || printf 'settings: missing\n'
 
-if [ -f ~/.claude/settings.json ]; then
-  if python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
+if [ -f "$CONFIG/settings.json" ]; then
+  if python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
     :
   else
     # Check if failure is due to JSONC comments
-    if python3 -c "import re, os; raw=open(os.path.expanduser('~/.claude/settings.json')).read(); exit(0 if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE) else 1)" 2>/dev/null; then
+    if python3 -c "import re; raw=open('$CONFIG/settings.json').read(); exit(0 if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE) else 1)" 2>/dev/null; then
       printf 'settings_parse: ERROR (JSONC comments detected)\n'
     else
       printf 'settings_parse: ERROR (invalid JSON)\n'
     fi
   fi
-  python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
+  python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
 fi
 
 printf '\n=== Plugin Detection ===\n'
-plugin_cache="$HOME/.claude/plugins/cache"
+plugin_cache="$CONFIG/plugins/cache"
 if [ -d "$plugin_cache" ]; then
   find "$plugin_cache" -path '*/.claude-plugin/plugin.json' -exec python3 -c "
 import json, sys, os
@@ -84,7 +85,6 @@ else
 fi
 
 printf '\n=== Context Observer ===\n'
-CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" plan --settings "$CONFIG/settings.json" \
   --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
@@ -240,9 +240,10 @@ existing statusline), report what it changed, and stop without Step 6.
 If user chose "Back up existing and replace":
 
 ```bash
+CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 python3 -c "
 import json, os, shlex, shutil
-settings_path = os.path.expanduser('~/.claude/settings.json')
+settings_path = '$CONFIG/settings.json'
 try:
     with open(settings_path) as f:
         cmd = json.load(f).get('statusLine', {}).get('command', '')
@@ -333,20 +334,22 @@ Re-run Step 1's `=== Context Observer ===` probe and report the observer from
 its `action` (`already-installed` → enabled; anything else → not enabled),
 not from the Step 5b answer.
 
-Read back `~/.claude/settings.json` to confirm `statusLine` is present:
+Read back `$CONFIG/settings.json` (same `CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"`
+as Step 1) to confirm `statusLine` is present:
 
 ```bash
-python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))"
+CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))"
 ```
 
-Display the final report:
+Display the final report, substituting the actual `$CONFIG` value:
 
 ```text
 Yellow Plugins Statusline — Installed
 ======================================
 
   Script:    ~/.claude/yellow-statusline.py
-  Settings:  ~/.claude/settings.json (statusLine key added)
+  Settings:  $CONFIG/settings.json (statusLine key added)
   Plugins:   X detected (Y with MCP servers)
   Observer:  enabled | not enabled   (measured)
   Version:   1.0.0
@@ -367,11 +370,11 @@ Then ask via AskUserQuestion: "What would you like to do next?" with options:
 |---|---|---|
 | Python 3 not found | "Python 3.7+ is required. Install from python.org." | Stop |
 | Python 3 < 3.7 | "Python 3.7+ required (found X.Y). Please upgrade." | Stop |
-| Plugin cache not found | "No plugin cache at ~/.claude/plugins/cache/. Are yellow-plugins installed?" | Warn, generate minimal script |
+| Plugin cache not found | "No plugin cache at $CONFIG/plugins/cache/. Are yellow-plugins installed?" | Warn, generate minimal script |
 | No MCP-enabled plugins | "No plugins with MCP servers detected. MCP health segment disabled." | Continue, skip MCP segment |
 | settings.json has JSONC comments | "Your settings.json contains JSONC comments. Please remove all comments." | Stop |
 | settings.json invalid JSON | "Could not parse settings.json. A fresh file will be created." | Warn, create new |
-| settings.json write failed | "Could not write settings.json. Check permissions on ~/.claude/." | Stop |
+| settings.json write failed | "Could not write settings.json. Check permissions on $CONFIG/." | Stop |
 | Script validation failed | "Generated script produced no output. Check Python installation." | Stop before writing settings |
 | disableAllHooks is true | "Warning: disableAllHooks is true — statusline won't appear." | Warn, continue |
 | User cancels the fresh install | "Setup cancelled. statusLine was not set (the generated script remains)." | Stop |

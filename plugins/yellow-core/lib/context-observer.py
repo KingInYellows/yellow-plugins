@@ -16,13 +16,13 @@ Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
     disk, SIGPIPE from a closed downstream, anything else.
   - Records one observation per session to
       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/context-observations/<session_id>.json
-    (observer_format 1) through a temp file plus os.replace, so a reader
-    sees either the previous complete record or the new one, never a partial.
-    The temp name is fixed per session and created exclusively, and it is the
-    writer lock: the previous record is read and the advisory state computed
-    only while holding it. A render that finds a live temp file skips its
-    write, and a killed writer leaves at most one orphan, reclaimed once it is
-    STALE_TEMP_SECONDS old. A record whose numbers are unchanged is rewritten
+    (observer_format 1) through the writer's own .<session_id>.<pid>.part
+    file plus os.replace, so a reader sees either the previous complete
+    record or the new one, never a partial. The lock is .<session_id>.tmp,
+    fixed per session and created exclusively: the previous record is read
+    and the advisory state computed only while holding it. A render that
+    finds a live lock skips its write, and a killed writer leaves at most a
+    lock and a data file, reclaimed once STALE_TEMP_SECONDS old. A record whose numbers are unchanged is rewritten
     only once it is REWRITE_AFTER_SECONDS old, which keeps it well inside the
     reader's 300 s staleness window. Recording is bounded by a deadline
     (CONTEXT_OBSERVER_DEADLINE_SECONDS, default 2) so a hung filesystem cannot
@@ -43,6 +43,7 @@ Environment:
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME  test only: seconds to sleep before the rename
 """
 import calendar
+import glob
 import json
 import os
 import re
@@ -76,11 +77,24 @@ def sanitize_session_id(value):
     return None
 
 
+def _is_unsafe_path_candidate(candidate):
+    """True if candidate is relative, has a "." / ".." component, or control chars."""
+    if not candidate.startswith("/"):
+        return True
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in candidate):
+        return True
+    return any(part in (".", "..") for part in candidate.split("/"))
+
+
 def project_slug(payload):
     """Slug for ~/.claude/projects/<slug>: workspace.project_dir, else cwd.
 
     Slashes become hyphens, which equals lib/compound-staging.sh's
     cs_derive_project_slug for a git toplevel without running git here (R22).
+    The candidate is external input: only an absolute path with no "."/".."
+    component and no control characters is accepted, and the resulting slug
+    must be non-empty and not "." or ".."; anything else means no slug (the
+    caller writes nothing) rather than joining an unsafe value into a path.
     """
     workspace = payload.get("workspace")
     candidate = workspace.get("project_dir") if isinstance(workspace, dict) else None
@@ -88,7 +102,12 @@ def project_slug(payload):
         candidate = payload.get("cwd")
     if not isinstance(candidate, str) or not candidate:
         return None
-    return candidate.replace("/", "-")
+    if _is_unsafe_path_candidate(candidate):
+        return None
+    slug = candidate.replace("/", "-")
+    if not slug or slug in (".", "..") or "/" in slug:
+        return None
+    return slug
 
 
 def config_dir():
@@ -190,20 +209,47 @@ def advisory_state(previous, remaining, watermark):
     return {"watermark_remaining": watermark, "crossings": crossings, "last_state": last_state}
 
 
-def open_temp(tmp):
-    """Create the per-session temp file exclusively (0600), or return None.
+def part_path(tmp):
+    """This process's data file next to the lock: .<session_id>.<pid>.part."""
+    return "%s.%d.part" % (tmp[: -len(".tmp")], os.getpid())
 
-    An existing temp file means another render is writing (skip this one) or a
-    writer was killed; an orphan older than STALE_TEMP_SECONDS is reclaimed.
+
+def remove_stale_parts(tmp):
+    """Unlink data files older than STALE_TEMP_SECONDS left by killed writers."""
+    pattern = glob.escape(tmp[: -len(".tmp")]) + ".*.part"
+    for leftover in glob.glob(pattern):
+        try:
+            if time.time() - os.stat(leftover).st_mtime >= STALE_TEMP_SECONDS:
+                os.unlink(leftover)
+        except OSError:
+            pass
+
+
+def open_temp(tmp):
+    """Create the per-session lock file exclusively (0600), or return None.
+
+    An existing lock means another render is writing (skip this one) or a
+    writer was killed; a lock older than STALE_TEMP_SECONDS is reclaimed,
+    together with any data file that writer left. Reclaiming re-checks the
+    stale lock's identity (dev, ino) and renames it to a pid-unique name
+    before unlinking it, so it rarely removes a newer writer's lock. The lock
+    only serialises writers: each writer publishes its own data file, so a
+    reclaim race can at worst let two writers publish complete records.
     """
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     try:
         return os.open(tmp, flags, 0o600)
     except FileExistsError:
         try:
-            if time.time() - os.stat(tmp).st_mtime < STALE_TEMP_SECONDS:
+            st = os.stat(tmp)
+            if time.time() - st.st_mtime < STALE_TEMP_SECONDS:
                 return None
-            os.unlink(tmp)
+            recheck = os.stat(tmp)
+            if (recheck.st_dev, recheck.st_ino) == (st.st_dev, st.st_ino):
+                aside = "%s.stale.%d" % (tmp, os.getpid())
+                os.rename(tmp, aside)
+                os.unlink(aside)
+                remove_stale_parts(tmp)
         except FileNotFoundError:
             pass
         try:
@@ -233,9 +279,12 @@ def unchanged(previous, record):
 def write_record(path, record):
     """Lock, finish the record from the previous one, and publish atomically.
 
-    0700 dir, exclusive 0600 temp sibling (the lock), os.replace. No fsync:
-    os.replace already gives readers the old or the new complete record, and
-    a record lost to a power failure reads as unknown anyway.
+    0700 dir; the exclusive 0600 .<session_id>.tmp sibling is the lock; the
+    record is written to this process's own .<session_id>.<pid>.part and
+    published with os.replace, so no writer can ever publish another
+    writer's partial file. No fsync: os.replace already gives readers the old
+    or the new complete record, and a record lost to a power failure reads as
+    unknown anyway.
     """
     directory = os.path.dirname(path)
     os.makedirs(directory, mode=0o700, exist_ok=True)
@@ -247,28 +296,29 @@ def write_record(path, record):
     fd = open_temp(tmp)
     if fd is None:
         return
+    os.close(fd)
+    part = part_path(tmp)
     try:
         previous = load_previous(path, record["session_id"])
         record["advisory"] = advisory_state(
             previous, record["context_window"]["remaining_percentage"], watermark_remaining()
         )
         if unchanged(previous, record):
-            os.close(fd)
-            os.unlink(tmp)
             return
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        part_fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(part_fd, "w", encoding="utf-8") as handle:
             json.dump(record, handle, sort_keys=True)
             handle.write("\n")
         delay = os.environ.get("CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME")
         if delay:
             time.sleep(float(delay))
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+        os.replace(part, path)
+    finally:
+        for leftover in (part, tmp):
+            try:
+                os.unlink(leftover)
+            except OSError:
+                pass
 
 
 def record_observation(raw):
