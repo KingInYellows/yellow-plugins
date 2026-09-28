@@ -21,6 +21,9 @@ hashed `repository_id` and `worktree_id` (never raw paths), `worktree_kind`,
 `remote_origin` (redacted), `branch`, `head`, `dirty_digest` with staged /
 unstaged / untracked counts, `task_ref`, `evidence_refs`,
 `context_at_capture`, `body_digest` — followed by the labeled narrative.
+`context_at_capture` is filled from the opt-in context observer
+(`/statusline:setup`, Step 5b) and reads `unknown` for headless `claude -p`
+sessions and whenever the observer is not enabled.
 `preflight` re-measures the live workspace and reports
 `ready | mismatched | unsupported | blocked` with reason codes, as JSON on
 stdout and a summary on stderr, without mutating anything. Exit codes: 0

@@ -152,7 +152,7 @@ reported unsupported.
   runs no git. Reuse `cs_iso_to_epoch` from `compound-staging.sh` (callers
   source that first; `co_read_observation` checks `command -v cs_iso_to_epoch`
   and returns `unknown` with a warning otherwise).
-- [ ] Step 6: Wire the reader into `handoff.sh`: source
+- [x] Step 6: Wire the reader into `handoff.sh`: source
   `${SCRIPT_DIR}/../../../lib/context-observer.sh` next to the other libs
   (line ≈37), add `co_read_observation` to the `ho_require_libs` symbol list,
   and in `ho_measure()` replace the literal `context_at_capture: "unknown"`

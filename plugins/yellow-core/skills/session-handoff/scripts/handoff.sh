@@ -25,7 +25,9 @@
 # shared safety flags: hooks and fsmonitor disabled, no optional locks. git
 # status still refreshes the index (no lock is taken); that is the one write
 # git performs. pi_report is handed the already-resolved root so it runs no
-# git here. Nothing checks out, stashes, fetches, resets or launches.
+# git here, and so is co_read_observation (lib/context-observer.sh), which
+# only reads the opt-in observer's record. Nothing checks out, stashes,
+# fetches, resets or launches.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
@@ -35,6 +37,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 . "${SCRIPT_DIR}/../../../lib/validate-fs.sh"
 # shellcheck source=../../../lib/plugin-identity.sh
 . "${SCRIPT_DIR}/../../../lib/plugin-identity.sh"
+# shellcheck source=../../../lib/context-observer.sh
+. "${SCRIPT_DIR}/../../../lib/context-observer.sh"
 
 HANDOFF_FORMAT=1
 HANDOFF_DIR="plans/handoff"
@@ -112,6 +116,7 @@ ho_require_jq() {
 ho_require_libs() {
   command -v cs_redact_secrets >/dev/null 2>&1 && command -v validate_file_path >/dev/null 2>&1 \
     && command -v pi_report >/dev/null 2>&1 && command -v pi_git_readonly >/dev/null 2>&1 \
+    && command -v co_read_observation >/dev/null 2>&1 \
     || { ho_err "yellow-core lib/ helpers are missing; refusing to run"; exit 2; }
 }
 
@@ -220,6 +225,14 @@ ho_measure() {
   case "$repository_id" in sha256:unknown) repository_id=unknown ;; esac
   case "$dirty_digest" in sha256:unknown) dirty_digest=unknown ;; esac
 
+  # Context comes from the opt-in observer's record for this session (R20):
+  # an object only when the record is fresh, same-session and in range;
+  # otherwise the JSON string "unknown". The reader is handed the toplevel
+  # already resolved above (or the cwd outside a repository) and runs no git.
+  local ctx
+  ctx=$(co_read_observation "$source_session" "${toplevel:-$PWD}")
+  if ! printf '%s' "$ctx" | jq -e 'type == "object"' >/dev/null 2>&1; then ctx='"unknown"'; fi
+
   jq -nc \
     --arg captured_at "$captured_at" --arg source_session "$source_session" \
     --arg plugin_version "$plugin_version" --arg repository_id "$repository_id" \
@@ -227,13 +240,14 @@ ho_measure() {
     --arg remote_origin "$remote_origin" --arg branch "$branch" --arg head "$head" \
     --arg dirty_digest "$dirty_digest" \
     --arg staged "$staged" --arg unstaged "$unstaged" --arg untracked "$untracked" \
+    --argjson context_at_capture "$ctx" \
     '{captured_at: $captured_at, source_session: $source_session, plugin_version: $plugin_version,
       repository_id: $repository_id, worktree_id: $worktree_id, worktree_kind: $worktree_kind,
       remote_origin: $remote_origin, branch: $branch, head: $head, dirty_digest: $dirty_digest,
       dirty_staged: ($staged | tonumber? // "unknown"),
       dirty_unstaged: ($unstaged | tonumber? // "unknown"),
       dirty_untracked: ($untracked | tonumber? // "unknown"),
-      context_at_capture: "unknown"}'
+      context_at_capture: $context_at_capture}'
 }
 
 cmd_measure() { ho_require_libs; ho_require_jq measure; ho_measure; }
@@ -521,7 +535,7 @@ ho_read_json() {
     --argjson complete "$complete" --arg id "$m_id" --arg ts "$m_ts" --arg sess "$m_sess" \
     --arg ver "$m_ver" --arg repo "$m_repo" --arg wt "$m_wt" --arg kind "$m_kind" --arg remote "$m_remote" \
     --arg branch "$m_branch" --arg head "$m_head" --arg dirty "$m_dirty" --arg task "$task_ref" \
-    --argjson ev "$evidence_json" '
+    --argjson ev "$evidence_json" --arg ts_re "$HANDOFF_TS_RE" '
     {format: "v1", reference: $ref, handoff_id: $id, title: $heading,
      measured: {captured_at: $ts, source_session: $sess, plugin_version: $ver, repository_id: $repo,
                 worktree_id: $wt, worktree_kind: $kind, remote_origin: $remote, branch: $branch, head: $head,
@@ -529,7 +543,15 @@ ho_read_json() {
                 dirty_staged: ($fm.dirty_staged | if type == "number" then . else "unknown" end),
                 dirty_unstaged: ($fm.dirty_unstaged | if type == "number" then . else "unknown" end),
                 dirty_untracked: ($fm.dirty_untracked | if type == "number" then . else "unknown" end),
-                context_at_capture: ($fm.context_at_capture | if type == "object" then . else "unknown" end)},
+                context_at_capture: ($fm.context_at_capture
+                  | if type == "object"
+                       and (.remaining_percentage | type == "number" and . >= 0 and . <= 100)
+                       and (.observed_at | type == "string" and test($ts_re))
+                    then {remaining_percentage,
+                          used_percentage: (.used_percentage | if type == "number" then . else null end),
+                          observed_at,
+                          advisory_crossings: (.advisory_crossings | if type == "number" then . else null end)}
+                    else "unknown" end)},
      body_digest_ok: $digest_ok,
      task_ref: $task,
      evidence_refs: $ev,
