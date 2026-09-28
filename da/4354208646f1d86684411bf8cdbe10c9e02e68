@@ -1,0 +1,27 @@
+plugins/yellow-core/lib/context-observer.sh
+  s_e08551998e4a64::t_2c1cdff9aa7950 71-74,78-79
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_5395545dbeb28d 307-316,324-328,351-360
+plugins/yellow-core/lib/context-observer-setup.py
+  s_e08551998e4a64::t_17ff358b254cdc 15-19,117,149-155,208
+plugins/yellow-core/lib/context-observer.py
+  s_e08551998e4a64::t_c82b98db113e3a 10-14,21-23,39,46,113,179-200,202-206,213-216,218-220,224,227,250-263,265,272-273,275,281
+plugins/yellow-core/tests/context-observer.bats
+  s_e08551998e4a64::t_564a5f4dc0e7c6 110,123,156,159,161,168,170,172,180,186-193,197,201,251,253-291,408,414-433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "da4354208646f1d86684411bf8cdbe10c9e02e68",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
