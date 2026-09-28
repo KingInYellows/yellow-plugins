@@ -1,0 +1,32 @@
+scripts/validate-agent-authoring.js
+  s_e3ae526d137cfd::t_eac629437a57a0 443-445
+tests/integration/markdown-fences.test.ts
+  s_e3ae526d137cfd::t_9387807f8a4d32 1-35,45-59,65-102,106-122,130,136-168,172-174,181-187
+  s_e3ae526d137cfd::t_fdbfa43c1347f8 36-44,60-64,103-105,123-129,131-135,169-171,175-180
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_231bcc92274fcc 529-589
+  s_e3ae526d137cfd::t_9bf0dccc0fdee3 1-120,122-528
+  s_e3ae526d137cfd::t_9d95c2a6a5f3ce 121
+scripts/lib/markdown-fences.js
+  s_e3ae526d137cfd::t_96721d4b986743 204-206,292-295,307-312
+  s_e3ae526d137cfd::t_87ac69814f7599 1-170,176-203,207-215,217-233,237-291,296-297,301-306,313-329,336-376
+  s_e3ae526d137cfd::t_fdbfa43c1347f8 171-175,216,234-236,298-300,330-335
+docs/brainstorms/2026-09-28-make-yellow-plugins-shell-scripts-and-co-brainstorm.md
+  s_e3ae526d137cfd::t_5d753d6949d6a4 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cde7e9a18044512223e795f9091df9e6aaddb2d6",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
