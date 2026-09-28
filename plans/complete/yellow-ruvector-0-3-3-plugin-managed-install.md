@@ -735,8 +735,8 @@ is unchanged.
   - A deleted partner file is filtered out.
   - An injected fence terminator in a path is neutralized.
   - p95 stays under 150 ms against a 5 000-pair file.
-  - Outcome: the shipped test times one run against an 800 ms bound, so the
-    p95 < 150 ms target is not verified. It moved to
+  - Outcome: the shipped test times one run against an 800 ms bound, so the p95
+    target of 150 ms is not verified. It moved to
     `plans/yellow-ruvector-live-verification-followups.md`.
 - 3.5 (dropped by maintainer decision; drafts kept in the 3.6 solution doc,
       which `CLAUDE.md` Known Limitations links): File two upstream RuVector
