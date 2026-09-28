@@ -167,7 +167,7 @@ reported unsupported.
   for headless (`claude -p`) sessions and whenever the observer is not
   enabled; keep the frontmatter single-line and the three headings (RULE 15,
   20).
-- [ ] Step 7: Create `plugins/yellow-core/lib/context-observer-setup.py`
+- [x] Step 7: Create `plugins/yellow-core/lib/context-observer-setup.py`
   (stdlib only, `argparse`, the T11 "setup logic extracted to a script").
   Subcommands: `plan --settings <path> --observer-dest <path> --statusline <path>`
   prints a JSON description `{existing_command, proposed_command, action}` and
