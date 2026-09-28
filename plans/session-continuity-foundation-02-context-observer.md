@@ -266,7 +266,7 @@ reported unsupported.
   object with `remaining_percentage`; with a stale or cross-session record →
   `"unknown"`; and `preflight` on a happy-path note reports `context` equal to
   the live reader result while `status` stays `ready` (never a reason code).
-- [ ] Step 12: Add `.changeset/yellow-core-context-observer.md`
+- [x] Step 12: Add `.changeset/yellow-core-context-observer.md`
   (`'yellow-core': minor`): opt-in context observer, observation reader,
   `context_at_capture` wiring, `/statusline:setup` opt-in step and manual
   merge, statusline fixtures and `context-observer.bats`; note that README and
