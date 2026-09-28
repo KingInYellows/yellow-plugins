@@ -147,6 +147,7 @@ jobs:
           - codex
           - cursor
           - generated
+          - shell-compat
 
     steps:
       - name: Checkout repository
@@ -422,6 +423,18 @@ jobs:
                 # matrix targets.
                 echo "::group::Capability-provider group validation"
                 node scripts/validate-provider-groups.js
+                echo "::endgroup::"
+                ;;
+              shell-compat)
+                # Static bash/zsh compatibility lint over fenced shell blocks
+                # in plugin markdown and the tier 4 (dual-shell) libraries.
+                # Report-only while the per-plugin fix stack lands
+                # (plans/bash-zsh-shell-compatibility.md); the final PR drops
+                # --report here and in `pnpm validate:schemas`. The zsh parse
+                # check needs zsh installed, so it runs in the dedicated zsh
+                # job rather than this 2-minute matrix target.
+                echo "::group::Shell compatibility lint (report-only)"
+                node scripts/validate-shell-compat.js --report
                 echo "::endgroup::"
                 ;;
               *)
