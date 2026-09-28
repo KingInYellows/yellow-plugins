@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.4.6
+
+### Patch Changes
+
+- [`3a42691`](https://github.com/KingInYellows/yellow-plugins/commit/3a4269196c143c604a3503dc94535159df205199)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  yellow-ruvector: the MCP launcher leases its pinned install so a concurrent
+  prune from another plugin version skips it until the server starts;
+  remove-legacy-hooks treats a quoted executable word
+  (`"/usr/local/bin/ruvector" hooks post-edit`) as a ruvector invocation.
+  yellow-core: `/setup:all` probes every yellow-ruvector data-dir candidate
+  instead of stopping at the first, so a stale broken one no longer hides a
+  healthy install.
+
+- [`32bd67b`](https://github.com/KingInYellows/yellow-plugins/commit/32bd67b9b960fc249479883ed981ee3215c90e8e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  yellow-ruvector: a failed swap of the `current` install link puts a real
+  directory it moved aside back instead of deleting it, and `/ruvector:status`
+  bounds its `timeout`/`gtimeout` compatibility probe so a stalled wrapper
+  cannot hang it. yellow-core: `/setup:all` ignores a relative `XDG_DATA_HOME`,
+  like the launcher, so it never runs a `cli.js` found under the current project
+  directory.
+
+- [`3a42691`](https://github.com/KingInYellows/yellow-plugins/commit/3a4269196c143c604a3503dc94535159df205199)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/setup:all`
+  detects yellow-ruvector's plugin-managed ruvector install (in its plugin data
+  dir, counted only where the launcher accepts that dir) instead of a global
+  `ruvector` on PATH, requires Node 20+, and reports a missing install as
+  PARTIAL (the plugin installs it on the next session). The git-worktree skill
+  and `worktree-manager.sh` comments no longer describe the removed
+  `RUVECTOR_STORAGE_PATH` env var.
+
 ## 2.4.5
 
 ### Patch Changes
