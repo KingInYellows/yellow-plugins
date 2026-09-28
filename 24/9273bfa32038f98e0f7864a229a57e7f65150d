@@ -1,0 +1,22 @@
+plugins/yellow-core/skills/session-handoff/scripts/handoff.sh
+  s_e08551998e4a64::t_c39d6b7733715e 546-554
+  s_e08551998e4a64::t_2f5b9516f9a17d 538
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_71bb1572cf4393 155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "249273bfa32038f98e0f7864a229a57e7f65150d",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
