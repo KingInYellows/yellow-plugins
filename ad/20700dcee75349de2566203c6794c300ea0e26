@@ -1,0 +1,21 @@
+plugins/yellow-core/lib/context-observer-setup.py
+  s_e08551998e4a64::t_09d069211488e3 1-226
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_b5cc4786388ace 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ad20700dcee75349de2566203c6794c300ea0e26",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
