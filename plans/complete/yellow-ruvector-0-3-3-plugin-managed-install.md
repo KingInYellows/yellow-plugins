@@ -281,9 +281,10 @@ provider (`/stack:status`). Each PR gets its own changeset.
     little is left, skip the warm-up and start read-only. Only a first
     `npm ci` may run past it.
   - Outcome: every item above was verified on 0.3.3 except the live
-    `MCP_TIMEOUT` measurement, which needs a `claude` binary; the 25 s
-    default stands until a live Claude Code check (PR 1 body, "Not verified
-    here").
+    `MCP_TIMEOUT` measurement, which needs a `claude` binary (PR 1 body, "Not
+    verified here"). That measurement moved to
+    `plans/yellow-ruvector-live-verification-followups.md`; the 25 s default
+    stands until it runs.
 - [x] 1.1b: Confirm 0.2.34 can still load a store written by 0.3.3 (rollback
       path). Record the result in Migration & Rollback.
 - [x] 1.1c: Confirm `hooks reembed --dry-run` output in 0.3.3 still has the
@@ -734,6 +735,9 @@ is unchanged.
   - A deleted partner file is filtered out.
   - An injected fence terminator in a path is neutralized.
   - p95 stays under 150 ms against a 5 000-pair file.
+  - Outcome: the shipped test times one run against an 800 ms bound, so the
+    p95 < 150 ms target is not verified. It moved to
+    `plans/yellow-ruvector-live-verification-followups.md`.
 - 3.5 (dropped by maintainer decision; drafts kept in the 3.6 solution doc,
       which `CLAUDE.md` Known Limitations links): File two upstream RuVector
       issues, using the draft in the brainstorm doc:
