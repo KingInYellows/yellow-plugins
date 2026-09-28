@@ -1,0 +1,52 @@
+docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md
+  s_e08551998e4a64::t_674188e8bd47fe 1-91
+  s_e08551998e4a64::t_27056a65aeb14a 92-94
+plugins/yellow-core/lib/context-observer.sh
+  s_e08551998e4a64::t_c9dbda314105f4 14-25,33-48,54-71,84,89-108,116,118-122,124-127,129,134-138,141,145,148,152
+plugins/yellow-core/lib/context-observer-setup.py
+  s_e08551998e4a64::t_c314729530d67f 2-17,20-30,32-33,35-40,54-55,57,61-76,83,91,96-103,105,114,119,130-138,140,143,147-153,155,161-162,164-193,216-218,220,252-273,278-290,292-293,296-325,329-345,348-349,352-353,359-362,364-372
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_e08551998e4a64::t_97a39a2b3707d0 1-68
+.changeset/yellow-core-context-observer.md
+  s_e08551998e4a64::t_a171062876f3c9 6-13,18-19,21
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_e08551998e4a64::t_5b7f141a9c2b4c 306-325
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_31fa71b4256a25 123-125,303-307,319-326,330-334,338-368
+plugins/yellow-core/CLAUDE.md
+  s_e08551998e4a64::t_cdbca63cf9f4d7 150-152,224-230,262-263,291-300,338-344,482-485
+plugins/yellow-core/README.md
+  s_e08551998e4a64::t_44a76fe86c9d0f 36,101
+plugins/yellow-core/commands/setup/claude-web.md
+  s_e08551998e4a64::t_d8c678df81c311 387-388
+plugins/yellow-core/commands/statusline/setup.md
+  s_e08551998e4a64::t_7b61f48c9f6cfc 4,19-21,85-92,109-111,159-162,170-172,207-208,231-238,262-266,269-272,275-277,280,282-300,303-304,306,310,312-320,332-335,351,357-358,377-379
+plugins/yellow-core/lib/context-observer.py
+  s_e08551998e4a64::t_23b1251e7f2673 21-29,35-36,42,45,55-56,58-59,73-74,127,215-232,234,236-238,251-258,283,290-294,297-298,306-322,324-327,339,341-343
+plugins/yellow-core/references/statusline-setup/statusline-template.py
+  s_e08551998e4a64::t_e6efd4aa67d6d8 1-196
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_e08551998e4a64::t_b5585bffab662d 25-33,150-152
+plugins/yellow-core/skills/session-handoff/scripts/handoff.sh
+  s_e08551998e4a64::t_1f659f8a80b56f 538,546
+plugins/yellow-core/tests/context-observer.bats
+  s_e08551998e4a64::t_222745d8b1fff5 473-668
+plugins/yellow-core/tests/handoff.bats
+  s_e08551998e4a64::t_993b9797b3a7ba 707-725
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "00dc28f0f1008ca260eecd0dd31a0d646db64843",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
