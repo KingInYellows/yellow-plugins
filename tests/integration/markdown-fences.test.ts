@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 /* eslint-disable @typescript-eslint/no-var-requires -- scripts/ is plain CJS */
 const {
   extractFencedBlocks,
+  extractRawFencedBlocks,
   stripFencedContent,
   languageOf,
 } = require('../../scripts/lib/markdown-fences.js');
@@ -99,6 +100,16 @@ describe('extractFencedBlocks', () => {
     expect(extract(md)[0]).toMatchObject({ closed: true, body: 'echo quoted' });
   });
 
+  it('keeps a leading `>` redirect inside an unquoted fence', () => {
+    const md = ['```bash', 'cmd \\', '  > "$out" 2> "$err"', '```'].join('\n');
+    expect(extract(md)[0].body).toBe('cmd \\\n  > "$out" 2> "$err"');
+  });
+
+  it('strips only the quote markers the fence is nested in', () => {
+    const md = ['> ```bash', '> cmd \\', '>   > "$out"', '> ```'].join('\n');
+    expect(extract(md)[0].body).toBe('cmd \\\n  > "$out"');
+  });
+
   it('treats an inner fence inside a longer outer fence as body text', () => {
     const md = ['````markdown', '```bash', 'echo inner', '```', '````'].join(
       '\n'
@@ -148,6 +159,51 @@ describe('extractFencedBlocks', () => {
   it('strips trailing carriage returns from CRLF bodies', () => {
     const md = '```bash\r\necho crlf\r\n```\r\n';
     expect(extract(md)[0]).toMatchObject({ closed: true, body: 'echo crlf' });
+  });
+});
+
+describe('extractRawFencedBlocks', () => {
+  const raw = (md: string): Block[] => extractRawFencedBlocks(md);
+
+  it('keeps a list-item fence whose body sits at column 0 (Claude runs it)', () => {
+    const md = [
+      '1. Step:',
+      '   ```bash',
+      'echo col0',
+      '   ```',
+      '2. Next',
+      '   ```bash',
+      'echo two',
+      '   ```',
+    ].join('\n');
+    const blocks = raw(md);
+    expect(blocks.map((b) => [b.startLine, b.lang, b.body])).toEqual([
+      [2, 'bash', 'echo col0'],
+      [6, 'bash', 'echo two'],
+    ]);
+    // CommonMark ends the list item at the outdented line instead.
+    expect(extractFencedBlocks(md)[0]).toMatchObject({
+      endReason: 'container',
+      body: '',
+    });
+  });
+
+  it('dedents by the opener indent and tolerates a differently indented closer', () => {
+    const md = ['  ```sh', '  a', '    b', '```'].join('\n');
+    expect(raw(md)[0]).toMatchObject({ closed: true, body: 'a\n  b' });
+  });
+
+  it('requires the closer to reuse the opener character and length', () => {
+    const md = ['````bash', '```', 'still body', '````'].join('\n');
+    expect(raw(md)[0].body).toBe('```\nstill body');
+  });
+
+  it('keeps a leading `>` redirect and runs an unclosed fence to EOF', () => {
+    const md = ['```bash', 'cmd \\', '  > "$out"'].join('\n');
+    expect(raw(md)[0]).toMatchObject({
+      endReason: 'eof',
+      body: 'cmd \\\n  > "$out"',
+    });
   });
 });
 

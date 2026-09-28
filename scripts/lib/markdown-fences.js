@@ -1,14 +1,17 @@
 'use strict';
 
 /**
- * CommonMark-aware fenced code block scanner, shared by
- * validate-agent-authoring.js (which strips fences so illustrative examples
- * never trip its prose rules) and validate-shell-compat.js /
- * check-shell-parse.js (which extract fence bodies to lint them).
+ * Fenced code block scanners shared by validate-agent-authoring.js and the
+ * shell-compat checks (validate-shell-compat.js, check-shell-parse.js).
  *
- * One state machine (`scanFences`) decides where every fence opens and ends;
- * `stripFencedContent` and `extractFencedBlocks` are two views over its
- * result, so the two consumers can never disagree about what is fenced.
+ * Two readings of the same markdown, deliberately separate:
+ *   - CommonMark (`scanFences`, with `stripFencedContent` and
+ *     `extractFencedBlocks` as views over it): what a renderer shows. The
+ *     authoring validator strips these fences so illustrative examples never
+ *     trip its prose rules.
+ *   - Raw reader (`extractRawFencedBlocks`): what Claude sees when it reads
+ *     the file as text and runs a ```bash block. The shell-compat checks
+ *     lint what runs, so they use this one.
  */
 
 // Implemented as a line scan rather than a single multiline regex: the lazy
@@ -336,6 +339,19 @@ function dedent(text, columns) {
   return text.slice(i);
 }
 
+// Remove exactly `depth` block-quote markers — the ones the fence itself is
+// nested in. A body line such as `  > "$out"` inside an unquoted fence is a
+// shell redirect, not a quote marker, and must survive intact.
+function stripQuoteMarkers(line, depth) {
+  let rest = line;
+  for (let n = 0; n < depth; n++) {
+    const match = /^[ \t]{0,3}>[ \t]?/.exec(rest);
+    if (!match) break;
+    rest = rest.slice(match[0].length);
+  }
+  return rest;
+}
+
 // Every fenced code block in `content`, in document order, with the body
 // dedented and stripped of block-quote markers so it can be handed straight
 // to a shell or a linter. Line numbers are 1-based and refer to `content` as
@@ -350,7 +366,7 @@ function extractFencedBlocks(content) {
   return scanFences(lines).map((fence) => {
     const bodyLines = [];
     for (let i = fence.openIndex + 1; i < fence.endIndex; i++) {
-      const { rest } = splitBlockquotePrefix(lines[i]);
+      const rest = stripQuoteMarkers(lines[i], fence.depth);
       bodyLines.push(dedent(rest.replace(/\r$/, ''), fence.bodyColumn));
     }
     const closed = fence.endReason === 'closer';
@@ -368,9 +384,71 @@ function extractFencedBlocks(content) {
   });
 }
 
+// Raw-reader fence scan. Claude reads command/skill/agent markdown as text,
+// not as rendered CommonMark, so a ```bash opener indented under a list item
+// whose body sits at column 0 is — to the reader that executes it — still a
+// bash block, even though CommonMark ends the list item (and the fence) at
+// the first outdented line. The shell-compat checks lint what runs, so they
+// use this reading: a fence opens on any fence-shaped line (any indentation;
+// block-quote markers stripped) and closes at the next line that is only a
+// marker of the same character and at least the same length. List
+// containers are ignored. Records have the same shape as
+// extractFencedBlocks'; endReason is 'closer' or 'eof'.
+function extractRawFencedBlocks(content) {
+  const lines = content.split('\n');
+  const blocks = [];
+  let current = null;
+  const finish = (endIndex, endReason) => {
+    const bodyLines = [];
+    for (let i = current.openIndex + 1; i < endIndex; i++) {
+      const rest = stripQuoteMarkers(lines[i], current.depth);
+      bodyLines.push(dedent(rest.replace(/\r$/, ''), current.indent));
+    }
+    const closed = endReason === 'closer';
+    blocks.push({
+      startLine: current.openIndex + 1,
+      bodyStartLine: current.openIndex + 2,
+      endLine: closed ? endIndex + 1 : endIndex,
+      closed,
+      endReason,
+      info: current.info,
+      lang: languageOf(current.info),
+      indent: current.indent,
+      body: bodyLines.join('\n'),
+    });
+    current = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    if (current) {
+      const rest = stripQuoteMarkers(lines[i], current.depth);
+      const closerRe = new RegExp(
+        `^[ \\t]*\\${current.char}{${current.len},}[ \\t]*\\r?$`
+      );
+      if (closerRe.test(rest)) finish(i, 'closer');
+      continue;
+    }
+    const { depth, rest } = splitBlockquotePrefix(lines[i]);
+    const indent = leadingIndentOf(rest);
+    const opener = fenceOpenerAt(rest.slice(indent), 0);
+    if (opener) {
+      current = {
+        openIndex: i,
+        depth,
+        indent,
+        char: opener.char,
+        len: opener.len,
+        info: opener.info,
+      };
+    }
+  }
+  if (current) finish(lines.length, 'eof');
+  return blocks;
+}
+
 module.exports = {
   scanFences,
   stripFencedContent,
   extractFencedBlocks,
+  extractRawFencedBlocks,
   languageOf,
 };
