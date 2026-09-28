@@ -1,0 +1,29 @@
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_4467015084cadb 207
+plugins/yellow-core/tests/fixtures/statusline/2.1.284/README.md
+  s_e08551998e4a64::t_f5c0538857c810 1-33
+plugins/yellow-core/tests/fixtures/statusline/2.1.284/malformed.json
+  s_e08551998e4a64::t_2b635900544356 1
+plugins/yellow-core/tests/fixtures/statusline/2.1.284/mid-session.json
+  s_e08551998e4a64::t_8b6eb1cdfa294a 1
+plugins/yellow-core/tests/fixtures/statusline/2.1.284/missing-session.json
+  s_e08551998e4a64::t_7d1e7a81606044 1
+plugins/yellow-core/tests/fixtures/statusline/2.1.284/startup-null.json
+  s_e08551998e4a64::t_7024a6bf55430a 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "06d6cbbbff29f4b92e50d79053a02393dbaa8666",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

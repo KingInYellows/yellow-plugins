@@ -1,0 +1,23 @@
+plugins/yellow-core/commands/statusline/setup.md
+  s_e08551998e4a64::t_5e70cc3756d743 489-536
+  s_e08551998e4a64::t_e4e58e6a62fd4a 412-414
+  s_e08551998e4a64::t_4d79bdb9c9239f 562
+plans/session-continuity-foundation-02-context-observer.md
+  s_e08551998e4a64::t_84576643926840 187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "33460a5fe25b8191d3c7f0b60c98033630871d33",
+  "prompts": {},
+  "sessions": {
+    "s_e08551998e4a64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15a312f8-6c6e-4ae0-a3b0-4ada2003a9c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
