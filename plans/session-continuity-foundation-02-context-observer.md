@@ -271,7 +271,7 @@ reported unsupported.
   `context_at_capture` wiring, `/statusline:setup` opt-in step and manual
   merge, statusline fixtures and `context-observer.bats`; note that README and
   CLAUDE.md inventories follow after PR #750 (R23).
-- [ ] Step 13: Normalize line endings (`sed -i 's/\r$//'`) and `chmod +x`
+- [x] Step 13: Normalize line endings (`sed -i 's/\r$//'`) and `chmod +x`
   on the two `.py` files, run every command in Verification, and record the
   actual test counts, the measured observer time, the fixture client version,
   and `not-run` for the installed-host interruption smoke in the commit body
@@ -308,6 +308,38 @@ reported unsupported.
   Claude Code statusline (interruption and debounce behavior is
   undocumented); reported as `not-run`. The user's `~/.claude/settings.json`
   is never modified by this work.
+
+## Results and Deviations (2026-09-28)
+
+- `bats tests/context-observer.bats`: 27 of 27 pass on the Claude Code
+  2.1.284 fixtures (target was ≥ 30; the suite covers every T09–T11 case
+  listed in Step 10). Observer best of five on `mid-session.json`: 28.1 ms
+  (budget 100 ms).
+- `bats tests/`: 241 of 241 pass, including `handoff.bats` 53 (50 + 3).
+- `bats skills/git-worktree/tests/`: 9–11 of 11 per run. The failures are in
+  teardown (`rm -rf "$REPO"`: "Directory not empty") and reproduce the same
+  way on `main`; this branch does not touch that suite. Follow-up.
+- `validate:schemas`, `validate:agents`, `lint:plugins`, `validate:generated`,
+  `validate:plans`, `typecheck`, `lint`, `test:integration` (1363) pass.
+  `setup.md`'s RULE 21 length advisory predates this work (538 → 589 lines).
+- Fixtures are versioned `2.1.284` (the client at capture time). Only
+  `startup-null` and `mid-session` are real payloads; no post-compact payload
+  was captured, so `post-compact-null.json` does not exist and
+  post-compaction behaviour has no real-host fixture.
+- Capture used `claude --settings '<json>'` for a single session instead of
+  editing `statusLine.command`, so `~/.claude/settings.json` was never
+  changed.
+- `context-observer-setup.py` also refuses an absent `statusLine` when the
+  yellow statusline script does not exist, wraps a custom command that
+  contains shell control characters in `( … )` so the payload still reaches
+  its first stage, and expands `~` before quoting paths.
+- `handoff.sh read` shape-validates a note's `context_at_capture` object
+  (numbers and timestamp only), like every other note-derived field.
+- The branch also carries `docs/CONCEPTS.md` and
+  `docs/solutions/workflow/plan-lifecycle-management.md` from the planning
+  session's compound step (outside the R23 allowlist; docs only).
+- Not run: installed-host smoke of the composed pipeline inside a live
+  statusline, including interruption and debounce behaviour.
 
 ## Context Files
 - `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh` — `ho_measure` (context stub at line 236), `ho_require_libs`, lib sourcing, `cmd_preflight` `context` field
