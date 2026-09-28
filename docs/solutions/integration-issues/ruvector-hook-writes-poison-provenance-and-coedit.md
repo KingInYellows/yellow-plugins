@@ -128,4 +128,4 @@ before save.
 - `docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
 - `docs/solutions/logic-errors/write-freeze-invariant-omits-passive-hook-path.md`
 - `docs/solutions/code-quality/ruvector-hook-rewrite-builtin-cli-delegation.md`
-- `plans/yellow-ruvector-0-3-3-plugin-managed-install.md`
+- `plans/complete/yellow-ruvector-0-3-3-plugin-managed-install.md`
