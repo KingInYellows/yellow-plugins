@@ -1,5 +1,102 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [`3a42691`](https://github.com/KingInYellows/yellow-plugins/commit/3a4269196c143c604a3503dc94535159df205199)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - **Breaking:**
+  requires Node.js 20+; the global `ruvector` binary is no longer used,
+  `scripts/install.sh` is removed, and the UserPromptSubmit and Stop hooks are
+  removed.
+
+  Upgrade to ruvector 0.3.3 as a plugin-managed install. The plugin now pins
+  ruvector in its own `package.json` + committed `package-lock.json` and
+  installs it into the plugin data dir (`$CLAUDE_PLUGIN_DATA`, or
+  `${XDG_DATA_HOME:-~/.local/share}/yellow-ruvector`): one `install-<lockhash>`
+  dir per lockfile plus an atomic `current` symlink, via
+  `npm ci --ignore-scripts` under `env -i`. The MCP server and every hook run
+  that one copy, so a global `npm install -g ruvector` is no longer needed or
+  used, and the CLI can no longer skew from the MCP pin. 0.3.3 fixes the
+  non-atomic store write race (RuVector#995).
+
+  The MCP server now starts through `bin/start-ruvector.sh`, which installs if
+  needed (waiting for a running prewarm), heals a linked worktree's `.ruvector`
+  symlink, and starts the server from the git toplevel — sessions launched from
+  a subdirectory or a fresh worktree use the project store in the same session.
+  When a fresh store has no embedding stamp and the ONNX model cannot be
+  downloaded (offline), the server starts without `hooks_remember` so its hash
+  fallback cannot stamp the store hash/64d (ADR-210).
+
+  Session recall is now one semantic `hooks recall` at SessionStart (6s hook
+  budget) instead of hash-embedded recall that compared 64d queries against 384d
+  vectors; the per-prompt UserPromptSubmit hook is removed. A new SessionStart
+  prewarm hook installs ruvector and downloads the model in the background.
+  `/ruvector:setup`, `/ruvector:status` (install, nested-store, read-only-mode,
+  and leftover-global-hook checks), and `/ruvector:seed-solutions` use the
+  plugin-managed CLI through the new `scripts/ruvector-cli.sh`;
+  `scripts/install.sh` is removed. Requires Node.js 20+.
+
+  The `Stop` hook is removed: `hooks session-end` only exported metrics, yet it
+  rewrote the whole store every turn and raced the MCP server's saves, and with
+  the plugin-managed CLI it would now run for every user.
+
+### Minor Changes
+
+- [`32bd67b`](https://github.com/KingInYellows/yellow-plugins/commit/32bd67b9b960fc249479883ed981ee3215c90e8e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop writing
+  memories from hooks and record co-edits instead. The PostToolUse hook no
+  longer calls ruvector's `hooks post-edit` / `hooks post-command`: each call
+  stored a near-empty hash-embedded memory ("successful edit of ts in project",
+  "npm test succeeded"), which cluttered recall, was refused on ONNX-stamped
+  stores, and on a fresh store was the write that stamped it hash/64d so every
+  later `hooks_remember` was refused (ADR-210). Their co-edit tracking never
+  recorded anything (ruvector keeps `lastEditedFile` per process). The hook now
+  records "files edited together" pairs in a plugin-owned
+  `.ruvector/coedit.json` with jq only (no Node start; ~3x faster), using
+  per-session state so concurrent sessions and worktrees never pair each other's
+  edits, atomic writes under bounded locks, and a cap of 1000 file pairs (2000
+  directed entries, and under 1 MB). MultiEdit is read from its top-level
+  `tool_input.file_path` (the old `edits[].file_path` never matched). The Stop
+  hook (`hooks session-end`, which rewrote the whole store every turn) and the
+  PostToolUseFailure registration are removed; no plugin hook writes
+  `intelligence.json` any more.
+
+- [`26c9dfe`](https://github.com/KingInYellows/yellow-plugins/commit/26c9dfe64d89123f3b5d24a909bd2fd001e78d12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Surface co-edit
+  history. The first time a session edits a file (tracked for the session's 200
+  most recently suggested files, so an older one can be suggested again), the
+  PreToolUse hook now adds up to 3 files usually edited together with it (seen
+  together at least 3 times, still existing) as fenced `additionalContext` — jq
+  only, no ruvector CLI or Node start. Partner names from
+  `.ruvector/coedit.json` are re-validated before they reach model context
+  (inside the project, existing files, no control characters). New
+  `/ruvector:related <file>` command lists the top 50 partners with counts. The
+  PreToolUse hook no longer runs ruvector's `hooks pre-edit` /
+  `hooks pre-command` (their output was always discarded) and no longer fires on
+  Bash.
+
+### Patch Changes
+
+- [`3a42691`](https://github.com/KingInYellows/yellow-plugins/commit/3a4269196c143c604a3503dc94535159df205199)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  yellow-ruvector: the MCP launcher leases its pinned install so a concurrent
+  prune from another plugin version skips it until the server starts;
+  remove-legacy-hooks treats a quoted executable word
+  (`"/usr/local/bin/ruvector" hooks post-edit`) as a ruvector invocation.
+  yellow-core: `/setup:all` probes every yellow-ruvector data-dir candidate
+  instead of stopping at the first, so a stale broken one no longer hides a
+  healthy install.
+
+- [`32bd67b`](https://github.com/KingInYellows/yellow-plugins/commit/32bd67b9b960fc249479883ed981ee3215c90e8e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  yellow-ruvector: a failed swap of the `current` install link puts a real
+  directory it moved aside back instead of deleting it, and `/ruvector:status`
+  bounds its `timeout`/`gtimeout` compatibility probe so a stalled wrapper
+  cannot hang it. yellow-core: `/setup:all` ignores a relative `XDG_DATA_HOME`,
+  like the launcher, so it never runs a `cli.js` found under the current project
+  directory.
+
 ## 1.3.3
 
 ### Patch Changes
