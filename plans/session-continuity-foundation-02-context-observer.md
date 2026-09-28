@@ -218,7 +218,7 @@ reported unsupported.
   in a session, trigger a compaction, restore the command, and hand over the
   file; never edit `~/.claude/settings.json` or run `claude` from this plan.
   If the user cannot capture, stop and report; do not fabricate payloads.
-- [ ] Step 10: Create `plugins/yellow-core/tests/context-observer.bats`
+- [x] Step 10: Create `plugins/yellow-core/tests/context-observer.bats`
   (`bats_require_minimum_version 1.5.0`; header explains it unit-tests
   `lib/context-observer.py`, `lib/context-observer.sh`, and
   `lib/context-observer-setup.py`). `setup()`: skip without `python3` or `jq`;
