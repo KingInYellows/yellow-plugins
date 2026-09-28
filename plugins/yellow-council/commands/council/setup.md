@@ -29,15 +29,21 @@ for tool in bash timeout jq mktemp awk sed grep find; do
 done
 printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find)\n'
 
-# Bash version check (need 4.3+ for ${BASH_VERSINFO[N]} array indexing, associative arrays, and ${var^} capitalization used in council.md)
-BASH_VER="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
-case "$BASH_VER" in
-  4.[3-9]*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9].*)
-    printf '[yellow-council] bash: ok (%s)\n' "$BASH_VER" ;;
-  *)
-    printf '[yellow-council] Error: bash 4.3+ required, found %s\n' "$BASH_VER" >&2
-    exit 1 ;;
-esac
+# Shell check. council.md's blocks run in the user's login shell and use
+# associative arrays: bash needs 4.3+, zsh supports them natively.
+if [ -n "${BASH_VERSION:-}" ]; then
+  case "$BASH_VERSION" in
+    [0-3].*|4.[0-2].*)
+      printf '[yellow-council] Error: bash 4.3+ required, found %s\n' "$BASH_VERSION" >&2
+      exit 1 ;;
+  esac
+  printf '[yellow-council] shell: bash %s ok\n' "$BASH_VERSION"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  printf '[yellow-council] shell: zsh %s ok\n' "$ZSH_VERSION"
+else
+  printf '[yellow-council] Error: run from bash 4.3+ or zsh\n' >&2
+  exit 1
+fi
 ```
 
 ### Step 2: Detect Antigravity CLI (`agy`, Gemini slot)
@@ -170,7 +176,7 @@ else
 fi
 
 printf '\n[yellow-council] Setup summary:\n'
-printf '  Required: bash 4.3+, timeout, jq — verified\n'
+printf '  Required: bash 4.3+ or zsh, timeout, jq — verified\n'
 printf '  Reviewers: %d of 4 available (Claude=in-process (always available), Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
   "$READY_COUNT" "$GEMINI_STATUS" "$OPENCODE_STATUS" "$CODEX_STATUS"
 if [ "$READY_COUNT" -eq 1 ]; then

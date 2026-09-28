@@ -15,7 +15,10 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 ## Required Environment
 
-- **Bash 4.3+** — for associative arrays and `${var^}` case-conversion used in `/council` orchestration
+- **Bash 4.3+ or zsh** — `/council`'s blocks run in the user's login shell
+  and use associative arrays (native in zsh). Keep them to constructs both
+  shells accept: no `${!arr[@]}` key expansion or `${var^}` case conversion,
+  and `>|` wherever a redirect overwrites an existing file (zsh `noclobber`)
 - **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
   `grep`, and `find` (the last drives the stale-`/tmp` sweep; without it a
   cancelled run leaves raw reviewer output behind until the OS reaps `/tmp`)
@@ -93,7 +96,7 @@ and never auto-commits. The user decides what to do with the verdicts.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
-- `/council:setup` — prerequisite check (bash 4.3+, `timeout`, `jq`) plus a
+- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`) plus a
   reviewer-availability summary. Does NOT verify CLI authentication.
 
 ### Agents (3)
