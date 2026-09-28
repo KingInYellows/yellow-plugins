@@ -12,9 +12,11 @@ user's existing statusline command and changes nothing else:
 Composition (the existing command is statusLine.command):
   absent                              -> python3 <observer> | python3 <statusline>
   any command (yellow's or custom)    -> python3 <observer> | <existing>
-                                         (wrapped in "( )" when it contains
-                                         shell control characters, so the
-                                         payload still reaches its first stage)
+                                         (wrapped in "(" ... ")" on their own
+                                         lines when it contains shell control
+                                         characters, so the payload still
+                                         reaches its first stage and a trailing
+                                         comment or heredoc stays closed)
   already contains <observer>         -> no change (action "already-installed")
 
 Refuses with exit 1 and no write: JSONC or otherwise invalid settings.json,
@@ -112,7 +114,7 @@ def compose(existing, observer_dest, statusline):
             )
         return "install", observer_stage + " | python3 " + shlex.quote(normalize(statusline))
     if SHELL_CONTROL_RE.search(existing):
-        return "install", observer_stage + " | ( " + existing.strip() + " )"
+        return "install", observer_stage + " | (\n" + existing.strip() + "\n)"
     return "install", observer_stage + " | " + existing.strip()
 
 
@@ -144,8 +146,13 @@ def install_observer(src, dest):
 
 
 def write_settings(path, settings):
-    """Atomic write: sibling temp -> json re-validate -> os.replace, keeping the file mode."""
-    directory = os.path.dirname(os.path.abspath(path))
+    """Atomic write: sibling temp -> json re-validate -> os.replace, keeping the file mode.
+
+    A symlinked settings.json (dotfile managers) is written through to its
+    target so the link survives.
+    """
+    path = os.path.realpath(path)
+    directory = os.path.dirname(path)
     os.makedirs(directory, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=directory, prefix=".settings.", suffix=".tmp")
     try:
@@ -198,8 +205,7 @@ def run(args):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Compose the yellow-core context observer into statusLine.")
-    sub = parser.add_subparsers(dest="command")
-    sub.required = True
+    sub = parser.add_subparsers(dest="command", required=True)
     for name in ("plan", "install"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--settings", required=True, help="path to settings.json")

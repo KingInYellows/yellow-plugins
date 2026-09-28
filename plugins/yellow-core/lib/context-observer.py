@@ -7,15 +7,20 @@ user's statusLine command:
     python3 ~/.claude/yellow-context-observer.py | python3 ~/.claude/yellow-statusline.py
 
 Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
-  - Reads the statusline JSON payload from stdin and writes it to stdout
-    byte-for-byte BEFORE any other work, so the statusline never waits on
-    the observer and a broken observer cannot blank the statusline.
+  - Reads the statusline JSON payload from stdin, writes it to stdout
+    byte-for-byte, and releases stdout BEFORE any other work, so the next
+    stage sees EOF and renders without waiting on the record write, and a
+    broken observer cannot blank the statusline. (The shell still waits for
+    the observer to exit before the whole statusLine command finishes.)
   - Exits 0 on every path: malformed input, missing session id, unwritable
     disk, SIGPIPE from a closed downstream, anything else.
   - Records one observation per session to
       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<slug>/context-observations/<session_id>.json
     (observer_format 1) through a temp file plus os.replace, so a reader
     sees either the previous complete record or the new one, never a partial.
+    The temp name is fixed per session and created exclusively: a render that
+    finds a live temp file skips its write, and a killed writer leaves at most
+    one orphan, reclaimed once it is STALE_TEMP_SECONDS old.
   - Tracks a provisional advisory watermark on remaining context (default
     50 %); crossing it below is counted in the record and nothing else
     happens: no stdout, no stderr, no spawn, no model call.
@@ -31,14 +36,14 @@ Environment:
 import json
 import os
 import re
+import signal
 import sys
-import tempfile
 import time
-from datetime import datetime, timezone
 
 OBSERVER_FORMAT = 1
 DEFAULT_WATERMARK = 50
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+STALE_TEMP_SECONDS = 10
 
 
 def parse_payload(raw):
@@ -105,7 +110,7 @@ def build_record(payload, session_id):
     return {
         "observer_format": OBSERVER_FORMAT,
         "session_id": session_id,
-        "observed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "observed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         # Private state: stays in this untracked record and is never printed.
         "cwd": payload.get("cwd") if isinstance(payload.get("cwd"), str) else None,
         "transcript_present": bool(payload.get("transcript_path")),
@@ -171,36 +176,55 @@ def advisory_state(previous, remaining, watermark):
     return {"watermark_remaining": watermark, "crossings": crossings, "last_state": last_state}
 
 
+def open_temp(tmp):
+    """Create the per-session temp file exclusively (0600), or return None.
+
+    An existing temp file means another render is writing (skip this one) or a
+    writer was killed; an orphan older than STALE_TEMP_SECONDS is reclaimed.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    try:
+        return os.open(tmp, flags, 0o600)
+    except FileExistsError:
+        try:
+            if time.time() - os.stat(tmp).st_mtime < STALE_TEMP_SECONDS:
+                return None
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        try:
+            return os.open(tmp, flags, 0o600)
+        except FileExistsError:
+            return None
+
+
 def write_record(path, record):
-    """Atomic write: 0700 dir, 0600 temp sibling, fsync, os.replace."""
+    """Atomic write: 0700 dir, exclusive 0600 temp sibling, os.replace.
+
+    No fsync: os.replace already gives readers the old or the new complete
+    record, and a record lost to a power failure reads as unknown anyway.
+    """
     directory = os.path.dirname(path)
     os.makedirs(directory, mode=0o700, exist_ok=True)
     try:
         os.chmod(directory, 0o700)
     except OSError:
         pass
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=directory,
-        prefix="." + record["session_id"] + ".",
-        suffix=".tmp",
-        delete=False,
-    )
+    tmp = os.path.join(directory, "." + record["session_id"] + ".tmp")
+    fd = open_temp(tmp)
+    if fd is None:
+        return
     try:
-        with tmp:
-            os.fchmod(tmp.fileno(), 0o600)
-            json.dump(record, tmp, sort_keys=True)
-            tmp.write("\n")
-            tmp.flush()
-            os.fsync(tmp.fileno())
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(record, handle, sort_keys=True)
+            handle.write("\n")
         delay = os.environ.get("CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME")
         if delay:
             time.sleep(float(delay))
-        os.replace(tmp.name, path)
+        os.replace(tmp, path)
     except BaseException:
         try:
-            os.unlink(tmp.name)
+            os.unlink(tmp)
         except OSError:
             pass
         raise
@@ -223,27 +247,38 @@ def record_observation(raw):
     write_record(path, record)
 
 
+def release_stdout():
+    """Point fd 1 at /dev/null: the next stage sees EOF now, and the
+    interpreter's exit-time flush has nowhere to fail."""
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except OSError:
+        pass
+
+
+def on_sigterm(signum, frame):
+    # Unwind through write_record's cleanup instead of dying mid-write.
+    raise SystemExit(0)
+
+
 def main():
+    signal.signal(signal.SIGTERM, on_sigterm)
     raw = b""
     try:
         raw = sys.stdin.buffer.read()
         sys.stdout.buffer.write(raw)
         sys.stdout.buffer.flush()
-    except BrokenPipeError:
-        # Downstream closed early; point stdout at /dev/null so the interpreter's
-        # exit-time flush cannot raise again, then still record what we read.
-        try:
-            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-        except OSError:
-            pass
     except BaseException:
+        # BrokenPipeError from a closed downstream, or anything else: still
+        # record what was read.
         pass
+    release_stdout()
     try:
         record_observation(raw)
     except BaseException as exc:  # never let recording affect the statusline
         if os.environ.get("CONTEXT_OBSERVER_DEBUG") == "1":
             try:
-                sys.stderr.write("[context-observer] %s: %s\n" % (type(exc).__name__, exc))
+                sys.stderr.write(f"[context-observer] {type(exc).__name__}: {exc}\n")
             except BaseException:
                 pass
     sys.exit(0)

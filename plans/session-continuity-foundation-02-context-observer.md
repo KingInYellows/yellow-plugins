@@ -304,6 +304,16 @@ reported unsupported.
   through the observer, then `handoff.sh measure` with the fixture's
   `session_id` exported as `CLAUDE_CODE_SESSION_ID` -> expected:
   `context_at_capture` object; `git status` unchanged.
+- Review fixes (flow:work Phase 3): the observer releases stdout before
+  recording (the next stage sees EOF at once), drops `fsync`, writes through
+  one exclusive temp name per session (a live temp file skips the render, a
+  stale one is reclaimed after 10 s, so a killed writer leaves at most one
+  orphan), and unwinds on SIGTERM; the reader anchors `observed_at` inside
+  jq so a planted newline cannot forge its output; setup wraps a compound
+  command with the parentheses on their own lines (comments and heredocs
+  stay closed) and writes a symlinked `settings.json` through the link.
+- Follow-ups not done here: skip rewriting an unchanged record, prune old
+  observation records, and the flaky `git-worktree` teardown above.
 - Not run: installed-host smoke of the composed pipeline inside a live
   Claude Code statusline (interruption and debounce behavior is
   undocumented); reported as `not-run`. The user's `~/.claude/settings.json`
@@ -311,11 +321,11 @@ reported unsupported.
 
 ## Results and Deviations (2026-09-28)
 
-- `bats tests/context-observer.bats`: 27 of 27 pass on the Claude Code
-  2.1.284 fixtures (target was ≥ 30; the suite covers every T09–T11 case
-  listed in Step 10). Observer best of five on `mid-session.json`: 28.1 ms
-  (budget 100 ms).
-- `bats tests/`: 241 of 241 pass, including `handoff.bats` 53 (50 + 3).
+- `bats tests/context-observer.bats`: 33 of 33 pass on the Claude Code
+  2.1.284 fixtures. Observer best of five on `mid-session.json`: 18.3 ms
+  after the review fixes (28.1 ms before; budget 100 ms). Best-of-five
+  measures the observer alone, not the whole statusline pipeline.
+- `bats tests/`: 247 of 247 pass, including `handoff.bats` 53 (50 + 3).
 - `bats skills/git-worktree/tests/`: 9–11 of 11 per run. The failures are in
   teardown (`rm -rf "$REPO"`: "Directory not empty") and reproduce the same
   way on `main`; this branch does not touch that suite. Follow-up.
@@ -338,6 +348,16 @@ reported unsupported.
 - The branch also carries `docs/CONCEPTS.md` and
   `docs/solutions/workflow/plan-lifecycle-management.md` from the planning
   session's compound step (outside the R23 allowlist; docs only).
+- Review fixes (flow:work Phase 3): the observer releases stdout before
+  recording (the next stage sees EOF at once), drops `fsync`, writes through
+  one exclusive temp name per session (a live temp file skips the render, a
+  stale one is reclaimed after 10 s, so a killed writer leaves at most one
+  orphan), and unwinds on SIGTERM; the reader anchors `observed_at` inside
+  jq so a planted newline cannot forge its output; setup wraps a compound
+  command with the parentheses on their own lines (comments and heredocs
+  stay closed) and writes a symlinked `settings.json` through the link.
+- Follow-ups not done here: skip rewriting an unchanged record, prune old
+  observation records, and the flaky `git-worktree` teardown above.
 - Not run: installed-host smoke of the composed pipeline inside a live
   statusline, including interruption and debounce behaviour.
 

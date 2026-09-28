@@ -68,12 +68,15 @@ co_read_observation() {
   fi
 
   # One jq pass validates the shape and emits two lines: observed_at (for the
-  # staleness check below) and the reduced object. Any shape failure emits
-  # nothing, which becomes `unknown`.
+  # staleness check below) and the reduced object. observed_at is anchored
+  # with \A…\z inside jq (Oniguruma's $ also matches before a newline), so a
+  # planted newline cannot shift a forged object onto the second line. Any
+  # shape failure emits nothing, which becomes `unknown`.
   local out="" observed_at="" obj=""
   out=$(jq -rc --arg sid "$sid" '
     if type == "object" and .observer_format == 1 and .session_id == $sid
-       and (.observed_at | type) == "string"
+       and (.observed_at | type == "string"
+            and test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\z"))
        and (.context_window | type) == "object"
        and (.context_window.remaining_percentage | type == "number" and . >= 0 and . <= 100)
     then
