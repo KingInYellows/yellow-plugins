@@ -17,16 +17,20 @@ Subcommands:
   remove      strip the observer stage, restoring the command it wrapped
 
 Composition (the existing command is statusLine.command):
-  absent                   -> python3 <observer> | python3 <statusline>
-  any command              -> python3 <observer> | <existing>
-                              (wrapped in "(" ... ")" on their own lines when it
+  absent                   -> { python3 <observer> || cat; } | python3 <statusline>
+  any command              -> { python3 <observer> || cat; } | <existing>
+                              (the "|| cat" keeps the payload flowing to the next
+                              stage when the observer file is missing or cannot
+                              start; the existing command is wrapped in "(" ... ")"
+                              on their own lines when it
                               contains shell control characters, so the payload
                               reaches its first stage and a trailing comment or
                               heredoc stays closed)
   already contains observer -> no change to settings; the observer copy is
                               refreshed when missing or different from the source
-                              ("contains" means a leading "python3 <observer> |"
-                              stage that resolves to --observer-dest; a command
+                              ("contains" means a leading observer stage, guarded or
+                              the older plain "python3 <observer> |", that resolves
+                              to --observer-dest; a command
                               that only mentions the observer's path elsewhere,
                               e.g. in a `test -f <observer> && ...` guard, is
                               treated as not installed)
@@ -61,11 +65,37 @@ OBSERVER_NAME = "yellow-context-observer.py"
 BACKUP_SUFFIX = ".pre-observer.backup"
 CORRUPT_SUFFIX = ".corrupt.backup"
 
+# Stable error_code values of the JSON contract; SetupError rejects anything else.
+ERROR_CODES = frozenset((
+    "settings_unreadable", "settings_jsonc", "settings_invalid", "settings_not_object",
+    "statusline_not_object", "command_not_string", "statusline_missing",
+    "observer_src_missing", "observer_not_removable",
+))
+
+# A leading observer stage, guarded ("{ python3 <observer> || cat; } |", the
+# installer's form) or plain ("python3 <observer> |", the older form and the
+# simplest manual merge). "path" is one shell word, possibly several quoted
+# segments joined (shlex.quote emits '...'"'"'...' for a path containing an
+# apostrophe); leading_observer_path() tokenises it and compares the result to
+# --observer-dest. A command that only mentions the observer elsewhere never
+# matches here.
+OBSERVER_PREFIX_RE = re.compile(
+    r"\A\s*(?P<guard>\{\s*)?python3?\s+(?P<path>(?:'[^']*'|\"[^\"]*\"|[^\s'\"|;])+)"
+    r"(?(guard)\s*\|\|\s*cat\s*;\s*\}|)\s*\|(?!\|)\s*"
+)
+
 
 class SetupError(Exception):
     def __init__(self, code, message):
+        if code not in ERROR_CODES:
+            raise ValueError("unknown error code %r" % code)
         super().__init__(message)
         self.code = code
+
+
+def fail(result, code, reason):
+    """Fill result as the one error shape shared by every failure path."""
+    result.update(action="error", error_code=code, reason=reason)
 
 
 def new_result(settings):
@@ -101,10 +131,10 @@ def load_settings(path, recover_invalid=False, result=None):
             raise SetupError("settings_jsonc", "settings.json contains JSONC comments; remove them or use the manual merge")
         if not recover_invalid:
             raise SetupError("settings_invalid", "settings.json is not valid JSON; fix it or use the manual merge")
-        corrupt = os.path.realpath(path) + CORRUPT_SUFFIX
-        shutil.copy2(path, corrupt)
+        corrupt = numbered_backup(os.path.realpath(path), CORRUPT_SUFFIX, raw)
         if result is not None:
             result["backup"] = corrupt
+            result["reason"] = "settings.json was not valid JSON and was reset; the original is saved at %s" % corrupt
         return {}, raw
     if not isinstance(settings, dict):
         raise SetupError("settings_not_object", "settings.json is not a JSON object")
@@ -134,7 +164,8 @@ def tokens(command):
 
 def observer_stage(observer_dest):
     # Expand "~" before quoting: a quoted "~/..." would reach the shell literally.
-    return "python3 " + shlex.quote(normalize(observer_dest))
+    # "|| cat": a missing or unstartable observer must not starve the next stage.
+    return "{ python3 " + shlex.quote(normalize(observer_dest)) + " || cat; }"
 
 
 def statusline_stage(statusline):
@@ -142,7 +173,7 @@ def statusline_stage(statusline):
 
 
 def contains_observer(command, observer_dest):
-    """True only when command's leading stage is 'python3 <observer_dest> |'.
+    """True only when command's leading stage is the observer at observer_dest.
 
     A command that merely mentions the observer path elsewhere (e.g. in a
     later stage, or in a `test -f <observer> && ...` guard) does not count:
@@ -172,26 +203,15 @@ def compose(existing, observer_dest, statusline):
     return "install", observer_stage(observer_dest) + " | " + wrap(existing)
 
 
-# Any "python3 <path ending in yellow-context-observer.py> |" prefix, quoted or not,
-# which covers both the installer's form and the documented manual merge. The
-# "path" group captures the path token (quotes included when quoted) so
-# leading_observer_path() can normalize and compare it to --observer-dest;
-# a command that only mentions the observer elsewhere never matches here.
-OBSERVER_PREFIX_RE = re.compile(
-    r"\A\s*python3?\s+(?P<path>'[^']*" + re.escape(OBSERVER_NAME) + r"'|\"[^\"]*" + re.escape(OBSERVER_NAME)
-    + r"\"|\S*" + re.escape(OBSERVER_NAME) + r")\s*\|\s*"
-)
-
-
 def leading_observer_path(command):
-    """Return the normalized path of a leading 'python3 <observer> |' stage, or None."""
+    """Return the normalized path of a leading observer stage, or None."""
     match = OBSERVER_PREFIX_RE.match(command)
     if match is None:
         return None
     parts = tokens(match.group("path"))
-    if not parts:
+    if not parts or len(parts) != 1 or os.path.basename(parts[0]) != OBSERVER_NAME:
         return None
-    return normalize(parts[0])
+    return normalize(os.path.expandvars(parts[0]))
 
 
 def decompose(existing):
@@ -214,11 +234,9 @@ def observer_is_current(src, dest):
         return False
 
 
-def backup_settings(path, raw):
-    """Copy settings.json aside once; reuse an identical backup, never clobber a different one."""
-    if raw is None:
-        return None
-    candidate = path + BACKUP_SUFFIX
+def numbered_backup(path, suffix, raw):
+    """Copy path aside; reuse an identical backup, never clobber a different one."""
+    candidate = path + suffix
     n = 1
     while os.path.exists(candidate):
         try:
@@ -228,9 +246,16 @@ def backup_settings(path, raw):
         except (OSError, UnicodeDecodeError):
             pass
         n += 1
-        candidate = "%s%s.%d" % (path, BACKUP_SUFFIX, n)
+        candidate = "%s%s.%d" % (path, suffix, n)
     shutil.copy2(path, candidate)
     return candidate
+
+
+def backup_settings(path, raw):
+    """Back up settings.json before a change; None when the file does not exist."""
+    if raw is None:
+        return None
+    return numbered_backup(path, BACKUP_SUFFIX, raw)
 
 
 def install_observer(src, dest):
@@ -316,7 +341,10 @@ def run_plan_or_install(args, result):
     result.update(existing_command=existing, proposed_command=proposed, action=action)
     src = getattr(args, "observer_src", None)
     if action == "already-installed":
-        if src and not observer_is_current(src, args.observer_dest):
+        missing_copy = not src and not os.path.isfile(normalize(args.observer_dest))
+        if missing_copy and args.command == "plan":
+            result["action"] = "refresh"
+        elif src and not observer_is_current(src, args.observer_dest):
             if args.command == "plan":
                 result["action"] = "refresh"
             else:
@@ -345,7 +373,7 @@ def run_remove(args, result):
     if restored is None:
         raise SetupError(
             "observer_not_removable",
-            "statusLine.command uses the observer but not as a leading 'python3 <observer> |' stage; edit it by hand",
+            "statusLine.command uses the observer but not as a leading observer stage; edit it by hand",
         )
     result["proposed_command"] = restored
     result["backup"] = backup_settings(args.settings, raw)
@@ -359,7 +387,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
 
     def error(self, message):
         result = new_result(None)
-        result.update(action="error", error_code="usage", reason="%s: %s" % (self.prog, message))
+        fail(result, "usage", "%s: %s" % (self.prog, message))
         sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")
         sys.exit(2)
 
@@ -373,7 +401,9 @@ def parse_args(argv):
         "Example: context-observer-setup.py plan --settings ~/.claude/settings.json "
         "--observer-dest ~/.claude/yellow-context-observer.py --statusline ~/.claude/yellow-statusline.py",
     )
-    sub = parser.add_subparsers(dest="command", required=True, metavar="{statusline,plan,install,remove}")
+    # parser_class is explicit: subparser usage errors must print JSON too.
+    sub = parser.add_subparsers(dest="command", required=True, metavar="{statusline,plan,install,remove}",
+                                parser_class=JsonArgumentParser)
     helps = {
         "statusline": "point statusLine.command at the yellow statusline, keeping a composed observer",
         "plan": "print what install would do; writes nothing",
@@ -402,13 +432,13 @@ def main(argv=None):
     try:
         runners[args.command](args, result)
     except SetupError as exc:
-        result.update(action="error", error_code=exc.code, reason=str(exc))
+        fail(result, exc.code, str(exc))
         code = 1
     except OSError as exc:
-        result.update(action="error", error_code="io_error", reason=str(exc))
+        fail(result, "io_error", str(exc))
         code = 1
     except Exception as exc:  # last resort: still one JSON object, never a traceback
-        result.update(action="error", error_code="internal", reason="%s: %s" % (type(exc).__name__, exc))
+        fail(result, "internal", "%s: %s" % (type(exc).__name__, exc))
         code = 1
     sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")
     return code

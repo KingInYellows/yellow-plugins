@@ -21,18 +21,20 @@ status. Installing or updating yellow-core never changes `statusLine`.
 
 `context-observer-setup.py install` writes:
 
-- no `statusLine` → `python3 <observer> | python3 <statusline>`
-- any existing command → `python3 <observer> | <existing>`; a command that
+- no `statusLine` → `{ python3 <observer> || cat; } | python3 <statusline>`
+- any existing command → `{ python3 <observer> || cat; } | <existing>`; a command that
   contains `;`, `&`, `|`, `#` or a newline is wrapped as
 
   ```text
-  python3 <observer> | (
+  { python3 <observer> || cat; } | (
   <existing>
   )
   ```
 
   so the payload reaches its first stage and a trailing comment or heredoc
-  stays closed.
+  stays closed. The `|| cat` keeps the payload flowing when the observer file
+  is missing or cannot start; without it the next stage would get empty stdin
+  and the whole statusline would go blank.
 
 `context-observer-setup.py statusline` (Step 5) keeps the observer stage when
 it is already composed, so re-running setup does not drop it.
@@ -48,13 +50,15 @@ chmod 755 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-context-observer.py"
 ```
 
 Then edit `statusLine.command` to the composition above: prefix a simple
-command with `python3 <config>/yellow-context-observer.py | `, or wrap a
-compound one in `(` … `)` on their own lines.
+command with `{ python3 <config>/yellow-context-observer.py || cat; } | `, or
+wrap a compound one in `(` … `)` on their own lines. The older plain
+`python3 <config>/yellow-context-observer.py | ` prefix is still recognised.
 
 ## Removal
 
 `context-observer-setup.py remove` strips a leading
-`python3 <…>/yellow-context-observer.py |` stage and unwraps the `(` … `)`
+observer stage (`{ python3 <…>/yellow-context-observer.py || cat; } |` or the
+older plain `python3 <…>/yellow-context-observer.py |`) and unwraps the `(` … `)`
 block, restoring the command it wrapped (backing up settings.json first). By
 hand: delete that prefix from `statusLine.command`. Deleting the whole
 `statusLine` key removes the statusline too.
@@ -63,6 +67,9 @@ hand: delete that prefix from `statusLine.command`. Deleting the whole
 
 Agents can call the script directly instead of the Step 5b questions:
 `plan` (read-only status: `already-installed` means enabled, `refresh` means
-enabled with a missing or outdated copy), `install`, `remove`. Each prints
+enabled with a missing or outdated copy; pass `--observer-src` to also detect
+an outdated one), `install`, `remove`. A `statusline` run that recovers from
+invalid settings.json saves the original as `settings.json.corrupt.backup`
+(numbered when one exists) and says so in `reason`. Each prints
 one JSON object with `action`, `error_code`, `existing_command`,
 `proposed_command`, `settings`, `backup`, `observer`, `reason`.

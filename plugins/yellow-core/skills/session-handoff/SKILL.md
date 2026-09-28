@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: "Write a validated session-handoff note at plans/handoff/<YYYY-MM-DD>-<slug>.md, or resume from an explicitly named one after a read-only preflight. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off\", or names a plans/handoff/ file to resume. Shell code measures repository, worktree, HEAD, dirty fingerprint and source session into the note; the narrative is model-authored reference data. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
+description: "Write a validated session-handoff note at plans/handoff/<YYYY-MM-DD>-<slug>.md, or resume from an explicitly named one after a read-only preflight. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off\", or names a plans/handoff/ file to resume, or to check remaining context mid-task via handoff.sh measure. Shell code measures repository, worktree, HEAD, dirty fingerprint and source session into the note; the narrative is model-authored reference data. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
 user-invocable: true
 ---
 
@@ -23,14 +23,19 @@ unstaged / untracked counts, `task_ref`, `evidence_refs`,
 `context_at_capture`, `body_digest` — followed by the labeled narrative.
 `context_at_capture` is filled from the opt-in context observer
 (`/statusline:setup observer`): either the string `unknown` or an object
-`{remaining_percentage, used_percentage, observed_at, advisory_crossings}`
-(`advisory_crossings` counts drops below the 50 % remaining watermark). It is
+`{remaining_percentage, used_percentage, observed_at, advisory_crossings,
+advisory_state, watermark_remaining}` (`advisory_crossings` counts drops below
+the remaining-context watermark, 50 % unless `YELLOW_CONTEXT_WATERMARK` moves
+it; `watermark_remaining` is the value in effect and `advisory_state` is
+`below` or `above` now). It is
 `unknown` when the observer is not enabled, in headless `claude -p` sessions,
 when no statusline has rendered in the last 300 s, or when the record belongs
 to another session or is out of range; `CONTEXT_OBSERVER_DEBUG=1` prints the
 reason on stderr. `unknown` is normal and never changes a preflight status.
 `handoff.sh measure` is the read-only way to check context mid-session:
-`advisory_crossings > 0` is a cue to offer a handoff.
+`advisory_state == "below"` is a cue to offer a handoff (`advisory_crossings`
+only ever grows, so it stays above 0 after context recovers, for example
+after `/compact`; offer again only when it has increased since your last offer).
 `preflight` re-measures the live workspace and reports
 `ready | mismatched | unsupported | blocked` with reason codes, as JSON on
 stdout and a summary on stderr, without mutating anything. Exit codes: 0

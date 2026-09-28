@@ -47,17 +47,17 @@ printf '\n=== Existing State ===\n'
 [ -f "$CONFIG/settings.json" ] && printf 'settings: exists\n' || printf 'settings: missing\n'
 
 if [ -f "$CONFIG/settings.json" ]; then
-  if python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
+  if python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" "$CONFIG/settings.json" 2>/dev/null; then
     :
   else
     # Check if failure is due to JSONC comments
-    if python3 -c "import re; raw=open('$CONFIG/settings.json').read(); exit(0 if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE) else 1)" 2>/dev/null; then
+    if python3 -c "import re, sys; raw=open(sys.argv[1]).read(); exit(0 if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE) else 1)" "$CONFIG/settings.json" 2>/dev/null; then
       printf 'settings_parse: ERROR (JSONC comments detected)\n'
     else
       printf 'settings_parse: ERROR (invalid JSON)\n'
     fi
   fi
-  python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
+  python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print('disableAllHooks:', d.get('disableAllHooks', False))" "$CONFIG/settings.json" 2>/dev/null
 fi
 
 printf '\n=== Plugin Detection ===\n'
@@ -89,7 +89,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" plan --settings "$
   --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
   --statusline "$HOME/.claude/yellow-statusline.py" \
-  | python3 -c 'import json, sys; d = json.load(sys.stdin); print("observer:", d["action"], d.get("error_code") or "")'
+  | python3 -c 'import json, sys; d = json.load(sys.stdin); print("observer:", d["action"], d.get("error_code") or "", d.get("reason") or "")' \
+  || printf 'observer: error probe_failed\n'
 ```
 
 **Decision tree from output:**
@@ -331,15 +332,17 @@ echo '{"model":{"display_name":"Test","id":"test"},"context_window":{"used_perce
 If the output is non-empty and the exit code is 0, report success.
 
 Re-run Step 1's `=== Context Observer ===` probe and report the observer from
-its `action` (`already-installed` → enabled; anything else → not enabled),
-not from the Step 5b answer.
+its `action` (`already-installed` → enabled; `refresh` → enabled, but the
+installed copy is missing or outdated, so suggest re-running
+`/statusline:setup observer`; anything else → not enabled), not from the
+Step 5b answer.
 
 Read back `$CONFIG/settings.json` (same `CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"`
 as Step 1) to confirm `statusLine` is present:
 
 ```bash
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-python3 -c "import json; d=json.load(open('$CONFIG/settings.json')); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))"
+python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))" "$CONFIG/settings.json"
 ```
 
 Display the final report, substituting the actual `$CONFIG` value:

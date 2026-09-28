@@ -166,11 +166,17 @@ def watermark_remaining():
 
 
 def load_previous(path, session_id):
-    """Previous record for the same session, or None when absent or unusable."""
+    """Previous record for the same session, or None when absent or malformed.
+
+    Raises OSError when the record exists but cannot be read (EIO, EACCES):
+    the caller keeps the old record instead of resetting its advisory state.
+    """
     try:
         with open(path, "r", encoding="utf-8") as handle:
             previous = json.load(handle)
-    except (OSError, ValueError, UnicodeDecodeError):
+    except FileNotFoundError:
+        return None
+    except (ValueError, UnicodeDecodeError):
         return None
     if not isinstance(previous, dict) or previous.get("session_id") != session_id:
         return None
@@ -342,7 +348,8 @@ def release_stdout():
         return
     try:
         os.dup2(devnull, sys.stdout.fileno())
-    except OSError:
+    except (OSError, AttributeError, ValueError):
+        # stdout closed or detached (sys.stdout is None / has no fileno).
         pass
     finally:
         os.close(devnull)
@@ -353,8 +360,13 @@ def on_sigterm(signum, frame):
     raise SystemExit(0)
 
 
+class DeadlineReached(BaseException):
+    """Not an Exception: TimeoutError is an OSError, which write_record's
+    cleanup handlers swallow, leaving later filesystem calls with no deadline."""
+
+
 def on_deadline(signum, frame):
-    raise TimeoutError("recording deadline reached")
+    raise DeadlineReached("recording deadline reached")
 
 
 def deadline_seconds():
@@ -371,7 +383,8 @@ def wants_help(argv):
 
 
 def main():
-    if wants_help(sys.argv) or sys.stdin.isatty():
+    stdin = sys.stdin
+    if wants_help(sys.argv) or (stdin is not None and stdin.isatty()):
         # Run by hand: explain instead of blocking on a terminal.
         sys.stdout.write(__doc__)
         sys.exit(0)

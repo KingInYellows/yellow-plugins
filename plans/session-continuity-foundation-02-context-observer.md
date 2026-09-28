@@ -316,6 +316,13 @@ reported unsupported.
 
 ## Results and Deviations (2026-09-28)
 
+> Implementation steps 1-5 above describe the original design and are
+> superseded by the shipped code: the session-id check uses `fullmatch` (Python)
+> and `\A…\z` (jq), the writer uses an exclusive lock plus a per-pid `.part`
+> file (no `tempfile.NamedTemporaryFile`, no `fsync`), and the composed stage
+> is `{ python3 <observer> || cat; } | <existing>`. The observer's docstring is
+> authoritative.
+
 Counts are from the final commit, restacked on `main` at `28220d1a`.
 
 - `bats tests/context-observer.bats`: 49 of 49 pass on the Claude Code

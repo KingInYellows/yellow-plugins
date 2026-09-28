@@ -32,14 +32,20 @@ embedded newline does not pass; only the trailing newline does.
 
 ## Symptoms
 
-- `plugins/yellow-core/lib/context-observer.py:45,60` —
-  `SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")` checked with
-  `.match()`. A session id with a trailing newline passed and was used to
-  build a project slug / write path.
-- `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh:549` —
-  `HANDOFF_TS_RE='^[0-9]{4}-...Z$'` passed into jq as `--arg ts_re` and
-  checked with `test($ts_re)`. A trailing newline let a note's
-  `context_at_capture.observed_at` through with the newline still in it.
+Before the fix in this PR (line numbers omitted on purpose; the code has moved):
+
+- `SESSION_ID_RE` in `plugins/yellow-core/lib/context-observer.py` was
+  `re.compile(r"^[A-Za-z0-9_-]{1,128}$")` checked with `.match()`. A session id
+  with a trailing newline passed and was used to build a project slug / write
+  path. It is now an unanchored pattern checked with `.fullmatch()`.
+- `plugins/yellow-core/skills/session-handoff/scripts/handoff.sh` passed
+  `HANDOFF_TS_RE='^[0-9]{4}-...Z$'` into jq as `--arg ts_re` and checked it
+  with `test($ts_re)`. A trailing newline let a note's
+  `context_at_capture.observed_at` through with the newline still in it. That
+  jq check is gone: validation now goes through `co_context`
+  (`CO_CONTEXT_JQ`, `\A…\z`). `HANDOFF_TS_RE` still exists for the bash
+  `[[ =~ ]]` check in `ho_shaped`; there `$` does not accept a trailing
+  newline, so that use is safe and was left alone.
 - Reads as correct at a glance: the pattern looks fully anchored, and
   hand-typed test inputs during development never exercise the
   trailing-newline case.
@@ -53,7 +59,7 @@ incorrect example of the *same* timestamp check next to each other:
 - The observation reader in `plugins/yellow-core/lib/context-observer.sh`
   validated the identical ISO-8601 timestamp shape correctly:
   `test("\\A[0-9]{4}-...Z\\z")` — jq/Oniguruma, lowercase `\z`.
-- `handoff.sh:549` validated the same shape but via a bash variable
+- `handoff.sh` validated the same shape in jq via a bash variable
   (`HANDOFF_TS_RE`) built with a bare `^...$`, so it inherited the unsafe
   anchor instead of the sibling's `\A...\z` convention.
 

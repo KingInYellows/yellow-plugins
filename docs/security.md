@@ -322,9 +322,12 @@ session-bound observation derived from externally supplied statusline
 fields (working directory, session context metrics). The boundary:
 
 - **Opt-in only.** Default is No. `lib/context-observer-setup.py` composes
-  `python3 ~/.claude/yellow-context-observer.py | <existing statusLine
-  command>`, backing up `settings.json` once (`.pre-observer.backup`) and
-  rewriting only `statusLine.command` — no other settings key is touched.
+  `{ python3 ~/.claude/yellow-context-observer.py || cat; } | <existing
+  statusLine command>` (the `|| cat` keeps a missing observer from blanking
+  the statusline), backing up `settings.json` before each change
+  (`.pre-observer.backup`, with a numeric suffix when an earlier backup
+  differs; an identical earlier backup is reused) and rewriting only
+  `statusLine.command` — no other settings key is touched.
   `context-observer-setup.py remove` (offered as "Disable it" by
   `/statusline:setup observer`) strips the stage and restores the wrapped
   command.

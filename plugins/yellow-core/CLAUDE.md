@@ -335,9 +335,10 @@ cross-plugin pattern:
   checkout. Always exits 0 and never installs anything. Used by the
   `session-handoff` preflight. Bats coverage at
   `plugins/yellow-core/tests/plugin-identity.bats`
-- `context-observer.sh` — `co_read_observation <session_id> <toplevel>`
-  prints the observer's record for the session reduced to
-  `{remaining_percentage, used_percentage, observed_at, advisory_crossings}`,
+- `context-observer.sh` — `co_read_observation <session_id> [<toplevel>]`
+  (the toplevel is unused; the newest record for the session id wins) prints
+  the observer's record reduced to `{remaining_percentage, used_percentage,
+  observed_at, advisory_crossings, advisory_state, watermark_remaining}`,
   or `unknown` (missing, stale beyond `CO_STALENESS_SECONDS`, cross-session,
   malformed, out of range). `CO_CONTEXT_JQ` is the shared jq validator for
   that object. Runs no git; needs `compound-staging.sh` sourced first. Used

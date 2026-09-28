@@ -11,10 +11,11 @@
 #   . "${SCRIPT_DIR}/../lib/context-observer.sh"
 #   co_read_observation "$session_id" "$toplevel"    # JSON object or "unknown"
 #
-# The record is looked up under the toplevel's project slug first, then by
-# session id across every project directory: the observer keys it by the
-# session's launch directory, which differs from the toplevel when a session
-# works in a linked worktree, a repository subdirectory, or through a symlink.
+# The record is the newest one for the session id across every project
+# directory: the observer keys it by the session's launch directory, which
+# differs from the toplevel when a session works in a linked worktree, a
+# repository subdirectory, or through a symlink, and a resumed session can leave
+# records under more than one directory.
 #
 # `unknown` is printed when the session id is "unknown" or malformed, no
 # record exists for it, the record is unreadable or not a JSON object, its
@@ -32,7 +33,7 @@ _CONTEXT_OBSERVER_LOADED=1
 CO_SESSION_ID_RE='^[A-Za-z0-9_-]{1,128}$'
 
 # jq definition shared with handoff.sh: validates a reduced context object
-# and returns it rebuilt from its four known fields, or the string "unknown".
+# and returns it rebuilt from its six known fields, or the string "unknown".
 # observed_at is anchored with \A…\z because Oniguruma's $ also matches
 # before a trailing newline.
 # shellcheck disable=SC2016
@@ -44,7 +45,9 @@ CO_CONTEXT_JQ='def co_context:
   then {remaining_percentage,
         used_percentage: (.used_percentage | if type == "number" then . else null end),
         observed_at,
-        advisory_crossings: (.advisory_crossings | if type == "number" then . else null end)}
+        advisory_crossings: (.advisory_crossings | if type == "number" then . else null end),
+        advisory_state: (.advisory_state | if . == "above" or . == "below" then . else null end),
+        watermark_remaining: (.watermark_remaining | if type == "number" then . else null end)}
   else "unknown" end;'
 
 co_warn() {
@@ -69,34 +72,15 @@ co_config_dir() {
   fi
 }
 
-# Record path for a session: <config dir>/projects/<slug>/context-observations/<id>.json.
-# The slug is the toplevel with "/" -> "-", the same mapping as
-# cs_derive_project_slug and the observer's project_slug(). Fails (prints
-# nothing) on a malformed id, an empty root, or no resolvable config dir.
+# The record for a session: the newest
+# <config>/projects/*/context-observations/<id>.json. Fails (prints nothing)
+# on a malformed id, no resolvable config dir, or no record.
 #
 # Args:
 #   $1 — session id (validated against CO_SESSION_ID_RE)
-#   $2 — canonical git toplevel, or the cwd outside a repository
-co_observation_path() {
-  local sid="${1:-}" root="${2:-}" config slug
-  [[ "$sid" =~ $CO_SESSION_ID_RE ]] || return 1
-  [ -n "$root" ] || return 1
-  config=$(co_config_dir) || return 1
-  slug=$(printf '%s' "$root" | tr '/' '-')
-  printf '%s/projects/%s/context-observations/%s.json\n' "$config" "$slug" "$sid"
-}
-
-# The record for a session: the toplevel's path when it exists, else the
-# newest <config>/projects/*/context-observations/<id>.json. Fails when none.
-#
-# Args: as co_observation_path.
 co_find_record() {
-  local sid="${1:-}" root="${2:-}" config primary candidate newest=""
-  primary=$(co_observation_path "$sid" "$root") || return 1
-  if [ -f "$primary" ]; then
-    printf '%s\n' "$primary"
-    return 0
-  fi
+  local sid="${1:-}" config candidate newest=""
+  [[ "$sid" =~ $CO_SESSION_ID_RE ]] || return 1
   config=$(co_config_dir) || return 1
   for candidate in "$config"/projects/*/context-observations/"$sid".json; do
     [ -f "$candidate" ] || continue
@@ -108,9 +92,9 @@ co_find_record() {
 
 # Args:
 #   $1 — current session id
-#   $2 — canonical git toplevel, or the cwd outside a repository
+#   $2 — unused; kept so callers that pass the toplevel keep working
 co_read_observation() {
-  local sid="${1:-}" root="${2:-}" file
+  local sid="${1:-}" file
   if ! command -v cs_iso_to_epoch >/dev/null 2>&1; then
     co_warn "cs_iso_to_epoch is unavailable; source lib/compound-staging.sh before this file"
     co_unknown "cs_iso_to_epoch missing"; return 0
@@ -118,14 +102,14 @@ co_read_observation() {
   if [ "$sid" = "unknown" ]; then co_unknown "no session id"; return 0; fi
   if ! [[ "$sid" =~ $CO_SESSION_ID_RE ]]; then co_unknown "malformed session id"; return 0; fi
   if ! command -v jq >/dev/null 2>&1; then co_unknown "jq missing"; return 0; fi
-  if ! file=$(co_find_record "$sid" "$root"); then co_unknown "no record for this session"; return 0; fi
+  if ! file=$(co_find_record "$sid"); then co_unknown "no record for this session"; return 0; fi
   if [ ! -r "$file" ]; then co_unknown "record unreadable"; return 0; fi
 
   # One jq pass validates the record, reduces it through co_context, and
   # emits two lines: observed_at (for the staleness check below) and the
   # reduced object. co_context anchors observed_at, so it cannot carry a
   # newline. Any failure emits nothing.
-  local out="" observed_at="" obj=""
+  local out="" observed_at="" obj="" jq_status=0
   out=$(jq -rc --arg sid "$sid" "$CO_CONTEXT_JQ"'
     if type == "object" and .observer_format == 1 and .session_id == $sid
        and (.context_window | type) == "object"
@@ -133,10 +117,13 @@ co_read_observation() {
       {remaining_percentage: .context_window.remaining_percentage,
        used_percentage: .context_window.used_percentage,
        observed_at,
-       advisory_crossings: (.advisory | if type == "object" then .crossings else null end)}
+       advisory_crossings: (.advisory | if type == "object" then .crossings else null end),
+       advisory_state: (.advisory | if type == "object" then .last_state else null end),
+       watermark_remaining: (.advisory | if type == "object" then .watermark_remaining else null end)}
       | co_context
       | if type == "object" then .observed_at, . else empty end
-    else empty end' -- "$file" 2>/dev/null) || out=""
+    else empty end' -- "$file" 2>/dev/null); jq_status=$?
+  if [ "$jq_status" -ne 0 ]; then co_unknown "jq failed (exit $jq_status)"; return 0; fi
   { IFS= read -r observed_at; IFS= read -r obj; } <<< "$out"
   if [ -z "$obj" ]; then co_unknown "record malformed, from another session, or percentage out of range"; return 0; fi
 
