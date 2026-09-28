@@ -184,7 +184,7 @@ reported unsupported.
   Refuse JSONC (same regex as setup.md Step 1) and invalid JSON with exit 1 and
   no write. Never touch `autoCompactEnabled`, `autoCompactWindow`, `hooks`, or
   any other key (R2).
-- [ ] Step 8: Edit `plugins/yellow-core/commands/statusline/setup.md`: after
+- [x] Step 8: Edit `plugins/yellow-core/commands/statusline/setup.md`: after
   Step 5's install (and also reachable when the user kept a custom statusline
   or cancelled the replacement), add `### Step 5b: Context Observer (opt-in)`
   with an AskUserQuestion "Record context observations for session handoffs?

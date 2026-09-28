@@ -409,7 +409,9 @@ Use AskUserQuestion to get confirmation.
 >
 > Options: "Replace existing" / "Back up existing and replace" / "Cancel"
 
-If user cancels: print "Setup cancelled. No files were modified." and stop.
+If user cancels: print "Statusline not replaced. No files were modified.",
+run Step 5b (the observer can still be composed ahead of the existing
+statusline), then stop without Step 6.
 
 If user chose "Back up existing and replace":
 
@@ -484,6 +486,54 @@ print(f'  statusLine.command = python3 {script_path}')
 "
 ```
 
+### Step 5b: Context Observer (opt-in)
+
+The context observer records the statusline payload's context-window numbers
+to `~/.claude/projects/<slug>/context-observations/<session_id>.json` so
+`session-handoff` can fill `context_at_capture`. It is off unless the user
+turns it on here; installing or updating yellow-core never changes
+`statusLine`. Headless `claude -p` sessions render no statusline, so they
+produce no observations and stay `unsupported`.
+
+Ask via AskUserQuestion: "Record context observations for session handoffs?
+(opt-in, off by default)" with options "No, leave my statusline alone"
+(first) / "Yes, compose the observer".
+
+On No: print "Context observer not enabled. statusLine unchanged." and
+continue.
+
+On Yes, preview without writing:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" plan \
+  --settings "$HOME/.claude/settings.json" \
+  --observer-dest "$HOME/.claude/yellow-context-observer.py" \
+  --statusline "$HOME/.claude/yellow-statusline.py"
+```
+
+The JSON result carries `action`, `existing_command`, `proposed_command`, and
+`reason`. On `action: "error"` show `reason` and the manual merge below, then
+continue. On `already-installed` say so and continue. On `install`, show both
+commands and confirm once more via AskUserQuestion ("Apply" / "Cancel"). On
+Apply:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer-setup.py" install \
+  --settings "$HOME/.claude/settings.json" \
+  --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
+  --observer-dest "$HOME/.claude/yellow-context-observer.py" \
+  --statusline "$HOME/.claude/yellow-statusline.py"
+```
+
+Report the `backup` path. Only `statusLine.command` changes; every other key
+is left as it was.
+
+**Manual merge** (for a hand-maintained statusline or JSONC settings): copy
+`lib/context-observer.py` from the plugin to
+`~/.claude/yellow-context-observer.py`, then prefix the existing
+`statusLine.command` with `python3 ~/.claude/yellow-context-observer.py | `.
+The observer passes its input through unchanged and always exits 0.
+
 ### Step 6: Validate and Report
 
 Run the generated script with mock data to verify it works:
@@ -509,6 +559,7 @@ Yellow Plugins Statusline — Installed
   Script:    ~/.claude/yellow-statusline.py
   Settings:  ~/.claude/settings.json (statusLine key added)
   Plugins:   X detected (Y with MCP servers)
+  Observer:  enabled | not enabled   (Step 5b)
   Version:   1.0.0
 
 The statusline will appear after your next assistant message.
