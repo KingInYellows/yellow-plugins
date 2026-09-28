@@ -204,7 +204,7 @@ reported unsupported.
   `statusLine`. Extend Step 6's report with the observer state
   (`enabled` / `not enabled`). Keep `description:` single-line; keep
   `allowed-tools` unchanged.
-- [ ] Step 9: Capture real-host statusline fixtures under
+- [x] Step 9: Capture real-host statusline fixtures under
   `plugins/yellow-core/tests/fixtures/statusline/<client-version>/`
   (`startup-null.json`, `mid-session.json`, `post-compact-null.json`, plus
   `missing-session.json` and `malformed.json` derived from `mid-session.json`
