@@ -1,0 +1,45 @@
+plugins/yellow-core/tests/context-observer.bats
+  s_682bb1ec7b1d7c::t_31967342262e57 255,267,299,663,670-671,674-675,679,683-687
+  s_682bb1ec7b1d7c::t_a265931350da0c 680-682
+  s_682bb1ec7b1d7c::t_15990c5faeb4ac 514-523
+  s_682bb1ec7b1d7c::t_8e7233e9e506df 253,278-279,283-298,300-301,551,688-689
+plugins/yellow-core/lib/context-observer-setup.py
+  s_682bb1ec7b1d7c::t_22444ef7eff05f 176-179,181,186-194
+  s_682bb1ec7b1d7c::t_82da22ebe5fcc3 237-242,246-260
+  s_682bb1ec7b1d7c::t_f913710ba532e4 28-32
+  s_682bb1ec7b1d7c::t_5b7b3e29d989d1 145-151
+  s_682bb1ec7b1d7c::t_9b22d1d45fd99b 195-196
+plugins/yellow-core/lib/context-observer.py
+  s_682bb1ec7b1d7c::t_1c1ff1b16baeb7 244-245,247-251
+  s_682bb1ec7b1d7c::t_ffa18df5384cdf 80-88,94-97,105-110
+  s_682bb1ec7b1d7c::t_c758a498401e32 19-25
+  s_682bb1ec7b1d7c::t_2abe96a0573189 252
+  s_682bb1ec7b1d7c::t_b2999c29ec1198 46,212-215,217-237,282-287,299-300,308-309,315-321
+docs/CONCEPTS.md
+  s_682bb1ec7b1d7c::t_0693cb2ef923c5 90-91
+docs/security.md
+  s_682bb1ec7b1d7c::t_c2fdf30d9cd714 317-357
+  s_682bb1ec7b1d7c::t_08fade83a5312f 358-359
+plugins/yellow-core/commands/statusline/setup.md
+  s_682bb1ec7b1d7c::t_9faae8ff16aaa5 337-338,341-342,345,352
+  s_682bb1ec7b1d7c::t_30909a5470d534 377
+  s_682bb1ec7b1d7c::t_d17c696d2cc97b 243,246
+  s_682bb1ec7b1d7c::t_a3a805358f7a72 373
+  s_682bb1ec7b1d7c::t_56413f8929f817 32,45,47,49-50,54,60,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4002add56d2fdf245a12e557d91434daaa8f9b45",
+  "prompts": {},
+  "sessions": {
+    "s_682bb1ec7b1d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd6a91b1-b7dd-464b-80a8-284c410c902c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
