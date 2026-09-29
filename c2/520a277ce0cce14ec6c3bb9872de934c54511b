@@ -1,0 +1,262 @@
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_e3ae526d137cfd::t_76aa2f0cc19697 207,217-219,221
+plugins/yellow-council/commands/council/setup.md
+  s_e3ae526d137cfd::t_ad94e66b183965 32-46
+  s_e3ae526d137cfd::t_ee117ef2868aff 179
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_e3ae526d137cfd::t_14cd938cd10766 672-673,675,677-678,681,685
+  s_e3ae526d137cfd::t_23c05f2e75c5df 602,978,1010
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_e3ae526d137cfd::t_23c05f2e75c5df 174,343,735,795,805
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_bab1a4a5a6b005 735
+  s_e3ae526d137cfd::t_0aee7beab3f044 173-177,187-190,309,314-315,328-332,343-345
+  s_e3ae526d137cfd::t_6a7c13c4786692 57,65,70-71,76-78,99-107,199-202,213-214,312,333,336-339,346-352,436-437,489,565,595,736
+  s_e3ae526d137cfd::t_25d77273ec3a25 68-69,81-82,361-369,374-379
+  s_e3ae526d137cfd::t_d315c4dd062069 737
+  s_e3ae526d137cfd::t_78a68a68153594 383,391-392,398,405,408-412
+  s_e3ae526d137cfd::t_374d6802d4f86f 413-414
+  s_e3ae526d137cfd::t_6ac852ffcdb25a 738
+  s_e3ae526d137cfd::t_34db8ed5c03c81 739
+  s_e3ae526d137cfd::t_f8b42a3abf4398 83-85,418,424,428,434,439-455,463-464
+  s_e3ae526d137cfd::t_ad35c29a6b29ad 731-734
+  s_e3ae526d137cfd::t_4d95b3fd7844c0 152,157-172,178-186,191-198,203-206,208-212,218-224,241-250,255,259,263-274,278-295,298-299,303,306-308,310-311,313,316-327,334-335,340-342,353-356,360,380-382,384-390,393-397,399-404,509
+  s_e3ae526d137cfd::t_f3e508e42f3aae 714
+  s_e3ae526d137cfd::t_bb6a2200a9a8ae 740
+  s_e3ae526d137cfd::t_f855292b522f14 468,470,475-477,494,499,741
+.changeset/zsh-compat-composio-council.md
+  s_e3ae526d137cfd::t_45f619211b5c88 1-15
+plugins/yellow-council/commands/council/council.md
+  s_e3ae526d137cfd::t_e13263e4091798 1365-1366,1854,1874,1910,1912-1915,1922-1924,1930,2015,2017-2020,2026-2028,2034
+  s_e3ae526d137cfd::t_ab311b7d45a72a 57-62
+  s_e3ae526d137cfd::t_23c05f2e75c5df 354,835,847
+  s_e3ae526d137cfd::t_6914279f54c7d4 54-56,63-65
+plugins/yellow-council/CLAUDE.md
+  s_e3ae526d137cfd::t_1bca620c913da4 18-21
+  s_e3ae526d137cfd::t_ee117ef2868aff 99
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_e3ae526d137cfd::t_23c05f2e75c5df 220,720,788,799
+scripts/validate-council-roster.js
+  s_e3ae526d137cfd::t_7fd65170a3f699 527-528
+.changeset/zsh-compat-core-debt.md
+  s_e3ae526d137cfd::t_546a28c953593e 1-19
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e3ae526d137cfd::t_594cc9a69137b8 148,204-207,299-300
+plugins/yellow-core/commands/compound/review-staged.md
+  s_e3ae526d137cfd::t_3d1da33ad3dc26 189
+plugins/yellow-core/commands/flow/review.md
+  s_e3ae526d137cfd::t_cf28fd939e945d 208-215
+plugins/yellow-core/commands/setup/all.md
+  s_e3ae526d137cfd::t_9da66d88be67a2 83,203-206
+plugins/yellow-core/commands/worktree/cleanup.md
+  s_e3ae526d137cfd::t_744e7b49ebab9c 37-39,42
+plugins/yellow-core/lib/compound-staging.sh
+  s_e3ae526d137cfd::t_764dbcce70f1bf 93-96,100,103,105,107,162,164,173
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e3ae526d137cfd::t_141754b5c5fae9 71-73,119-120,156-158,167,181-182,196-198,221,235-236,255-257,265-266
+plugins/yellow-debt/commands/debt/audit.md
+  s_e3ae526d137cfd::t_0e1e4034f5e540 36-38,145
+  s_e3ae526d137cfd::t_2ccefda91cc7ba 146
+  s_e3ae526d137cfd::t_ac4088557e95ea 29-34
+plugins/yellow-debt/commands/debt/fix.md
+  s_e3ae526d137cfd::t_066e28035cf2bb 28-30,118
+  s_e3ae526d137cfd::t_b927d02280bddc 23-26
+  s_e3ae526d137cfd::t_3ef100b4e68907 119
+plugins/yellow-debt/commands/debt/status.md
+  s_e3ae526d137cfd::t_e7c6722a75a462 27-29,248
+  s_e3ae526d137cfd::t_9e9e341a4b47b3 22-25
+  s_e3ae526d137cfd::t_1517a870ecf551 249
+plugins/yellow-debt/commands/debt/sync.md
+  s_e3ae526d137cfd::t_05a02469eae810 133-135,163-164
+plugins/yellow-debt/commands/debt/triage.md
+  s_e3ae526d137cfd::t_f9b9a676ec2349 114-123,130-139,171-173,178,184,192-194,197-198,200-201
+  s_e3ae526d137cfd::t_45651d8b36ae68 156-160,163,165,170,176,179,183,186
+  s_e3ae526d137cfd::t_3617451f6022b4 9-12
+  s_e3ae526d137cfd::t_7875a0e06a2cc8 161-162,164,166-169
+  s_e3ae526d137cfd::t_e314035a5692e0 175
+  s_e3ae526d137cfd::t_7e05eb4f12607b 181-182,185
+scripts/shell-compat-config.json
+  s_e3ae526d137cfd::t_b911b737f2c401 12
+  s_e3ae526d137cfd::t_83d09a08a4d23c 11
+  s_e3ae526d137cfd::t_e760155d383721 14
+  s_e3ae526d137cfd::t_18cdacef3d6721 1-3,4-5,6-10,13,15-19
+plugins/yellow-ci/commands/ci/setup.md
+  s_e3ae526d137cfd::t_874241410cc639 22-27
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_e3ae526d137cfd::t_874241410cc639 455-457
+plugins/yellow-ruvector/tests/status-provenance.bats
+  s_e3ae526d137cfd::t_21fc85f5e8de1b 33-35
+.changeset/zsh-compat-ci-ruvector.md
+  s_e3ae526d137cfd::t_25d77273ec3a25 1-19
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_e3ae526d137cfd::t_f2c4c87a2014f9 454-456
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 22-24,51-52,63-65,97-98,189-191,361-362
+plugins/yellow-ci/tests/redaction.bats
+  s_e3ae526d137cfd::t_817ab4b7f0aeae 542-543,546-550
+  s_e3ae526d137cfd::t_e2d61222527b6c 544-545
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 42-44,81-82,98-100,125-126,149-151,200-201
+plugins/yellow-ci/commands/ci/setup-runner-targets.md
+  s_e3ae526d137cfd::t_874241410cc639 26-27
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 33-41
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_e3ae526d137cfd::t_817ab4b7f0aeae 199-201,203
+plugins/yellow-review/commands/review/review-all.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 385
+plugins/yellow-codex/commands/codex/setup.md
+  s_e3ae526d137cfd::t_806c4e86fd8ac5 58-59,61-69
+plugins/yellow-semgrep/commands/semgrep/setup.md
+  s_e3ae526d137cfd::t_806c4e86fd8ac5 72-73,75-83
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 207
+plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 246
+plugins/yellow-browser-test/agents/testing/test-reporter.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 83
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 133
+  s_e3ae526d137cfd::t_ab0c46a185b221 91-92,96,98
+plugins/yellow-devin/skills/devin-workflows/SKILL.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 108-109
+plugins/yellow-linear/commands/linear/delegate.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 523-524
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 438-441
+plugins/github-workflow/skills/github-stack-submit/SKILL.md
+  s_e3ae526d137cfd::t_98cfa640c65d1d 63-66
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_e3ae526d137cfd::t_ab0c46a185b221 41-47,50,54-61,64-65,68
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_111258d4ee0d46 90-91,95,97,132
+.changeset/zsh-compat-remaining.md
+  s_e3ae526d137cfd::t_78a68a68153594 1-30
+plugins/yellow-browser-test/commands/browser-test/test.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 78,105
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 85
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 115
+plugins/github-workflow/skills/github-stack-amend/SKILL.md
+  s_e3ae526d137cfd::t_98cfa640c65d1d 51-54
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_e3ae526d137cfd::t_111258d4ee0d46 40-46,49,53-60,63-64,67
+tests/shell-compat/helpers/shells.bash
+  s_e3ae526d137cfd::t_9ade71f8a3c1f8 1-27
+tests/shell-compat/tier4-libraries.bats
+  s_e3ae526d137cfd::t_e760155d383721 1-28,30-51,53-65,82-83,85-88,90-93,95-98,100-103,105-108,111
+  s_e3ae526d137cfd::t_5cc25114f0426d 29,52,84,89,94,99,104,109-110
+  s_e3ae526d137cfd::t_63071f2555cb95 69-75,79
+  s_e3ae526d137cfd::t_9dd9f0570dae08 66-68,76-78,80-81
+.github/workflows/validate-schemas.yml
+  s_e3ae526d137cfd::t_704f77467fa58b 1539-1543,1546-1549,1550-1561,1566-1567,1569,1572-1574,1580-1583
+  s_e3ae526d137cfd::t_45b284bd3e4050 1562-1565,1568,1570-1571,1575-1576
+  s_e3ae526d137cfd::t_51d8d65d080b4c 1577
+  s_e3ae526d137cfd::t_09a4087adf24a8 150,428-429
+  s_e3ae526d137cfd::t_6f3eec121fe27d 436-437
+  s_e3ae526d137cfd::t_b46751282010dd 430-435,1544-1545,1578-1579,1715,1730,1743,1759
+tests/shell-compat/drivers/yellow-core--repo-profile.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-17
+tests/shell-compat/drivers/yellow-core--compound-staging.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-7,9-16
+  s_e3ae526d137cfd::t_f857ae2713f80a 8
+tests/shell-compat/wrappers.bats
+  s_e3ae526d137cfd::t_8ad36d2e7a7313 1-117
+tests/shell-compat/drivers/yellow-core--validate-fs.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-11
+tests/shell-compat/drivers/yellow-ruvector--validate.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-9
+tests/shell-compat/controls.bats
+  s_e3ae526d137cfd::t_9ade71f8a3c1f8 1-45
+tests/shell-compat/drivers/yellow-ci--redact.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-15
+tests/shell-compat/drivers/yellow-morph--install-morphmcp.sh
+  s_e3ae526d137cfd::t_91ef3232d4067c 1-17
+package.json
+  s_e3ae526d137cfd::t_704f77467fa58b 37
+  s_e3ae526d137cfd::t_09a4087adf24a8 35-36
+  s_e3ae526d137cfd::t_b46751282010dd 20
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_3b8d1283012fb7 704-707,720,807,835
+  s_e3ae526d137cfd::t_ddd2b255aed13c 485,506,508,551,580-582,591-593,631,638-641,717-718
+  s_e3ae526d137cfd::t_523ca85f14fbe8 796,800-805,808-817,822-827,980-988
+  s_e3ae526d137cfd::t_90e253c0a539f1 134-135,308-309,311,361-362,379-387,390-395,400-411,479-482,489-492,527-534,539-545,564-568,575-577,645-647,653-655,708-714,723-729,753-757,759-763,779-783,797-799,806,818-821,828-833,836-838,847-855,870-876,884-885,888-889,895-897,908-912,914-921,940-941,952-953,974-979,995-997,1000-1003,1042-1044,1051-1053,1058
+  s_e3ae526d137cfd::t_18cdacef3d6721 893-894,898
+  s_e3ae526d137cfd::t_c0eb38b8a24ae3 70
+  s_e3ae526d137cfd::t_05d45c3cdb6233 194-253,290-295,297-298,305,315-319,324-331,334,336,358-360,363-369,373
+  s_e3ae526d137cfd::t_eadb7f2999c537 1-13,25-42,44-49,52-69,71-86,88-106,112-133,136-169,182-187,192-193,296,299-304,306-307,312-314,332-333,335,347,349,355,357,370-372,374-378,388-389,396-399,412-455,474-478,483-484,486-488,493-496,501-505,507,509-526,535-538,547,548-550,552,560-563,569-574,578-579,583-590,595-609,625-628,632-637,642-644,648-652,656-657,661-665,684-703,715-716,719,721-722,730-731,733,742-743,747-748,750,758,764-768,773,778,784-795,834,839-846,856-869,877-883,886-887,890-892,899-907,913,922-939,942-951,954-973,989-994,998-999,1004-1041,1045-1050,1054-1057,1059-1077
+  s_e3ae526d137cfd::t_0c5d2b5e7dc373 338-340,342
+  s_e3ae526d137cfd::t_aae9793bf8a432 546,553-559
+  s_e3ae526d137cfd::t_220666c6e65233 610-624
+  s_e3ae526d137cfd::t_203528bbe3a3a4 310
+  s_e3ae526d137cfd::t_db7640ecf76216 735-741
+  s_e3ae526d137cfd::t_22b98cdeb2abe3 769-772,774-777
+  s_e3ae526d137cfd::t_506d4819943389 170-178
+  s_e3ae526d137cfd::t_72b1dd271206e7 320-323
+  s_e3ae526d137cfd::t_e64e539d2389d2 456-473
+  s_e3ae526d137cfd::t_c8d87c96018b2f 111,190-191
+  s_e3ae526d137cfd::t_f22b89610525e9 14-24,43,50-51,87,107-110,179,188-189,337,341,343-350,354,356,734
+  s_e3ae526d137cfd::t_a175280c1dc976 497-500
+  s_e3ae526d137cfd::t_7f60e8e8aada05 594
+  s_e3ae526d137cfd::t_d6b11c68b803f0 180-181
+  s_e3ae526d137cfd::t_d4dd83d0974d8d 254-289,351-353,674,683,732,744-746,749,751-752
+  s_e3ae526d137cfd::t_ba8a9b61a796fa 658,660,666-673,675-682
+tests/integration/check-shell-parse.test.ts
+  s_e3ae526d137cfd::t_45e4a4c81c502a 1-14,22-36,42-53,58-63,68-75,84-94,99-115
+  s_e3ae526d137cfd::t_f3e508e42f3aae 15-21,37-41,54-57,64-67,76-83,95-98
+scripts/check-shell-parse.js
+  s_e3ae526d137cfd::t_90e253c0a539f1 52-53,91-98,138-141,163-165,168-170,181-183,185,187
+  s_e3ae526d137cfd::t_c0eb38b8a24ae3 35,116
+  s_e3ae526d137cfd::t_a118392b7a0dd7 30
+  s_e3ae526d137cfd::t_3f03bc56796e1d 1-29,31-34,36-51,54-70,99-115,117-126,129-137,142-162,166-167,171-180,184,188-195
+  s_e3ae526d137cfd::t_f171daaee74381 71-90,127-128
+  s_e3ae526d137cfd::t_baa9a39cffdce2 186
+.github/workflows/validate-schemas-fork.yml
+  s_e3ae526d137cfd::t_09a4087adf24a8 84,245
+  s_e3ae526d137cfd::t_234ce1db7fcddd 248
+  s_e3ae526d137cfd::t_b46751282010dd 246-247
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_f3e508e42f3aae 18-21,24-30,45-54,56-60,65,77-81,139,141,144-145,197-200,205-210,233,237-241,246-250,259-266,293-296,309-312,314-317,324-327,372-374,392-395,407-413,420-430,443-445,451-453
+  s_e3ae526d137cfd::t_8cce6a79e88889 1-17,22-23,31-44,55,61-64,66-71,74-76,82-83,89-92,101-104,106,110-128,130-131,134-138,159-171,195-196,201-204,211-232,234-236,242-245,251-258,267-292,297-298,302-308,313,318-323,328-330,367-371,375-391,396-406,414-419,431-442,446-450,454-455
+  s_e3ae526d137cfd::t_2426e938077883 172-194
+  s_e3ae526d137cfd::t_a4790903fc7de7 107-109
+  s_e3ae526d137cfd::t_c8d87c96018b2f 299-301
+  s_e3ae526d137cfd::t_d6d76953239a3d 72-73
+  s_e3ae526d137cfd::t_f88edaf5d4b7d6 129,132-133,140,142-143,146-148,156-158
+  s_e3ae526d137cfd::t_7658375a9a3ad4 93-100,149-155,331-350,355-356,359-366
+.changeset/zsh-compat-docs.md
+  s_e3ae526d137cfd::t_f855292b522f14 1-9
+CLAUDE.md
+  s_e3ae526d137cfd::t_dd8626439ee23a 139-142
+  s_e3ae526d137cfd::t_c67f3b6da30dda 32,34-36,56-59,65-66
+CONTRIBUTING.md
+  s_e3ae526d137cfd::t_e2db556137053c 586-646
+plugins/yellow-ci/CLAUDE.md
+  s_e3ae526d137cfd::t_442baf1bc5030d 35-42
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_e3ae526d137cfd::t_e50b50d1d68c6d 1-95
+docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md
+  s_e3ae526d137cfd::t_e50b50d1d68c6d 184-193
+plugins/yellow-debt/CLAUDE.md
+  s_e3ae526d137cfd::t_442baf1bc5030d 15-19
+plugins/yellow-ruvector/CLAUDE.md
+  s_e3ae526d137cfd::t_442baf1bc5030d 80-86
+AGENTS.md
+  s_e3ae526d137cfd::t_fcd1fb48c641bc 98-105,146-148,150-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c2520a277ce0cce14ec6c3bb9872de934c54511b",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
