@@ -65,8 +65,8 @@ unaffected today and must stay unaffected.
     markdown block that sources one of these gets a Tier 2 bash wrapper, so
     the `source` and the function calls run in one bash process. Return values
     and variables therefore stay in scope. The libraries are:
-    - yellow-ci `hooks/scripts/lib/validate.sh`, `resolve-runner-targets.sh`
-      and `redact.sh`
+    - yellow-ci `hooks/scripts/lib/validate.sh` and
+      `resolve-runner-targets.sh` (`redact.sh` moved to Tier 4 in item 5)
     - yellow-debt `lib/validate.sh` (its lock uses `exec 200>` and a RETURN
       trap — both fail under zsh; confirmed by running it)
     - yellow-ruvector `lib/install-ruvector.sh` and `hooks/scripts/lib/resolve.sh`
@@ -78,6 +78,8 @@ unaffected today and must stay unaffected.
       research's "5 bash-only constructs" were `[[:space:]]` inside sed)
     - yellow-morph `lib/install-morphmcp.sh`
     - yellow-ruvector `hooks/scripts/lib/validate.sh`
+    - yellow-ci `hooks/scripts/lib/redact.sh` (moved from Tier 3 in item 5:
+      lints clean, identical output under both shells)
   - The Phase 1 measurement re-confirms which bucket each library is in.
 - **The parse check flags zsh-only failures (user decision).** A block fails
   only when `bash -n` accepts it and `zsh -n` rejects it. Template blocks with
@@ -353,12 +355,25 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
   - The `mapfile` calls at `debt-fixer.md:81,192` end up inside the wrapper
     or get rewritten to `while IFS= read -r`.
   - `commands/debt/status.md:53` (SHC-002, `for status in`).
-- [ ] 2.5: yellow-ci (4 findings).
+- [x] 2.5: yellow-ci (4 findings). `redact.sh` moved to Tier 4 (lints
+      clean; identical redaction output under bash, zsh and zsh with the
+      snapshot options), so `failure-analyst.md:87` keeps its direct source.
+      The dual-shell run exposed a bash-only bug: `fence_log_content`'s
+      `printf '--- begin…'` is an invalid-option error in bash, so the begin
+      fence was never printed — fixed, with a regression test. The
+      `/ci:setup` and `/ci:setup-runner-targets` prose now tells the model to
+      call `validate.sh` through `bash -c '. "$1" && fn "$2"' _ lib value`
+      (verified from zsh).
   - Rename `local status` in `skills/ci-runner-health/SKILL.md:455`.
   - Wrap the call sites that source `validate.sh`, `resolve-runner-targets.sh`
     and `redact.sh` (`commands/ci/setup-runner-targets.md:33-34`,
     `agents/ci/failure-analyst.md:87`).
-- [ ] 2.6: yellow-ruvector (10 findings). Wrap the `install-ruvector.sh` and
+- [x] 2.6: yellow-ruvector (10 findings). All six blocks wrapped
+      (`__YELLOW_RUVECTOR_BASH__`); `/ruvector:status` blocks produce the
+      same output wrapped and unwrapped under zsh (those paths avoid the
+      bash-only functions; the setup install path does not).
+      `tests/status-provenance.bats` extracts a block from `status.md` and
+      now stops at the wrapper tag. Wrap the `install-ruvector.sh` and
       `resolve.sh` call sites in `commands/ruvector/setup.md` (`:56`, `:94`,
       `:106`, `:140`, `:178`) and `status.md` (`:23`, `:59`, `:78`, `:189`,
       `:264`).
@@ -688,7 +703,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - [x] 1. agent/refactor/shared-markdown-fences (completed 2026-09-28)
 - [x] 2. agent/feat/shell-compat-lint (completed 2026-09-28)
 - [x] 3. agent/fix/zsh-composio-council (completed 2026-09-28)
-- [ ] 4. agent/fix/zsh-core-debt-wrappers
+- [x] 4. agent/fix/zsh-core-debt-wrappers (completed 2026-09-28)
 - [ ] 5. agent/fix/zsh-ci-ruvector-wrappers
 - [ ] 6. agent/fix/zsh-remaining-plugins
 - [ ] 7. agent/test/zsh-runtime-suite

@@ -451,8 +451,9 @@ rm -f "$runner_os_err_file"
 # carrying fence markers or instruction-shaped text) never has to be handed
 # to the model as something it reads and reasons over to pick a category.
 classify_ssh_failure() {  # $1=exit status $2=stderr text -> prints one fixed token
-  local status="$1" err="$2"
-  if [ "$status" -eq 124 ]; then
+  # `rc`, not `status`: `status` is read-only in zsh.
+  local rc="$1" err="$2"
+  if [ "$rc" -eq 124 ]; then
     printf 'timeout\n'; return
   fi
   case "$err" in
