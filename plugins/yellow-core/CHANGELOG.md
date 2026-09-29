@@ -1,5 +1,98 @@
 # Changelog
 
+## 2.5.0
+
+### Minor Changes
+
+- [`611671f`](https://github.com/KingInYellows/yellow-plugins/commit/611671fb15f7b95bbaf50d4b41f2048b2b52a282)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add an opt-in
+  context observer for session handoffs. `/statusline:setup` gains Step 5b (also
+  reachable as `/statusline:setup observer`), which asks before composing
+  `lib/context-observer.py` ahead of the existing statusline command (default:
+  leave it off), refreshes an outdated installed copy, and can disable it again
+  (non-interactively with `observer enable --yes` or `observer disable --yes`;
+  `observer status` only reports). `lib/statusline-settings.py` is now the only
+  writer of `statusLine.command` (`statusline`, `status`, `plan`, `install`,
+  `remove`, `prune`; every path has a default and `--dry-run` writes nothing),
+  so re-running setup keeps an enabled observer, a symlinked settings.json stays
+  a symlink, and settings.json, the generated statusline script, the observer
+  copy and the records all follow `CLAUDE_CONFIG_DIR` (the statusline script
+  moves from `~/.claude/yellow-statusline.py` to
+  `<config>/yellow-statusline.py`, the same path unless a custom profile is
+  selected). The composed stage is
+  `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; } | <existing>`:
+  the fallback to `cat` keeps a missing observer or `python3` from blanking the
+  statusline, and `exec` lets the statusline script compute its output as soon
+  as the observer releases stdout, while the observer records (Claude Code shows
+  the statusline once the whole command exits; recording has a 2 s deadline).
+  The generated statusline template moved to
+  `references/statusline-setup/statusline-template.py`; its git cache and error
+  log now also follow `CLAUDE_CONFIG_DIR`, and `/setup:all` probes the
+  statusline and settings in the selected config dir. The observer passes the
+  statusline payload through byte-for-byte, always exits 0, and records
+  context-window numbers per session under
+  `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/`,
+  counting one advisory crossing per drop below a 50 % remaining watermark
+  (`YELLOW_CONTEXT_WATERMARK`) and doing nothing else. `session-handoff` now
+  fills `context_at_capture` from a fresh, same-session record (found by session
+  id even when the session works in a worktree or subdirectory) and reports
+  `unknown` otherwise, including for headless `claude -p` sessions; context
+  never changes a preflight status. A new `handoff.sh context` prints the
+  context and a stable `reason` code for `unknown` without running git.
+  Installing or updating yellow-core does not touch `statusLine`.
+
+### Patch Changes
+
+- [`f6ee1ff`](https://github.com/KingInYellows/yellow-plugins/commit/f6ee1ffa2ad14940c63a8c5d9f30bbc954d3fdca)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `statusline-settings.py statusline` now saves the `.corrupt.backup` of an
+  invalid, symlinked settings.json next to the link, like the
+  `.pre-observer.backup`, instead of in the link target's directory. When the
+  link's directory is not writable, the recovery now fails there as the
+  pre-observer backup already did. A settings.json symlinked to one of its own
+  backup names no longer has that file reused as the backup and then
+  overwritten; the original is copied to the next numbered backup instead. The
+  context observer docs now match the code: `--yes` applies only to
+  `observer enable|disable`, and the statusline script computes its output while
+  the observer records, but Claude Code shows it only once the whole command
+  exits (recording has a 2 s deadline).
+
+- [`2ed5522`](https://github.com/KingInYellows/yellow-plugins/commit/2ed5522de351370bc8f77bbabc0edd695f5b97b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-debt: every command and agent block that sources `lib/validate.sh`
+    now runs it in a bash child (`bash /dev/fd/3 3<<'TAG'`). Under zsh the
+    library's state-transition lock ran a command named `200` and its RETURN
+    trap was undefined, so `/debt:triage`, `/debt:fix` and the remediation agent
+    left todos untransitioned with a stale `.lock`.
+  - yellow-core: `lib/compound-staging.sh` no longer declares `local path` (tied
+    to `$PATH` in zsh) and is now tested under both shells; `/setup:all` no
+    longer loops over `path`; `/worktree:cleanup` parses `--dry-run` correctly
+    under zsh (its 0-based index loop missed it); `/flow:review` and the
+    staging-reviewer dedup pass no longer rely on bash-only array key expansion;
+    overwriting redirects use `>|` where zsh's `noclobber` would refuse them.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document each
+  plugin's shell tier under a consistent `**Shell libraries and zsh:**` note in
+  its CLAUDE.md: which libraries are dual-shell or bash-only, and how blocks
+  stay runnable under zsh.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Follow-up zsh
+  fixes from review:
+  - Bash-only blocks now run as `bash /dev/fd/3 3<<'TAG'`, which the stacked-PR
+    providers' git-push hook can inspect (the earlier
+    `bash -c "$(cat <<'TAG' …)"` form was refused as unverifiable) and which
+    keeps the caller's stdin.
+  - gt-workflow: `gt-setup`'s version check split the version into a 0-based
+    array and passed every version under zsh; it now compares with awk.
+  - yellow-core: `/flow:compound --in-pr` no longer loses `gh pr view` to zsh's
+    `noclobber` (`2>|` onto its mktemp file).
+  - yellow-composio: the usage counter writes through a fresh `mktemp` name
+    rather than a fixed `.tmp` a repo could ship as a symlink.
+  - yellow-ci: validation one-liners single-quote the value.
+
 ## 2.4.6
 
 ### Patch Changes

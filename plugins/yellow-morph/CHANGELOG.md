@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.3
+
+### Patch Changes
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document each
+  plugin's shell tier under a consistent `**Shell libraries and zsh:**` note in
+  its CLAUDE.md: which libraries are dual-shell or bash-only, and how blocks
+  stay runnable under zsh.
+
 ## 1.3.2
 
 ### Patch Changes

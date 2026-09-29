@@ -1,5 +1,44 @@
 # github-workflow
 
+## 0.3.5
+
+### Patch Changes
+
+- [`9ad2fd2`](https://github.com/KingInYellows/yellow-plugins/commit/9ad2fd241602bc0307f56c7bb1e2b178a7273d52)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - git-push hook
+  detector:
+  - A shell whose script is `/dev/fd/N`, `/dev/stdin` or `/proc/self/fd/N` is
+    read only when that descriptor has a heredoc, here-string, pipe or `N< <(…)`
+    on the same command; otherwise the command is refused as unverifiable
+    (`exec 3<<'X' … X` then `bash /dev/fd/3` used to pass unread).
+  - `git -c alias.x='!bash /dev/fd/3' x 3<<'T'`, `GIT_SSH_COMMAND=` and `PAGER=`
+    values now keep the command's heredoc context, so a push inside it is
+    caught; a pager or editor reading its own stdin is refused.
+  - `case` pattern lists (`*)`, `R*|C*)`) and `$((…))` arithmetic are no longer
+    read as commands, so about 120 markdown shell blocks — including the six
+    wrapped yellow-debt and yellow-ruvector blocks — stop tripping the "could
+    not verify" refusal.
+
+- [`81189d7`](https://github.com/KingInYellows/yellow-plugins/commit/81189d79e855529134be73946702f3350148c736)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-codex, yellow-semgrep: the setup version check used `read -a` into
+    0-based arrays; under zsh it errored and always reported the installed
+    version as new enough. It now compares with awk (same results in both
+    shells).
+  - gt-workflow: `gt-cleanup` parses flags by shifting positional parameters
+    (its 0-based index loop missed `--dry-run` and `--stale-days` under zsh);
+    `gt-setup` no longer loops over `path` (tied to `$PATH` in zsh).
+  - github-workflow, yellow-devin: NUL-/newline-delimited read loops replace
+    bash-only `mapfile`.
+  - yellow-linear: `/linear:delegate` no longer assigns `path`, which clobbered
+    `$PATH` under zsh before the idempotency-key hashing ran.
+  - yellow-devin: the session-status example no longer assigns the read-only zsh
+    parameter `status`.
+  - yellow-browser-test, yellow-research, yellow-review, yellow-semgrep, and
+    gt-workflow: redirects that overwrite a file created by `mktemp` use `>|`,
+    which zsh's `noclobber` would otherwise refuse.
+
 ## 0.3.4
 
 ### Patch Changes

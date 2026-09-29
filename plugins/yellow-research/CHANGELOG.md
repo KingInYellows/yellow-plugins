@@ -1,5 +1,35 @@
 # Changelog
 
+## 4.2.1
+
+### Patch Changes
+
+- [`9ad2fd2`](https://github.com/KingInYellows/yellow-plugins/commit/9ad2fd241602bc0307f56c7bb1e2b178a7273d52)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix the
+  context7-cache skip-if-fresh test: seed the cache with the current lockfile
+  fingerprint, since package.json is fingerprinted and an empty fingerprint
+  correctly invalidates the cache. Test-only; no runtime change.
+
+- [`81189d7`](https://github.com/KingInYellows/yellow-plugins/commit/81189d79e855529134be73946702f3350148c736)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-codex, yellow-semgrep: the setup version check used `read -a` into
+    0-based arrays; under zsh it errored and always reported the installed
+    version as new enough. It now compares with awk (same results in both
+    shells).
+  - gt-workflow: `gt-cleanup` parses flags by shifting positional parameters
+    (its 0-based index loop missed `--dry-run` and `--stale-days` under zsh);
+    `gt-setup` no longer loops over `path` (tied to `$PATH` in zsh).
+  - github-workflow, yellow-devin: NUL-/newline-delimited read loops replace
+    bash-only `mapfile`.
+  - yellow-linear: `/linear:delegate` no longer assigns `path`, which clobbered
+    `$PATH` under zsh before the idempotency-key hashing ran.
+  - yellow-devin: the session-status example no longer assigns the read-only zsh
+    parameter `status`.
+  - yellow-browser-test, yellow-research, yellow-review, yellow-semgrep, and
+    gt-workflow: redirects that overwrite a file created by `mktemp` use `>|`,
+    which zsh's `noclobber` would otherwise refuse.
+
 ## 4.2.0
 
 ### Minor Changes

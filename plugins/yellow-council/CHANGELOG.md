@@ -1,5 +1,28 @@
 # yellow-council
 
+## 0.3.4
+
+### Patch Changes
+
+- [`9ad2fd2`](https://github.com/KingInYellows/yellow-plugins/commit/9ad2fd241602bc0307f56c7bb1e2b178a7273d52)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `council-patterns`: the diff-truncation `awk '…'` program in the review pack
+  builder no longer breaks. An apostrophe in one of its comments (`character's`)
+  closed the single-quoted program early, so the block failed to parse in both
+  bash and zsh whenever a diff exceeded the byte budget.
+
+- [`f0072e0`](https://github.com/KingInYellows/yellow-plugins/commit/f0072e00255cb96be5b6cf5935339dec87368941)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-composio: the usage-counter lock no longer fails to parse in zsh (fd
+    9 instead of a multi-digit fd, appended rather than truncated) and the temp
+    write uses `>|` so a stale `.tmp` cannot block it under `noclobber`.
+  - yellow-council: `/council` and `/council:setup` no longer refuse to run
+    under zsh (the bash 4.3 check now applies only to bash), the report no
+    longer uses bash-only `${!arr[@]}` and `${var^}` expansions, overwriting
+    redirects onto existing temp and state files use `>|`, and the
+    `build_target_path` helper no longer shadows zsh's `path`/`PATH`.
+
 ## 0.3.3
 
 ### Patch Changes
