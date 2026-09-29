@@ -100,9 +100,8 @@ obs_stage() {
 }
 
 @test "T09: mid-session records the payload's context numbers and the reader returns them" {
-  local sid top record
+  local sid record
   sid=$(jq -r '.session_id' "$FIX/mid-session.json")
-  top=$(jq -r '.workspace.project_dir // .cwd' "$FIX/mid-session.json")
   python3 "$OBS" < "$FIX/mid-session.json" >/dev/null
   record=$(co_find_record "$sid")
   [ -f "$record" ]
@@ -113,20 +112,19 @@ obs_stage() {
     and .context_window.context_window_size == $p[0].context_window.context_window_size
     and .context_window.current_usage_null == false
     and (.transcript_present | type == "boolean")' "$record" >/dev/null
-  run --separate-stderr co_read_observation "$sid" "$top"
+  run --separate-stderr co_read_observation "$sid"
   echo "$output" | jq -e --slurpfile p "$FIX/mid-session.json" \
     '.remaining_percentage == $p[0].context_window.remaining_percentage' >/dev/null
 }
 
 @test "T09: the startup payload (null usage and percentages) records current_usage_null and reads as unknown" {
-  local f="$FIX/startup-null.json" sid top record
+  local f="$FIX/startup-null.json" sid record
   jq -e '.context_window.current_usage == null and .context_window.remaining_percentage == null' "$f" >/dev/null
   sid=$(jq -r '.session_id' "$f")
-  top=$(jq -r '.workspace.project_dir // .cwd' "$f")
   python3 "$OBS" < "$f" >/dev/null
   record=$(co_find_record "$sid")
   jq -e '.context_window.current_usage_null == true and .context_window.remaining_percentage == null' "$record" >/dev/null
-  run --separate-stderr co_read_observation "$sid" "$top"
+  run --separate-stderr co_read_observation "$sid"
   [ "$output" = "unknown" ]
 }
 
@@ -1311,4 +1309,72 @@ PY
   echo "$output" | jq -e '.action == "installed"' >/dev/null
   [ -f "$TEST_HOME/rel/yellow-context-observer.py" ]
   jq -r '.statusLine.command' "$SETTINGS" | grep -qF "$TEST_HOME/rel/yellow-context-observer.py"
+}
+
+# --- review ledger follow-ups (PR #912) ---------------------------------------
+
+@test "T11: a symlinked invalid settings.json is recovered with the corrupt backup next to the link" {
+  seed_settings none
+  mkdir -p "$TEST_HOME/dotfiles"
+  printf '{"a": ' > "$TEST_HOME/dotfiles/settings.json"
+  rm -f "$SETTINGS"
+  ln -s "$TEST_HOME/dotfiles/settings.json" "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup" '.action == "recovered" and .backup == $b' >/dev/null
+  [ -f "$SETTINGS.corrupt.backup" ] && [ ! -L "$SETTINGS.corrupt.backup" ]
+  [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
+  [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
+  [ -L "$SETTINGS" ]
+  jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$TEST_HOME/dotfiles/settings.json" >/dev/null
+}
+
+@test "T11: status on an unreadable settings.json fails with settings_unreadable" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores file modes"
+  seed_settings "bash ~/custom.sh"
+  chmod 000 "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  chmod 600 "$SETTINGS"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "settings_unreadable"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+}
+
+@test "T11: install into an unwritable observer directory fails with io_error and leaves settings unchanged" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory modes"
+  local dir="$TEST_HOME/observer-dir"
+  seed_settings "bash ~/custom.sh"
+  mkdir -p "$dir"
+  chmod 500 "$dir"
+  run --separate-stderr setup_py install --observer-dest "$dir/yellow-context-observer.py"
+  chmod 700 "$dir"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "io_error"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
+  jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  [ ! -e "$dir/yellow-context-observer.py" ]
+  [ -z "$(find "$dir" -name '.observer.*')" ]
+}
+
+@test "T09: an unchanged sample over a future-dated record is rewritten with the current time" {
+  local future
+  observe steady 61
+  future=$(iso_ago -600)
+  set_observed_at "$(record_for steady)" "$future"
+  observe steady 61
+  jq -e --arg ts "$future" '.observed_at != $ts' "$(record_for steady)" >/dev/null
+  python3 - "$(jq -r '.observed_at' "$(record_for steady)")" <<'PY'
+import calendar, sys, time
+age = time.time() - calendar.timegm(time.strptime(sys.argv[1], "%Y-%m-%dT%H:%M:%SZ"))
+sys.exit(0 if -5 <= age <= 5 else 1)
+PY
+}
+
+@test "parity: REWRITE_AFTER_SECONDS stays below CO_STALE_AFTER, so an unchanged session never reads as stale" {
+  local rewrite
+  rewrite=$(sed -nE 's/^REWRITE_AFTER_SECONDS *= *([0-9]+).*/\1/p' "$OBS")
+  [ -n "$rewrite" ]
+  [ -n "${CO_STALE_AFTER:-}" ]
+  [ "$rewrite" -lt "$CO_STALE_AFTER" ]
 }

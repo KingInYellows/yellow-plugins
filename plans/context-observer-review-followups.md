@@ -59,16 +59,16 @@ in place and add a patch changeset for the new behaviour change only.
 
 ### Phase 2: Tests (`plugins/yellow-core/tests/context-observer.bats`)
 
-- [ ] 2.1: `T11:` a symlinked invalid `settings.json` recovered by
+- [x] 2.1: `T11:` a symlinked invalid `settings.json` recovered by
   `statusline` reports `.backup == "$SETTINGS.corrupt.backup"`; that file
   exists next to the link, holds the raw invalid content, and no
   `*.corrupt.backup` appears in the link target's directory. Model on the
   symlink tests near 446 and 1190 and the recovery test near 686.
-- [ ] 2.2: `T11:` `status` on a `chmod 000` settings file exits 1 with
+- [x] 2.2: `T11:` `status` on a `chmod 000` settings file exits 1 with
   `error_code == "settings_unreadable"`. Skip as root with the file's idiom
   (`[ "$(id -u)" -ne 0 ] || skip "root ignores file modes"`); restore the mode
   before asserting.
-- [ ] 2.3: `T11:` `install` whose `--observer-dest` directory is `chmod 500`
+- [x] 2.3: `T11:` `install` whose `--observer-dest` directory is `chmod 500`
   (separate from the settings directory) exits 1 with `error_code ==
   "io_error"`; the settings backup exists, `statusLine.command` is unchanged,
   and neither the observer copy nor an `.observer.*` temp file exists. Skip as
@@ -82,11 +82,11 @@ in place and add a patch changeset for the new behaviour change only.
 > and argparse keeps the last value, so appending `--observer-dest "$dir/yellow-context-observer.py"`
 > overrides the helper's default. Action on a fresh seed is `installed`, not `already-installed`.
 <!-- /deepen-plan -->
-- [ ] 2.4: `T09:` an unchanged sample over a future-dated record is rewritten:
+- [x] 2.4: `T09:` an unchanged sample over a future-dated record is rewritten:
   `observe steady 61`, `set_observed_at "$(record_for steady)" "$(iso_ago
   -600)"`, `observe steady 61`, then assert `observed_at` is no longer the
   future value and is within a few seconds of now.
-- [ ] 2.5: `parity:` `REWRITE_AFTER_SECONDS` is below `CO_STALE_AFTER`. Read
+- [x] 2.5: `parity:` `REWRITE_AFTER_SECONDS` is below `CO_STALE_AFTER`. Read
   the Python value with `sed -nE 's/^REWRITE_AFTER_SECONDS *= *([0-9]+).*/\1/p'`
   and use the sourced `$CO_STALE_AFTER`; fail if either is empty.
 <!-- deepen-plan: codebase -->
@@ -94,7 +94,7 @@ in place and add a patch changeset for the new behaviour change only.
 > `readonly`) is in scope. The sed pattern matches `REWRITE_AFTER_SECONDS = 60` at column 0. The
 > existing `parity:` test (~937) reads Python constants via `importlib`; either approach works.
 <!-- /deepen-plan -->
-- [ ] 2.6: Drop the dead `"$top"` argument at ~116 and ~129 and the now-unused
+- [x] 2.6: Drop the dead `"$top"` argument at ~116 and ~129 and the now-unused
   `top` locals and `top=$(jq …)` assignments (~103/105, ~122/125).
 <!-- deepen-plan: codebase -->
 > **Codebase:** Dead args at bats `:116` and `:129`; `top=` at `:105` and `:125`; the `local ... top ...`
