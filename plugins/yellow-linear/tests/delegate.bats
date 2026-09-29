@@ -204,3 +204,40 @@ setup() {
   normalized=$(tr '\n' ' ' < "$DELEGATE_MD")
   printf '%s' "$normalized" | grep -q -- 'ONLY.*state.*--provider.*may override'
 }
+
+@test "--provider accepts exactly cursor, devin, or jules" {
+  run grep -F 'exactly `cursor`, `devin`, or `jules`' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F "argument-hint: '[issue-id] [--provider cursor|devin|jules]'" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "READY_JULES maps to the jules provider inside the marked decision list" {
+  providers_block=$(awk '/<!-- linear-delegate-providers:start -->/,/<!-- linear-delegate-providers:end -->/' "$DELEGATE_MD")
+  printf '%s\n' "$providers_block" | grep -qF '**`READY_JULES`** → provider = `jules`'
+  printf '%s\n' "$providers_block" | grep -qF '`cursor`, `devin`, or `jules`'
+}
+
+@test "the jules dispatch branch is a fail-closed stub" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  [ -n "$jules_block" ]
+  printf '%s\n' "$jules_block" | grep -qF 'Jules delegation is not available yet'
+  printf '%s\n' "$jules_block" | grep -qE '^exit 1$'
+}
+
+@test "the jules branch never invokes the yellow-jules CLI or any vendor surface" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  run bash -c 'printf "%s\n" "$1" | grep -E "dist/cli\.js|jules\.googleapis|node " ' _ "$jules_block"
+  [ "$status" -eq 1 ]
+  run grep -F 'jules.googleapis.com' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+}
+
+@test "the classifier receives the jules tooling probe" {
+  run grep -F 'TOOLING_JULES=$([ -n "$YELLOW_JULES_ROOT" ]' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F '"$TOOLING_CURSOR" "$TOOLING_DEVIN" "$TOOLING_JULES")' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'resolve_plugin_root yellow-jules dist/cli.js' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}

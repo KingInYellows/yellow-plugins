@@ -601,7 +601,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
 
 ### Checkpoint 4 — Provider registration and every consumer
 
-- [ ] Step 4.1: `catalog/plugins/yellow-jules.json` mirroring
+- [x] Step 4.1: `catalog/plugins/yellow-jules.json` mirroring
   `catalog/plugins/yellow-cursor.json` with `capabilityProvider: { group:
   "remote-agent", id: "jules" }`, `lifecycle: { status: "experimental",
   installPolicy: "manual" }`, `targets: { claude: true, codex: { enabled:
@@ -611,7 +611,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   `pnpm vitest run tests/integration/generate-manifests-characterization.test.ts -u`
   and review the three snapshot changes (marketplace bytes, inventory, new
   per-plugin block).
-- [ ] Step 4.2: `plugins/yellow-core/lib/remote-agent-provider-state.js` —
+- [x] Step 4.2: `plugins/yellow-core/lib/remote-agent-provider-state.js` —
   add `Object.freeze({ id: 'jules', plugin: 'yellow-jules' })` inside
   `// provider-table:start/end` in the exact existing row form; add
   `READY_JULES` to `STATES`/`READY_STATE_BY_ID`; read `--tooling-jules` in
@@ -622,14 +622,14 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   READY_*` and `PREFERRED_PROVIDER_ID = 'cursor'`; correct the :12 docstring
   (consumers are `/linear:delegate` and `setup/all.md` Step 2.5) and the
   header :3-6, :23-27 (R22).
-- [ ] Step 4.3: `tests/integration/remote-agent-provider-state.test.ts` and
+- [x] Step 4.3: `tests/integration/remote-agent-provider-state.test.ts` and
   fixtures — update :65-78 to the three-provider table and the "six states"
   title; add fixtures for the seventh state (e.g. `jules-enabled.json`,
   `three-installed-jules-enabled.json`, `three-enabled.json`) and update the
   fixture `README.md`; cover READY_JULES, two- and three-provider
   CONFLICT, scope filtering, `--tooling-jules no` → PARTIAL_TOOLING, and all
   existing Cursor/Devin cases unchanged (R24 tests, R26).
-- [ ] Step 4.4: `plugins/yellow-core/commands/setup/all.md` at every site
+- [x] Step 4.4: `plugins/yellow-core/commands/setup/all.md` at every site
   (R23): `JULES_API_KEY` presence probe beside :161-166 (value never
   printed); `yellow-jules` in the `setup-all-dashboard-plugin-loop` list
   (:343); a `**yellow-jules:**` READY/PARTIAL/NEEDS SETUP block in
@@ -647,7 +647,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   (`<!-- setup-all-remote-agent-tooling:start/end -->`,
   `<!-- setup-all-remote-agent-states:start/end -->`) for Step 4.7. Run
   `pnpm validate:setup-all`.
-- [ ] Step 4.5: `plugins/yellow-linear/commands/linear/delegate.md` at every
+- [x] Step 4.5: `plugins/yellow-linear/commands/linear/delegate.md` at every
   site (R24): description :3 and `argument-hint` :4
   (`--provider cursor|devin|jules`); provider prose :20-34 ("any two
   enabled"); the `--provider` validator :40-41 (exactly `cursor`, `devin`, or
@@ -665,11 +665,11 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   bats cases for the stub (text present, non-zero exit documented, no
   `dist/cli.js delegate` call) and the three-value validator. Run
   `bats tests/` from `plugins/yellow-linear`.
-- [ ] Step 4.6: `scripts/validate-provider-groups.js` — correct the stale
+- [x] Step 4.6: `scripts/validate-provider-groups.js` — correct the stale
   header :4-7; extend `tests/integration/validate-provider-groups.test.ts`
   `REMOTE_AGENT_PROVIDERS` for a three-member group (never relax a check,
   R26).
-- [ ] Step 4.7: R25 consumer-site gate in `scripts/validate-provider-groups.js`:
+- [x] Step 4.7: R25 consumer-site gate in `scripts/validate-provider-groups.js`:
   a new `ERROR-PROVIDER-008` (`PROVIDER_CONSUMER_SITE_DRIFT`, assembled by
   concatenation, registered in `errorCatalog.ts`) that reads every id from
   each `provider-table` block and fails when an id is absent from any
@@ -680,7 +680,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   cases (id missing from each site, marker missing, all present) to
   `tests/integration/validate-provider-groups.test.ts`. The Linear stub is
   that consumer's handling, so the gate holds across the PR2/PR3 split.
-- [ ] Step 4.8: Root and CI wiring (R27): append
+- [x] Step 4.8: Root and CI wiring (R27): append
   `&& pnpm --filter yellow-jules run typecheck` to `package.json:16` and
   `&& pnpm --filter yellow-jules run test` to `:18`; in
   `.github/workflows/validate-schemas.yml` add a `yellow-jules` dist drift

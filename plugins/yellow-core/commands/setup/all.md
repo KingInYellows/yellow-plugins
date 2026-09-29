@@ -180,6 +180,7 @@ elif grep -qE '"devin_org_id"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 
 else
   printf 'DEVIN_ORG_ID:              NOT SET (run /devin:setup if you configured via keychain)\n'
 fi
+[ -n "${JULES_API_KEY:-}" ] && printf 'JULES_API_KEY:             set (shell env)\n' || printf 'JULES_API_KEY:             NOT SET (export it in your shell; see /jules:setup)\n'
 [ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
@@ -340,7 +341,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-jules yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -386,15 +387,19 @@ else
 fi
 
 printf '\n=== Remote-Agent Provider Tooling ===\n'
-# Coarse "is the yellow-cursor CLI resolvable" proxy: checks that
-# `dist/cli.js` exists at the plugin's installPath (from `claude plugin
-# list --json`, NEVER a `${CLAUDE_PLUGIN_ROOT}/../yellow-cursor` relative
-# guess — the real plugin cache is version-suffixed). This is a coarse
-# signal — file presence, not a live `@cursor/sdk` resolution or auth
-# check — the authoritative live check is `/cursor:setup`.
+# setup-all-remote-agent-tooling:start
+# Coarse "is the plugin CLI resolvable" proxy for yellow-cursor and
+# yellow-jules: checks that `dist/cli.js` exists at the plugin's installPath
+# (from `claude plugin list --json`, NEVER a `${CLAUDE_PLUGIN_ROOT}/../<plugin>`
+# relative guess — the real plugin cache is version-suffixed). This is a
+# coarse signal — file presence, not a live SDK resolution or auth check —
+# the authoritative live checks are `/cursor:setup` and `/jules:setup`.
+# yellow-devin ships no CLI to resolve: its tooling is the DEVIN_* credential
+# rows under "Environment Variables" above.
 _cursor_root=""
-if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
-  _cursor_root=$(printf '%s' "$_plugin_list_json" | node -e '
+_jules_root=""
+_enabled_install_path() {
+  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" node -e '
     const fs = require("fs");
     let rows;
     try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
@@ -403,19 +408,29 @@ if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
     const candidates = rows
       .filter((row) =>
         row && typeof row === "object" &&
-        row.id === "yellow-cursor@yellow-plugins" &&
+        row.id === process.env.PLUGIN_ID &&
         row.enabled === true &&
         typeof row.installPath === "string" && row.installPath.length > 0
       )
       .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
     process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
-  ' 2>/dev/null)
+  ' 2>/dev/null
+}
+if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  _cursor_root=$(_enabled_install_path 'yellow-cursor@yellow-plugins')
+  _jules_root=$(_enabled_install_path 'yellow-jules@yellow-plugins')
 fi
 if [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ]; then
   printf 'cursor_cli_resolved: OK (%s)\n' "$_cursor_root"
 else
   printf 'cursor_cli_resolved: NOT FOUND\n'
 fi
+if [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ]; then
+  printf 'jules_cli_resolved: OK (%s)\n' "$_jules_root"
+else
+  printf 'jules_cli_resolved: NOT FOUND\n'
+fi
+# setup-all-remote-agent-tooling:end
 ```
 
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
@@ -574,6 +589,22 @@ credential shows `NOT SET`; `/devin:setup` is the authoritative check.
   var is unset; /devin:* commands call curl directly and will return 401.
   Export the vars (or see /devin:setup)."
 - NEEDS SETUP: `curl` missing OR `jq` missing OR either row `NOT SET`
+
+**yellow-jules:**
+
+Experimental remote-agent provider — `yellow-cursor` above is preferred. The
+CLI reads `JULES_API_KEY` from the shell environment only (no `userConfig`),
+so classification reads Step 1's `JULES_API_KEY` row and the
+`jules_cli_resolved` probe. Whether the pinned Jules SDK is installed is not
+visible here; `/jules:setup` is the authoritative check and installs it only
+with consent.
+
+- READY: `jules_cli_resolved` is `OK` AND `JULES_API_KEY` shows
+  `set (shell env)` — detail notes that `/jules:setup` verifies the SDK
+- PARTIAL: plugin enabled but `jules_cli_resolved` is `NOT FOUND`, OR the CLI
+  resolved but `JULES_API_KEY` is `NOT SET` — detail: "export
+  `JULES_API_KEY`, then run `/jules:setup` to verify or install the SDK"
+- NEEDS SETUP: neither the CLI nor the credential resolved
 
 **yellow-semgrep:**
 
@@ -761,6 +792,7 @@ Marketplace Setup Dashboard
   yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
   yellow-cursor        READY           CLI resolved, credentials configured (alternative provider — not enabled)
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
+  yellow-jules         NEEDS SETUP     JULES_API_KEY not set (experimental provider — not enabled)
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/6 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
@@ -786,8 +818,8 @@ or bundled research source count rather than using generic labels.
 
 Some marketplace plugins are **alternative providers** of the same
 capability: interchangeable implementations, of which exactly one may be
-enabled at a time. Both may be installed — installing both is normal and
-supported — but enabling both is a conflict, not a redundancy.
+enabled at a time. Several may be installed — that is normal and supported —
+but enabling more than one is a conflict, not a redundancy.
 
 <!-- setup-all-provider-groups:start -->
 - `stacked-pr` (mutually exclusive: exactly one enabled)
@@ -796,15 +828,16 @@ supported — but enabling both is a conflict, not a redundancy.
 - `remote-agent` (mutually exclusive: exactly one enabled)
   - `yellow-cursor` → `cursor`
   - `yellow-devin` → `devin`
+  - `yellow-jules` → `jules`
 <!-- setup-all-provider-groups:end -->
 
 `scripts/validate-provider-groups.js` gates this list against the
 `capabilityProvider` declarations in `catalog/plugins/*.json`, so it cannot
 drift from the marketplace silently.
 
-**Never ask the user to configure more than one member of a group.** Both
-appear in the dashboard, because both can be installed and their readiness
-is worth reporting. Only the **enabled** one is offered for setup:
+**Never ask the user to configure more than one member of a group.** Every
+member appears in the dashboard, because all can be installed and their
+readiness is worth reporting. Only the **enabled** one is offered for setup:
 
 1. Determine the group's enabled member. For `stacked-pr`, use
    `/stack:status` (or the `stack-provider-router` skill). For
@@ -813,27 +846,30 @@ is worth reporting. Only the **enabled** one is offered for setup:
    against `claude plugin list --json`, the same classifier
    `/linear:delegate` uses. Do not infer either group's active member from
    which CLI happens to be on PATH.
-2. Offer setup for that member only. Show the other member's row with its
+2. Offer setup for that member only. Show every other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
+<!-- setup-all-remote-agent-states:start -->
 3. If the group's state is not one of its READY states or
    `PARTIAL_TOOLING` — `stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`,
    or `PARTIAL_TOOLING` (no provider enabled, both enabled, an intent
    mismatch, an unparseable `.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a
    managed-scope conflict); `remote-agent`: not `READY_CURSOR`,
-   `READY_DEVIN`, or `PARTIAL_TOOLING` (`UNSELECTED`, `CONFLICT`, or
-   `CONFIG_INVALID`) — do **not** pick one. Report the state and its
+   `READY_DEVIN`, `READY_JULES`, or `PARTIAL_TOOLING` (`UNSELECTED`,
+   `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report the state and its
    `detail` (fenced as untrusted, same as `/stack:status` and
    `/linear:delegate` do), and point at `/stack:select` for `stacked-pr`
    (or, for `CONFIG_INVALID`, at fixing/removing `.yellow-stack.yml` by
    hand first) — `remote-agent` has no switch command in v1, so for that
    group just report which provider(s) need to be enabled/disabled by
    hand. There is no fallback between providers in either group.
+<!-- setup-all-remote-agent-states:end -->
 4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous
    — only its tooling is missing. Offer that provider's own setup command
    rather than a provider-switch command (which only changes plugin
    enablement and cannot install missing tooling): `/gt-setup` for
    `gt-workflow`, `/github-stack:setup` for `github-workflow`,
-   `/cursor:setup` for `yellow-cursor`, `/devin:setup` for `yellow-devin`.
+   `/cursor:setup` for `yellow-cursor`, `/devin:setup` for `yellow-devin`,
+   `/jules:setup` for `yellow-jules`.
 5. If `yellow-core` is not installed, neither group's status can be
    determined (both classifiers live in `plugins/yellow-core/lib/`): report
    every member's readiness, annotate that the active provider could not be
@@ -896,19 +932,20 @@ tool in this fixed order:
 4. `morph:setup`
 5. `cursor:setup`
 6. `devin:setup`
-7. `semgrep:setup`
-8. `research:setup`
-9. `linear:setup`
-10. `debt:setup`
-11. `ci:setup`
-12. `review:setup`
-13. `browser-test:setup`
-14. `docs:setup`
-15. `composio:setup`
-16. `codex:setup`
-17. `council:setup`
-18. `goal:setup`
-19. `statusline:setup`
+7. `jules:setup`
+8. `semgrep:setup`
+9. `research:setup`
+10. `linear:setup`
+11. `debt:setup`
+12. `ci:setup`
+13. `review:setup`
+14. `browser-test:setup`
+15. `docs:setup`
+16. `composio:setup`
+17. `codex:setup`
+18. `council:setup`
+19. `goal:setup`
+20. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 This list is the fixed **order**, not a to-do list. Only invoke setups for
@@ -922,6 +959,7 @@ provider group in one run (see the section below). Use this mapping:
 - `yellow-morph` → `morph:setup`
 - `yellow-cursor` → `cursor:setup`
 - `yellow-devin` → `devin:setup`
+- `yellow-jules` → `jules:setup`
 - `yellow-semgrep` → `semgrep:setup`
 - `yellow-research` → `research:setup`
 - `yellow-linear` → `linear:setup`

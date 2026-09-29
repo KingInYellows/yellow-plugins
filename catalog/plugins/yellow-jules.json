@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-jules",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["jules", "google", "remote-agent", "delegation", "ai-agent", "automation"],
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-jules"
+  },
+  "capabilityProvider": {
+    "group": "remote-agent",
+    "id": "jules"
+  },
+  "lifecycle": {
+    "status": "experimental",
+    "installPolicy": "manual"
+  },
+  "targets": {
+    "claude": true,
+    "codex": {
+      "enabled": false
+    }
+  }
+}

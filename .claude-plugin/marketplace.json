@@ -72,6 +72,16 @@
       "category": "development"
     },
     {
+      "name": "yellow-jules",
+      "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-jules",
+      "category": "development"
+    },
+    {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "3.5.2",

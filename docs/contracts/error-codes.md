@@ -910,6 +910,7 @@ exactly-one-enabled rule is not one of these codes.
 | `ERROR-PROVIDER-005` | `PROVIDER_SETUP_SECTION_DRIFT`  | Setup section drifted from the provider group                                                  |
 | `ERROR-PROVIDER-006` | `PROVIDER_ROUTER_TABLE_DRIFT`   | Router table drifted from the provider group                                                   |
 | `ERROR-PROVIDER-007` | `PROVIDER_ARTIFACT_MISSING`     | Expected generated manifest for a provider plugin is missing                                   |
+| `ERROR-PROVIDER-008` | `PROVIDER_CONSUMER_SITE_DRIFT`  | A provider is missing from a registered consumer site's marker slice, or the marker is missing |
 
 ## Namespace Migration Errors (NAMESPACE)
 

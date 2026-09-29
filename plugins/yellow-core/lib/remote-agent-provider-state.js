@@ -3,21 +3,22 @@
 /**
  * remote-agent-provider-state.js — the single owner of remote-agent provider
  * state (which member of the `remote-agent` capability group is active:
- * Cursor cloud agents via yellow-cursor, or Devin sessions via yellow-devin).
+ * Cursor cloud agents via yellow-cursor, Devin sessions via yellow-devin, or
+ * Google Jules sessions via yellow-jules, which is experimental).
  *
  * Deliberately smaller than its sibling
  * plugins/yellow-core/lib/stack-provider-state.js:
  *   - No `.yellow-stack.yml`-style intent file in v1 — nothing here builds
  *     or executes a provider switch, so there is no repository intent to
- *     record or resolve against. `/linear:delegate` is the only consumer
- *     and it re-classifies on every invocation.
+ *     record or resolve against. Its consumers — `/linear:delegate` and
+ *     `/setup:all` Step 2.5 — re-classify on every invocation.
  *   - No `planProviderSwitch` — there is no "make this the enabled
  *     provider" operation for remote agents (unlike `/stack:select`,
- *     nothing in this milestone enables/disables yellow-cursor or
- *     yellow-devin on the caller's behalf).
+ *     nothing in this milestone enables/disables a remote-agent plugin on
+ *     the caller's behalf).
  *
  * HARD RULES this module encodes:
- *   - Both providers MAY be installed. Exactly one MAY be enabled.
+ *   - Any number of providers MAY be installed. Exactly one MAY be enabled.
  *   - Cursor is the PREFERRED provider: UNSELECTED and CONFLICT guidance
  *     recommends it, but this module NEVER auto-selects — it only reports
  *     a state and lets the caller (or its own `--provider` escape hatch,
@@ -25,7 +26,7 @@
  *   - This module NEVER executes a command, NEVER reads the environment,
  *     and NEVER reads a file other than `--plugins-file`. The tooling
  *     readiness of each provider is a probe RESULT the caller passes in
- *     (for cursor: whether the yellow-cursor CLI resolved on disk; for
+ *     (for cursor and jules: whether the plugin's CLI resolved on disk; for
  *     devin: whether its credential env vars are set) — this module has no
  *     opinion on how that probe was performed.
  *
@@ -39,6 +40,8 @@
  *   --tooling-cursor <yes|no|unknown>  probe result (omit/unknown ⇒ not
  *                                      checked)
  *   --tooling-devin <yes|no|unknown>   probe result (omit/unknown ⇒ not
+ *                                      checked)
+ *   --tooling-jules <yes|no|unknown>   probe result (omit/unknown ⇒ not
  *                                      checked)
  *
  * Output is a single JSON object on stdout.
@@ -63,7 +66,7 @@ const { readFileSync } = require('fs');
  * Canonical provider table for the `remote-agent` capability group.
  *
  * Replica of the `capabilityProvider` declarations in
- * catalog/plugins/{yellow-cursor,yellow-devin}.json — an installed plugin
+ * catalog/plugins/{yellow-cursor,yellow-devin,yellow-jules}.json — an installed plugin
  * has no access to this repo's catalog at runtime, so the table has to
  * ship. scripts/validate-provider-groups.js parses the marker-delimited
  * block below and fails CI when it disagrees with the catalog
@@ -75,23 +78,25 @@ const PROVIDER_GROUP = 'remote-agent';
 const PROVIDERS = Object.freeze([
   Object.freeze({ id: 'cursor', plugin: 'yellow-cursor' }),
   Object.freeze({ id: 'devin', plugin: 'yellow-devin' }),
+  Object.freeze({ id: 'jules', plugin: 'yellow-jules' }),
 ]);
 // provider-table:end
 
 /** Marketplace this repository's provider plugins are published under. */
 const DEFAULT_MARKETPLACE = 'yellow-plugins';
 
-/** Provider id that this module recommends when nothing is enabled or both are. */
+/** Provider id that this module recommends when nothing is enabled or several are. */
 const PREFERRED_PROVIDER_ID = 'cursor';
 
 /**
- * The six remote-agent provider states. Exported so consumers compare
+ * The seven remote-agent provider states. Exported so consumers compare
  * against a constant rather than a string literal a typo can silently break.
  */
 const STATES = Object.freeze({
   UNSELECTED: 'UNSELECTED',
   READY_CURSOR: 'READY_CURSOR',
   READY_DEVIN: 'READY_DEVIN',
+  READY_JULES: 'READY_JULES',
   CONFLICT: 'CONFLICT',
   PARTIAL_TOOLING: 'PARTIAL_TOOLING',
   CONFIG_INVALID: 'CONFIG_INVALID',
@@ -101,6 +106,7 @@ const STATES = Object.freeze({
 const READY_STATE_BY_ID = Object.freeze({
   cursor: STATES.READY_CURSOR,
   devin: STATES.READY_DEVIN,
+  jules: STATES.READY_JULES,
 });
 
 /**
@@ -171,7 +177,7 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
  *
  * @param {{
  *   plugins: unknown,
- *   tooling?: { cursor?: boolean, devin?: boolean },
+ *   tooling?: { cursor?: boolean, devin?: boolean, jules?: boolean },
  *   projectPath?: string|null,
  * }} input
  */
@@ -211,8 +217,8 @@ function classifyRemoteAgentState({
         : enabled.every((entry) => typeof tooling[entry.id] === 'boolean'),
   };
 
-  // 1. CONFLICT — both providers enabled. Two remote-agent providers active
-  //    at once is a correctness bug, not redundancy.
+  // 1. CONFLICT — more than one provider enabled. Two remote-agent providers
+  //    active at once is a correctness bug, not redundancy.
   if (enabled.length > 1) {
     return {
       ...result,
@@ -221,7 +227,7 @@ function classifyRemoteAgentState({
         .map((entry) => `${entry.plugin} @ ${entry.enabledScopes.join('/')}`)
         .join(
           ', '
-        )}). Exactly one may be enabled — disable one provider; yellow-cursor is the preferred choice.`,
+        )}). Exactly one may be enabled — disable the others; yellow-cursor is the preferred choice (yellow-jules is experimental).`,
     };
   }
 
@@ -235,10 +241,12 @@ function classifyRemoteAgentState({
       state: STATES.UNSELECTED,
       detail:
         installed.length === 0
-          ? 'No remote-agent provider is installed. Install and enable yellow-cursor (preferred), or yellow-devin.'
+          ? 'No remote-agent provider is installed. Install and enable yellow-cursor (preferred), or yellow-devin, or the experimental yellow-jules.'
           : `Installed but not enabled: ${installed
               .map((entry) => entry.plugin)
-              .join(', ')}. Enable yellow-cursor (preferred), or yellow-devin.`,
+              .join(
+                ', '
+              )}. Enable yellow-cursor (preferred), or yellow-devin, or the experimental yellow-jules.`,
     };
   }
 
@@ -250,7 +258,7 @@ function classifyRemoteAgentState({
     return {
       ...result,
       state: STATES.PARTIAL_TOOLING,
-      detail: `${active.plugin} is enabled, but its tooling is not ready (cursor: the CLI could not be resolved; devin: required credential env vars are not set).`,
+      detail: `${active.plugin} is enabled, but its tooling is not ready (cursor, jules: the plugin CLI could not be resolved; devin: required credential env vars are not set).`,
     };
   }
 
@@ -354,8 +362,10 @@ function main(argv) {
   const tooling = {};
   const cursor = parseToolingFlag(args['tooling-cursor']);
   const devin = parseToolingFlag(args['tooling-devin']);
+  const jules = parseToolingFlag(args['tooling-jules']);
   if (cursor !== undefined) tooling.cursor = cursor;
   if (devin !== undefined) tooling.devin = devin;
+  if (jules !== undefined) tooling.jules = jules;
 
   const state = classifyRemoteAgentState({ plugins, tooling, projectPath });
   console.log(JSON.stringify(state, null, 2));

@@ -3,9 +3,9 @@
  *
  * `/linear:delegate` is markdown and cannot be fixture-tested directly.
  * Every classification rule for the `remote-agent` capability group
- * (yellow-cursor vs. yellow-devin) therefore lives in
- * plugins/yellow-core/lib/remote-agent-provider-state.js, and this suite is
- * what actually verifies the six-state enum and its precedence.
+ * (yellow-cursor, yellow-devin, and the experimental yellow-jules) therefore
+ * lives in plugins/yellow-core/lib/remote-agent-provider-state.js, and this
+ * suite is what actually verifies the seven-state enum and its precedence.
  *
  * Fixtures are sanitized `claude plugin list --json` snapshots; see
  * fixtures/remote-agent-provider/README.md.
@@ -63,21 +63,37 @@ function runCli(args: string[]): {
 }
 
 describe('provider table', () => {
-  it('declares exactly the two remote-agent providers, cursor first (preferred)', () => {
+  it('declares exactly the three remote-agent providers, cursor first (preferred)', () => {
     expect(PROVIDER_GROUP).toBe('remote-agent');
     expect(PROVIDERS.map((p: { id: string }) => p.id)).toEqual([
       'cursor',
       'devin',
+      'jules',
     ]);
     expect(PROVIDERS.map((p: { plugin: string }) => p.plugin)).toEqual([
       'yellow-cursor',
       'yellow-devin',
+      'yellow-jules',
     ]);
     expect(PREFERRED_PROVIDER_ID).toBe('cursor');
   });
+
+  it('declares exactly the seven states', () => {
+    expect(Object.keys(STATES).sort()).toEqual(
+      [
+        'CONFIG_INVALID',
+        'CONFLICT',
+        'PARTIAL_TOOLING',
+        'READY_CURSOR',
+        'READY_DEVIN',
+        'READY_JULES',
+        'UNSELECTED',
+      ].sort()
+    );
+  });
 });
 
-describe('classifyRemoteAgentState — the six states', () => {
+describe('classifyRemoteAgentState — the seven states', () => {
   it('case 1: neither provider installed => UNSELECTED', () => {
     const result = classifyRemoteAgentState({
       plugins: fixture('neither-installed'),
@@ -88,6 +104,7 @@ describe('classifyRemoteAgentState — the six states', () => {
     expect(result.providers.devin.installed).toBe(false);
     expect(result.detail).toContain('No remote-agent provider is installed');
     expect(result.detail).toContain('yellow-cursor (preferred)');
+    expect(result.detail).toContain('experimental yellow-jules');
   });
 
   it('case 2: both installed, cursor enabled => READY_CURSOR', () => {
@@ -192,6 +209,73 @@ describe('classifyRemoteAgentState — the six states', () => {
     expect(result.state).toBe(STATES.CONFLICT);
   });
 
+  it('READY_JULES: only yellow-jules installed and enabled', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('jules-enabled'),
+      tooling: { jules: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_JULES);
+    expect(result.providers.jules.enabled).toBe(true);
+    expect(result.toolingKnown).toBe(true);
+  });
+
+  it('READY_JULES: all three installed, only yellow-jules enabled', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('three-installed-jules-enabled'),
+      tooling: { jules: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_JULES);
+    expect(result.providers.cursor.installed).toBe(true);
+    expect(result.providers.devin.installed).toBe(true);
+  });
+
+  it('CONFLICT: cursor and jules enabled, cursor still preferred', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('cursor-and-jules-enabled'),
+      tooling: { cursor: true, jules: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFLICT);
+    expect(result.detail).toContain('yellow-cursor @ user');
+    expect(result.detail).toContain('yellow-jules @ user');
+    expect(result.detail).toContain('yellow-cursor is the preferred choice');
+  });
+
+  it('CONFLICT: all three enabled names every provider', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('three-enabled'),
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFLICT);
+    for (const plugin of ['yellow-cursor', 'yellow-devin', 'yellow-jules']) {
+      expect(result.detail).toContain(plugin);
+    }
+  });
+
+  it('PARTIAL_TOOLING: jules enabled, its CLI probed as unresolved', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('jules-enabled'),
+      tooling: { jules: false },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.PARTIAL_TOOLING);
+    expect(result.detail).toContain('yellow-jules');
+  });
+
+  it("a foreign repository's enabled jules row does not cause CONFLICT", () => {
+    const filtered = classifyRemoteAgentState({
+      plugins: fixture('foreign-project-jules'),
+      projectPath: PROJECT_PATH,
+    });
+    expect(filtered.state).toBe(STATES.READY_CURSOR);
+    const unfiltered = classifyRemoteAgentState({
+      plugins: fixture('foreign-project-jules'),
+    });
+    expect(unfiltered.state).toBe(STATES.CONFLICT);
+  });
+
   it('filters project-scope rows belonging to a different repository', () => {
     // Without filtering, another repo's enabled yellow-devin row would read
     // as a second enabled provider here and report CONFLICT.
@@ -259,6 +343,33 @@ describe('CLI — classify end to end', () => {
     const parsed = JSON.parse(run.stdout);
     expect(parsed.state).toBe(STATES.READY_CURSOR);
     expect(parsed.toolingKnown).toBe(true);
+  });
+
+  it('classifies a jules fixture to READY_JULES with --tooling-jules yes', () => {
+    const run = runCli([
+      'classify',
+      '--plugins-file',
+      join(FIXTURE_DIR, 'jules-enabled.json'),
+      '--project-path',
+      PROJECT_PATH,
+      '--tooling-jules',
+      'yes',
+    ]);
+    expect(run.status).toBe(0);
+    const parsed = JSON.parse(run.stdout);
+    expect(parsed.state).toBe(STATES.READY_JULES);
+    expect(parsed.toolingKnown).toBe(true);
+  });
+
+  it('--tooling-jules no is PARTIAL_TOOLING', () => {
+    const run = runCli([
+      'classify',
+      '--plugins-file',
+      join(FIXTURE_DIR, 'jules-enabled.json'),
+      '--tooling-jules',
+      'no',
+    ]);
+    expect(JSON.parse(run.stdout).state).toBe(STATES.PARTIAL_TOOLING);
   });
 
   it('--tooling-devin unknown means NOT CHECKED, never PARTIAL_TOOLING', () => {

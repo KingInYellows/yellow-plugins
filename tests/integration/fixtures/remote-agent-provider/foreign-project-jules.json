@@ -1,0 +1,21 @@
+[
+  {
+    "id": "yellow-cursor@yellow-plugins",
+    "version": "0.1.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/yellow-cursor/0.1.0",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "yellow-jules@yellow-plugins",
+    "version": "0.1.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/fixture/.claude/plugins/cache/yellow-plugins/yellow-jules/0.1.0",
+    "installedAt": "2026-01-01T00:00:00.000Z",
+    "lastUpdated": "2026-01-01T00:00:00.000Z",
+    "projectPath": "/fixture/projects/some-other-repo"
+  }
+]

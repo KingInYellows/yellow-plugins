@@ -78,6 +78,13 @@ interface FixtureOptions {
       omit?: boolean;
     }
   >;
+  /**
+   * Consumer-site marker slices (ERROR-PROVIDER-008), keyed by marker name.
+   * By default every registered site for a present group is written with
+   * every member; a string replaces that slice's inner text, `null` omits
+   * the marker pair entirely.
+   */
+  consumerSites?: Record<string, string | null>;
 }
 
 const DEFAULT_PROVIDERS = [
@@ -103,6 +110,81 @@ const ROUTER_TABLE_PATHS: Record<string, string> = {
     'remote-agent-provider-state.js'
   ),
 };
+
+const SETUP_ALL_PATH = join(
+  'plugins',
+  'yellow-core',
+  'commands',
+  'setup',
+  'all.md'
+);
+const DELEGATE_PATH = join(
+  'plugins',
+  'yellow-linear',
+  'commands',
+  'linear',
+  'delegate.md'
+);
+
+// Mirrors CONSUMER_SITES in scripts/validate-provider-groups.js (deliberately
+// duplicated, like ROUTER_TABLE_PATHS above).
+const CONSUMER_SITES: Record<
+  string,
+  {
+    group: string;
+    file: string;
+    shell: boolean;
+    render: (members: Array<{ plugin: string; id: string }>) => string;
+  }
+> = {
+  'linear-delegate-providers': {
+    group: 'remote-agent',
+    file: DELEGATE_PATH,
+    shell: false,
+    render: (members) =>
+      [
+        ...members.map(
+          (m) =>
+            `- **\`READY_${m.id.toUpperCase()}\`** → provider = \`${m.id}\`.`
+        ),
+        `- **\`CONFLICT\`** → \`--provider\` may be ${members.map((m) => `\`${m.id}\``).join(', ')}.`,
+      ].join('\n'),
+  },
+  'setup-all-remote-agent-states': {
+    group: 'remote-agent',
+    file: SETUP_ALL_PATH,
+    shell: false,
+    render: (members) =>
+      `not ${members.map((m) => `\`READY_${m.id.toUpperCase()}\``).join(', ')}, or \`PARTIAL_TOOLING\``,
+  },
+  'setup-all-remote-agent-tooling': {
+    group: 'remote-agent',
+    file: SETUP_ALL_PATH,
+    shell: true,
+    render: (members) => members.map((m) => `# probe ${m.plugin}`).join('\n'),
+  },
+};
+
+function consumerBlocks(
+  file: string,
+  providers: Array<{ plugin: string; group: string; id: string }>,
+  overrides: Record<string, string | null> = {}
+): string {
+  const blocks: string[] = [];
+  for (const [marker, site] of Object.entries(CONSUMER_SITES)) {
+    if (site.file !== file) continue;
+    const members = providers.filter((p) => p.group === site.group);
+    if (members.length === 0) continue;
+    const override = overrides[marker];
+    if (override === null) continue;
+    const inner = override ?? site.render(members);
+    const [open, close] = site.shell
+      ? [`# ${marker}:start`, `# ${marker}:end`]
+      : [`<!-- ${marker}:start -->`, `<!-- ${marker}:end -->`];
+    blocks.push(open, inner, close, '');
+  }
+  return blocks.join('\n');
+}
 
 function routerFileContent(
   group: string,
@@ -190,9 +272,18 @@ function buildFixture(options: FixtureOptions = {}): string {
   ].join('\n');
   write(
     root,
-    join('plugins', 'yellow-core', 'commands', 'setup', 'all.md'),
-    options.setupSection ?? defaultSection
+    SETUP_ALL_PATH,
+    (options.setupSection ?? defaultSection) +
+      consumerBlocks(SETUP_ALL_PATH, providers, options.consumerSites)
   );
+  const delegate = consumerBlocks(
+    DELEGATE_PATH,
+    providers,
+    options.consumerSites
+  );
+  if (delegate !== '') {
+    write(root, DELEGATE_PATH, delegate);
+  }
 
   if (
     options.routerGroup !== undefined ||
@@ -372,6 +463,7 @@ describe('validate-provider-groups — remote-agent group (multi-router-table ge
   const REMOTE_AGENT_PROVIDERS = [
     { plugin: 'yellow-cursor', group: 'remote-agent', id: 'cursor' },
     { plugin: 'yellow-devin', group: 'remote-agent', id: 'devin' },
+    { plugin: 'yellow-jules', group: 'remote-agent', id: 'jules' },
   ];
   const TWO_GROUP_PROVIDERS = [...DEFAULT_PROVIDERS, ...REMOTE_AGENT_PROVIDERS];
 
@@ -439,6 +531,89 @@ describe('validate-provider-groups — remote-agent group (multi-router-table ge
     expect(run.stderr).not.toContain(
       'remote-agent-provider-state.js provider table drifts'
     );
+  });
+});
+
+describe('validate-provider-groups — consumer sites (ERROR-PROVIDER-008, R25)', () => {
+  const PROVIDERS_WITH_JULES = [
+    ...DEFAULT_PROVIDERS,
+    { plugin: 'yellow-cursor', group: 'remote-agent', id: 'cursor' },
+    { plugin: 'yellow-devin', group: 'remote-agent', id: 'devin' },
+    { plugin: 'yellow-jules', group: 'remote-agent', id: 'jules' },
+  ];
+  const withoutJules = PROVIDERS_WITH_JULES.filter((p) => p.id !== 'jules');
+
+  it('passes when every provider appears at every consumer site', () => {
+    const run = runValidator(buildFixture({ providers: PROVIDERS_WITH_JULES }));
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('remote-agent (cursor, devin, jules)');
+  });
+
+  it.each([
+    ['linear-delegate-providers', 'READY_JULES'],
+    ['setup-all-remote-agent-states', 'READY_JULES'],
+    ['setup-all-remote-agent-tooling', 'yellow-jules'],
+  ])('fails when jules is missing from %s', (marker, token) => {
+    const site = CONSUMER_SITES[marker]!;
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: { [marker]: site.render(withoutJules) },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('provider "jules"');
+    expect(run.stderr).toContain(marker);
+    expect(run.stderr).toContain(token);
+  });
+
+  it('fails when the delegate --provider value list omits jules', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: {
+          'linear-delegate-providers': [
+            '- **`READY_CURSOR`** → provider = `cursor`.',
+            '- **`READY_DEVIN`** → provider = `devin`.',
+            '- **`READY_JULES`** → stop.',
+          ].join('\n'),
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('`jules`');
+  });
+
+  it('a missing marker pair is itself an error', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: { 'setup-all-remote-agent-states': null },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('setup-all-remote-agent-states:start');
+  });
+
+  it('a missing consumer file is an error', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: { 'linear-delegate-providers': null },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('missing from disk');
+  });
+
+  it('checks nothing for a group with no registered consumer sites', () => {
+    const run = runValidator(buildFixture());
+    expect(run.status).toBe(0);
+    expect(run.stderr).not.toContain('ERROR-PROVIDER-008');
   });
 });
 
