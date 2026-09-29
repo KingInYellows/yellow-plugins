@@ -69,6 +69,8 @@ describe('inline rules', () => {
     ['SHC-003 BASH_VERSINFO', 'v=${BASH_VERSINFO[0]:-0}', 'SHC-003'],
     ['SHC-003 case modification', 'lower=${name,,}', 'SHC-003'],
     ['SHC-003 nameref', 'f() { local -n ref=$1; }', 'SHC-003'],
+    ['SHC-003 multi-digit fd', 'exec 200>"$lock_file"', 'SHC-003'],
+    ['SHC-003 RETURN trap', 'trap \'rm -f "$t"\' RETURN', 'SHC-003'],
     ['SHC-004 echo -e', 'echo -e "a\\tb"', 'SHC-004'],
     ['SHC-004 echo with escape', "echo 'line1\\nline2'", 'SHC-004'],
     ['SHC-005 literal index', 'first=${arr[0]}', 'SHC-005'],
@@ -89,6 +91,9 @@ describe('inline rules', () => {
     ['mktemp -u path', 'f=$(mktemp -u)\necho hi > "$f"'],
     ['/dev/null fallback', 'e=$(mktemp)\ncmd 2>"${e:-/dev/null}"'],
     ['a path built from the variable', 'f=$(mktemp)\ncmd 2>"$f.err"'],
+    ['single-digit fd on a subshell', '( flock -x 9; true ) 9>>"$lock"'],
+    ['arithmetic comparison', 'x=$(( 10 > 3 ))'],
+    ['truncating /dev/null', ': > /dev/null'],
     ['2>&1', 'f=$(mktemp)\ncmd >"$g" 2>&1'],
     ['file_path is not path', 'file_path=x; my_status=1'],
     ['declare -A alone', 'declare -A seen'],
@@ -108,22 +113,29 @@ describe('inline rules', () => {
       "cat <<'EOF'",
       'path=/not/shell/here',
       'EOF',
-      "bash <<'EOF'",
+      `bash -c "$(cat <<'__W__'`,
       'mapfile -t lines < f',
       'for k in "${!m[@]}"; do :; done',
-      'EOF',
+      '__W__',
+      ')"',
     ].join('\n');
     expect(lint(text)).toEqual([]);
   });
 
   it('flags bash-only code after the wrapper closes', () => {
     const text = [
-      "bash <<'EOF'",
+      `bash -c "$(cat <<'__W__'`,
       'mapfile -t a < f',
-      'EOF',
+      '__W__',
+      ')"',
       'mapfile -t b < f',
     ].join('\n');
-    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 4]]);
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 5]]);
+  });
+
+  it('flags a wrapper that feeds the script to bash on stdin (SHC-009)', () => {
+    const text = ["bash <<'EOF'", 'mapfile -t a < f', 'EOF'].join('\n');
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-009', 1]]);
   });
 
   it('skips the inside of a multi-line quoted program but lints the closing line', () => {
@@ -264,7 +276,9 @@ describe('fixture runs', () => {
     );
     write(
       'plugins/demo/commands/wrapped.md',
-      md(`bash <<'EOF'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\nEOF`)
+      md(
+        `bash -c "$(cat <<'__W__'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\n__W__\n)"`
+      )
     );
     const result = run();
     expect(result.stderr).toContain('commands/src.md:4 [SHC-008]');

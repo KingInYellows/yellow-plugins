@@ -11,10 +11,17 @@
  * The tiered contract this lint enforces (plans/bash-zsh-shell-compatibility.md):
  *
  *   Tier 1  Inline fenced blocks must run as written in bash AND zsh.
- *   Tier 2  A block that needs bash-only constructs wraps them in
- *           `bash <<'EOF' … EOF`; the wrapper body is exempt from the
- *           inline rules (a `bash` child also ignores the parent's
- *           noclobber).
+ *   Tier 2  A block that needs bash-only constructs runs them in a bash
+ *           child passed the script as an argument:
+ *             bash -c "$(cat <<'TAG'
+ *             …
+ *             TAG
+ *             )"
+ *           The body is exempt from the inline rules (a `bash` child also
+ *           ignores the parent's noclobber). Not `bash <<'TAG'`: that feeds
+ *           the script on stdin, so any command in the body that reads
+ *           stdin (gt, gh, node, claude -p, a bare `cat`) silently consumes
+ *           the rest of the script (SHC-009).
  *   Tier 3  Bash-shebang libraries listed in `tier3Libraries` are
  *           bash-by-contract: markdown may only source them inside a
  *           Tier 2 wrapper.
@@ -33,14 +40,15 @@
  *   SHC-007  adjacent single-quoted strings (`'a''b'` changes under rcquotes)
  *   SHC-008  markdown sources a Tier 3 library outside a wrapper, or sources
  *            a plugin library that is in neither tier list
+ *   SHC-009  `bash <<'TAG'` wrapper that feeds the script on stdin
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
  *   SHC-900  shell-compat-config.json problem (unknown path, missing reason,
  *            stale allowlist cap, ...)
  *
  * Scope: fenced blocks tagged bash/sh/shell in `plugins/**\/*.md`, excluding
  * the generated `plugins/<p>/{codex,cursor}/skills/` copies (fix the source
- * and regenerate), `plugins/<p>/tests/`, and CHANGELOG.md. Heredoc bodies
- * are data, not shell, and are skipped.
+ * and regenerate), `plugins/<p>/tests/`, and CHANGELOG.md. Quoted heredoc
+ * bodies are data, not shell, and are skipped.
  *
  * Allowlist (`allowlist` in the config) caps findings per file and rule:
  *   { "plugins/x/y.md": { "SHC-005": { "max": 1, "reason": "..." } } }
@@ -76,7 +84,7 @@ const RULES = {
   },
   'SHC-003': {
     summary: 'bash-only construct outside a bash wrapper',
-    hint: "rewrite with a construct both shells accept, or wrap the block in `bash <<'EOF' … EOF`",
+    hint: 'rewrite with a construct both shells accept, or run the block in bash: bash -c "$(cat <<\'TAG\' … TAG + newline + )"',
   },
   'SHC-004': {
     summary: 'echo with escapes behaves differently in zsh',
@@ -96,7 +104,11 @@ const RULES = {
   },
   'SHC-008': {
     summary: 'library sourced into the user shell',
-    hint: "source Tier 3 (bash-only) libraries inside `bash <<'EOF' … EOF`; classify new libraries in scripts/shell-compat-config.json",
+    hint: 'source Tier 3 (bash-only) libraries inside a bash -c "$(cat <<\'TAG\' … )" wrapper; classify new libraries in scripts/shell-compat-config.json',
+  },
+  'SHC-009': {
+    summary: 'bash wrapper reads its script from stdin',
+    hint: "use bash -c \"$(cat <<'TAG' … TAG + newline + )\" — with bash <<'TAG' any command that reads stdin swallows the rest of the script",
   },
   'SHC-101': {
     summary: 'shell file without a shebang or library marker',
@@ -164,13 +176,18 @@ function listShellFiles(root) {
 //            heredoc body or the inside of a multi-line double-quoted string.
 //            Only the expansion rules apply (`${reviewer^}` there is still a
 //            zsh `bad substitution`).
-//   pinned   runs under a bash child (`bash <<'EOF'` body, `bash -c` line)
+//   pinned   runs under a bash child (a quoted-tag heredoc fed to bash —
+//            `bash -c "$(cat <<'TAG'` or `bash <<'TAG'` — or a `bash -c` line)
 
 // `<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"` — but never the `<<<` here-string.
 const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
 // The command in front of the heredoc is a bash interpreter: `bash`,
 // `bash -s -- "$x"`, `command bash`, possibly after `&&`/`;`/`|`.
 const BASH_WRAPPER_PREFIX_RE = /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s[^<]*)?$/;
+// `bash -c "$(cat <<'TAG'`: the script arrives as an argument, stdin stays
+// the caller's. Any other bash-fed heredoc passes the script on stdin.
+const BASH_ARG_WRAPPER_PREFIX_RE =
+  /(?:^|[\s;&|(])(?:command\s+)?bash\s+(?:-\w+\s+)*-c\s+"\$\(cat\s*$/;
 const BASH_DASH_C_RE = /(?:^|[\s;&|(])bash\s+(?:-\w+\s+)*-c\s/;
 
 // Scan one line for shell quoting. `open` is the quote character a string
@@ -277,22 +294,27 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       out[i] = { kind: 'comment', code: '' };
       continue;
     }
+    const match = HEREDOC_RE.exec(code);
+    if (match) {
+      const prefix = code.slice(0, match.index);
+      const bashFed = BASH_WRAPPER_PREFIX_RE.test(prefix);
+      // An unquoted tag means the CURRENT shell expands the body before the
+      // command sees it — even when that command is a bash wrapper.
+      let kind = 'expand';
+      if (match[2] !== '') kind = bashFed ? 'pinned' : 'data';
+      heredoc = { tag: match[3], stripTabs: match[1] === '-', kind };
+      out[i] = {
+        kind: bashFed ? 'pinned' : 'code',
+        code,
+        stdinWrapper: bashFed && !BASH_ARG_WRAPPER_PREFIX_RE.test(prefix),
+      };
+      continue;
+    }
     if (BASH_DASH_C_RE.test(code)) {
       out[i] = { kind: 'pinned', code };
       continue;
     }
     out[i] = { kind: 'code', code };
-    const match = HEREDOC_RE.exec(code);
-    if (match) {
-      const prefix = code.slice(0, match.index);
-      // An unquoted tag means the CURRENT shell expands the body before the
-      // command sees it — even when that command is a bash wrapper.
-      let kind = 'expand';
-      if (match[2] !== '') {
-        kind = BASH_WRAPPER_PREFIX_RE.test(prefix) ? 'pinned' : 'data';
-      }
-      heredoc = { tag: match[3], stripTabs: match[1] === '-', kind };
-    }
   }
   // A quote that never closes means the scan misread the block (an
   // apostrophe in prose, say). Fail open to plain code rather than hide
@@ -433,6 +455,10 @@ const BASH_ONLY_PATTERNS = [
   [/(?:^|[\s;&|(])export\s+-f\b/, 'export -f'],
   [/(?:^|[\s;&|(])type\s+-[a-zA-Z]*[tPpaf]/, 'type -t/-P'],
   [/;;&/, 'case ;;& fallthrough'],
+  // zsh redirections take a single-digit fd: `exec 200>f` runs a command
+  // named 200. `exec {fd}>f` (bash 4.1+, zsh) or fd 3-9 work in both.
+  [/(?:^|[\s;&|(])\d{2,}(?:>>?|<)/, 'multi-digit fd redirect'],
+  [/(?:^|[\s;&|(])trap\s.*\bRETURN\b/, 'trap … RETURN'],
   [/(?:^|[\s;&|(])wait\s+-n\b/, 'wait -n'],
 ];
 
@@ -647,8 +673,9 @@ function lintShellText(
     });
 
   for (let i = 0; i < lines.length; i++) {
-    const { kind, code: line } = classes[i];
+    const { kind, code: line, stdinWrapper } = classes[i];
     if (kind === 'comment' || kind === 'data') continue;
+    if (stdinWrapper) add('SHC-009', i, 'script fed to bash on stdin');
     if (kind === 'expand') {
       for (const detail of ruleBashOnlyExpansion(line)) {
         add('SHC-003', i, detail);

@@ -183,7 +183,7 @@ function main(argv) {
   );
   for (const f of result.failures) out(`  ${f.file}:${f.line} — ${f.error}`);
   out(
-    `${TAG} Rewrite the construct so both shells accept it, or wrap the block in \`bash <<'EOF' … EOF\`.`
+    `${TAG} Rewrite the construct so both shells accept it, or run the block in bash: bash -c "$(cat <<'TAG' … TAG + newline + )".`
   );
   return report ? 0 : 1;
 }
