@@ -255,7 +255,7 @@ ejection, or external close) and names the PR's `merged` boolean as the
 authoritative check. `merged: true` settles it; `merged: false` does not rule
 out a Graphite direct push to trunk, where GitHub never performs the PR merge.
 In that case confirm the delivered commit on `origin/main` with the
-diff-stat equality check below before using the override.
+patch-id check below before using the override.
 
 - **File-provenance tier** — `gh api repos/{owner}/{repo}/commits/{sha}/pulls
   --jq '[.[]|select(.state=="closed")]'` against the squash commit returned 0
@@ -280,24 +280,32 @@ override; if a PR shows this state, expect the provenance → strict → loose �
 override fallthrough as a possibility: check `merged` first, then the
 commit on `origin/main` when `merged` is false.
 
-### Verifying an MQ merge when Gate C has nothing: diff-stat equality
+### Verifying an MQ merge when Gate C has nothing: patch-id equality
 
 With a PR number already known from context (not discovered by search),
-diff-stat equality between the squash commit and the reviewed branch head is
-fast corroboration before taking the override path:
+comparing the patch content of the squash commit and the reviewed branch is
+fast corroboration before taking the override path. Compare stable patch
+ids, not `--stat`: two different changes to the same files with the same
+insertion and deletion counts produce identical diffstats.
 
 ```bash
-git diff --stat "$SQUASH_SHA"^ "$SQUASH_SHA"       # squash commit's own diff
-git diff --stat "$MERGE_BASE" "$BRANCH_HEAD_SHA"    # branch diff vs. its merge-base
-# both must report identical files-changed / insertions / deletions
+MERGE_BASE=$(git merge-base "$BRANCH_HEAD_SHA" "$SQUASH_SHA"^)
+git diff "$SQUASH_SHA"^ "$SQUASH_SHA" | git patch-id --stable     # squash commit's own patch
+git diff "$MERGE_BASE" "$BRANCH_HEAD_SHA" | git patch-id --stable # branch patch vs. its merge-base
+# the first field (the patch id) must be identical
 ```
+
+The ids match only when the branch's changes applied to trunk unchanged. If
+they differ because trunk moved under the branch, compare the content
+directly (`git diff "$SQUASH_SHA" "$BRANCH_HEAD_SHA" -- <changed paths>`
+should show only the unrelated trunk changes) rather than accepting a
+matching diffstat.
 
 This is corroborating evidence, not proof — treat it as sufficient only when
 paired with an independently-known candidate PR number, never as a blind
 filter to search for "which PR merged" among candidates with no other
 supporting reason. Record the result through Gate C's existing override path
-(`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`) — no new
-trailer format needed for this case.
+(`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`).
 
 ### Stale main-clone trunk breaks Phase 6 *and* Phase 8, distinct from a Graphite API outage
 
