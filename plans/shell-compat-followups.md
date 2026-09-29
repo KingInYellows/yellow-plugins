@@ -90,6 +90,21 @@ recorded instead of fixed so the stack can merge; each thread links here):
       accept. Add `if|while|until|then|do|else|elif|!` there.
       (PR #914 thread PRRT_kwDOQ3SUys6nJXz2.)
 
+Review-bot findings from the third round (P2; no plugin file hits either
+pattern today, so both are lint hardening):
+
+- [ ] 14: `classifyLines` compares a heredoc terminator after `trimEnd()`,
+      so an fd-wrapper tag line with trailing spaces or tabs counts as
+      closed although the shell does not recognise it; execution then feeds
+      the would-be tag to bash as a command. Compare the raw line (after the
+      `<<-` tab strip only) for fd wrappers, and report the trailing-blank
+      tag as unclosed. (PR #921 thread PRRT_kwDOQ3SUys6nJqQp.)
+- [ ] 15: `existingFileVars` collects `f=$(mktemp)` from comment text and
+      quoted examples (`rm -f "$f" # f=$(mktemp)`), so a later `> "$f"` is
+      a false SHC-001. Scan only code outside comments and quotes (reuse
+      `scanQuotes` and the comment cut). (PR #921 thread
+      PRRT_kwDOQ3SUys6nJqQx.)
+
 ## Acceptance Criteria
 
 - Items 1–2 have regression tests (symlinked target refused; a `$(…)`
