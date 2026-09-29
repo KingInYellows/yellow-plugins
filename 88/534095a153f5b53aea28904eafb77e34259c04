@@ -1,0 +1,21 @@
+plugins/yellow-research/tests/context7-cache.bats
+  s_e23df78d9c2b73::t_f9a1972565d931 115-119
+.changeset/yellow-research-context7-cache-test.md
+  s_e23df78d9c2b73::t_19d1039ba315c2 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "88534095a153f5b53aea28904eafb77e34259c04",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
