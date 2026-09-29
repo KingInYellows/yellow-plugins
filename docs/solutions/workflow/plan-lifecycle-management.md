@@ -311,7 +311,7 @@ filter to search for "which PR merged" among candidates with no other
 supporting reason. Record the result through Gate C's existing override path
 (`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`).
 
-### Stale main-clone trunk breaks Phase 6 *and* Phase 8, distinct from a Graphite API outage
+### Stale main-clone trunk: Phase 6 warns, Phase 8 `gt submit` fails (not a Graphite API outage)
 
 Separately, in the same session: the Phase 6 trunk refresh can fail for a
 reason unrelated to Gate C — a shared main clone's local `main` had
