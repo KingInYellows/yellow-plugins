@@ -97,9 +97,10 @@ while IFS= read -r status_line; do
   changed_file="${status_line:3}"
   # Rename/copy entries are "old -> new"; the destination is the file on disk
   case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
-  # The todo file itself is legitimately modified (/debt:fix transitions it to
-  # in-progress before launching this agent) — never treat it as out-of-scope
-  [ "$changed_file" = "$TODO_PATH" ] && continue
+  # Todo bookkeeping is never part of a fix: /debt:fix renames this todo to
+  # in-progress before launching the agent (the old name shows as deleted),
+  # and todos/ is often untracked. Never revert or delete anything under it.
+  case "$changed_file" in todos/*) continue ;; esac
   in_scope=0
   for allowed in "${ALLOWED[@]}"; do
     [ "$changed_file" = "$allowed" ] && { in_scope=1; break; }
@@ -115,7 +116,7 @@ while IFS= read -r status_line; do
       rm -f -- "$changed_file"
     fi
   fi
-done < <(git status --porcelain)
+done < <(git status --porcelain --untracked-files=all)
 
 if [ "$OUT_OF_SCOPE" -eq 1 ]; then
   transition_todo_state "$TODO_PATH" "ready" \
@@ -261,13 +262,17 @@ provider-specific mutation.
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
-while IFS= read -r changed_file; do
-  [ -z "$changed_file" ] && continue
-  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
-done < <(git status --porcelain | cut -c4-)
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_path=$(debt_resolve_todo "$1" in-progress) || exit 1
+while IFS= read -r status_line; do
+  [ -z "$status_line" ] && continue
+  changed_file="${status_line:3}"
+  case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
+  # Leave todo bookkeeping alone (see the scope check in step 3).
+  case "$changed_file" in todos/*) continue ;; esac
+  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
+done < <(git status --porcelain --untracked-files=all)
 transition_todo_state "$todo_path" "ready"
 __YELLOW_DEBT_BASH__
 ```

@@ -13,7 +13,7 @@ Technical debt audit and remediation with parallel scanner agents.
   function
 - Path arguments validated before use: source `lib/validate.sh` in all commands
 - **Shell libraries and zsh:** `lib/validate.sh` is bash-only (its
-  transition lock uses `exec 200>` and a RETURN trap) and markdown blocks run
+  transition cleanup is a RETURN trap) and markdown blocks run
   under the user's shell, often zsh: every block that sources it runs in a
   bash child —
   `bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'` … `__YELLOW_DEBT_BASH__`.

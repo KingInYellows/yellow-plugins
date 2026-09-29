@@ -19,3 +19,8 @@ Harden todo and `.debt/` handling against hostile repository content:
 - Fix `/debt:sync` step 8a, which called `extract_frontmatter` without
   sourcing `lib/validate.sh`; it now runs in the bash wrapper and prints the
   fields as JSON.
+- `debt-fixer`: the scope check and the rejected-fix revert skip everything
+  under `todos/`. `/debt:fix` renames the todo to in-progress without
+  committing, so the scope check used to count the old name (or an untracked
+  `todos/`) as an out-of-scope edit and abort every fix, and the revert
+  restored the old name and then failed to reset the todo to ready.

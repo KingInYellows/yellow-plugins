@@ -448,3 +448,61 @@ init_repo() {
   [ "$status" -eq 1 ]
   no_pwned
 }
+
+@test "debt-fixer rejected block reverts the fix but keeps the in-progress todo (zsh noclobber)" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  printf 'x\n' > app.ts
+  make_todo 042 ready 042-ready-high-long-fn-abc123.md
+  git add -A && git commit -qm base
+  # /debt:fix moved the todo to in-progress without committing it; the fix
+  # then edited a tracked file and created an untracked one.
+  transition_todo_state todos/debt/042-ready-high-long-fn-abc123.md in-progress
+  printf 'changed\n' > app.ts
+  printf 'new\n' > helper.ts
+  extract_wrapper "$PLUGIN_ROOT/agents/remediation/debt-fixer.md" 4 \
+    | sed "s#'<todo-id>'#'042'#" > "$BATS_TEST_TMPDIR/rejected.zsh"
+
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/rejected.zsh"
+  [ "$status" -eq 0 ]
+  [ "$(cat app.ts)" = "x" ]
+  [ ! -e helper.ts ]
+  [ -f todos/debt/042-ready-high-long-fn-abc123.md ]
+  [ ! -e todos/debt/042-in-progress-high-long-fn-abc123.md ]
+}
+
+@test "debt-fixer scope block ignores the uncommitted todo rename from /debt:fix (zsh noclobber)" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  printf -- '---\nid: "042"\nstatus: ready\ncategory: complexity\nseverity: high\ntitle: T\naffected_files:\n  - app.ts:1-2\n---\nBody.\n' \
+    > todos/debt/042-ready-high-long-fn-abc123.md
+  git add -A && git commit -qm todo
+  transition_todo_state todos/debt/042-ready-high-long-fn-abc123.md in-progress
+  printf 'changed\n' > app.ts
+  extract_wrapper "$PLUGIN_ROOT/agents/remediation/debt-fixer.md" 1 \
+    | sed "s#'<todo-id>'#'042'#" > "$BATS_TEST_TMPDIR/scope.zsh"
+
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/scope.zsh"
+  [ "$status" -eq 0 ]
+  [ "$(cat app.ts)" = "changed" ]
+  [ -f todos/debt/042-in-progress-high-long-fn-abc123.md ]
+  [ ! -e todos/debt/042-ready-high-long-fn-abc123.md ]
+}
+
+@test "debt-fixer scope block accepts an untracked todos directory (zsh noclobber)" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  printf -- '---\nid: "042"\nstatus: in-progress\ncategory: complexity\nseverity: high\ntitle: T\naffected_files:\n  - app.ts:1-2\n---\nBody.\n' \
+    > todos/debt/042-in-progress-high-long-fn-abc123.md
+  make_todo 043 pending 043-pending-high-other-def456.md
+  printf 'changed\n' > app.ts
+  extract_wrapper "$PLUGIN_ROOT/agents/remediation/debt-fixer.md" 1 \
+    | sed "s#'<todo-id>'#'042'#" > "$BATS_TEST_TMPDIR/scope.zsh"
+
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/scope.zsh"
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/043-pending-high-other-def456.md ]
+}
