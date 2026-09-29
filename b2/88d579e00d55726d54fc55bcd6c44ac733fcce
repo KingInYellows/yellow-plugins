@@ -1,0 +1,20 @@
+docs/solutions/code-quality/fail-open-observer-stage-patterns.md
+  s_2bf3a37c3fe1a7::t_d9a98611bcc5b8 24-39
+  s_2bf3a37c3fe1a7::t_87ba0cbff2289d 81,91-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b288d579e00d55726d54fc55bcd6c44ac733fcce",
+  "prompts": {},
+  "sessions": {
+    "s_2bf3a37c3fe1a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84692cd2-e8b5-46ff-9c63-485bc5e597c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
