@@ -100,9 +100,8 @@ obs_stage() {
 }
 
 @test "T09: mid-session records the payload's context numbers and the reader returns them" {
-  local sid top record
+  local sid record
   sid=$(jq -r '.session_id' "$FIX/mid-session.json")
-  top=$(jq -r '.workspace.project_dir // .cwd' "$FIX/mid-session.json")
   python3 "$OBS" < "$FIX/mid-session.json" >/dev/null
   record=$(co_find_record "$sid")
   [ -f "$record" ]
@@ -113,20 +112,19 @@ obs_stage() {
     and .context_window.context_window_size == $p[0].context_window.context_window_size
     and .context_window.current_usage_null == false
     and (.transcript_present | type == "boolean")' "$record" >/dev/null
-  run --separate-stderr co_read_observation "$sid" "$top"
+  run --separate-stderr co_read_observation "$sid"
   echo "$output" | jq -e --slurpfile p "$FIX/mid-session.json" \
     '.remaining_percentage == $p[0].context_window.remaining_percentage' >/dev/null
 }
 
 @test "T09: the startup payload (null usage and percentages) records current_usage_null and reads as unknown" {
-  local f="$FIX/startup-null.json" sid top record
+  local f="$FIX/startup-null.json" sid record
   jq -e '.context_window.current_usage == null and .context_window.remaining_percentage == null' "$f" >/dev/null
   sid=$(jq -r '.session_id' "$f")
-  top=$(jq -r '.workspace.project_dir // .cwd' "$f")
   python3 "$OBS" < "$f" >/dev/null
   record=$(co_find_record "$sid")
   jq -e '.context_window.current_usage_null == true and .context_window.remaining_percentage == null' "$record" >/dev/null
-  run --separate-stderr co_read_observation "$sid" "$top"
+  run --separate-stderr co_read_observation "$sid"
   [ "$output" = "unknown" ]
 }
 
@@ -326,22 +324,32 @@ obs_stage() {
   [ -z "$stderr" ]
 }
 
-@test "R22: the observer stays well under the 100 ms budget on the largest fixture (limit 250 ms, 1000 ms on CI)" {
+@test "R22: the observer stays near its 100 ms latency target on the largest fixture (limit 250 ms, 1000 ms on CI)" {
   # The limit only catches gross regressions (a subprocess, a network call);
   # the measured best of five is printed below. A shared CI runner gets a
-  # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both.
+  # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both. Each
+  # run uses its own session id, so every timed run writes a record instead
+  # of taking the unchanged-sample early return; the script checks each one.
   local largest best limit
   limit=${CONTEXT_OBSERVER_LATENCY_LIMIT_MS:-$([ -n "${CI:-}" ] && echo 1000 || echo 250)}
   largest=$(ls -S "$FIX"/*.json | head -n 1)
   best=$(python3 - "$OBS" "$largest" <<'PY'
-import subprocess, sys, time
+import glob, json, os, subprocess, sys, time
 obs, fixture = sys.argv[1], sys.argv[2]
-data = open(fixture, "rb").read()
+payload = json.load(open(fixture, "rb"))
+records = os.path.join(os.environ["HOME"], ".claude", "projects", "*", "context-observations")
 runs = []
-for _ in range(5):
+for n in range(5):
+    sid = payload["session_id"] = "r22-%d" % n
+    data = json.dumps(payload).encode()
     start = time.perf_counter()
     subprocess.run([sys.executable, obs], input=data, stdout=subprocess.DEVNULL, check=True)
     runs.append((time.perf_counter() - start) * 1000)
+    found = glob.glob(os.path.join(records, sid + ".json"))
+    record = json.load(open(found[0])) if len(found) == 1 else {}
+    if record.get("session_id") != sid or record.get("context_window", {}).get(
+            "remaining_percentage") != payload["context_window"]["remaining_percentage"]:
+        sys.exit("run %d wrote no complete record" % n)
 print("%.1f" % min(runs))
 PY
 )
@@ -1311,4 +1319,106 @@ PY
   echo "$output" | jq -e '.action == "installed"' >/dev/null
   [ -f "$TEST_HOME/rel/yellow-context-observer.py" ]
   jq -r '.statusLine.command' "$SETTINGS" | grep -qF "$TEST_HOME/rel/yellow-context-observer.py"
+}
+
+# --- symlinked recovery, error paths and cross-language invariants ------------
+
+@test "T11: a symlinked invalid settings.json is recovered with the corrupt backup next to the link" {
+  seed_settings none
+  mkdir -p "$TEST_HOME/dotfiles"
+  printf '{"a": ' > "$TEST_HOME/dotfiles/settings.json"
+  rm -f "$SETTINGS"
+  ln -s "$TEST_HOME/dotfiles/settings.json" "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "recover" and .backup == null' >/dev/null
+  [ -z "$(find "$TEST_HOME" -name '*.corrupt.backup*')" ]
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup" '.action == "recovered" and .backup == $b' >/dev/null
+  [ -f "$SETTINGS.corrupt.backup" ]
+  [ ! -L "$SETTINGS.corrupt.backup" ]
+  [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
+  [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
+  [ -L "$SETTINGS" ]
+  jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$TEST_HOME/dotfiles/settings.json" >/dev/null
+  printf '{"b": ' > "$TEST_HOME/dotfiles/settings.json"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup.2" '.action == "recovered" and .backup == $b' >/dev/null
+  [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
+  [ "$(cat "$SETTINGS.corrupt.backup.2")" = '{"b": ' ]
+  [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
+}
+
+@test "T11: a symlink pointing at its own corrupt backup name keeps the original text in a distinct backup" {
+  seed_settings none
+  printf '{"a": ' > "$TEST_HOME/.claude/settings.json.corrupt.backup"
+  rm -f "$SETTINGS"
+  ln -s settings.json.corrupt.backup "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  local backup
+  backup="$(echo "$output" | jq -r '.backup')"
+  [ "$backup" != "null" ]
+  [ "$backup" != "$SETTINGS.corrupt.backup" ]
+  [ "$(cat "$backup")" = '{"a": ' ]
+}
+
+@test "T11: status and statusline on an unreadable settings.json fail with settings_unreadable and write nothing" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores file modes"
+  local sub
+  seed_settings "bash ~/custom.sh"
+  for sub in status statusline; do
+    chmod 000 "$SETTINGS"
+    run --separate-stderr python3 "$SETUP_PY" "$sub" --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+    chmod 600 "$SETTINGS"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.error_code == "settings_unreadable"' >/dev/null
+    cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  done
+  [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
+}
+
+@test "T11: install into an unwritable observer directory fails with io_error and leaves settings unchanged" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory modes"
+  local dir="$TEST_HOME/observer-dir"
+  seed_settings "bash ~/custom.sh"
+  mkdir -p "$dir"
+  chmod 500 "$dir"
+  run --separate-stderr setup_py install --observer-dest "$dir/yellow-context-observer.py"
+  chmod 700 "$dir"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "io_error"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  [ ! -e "$dir/yellow-context-observer.py" ]
+  [ -z "$(find "$dir" -name '.observer.*')" ]
+}
+
+@test "T09: an unchanged sample over a future-dated record is rewritten with the current time" {
+  local future
+  observe steady 61
+  future=$(iso_ago -600)
+  set_observed_at "$(record_for steady)" "$future"
+  observe steady 61
+  jq -e --arg ts "$future" '.observed_at != $ts' "$(record_for steady)" >/dev/null
+  python3 - "$(jq -r '.observed_at' "$(record_for steady)")" <<'PY'
+import calendar, sys, time
+age = time.time() - calendar.timegm(time.strptime(sys.argv[1], "%Y-%m-%dT%H:%M:%SZ"))
+sys.exit(0 if -5 <= age <= 5 else 1)
+PY
+}
+
+@test "parity: REWRITE_AFTER_SECONDS stays below CO_STALE_AFTER, so an unchanged session never reads as stale" {
+  local rewrite
+  rewrite=$(python3 - "$OBS" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+print(m.REWRITE_AFTER_SECONDS)
+PY
+)
+  [ -n "$rewrite" ]
+  [ -n "${CO_STALE_AFTER:-}" ]
+  [ "$rewrite" -lt "$CO_STALE_AFTER" ]
 }

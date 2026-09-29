@@ -329,7 +329,11 @@ fields (working directory, session context metrics). The boundary:
   blanking the statusline), backing up `settings.json` before each change
   (`.pre-observer.backup`, with a numeric suffix when an earlier backup
   differs; an identical earlier backup is reused) and rewriting only
-  `statusLine.command` — no other settings key is touched.
+  `statusLine.command` — no other settings key is touched. Resetting an
+  invalid `settings.json` (`statusline-settings.py statusline`) keeps the
+  original, which can hold secrets, as `.corrupt.backup` (numbered, capped
+  like the other backups) next to the `settings.json` path, beside the link
+  when it is a symlink.
   `statusline-settings.py remove` (offered as "Disable it" by
   `/statusline:setup observer`) strips the stage and restores the wrapped
   command.
@@ -343,11 +347,22 @@ fields (working directory, session context metrics). The boundary:
   slug is derived only from an absolute `project_dir` (or `cwd`) with no
   `.`/`..` component or control character; anything else writes nothing.
 - **No side channels.** The observer does no network calls, spawns no
-  subprocess, runs no git, and prints nothing beyond passing its stdin
-  payload through to stdout byte-for-byte before it does any of this work.
-  It then releases stdout, and the composed stage `exec`s it so no shell
-  keeps the pipe open, so the statusline renders without waiting for the
-  record write (bounded by a 2 s deadline in any case).
+  subprocess and runs no git. On stdout it prints only the byte-for-byte
+  pass-through of its stdin payload, which it writes and releases before any
+  other work, or, run with `--help` or a terminal on stdin, its usage text
+  instead of reading a payload. On stderr it writes one line saying why
+  nothing was recorded, and only when `CONTEXT_OBSERVER_DEBUG=1`.
+- **Latency.** The composed stage `exec`s the observer so no shell keeps the
+  pipe open: the statusline script sees EOF and computes its output while
+  the observer records. Claude Code shows the statusline only once the whole
+  command exits, which waits for the record write. Recording has a 100 ms
+  latency target; the R22 bats test is a looser regression guard (best of
+  five runs against a limit well above the target), not a check of the
+  target itself. Recording also has a 2 s deadline
+  (`DEADLINE_SECONDS`) armed once the payload is read; a filesystem call
+  that cannot be interrupted can outlast it. A new statusline update that
+  arrives while a stalled write holds the command cancels that run, so a
+  persistently stalled filesystem can keep the statusline from refreshing.
 - **Read path treats the record as untrusted.** The reader
   (`lib/context-observer.sh`'s `co_read_observation`, wired into
   session-handoff to fill `context_at_capture`) revalidates

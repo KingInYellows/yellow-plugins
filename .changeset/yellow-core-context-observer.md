@@ -6,7 +6,8 @@ Add an opt-in context observer for session handoffs. `/statusline:setup` gains
 Step 5b (also reachable as `/statusline:setup observer`), which asks before
 composing `lib/context-observer.py` ahead of the existing statusline command
 (default: leave it off), refreshes an outdated installed copy, and can disable
-it again (or non-interactively with `observer enable|disable|status --yes`).
+it again (non-interactively with `observer enable --yes` or
+`observer disable --yes`; `observer status` only reports).
 `lib/statusline-settings.py` is now the only writer of `statusLine.command`
 (`statusline`, `status`, `plan`, `install`, `remove`, `prune`; every path has a
 default and `--dry-run` writes nothing), so re-running
@@ -16,10 +17,12 @@ records all follow `CLAUDE_CONFIG_DIR` (the statusline script moves from
 `~/.claude/yellow-statusline.py` to `<config>/yellow-statusline.py`, the same
 path unless a custom profile is selected). The composed
 stage is `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
-<observer>; exec cat; } | <existing>`: a missing observer or `python3` falls
-back to `cat` so the statusline never blanks, and `exec` lets the statusline
-render as soon as the observer releases stdout instead of waiting for the
-record write. The generated statusline template moved to
+<observer>; exec cat; } | <existing>`: the fallback to `cat` keeps a missing
+observer or `python3` from blanking the statusline, and `exec` lets the
+statusline script compute its output as soon as the observer releases stdout,
+while the observer records (Claude Code shows the statusline once the whole
+command exits; recording has a 2 s deadline). The generated statusline template
+moved to
 `references/statusline-setup/statusline-template.py`; its git cache and error
 log now also follow `CLAUDE_CONFIG_DIR`, and `/setup:all` probes the statusline
 and settings in the selected config dir. The observer passes the statusline payload through byte-for-byte,
