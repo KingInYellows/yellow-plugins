@@ -284,15 +284,19 @@ commit on `origin/main` when `merged` is false.
 
 With a PR number already known from context (not discovered by search),
 comparing the patch content of the squash commit and the reviewed branch is
-fast corroboration before taking the override path. Compare stable patch
+fast corroboration before taking the override path. Compare verbatim patch
 ids, not `--stat`: two different changes to the same files with the same
-insertion and deletion counts produce identical diffstats.
+insertion and deletion counts produce identical diffstats, and
+`git patch-id --stable` ignores whitespace, so it would also equate patches
+that differ only in whitespace. `--verbatim` (git 2.40+) hashes the patch as
+written.
 
 ```bash
 MERGE_BASE=$(git merge-base "$BRANCH_HEAD_SHA" "$SQUASH_SHA"^)
-git diff "$SQUASH_SHA"^ "$SQUASH_SHA" | git patch-id --stable     # squash commit's own patch
-git diff "$MERGE_BASE" "$BRANCH_HEAD_SHA" | git patch-id --stable # branch patch vs. its merge-base
-# the first field (the patch id) must be identical
+git diff "$SQUASH_SHA"^ "$SQUASH_SHA" | git patch-id --verbatim     # squash commit's own patch
+git diff "$MERGE_BASE" "$BRANCH_HEAD_SHA" | git patch-id --verbatim # branch patch vs. its merge-base
+# the first field (the patch id) must be identical: the squash landed the
+# reviewed patch byte-for-byte
 ```
 
 The ids match only when the branch's changes applied to trunk unchanged. If
