@@ -59,7 +59,7 @@ job-level `if:`). On a fork pull request every job here is skipped, and
 
 **Jobs:**
 
-- `validate-schemas` (matrix: marketplace, plugins, contracts, examples, solutions, authoring, plans, codex, cursor, generated)
+- `validate-schemas` (matrix: marketplace, plugins, contracts, examples, solutions, authoring, plans, codex, cursor, generated, shell-compat)
 - `validate-versions`
 - `changeset-check`
 - `lint-and-typecheck`
@@ -69,6 +69,7 @@ job-level `if:`). On a fork pull request every job here is skipped, and
 - `security-audit`
 - `build`
 - `plugin-shell-tests` (needs `validate-schemas`; required by `ci-status`)
+- `shell-compat-tests` (needs `validate-schemas`; required by `ci-status`)
 - `goal-engine-compat` (needs `build`; required by `ci-status`)
 - `codex-install-verification` (advisory; not in `ci-status` `needs`)
 - `validate-solutions-advisory` (pull requests only; advisory; not in `ci-status` `needs`)
@@ -115,16 +116,17 @@ validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
   -> build
 validate-schemas -> plugin-shell-tests
+validate-schemas -> shell-compat-tests
 build -> goal-engine-compat
-ci-status needs the blocking jobs above, including plugin-shell-tests and goal-engine-compat
+ci-status needs the blocking jobs above, including plugin-shell-tests, shell-compat-tests and goal-engine-compat
 codex-install-verification and validate-solutions-advisory do not feed ci-status
 report-metrics needs validate-schemas, validate-versions, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build, changeset-check, and plugin-shell-tests
-report-metrics does not need goal-engine-compat, the two advisory jobs, or ci-status
+report-metrics does not need goal-engine-compat, shell-compat-tests, the two advisory jobs, or ci-status
 ```
 
 ### Matrix Strategy: validate-schemas
 
-The `validate-schemas` job uses a matrix to parallelize validation across ten
+The `validate-schemas` job uses a matrix to parallelize validation across eleven
 targets:
 
 #### Target: `marketplace`
@@ -191,6 +193,36 @@ targets:
 - AJV-validates `catalog/catalog.json` and `catalog/plugins/*.json`
 - Runs `scripts/generate-manifests.js --check` for generated-artifact drift
 - Runs `scripts/validate-provider-groups.js` after that drift check
+
+#### Target: `shell-compat`
+
+- Runs `scripts/validate-shell-compat.js`, the static bash/zsh lint over
+  fenced shell blocks in plugin markdown and the tier 4 (dual-shell)
+  libraries
+- Needs only Node built-ins, so it skips pnpm, the store cache and AJV
+- The matrix runner has no zsh, so the zsh parse check and the
+  `tests/shell-compat` bats suite run in `shell-compat-tests` instead
+
+### Shell Compatibility Job: `shell-compat-tests`
+
+The zsh runtime layer of the bash/zsh contract
+(`plans/bash-zsh-shell-compatibility.md`). It needs `validate-schemas`, runs
+only on non-PR events and same-repo pull requests, and is required by
+`ci-status`. It installs zsh, `bats@1.11.0` and kislyuk `yq==3.4.3` (pipx,
+put first on `PATH` because the runner image ships mikefarah yq), then runs:
+
+- `node scripts/check-shell-parse.js`: every fenced shell block through
+  `bash -n` and `zsh -n`, plus the body of each `bash /dev/fd/3` wrapper
+  through `bash -n`. A block bash accepts and zsh rejects fails; so does a
+  block both shells reject, unless both accept it once its `<placeholder>`
+  tokens are replaced
+- `bats tests/shell-compat/`: tier 4 libraries under bash, zsh and zsh with
+  snapshot options, and tier 3 libraries through the bash wrapper from a zsh
+  `noclobber` parent
+
+Locally: `pnpm validate:shell-compat`, `pnpm check:shell-parse` (skips
+without zsh) and `pnpm test:shell-compat`. Fork pull requests skip this job;
+the fork workflow's `shell-compat` target runs all three instead.
 
 ### Environment Variables
 
