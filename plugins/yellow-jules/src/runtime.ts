@@ -38,7 +38,12 @@ import {
   isExpired,
   withReadRetry,
 } from './deadline.js';
-import { AdapterError, mapAdapterError, throwAppError } from './errors.js';
+import {
+  AdapterError,
+  AppErrorException,
+  mapAdapterError,
+  throwAppError,
+} from './errors.js';
 import { redact, redactDeep, scanSecretShapes } from './redact.js';
 import {
   installSdk as realInstallSdk,
@@ -118,7 +123,16 @@ async function withAdapter<T>(
   try {
     result = await fn(adapter);
   } catch (err) {
-    await adapter.close().catch(() => undefined);
+    try {
+      await adapter.close();
+    } catch (closeErr) {
+      // A scratch-tripwire violation is the more severe invariant failure; it outranks the operation's own error.
+      if (
+        closeErr instanceof AppErrorException &&
+        closeErr.appError.code === 'JULES_SDK_INTEGRITY'
+      )
+        throw closeErr;
+    }
     throw err;
   }
   await adapter.close();
@@ -760,6 +774,15 @@ export async function status(
         resumePageToken,
         recentActivityIds: ring,
         activityCountDelta: walk.newIds.length,
+        // The walk ran unlocked: rebase against the journal record as it is
+        // when the update lands, so an overlapping status is not double-counted.
+        newActivityIds: walk.newIds,
+        rebase: {
+          ring: record.recentActivityIds,
+          ...(record.pendingPlan !== undefined
+            ? { pendingPlan: record.pendingPlan }
+            : {}),
+        },
         ...(walk.pendingPlan !== record.pendingPlan
           ? {
               // Plan text is vendor-writable: redacted before it is persisted.

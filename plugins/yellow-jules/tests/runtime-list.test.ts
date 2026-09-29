@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveJournalPath, resolveStateDir } from '../src/config.js';
+import { AdapterError, throwAppError } from '../src/errors.js';
 import { list } from '../src/runtime.js';
 import { ensureObservedRecord, reserveOperation } from '../src/state.js';
 
@@ -122,6 +123,31 @@ describe('list', () => {
     await expect(
       codeOfAsync(() => list(makeDeps(dataDir, fake), {}))
     ).resolves.toBe('JULES_MALFORMED_RESPONSE');
+  });
+
+  it('a scratch-integrity failure at close outranks the read error', async () => {
+    const scratch = path.join(dataDir, 'sdk-scratch');
+    fs.mkdirSync(scratch, { recursive: true });
+    fake.listSessionsImpl = async () => {
+      fs.writeFileSync(path.join(scratch, 'leak'), 'x');
+      throw new AdapterError('server-error', 'boom', { status: 500 });
+    };
+    vi.spyOn(fake, 'close').mockImplementation(async () =>
+      throwAppError('JULES_SDK_INTEGRITY', 'sdk-scratch/ is not empty at exit')
+    );
+    await expect(
+      codeOfAsync(() => list(makeDeps(dataDir, fake), {}))
+    ).resolves.toBe('JULES_SDK_INTEGRITY');
+  });
+
+  it('a failed read still surfaces its own error when close succeeds', async () => {
+    fake.listSessionsImpl = async () => {
+      throw new AdapterError('auth', 'nope', { status: 401 });
+    };
+    await expect(
+      codeOfAsync(() => list(makeDeps(dataDir, fake), {}))
+    ).resolves.toBe('JULES_AUTH_FAILED');
+    expect(fake.closed).toBe(true);
   });
 
   it('a corrupt journal is reported, not degraded to an empty set (R37)', async () => {

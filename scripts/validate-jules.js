@@ -14,9 +14,10 @@
  *   - the declared substitution map applied to the yellow-cursor slice
  *     (`CURSOR` -> `JULES`, `yellow-cursor` -> `yellow-jules`), which covers
  *     the intentionally divergent env-var names and error-code prefixes;
- *   - all whitespace removed and trailing commas before a closing bracket
+ *   - whitespace removed and trailing commas before a closing bracket
  *     dropped, so formatter line-folding (the substituted names differ in
- *     length) is not drift.
+ *     length) is not drift. Whitespace inside string, template, and regex
+ *     literals is preserved: changing it changes behavior.
  * Intentionally divergent lines (secret patterns, the live-key env var) stay
  * outside the markers.
  *
@@ -92,8 +93,71 @@ function substitute(text) {
   );
 }
 
+// A `/` starts a regex literal (not division) after one of these characters.
+const REGEX_PRECEDERS = '(,=:[!&|?{};+-*%<>~^';
+
+/**
+ * Drops whitespace and trailing commas before a closing bracket, but leaves
+ * the contents of string, template, and regex literals untouched so a change
+ * such as 'Application Support' -> 'ApplicationSupport' is still drift.
+ * A small scanner, not a parser: template `${}` bodies are kept verbatim.
+ */
 function normalize(text) {
-  return text.replace(/\s+/g, '').replace(/,([)\]}])/g, '$1');
+  let out = '';
+  let lastSignificant = '';
+  let i = 0;
+  const copyUntil = (end) => {
+    out += text.slice(i, end);
+    i = end;
+  };
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (/\s/.test(ch)) {
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      // Comment text is compared with whitespace removed (formatter-safe).
+      const eol = text.indexOf('\n', i);
+      out += text.slice(i, eol === -1 ? text.length : eol).replace(/\s+/g, '');
+      i = eol === -1 ? text.length : eol;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      const close = text.indexOf('*/', i + 2);
+      const end = close === -1 ? text.length : close + 2;
+      out += text.slice(i, end).replace(/\s+/g, '');
+      i = end;
+      continue;
+    }
+    const isRegex =
+      ch === '/' &&
+      (lastSignificant === '' || REGEX_PRECEDERS.includes(lastSignificant));
+    if (ch === "'" || ch === '"' || ch === '`' || isRegex) {
+      let j = i + 1;
+      let inClass = false;
+      while (j < text.length) {
+        const c = text[j];
+        if (c === '\\') {
+          j += 2;
+          continue;
+        }
+        if (isRegex && c === '[') inClass = true;
+        else if (isRegex && c === ']') inClass = false;
+        else if (c === ch && !inClass) break;
+        j += 1;
+      }
+      copyUntil(Math.min(j + 1, text.length));
+      lastSignificant = ch === '/' ? ')' : ch;
+      continue;
+    }
+    if (')]}'.includes(ch) && out.endsWith(',')) out = out.slice(0, -1);
+    out += ch;
+    lastSignificant = ch;
+    i += 1;
+  }
+  return out;
 }
 
 function firstDifference(a, b) {

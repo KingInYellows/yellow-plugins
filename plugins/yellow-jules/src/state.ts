@@ -18,6 +18,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { compareStamp, DEDUP_RING_CAP } from './activity-walk.js';
 import {
   assertOwnerOnlyFile,
   ensureOwnerOnlyDir,
@@ -689,6 +690,23 @@ export interface ReadStateUpdate {
   /** `null` clears the pending plan (a `planApproved` was seen). */
   readonly pendingPlan?: PendingPlan | null;
   readonly resumeRestartCount?: number;
+  /**
+   * The ids the walk counted as new. When given with `rebase`, the count added
+   * is recomputed under the lock as the ids not already in the fresh record's
+   * ring, so an overlapping status update does not count them twice
+   * (`activityCountDelta` is then ignored).
+   */
+  readonly newActivityIds?: readonly string[];
+  /**
+   * The pre-walk snapshot this update was computed from. Given, the update is
+   * rebased against the fresh journal record: the watermark never moves
+   * backwards, ids a concurrent writer added to the ring are kept, and a
+   * pending plan never regresses to an older one.
+   */
+  readonly rebase?: {
+    readonly ring: readonly string[];
+    readonly pendingPlan?: PendingPlan;
+  };
 }
 
 /**
@@ -716,10 +734,84 @@ export async function upsertReadState(
         update.resumePageToken === undefined
           ? current.resumePageToken
           : (update.resumePageToken ?? undefined);
-      const pendingPlan =
+      const rebase = update.rebase;
+      let pendingPlan =
         update.pendingPlan === undefined
           ? current.pendingPlan
           : (update.pendingPlan ?? undefined);
+      let watermark = update.watermark;
+      let recentActivityIds =
+        update.recentActivityIds ?? current.recentActivityIds;
+      let activityCountDelta = update.activityCountDelta ?? 0;
+      if (rebase !== undefined) {
+        const fresh = current.pendingPlan;
+        if (update.pendingPlan === undefined) {
+          pendingPlan = fresh;
+        } else if (update.pendingPlan === null) {
+          // Approval seen against the snapshot's plan: it must not clear a
+          // different (newer) plan a concurrent update stored since.
+          pendingPlan =
+            fresh === undefined ||
+            fresh.activityId === rebase.pendingPlan?.activityId
+              ? undefined
+              : fresh;
+        } else if (fresh !== undefined) {
+          const newer =
+            compareStamp(
+              {
+                createTime: update.pendingPlan.activityCreateTime,
+                activityId: update.pendingPlan.activityId,
+              },
+              {
+                createTime: fresh.activityCreateTime,
+                activityId: fresh.activityId,
+              }
+            ) > 0;
+          pendingPlan = newer ? update.pendingPlan : fresh;
+        } else if (
+          current.lastActivityCreateTime !== undefined &&
+          current.lastActivityId !== undefined &&
+          compareStamp(
+            {
+              createTime: update.pendingPlan.activityCreateTime,
+              activityId: update.pendingPlan.activityId,
+            },
+            {
+              createTime: current.lastActivityCreateTime,
+              activityId: current.lastActivityId,
+            }
+          ) <= 0
+        ) {
+          // No plan is stored, and a concurrent walk already advanced past
+          // this one: it saw the plan and its approval, so do not resurrect it.
+          pendingPlan = undefined;
+        }
+        if (
+          watermark !== undefined &&
+          current.lastActivityCreateTime !== undefined &&
+          current.lastActivityId !== undefined &&
+          compareStamp(watermark, {
+            createTime: current.lastActivityCreateTime,
+            activityId: current.lastActivityId,
+          }) <= 0
+        ) {
+          watermark = undefined;
+        }
+        if (update.recentActivityIds !== undefined) {
+          const base = new Set(rebase.ring);
+          const merged = new Set(update.recentActivityIds);
+          const concurrent = current.recentActivityIds.filter(
+            (id) => !base.has(id) && !merged.has(id)
+          );
+          recentActivityIds = [...concurrent, ...merged].slice(-DEDUP_RING_CAP);
+        }
+        if (update.newActivityIds !== undefined) {
+          const known = new Set(current.recentActivityIds);
+          activityCountDelta = update.newActivityIds.filter(
+            (id) => !known.has(id)
+          ).length;
+        }
+      }
       const next: OperationRecord = applyRetention({
         ...base,
         ...(update.vendorState !== undefined
@@ -728,17 +820,16 @@ export async function upsertReadState(
         ...(update.condition !== undefined
           ? { condition: update.condition }
           : {}),
-        ...(update.watermark !== undefined
+        ...(watermark !== undefined
           ? {
-              lastActivityCreateTime: update.watermark.createTime,
-              lastActivityId: update.watermark.activityId,
+              lastActivityCreateTime: watermark.createTime,
+              lastActivityId: watermark.activityId,
             }
           : {}),
         ...(resumePageToken !== undefined ? { resumePageToken } : {}),
         ...(pendingPlan !== undefined ? { pendingPlan } : {}),
-        recentActivityIds:
-          update.recentActivityIds ?? current.recentActivityIds,
-        activityCount: current.activityCount + (update.activityCountDelta ?? 0),
+        recentActivityIds,
+        activityCount: current.activityCount + activityCountDelta,
         resumeRestartCount:
           update.resumeRestartCount ?? current.resumeRestartCount,
         updatedAt: now().toISOString(),

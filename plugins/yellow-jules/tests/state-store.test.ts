@@ -357,6 +357,80 @@ describe('read-state, external records, deviations, retention', () => {
     expect(next.recentActivityIds).toEqual(['a1']);
   });
 
+  it('rebases overlapping status updates computed from one snapshot', async () => {
+    const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
+    const rebase = { ring: [] as string[] };
+    const w1 = { createTime: '2026-01-01T00:01:00Z', activityId: 'a2' };
+    const w2 = { createTime: '2026-01-01T00:02:00Z', activityId: 'a3' };
+    const plan = (id: string, createTime: string) => ({
+      planId: `p-${id}`,
+      steps: [],
+      activityCreateTime: createTime,
+      activityId: id,
+    });
+    // Newer walk lands first, then an older walk from the same snapshot.
+    await upsertReadState(dataDir, rec.localRequestId, {
+      watermark: w2,
+      recentActivityIds: ['a1', 'a2', 'a3'],
+      activityCountDelta: 3,
+      newActivityIds: ['a1', 'a2', 'a3'],
+      pendingPlan: plan('a3', w2.createTime),
+      rebase,
+    });
+    const next = await upsertReadState(dataDir, rec.localRequestId, {
+      watermark: w1,
+      recentActivityIds: ['a1', 'a2'],
+      activityCountDelta: 2,
+      newActivityIds: ['a1', 'a2'],
+      pendingPlan: plan('a2', w1.createTime),
+      rebase,
+    });
+    expect(next.activityCount).toBe(3);
+    expect(next.lastActivityId).toBe('a3');
+    expect(next.recentActivityIds).toEqual(
+      expect.arrayContaining(['a1', 'a2', 'a3'])
+    );
+    expect(next.pendingPlan?.activityId).toBe('a3');
+
+    // A stale approval from the old snapshot does not clear the newer plan.
+    const cleared = await upsertReadState(dataDir, rec.localRequestId, {
+      pendingPlan: null,
+      rebase: { ring: [], pendingPlan: plan('a2', w1.createTime) },
+    });
+    expect(cleared.pendingPlan?.activityId).toBe('a3');
+  });
+
+  it('a stale status update does not resurrect an approved plan', async () => {
+    const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
+    const rebase = { ring: [] as string[] };
+    const planStamp = { createTime: '2026-01-01T00:01:00Z', activityId: 'a1' };
+    const plan = {
+      planId: 'p-a1',
+      steps: [],
+      activityCreateTime: planStamp.createTime,
+      activityId: planStamp.activityId,
+    };
+    // The newer walk saw the plan and then its approval, so it cleared it.
+    await upsertReadState(dataDir, rec.localRequestId, {
+      watermark: { createTime: '2026-01-01T00:02:00Z', activityId: 'a2' },
+      recentActivityIds: ['a1', 'a2'],
+      newActivityIds: ['a1', 'a2'],
+      pendingPlan: null,
+      rebase,
+    });
+    // The older walk from the same snapshot saw only the plan.
+    const next = await upsertReadState(dataDir, rec.localRequestId, {
+      watermark: planStamp,
+      recentActivityIds: ['a1'],
+      newActivityIds: ['a1'],
+      pendingPlan: plan,
+      rebase,
+    });
+    expect(next.pendingPlan).toBeUndefined();
+    expect(next.lastActivityId).toBe('a2');
+    expect(next.activityCount).toBe(2);
+  });
+
   it('collect owns only artifactResumePageToken', async () => {
     const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
     let next = await upsertArtifactResumeToken(

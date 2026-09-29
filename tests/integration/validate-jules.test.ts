@@ -102,6 +102,28 @@ describe('validate-jules.js', () => {
     expect(run.stderr).toContain('unit "validateRef"');
   });
 
+  it('flags whitespace changed inside a string literal as drift (-002)', () => {
+    const root = fixture();
+    edit(root, 'plugins/yellow-jules/src/config.ts', (t) =>
+      t.replace("'Application Support'", "'ApplicationSupport'")
+    );
+    const run = runValidator(root);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(`${JULES_CODE}-002`);
+    expect(run.stderr).toContain('unit "resolveDataDir"');
+  });
+
+  it('still passes formatting-only differences outside literals', () => {
+    const root = fixture();
+    edit(root, 'plugins/yellow-jules/src/config.ts', (t) =>
+      t.replace(
+        "p.join(homedir(), 'Library', 'Application Support', 'yellow-jules')",
+        "p.join(\n      homedir(),\n      'Library',\n      'Application Support',\n      'yellow-jules',\n    )"
+      )
+    );
+    expect(runValidator(root).status).toBe(0);
+  });
+
   it('flags a change on the yellow-cursor side too', () => {
     const root = fixture();
     edit(root, 'plugins/yellow-cursor/src/redact.ts', (t) =>

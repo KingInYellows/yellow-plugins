@@ -69,6 +69,7 @@ const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
+const activity_walk_js_1 = require("./activity-walk.js");
 const config_js_1 = require("./config.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
@@ -548,9 +549,70 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
         const resumePageToken = update.resumePageToken === undefined
             ? current.resumePageToken
             : (update.resumePageToken ?? undefined);
-        const pendingPlan = update.pendingPlan === undefined
+        const rebase = update.rebase;
+        let pendingPlan = update.pendingPlan === undefined
             ? current.pendingPlan
             : (update.pendingPlan ?? undefined);
+        let watermark = update.watermark;
+        let recentActivityIds = update.recentActivityIds ?? current.recentActivityIds;
+        let activityCountDelta = update.activityCountDelta ?? 0;
+        if (rebase !== undefined) {
+            const fresh = current.pendingPlan;
+            if (update.pendingPlan === undefined) {
+                pendingPlan = fresh;
+            }
+            else if (update.pendingPlan === null) {
+                // Approval seen against the snapshot's plan: it must not clear a
+                // different (newer) plan a concurrent update stored since.
+                pendingPlan =
+                    fresh === undefined ||
+                        fresh.activityId === rebase.pendingPlan?.activityId
+                        ? undefined
+                        : fresh;
+            }
+            else if (fresh !== undefined) {
+                const newer = (0, activity_walk_js_1.compareStamp)({
+                    createTime: update.pendingPlan.activityCreateTime,
+                    activityId: update.pendingPlan.activityId,
+                }, {
+                    createTime: fresh.activityCreateTime,
+                    activityId: fresh.activityId,
+                }) > 0;
+                pendingPlan = newer ? update.pendingPlan : fresh;
+            }
+            else if (current.lastActivityCreateTime !== undefined &&
+                current.lastActivityId !== undefined &&
+                (0, activity_walk_js_1.compareStamp)({
+                    createTime: update.pendingPlan.activityCreateTime,
+                    activityId: update.pendingPlan.activityId,
+                }, {
+                    createTime: current.lastActivityCreateTime,
+                    activityId: current.lastActivityId,
+                }) <= 0) {
+                // No plan is stored, and a concurrent walk already advanced past
+                // this one: it saw the plan and its approval, so do not resurrect it.
+                pendingPlan = undefined;
+            }
+            if (watermark !== undefined &&
+                current.lastActivityCreateTime !== undefined &&
+                current.lastActivityId !== undefined &&
+                (0, activity_walk_js_1.compareStamp)(watermark, {
+                    createTime: current.lastActivityCreateTime,
+                    activityId: current.lastActivityId,
+                }) <= 0) {
+                watermark = undefined;
+            }
+            if (update.recentActivityIds !== undefined) {
+                const base = new Set(rebase.ring);
+                const merged = new Set(update.recentActivityIds);
+                const concurrent = current.recentActivityIds.filter((id) => !base.has(id) && !merged.has(id));
+                recentActivityIds = [...concurrent, ...merged].slice(-activity_walk_js_1.DEDUP_RING_CAP);
+            }
+            if (update.newActivityIds !== undefined) {
+                const known = new Set(current.recentActivityIds);
+                activityCountDelta = update.newActivityIds.filter((id) => !known.has(id)).length;
+            }
+        }
         const next = applyRetention({
             ...base,
             ...(update.vendorState !== undefined
@@ -559,16 +621,16 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
             ...(update.condition !== undefined
                 ? { condition: update.condition }
                 : {}),
-            ...(update.watermark !== undefined
+            ...(watermark !== undefined
                 ? {
-                    lastActivityCreateTime: update.watermark.createTime,
-                    lastActivityId: update.watermark.activityId,
+                    lastActivityCreateTime: watermark.createTime,
+                    lastActivityId: watermark.activityId,
                 }
                 : {}),
             ...(resumePageToken !== undefined ? { resumePageToken } : {}),
             ...(pendingPlan !== undefined ? { pendingPlan } : {}),
-            recentActivityIds: update.recentActivityIds ?? current.recentActivityIds,
-            activityCount: current.activityCount + (update.activityCountDelta ?? 0),
+            recentActivityIds,
+            activityCount: current.activityCount + activityCountDelta,
             resumeRestartCount: update.resumeRestartCount ?? current.resumeRestartCount,
             updatedAt: now().toISOString(),
         });
