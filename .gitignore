@@ -51,14 +51,16 @@ yarn.lock
 # (supply-chain guarantee). Add new plugins here as they adopt the pattern.
 !plugins/yellow-morph/package-lock.json
 !plugins/yellow-ruvector/package-lock.json
+!plugins/yellow-jules/runtime/package-lock.json
 
 # Build outputs (Task I1.T1: pnpm workspace)
 dist/
 **/dist/
-# yellow-cursor / yellow-goal ship compiled CLIs so installed plugins are
+# yellow-cursor / yellow-goal / yellow-jules ship compiled CLIs so installed plugins are
 # runnable without a build step; CI's build job drift-checks them against src/.
 !plugins/yellow-cursor/dist/
 !plugins/yellow-goal/dist/
+!plugins/yellow-jules/dist/
 build/
 **/build/
 *.tsbuildinfo
