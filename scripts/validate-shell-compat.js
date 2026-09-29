@@ -655,7 +655,7 @@ function pluginOf(rel) {
 }
 
 const CROSS_PLUGIN_RE =
-  /\$(?:\{CLAUDE_PLUGIN_ROOT\}|CLAUDE_PLUGIN_ROOT)\/\.\.\/([^/]+)\/(.+)$/;
+  /\$(?:\{CLAUDE_PLUGIN_ROOT(?::-[^}$]*)?\}|CLAUDE_PLUGIN_ROOT)\/\.\.\/([^/]+)\/(.+)$/;
 
 function classifySource(target, rel, ctx) {
   const tail = sourceTail(target);

@@ -343,8 +343,14 @@ describe('fixture runs', () => {
     );
     write('plugins/demo/commands/t4.md', md(src('b4.sh')));
     write('plugins/demo/commands/un.md', md(src('new.sh')));
+    const dsrc = (lib: string) =>
+      `. "\${CLAUDE_PLUGIN_ROOT:-}/../other/lib/${lib}"`;
+    write('plugins/demo/commands/d3.md', md(dsrc('b3.sh')));
+    write('plugins/demo/commands/d4.md', md(dsrc('b4.sh')));
     const result = run();
     expect(result.stderr).toContain('commands/t3.md:4 [SHC-008]');
+    expect(result.stderr).toContain('commands/d3.md:4 [SHC-008]');
+    expect(result.stderr).not.toContain('d4.md');
     expect(result.stderr).not.toContain('t3w.md');
     expect(result.stderr).not.toContain('t4.md');
     expect(result.stderr).toContain('commands/un.md:4 [SHC-008]');
