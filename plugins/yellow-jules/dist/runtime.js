@@ -434,6 +434,7 @@ async function status(deps, args) {
         const noProgress = walk.startedFromResume &&
             !walk.resumeRejected &&
             walk.pages > 0 &&
+            !walk.unmappedActivity &&
             walk.newIds.length === 0;
         const restarted = walk.startedFromResume && (walk.resumeRejected || noProgress);
         const restartCount = restarted
@@ -525,26 +526,81 @@ function writeStaged(filePath, content) {
     fs.writeFileSync(tmp, content, { mode: 0o600, flag: 'wx' });
     fs.renameSync(tmp, filePath);
 }
-const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
-/** Artifacts a previous `collect` recorded in this directory's manifest; anything malformed is ignored. */
-function readManifestArtifacts(dir) {
+const MANIFEST_MAX_BYTES = 10 * 1024 * 1024;
+const STAGED_PATH_RE = /^(?:patch\.diff|patches\/\d{2,}-[0-9a-f]{12}\.diff|generated\/\d{2,}-[0-9a-f]{12})$/;
+/**
+ * Artifacts a previous `collect` recorded here, rebuilt from validated fields
+ * only: a staged file must still exist with the recorded digest (its secret
+ * scan is recomputed), `verification` is always `unverified`, and a PR
+ * reference must pass the session-source check again. Anything else in the
+ * manifest is ignored — it is never trusted as data.
+ */
+function readManifestArtifacts(dir, sourceResource) {
+    const file = path.join(dir, 'manifest.json');
     let parsed;
     try {
-        parsed = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+        const stat = fs.lstatSync(file);
+        if (!stat.isFile() || stat.size > MANIFEST_MAX_BYTES)
+            return [];
+        parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     }
     catch {
         return [];
     }
-    const list = parsed.artifacts;
+    const list = parsed?.artifacts;
     if (!Array.isArray(list))
         return [];
-    return list.filter((a) => a !== null &&
-        typeof a === 'object' &&
-        ARTIFACT_KINDS.has(a.kind) &&
-        (a.path === undefined ||
-            typeof a.path === 'string') &&
-        (a.sha256 === undefined ||
-            /^[0-9a-f]{64}$/.test(String(a.sha256))));
+    const out = [];
+    for (const entry of list) {
+        const a = (entry ?? {});
+        if (a.kind === 'pr-ref') {
+            const check = sourceResource !== undefined
+                ? (0, validate_js_1.validatePullRequestUrl)(a.prUrl, sourceResource)
+                : undefined;
+            if (check?.valid === true) {
+                out.push({
+                    kind: 'pr-ref',
+                    prUrl: check.url,
+                    secretShapedContent: false,
+                    verification: 'unverified',
+                });
+            }
+            continue;
+        }
+        if (a.kind !== 'patch' && a.kind !== 'generated-file')
+            continue;
+        if (typeof a.path !== 'string' || !STAGED_PATH_RE.test(a.path))
+            continue;
+        if (typeof a.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.sha256))
+            continue;
+        let content;
+        try {
+            const staged = path.join(dir, a.path);
+            if (!fs.lstatSync(staged).isFile())
+                continue;
+            content = fs.readFileSync(staged, 'utf8');
+        }
+        catch {
+            continue;
+        }
+        if (sha256(content) !== a.sha256)
+            continue;
+        const baseCommit = typeof a.baseCommit === 'string'
+            ? optionalBaseCommit(a.baseCommit)
+            : undefined;
+        out.push({
+            kind: a.kind,
+            path: a.path,
+            sha256: a.sha256,
+            ...(a.kind === 'patch' && baseCommit !== undefined ? { baseCommit } : {}),
+            ...(a.kind === 'generated-file' && typeof a.vendorPath === 'string'
+                ? { vendorPath: (0, redact_js_1.redact)(a.vendorPath) }
+                : {}),
+            secretShapedContent: (0, redact_js_1.scanSecretShapes)(content),
+            verification: 'unverified',
+        });
+    }
+    return out;
 }
 function countFiles(dir) {
     try {
@@ -571,10 +627,10 @@ class Stager {
     seenPrs = new Set();
     patchSeq;
     generatedSeq;
-    constructor(dir, capBytes) {
+    constructor(dir, capBytes, sourceResource) {
         this.dir = dir;
         this.capBytes = capBytes;
-        for (const prior of readManifestArtifacts(dir)) {
+        for (const prior of readManifestArtifacts(dir, sourceResource)) {
             this.artifacts.push(prior);
             if (prior.kind === 'patch' && prior.sha256 !== undefined)
                 this.seenDigests.add(prior.sha256);
@@ -632,6 +688,14 @@ class Stager {
     }
     /** Named locally by sequence and digest; the vendor path is recorded as redacted data only. */
     generated(vendorPath, content) {
+        // Dedupe before the cap check, so a file an earlier run staged is never
+        // reported as skipped (which would set partialStaging for nothing).
+        const digest = sha256(content);
+        const safeVendorPath = (0, redact_js_1.redact)(vendorPath);
+        const key = `${digest}:${safeVendorPath}`;
+        if (this.seenGenerated.has(key))
+            return;
+        this.seenGenerated.add(key);
         const bytes = Buffer.byteLength(content, 'utf8');
         if (this.overCap(bytes)) {
             this.skipped.push({
@@ -641,12 +705,6 @@ class Stager {
             });
             return;
         }
-        const digest = sha256(content);
-        const safeVendorPath = (0, redact_js_1.redact)(vendorPath);
-        const key = `${digest}:${safeVendorPath}`;
-        if (this.seenGenerated.has(key))
-            return;
-        this.seenGenerated.add(key);
         this.staged += bytes;
         this.generatedSeq += 1;
         (0, config_js_1.ensureOwnerOnlyDir)(path.join(this.dir, 'generated'));
@@ -688,7 +746,7 @@ async function collect(deps, args) {
         (0, config_js_1.ensureOwnerOnlyDir)(artifactsRoot);
         const dir = path.join(artifactsRoot, record.localId);
         (0, config_js_1.ensureOwnerOnlyDir)(dir);
-        const stager = new Stager(dir, deps.aggregateCapBytes ?? exports.AGGREGATE_ARTIFACT_CAP_BYTES);
+        const stager = new Stager(dir, deps.aggregateCapBytes ?? exports.AGGREGATE_ARTIFACT_CAP_BYTES, session.sourceResource);
         for (const output of session.outputs) {
             if (output.type === 'changeSet') {
                 stager.patch(output.unidiffPatch, output.baseCommitId);

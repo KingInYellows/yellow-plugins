@@ -153,6 +153,22 @@ describe('corrupt journal (R37)', () => {
   );
 });
 
+describe('stored resume tokens', () => {
+  it('a token outside the page-token allowlist makes the journal corrupt, not trusted', async () => {
+    const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
+    const raw = JSON.parse(
+      fs.readFileSync(resolveJournalPath(dataDir), 'utf8')
+    );
+    raw.operations[rec.localRequestId].resumePageToken = '../../etc';
+    fs.writeFileSync(resolveJournalPath(dataDir), JSON.stringify(raw), {
+      mode: 0o600,
+    });
+    await expect(codeOfAsync(() => readJournal(dataDir))).resolves.toBe(
+      'JULES_JOURNAL_CORRUPT'
+    );
+  });
+});
+
 describe('withJournalLock', () => {
   it('serializes concurrent read-modify-write cycles (no lost updates)', async () => {
     const writers = Array.from({ length: 15 }, (_, i) =>

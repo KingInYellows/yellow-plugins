@@ -62,6 +62,7 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const config_js_1 = require("./config.js");
 const errors_js_1 = require("./errors.js");
+const fetch_guard_js_1 = require("./fetch-guard.js");
 const redact_js_1 = require("./redact.js");
 const validate_js_1 = require("./validate.js");
 exports.CREATE_REQUEST_TIMEOUT_MS = 60_000;
@@ -178,6 +179,18 @@ function mapOutput(output) {
         suggestedCommitMessage: str(output.changeSet?.gitPatch?.suggestedCommitMessage),
     };
 }
+const STATE_RE = /^[A-Za-z_]{1,64}$/;
+const RFC3339_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+/** Unknown or non-enum-shaped states become `unspecified` (condition `needs-inspection`). */
+function allowlistedState(value) {
+    return typeof value === 'string' && STATE_RE.test(value)
+        ? value
+        : 'unspecified';
+}
+/** Vendor timestamps are rendered and persisted, so anything not RFC 3339 is dropped. */
+function rfc3339OrEmpty(value) {
+    return typeof value === 'string' && RFC3339_RE.test(value) ? value : '';
+}
 function optionalSource(value) {
     try {
         return (0, validate_js_1.validateSourceResource)(value, 'response');
@@ -198,10 +211,11 @@ function mapSession(resource) {
     }));
     return {
         sessionResource,
-        vendorState: typeof resource.state === 'string' ? resource.state : 'unspecified',
+        // Server-set enum text, but rendered bare and persisted: allowlisted.
+        vendorState: allowlistedState(resource.state),
         title: str(resource.title),
-        ...(typeof resource.createTime === 'string'
-            ? { createTime: resource.createTime }
+        ...(rfc3339OrEmpty(resource.createTime) !== ''
+            ? { createTime: rfc3339OrEmpty(resource.createTime) }
             : {}),
         ...(typeof resource.updateTime === 'string'
             ? { updateTime: resource.updateTime }
@@ -231,7 +245,7 @@ function mapActivity(activity) {
     const activityId = (0, validate_js_1.validateActivityId)(activity.id, 'response');
     const base = {
         activityId,
-        createTime: str(activity.createTime),
+        createTime: rfc3339OrEmpty(activity.createTime),
         type: str(activity.type),
         ...(typeof activity.originator === 'string'
             ? { originator: activity.originator }
@@ -351,10 +365,9 @@ class JulesSdkAdapter {
         const existing = this.infoReads.get(id);
         if (existing !== undefined)
             return existing;
-        const sessionClient = this.sessionClient(sessionResource);
         const read = (async () => {
             try {
-                return mapSession(await sessionClient.info());
+                return mapSession(await this.sessionClient(sessionResource).info());
             }
             catch (err) {
                 return this.fail(err);
@@ -363,7 +376,10 @@ class JulesSdkAdapter {
         this.infoReads.set(id, read);
         // Only a successful read is memoized: a failed one must be re-sent by the
         // bounded read retry, not answered from this cache.
-        read.catch(() => this.infoReads.delete(id));
+        read.catch(() => {
+            if (this.infoReads.get(id) === read)
+                this.infoReads.delete(id);
+        });
         return read;
     }
     async listSessions(options) {
@@ -413,6 +429,9 @@ class JulesSdkAdapter {
         catch (err) {
             if (err instanceof this.sdk.JulesError)
                 return this.fail(err);
+            // Our own refusals are never downgraded to an "unmappable SDK type" signal.
+            if (err instanceof errors_js_1.AppErrorException || err instanceof fetch_guard_js_1.FetchGuardRefusal)
+                throw err;
             return { activities: [], unmappedActivity: true };
         }
         // An activity the SDK mapped but whose ids fail the allowlist, or a page
@@ -485,6 +504,9 @@ class JulesSdkAdapter {
         catch (err) {
             if (err instanceof this.sdk.JulesError)
                 return this.fail(err);
+            // Our own refusals are never downgraded to an "unmappable SDK type" signal.
+            if (err instanceof errors_js_1.AppErrorException || err instanceof fetch_guard_js_1.FetchGuardRefusal)
+                throw err;
             unsupportedReason =
                 'a connected source has a type the pinned SDK cannot map';
         }

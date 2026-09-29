@@ -109,6 +109,23 @@ describe('assertNoSecretShapedValues (layer 5)', () => {
   });
 });
 
+describe('assertNoSecretShapedValues and the redaction marker', () => {
+  it('accepts fully redacted text but refuses the marker next to a secret', () => {
+    expect(() =>
+      assertNoSecretShapedValues({ t: 'Bearer ***REDACTED***' })
+    ).not.toThrow();
+    expect(() =>
+      assertNoSecretShapedValues({ t: `Bearer ***REDACTED***${LIVE_KEY}` })
+    ).toThrow(/refusing/);
+  });
+
+  it('refuses any string that contains the live key', () => {
+    expect(() =>
+      assertNoSecretShapedValues({ t: `prefix-${LIVE_KEY}-suffix` })
+    ).toThrow(/refusing/);
+  });
+});
+
 describe('truncateRedacted (layer 6)', () => {
   it('redacts before truncating to 512 bytes', () => {
     const text = `${LIVE_KEY} ${'x'.repeat(2000)}`;

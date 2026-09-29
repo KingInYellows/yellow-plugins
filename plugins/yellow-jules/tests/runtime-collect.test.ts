@@ -295,6 +295,63 @@ describe('collect', () => {
     expect(record?.artifacts.filter((a) => a.kind === 'patch')).toHaveLength(2);
   });
 
+  it('a tampered manifest is rebuilt from validated fields only', async () => {
+    fake.sessions.set(
+      S,
+      makeSession({
+        outputs: [
+          {
+            type: 'changeSet',
+            source: 's',
+            unidiffPatch: PATCH,
+            baseCommitId: BASE,
+            suggestedCommitMessage: 'm',
+          },
+        ],
+      })
+    );
+    const first = await collect(makeDeps(dataDir, fake), { session: S });
+    const dir = path.join(resolveArtifactsDir(dataDir), first.localId);
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+    );
+    manifest.artifacts[0].verification = 'passed';
+    manifest.artifacts[0].secretShapedContent = false;
+    manifest.artifacts[0].injected = 'x';
+    manifest.artifacts.push(
+      {
+        kind: 'patch',
+        path: '../../escape.diff',
+        sha256: 'a'.repeat(64),
+        secretShapedContent: false,
+        verification: 'passed',
+      },
+      {
+        kind: 'patch',
+        path: 'patches/02-aaaaaaaaaaaa.diff',
+        sha256: 'b'.repeat(64),
+        secretShapedContent: false,
+        verification: 'passed',
+      },
+      {
+        kind: 'pr-ref',
+        prUrl: 'https://github.com/evil/repo/pull/1',
+        secretShapedContent: false,
+        verification: 'passed',
+      }
+    );
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest));
+    const second = await collect(makeDeps(dataDir, fake), { session: S });
+    expect(second.artifacts).toEqual([
+      expect.objectContaining({
+        kind: 'patch',
+        path: 'patch.diff',
+        verification: 'unverified',
+      }),
+    ]);
+    expect(second.artifacts[0]).not.toHaveProperty('injected');
+  });
+
   it('stops staging at the aggregate cap and lists the rest as skipped', async () => {
     fake.sessions.set(
       S,

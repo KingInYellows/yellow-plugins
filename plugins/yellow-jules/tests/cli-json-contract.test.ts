@@ -92,6 +92,7 @@ describe('operational failures exit 1', () => {
     [['list', '--limit', '0'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--limit', '101'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--deadline-ms', 'soon'], 'list', 'JULES_INVALID_INPUT'],
+    [['list', '--deadline-ms', '240001'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--page-token', '../x'], 'list', 'JULES_INVALID_INPUT'],
     [['cancel'], 'cancel', 'JULES_UNSUPPORTED_CAPABILITY'],
     [['pause'], 'pause', 'JULES_UNSUPPORTED_CAPABILITY'],
@@ -152,6 +153,8 @@ describe('redaction on every output path', () => {
     expect(r.stderr).not.toContain(iso.env['JULES_API_KEY']);
     expect(r.stdout).not.toContain('AIzaSyA1234567890abcdefXYZ');
     expect(r.stdout).toContain('***REDACTED***');
+    // stderr carries the code only: vendor text travels inside the envelope.
+    expect(r.stderr.trim()).toBe('JULES_INVALID_INPUT');
   });
 
   it('no trapped tool was invoked', () => {

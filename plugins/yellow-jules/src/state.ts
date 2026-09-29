@@ -36,7 +36,11 @@ import type {
   OperationStatus,
   PendingPlan,
 } from './types.js';
-import { mintLocalId, validateRequestId } from './validate.js';
+import {
+  isValidPageToken,
+  mintLocalId,
+  validateRequestId,
+} from './validate.js';
 
 export function digestText(text: string): string {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
@@ -123,6 +127,11 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
   if (!STATUSES.has(value['status'] as OperationStatus)) return false;
   for (const field of OPTIONAL_STRING_FIELDS) {
     if (value[field] !== undefined && typeof value[field] !== 'string')
+      return false;
+  }
+  // Stored tokens go back to the vendor as query parameters: re-checked on load.
+  for (const field of ['resumePageToken', 'artifactResumePageToken'] as const) {
+    if (value[field] !== undefined && !isValidPageToken(value[field]))
       return false;
   }
   if (
@@ -747,10 +756,9 @@ export async function upsertArtifactResumeToken(
   return updateJournal(
     dataDir,
     (operations) => {
-      const { artifactResumePageToken: _drop, ...rest } = requireRecord(
-        operations,
-        localRequestId
-      );
+      const current = requireRecord(operations, localRequestId);
+      if ((current.artifactResumePageToken ?? null) === token) return current;
+      const { artifactResumePageToken: _drop, ...rest } = current;
       const next = applyRetention({
         ...rest,
         ...(token !== null ? { artifactResumePageToken: token } : {}),

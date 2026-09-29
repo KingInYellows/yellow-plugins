@@ -86,6 +86,19 @@ mechanism, and none widens a guarantee.
   manifest accumulates. Journal artifacts are keyed by content digest.
 - **Retry window.** A read is retried only while the deadline leaves room for
   the backoff plus a 5 s attempt, so a late retry does not overshoot it.
+- **Deadline ceiling.** `--deadline-ms` accepts 1-240 000. A run can outlast its
+  deadline by one in-flight read (the 60 s client timeout), and the command
+  wrappers run the CLI under a 300 s Bash timeout; a longer deadline would let
+  the host kill a run mid-write.
+- **Diagnostics and fencing.** On an operational failure stderr carries only the
+  error code; the message, which can embed vendor text, travels only in the JSON
+  envelope. The command wrappers print allowlisted fields, then every
+  vendor-writable string inside the untrusted-content fence as one labeled line,
+  with control and format characters flattened, dash runs folded, and a
+  300-character cap, so no fenced line can forge a delimiter or a trusted row.
+- **Vendor enums and timestamps.** A session state that is not enum-shaped is
+  mapped to `unspecified`, and a timestamp that is not RFC 3339 is dropped,
+  since both are rendered bare and persisted.
 - **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
   recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
   `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors

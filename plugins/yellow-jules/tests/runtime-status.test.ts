@@ -414,6 +414,32 @@ describe('resume tokens survive transient failures', () => {
   });
 });
 
+describe('an unmappable page is reported, never escalated', () => {
+  it('a resumed walk that stops on the same unmappable page keeps reporting unmappedActivity', async () => {
+    fake.activities.set(S, makeActivities(60));
+    const rec = await ensureObservedRecord(dataDir, S);
+    await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'p50',
+    });
+    const base = fake.listActivitiesImpl;
+    fake.listActivitiesImpl = async (s, o) =>
+      o.pageToken === 'p50'
+        ? { activities: [], unmappedActivity: true }
+        : base(s, o);
+    for (let i = 0; i < 4; i += 1) {
+      const result = await status(makeDeps(dataDir, fake), {
+        session: S,
+        reconcile: false,
+      });
+      expect(result.activities).toMatchObject({
+        unmappedActivity: true,
+        partialPagination: true,
+      });
+    }
+    expect((await recordFor())?.resumeRestartCount).toBe(0);
+  });
+});
+
 describe('vendor text in the journal', () => {
   it('a plan step that looks like a credential phrase is redacted, not a write failure', async () => {
     fake.activities.set(S, [

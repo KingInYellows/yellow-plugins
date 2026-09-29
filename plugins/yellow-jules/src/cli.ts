@@ -42,7 +42,9 @@ const LATER_OPERATIONS = [
   'supervise',
   'integrate',
 ] as const;
-const MAX_DEADLINE_MS = 3_600_000;
+// Deadline plus one in-flight read (up to the 60 s client timeout) must fit
+// inside the wrappers' 300 s Bash timeout, or the run is killed mid-write.
+const MAX_DEADLINE_MS = 240_000;
 
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(redactDeep(value))}\n`);
@@ -267,13 +269,17 @@ async function main(): Promise<void> {
       return;
     }
     const appError = toAppError(err, 'read');
-    process.stderr.write(`${appError.code}: ${redact(appError.message)}\n`);
+    // The message can carry vendor text; it travels only inside the JSON
+    // envelope, which the wrappers fence. stderr gets the code alone.
+    process.stderr.write(`${appError.code}\n`);
     printJson({ ok: false, operation: name, error: appError });
     process.exitCode = 1;
   }
 }
 
 main().catch((err: unknown) => {
-  process.stderr.write(`unexpected error: ${redact(String(err))}\n`);
+  process.stderr.write(
+    `unexpected error: ${redact(err instanceof Error ? err.name : 'unknown')}\n`
+  );
   process.exitCode = 1;
 });

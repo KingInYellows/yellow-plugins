@@ -47,10 +47,11 @@ function redact(input) {
     return out;
 }
 function looksSecretShaped(value) {
-    if (liveApiKeyPatterns().includes(value))
+    if (liveApiKeyPatterns().some((secret) => value.includes(secret)))
         return true;
-    // Already-redacted text (e.g. "Bearer ***REDACTED***") is safe to persist.
-    if (value.includes(REDACTED))
+    // Fully redacted text (e.g. "Bearer ***REDACTED***") is safe to persist; a
+    // string that merely contains the marker next to a secret is not.
+    if (value.includes(REDACTED) && redact(value) === value)
         return false;
     if (/^Bearer\s+\S+$/i.test(value))
         return true;

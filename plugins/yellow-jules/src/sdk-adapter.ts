@@ -34,6 +34,7 @@ import {
   mapAdapterError,
   throwAppError,
 } from './errors.js';
+import { FetchGuardRefusal } from './fetch-guard.js';
 import { truncateRedacted } from './redact.js';
 import type {
   ActivityPage,
@@ -234,6 +235,22 @@ function mapOutput(output: Sdk.SessionOutput): AdapterOutput {
   };
 }
 
+const STATE_RE = /^[A-Za-z_]{1,64}$/;
+const RFC3339_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** Unknown or non-enum-shaped states become `unspecified` (condition `needs-inspection`). */
+function allowlistedState(value: unknown): string {
+  return typeof value === 'string' && STATE_RE.test(value)
+    ? value
+    : 'unspecified';
+}
+
+/** Vendor timestamps are rendered and persisted, so anything not RFC 3339 is dropped. */
+function rfc3339OrEmpty(value: unknown): string {
+  return typeof value === 'string' && RFC3339_RE.test(value) ? value : '';
+}
+
 function optionalSource(value: unknown): string | undefined {
   try {
     return validateSourceResource(value, 'response');
@@ -257,11 +274,11 @@ export function mapSession(resource: Sdk.SessionResource): AdapterSession {
   }));
   return {
     sessionResource,
-    vendorState:
-      typeof resource.state === 'string' ? resource.state : 'unspecified',
+    // Server-set enum text, but rendered bare and persisted: allowlisted.
+    vendorState: allowlistedState(resource.state),
     title: str(resource.title),
-    ...(typeof resource.createTime === 'string'
-      ? { createTime: resource.createTime }
+    ...(rfc3339OrEmpty(resource.createTime) !== ''
+      ? { createTime: rfc3339OrEmpty(resource.createTime) }
       : {}),
     ...(typeof resource.updateTime === 'string'
       ? { updateTime: resource.updateTime }
@@ -293,7 +310,7 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
   const activityId = validateActivityId(activity.id, 'response');
   const base = {
     activityId,
-    createTime: str(activity.createTime),
+    createTime: rfc3339OrEmpty(activity.createTime),
     type: str(activity.type),
     ...(typeof activity.originator === 'string'
       ? { originator: activity.originator }
@@ -450,10 +467,9 @@ export class JulesSdkAdapter implements SdkAdapter {
     const id = sessionIdOf(sessionResource);
     const existing = this.infoReads.get(id);
     if (existing !== undefined) return existing;
-    const sessionClient = this.sessionClient(sessionResource);
     const read = (async () => {
       try {
-        return mapSession(await sessionClient.info());
+        return mapSession(await this.sessionClient(sessionResource).info());
       } catch (err) {
         return this.fail(err);
       }
@@ -461,7 +477,9 @@ export class JulesSdkAdapter implements SdkAdapter {
     this.infoReads.set(id, read);
     // Only a successful read is memoized: a failed one must be re-sent by the
     // bounded read retry, not answered from this cache.
-    read.catch(() => this.infoReads.delete(id));
+    read.catch(() => {
+      if (this.infoReads.get(id) === read) this.infoReads.delete(id);
+    });
     return read;
   }
 
@@ -518,6 +536,9 @@ export class JulesSdkAdapter implements SdkAdapter {
       });
     } catch (err) {
       if (err instanceof this.sdk.JulesError) return this.fail(err);
+      // Our own refusals are never downgraded to an "unmappable SDK type" signal.
+      if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
+        throw err;
       return { activities: [], unmappedActivity: true };
     }
     // An activity the SDK mapped but whose ids fail the allowlist, or a page
@@ -591,6 +612,9 @@ export class JulesSdkAdapter implements SdkAdapter {
       }
     } catch (err) {
       if (err instanceof this.sdk.JulesError) return this.fail(err);
+      // Our own refusals are never downgraded to an "unmappable SDK type" signal.
+      if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
+        throw err;
       unsupportedReason =
         'a connected source has a type the pinned SDK cannot map';
     }

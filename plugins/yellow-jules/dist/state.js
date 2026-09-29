@@ -156,6 +156,11 @@ function isValidRecord(key, value) {
         if (value[field] !== undefined && typeof value[field] !== 'string')
             return false;
     }
+    // Stored tokens go back to the vendor as query parameters: re-checked on load.
+    for (const field of ['resumePageToken', 'artifactResumePageToken']) {
+        if (value[field] !== undefined && !(0, validate_js_1.isValidPageToken)(value[field]))
+            return false;
+    }
     if (value['autoPrRequested'] !== undefined &&
         typeof value['autoPrRequested'] !== 'boolean') {
         return false;
@@ -571,7 +576,10 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
 /** The one read-state field `collect` owns. `null` clears it. */
 async function upsertArtifactResumeToken(dataDir, localRequestId, token, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
-        const { artifactResumePageToken: _drop, ...rest } = requireRecord(operations, localRequestId);
+        const current = requireRecord(operations, localRequestId);
+        if ((current.artifactResumePageToken ?? null) === token)
+            return current;
+        const { artifactResumePageToken: _drop, ...rest } = current;
         const next = applyRetention({
             ...rest,
             ...(token !== null ? { artifactResumePageToken: token } : {}),
