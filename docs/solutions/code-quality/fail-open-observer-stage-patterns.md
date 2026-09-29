@@ -21,12 +21,22 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
 
 ## Guidance
 
-1. **Compose a pass-through stage with a `cat` fallback.** When wrapping an
-   existing statusline command, write
-   `{ python3 <observer> || cat; } | <existing>`. If the observer fails to
-   start (missing interpreter, bad path), `cat` forwards stdin so the
-   downstream statusline still renders. A bare `python3 <observer> | <existing>`
-   blanks the user's statusline on any startup failure.
+1. **Compose a pass-through stage that `exec`s the observer, with an
+   `exec cat` fallback.** When wrapping an existing statusline command, write
+   `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; } | <existing>`.
+   The `exec cat` covers a missing python3 or an unreadable observer file, so
+   the downstream statusline still renders. `exec` makes the observer the only
+   holder of the pipe's write end, so its early stdout release gives the next
+   stage EOF. Two forms to avoid:
+   - A bare `python3 <observer> | <existing>` blanks the statusline on any
+     startup failure.
+   - The guarded group `{ python3 <observer> || cat; } | <existing>` keeps the
+     write end open in its subshell until the group exits, so the early
+     release never reaches the next stage.
+
+   Trade-off: a python3 that starts but crashes before reading stdin no
+   longer falls back to `cat`; the observer's own top-level try/except keeps
+   that path fail-open.
 2. **Deadline exceptions must not derive from `OSError`.** `TimeoutError`
    subclasses `OSError`, so a `signal.alarm` handler raising it is swallowed
    by every `except OSError:` I/O guard. Raise a dedicated
@@ -68,7 +78,7 @@ flow and that touches user-owned config.
 
 ```bash
 # wrap, do not replace
-"statusLine": { "command": "{ python3 \"$OBS\" || cat; } | $EXISTING" }
+"statusLine": { "command": "{ command -v python3 >/dev/null && [ -r \"$OBS\" ] && exec python3 \"$OBS\"; exec cat; } | $EXISTING" }
 ```
 
 ```python
@@ -78,3 +88,54 @@ class Deadline(BaseException):
 def on_deadline(signum, frame):
     raise Deadline()
 ```
+
+---
+
+## Update — 2026-09-28
+
+Third-round P2 findings on PR #912, in four groups.
+
+### 1. A guarded group does not release the pipe early
+
+Time until the next stage sees EOF, with a 1 s simulated recording step:
+
+| Stage | Time to EOF |
+|---|---|
+| bare `python3 obs \| existing` | 0.04 s |
+| `{ python3 obs \|\| cat; } \| existing` | 2.40 s |
+| `{ … && exec python3 obs; exec cat; } \| existing` | 0.02 s |
+
+Codex reproduced it independently at about 1.06 s against 0.10 s. The
+statusline waited for the recording because the brace group held the pipe's
+write end. The fix is the `exec` stage in Guidance item 1; `install`
+upgrades the earlier guarded and plain forms in place (action `upgraded`).
+The T10 EOF-timing bats test now runs the installed command under
+`bash -c`. The original piped the bare observer, so it could not see this
+bug. Test the composed command, not the component.
+
+### 2. Report what actually happened
+
+- Resetting invalid settings.json returns action `recovered` (`recover` on
+  `--dry-run`), not the ordinary statusline-set action.
+- `prune` counts only successful unlinks and fails with `prune_incomplete`,
+  instead of swallowing `OSError` and reporting the files as removed.
+- A status probe separates "not enabled" from "could not tell" (for example
+  `settings_jsonc`): report an unknown state with the error code.
+
+### 3. Validate numbers at the boundary
+
+`json.loads` accepts `NaN` and `Infinity`. A `number_or_none` helper that
+only checks the type writes non-JSON tokens and defeats equality-based
+throttles such as `unchanged()` (`NaN != NaN`). Guard with `math.isfinite`.
+
+### 4. Keep docs and commands in step with the code
+
+- `docs/security.md` drifted three ways: it said no code path prunes
+  records (on-demand `prune` ships), that the reader exposes four fields (it
+  returns six), and that lookup is primary-slug-first (it takes the newest
+  record across projects). Re-check enumerated claims when a feature grows.
+- A slash command whose `argument-hint` lists subcommands needs a fenced
+  Arguments section that parses `$ARGUMENTS`.
+- Drop tool-call-budget claims once later steps add calls.
+- Untested promises need cases: the 0700/0600 file modes and the
+  `observer_not_removable` path.
