@@ -1,0 +1,21 @@
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_817f7bf54355bc 658
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_817f7bf54355bc 346-349,352-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7b5cbaf7aa9f6c65fc390e1ce6bc980736b72a3d",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
