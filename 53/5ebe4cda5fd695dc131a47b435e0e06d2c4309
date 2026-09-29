@@ -1,0 +1,28 @@
+plugins/yellow-debt/commands/debt/status.md
+  s_e3ae526d137cfd::t_9e9e341a4b47b3 22-25
+  s_e3ae526d137cfd::t_1517a870ecf551 249
+plugins/yellow-debt/commands/debt/audit.md
+  s_e3ae526d137cfd::t_2ccefda91cc7ba 146
+  s_e3ae526d137cfd::t_ac4088557e95ea 29-34
+plugins/yellow-debt/commands/debt/triage.md
+  s_e3ae526d137cfd::t_45651d8b36ae68 155-168,173-174,177,179-180,182-183
+plugins/yellow-debt/commands/debt/fix.md
+  s_e3ae526d137cfd::t_b927d02280bddc 23-26
+  s_e3ae526d137cfd::t_3ef100b4e68907 119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "535ebe4cda5fd695dc131a47b435e0e06d2c4309",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
