@@ -134,53 +134,68 @@ mutation, and use only the enabled provider.
   - **Prototype:**
     `/tmp/claude-1000/-home-kinginyellow--herdr-worktrees-yellow-plugins-zsh-compatibility/2c9a3151-c782-4681-a8fa-8f3faec1c7ed/scratchpad/extract.js`
     (876 blocks found).
-- [ ] 1.2: Add `scripts/validate-shell-compat.js`, the static lint.
+- [x] 1.2: Add `scripts/validate-shell-compat.js`, the static lint.
   - Copy the skeleton from `scripts/validate-provider-neutral-commands.js`
     (constants, walker, `main()`, `require.main` guard, exported helpers).
   - Support a `VALIDATE_SHELL_COMPAT_ROOT` env override, as
     `validate-doc-counts.js:33` does.
-  - Support `--report` mode: print findings and exit 0.
-  - **Scan scope:**
-    - Include `plugins/*/{commands,skills,agents,references}/**/*.md` and
-      plugin `CLAUDE.md`/`README.md`, fences tagged `bash`, `sh` or `shell`.
-    - Exclude generated `plugins/*/codex/**` (fix the source and regenerate),
-      `CHANGELOG.md`, and `docs/`.
-  - **Rules for inline blocks.** SHC-001 to SHC-007 are skipped inside a Tier 2
-    wrapper body, except SHC-001 and SHC-002, which apply inside
-    `bash <<'EOF'` too. Every finding prints file, line, rule ID and a
-    one-line fix hint.
-    - SHC-001 (noclobber): `>`, `2>` or `&>` onto a variable assigned from
-      `mktemp` in the same block, or onto a file created with `touch` in the
-      same block. A `${var:-/dev/null}` target is exempt.
-    - SHC-002 (special parameter): assigning `status`, `path`, `argv`,
-      `pipestatus`, `match` or `MATCH`, with or without `local`, `export` or
-      `declare`.
-    - SHC-003 (bash-only builtin or expansion outside a wrapper):
-      `mapfile`, `readarray`, `read` with `-a`, `-p`, `-n`, `-s` or `-d`,
-      `${!…}`, `${v,,}`, `${v^^}`, `local -n`, `declare -n`, `BASH_REMATCH`,
-      `BASH_SOURCE`, `PIPESTATUS`, `FUNCNAME`, `shopt`, `export -f`,
-      `type -t`, `type -P`, `;;&`. `declare -A` alone is not flagged, because
-      it works in zsh.
-    - SHC-004 (echo escapes): `echo -e`, or `echo` with a backslash in its
-      argument. Fix: use `printf`.
-    - SHC-005 (array indexing): a literal numeric index `${a[N]}`. Fix: iterate
-      over `"${a[@]}"`.
+  - Support `--report` mode (print findings and exit 0) and `--json`.
+  - **Scan scope:** every `.md` under `plugins/`, fences tagged `bash`, `sh`
+    or `shell`. Exclude the generated `plugins/<p>/{codex,cursor}/skills/`
+    copies (fix the source and regenerate), `plugins/<p>/tests/` and
+    `CHANGELOG.md`.
+  - **Fence reading.** Uses `extractRawFencedBlocks` (item 1 follow-up), the
+    raw-reader view: a list-item fence whose body sits at column 0 is still a
+    bash block to Claude, though CommonMark ends it early. This found two
+    unwrapped `validate.sh` sources in `debt/triage.md` the CommonMark view
+    missed.
+  - **Line classes.** Comment lines, heredoc bodies and the inside of
+    multi-line quoted strings (an awk or python program passed as one
+    argument) are skipped; the line that closes such a string is linted after
+    the closing quote. Single-quoted arguments are blanked before the
+    SHC-002/003/005/006 checks so awk/jq/`bash -c` program text is not read
+    as shell. An unclosed quote falls back to plain lines (fail open).
+  - **Rules.** All inline rules are skipped inside a Tier 2 wrapper body
+    (`bash <<'TAG'` and `bash -c` lines): a bash child has no zsh specials
+    and ignores the parent's noclobber. Every finding prints file, line,
+    rule ID and a one-line fix hint.
+    - SHC-001 (noclobber): `>`, `2>`, `&>` or `N>` onto a file that already
+      exists — a variable assigned from `mktemp` (not `-u`) or `touch`ed in
+      the same file, or an UPPERCASE `mktemp` variable anywhere in the same
+      plugin (the cross-file handoff convention: an agent creates
+      `OUTPUT_FILE`, the skill it follows documents `> "$OUTPUT_FILE"`), or a
+      second `>` onto the same target in one block. `${var:-/dev/null}` and
+      paths built from a variable (`$f.err`) are exempt.
+    - SHC-002 (special parameter): assigning, declaring, `for`/`select`
+      looping over, or `read`ing into `status`, `path`, `argv`, `pipestatus`,
+      `fpath`, `cdpath` or `manpath`.
+    - SHC-003 (bash-only outside a wrapper): `mapfile`, `readarray`, `read`
+      with `-a`, `-p`, `-n`, `-e` or `-i` (zsh supports `-d`, `-s`, `-t`,
+      `-u`), `${!…}`, `${v,,}`/`${v^^}`, `${v@op}`, `local -n`/`declare -n`,
+      `BASH_REMATCH`, `BASH_SOURCE`, `BASH_VERSINFO`, `PIPESTATUS`,
+      `FUNCNAME`, `BASHPID`, `EPOCHSECONDS`/`EPOCHREALTIME`, `shopt`,
+      `export -f`, `type -t`/`-P`, `;;&`, `wait -n`. `declare -A` alone is
+      not flagged, because it works in zsh.
+    - SHC-004 (echo escapes): `echo -e`, or `echo` with a backslash escape
+      in its arguments. Fix: use `printf`.
+    - SHC-005 (array indexing): a literal numeric index `${a[N]}`, `a[0]=`,
+      or `${a[$i]}` where `i` starts at 0 in the block.
     - SHC-006 (test syntax): `==` inside single-bracket `[ … ]`.
-    - SHC-007 (rcquotes): adjacent single-quoted segments `'…''…'`.
-    - SHC-008 (unwrapped source): `source` or `.` of a Tier 3 library outside
-      a `bash <<'EOF'` wrapper. The Tier 3 list lives in the config file
-      (1.3).
-  - **Wrapper detection (SHC-W).** A block counts as pinned when its first
-    non-blank, non-comment line is `bash <<'TAG'` or `bash <<-'TAG'`, and the
-    matching terminator closes it. The body of a `bash -c '…'` counts as
-    pinned only for a single-line `-c` argument. A block whose only command is
-    `bash path/to/script.sh …` has no inline body to check.
+    - SHC-007 (rcquotes): adjacent single-quoted strings `'…''…'` (not the
+      `'\''` idiom).
+    - SHC-008 (sourcing): `source`/`.` in command position of a Tier 3
+      library outside a wrapper, or of a plugin library in neither tier
+      list (so every new sourced library gets classified).
   - **Rules for `.sh` files:**
     - SHC-101: a `.sh` file under `plugins/` has no shebang and no
       `# shell-compat: library` marker.
-    - SHC-102: a library listed as Tier 4 in the config contains a bash-only
-      construct (the SHC-003 list). This keeps dual-shell libraries dual-shell.
-- [ ] 1.3: Add `scripts/shell-compat-config.json`, holding the tier 3 and
+    - Tier 4 libraries are linted in full with the inline rules (this
+      replaces the planned SHC-102).
+    - SHC-900: config problems — a listed library that does not exist, a
+      library in both tiers, a Tier 3 library without a bash (or
+      `#!/bin/false`) shebang, an allowlist entry with an unknown rule, a
+      missing reason, or a stale cap.
+- [x] 1.3: Add `scripts/shell-compat-config.json`, holding the tier 3 and
       tier 4 library lists and the allowlist:
 
       ```json
@@ -197,98 +212,139 @@ mutation, and use only the enabled provider.
 
   - An empty `reason`, or a `max` above the actual count (a stale entry), is a
     lint error.
-- [ ] 1.4: Add `scripts/check-shell-parse.js`, the differential parse check.
-  - Batch the extracted blocks into one temp dir and spawn one loop per shell,
-    not about 1,750 separate processes.
+  - Initial tiers: Tier 3 = yellow-ci `redact.sh`,
+    `resolve-runner-targets.sh`, `validate.sh`; yellow-core
+    `compound-staging.sh`; yellow-debt `lib/validate.sh`; yellow-ruvector
+    `hooks/scripts/lib/resolve.sh`, `lib/install-ruvector.sh`. Tier 4 =
+    yellow-core `repo-profile.sh`, yellow-morph `install-morphmcp.sh`,
+    yellow-ruvector `hooks/scripts/lib/validate.sh`. All three Tier 4 files
+    lint clean.
+- [x] 1.4: Add `scripts/check-shell-parse.js`, the differential parse check.
+  - Batch the extracted blocks into one temp dir and spawn one driver per
+    shell (about 4 s for 784 blocks), not about 1,570 separate processes.
   - Fail only when bash accepts a block and zsh rejects it.
   - If zsh is missing, print a skip warning and exit 0 locally. Exit 1 when
     `CI=true`.
   - Honor `--report`.
-- [ ] 1.5: Run the measurement.
+- [x] 1.5: Run the measurement.
   - Run `node scripts/validate-shell-compat.js --report` and
     `node scripts/check-shell-parse.js --report`.
   - Also run every extracted block through
-    `zsh -f -o noclobber -o extendedglob -o rcquotes -n`.
+    `zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob -n`.
   - Commit the per-plugin inventory as the checklist in Phase 2.
   - Classify each finding as real breakage (fix), style-level or false
     positive (allowlist with a reason), or a lint bug (fix the rule).
-- [ ] 1.6: Wire the scripts into the build.
+  - **Result (2026-09-28):** 86 lint findings, all real breakage, no
+    allowlist entries needed. Parse check: 784 blocks, 1 zsh-only failure
+    (composio `:192`), 37 fail both shells (templates, ignored); the
+    snapshot options change nothing. Lint bugs found and fixed during
+    triage: `source` inside a message string, `$f.err` read as `$f`, the
+    `'\''` idiom read as rcquotes, awk/python program text read as shell,
+    and a fence-extractor bug that stripped a leading `>` redirect from
+    fence bodies (fixed in item 1's `markdown-fences.js`). Against the
+    noclobber doc's plugin-wide grep (markdown only), the lint misses only
+    the two `gt-setup` `${mq_err_log:-/dev/null}` lines, which are false
+    positives by design.
+- [x] 1.6: Wire the scripts into the build.
   - `package.json`: add `validate:shell-compat` and `check:shell-parse`
     aliases. Append `node scripts/validate-shell-compat.js --report` to the
     `validate:schemas` chain (line 20).
-  - `.github/workflows/validate-schemas.yml`: add a `shell-compat` matrix
-    target and `case` arm in the `validate-schemas` job (matrix around lines
-    138-149, `case` around line 198). It runs the lint and, after
-    `sudo apt-get install -y zsh`, the parse check, both in `--report` mode for
-    now.
-  - `.github/workflows/validate-schemas-fork.yml`: mirror the target.
-- [ ] 1.7: Add integration tests.
-  - `tests/integration/validate-shell-compat.test.ts`: follow the fixture and
-    env-root pattern in `tests/integration/validate-doc-counts.test.ts`, with
-    a positive and a negative fixture per rule. Also cover wrapper exemption,
-    a codex-path exclusion, a stale allowlist entry, an empty reason, and
-    `--report` exit 0.
-  - `tests/integration/markdown-fences.test.ts`: cover the extractor edge
-    cases (indented list-item fences, tilde fences, nested four-backtick
-    fences, info strings, unterminated fences).
+  - `.github/workflows/validate-schemas.yml` and `validate-schemas-fork.yml`:
+    add a `shell-compat` matrix target and `case` arm running the lint in
+    `--report` mode.
+  - Deviation: the parse check is not in this matrix target. The matrix jobs
+    have a 2-minute budget and installing zsh via apt does not fit safely,
+    so the parse check runs in the dedicated zsh job (3.5), which installs
+    zsh anyway.
+- [x] 1.7: Add integration tests.
+  - `tests/integration/validate-shell-compat.test.ts`: positive and negative
+    cases per rule via `lintShellText`, plus fixture-tree runs for wrapper
+    exemption, multi-line strings, tier 3/4 sourcing, unclassified
+    libraries, plugin-wide handoff variables, codex/cursor/tests/CHANGELOG
+    exclusion, SHC-101, allowlist caps (within, above, stale, empty reason),
+    config errors, and `--report` exit 0.
+  - `tests/integration/markdown-fences.test.ts`: extractor edge cases for
+    both readings (indented list-item fences, column-0 bodies, tilde fences,
+    nested four-backtick fences, info strings, unterminated fences, leading
+    `>` redirects inside fences).
   - `tests/integration/check-shell-parse.test.ts`: skip when zsh is missing
     locally. Cover a bash-and-zsh failure (template, not flagged), a zsh-only
-    failure (flagged), and the missing-zsh path under `CI=true`.
+    failure (flagged), fence-language and generated-copy scope, and the
+    missing-zsh path with and without `CI=true`.
 
 ### Phase 2: Fix real breakage (one PR per plugin or small group)
 
-Each PR fixes the source files, regenerates the Codex copies
+Each PR fixes the source files, regenerates the Codex/Cursor copies
 (`pnpm generate:manifests`), runs `pnpm validate:agents`, `pnpm lint:plugins`,
 `pnpm validate:shell-compat` and `pnpm check:shell-parse`, and adds a patch
-changeset per touched plugin. The inventory from 1.5 is authoritative. The
-items below come from research and must be confirmed against it.
+changeset per touched plugin. The file:line lists below are the measured
+inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 
-- [ ] 2.1: yellow-composio `skills/composio-patterns/SKILL.md:192,210`. Fix the
-      zsh parse failure in `( flock -x 200; … ) 200>"$LOCK_FILE"` and the
-      noclobber hit after `touch "$LOCK_FILE"`. Use `exec 200>>"$LOCK_FILE"`
-      or a `bash <<'EOF'` wrapper.
-- [ ] 2.2: yellow-council. Fix the noclobber hits in
-      `skills/council-patterns/SKILL.md` (for example `:602`, `:977`) and the
-      `path=` assignments (`:674`, `:677`). Wrap the `declare -A` /
-      `${!REVIEWER_*[@]}` blocks in `commands/council/council.md` (`:350`,
-      `:1326`, `:1901`, `:1917`, `:2016`), or rewrite them without `${!`.
-- [ ] 2.3: yellow-core.
-  - Wrap `agents/workflow/staging-reviewer.md:235-251` (`declare -A`, `${!`,
-    `read -ra`).
-  - Rewrite the `${!BRANCHES[@]}` loop at `commands/flow/review.md:209` to
-    iterate values.
+- [ ] 2.1: yellow-composio `skills/composio-patterns/SKILL.md:192`. Fix the
+      zsh parse failure in `( flock -x 200; … ) 200>"$LOCK_FILE"` (and the
+      noclobber hit after `touch "$LOCK_FILE"`, which the parse failure hides
+      from the lint). Use `exec 200>>"$LOCK_FILE"` or a `bash <<'EOF'`
+      wrapper.
+- [ ] 2.2: yellow-council (26 findings).
+  - SHC-003: `commands/council/council.md:55-56` and
+    `commands/council/setup.md:33` read `BASH_VERSINFO`, which is empty in
+    zsh, so `/council` and `/council:setup` refuse to run under zsh
+    ("bash 4.3+ required, found 0.0"). Check the bash on PATH instead
+    (`bash -c 'printf "%s" "${BASH_VERSINFO[0]}"'`) or wrap.
+  - SHC-003: `council.md:1917,2016` `${!REVIEWER_FENCED_PATHS[@]}` — wrap or
+    rewrite without `${!`.
+  - SHC-001: `council.md:829`; `agents/review/gemini-reviewer.md:220,720,
+    788,799`; `agents/review/opencode-reviewer.md:174,343,735,795,805`;
+    `skills/council-patterns/SKILL.md:602,977,1009` (the canonical pattern
+    the reviewer agents copy).
+  - SHC-002: `council-patterns/SKILL.md:672,674,677` (`path`).
+- [ ] 2.3: yellow-core (8 findings).
+  - Wrap `agents/workflow/staging-reviewer.md:249,251` (`${!`, `read -ra`).
+  - Rewrite the `${!BRANCHES[@]}` loop at `commands/flow/review.md:209`.
   - Wrap the `compound-staging.sh` call sites in
     `commands/compound/review-staged.md:33,161`.
-- [ ] 2.4: yellow-debt.
-  - Wrap every markdown block that sources `lib/validate.sh`: `commands/debt/`
-    `fix.md`, `audit.md`, `triage.md`, `status.md` and `sync.md`,
-    `agents/remediation/debt-fixer.md`, `skills/debt-conventions`, and the
-    plugin `CLAUDE.md` examples.
+  - `commands/setup/all.md:83` (SHC-001, `>"$out"` after `mktemp`) and
+    `:203` (SHC-002, `for path in`).
+  - `commands/worktree/cleanup.md:51` (SHC-005, `${args_copy[$i]}` from 0).
+- [ ] 2.4: yellow-debt (14 findings).
+  - Wrap every markdown block that sources `lib/validate.sh`:
+    `commands/debt/fix.md:29`, `audit.md:35`, `status.md:28`, `sync.md:135`,
+    `triage.md:113,124,150,166`, `agents/remediation/debt-fixer.md:151,186,
+    244`.
   - Fix the noclobber hits in `debt-fixer.md:159,208`.
   - The `mapfile` calls at `debt-fixer.md:81,192` end up inside the wrapper
     or get rewritten to `while IFS= read -r`.
-- [ ] 2.5: yellow-ci.
+  - `commands/debt/status.md:53` (SHC-002, `for status in`).
+- [ ] 2.5: yellow-ci (4 findings).
   - Rename `local status` in `skills/ci-runner-health/SKILL.md:455`.
   - Wrap the call sites that source `validate.sh`, `resolve-runner-targets.sh`
     and `redact.sh` (`commands/ci/setup-runner-targets.md:33-34`,
     `agents/ci/failure-analyst.md:87`).
-- [ ] 2.6: yellow-ruvector. Wrap the `install-ruvector.sh` and `resolve.sh`
-      call sites in `commands/ruvector/setup.md` (`:56`, `:94`, `:106`,
-      `:140`, `:178`) and `status.md` (`:23`, `:59`, `:78`, `:189`, `:264`).
-- [ ] 2.7: github-workflow and yellow-devin. Rewrite the `mapfile -d '' -t`
-      calls in `skills/github-stack-amend/SKILL.md:51` and
-      `skills/github-stack-submit/SKILL.md:63` (NUL-delimited, so a
-      `while IFS= read -r -d ''` loop inside a bash wrapper), plus the
-      yellow-devin `mapfile`.
-- [ ] 2.8: gt-workflow.
-  - Check `skills/gt-cleanup/SKILL.md:55`: `${args_copy[$i]}` indexed from a
-    0-based counter is off by one in zsh. Rewrite it to iterate values or
-    shift positional parameters.
-  - Confirm that the `gt-setup` `mq_err_log` hits are false positives
-    (`${mq_err_log:-/dev/null}`).
-- [ ] 2.9: yellow-linear `commands/linear/delegate.md:523` (`path=`), and the
-      noclobber hits in yellow-browser-test, yellow-review, yellow-semgrep
-      (`skills/semgrep-conventions/SKILL.md:246`) and yellow-research.
+- [ ] 2.6: yellow-ruvector (10 findings). Wrap the `install-ruvector.sh` and
+      `resolve.sh` call sites in `commands/ruvector/setup.md` (`:56`, `:94`,
+      `:106`, `:140`, `:178`) and `status.md` (`:23`, `:59`, `:78`, `:189`,
+      `:264`).
+- [ ] 2.7: github-workflow, yellow-devin and yellow-codex.
+  - Rewrite the `mapfile -d '' -t` calls in
+    `github-workflow/skills/github-stack-amend/SKILL.md:51` and
+    `github-stack-submit/SKILL.md:63` (NUL-delimited, so a
+    `while IFS= read -r -d ''` loop).
+  - yellow-devin: `commands/devin/review-prs.md:439` (`mapfile`) and
+    `skills/devin-workflows/SKILL.md:108` (`status=`).
+  - yellow-codex: `commands/codex/setup.md:61-62` (`read -r -a`).
+- [ ] 2.8: gt-workflow (5 findings).
+  - `skills/gt-cleanup/SKILL.md:46,55,56`: `${args_copy[$i]}` indexed from
+    a 0-based counter is off by one in zsh. Iterate values or shift
+    positional parameters.
+  - `skills/gt-setup/SKILL.md:91` (SHC-002, `for path in`) and `:132`
+    (SHC-001, `: > "$mq_err_log"` after `mktemp`).
+- [ ] 2.9: yellow-linear `commands/linear/delegate.md:523` (`path=`);
+      yellow-semgrep `commands/semgrep/setup.md:75-76` (`read -r -a`) and
+      `skills/semgrep-conventions/SKILL.md:246` (SHC-001); and the SHC-001
+      hits in yellow-browser-test (`agents/testing/test-reporter.md:83`,
+      `commands/browser-test/explore.md:85`, `test.md:78,105`), yellow-review
+      (`commands/review/resolve-stack.md:207`, `review-all.md:385`) and
+      yellow-research (`skills/library-context/SKILL.md:115`).
 - [ ] 2.10: Allowlist every remaining style-level or false-positive finding
       with a reason. Target: the lint is clean in non-report mode, with fewer
       than 10 allowlist entries. Explain any larger number in the PR body.
@@ -365,7 +421,7 @@ items below come from research and must be confirmed against it.
 
 - `scripts/lib/markdown-fences.js`: shared fence extractor.
 - `scripts/validate-shell-compat.js`: static lint (SHC-001 to SHC-008,
-  SHC-101, SHC-102).
+  SHC-101, SHC-900).
 - `scripts/shell-compat-config.json`: tier library lists and allowlist.
 - `scripts/check-shell-parse.js`: differential `bash -n` / `zsh -n` check.
 - `tests/integration/validate-shell-compat.test.ts`,
@@ -570,7 +626,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 ### 6. agent/fix/zsh-remaining-plugins
 - **Type:** fix
 - **Description:** Fix remaining zsh breakage across plugins and record the allowlist
-- **Scope:** plugins/github-workflow/skills/, plugins/yellow-devin/, plugins/gt-workflow/skills/gt-cleanup/SKILL.md, plugins/yellow-linear/commands/linear/delegate.md, plugins/yellow-browser-test/, plugins/yellow-review/, plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md, plugins/yellow-research/, scripts/shell-compat-config.json, .changeset/
+- **Scope:** plugins/github-workflow/skills/, plugins/yellow-devin/, plugins/yellow-codex/commands/codex/setup.md, plugins/gt-workflow/skills/, plugins/yellow-linear/commands/linear/delegate.md, plugins/yellow-browser-test/, plugins/yellow-review/, plugins/yellow-semgrep/, plugins/yellow-research/, scripts/shell-compat-config.json, .changeset/
 - **Tasks:** 2.7, 2.8, 2.9, 2.10
 - **Depends on:** #5
 
@@ -587,3 +643,14 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - **Scope:** package.json, .github/workflows/validate-schemas.yml, .github/workflows/validate-schemas-fork.yml, CLAUDE.md, AGENTS.md, CONTRIBUTING.md, docs/solutions/, plugins/yellow-debt/CLAUDE.md, plugins/yellow-ci/CLAUDE.md, plugins/yellow-ruvector/CLAUDE.md
 - **Tasks:** 4.1, 4.2, 4.3, 4.4, 4.5
 - **Depends on:** #7
+
+## Stack Progress
+<!-- Updated by flow:work. Do not edit manually. -->
+- [x] 1. agent/refactor/shared-markdown-fences (completed 2026-09-28)
+- [ ] 2. agent/feat/shell-compat-lint
+- [ ] 3. agent/fix/zsh-composio-council
+- [ ] 4. agent/fix/zsh-core-debt-wrappers
+- [ ] 5. agent/fix/zsh-ci-ruvector-wrappers
+- [ ] 6. agent/fix/zsh-remaining-plugins
+- [ ] 7. agent/test/zsh-runtime-suite
+- [ ] 8. agent/chore/shell-compat-required

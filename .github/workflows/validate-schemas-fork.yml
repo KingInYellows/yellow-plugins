@@ -81,6 +81,7 @@ jobs:
           - cursor
           - yellow-goal
           - generated
+          - shell-compat
 
     steps:
       - name: Checkout repository
@@ -240,6 +241,11 @@ jobs:
               # contributor who leaks catalog-only provider metadata into a
               # generated manifest sees the same blocking signal.
               node scripts/validate-provider-groups.js
+              ;;
+            shell-compat)
+              # Mirror of the main workflow's `shell-compat` target
+              # (report-only until the fix stack lands).
+              node scripts/validate-shell-compat.js --report
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"
