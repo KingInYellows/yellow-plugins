@@ -174,15 +174,15 @@ together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 
 ### Phase 4: Release and verification
 
-- [ ] 4.1: Add `.changeset/yellow-core-context-observer-followups.md`
+- [x] 4.1: Add `.changeset/yellow-core-context-observer-followups.md`
   (`"yellow-core": patch`) covering only the corrupt-backup location change
   (it now sits next to a symlinked `settings.json`, like the pre-observer
   backup) and the doc corrections. The pending #912 changeset is corrected in
   3.1 and 3.2, not duplicated.
-- [ ] 4.2: `cd plugins/yellow-core && bats tests/ && bats
+- [x] 4.2: `cd plugins/yellow-core && bats tests/ && bats
   skills/git-worktree/tests/`; remove `lib/__pycache__` afterwards.
-- [ ] 4.3: `pnpm validate:schemas && pnpm validate:agents && pnpm lint:plugins`.
-- [ ] 4.4: Run `rg` for `status --yes`, `without waiting`, `class Deadline(`,
+- [x] 4.3: `pnpm validate:schemas && pnpm validate:agents && pnpm lint:plugins`.
+- [x] 4.4: Run `rg` for `status --yes`, `without waiting`, `class Deadline(`,
   `UNREADABLE`, `primary-slug`, `100 ms budget` and `five tool calls` to
   confirm no stale restatement remains outside `plans/complete/` and
   `CHANGELOG.md`.
