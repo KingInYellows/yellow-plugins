@@ -1,0 +1,51 @@
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt
+  s_e23df78d9c2b73::t_56a89d10968df1 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.stdin
+  s_e23df78d9c2b73::t_56a89d10968df1 1
+plugins/github-workflow/hooks/scripts/lib/git-push-detector.js
+  s_e23df78d9c2b73::t_c06cede639983d 388,404-406,416,446-454,484,491,514-522,537,543-551,559,562,566,568-569,581-582,586-590,613-617,645,840,849,900-901,909-913,937-944,958-965,988-997,1032,1078-1095,1100,1104,1107-1113,1121,1128,1171,1235,1274,1358,1360,1378,1408-1410,1416-1441
+  s_e23df78d9c2b73::t_4411aca5dd762b 361-385,407-409,650-676,747-751,824,918-922
+  s_e23df78d9c2b73::t_8148a9ee7fa67d 43-49,360,1442-1443
+plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js
+  s_e23df78d9c2b73::t_b559992376f69d 361-364,368,370-372,374-385,407-409,650-667,669,671-676,747-751,824,918-922
+  s_e23df78d9c2b73::t_4411aca5dd762b 365-367,369,373,668,670
+  s_e23df78d9c2b73::t_e43d742b36d81c 543-545
+  s_e23df78d9c2b73::t_2dcf0b06ff010e 43-49
+  s_e23df78d9c2b73::t_52d73023a04d15 360,1078-1095,1100,1104,1107-1113,1121,1128,1171,1235,1274,1358,1360,1378,1408-1410,1416-1442
+  s_e23df78d9c2b73::t_60b93471f445b7 388,404-406,416,446-454,484,491,514-522,537,546-551,559,562,566,568-569,581-582,586-590,613-617,645,840,849,900-901,909-913,937-944,958-965,988-997,1032
+  s_e23df78d9c2b73::t_7afdc023050c9d 1443
+plugins/gt-workflow/CLAUDE.md
+  s_e23df78d9c2b73::t_b495f934cfe588 218-220
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt
+  s_e23df78d9c2b73::t_56a89d10968df1 1-5
+plugins/gt-workflow/tests/hook-parity.bats
+  s_e23df78d9c2b73::t_83e208be0759f6 313-320
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.stdin
+  s_e23df78d9c2b73::t_56a89d10968df1 1
+plugins/github-workflow/tests/hooks.bats
+  s_e23df78d9c2b73::t_1c59c98a69f24a 254-278
+.changeset/git-push-detector-fd-case.md
+  s_e23df78d9c2b73::t_460d475da4929c 1-19
+tests/integration/git-push-detector-parity.test.ts
+  s_e23df78d9c2b73::t_b0e015e5d9fbdc 470-489
+  s_e23df78d9c2b73::t_058ad2517ce35c 332-357
+  s_e23df78d9c2b73::t_ca88ce2deb7b6c 564-568
+tests/integration/shell-compat-hook-parity.test.ts
+  s_e23df78d9c2b73::t_14ea2d607da311 33-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5ac04d5df57bccb4730f0052633f848895c5bdda",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
