@@ -14,8 +14,11 @@ observer as the only holder of the pipe's write end.
 Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
   - Reads the statusline JSON payload from stdin, writes it to stdout
     byte-for-byte, and releases stdout BEFORE any other work, so the next
-    stage sees EOF and computes its output while the observer records, and a
-    broken observer cannot blank the statusline. Claude Code shows the
+    stage sees EOF and computes its output while the observer records. Once
+    main() runs, a failure while recording cannot blank the statusline; the
+    cat fallback covers only a missing python3 or an unreadable observer
+    file, so an observer that fails before it reads stdin (a syntax error,
+    say) leaves the next stage with no payload. Claude Code shows the
     statusline only once the whole statusLine command exits, and the shell
     waits for the observer, so the display still waits for the record write
     (bounded by DEADLINE_SECONDS). A stage that wraps the observer without

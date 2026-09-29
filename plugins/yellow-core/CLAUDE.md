@@ -293,7 +293,8 @@ than sourced:
   exits 0, and records context-window numbers to
   `<config>/projects/<slug>/context-observations/<session_id>.json`
   (stdlib only, no git; a 2 s recording deadline, `DEADLINE_SECONDS`, and
-  a 100 ms latency target checked by the R22 bats test). Bats coverage at
+  a 100 ms latency target, backed by a looser R22 bats regression guard: best
+  of five runs against a limit well above the target). Bats coverage at
   `tests/context-observer.bats` with real-host fixtures under
   `tests/fixtures/statusline/<client-version>/`
 - `statusline-settings.py` — the only writer of `statusLine.command`

@@ -352,6 +352,11 @@ def numbered_backups(path, suffix):
     return [candidate for _, candidate in sorted(found)]
 
 
+def aliases(candidate, path):
+    """True when candidate resolves to the same file as path (symlink to its own backup name)."""
+    return os.path.realpath(candidate) == os.path.realpath(path)
+
+
 def numbered_backup(path, suffix, raw):
     """Copy path aside; reuse an identical backup, never clobber a different one.
 
@@ -363,6 +368,8 @@ def numbered_backup(path, suffix, raw):
     original = path + suffix
     numbered = numbered_backups(path, suffix)
     for candidate in ([original] if os.path.exists(original) else []) + numbered:
+        if aliases(candidate, path):
+            continue  # a symlinked settings.json may point at its own backup name
         try:
             with open(candidate, "r", encoding="utf-8") as handle:
                 if handle.read() == raw:
@@ -374,6 +381,9 @@ def numbered_backup(path, suffix, raw):
     else:
         last = int(numbered[-1][len(original) + 1:]) if numbered else 1
         candidate = "%s%s.%d" % (path, suffix, last + 1)
+        while aliases(candidate, path):
+            last += 1
+            candidate = "%s%s.%d" % (path, suffix, last + 1)
     shutil.copy2(path, candidate)
     prune_backups(path, suffix, keep=candidate)
     return candidate
@@ -381,7 +391,8 @@ def numbered_backup(path, suffix, raw):
 
 def prune_backups(path, suffix, keep):
     """Delete the oldest numbered backups beyond MAX_BACKUPS; never the original or `keep`."""
-    numbered = [b for b in numbered_backups(path, suffix) if b != keep]
+    numbered = [b for b in numbered_backups(path, suffix)
+                if b != keep and not aliases(b, path)]
     excess = len(numbered) + 2 - MAX_BACKUPS  # + the original + `keep`
     for old in numbered[:max(excess, 0)]:
         try:

@@ -1349,6 +1349,20 @@ PY
   [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
 }
 
+@test "T11: a symlink pointing at its own corrupt backup name keeps the original text in a distinct backup" {
+  seed_settings none
+  printf '{"a": ' > "$TEST_HOME/.claude/settings.json.corrupt.backup"
+  rm -f "$SETTINGS"
+  ln -s settings.json.corrupt.backup "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  local backup
+  backup="$(echo "$output" | jq -r '.backup')"
+  [ "$backup" != "null" ]
+  [ "$backup" != "$SETTINGS.corrupt.backup" ]
+  [ "$(cat "$backup")" = '{"a": ' ]
+}
+
 @test "T11: status and statusline on an unreadable settings.json fail with settings_unreadable and write nothing" {
   [ "$(id -u)" -ne 0 ] || skip "root ignores file modes"
   local sub
