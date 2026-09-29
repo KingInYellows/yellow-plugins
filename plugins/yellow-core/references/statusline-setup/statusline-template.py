@@ -12,7 +12,7 @@ RUVECTOR_CHECK = REPLACE_WITH_BOOLEAN  # True if yellow-ruvector is installed
 CONTEXT_WARN = 70
 CONTEXT_CRIT = 90
 GIT_CACHE_TTL = 5
-CACHE_DIR = os.path.expanduser("~/.claude")
+CACHE_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 
 # --- Color helpers ---
 USE_COLOR = (

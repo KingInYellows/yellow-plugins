@@ -20,7 +20,9 @@ stage is `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
 back to `cat` so the statusline never blanks, and `exec` lets the statusline
 render as soon as the observer releases stdout instead of waiting for the
 record write. The generated statusline template moved to
-`references/statusline-setup/statusline-template.py` unchanged. The observer passes the statusline payload through byte-for-byte,
+`references/statusline-setup/statusline-template.py`; its git cache and error
+log now also follow `CLAUDE_CONFIG_DIR`, and `/setup:all` probes the statusline
+and settings in the selected config dir. The observer passes the statusline payload through byte-for-byte,
 always exits 0, and records context-window numbers per session under
 `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/`, counting one advisory
 crossing per drop below a 50 % remaining watermark (`YELLOW_CONTEXT_WATERMARK`)

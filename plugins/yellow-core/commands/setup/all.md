@@ -222,13 +222,14 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.codex/auth.json ] && printf '~/.codex/auth.json:                 exists\n' || printf '~/.codex/auth.json:                 missing\n'
-[ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
+claude_config="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+[ -f "$claude_config/yellow-statusline.py" ] && printf '<config>/yellow-statusline.py:      exists\n' || printf '<config>/yellow-statusline.py:      missing\n'
 
-if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
-  python3 -c '
+if [ -f "$claude_config/settings.json" ] && command -v python3 >/dev/null 2>&1; then
+  CLAUDE_SETTINGS_PATH="$claude_config/settings.json" python3 -c '
 import json, os
 try:
-    d = json.load(open(os.path.expanduser("~/.claude/settings.json")))
+    d = json.load(open(os.environ["CLAUDE_SETTINGS_PATH"]))
     sl = "present" if "statusLine" in d else "missing"
     dh = d.get("disableAllHooks", False)
     print(f"statusLine_key:      {sl}")
@@ -737,7 +738,7 @@ prefixes and are not in the recorded probe list.
 
 **yellow-core:**
 
-- READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
+- READY: `python37_check` ok AND `<config>/yellow-statusline.py` exists AND
   `statusLine_key` is `present` AND `disableAllHooks` is not `True`
 - PARTIAL: script exists AND `statusLine_key` is present AND `python37_check`
   is ok, but `disableAllHooks` is `True`
