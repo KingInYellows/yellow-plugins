@@ -20,7 +20,7 @@ Run a single Bash call:
 
 ```bash
 printf '=== Prerequisites ===\n'
-for cmd in git jq yq realpath flock gt; do
+for cmd in git jq yq realpath gt; do
   command -v "$cmd" >/dev/null 2>&1 && printf '%-12s ok\n' "${cmd}:" || printf '%-12s NOT FOUND\n' "${cmd}:"
 done
 
@@ -65,7 +65,7 @@ fi
 
 Stop after reporting all required failures:
 
-- Any missing command in `git`, `jq`, `yq`, `realpath`, `flock`, or `gt`
+- Any missing command in `git`, `jq`, `yq`, `realpath`, or `gt`
   blocks setup. Report all missing commands together.
 - `git_repo` not ok: "yellow-debt must run inside a git repository."
 - `repo_root` not writable: "The repository root is not writable, so debt

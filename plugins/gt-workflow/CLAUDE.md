@@ -215,7 +215,9 @@ git-push field path was then corrected on 2026-09-16 — see below):
   `submodule foreach`/`bisect run`/`subtree push`, expanding-heredoc
   `$(…)` bodies, `sh -c`/`eval`/`su -c`/`sudo -s`/heredoc/pipe recursion
   capped at depth 3 and 16 wrapper layers with stdin inherited through
-  every level, denies what it cannot read, fails closed on parser error).
+  every level, `case` pattern lists and `$((…))` arithmetic read as data,
+  a `/dev/fd/N` script operand matched to that descriptor's heredoc on the
+  same command, denies what it cannot read, fails closed on parser error).
   Kept byte-identical to github-workflow's copy by
   `tests/integration/git-push-detector-parity.test.ts`; edit both or that
   suite fails. `${IFS}`, `$GIT push` indirection, shell aliases/`hash -p`,

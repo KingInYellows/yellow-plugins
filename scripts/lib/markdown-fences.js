@@ -378,13 +378,15 @@ function stripQuoteMarkers(line, depth) {
 // the first outdented line. The shell-compat checks lint what runs, so they
 // use this reading: a fence opens on any fence-shaped line (any indentation;
 // block-quote markers stripped) and closes at the next line that is only a
-// marker of the same character and at least the same length. List
-// containers are ignored. Each record:
+// marker of the same character and at least the same length, or where its
+// block quote ends (a blank line or a line with fewer `>` markers) — an
+// unterminated quoted example must not swallow a later top-level ```bash
+// block. List containers are ignored. Each record:
 //   startLine      the opener line (1-based, frontmatter not stripped)
 //   bodyStartLine  the first body line (startLine + 1)
 //   endLine        the closer line, or the last body line when unclosed
 //   closed         true when a matching closer ended the fence
-//   endReason      'closer' | 'eof'
+//   endReason      'closer' | 'container' | 'eof'
 //   info, lang     the info string and its language tag
 //   indent         the opener's indent, stripped from each body line
 //   body           the dedented body, block-quote markers removed
@@ -413,13 +415,20 @@ function extractRawFencedBlocks(content) {
     current = null;
   };
   for (let i = 0; i < lines.length; i++) {
-    if (current) {
-      if (current.closerRe.test(stripQuoteMarkers(lines[i], current.depth))) {
-        finish(i, 'closer');
-      }
-      continue;
-    }
     const { depth, rest } = splitBlockquotePrefix(lines[i]);
+    if (current) {
+      if (depth < current.depth) {
+        // The block quote the fence sits in ended (a blank line, or a line
+        // with fewer `>` markers): so does the fence, closer or not. The
+        // line is then read afresh — it may open the next block.
+        finish(i, 'container');
+      } else {
+        if (current.closerRe.test(stripQuoteMarkers(lines[i], current.depth))) {
+          finish(i, 'closer');
+        }
+        continue;
+      }
+    }
     const indent = leadingIndentOf(rest);
     const opener = fenceOpenerAt(rest.slice(indent), 0);
     if (opener) {

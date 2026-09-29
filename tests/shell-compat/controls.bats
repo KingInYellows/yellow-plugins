@@ -36,6 +36,19 @@ setup() {
   [ "$output" = "it's" ]
 }
 
+@test "zsh-snapshot globs case-insensitively (nocaseglob) and plain zsh does not" {
+  d="$BATS_TEST_TMPDIR/glob"
+  mkdir -p "$d"
+  : > "$d/MixedCase.txt"
+  profile_cmd zsh-snapshot
+  run --separate-stderr "${PROFILE_CMD[@]}" -c '[[ -o nocaseglob ]] && cd "$1" && printf "%s" mixedcase*' _ "$d"
+  [ "$status" -eq 0 ]
+  [ "$output" = MixedCase.txt ]
+  profile_cmd zsh
+  run --separate-stderr "${PROFILE_CMD[@]}" -c 'cd "$1" && printf "%s" mixedcase*' _ "$d"
+  [ "$status" -ne 0 ]
+}
+
 @test "zsh -f ignores the contributor's ~/.zshrc" {
   mkdir -p "$BATS_TEST_TMPDIR/zdot"
   printf 'print -r -- ZSHRC-LOADED\n' > "$BATS_TEST_TMPDIR/zdot/.zshrc"

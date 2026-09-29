@@ -830,6 +830,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install zsh
+        # tests/integration/check-shell-parse.test.ts runs its parse cases
+        # against a real zsh; under CI it fails rather than skips without one.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends zsh
+          zsh --version
+
       - name: Start integration test timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
 

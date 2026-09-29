@@ -304,6 +304,108 @@ function scanQuotes(line, open) {
   return { resume, open: '' };
 }
 
+// A same-length copy of one line of shell in which quoted text is replaced by
+// `_` (the quote characters stay) and a comment by spaces, so a rule can find
+// operators (`<<`, `>`, `]]`, `)`) that the shell actually sees. Command
+// substitutions stay code even inside double quotes, and so do `$var` /
+// `${…}` expansions (`f="$(mktemp)"`, `> "$f"` read as before). A quote left
+// open runs to the end of the line; escaped characters are masked too.
+function maskShell(text) {
+  const out = text.split('');
+  const n = text.length;
+  let i = 0;
+  const blank = (j) => {
+    if (j < n) out[j] = '_';
+  };
+  const singleQuoted = (ansi) => {
+    i++;
+    while (i < n && text[i] !== "'") {
+      if (ansi && text[i] === '\\') blank(i++);
+      blank(i++);
+    }
+    i++;
+  };
+  // Code up to `stop`: ')' ends a `$(…)`, '`' a backtick substitution.
+  const code = (stop) => {
+    let depth = 0;
+    while (i < n) {
+      const ch = text[i];
+      if (ch === '\\') {
+        blank(i + 1);
+        i += 2;
+      } else if (stop === '`' && ch === '`') {
+        i++;
+        return;
+      } else if (ch === '#' && (i === 0 || /\s/.test(text[i - 1]))) {
+        for (let j = i; j < n; j++) out[j] = ' ';
+        i = n;
+      } else if (ch === "'") {
+        singleQuoted(text[i - 1] === '$');
+      } else if (ch === '"') {
+        doubleQuoted();
+      } else if (ch === '`') {
+        i++;
+        code('`');
+      } else if (ch === '$' && text[i + 1] === '(') {
+        i += 2;
+        code(')');
+      } else {
+        i++;
+        if (stop !== ')') continue;
+        if (ch === '(') depth++;
+        else if (ch === ')' && depth-- === 0) return;
+      }
+    }
+  };
+  const doubleQuoted = () => {
+    i++;
+    while (i < n && text[i] !== '"') {
+      const ch = text[i];
+      const next = text[i + 1] || '';
+      if (ch === '\\') {
+        blank(i++);
+        blank(i++);
+      } else if (ch === '`') {
+        i++;
+        code('`');
+      } else if (ch === '$' && next === '(') {
+        i += 2;
+        code(')');
+      } else if (ch === '$' && next === '{') {
+        const close = text.indexOf('}', i);
+        i = close === -1 ? n : close + 1;
+      } else if (ch === '$' && /[A-Za-z_]/.test(next)) {
+        i++;
+        while (i < n && /\w/.test(text[i])) i++;
+      } else if (ch === '$' && /[0-9@#?*!$-]/.test(next)) {
+        i += 2;
+      } else {
+        blank(i++);
+      }
+    }
+    i++;
+  };
+  code('');
+  return out.join('');
+}
+
+// The first heredoc operator the shell sees on the line — not one inside a
+// quoted string or a comment (`printf '%s' "cat <<'EOF'"`,
+// `true # cat <<'EOF'`). Matched against the line itself, so a quoted tag
+// (`<<'EOF'`) still reads as one.
+const HEREDOC_AT_RE = new RegExp(HEREDOC_RE.source, 'y');
+function findHeredoc(text) {
+  const mask = maskShell(text);
+  const ops = /(?<!<)<<(?!<)/g;
+  let m;
+  while ((m = ops.exec(mask)) !== null) {
+    HEREDOC_AT_RE.lastIndex = m.index;
+    const match = HEREDOC_AT_RE.exec(text);
+    if (match) return match;
+  }
+  return null;
+}
+
 // Blank the script argument of each `bash -c` on the line (to the end of the
 // line when its quote stays open), keeping the surrounding command intact.
 function blankBashDashC(text) {
@@ -349,19 +451,31 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
   let heredoc = null; // { tag, stripTabs, kind }
   let open = '';
   let openedAt = -1;
+  // Text of earlier physical lines that end in a `\` continuation, so a
+  // wrapper split as `bash /dev/fd/3 \` + `3<<'TAG'` is still recognised.
+  let continued = '';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const carried = continued;
+    continued = '';
     if (heredoc) {
       const candidate = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
       const trimmed = candidate.trimEnd();
       // `TAG)` closes only a command-substitution heredoc; an fd wrapper
-      // needs a line that is exactly the tag.
+      // needs a line that is exactly the tag — trailing blanks included,
+      // since the shell does not strip them.
       if (
-        trimmed === heredoc.tag ||
+        (heredoc.wrapper ? candidate : trimmed) === heredoc.tag ||
         (!heredoc.wrapper && trimmed === `${heredoc.tag})`)
       ) {
         out[i] = { kind: 'data', code: '', closesWrapper: heredoc.wrapper };
         heredoc = null;
+      } else if (heredoc.wrapper && trimmed === heredoc.tag) {
+        out[i] = {
+          kind: heredoc.kind,
+          code: '',
+          badWrapper: `trailing blanks after the ${heredoc.tag} tag line: the shell does not read it as the terminator, so the wrapper never closes`,
+        };
       } else {
         out[i] = {
           kind: heredoc.kind,
@@ -390,9 +504,13 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       continue;
     }
     const heredocScan = stripArithmetic(code);
-    const match = HEREDOC_RE.exec(heredocScan);
+    if (maskShell(heredocScan).endsWith('\\')) {
+      continued = carried + heredocScan.slice(0, -1);
+    }
+    const match = findHeredoc(heredocScan);
     if (match) {
-      const prefix = heredocScan.slice(0, match.index);
+      const ownPrefix = heredocScan.slice(0, match.index);
+      const prefix = carried + ownPrefix;
       const bashFed = BASH_WRAPPER_PREFIX_RE.test(prefix);
       // An unquoted tag means the CURRENT shell expands the body before the
       // command sees it — even when that command is a bash wrapper.
@@ -419,10 +537,14 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
         // The rest of the wrapper line (redirects, a pipe) runs in the
         // current shell: lint it with the wrapper itself replaced by `:`.
         const rest = heredocScan.slice(match.index + match[0].length);
+        const before = ownPrefix.slice(
+          0,
+          Math.max(0, wrapper.start - carried.length)
+        );
         heredoc.wrapper = true;
         out[i] = {
           kind: 'code',
-          code: `${prefix.slice(0, wrapper.start)}:${rest}`,
+          code: `${before}:${rest}`,
           opensWrapper: match[3],
         };
       }
@@ -467,7 +589,9 @@ const ZSH_SPECIAL_PARAMS = [
   'manpath',
 ];
 const SPECIAL_ALT = ZSH_SPECIAL_PARAMS.join('|');
-const CMD_START = String.raw`(?:^\s*|[;&|({]\s*|\b(?:then|do|else|elif)\s+)`;
+// Command position: line start, after an operator or `!`, or after a
+// keyword that takes a command (`if status=0; then` assigns, too).
+const CMD_START = String.raw`(?:^\s*|[;&|({!]\s*|\b(?:if|while|until|then|do|else|elif)\s+)`;
 const SPECIAL_ASSIGN_RE = new RegExp(
   `${CMD_START}(${SPECIAL_ALT})(?:\\[[^\\]]*\\])?\\+?=`,
   'g'
@@ -682,9 +806,18 @@ const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*"?\$\{?([A-Za-z_]\w*)/g;
 const CLOBBER_REDIRECT_RE =
   /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*"?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["\s;&|)<>]|$)/g;
 
+// A literal redirect target (`> result.json`, `2>"out/log"`) for the
+// second-write check. A target built from an expansion or a glob is left to
+// the variable form above or skipped; /dev/* targets are exempt. The
+// operator must start a word, so a `<branch>...` placeholder is not one.
+const LITERAL_REDIRECT_RE =
+  /(?:^|(?<=[\s;&|(){}]))(?:\d|&)?>(?![>|&])\s*(["']?)([^\s"'`$;&|()<>*?[\]{}\\]+)\1(?=[\s;&|)<>]|$)/g;
+
+// Only code the shell runs: a comment or quoted example
+// (`rm -f "$f" # f=$(mktemp)`) does not create a file.
 function existingFileVars(codeLines) {
   const vars = new Set();
-  for (const line of codeLines) {
+  for (const line of codeLines.map(maskShell)) {
     let m;
     MKTEMP_ASSIGN_RE.lastIndex = 0;
     while ((m = MKTEMP_ASSIGN_RE.exec(line)) !== null) {
@@ -713,21 +846,22 @@ function truncationTargets(code) {
 }
 
 // `$( … )` and backtick substitutions inside a span (nested parens balanced).
-// They run as real commands, so their redirects still count.
-function commandSubstitutions(span) {
+// They run as real commands, so their redirects still count. `mask` is the
+// span's maskShell text: quoted parens and backticks do not count.
+function commandSubstitutions(span, mask) {
   const found = [];
-  for (let i = 0; i < span.length; i++) {
-    if (span[i] === '`') {
-      const end = span.indexOf('`', i + 1);
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] === '`') {
+      const end = mask.indexOf('`', i + 1);
       if (end === -1) break;
       found.push(span.slice(i, end + 1));
       i = end;
-    } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+    } else if (mask[i] === '$' && mask[i + 1] === '(' && mask[i + 2] !== '(') {
       let depth = 0;
       let j = i + 1;
-      for (; j < span.length; j++) {
-        if (span[j] === '(') depth++;
-        else if (span[j] === ')' && --depth === 0) break;
+      for (; j < mask.length; j++) {
+        if (mask[j] === '(') depth++;
+        else if (mask[j] === ')' && --depth === 0) break;
       }
       found.push(span.slice(i, j + 1));
       i = j;
@@ -736,26 +870,54 @@ function commandSubstitutions(span) {
   return found;
 }
 
+// Replace each `re` match in the shell-visible text (quotes masked, so a
+// quoted `"]]"` does not end a `[[ … ]]` span) with `placeholder`, keeping
+// the span's command substitutions.
+function blankSpans(code, re, placeholder) {
+  const mask = maskShell(code);
+  let result = '';
+  let last = 0;
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(mask)) !== null) {
+    const end = m.index + m[0].length;
+    const subs = commandSubstitutions(code.slice(m.index, end), m[0]);
+    result +=
+      code.slice(last, m.index) +
+      (subs.length ? `${placeholder} ; ${subs.join(' ; ')} ;` : placeholder);
+    last = end;
+  }
+  return result + code.slice(last);
+}
+
 // `(( n > $max ))` and `[[ $a > $b ]]` compare; they do not redirect. Blank
 // the span but keep its command substitutions so their redirects are scanned.
 function stripComparisons(code) {
-  const blank = (placeholder) => (span) => {
-    const subs = commandSubstitutions(span);
-    return subs.length ? `${placeholder} ; ${subs.join(' ; ')} ;` : placeholder;
-  };
-  return code
-    .replace(ARITHMETIC_RE, blank('0'))
-    .replace(/\[\[(?:[^\]]|\](?!\]))*\]\]/g, blank('[[ ]]'));
+  return blankSpans(
+    blankSpans(code, ARITHMETIC_RE, '0'),
+    /\[\[(?:[^\]]|\](?!\]))*\]\]/g,
+    '[[ ]]'
+  );
 }
 
+// Redirect targets the line writes with `>`: { name, literal }. `name` is
+// the variable (`$f`, `${f:-/dev/null}`) or, when `literal`, the path. A `>`
+// inside a quoted string is text, not a redirect.
 function* clobberRedirects(rawCode) {
   const code = stripComparisons(rawCode);
+  const mask = maskShell(code);
+  const isRedirect = (m) => mask[code.indexOf('>', m.index)] === '>';
   CLOBBER_REDIRECT_RE.lastIndex = 0;
   let m;
   while ((m = CLOBBER_REDIRECT_RE.exec(code)) !== null) {
     // `${var:-/dev/null}` still writes to $var whenever it is set — the
     // mktemp file — so noclobber refuses it like a bare `$var`.
-    yield m[1] || m[3];
+    if (isRedirect(m)) yield { name: m[1] || m[3], literal: false };
+  }
+  LITERAL_REDIRECT_RE.lastIndex = 0;
+  while ((m = LITERAL_REDIRECT_RE.exec(code)) !== null) {
+    if (isRedirect(m) && !m[2].startsWith('/dev/'))
+      yield { name: m[2], literal: true };
   }
 }
 
@@ -897,21 +1059,25 @@ function lintShellText(
     for (const target of truncated) {
       add('SHC-001', i, `\`: >\` truncates ${target}, which may already exist`);
     }
-    for (const target of clobberRedirects(line)) {
-      if (truncated.some((t) => t.replace(/^\$\{?|\}$/g, '') === target)) {
-        written.add(target);
+    for (const { name, literal } of clobberRedirects(line)) {
+      const key = literal ? `literal:${name}` : name;
+      const shown = literal ? name : `$${name}`;
+      const truncates = (t) =>
+        (literal ? t : t.replace(/^\$\{?|\}$/g, '')) === name;
+      if (truncated.some(truncates)) {
+        written.add(key);
         continue;
       }
-      if (existing.has(target)) {
+      if (!literal && existing.has(name)) {
         add(
           'SHC-001',
           i,
-          `\`>\` onto $${target}, which already exists (mktemp/touch)`
+          `\`>\` onto ${shown}, which already exists (mktemp/touch)`
         );
-      } else if (written.has(target)) {
-        add('SHC-001', i, `second \`>\` onto $${target} in the same block`);
+      } else if (written.has(key)) {
+        add('SHC-001', i, `second \`>\` onto ${shown} in the same block`);
       }
-      written.add(target);
+      written.add(key);
     }
     for (const [rule, fn] of LINE_RULES) {
       for (const detail of fn(line, blockCode)) add(rule, i, detail);

@@ -1,0 +1,5 @@
+EXIT_CODE=2
+--- STDOUT ---
+--- STDERR ---
+⛔  Hook could not verify this Bash command. Blocking as a precaution.
+   If you intended to push, use `gt submit --no-interactive` instead.

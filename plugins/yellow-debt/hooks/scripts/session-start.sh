@@ -25,21 +25,24 @@ else
 fi
 TODOS_DIR="${PROJECT_DIR}/todos/debt"
 
-# Exit silently if no todos directory
-if [ ! -d "$TODOS_DIR" ]; then
+# Exit silently if no todos directory (or a symlinked one a cloned
+# repository could point anywhere)
+if [ ! -d "$TODOS_DIR" ] || [ -L "$TODOS_DIR" ] || [ -L "${PROJECT_DIR}/todos" ]; then
   printf '{"continue": true}\n'
   exit 0
 fi
 
-# Count high/critical findings by matching structured filename format:
-# {id}-{status}-{severity}-{slug}-{hash}.md
-# Regex anchored to position — avoids double-counting files whose slugs
-# contain status/severity keywords. in-progress is excluded: already being worked on.
+# Count high/critical findings by matching the full structured filename:
+# {id}-{status}-{severity}-{slug}[-{hash}].md (lib/validate.sh
+# DEBT_TODO_NAME_RE). Names outside it — e.g. carrying `$(…)` — are not
+# counted, matching what /debt:triage lists. Anchored to position, so slugs
+# containing status/severity keywords are not double-counted. in-progress is
+# excluded: already being worked on.
 count=0
 for f in "$TODOS_DIR"/*.md; do
-  [ -f "$f" ] || continue
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
   base="$(basename "$f")"
-  if [[ "$base" =~ ^[0-9]+-(pending|ready)-(critical|high)- ]]; then
+  if [[ "$base" =~ ^[0-9]{1,6}-(pending|ready)-(critical|high)-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
     count=$((count + 1))
   fi
 done

@@ -1,7 +1,7 @@
 ---
 name: debt:fix
 description: "Agent-driven remediation of specific debt findings with human approval. Use when you want to fix a specific technical debt item."
-argument-hint: '<todo-path>'
+argument-hint: '<todo-id | todo-path>'
 allowed-tools:
   - Bash
   - Read
@@ -16,18 +16,20 @@ human approval before committing changes.
 
 ## Arguments
 
-- `<path>` — Path to todo file (e.g., `todos/debt/042-ready-high-complexity.md`)
+- `<todo-id | todo-path>` — The todo's numeric id (e.g. `042`) or its path
+  (e.g. `todos/debt/042-ready-high-complexity.md`). The block resolves the
+  file from the id and requires a given path to name that same file.
 
 ## Implementation
 
-Replace `<todo-path>` on the `bash /dev/fd/3` line with the todo path from
-the command arguments, single-quoted. Stop with an error instead of running the
-block if the value contains a single quote.
+Replace `<todo-arg>` on the `bash /dev/fd/3` line with the command argument,
+single-quoted. Stop with an error instead of running the block if the value
+contains a single quote.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 '<todo-path>' 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<todo-arg>' 3<<'__YELLOW_DEBT_BASH__'
 set -euo pipefail
 
 # Source shared validation library for extract_frontmatter and transition_todo_state
@@ -35,44 +37,37 @@ set -euo pipefail
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 
 # Parse arguments
-if [ $# -ne 1 ]; then
-  printf 'Usage: /debt:fix <todo-id>\n' >&2
+if [ $# -ne 1 ] || [ -z "${1:-}" ]; then
+  printf 'Usage: /debt:fix <todo-id | todos/debt/<id>-ready-...md>\n' >&2
+  printf 'Example: /debt:fix 042\n' >&2
   exit 1
 fi
 
-TODO_PATH="${1:-}"
+cd "$(git rev-parse --show-toplevel)"
 
-if [ -z "$TODO_PATH" ]; then
-  printf 'ERROR: Missing required argument <path>\n' >&2
-  printf 'Usage: /debt:fix <path-to-todo>\n' >&2
-  printf 'Example: /debt:fix todos/debt/042-ready-high-complexity.md\n' >&2
-  exit 1
-fi
-
-# Validate path (must be under todos/debt/, reject traversal)
-validate_file_path "$TODO_PATH" || {
-  printf 'ERROR: Invalid path "%s" (path traversal detected)\n' "$TODO_PATH" >&2
+# Resolve the todo from its numeric id; a path argument only supplies the id
+# and must name the same file. The filename itself is repository-controlled
+# and is never trusted as shell text.
+TODO_ARG="$1"
+case "$TODO_ARG" in
+  todos/debt/*)
+    TODO_ID="${TODO_ARG#todos/debt/}"
+    TODO_ID="${TODO_ID%%-*}"
+    ;;
+  *) TODO_ID="$TODO_ARG" ;;
+esac
+TODO_PATH=$(debt_resolve_todo "$TODO_ID" ready) || {
+  printf 'Run /debt:triage to accept findings first.\n' >&2
   exit 1
 }
-
-# Verify path is under todos/debt/
-case "$TODO_PATH" in
-  todos/debt/*) ;;
-  *)
-    printf 'ERROR: Path must be under todos/debt/\n' >&2
-    exit 1
-    ;;
-esac
-
-# Verify file exists
-if [ ! -f "$TODO_PATH" ]; then
-  printf 'ERROR: Todo file not found: %s\n' "$TODO_PATH" >&2
+if [ "$TODO_ARG" != "$TODO_ID" ] && [ "$TODO_ARG" != "$TODO_PATH" ]; then
+  printf 'ERROR: %s is not the ready todo for id %s\n' "$TODO_ARG" "$TODO_ID" >&2
   exit 1
 fi
 
 # Remediation runs in an isolated worktree and must start from a clean repo.
 # Exclude .debt/ and todos/debt/ artifacts left by /debt:audit so the audit→fix flow works.
-if [ -n "$(git status --porcelain | grep -Ev '^(\?\?|[MADRCU ]{2}) (\.debt/|todos/debt/)')" ]; then
+if [ -n "$(git status --porcelain --untracked-files=all | grep -Ev '^(\?\?|[MADRCU ]{2}) "?(\.debt/|todos/debt/)')" ]; then
   printf 'ERROR: /debt:fix requires a clean working tree (ignoring .debt/ and todos/debt/). Commit, stash, or discard unrelated changes first.\n' >&2
   exit 1
 fi
@@ -96,22 +91,28 @@ transition_todo_state "$TODO_PATH" "in-progress" || {
 }
 
 # Update TODO_PATH after state transition (filename changed)
-NEW_TODO_PATH=$(printf '%s' "$TODO_PATH" | sed 's/-ready-/-in-progress-/')
+NEW_TODO_PATH=$(debt_resolve_todo "$TODO_ID" in-progress)
 
 # Extract finding details
 TITLE=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.title // "Untitled"' 2>/dev/null)
 CATEGORY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.category' 2>/dev/null)
 SEVERITY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.severity' 2>/dev/null)
-TODO_ID=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.id' 2>/dev/null)
 
 printf '[fix] Launching yellow-debt:remediation:debt-fixer agent for: %s\n' "$TITLE" >&2
 printf '[fix] Category: %s | Severity: %s | ID: %s\n' "$CATEGORY" "$SEVERITY" "$TODO_ID" >&2
 
-printf '[fix] Ready todo path: %s\n' "$NEW_TODO_PATH" >&2
+printf '[fix] Todo id: %s\n' "$TODO_ID" >&2
+printf '[fix] In-progress todo path: %s\n' "$NEW_TODO_PATH" >&2
 printf '[fix] Next step: launch yellow-debt:remediation:debt-fixer in an isolated worktree for this todo.\n' >&2
 
-# Show next ready finding if any
-NEXT_READY=$(find todos/debt -name '*-ready-*.md' 2>/dev/null | head -1)
+# Show next ready finding if any (only names that fit the todo pattern)
+NEXT_READY=""
+while IFS= read -r -d '' f; do
+  if debt_todo_name_ok "${f##*/}"; then
+    NEXT_READY="$f"
+    break
+  fi
+done < <(find todos/debt -maxdepth 1 -type f -name '*-ready-*.md' -print0 2>/dev/null | sort -z)
 if [ -n "$NEXT_READY" ]; then
   printf '\nNext ready finding: %s\n' "$NEXT_READY"
 fi
@@ -121,14 +122,15 @@ __YELLOW_DEBT_BASH__
 ## Agent Orchestration
 
 After the bash block succeeds, launch the fixer agent directly via the Agent tool with
-the updated todo path, using this literal value:
+the todo id and in-progress path the block printed, using this literal value:
 
 ```text
 Agent(
   subagent_type="yellow-debt:remediation:debt-fixer",
   description="Fix debt finding",
-  prompt="Remediate the technical debt finding in <NEW_TODO_PATH printed by the
-bash block above>. Work in an isolated worktree for this todo."
+  prompt="Remediate the technical debt finding with todo id <todo id printed
+by the bash block above> (file: <in-progress todo path printed by the bash
+block above>). Work in an isolated worktree for this todo."
 )
 ```
 
@@ -139,7 +141,8 @@ restore only the files it changed before resetting the todo to `ready`.
 ## Example Usage
 
 ```bash
-# Fix a specific finding
+# Fix a specific finding by id or by path
+$ARGUMENTS 042
 $ARGUMENTS todos/debt/042-ready-high-complexity.md
 
 # Fix will fail if todo is not in 'ready' state
@@ -200,7 +203,9 @@ If fix agent fails:
 
 - Todo remains in `in-progress` state
 - Run `/debt:fix` again to retry (will fail - need to manually reset to ready)
-- Or manually transition back to ready: `transition_todo_state "<path>" ready`
+- Or manually transition back to ready, from the git root in a bash child
+  that sources `lib/validate.sh`:
+  `transition_todo_state "$(debt_resolve_todo '<id>' in-progress)" ready`
 
 If git changes need to be reverted, restore only the files touched by the fix:
 

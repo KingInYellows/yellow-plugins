@@ -35,6 +35,12 @@ patterns, effort estimation, validation rules, and todo status values.
 Extract finding description, affected files/line ranges, suggested remediation,
 category, and severity.
 
+Note the todo's numeric id — the leading digits of its filename (1–6 digits;
+stop if it is anything else). Every bash block below takes only that id, as
+a single-quoted `'<todo-id>'` operand, and finds the file itself. Never paste
+the todo path or any other part of its filename into a block: the repository
+controls the name, and a `$(…)` in it would run.
+
 ### 2. Analyze and Implement
 
 Apply appropriate fix based on debt category:
@@ -65,16 +71,17 @@ patterns and style.
    - Reset todo to ready: `transition_todo_state "$TODO_PATH" "ready"`
    - Exit with error message
 
-**Implementation** (run as one Bash call; substitute the actual todo path):
+**Implementation** (run as one Bash call; substitute the todo id):
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
 _validate_sh="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT is unset}/lib/validate.sh"
 [ -f "$_validate_sh" ] || { printf '[debt-fixer] ERROR: validate.sh not found at %s\n' "$_validate_sh" >&2; exit 1; }
 . "$_validate_sh"
-TODO_PATH="<todo-path-from-step-1>"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+TODO_PATH=$(debt_resolve_todo "$1" in-progress) || exit 1
 
 command -v yq >/dev/null 2>&1 || { printf '[debt-fixer] ERROR: yq not installed\n' >&2; exit 1; }
 frontmatter=$(extract_frontmatter "$TODO_PATH") \
@@ -90,9 +97,10 @@ while IFS= read -r status_line; do
   changed_file="${status_line:3}"
   # Rename/copy entries are "old -> new"; the destination is the file on disk
   case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
-  # The todo file itself is legitimately modified (/debt:fix transitions it to
-  # in-progress before launching this agent) — never treat it as out-of-scope
-  [ "$changed_file" = "$TODO_PATH" ] && continue
+  # Todo bookkeeping is never part of a fix: /debt:fix renames this todo to
+  # in-progress before launching the agent (the old name shows as deleted),
+  # and todos/ is often untracked. Never revert or delete anything under it.
+  case "$changed_file" in todos/*) continue ;; esac
   in_scope=0
   for allowed in "${ALLOWED[@]}"; do
     [ "$changed_file" = "$allowed" ] && { in_scope=1; break; }
@@ -108,7 +116,7 @@ while IFS= read -r status_line; do
       rm -f -- "$changed_file"
     fi
   fi
-done < <(git status --porcelain)
+done < <(git status --porcelain --untracked-files=all)
 
 if [ "$OUT_OF_SCOPE" -eq 1 ]; then
   transition_todo_state "$TODO_PATH" "ready" \
@@ -154,9 +162,10 @@ Resolve the active stacked-PR provider first: invoke the `Skill` tool with
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_path=$(debt_resolve_todo "$1" in-progress) || exit 1
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
 category=$(extract_frontmatter "$todo_path" | yq -r '.category')
 severity=$(extract_frontmatter "$todo_path" | yq -r '.severity')
@@ -193,9 +202,10 @@ complete either.
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_path=$(debt_resolve_todo "$1" in-progress) || exit 1
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
 category=$(extract_frontmatter "$todo_path" | yq -r '.category')
 severity=$(extract_frontmatter "$todo_path" | yq -r '.severity')
@@ -251,13 +261,18 @@ provider-specific mutation.
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
-while IFS= read -r changed_file; do
-  [ -z "$changed_file" ] && continue
-  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
-done < <(git status --porcelain | cut -c4-)
+bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_path=$(debt_resolve_todo "$1" in-progress) || exit 1
+while IFS= read -r status_line; do
+  [ -z "$status_line" ] && continue
+  changed_file="${status_line:3}"
+  case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
+  # Leave todo bookkeeping alone (see the scope check in step 3).
+  case "$changed_file" in todos/*) continue ;; esac
+  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
+done < <(git status --porcelain --untracked-files=all)
 transition_todo_state "$todo_path" "ready"
 __YELLOW_DEBT_BASH__
 ```

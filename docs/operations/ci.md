@@ -97,7 +97,10 @@ A lighter workflow for pull requests from forks, on GitHub-hosted runners so
 untrusted code never reaches self-hosted infrastructure. It runs
 `validate-schemas`, `lint-and-typecheck`, `unit-tests`, `validate-versions`,
 `changeset-check`, and its own `ci-status`, and only when the PR head is a
-fork.
+fork. Fork PRs skip the main workflow's `shell-compat-tests` job, so the fork
+`validate-schemas` job's `shell-compat` target installs zsh, bats and kislyuk
+yq itself and runs the shell-compat lint, the zsh parse check, and the
+`tests/shell-compat` bats suite.
 
 ---
 

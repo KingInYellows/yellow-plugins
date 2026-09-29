@@ -13,7 +13,7 @@ Technical debt audit and remediation with parallel scanner agents.
   function
 - Path arguments validated before use: source `lib/validate.sh` in all commands
 - **Shell libraries and zsh:** `lib/validate.sh` is bash-only (its
-  transition lock uses `exec 200>` and a RETURN trap) and markdown blocks run
+  transition cleanup is a RETURN trap) and markdown blocks run
   under the user's shell, often zsh: every block that sources it runs in a
   bash child —
   `bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'` … `__YELLOW_DEBT_BASH__`.
@@ -34,10 +34,15 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
    before use (reject `..`, `/`, `~`). Sourced from
    `yellow-core/lib/validate-fs.sh` via `lib/validate.sh`; yellow-core is a
    required dependency declared in `plugin.json`
-4. **TOCTOU protection**: State transitions re-read file inside `flock` scope
-5. **Derived path validation**: Synthesizer validates category/slug contain only
+4. **TOCTOU protection**: State transitions re-read the file while holding a
+   `mkdir` lock (`<todo>.lock`) and write through `mktemp` + `mv`; symlinked
+   `.debt/`, `todos/debt/`, todo or lock paths are refused
+5. **Todo ids, not paths, in shell text**: blocks take the numeric todo id as a
+   single-quoted operand and resolve the file with `debt_resolve_todo`; names
+   outside `DEBT_TODO_NAME_RE` are never listed or pasted
+6. **Derived path validation**: Synthesizer validates category/slug contain only
    `[a-z0-9-]` before constructing todo paths
-6. **Error logging**: All failures logged with `[debt-component] Error: ...`
+7. **Error logging**: All failures logged with `[debt-component] Error: ...`
    prefix to stderr
 
 ## Plugin Components

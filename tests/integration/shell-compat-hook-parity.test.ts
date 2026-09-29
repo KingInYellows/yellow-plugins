@@ -30,17 +30,11 @@ const detectors = {
 
 const ROOT = join(__dirname, '..', '..');
 
-// Wrapped blocks the hook already could not verify before they were
-// wrapped (plans/shell-compat-followups.md item 4), counted per file. Every
-// other wrapped block must be allowed outright. Lower a count when a block
-// starts passing; never raise one to admit a new block.
-const KNOWN_UNVERIFIABLE: Record<string, number> = {
-  'plugins/yellow-debt/agents/remediation/debt-fixer.md': 2,
-  'plugins/yellow-debt/commands/debt/audit.md': 1,
-  'plugins/yellow-debt/commands/debt/fix.md': 1,
-  'plugins/yellow-debt/commands/debt/status.md': 1,
-  'plugins/yellow-ruvector/commands/ruvector/status.md': 1,
-};
+// Wrapped blocks the hook cannot verify, counted per file. Empty since the
+// detector learned `case` pattern lists and `$((…))` arithmetic
+// (plans/shell-compat-followups.md item 4): every wrapped block must be
+// allowed outright. Never add an entry to admit a new block.
+const KNOWN_UNVERIFIABLE: Record<string, number> = {};
 
 type Block = { startLine: number; lang: string; body: string };
 type Wrapper = { open: number; close: number; tag: string };
