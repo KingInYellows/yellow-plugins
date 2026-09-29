@@ -30,7 +30,9 @@ setup() {
   WORK="$BATS_TEST_TMPDIR/work"
   mkdir -p "$WORK/.ruvector" "$BATS_TEST_TMPDIR/bin"
   BLOCK="$BATS_TEST_TMPDIR/block.sh"
-  awk '/^INTEL=.ruvector\/intelligence.json$/{f=1} f&&/^```$/{exit} f{print}' "$STATUS_MD" > "$BLOCK"
+  # Stop at the closing fence or the bash wrapper's heredoc tag, whichever
+  # comes first (the block runs inside `bash -c "$(cat <<'TAG' … )"`).
+  awk '/^INTEL=.ruvector\/intelligence.json$/{f=1} f&&/^(```|__YELLOW_RUVECTOR_BASH__)$/{exit} f{print}' "$STATUS_MD" > "$BLOCK"
   [ -s "$BLOCK" ]
 }
 

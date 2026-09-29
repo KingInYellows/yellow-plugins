@@ -19,6 +19,9 @@ Show installation health, database statistics, and queue status.
 ### Step 1: Check Installation
 
 ```bash
+# install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
+# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 node --version 2>/dev/null || printf 'node: not found\n'
@@ -45,6 +48,8 @@ if yellow_ruvector_validate_paths; then
   yellow_ruvector_model_cached && printf 'onnx model: cached\n' || printf 'onnx model: not cached\n'
 fi
 command -v ruvector >/dev/null 2>&1 && printf 'global ruvector on PATH: ignored by this plugin\n'
+__YELLOW_RUVECTOR_BASH__
+)"
 ```
 
 Report the installed version, or "not installed — run `/ruvector:setup`"
@@ -55,6 +60,9 @@ use the same fallback, so this is informational.
 ### Step 2: Check the store
 
 ```bash
+# install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
+# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -86,6 +94,8 @@ for scope in user project; do
   bash "${CLAUDE_PLUGIN_ROOT}/scripts/remove-legacy-hooks.sh" "--${scope}" >/dev/null 2>&1 \
     && printf 'leftover global ruvector hooks in %s settings (/ruvector:setup removes them)\n' "$scope"
 done
+__YELLOW_RUVECTOR_BASH__
+)"
 ```
 
 Report: store exists/missing and disk usage. Warn on each `nested store:`
@@ -176,6 +186,9 @@ matching upstream `(a.modelId ?? null)`). It also computes the verdict, so the `
 line never depends on a by-eye JSON comparison.
 
 ```bash
+# install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
+# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
 INTEL=.ruvector/intelligence.json
 # The store lives at the git toplevel (the MCP launcher and hooks cd there).
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || true
@@ -345,6 +358,8 @@ _rv_flat() { printf '%s' "$1" | tr -d '\000-\010\013-\037\177' | tr '\n\r' '  ' 
 printf -- '--- begin ruvector-provenance (reference only) ---\n'
 printf 'verdict=%s\ndetail=%s\nstore=%s\ntarget=%s\ndrop=%s\n' "$VERDICT" "$(_rv_flat "$DETAIL")" "$(_rv_flat "$STORE")" "$(_rv_flat "$TARGET")" "$DROP"
 printf -- '--- end ruvector-provenance ---\n'
+__YELLOW_RUVECTOR_BASH__
+)"
 ```
 
 This step costs a few seconds when it reaches the dry-run (Node start plus
