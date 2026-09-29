@@ -27,6 +27,7 @@ import type * as Sdk from '@google/jules-sdk' with {
 import { ensureOwnerOnlyDir, resolveSdkScratchDir } from './config.js';
 import {
   AdapterError,
+  AppErrorException,
   type AdapterErrorKind,
   type AppError,
   type CallPhase,
@@ -51,6 +52,7 @@ import type {
 import {
   repoOfSourceResource,
   sessionIdOf,
+  isValidPageToken,
   validateActivityId,
   validatePlanId,
   validateSessionDisplayUrl,
@@ -407,7 +409,9 @@ export class JulesSdkAdapter implements SdkAdapter {
     );
   }
 
+  /** Our own verdicts (an integrity or allowlist failure) pass through; SDK errors are classified. */
   private fail(err: unknown): never {
+    if (err instanceof AppErrorException) throw err;
     throw toAdapterError(this.sdk, err);
   }
 
@@ -446,14 +450,18 @@ export class JulesSdkAdapter implements SdkAdapter {
     const id = sessionIdOf(sessionResource);
     const existing = this.infoReads.get(id);
     if (existing !== undefined) return existing;
+    const sessionClient = this.sessionClient(sessionResource);
     const read = (async () => {
       try {
-        return mapSession(await this.sessionClient(sessionResource).info());
+        return mapSession(await sessionClient.info());
       } catch (err) {
         return this.fail(err);
       }
     })();
     this.infoReads.set(id, read);
+    // Only a successful read is memoized: a failed one must be re-sent by the
+    // bounded read retry, not answered from this cache.
+    read.catch(() => this.infoReads.delete(id));
     return read;
   }
 
@@ -470,6 +478,16 @@ export class JulesSdkAdapter implements SdkAdapter {
       });
     } catch (err) {
       return this.fail(err);
+    }
+    if (
+      typeof page.nextPageToken === 'string' &&
+      page.nextPageToken !== '' &&
+      !isValidPageToken(page.nextPageToken)
+    ) {
+      throw new AdapterError(
+        'malformed',
+        'the sessions page token has an unexpected shape'
+      );
     }
     return {
       sessions: (page.sessions ?? []).map(mapSession),
@@ -502,12 +520,22 @@ export class JulesSdkAdapter implements SdkAdapter {
       if (err instanceof this.sdk.JulesError) return this.fail(err);
       return { activities: [], unmappedActivity: true };
     }
-    return {
-      activities: (page.activities ?? []).map(mapActivity),
-      ...(typeof page.nextPageToken === 'string' && page.nextPageToken !== ''
-        ? { nextPageToken: page.nextPageToken }
-        : {}),
-    };
+    // An activity the SDK mapped but whose ids fail the allowlist, or a page
+    // token outside it, is the same signal as a mapper throw: the walk stops
+    // with unmappedActivity (re-verify the SDK pin), never a retried error.
+    let activities: AdapterActivity[];
+    try {
+      activities = (page.activities ?? []).map(mapActivity);
+    } catch (err) {
+      if (err instanceof AppErrorException) {
+        return { activities: [], unmappedActivity: true };
+      }
+      throw err;
+    }
+    const token = page.nextPageToken;
+    if (typeof token !== 'string' || token === '') return { activities };
+    if (!isValidPageToken(token)) return { activities, unmappedActivity: true };
+    return { activities, nextPageToken: token };
   }
 
   async getSource(owner: string, repo: string): Promise<AdapterSource> {
@@ -538,14 +566,18 @@ export class JulesSdkAdapter implements SdkAdapter {
     const sources: AdapterSource[] = [];
     let truncated = false;
     let unsupportedReason: string | undefined;
+    let seen = 0;
     try {
       for await (const source of this.client.sources({
         pageSize: options.pageSize,
       })) {
-        if (sources.length >= options.pageSize) {
+        // Count every source, mappable or not, so the probe never reads past
+        // pageSize + 1 items (at most two GET sources pages).
+        if (seen >= options.pageSize) {
           truncated = true;
           break;
         }
+        seen += 1;
         const sourceResource = optionalSource(source.name);
         if (sourceResource === undefined) {
           unsupportedReason =

@@ -61,6 +61,7 @@ exports.sourceResourceFor = sourceResourceFor;
 exports.validateBaseCommitId = validateBaseCommitId;
 exports.validatePullRequestUrl = validatePullRequestUrl;
 exports.validateSessionDisplayUrl = validateSessionDisplayUrl;
+exports.isValidPageToken = isValidPageToken;
 exports.validatePageToken = validatePageToken;
 exports.validateLocalId = validateLocalId;
 exports.mintLocalId = mintLocalId;
@@ -236,6 +237,9 @@ function validateSessionDisplayUrl(value) {
     catch {
         return undefined;
     }
+}
+function isValidPageToken(value) {
+    return typeof value === 'string' && PAGE_TOKEN_RE.test(value);
 }
 /** Page and resume tokens: query parameter only, never a path. */
 function validatePageToken(value, origin = 'input') {

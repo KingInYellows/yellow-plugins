@@ -107,6 +107,10 @@ async function walkActivities(params) {
                 next = {};
                 continue;
             }
+            // Only a vendor/transport failure is a page failure; our own verdicts
+            // (integrity, allowlist) and programming errors surface as errors.
+            if (!(err instanceof errors_js_1.AdapterError))
+                throw err;
             stopReason = 'page-failure';
             break;
         }
@@ -173,7 +177,9 @@ async function walkActivities(params) {
         next = { pageToken: page.nextPageToken };
     }
     if (!complete && stopReason !== 'unmapped') {
-        resumePageToken = pages > 0 ? next.pageToken : undefined;
+        // Continue from the page that was not read. A resumed walk that failed
+        // before reading anything keeps its (still valid) stored token.
+        resumePageToken = next.pageToken;
     }
     return {
         pages,

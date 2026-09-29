@@ -31,6 +31,7 @@ import {
 
 import { walkActivities } from '../src/activity-walk.js';
 import { resolveRuntimeDir, resolveSdkScratchDir } from '../src/config.js';
+import { withReadRetry } from '../src/deadline.js';
 import { AdapterError, type CallPhase } from '../src/errors.js';
 import {
   type FetchGuardHandle,
@@ -737,6 +738,98 @@ describe('reads through the shipped adapter (R9, R15, R18, R10)', () => {
     }
     await adapter.close();
     expect(code).toBe('JULES_MALFORMED_RESPONSE');
+  });
+});
+
+describe('review regressions through the real SDK', () => {
+  it('a failed getSession is re-sent by the bounded read retry, not answered from a cache', async () => {
+    server.state.sessions.set('s1', restSession('s1'));
+    let failures = 1;
+    server.state.overrides.push((r) =>
+      r.path === '/v1alpha/sessions/s1' && failures-- > 0
+        ? { status: 503, body: {} }
+        : undefined
+    );
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    const clock = new FakeClock();
+    const session = await withReadRetry(
+      () => adapter.getSession('sessions/s1'),
+      {
+        clock,
+        deadline: { expiresAt: clock.now() + 60_000 },
+      }
+    );
+    await adapter.close();
+    expect(session.sessionResource).toBe('sessions/s1');
+    expect(server.paths()).toEqual([
+      'GET /v1alpha/sessions/s1',
+      'GET /v1alpha/sessions/s1',
+    ]);
+  });
+
+  it('an activity id outside the allowlist stops the page as unmappedActivity', async () => {
+    server.state.activities.set('s1', [
+      restActivity('s1', 'bad id', '2026-09-10T00:00:01Z'),
+    ]);
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    const page = await adapter.listActivities('sessions/s1', { pageSize: 10 });
+    await adapter.close();
+    expect(page).toEqual({ activities: [], unmappedActivity: true });
+  });
+
+  it('a page token outside the allowlist is never followed or returned', async () => {
+    server.state.overrides.push((r) =>
+      r.path === '/v1alpha/sessions/s1/activities'
+        ? {
+            body: {
+              activities: [restActivity('s1', 'act-1', '2026-09-10T00:00:01Z')],
+              nextPageToken: '../../x',
+            },
+          }
+        : undefined
+    );
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    const page = await adapter.listActivities('sessions/s1', { pageSize: 10 });
+    await adapter.close();
+    expect(page.unmappedActivity).toBe(true);
+    expect(page.nextPageToken).toBeUndefined();
+    expect(page.activities).toHaveLength(1);
+  });
+
+  it('the sources probe reads at most two pages even when no source maps', async () => {
+    server.state.sources = Array.from({ length: 45 }, (_, i) => ({
+      owner: 'bad_owner',
+      repo: `r${i}`,
+    }));
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    const page = await adapter.listSources({ pageSize: 20 });
+    await adapter.close();
+    expect(page.truncated).toBe(true);
+    expect(page.sources).toEqual([]);
+    expect(page.unsupportedReason).toBeDefined();
+    expect(
+      server.log.filter((r) => r.path === '/v1alpha/sources').length
+    ).toBeLessThanOrEqual(2);
   });
 });
 

@@ -58,13 +58,14 @@ describe('list', () => {
     expect(fake.closed).toBe(true);
   });
 
-  it('strips the tag from titles and surfaces it as localId', async () => {
+  it('strips the tag from titles but never trusts it as a local id on its own', async () => {
     const result = await list(makeDeps(dataDir, fake), {});
     expect(result.sessions[0]).toMatchObject({
-      localId: TAGGED,
       title: 'Tagged task',
       condition: 'working',
     });
+    // The tag is vendor-writable: an unbound claim is not surfaced.
+    expect(result.sessions[0]).not.toHaveProperty('localId');
     expect(result.sessions[1]).toMatchObject({
       title: 'Plain',
       condition: 'remote-completed',

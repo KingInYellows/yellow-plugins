@@ -384,6 +384,69 @@ describe('resume-token restarts and JULES_NO_PROGRESS', () => {
   });
 });
 
+describe('resume tokens survive transient failures', () => {
+  it('a resumed walk that fails before reading keeps its token and counts no restart', async () => {
+    fake.activities.set(S, makeActivities(120));
+    const rec = await ensureObservedRecord(dataDir, S);
+    await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'p50',
+    });
+    const base = fake.listActivitiesImpl;
+    fake.listActivitiesImpl = async (s, o) => {
+      if (o.pageToken === 'p50')
+        throw new AdapterError('server-error', '503', { status: 503 });
+      return base(s, o);
+    };
+    for (let i = 0; i < 3; i += 1) {
+      const result = await status(makeDeps(dataDir, fake), {
+        session: S,
+        reconcile: false,
+      });
+      expect(result.activities).toMatchObject({
+        pages: 0,
+        partialPagination: true,
+        resumePageToken: 'p50',
+      });
+    }
+    const record = await recordFor();
+    expect(record?.resumePageToken).toBe('p50');
+    expect(record?.resumeRestartCount).toBe(0);
+  });
+});
+
+describe('vendor text in the journal', () => {
+  it('a plan step that looks like a credential phrase is redacted, not a write failure', async () => {
+    fake.activities.set(S, [
+      {
+        activityId: 'x1',
+        createTime: '2026-09-01T00:00:01.000Z',
+        type: 'planGenerated',
+        plan: {
+          planId: 'p1',
+          steps: [{ id: 's1', title: 'Bearer authentication', index: 0 }],
+        },
+        artifacts: [],
+      },
+    ]);
+    const result = await status(makeDeps(dataDir, fake), {
+      session: S,
+      reconcile: false,
+    });
+    expect(result.pendingPlan?.planId).toBe('p1');
+    const stored = (await recordFor())?.pendingPlan?.steps[0]?.title;
+    expect(stored).toBe('Bearer ***REDACTED***');
+  });
+
+  it('a repeated read that changes nothing does not rewrite the journal', async () => {
+    fake.activities.set(S, makeActivities(3));
+    await status(makeDeps(dataDir, fake), { session: S, reconcile: false });
+    const journalPath = resolveJournalPath(dataDir);
+    const before = fs.statSync(journalPath).mtimeMs;
+    await ensureObservedRecord(dataDir, S);
+    expect(fs.statSync(journalPath).mtimeMs).toBe(before);
+  });
+});
+
 describe('dedup ring', () => {
   it('overflowing the 1000-id ring reports dedupWindowExceeded', async () => {
     fake.activities.set(S, makeActivities(60));

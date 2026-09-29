@@ -16,6 +16,7 @@ import * as path from 'node:path';
 
 import {
   COLLECT_PAGE_SIZE,
+  compareStamp,
   nextRing,
   STATUS_PAGE_SIZE,
   walkActivities,
@@ -38,7 +39,7 @@ import {
   withReadRetry,
 } from './deadline.js';
 import { AdapterError, mapAdapterError, throwAppError } from './errors.js';
-import { scanSecretShapes } from './redact.js';
+import { redact, redactDeep, scanSecretShapes } from './redact.js';
 import {
   installSdk as realInstallSdk,
   probeSdkResolution,
@@ -387,8 +388,9 @@ export async function list(
   const sessions = page.sessions.map((s): ListedSession => {
     onPage.add(s.sessionResource);
     const tag = extractTitleTag(s.title);
-    const localId =
-      findBySessionResource(journal, s.sessionResource)?.localId ?? tag.localId;
+    // The title tag is vendor-writable, so it is never trusted on its own:
+    // a local id is shown only when the journal binds it to this session.
+    const localId = findBySessionResource(journal, s.sessionResource)?.localId;
     return {
       ...(localId !== undefined ? { localId } : {}),
       sessionResource: s.sessionResource,
@@ -679,6 +681,14 @@ export async function status(
     );
     let record = await boundRecord(deps, journal, sessionResource);
 
+    const watermark =
+      record.lastActivityCreateTime !== undefined &&
+      record.lastActivityId !== undefined
+        ? {
+            createTime: record.lastActivityCreateTime,
+            activityId: record.lastActivityId,
+          }
+        : undefined;
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -687,15 +697,7 @@ export async function status(
       clock: deps.clock,
       deadline,
       ring: record.recentActivityIds,
-      ...(record.lastActivityCreateTime !== undefined &&
-      record.lastActivityId !== undefined
-        ? {
-            watermark: {
-              createTime: record.lastActivityCreateTime,
-              activityId: record.lastActivityId,
-            },
-          }
-        : {}),
+      ...(watermark !== undefined ? { watermark } : {}),
       ...(record.pendingPlan !== undefined
         ? { pendingPlan: record.pendingPlan }
         : {}),
@@ -703,9 +705,12 @@ export async function status(
 
     // Restart guard: a stored token the vendor rejected, or one that yielded
     // nothing new, is discarded; the second consecutive such restart fails.
+    // A resumed walk that read nothing (a transient failure on its first
+    // page) says nothing about progress; only a walk that read pages counts.
     const noProgress =
       walk.startedFromResume &&
       !walk.resumeRejected &&
+      walk.pages > 0 &&
       walk.newIds.length === 0;
     const restarted =
       walk.startedFromResume && (walk.resumeRejected || noProgress);
@@ -734,17 +739,10 @@ export async function status(
     const advance =
       walk.complete &&
       walk.newest !== undefined &&
-      (record.lastActivityCreateTime === undefined ||
-        record.lastActivityId === undefined ||
-        Date.parse(walk.newest.createTime) >
-          Date.parse(record.lastActivityCreateTime) ||
-        (walk.newest.createTime === record.lastActivityCreateTime &&
-          walk.newest.activityId > record.lastActivityId));
+      walk.newest.createTime !== '' &&
+      (watermark === undefined || compareStamp(walk.newest, watermark) > 0);
     const resumePageToken =
-      walk.complete || noProgress
-        ? null
-        : (walk.resumePageToken ??
-          (restarted ? null : (record.resumePageToken ?? null)));
+      walk.complete || noProgress ? null : (walk.resumePageToken ?? null);
     const vendorState = session.vendorState;
     const condition = conditionOf(vendorState);
 
@@ -761,7 +759,11 @@ export async function status(
         recentActivityIds: ring,
         activityCountDelta: walk.newIds.length,
         ...(walk.pendingPlan !== record.pendingPlan
-          ? { pendingPlan: walk.pendingPlan ?? null }
+          ? {
+              // Plan text is vendor-writable: redacted before it is persisted.
+              pendingPlan:
+                walk.pendingPlan == null ? null : redactDeep(walk.pendingPlan),
+            }
           : {}),
         resumeRestartCount: restartCount,
       },
@@ -863,31 +865,82 @@ function writeStaged(filePath: string, content: string): void {
   fs.renameSync(tmp, filePath);
 }
 
+const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
+
+/** Artifacts a previous `collect` recorded in this directory's manifest; anything malformed is ignored. */
+function readManifestArtifacts(dir: string): CollectedArtifact[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+    );
+  } catch {
+    return [];
+  }
+  const list = (parsed as { artifacts?: unknown }).artifacts;
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (a): a is CollectedArtifact =>
+      a !== null &&
+      typeof a === 'object' &&
+      ARTIFACT_KINDS.has((a as CollectedArtifact).kind) &&
+      ((a as CollectedArtifact).path === undefined ||
+        typeof (a as CollectedArtifact).path === 'string') &&
+      ((a as CollectedArtifact).sha256 === undefined ||
+        /^[0-9a-f]{64}$/.test(String((a as CollectedArtifact).sha256)))
+  );
+}
+
+function countFiles(dir: string): number {
+  try {
+    return fs.readdirSync(dir).filter((name) => !name.includes('.tmp-')).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Stages artifacts under `artifacts/<local-id>/`. Seeded from the previous
+ * manifest and the files on disk, so a resumed `collect` continues the
+ * numbering instead of overwriting `patch.diff` or an earlier file, and the
+ * manifest accumulates rather than being replaced.
+ */
 class Stager {
   readonly artifacts: CollectedArtifact[] = [];
   readonly skipped: SkippedArtifact[] = [];
   private staged = 0;
   private readonly seenDigests = new Set<string>();
+  private readonly seenGenerated = new Set<string>();
   private readonly seenPrs = new Set<string>();
-  private patchSeq = 0;
-  private generatedSeq = 0;
+  private patchSeq: number;
+  private generatedSeq: number;
 
   constructor(
     private readonly dir: string,
     private readonly capBytes: number
-  ) {}
+  ) {
+    for (const prior of readManifestArtifacts(dir)) {
+      this.artifacts.push(prior);
+      if (prior.kind === 'patch' && prior.sha256 !== undefined)
+        this.seenDigests.add(prior.sha256);
+      if (prior.kind === 'generated-file' && prior.sha256 !== undefined) {
+        this.seenGenerated.add(`${prior.sha256}:${prior.vendorPath ?? ''}`);
+      }
+      if (prior.kind === 'pr-ref' && prior.prUrl !== undefined)
+        this.seenPrs.add(prior.prUrl);
+    }
+    this.patchSeq =
+      (fs.existsSync(path.join(dir, 'patch.diff')) ? 1 : 0) +
+      countFiles(path.join(dir, 'patches'));
+    this.generatedSeq = countFiles(path.join(dir, 'generated'));
+  }
 
   get partialStaging(): boolean {
     return this.skipped.length > 0;
   }
 
-  private admit(kind: CollectedArtifact['kind'], bytes: number): boolean {
-    if (this.staged + bytes > this.capBytes) {
-      this.skipped.push({ kind, reason: 'aggregate-cap-reached', bytes });
-      return false;
-    }
-    this.staged += bytes;
-    return true;
+  private overCap(bytes: number): boolean {
+    return this.staged + bytes > this.capBytes;
   }
 
   /** Patches are staged byte-exact and scanned, never redacted (contract "Redaction" layer 8). */
@@ -895,9 +948,17 @@ class Stager {
     if (unidiffPatch === '') return;
     const digest = sha256(unidiffPatch);
     if (this.seenDigests.has(digest)) return;
-    const bytes = Buffer.byteLength(unidiffPatch, 'utf8');
-    if (!this.admit('patch', bytes)) return;
     this.seenDigests.add(digest);
+    const bytes = Buffer.byteLength(unidiffPatch, 'utf8');
+    if (this.overCap(bytes)) {
+      this.skipped.push({
+        kind: 'patch',
+        reason: 'aggregate-cap-reached',
+        bytes,
+      });
+      return;
+    }
+    this.staged += bytes;
     this.patchSeq += 1;
     const rel =
       this.patchSeq === 1
@@ -919,11 +980,23 @@ class Stager {
     });
   }
 
-  /** Named locally by sequence and digest; the vendor path is recorded as data only. */
+  /** Named locally by sequence and digest; the vendor path is recorded as redacted data only. */
   generated(vendorPath: string, content: string): void {
-    const digest = sha256(content);
     const bytes = Buffer.byteLength(content, 'utf8');
-    if (!this.admit('generated-file', bytes)) return;
+    if (this.overCap(bytes)) {
+      this.skipped.push({
+        kind: 'generated-file',
+        reason: 'aggregate-cap-reached',
+        bytes,
+      });
+      return;
+    }
+    const digest = sha256(content);
+    const safeVendorPath = redact(vendorPath);
+    const key = `${digest}:${safeVendorPath}`;
+    if (this.seenGenerated.has(key)) return;
+    this.seenGenerated.add(key);
+    this.staged += bytes;
     this.generatedSeq += 1;
     ensureOwnerOnlyDir(path.join(this.dir, 'generated'));
     const rel = path.join(
@@ -935,7 +1008,7 @@ class Stager {
       kind: 'generated-file',
       path: rel,
       sha256: digest,
-      vendorPath,
+      vendorPath: safeVendorPath,
       secretShapedContent: scanSecretShapes(content),
       verification: 'unverified',
     });
@@ -1055,7 +1128,9 @@ export async function collect(
     record = await upsertArtifactResumeToken(
       deps.dataDir,
       record.localRequestId,
-      walk.complete ? null : (walk.resumePageToken ?? token ?? null),
+      // A token the vendor rejected is never re-stored; a resumed walk that
+      // failed before reading keeps it (the walk returns it as resumePageToken).
+      walk.complete ? null : (walk.resumePageToken ?? null),
       nowFn(deps)
     );
 

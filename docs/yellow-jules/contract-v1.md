@@ -76,6 +76,16 @@ mechanism, and none widens a guarantee.
   `reconciled: []`. A hand-planted unresolved record is reported as
   `not-reached` with `reason: "reconcile ships with delegate in PR3"` rather
   than ignored.
+- **Title tags in `list`.** The `[yellow:<local-id>]` tag is vendor-writable, so
+  `list` strips it from the displayed title but surfaces a `localId` only when
+  the journal binds that id to the same session. Reconcile (PR3) still matches
+  on the tag.
+- **Accumulating staging.** A later `collect` continues the numbering recorded
+  in the previous `manifest.json` and on disk: `patch.diff` is never
+  overwritten, new patches go to `patches/<nn>-<sha256[0:12]>.diff`, and the
+  manifest accumulates. Journal artifacts are keyed by content digest.
+- **Retry window.** A read is retried only while the deadline leaves room for
+  the backoff plus a 5 s attempt, so a late retry does not overshoot it.
 - **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
   recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
   `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors

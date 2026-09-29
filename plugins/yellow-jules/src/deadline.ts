@@ -13,6 +13,7 @@ export const DEFAULT_READ_DEADLINE_MS = 120_000;
 export const DEFAULT_COLLECT_DEADLINE_MS = 180_000;
 export const READ_RETRIES = 2;
 export const READ_BACKOFF_BASE_MS = 500;
+export const MIN_ATTEMPT_MS = 5_000;
 
 export interface Deadline {
   readonly expiresAt: number;
@@ -56,7 +57,13 @@ export async function withReadRetry<T>(
       const delay =
         READ_BACKOFF_BASE_MS * 2 ** attempt +
         Math.floor(random() * READ_BACKOFF_BASE_MS);
-      if (remainingMs(options.clock, options.deadline) <= delay) throw err;
+      // Retry only when the deadline still leaves room for a useful attempt
+      // after the backoff; a retry that cannot finish only overshoots it.
+      if (
+        remainingMs(options.clock, options.deadline) <=
+        delay + MIN_ATTEMPT_MS
+      )
+        throw err;
       await options.clock.sleep(delay);
     }
   }

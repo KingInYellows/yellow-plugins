@@ -101,7 +101,10 @@ function entryFileOf(pkgDir) {
     }
     const entry = path.resolve(pkgDir, importPath);
     const rel = path.relative(pkgDir, entry);
-    if (rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(entry)) {
+    if (rel === '..' ||
+        rel.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(rel) ||
+        !fs.existsSync(entry)) {
         return integrityFailure(`${exports.SDK_PACKAGE} entry ${importPath} is missing or escapes the package`);
     }
     return { version: m.version, entry };

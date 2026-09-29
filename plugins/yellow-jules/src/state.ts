@@ -327,9 +327,13 @@ async function acquireLock(
       const handle = await fs.promises.open(lockPath, 'wx', 0o600);
       try {
         await handle.writeFile(JSON.stringify(content));
-      } finally {
-        await handle.close();
+      } catch (writeErr) {
+        // Never leave an empty lock behind: the next process would read it as stale.
+        await handle.close().catch(() => undefined);
+        await fs.promises.unlink(lockPath).catch(() => undefined);
+        throw writeErr;
       }
+      await handle.close();
       return owner;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
@@ -414,8 +418,11 @@ export async function updateJournal<T>(
     dataDir,
     async () => {
       const journal = await readJournal(dataDir);
+      const before = JSON.stringify(journal);
       const result = mutate(journal.operations, journal);
-      await writeJournal(dataDir, journal);
+      // A mutation that changed nothing skips the fsync'd rewrite.
+      if (JSON.stringify(journal) !== before)
+        await writeJournal(dataDir, journal);
       return result;
     },
     config
@@ -756,8 +763,11 @@ export async function upsertArtifactResumeToken(
   );
 }
 
+/** Content identity: the same bytes (or the same PR) are one artifact wherever they were staged. */
 function artifactKey(a: ArtifactRecord): string {
-  return `${a.kind}:${a.sha256 ?? ''}:${a.prUrl ?? ''}:${a.path ?? ''}`;
+  return a.kind === 'pr-ref'
+    ? `pr-ref:${a.prUrl ?? ''}`
+    : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPath ?? ''}`;
 }
 
 /**

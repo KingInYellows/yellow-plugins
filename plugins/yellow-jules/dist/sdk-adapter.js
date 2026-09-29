@@ -316,7 +316,10 @@ class JulesSdkAdapter {
         assertScratchEmpty(scratch, 'after connect()');
         return new JulesSdkAdapter(input.sdk, client, recorder, scratch, previousJulesHome);
     }
+    /** Our own verdicts (an integrity or allowlist failure) pass through; SDK errors are classified. */
     fail(err) {
+        if (err instanceof errors_js_1.AppErrorException)
+            throw err;
         throw toAdapterError(this.sdk, err);
     }
     /** `session(id)` is local; on first use assert the activity storage came from the factory. */
@@ -348,15 +351,19 @@ class JulesSdkAdapter {
         const existing = this.infoReads.get(id);
         if (existing !== undefined)
             return existing;
+        const sessionClient = this.sessionClient(sessionResource);
         const read = (async () => {
             try {
-                return mapSession(await this.sessionClient(sessionResource).info());
+                return mapSession(await sessionClient.info());
             }
             catch (err) {
                 return this.fail(err);
             }
         })();
         this.infoReads.set(id, read);
+        // Only a successful read is memoized: a failed one must be re-sent by the
+        // bounded read retry, not answered from this cache.
+        read.catch(() => this.infoReads.delete(id));
         return read;
     }
     async listSessions(options) {
@@ -373,6 +380,11 @@ class JulesSdkAdapter {
         }
         catch (err) {
             return this.fail(err);
+        }
+        if (typeof page.nextPageToken === 'string' &&
+            page.nextPageToken !== '' &&
+            !(0, validate_js_1.isValidPageToken)(page.nextPageToken)) {
+            throw new errors_js_1.AdapterError('malformed', 'the sessions page token has an unexpected shape');
         }
         return {
             sessions: (page.sessions ?? []).map(mapSession),
@@ -403,12 +415,25 @@ class JulesSdkAdapter {
                 return this.fail(err);
             return { activities: [], unmappedActivity: true };
         }
-        return {
-            activities: (page.activities ?? []).map(mapActivity),
-            ...(typeof page.nextPageToken === 'string' && page.nextPageToken !== ''
-                ? { nextPageToken: page.nextPageToken }
-                : {}),
-        };
+        // An activity the SDK mapped but whose ids fail the allowlist, or a page
+        // token outside it, is the same signal as a mapper throw: the walk stops
+        // with unmappedActivity (re-verify the SDK pin), never a retried error.
+        let activities;
+        try {
+            activities = (page.activities ?? []).map(mapActivity);
+        }
+        catch (err) {
+            if (err instanceof errors_js_1.AppErrorException) {
+                return { activities: [], unmappedActivity: true };
+            }
+            throw err;
+        }
+        const token = page.nextPageToken;
+        if (typeof token !== 'string' || token === '')
+            return { activities };
+        if (!(0, validate_js_1.isValidPageToken)(token))
+            return { activities, unmappedActivity: true };
+        return { activities, nextPageToken: token };
     }
     async getSource(owner, repo) {
         let source;
@@ -433,14 +458,18 @@ class JulesSdkAdapter {
         const sources = [];
         let truncated = false;
         let unsupportedReason;
+        let seen = 0;
         try {
             for await (const source of this.client.sources({
                 pageSize: options.pageSize,
             })) {
-                if (sources.length >= options.pageSize) {
+                // Count every source, mappable or not, so the probe never reads past
+                // pageSize + 1 items (at most two GET sources pages).
+                if (seen >= options.pageSize) {
                     truncated = true;
                     break;
                 }
+                seen += 1;
                 const sourceResource = optionalSource(source.name);
                 if (sourceResource === undefined) {
                     unsupportedReason =

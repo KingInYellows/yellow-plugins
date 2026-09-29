@@ -7,7 +7,7 @@
  * exposes no Retry-After). Writes never go through this helper.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
+exports.MIN_ATTEMPT_MS = exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
 exports.deadlineIn = deadlineIn;
 exports.remainingMs = remainingMs;
 exports.isExpired = isExpired;
@@ -17,6 +17,7 @@ exports.DEFAULT_READ_DEADLINE_MS = 120_000;
 exports.DEFAULT_COLLECT_DEADLINE_MS = 180_000;
 exports.READ_RETRIES = 2;
 exports.READ_BACKOFF_BASE_MS = 500;
+exports.MIN_ATTEMPT_MS = 5_000;
 function deadlineIn(clock, ms) {
     return { expiresAt: clock.now() + ms };
 }
@@ -41,7 +42,10 @@ async function withReadRetry(fn, options) {
                 throw err;
             const delay = exports.READ_BACKOFF_BASE_MS * 2 ** attempt +
                 Math.floor(random() * exports.READ_BACKOFF_BASE_MS);
-            if (remainingMs(options.clock, options.deadline) <= delay)
+            // Retry only when the deadline still leaves room for a useful attempt
+            // after the backoff; a retry that cannot finish only overshoots it.
+            if (remainingMs(options.clock, options.deadline) <=
+                delay + exports.MIN_ATTEMPT_MS)
                 throw err;
             await options.clock.sleep(delay);
         }

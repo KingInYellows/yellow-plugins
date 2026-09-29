@@ -274,6 +274,10 @@ export function validateSessionDisplayUrl(value: unknown): string | undefined {
   }
 }
 
+export function isValidPageToken(value: unknown): value is string {
+  return typeof value === 'string' && PAGE_TOKEN_RE.test(value);
+}
+
 /** Page and resume tokens: query parameter only, never a path. */
 export function validatePageToken(
   value: unknown,

@@ -259,6 +259,42 @@ describe('collect', () => {
     expect(record?.artifactResumePageToken).toBeUndefined();
   });
 
+  it('a resumed collect never overwrites patch.diff and merges the manifest', async () => {
+    fake.sessions.set(S, makeSession());
+    fake.activities.set(S, [
+      changeSetActivity(PATCH),
+      ...makeActivities(12),
+      changeSetActivity(PATCH2),
+    ]);
+    const base = fake.listActivitiesImpl;
+    let failSecondPage = true;
+    fake.listActivitiesImpl = async (s, o) => {
+      if (failSecondPage && o.pageToken === 'p10')
+        throw new AdapterError('network', 'reset');
+      return base(s, o);
+    };
+    const first = await collect(makeDeps(dataDir, fake), { session: S });
+    expect(first.activities.partialPagination).toBe(true);
+    failSecondPage = false;
+    const second = await collect(makeDeps(dataDir, fake), { session: S });
+    const dir = path.join(resolveArtifactsDir(dataDir), second.localId);
+    expect(fs.readFileSync(path.join(dir, 'patch.diff'), 'utf8')).toBe(PATCH);
+    const patches = second.artifacts.filter((a) => a.kind === 'patch');
+    expect(patches.map((a) => a.path)).toEqual([
+      'patch.diff',
+      expect.stringMatching(/^patches\/02-[0-9a-f]{12}\.diff$/),
+    ]);
+    expect(fs.readFileSync(path.join(dir, patches[1]!.path!), 'utf8')).toBe(
+      PATCH2
+    );
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+    );
+    expect(manifest.artifacts).toHaveLength(2);
+    const record = Object.values((await readJournal(dataDir)).operations)[0];
+    expect(record?.artifacts.filter((a) => a.kind === 'patch')).toHaveLength(2);
+  });
+
   it('stops staging at the aggregate cap and lists the rest as skipped', async () => {
     fake.sessions.set(
       S,

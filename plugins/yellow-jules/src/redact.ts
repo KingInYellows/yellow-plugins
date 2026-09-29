@@ -48,6 +48,8 @@ export function redact(input: string): string {
 
 function looksSecretShaped(value: string): boolean {
   if (liveApiKeyPatterns().includes(value)) return true;
+  // Already-redacted text (e.g. "Bearer ***REDACTED***") is safe to persist.
+  if (value.includes(REDACTED)) return false;
   if (/^Bearer\s+\S+$/i.test(value)) return true;
   if (/^(?:sk|pk|key|tok)[-_][A-Za-z0-9]{16,}$/i.test(value)) return true;
   if (/^AIza[A-Za-z0-9_-]{16,}$/.test(value)) return true;
