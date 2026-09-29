@@ -608,4 +608,146 @@ describe('heredoc terminators', () => {
     expect(classes[2].kind).toBe('data');
     expect(classes[3].kind).toBe('code');
   });
+
+  // Follow-up 14: the shell does not strip trailing blanks from the tag line.
+  it('does not close an fd wrapper on a tag line with trailing blanks', () => {
+    const lines = ["bash /dev/fd/3 3<<'TAG'", 'true', 'TAG \t', 'TAG'];
+    expect(findFdWrappers(lines)).toEqual([{ open: 0, close: 3, tag: 'TAG' }]);
+    const findings = lint(lines.slice(0, 3).join('\n'));
+    expect(findings.map((f) => [f.rule, f.line])).toEqual([['SHC-009', 3]]);
+    expect(findings[0].detail).toContain('trailing blanks');
+  });
+
+  it('still closes a data heredoc on a tag line with trailing blanks', () => {
+    const lines = ["cat <<'EOF'", 'hello', 'EOF  ', 'mapfile -t a < f'];
+    expect(rules(lines.join('\n'))).toEqual(['SHC-003']);
+  });
+});
+
+// Regressions for plans/shell-compat-followups.md items 11–21.
+describe('shell-visible text only', () => {
+  it.each([
+    // 11: a quoted `<<` is text, not a heredoc that hides later lines.
+    ['a quoted heredoc example', `printf '%s\\n' "use cat <<'EOF'"`],
+    ['a single-quoted heredoc example', "echo 'cat <<EOF'"],
+    // 18: nor is one in a trailing comment.
+    ['a heredoc in a trailing comment', "true # example: cat <<'EOF'"],
+  ])('keeps linting after %s', (_name, first) => {
+    expect(
+      lint([first, 'mapfile -t a < f', 'EOF'].join('\n')).map((f) => [
+        f.rule,
+        f.line,
+      ])
+    ).toEqual([['SHC-003', 2]]);
+  });
+
+  it('still opens a heredoc inside a double-quoted command substitution', () => {
+    const lines = [`x="$(cat <<'EOF'`, 'mapfile -t a < f', 'EOF', ')"'];
+    expect(classifyLines(lines)[1].kind).toBe('data');
+  });
+
+  // 12: literal redirect targets.
+  it('flags a second `>` onto the same literal path', () => {
+    const findings = lint('cmd > result.json\ncmd2 > "result.json"');
+    expect(findings.map((f) => [f.rule, f.line, f.detail])).toEqual([
+      ['SHC-001', 2, 'second `>` onto result.json in the same block'],
+    ]);
+  });
+
+  it.each([
+    ['/dev/null', 'cmd > /dev/null\ncmd2 > /dev/null'],
+    ['/dev/stderr', 'cmd >/dev/stderr\ncmd2 >/dev/stderr'],
+    ['>> appends', 'cmd >> log\ncmd2 >> log'],
+    ['>| overwrites', 'cmd >| log\ncmd2 >| log'],
+    ['a path built from an expansion', 'cmd > "$d/out"\ncmd2 > "$d/out"'],
+    ['a path with $$', 'cmd > out.$$\ncmd2 > out.$$'],
+    ['a quoted `>`', 'echo "a > b"\necho "a > b"'],
+    ['a placeholder', 'git diff <a>...<b>\ngit diff <a>...<b>'],
+  ])('does not flag %s', (_name, text) => {
+    expect(lint(text)).toEqual([]);
+  });
+
+  it('counts `: > file` as the first write to a literal path', () => {
+    expect(
+      lint(': > log\ncmd > log').map((f) => [f.rule, f.line, f.detail])
+    ).toEqual([
+      ['SHC-001', 1, '`: >` truncates log, which may already exist'],
+      ['SHC-001', 2, 'second `>` onto log in the same block'],
+    ]);
+  });
+
+  // 13: a special parameter assigned as a condition.
+  it.each([
+    'if status=0; then :; fi',
+    'while path=x; do :; done',
+    'until argv=1; do :; done',
+    '! status=1',
+  ])('flags `%s` (SHC-002)', (text) => {
+    expect(rules(text)).toEqual(['SHC-002']);
+  });
+
+  // 15: a mktemp in a comment or quoted example creates nothing.
+  it.each([
+    ['a comment', 'rm -f "$f" # f=$(mktemp)\necho hi > "$f"'],
+    ['a single-quoted example', "printf '%s\\n' 'f=$(mktemp)'\necho hi > \"$f\""],
+    ['a double-quoted example', 'echo "use f=\\$(mktemp)"\necho hi > "$f"'],
+  ])('does not treat %s as creating the file', (_name, text) => {
+    expect(lint(text)).toEqual([]);
+  });
+
+  // 17: a quoted `)` does not end a command substitution early.
+  it('keeps a redirect after a quoted `)` inside a [[ ]] substitution', () => {
+    const text = `f=$(mktemp)\n[[ -n $(printf ')'; printf x > "$f") ]]`;
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-001', 2]]);
+  });
+
+  // 19: a quoted `]]` does not end a [[ ]] span early.
+  it('does not read a comparison after a quoted `]]` as a redirect', () => {
+    expect(lint(`f=$(mktemp); [[ "]]" > "$f" ]]`)).toEqual([]);
+  });
+});
+
+describe('line continuations (follow-up 21)', () => {
+  it('recognises an fd wrapper split with a `\\` continuation', () => {
+    const lines = [
+      'bash /dev/fd/3 \\',
+      "  3<<'__W__'",
+      'mapfile -t a < f',
+      '__W__',
+      'mapfile -t b < f',
+    ];
+    expect(findFdWrappers(lines)).toEqual([
+      { open: 1, close: 3, tag: '__W__' },
+    ]);
+    expect(lint(lines.join('\n')).map((f) => [f.rule, f.line])).toEqual([
+      ['SHC-003', 5],
+    ]);
+  });
+
+  it('checks a continued wrapper like a one-line one', () => {
+    const text = ['sudo bash /dev/fd/3 \\', "3<<'__W__'", 'true', '__W__'];
+    const [finding] = lint(text.join('\n'));
+    expect(finding.rule).toBe('SHC-009');
+    expect(finding.detail).toContain('no sudo');
+  });
+
+  it('flags a continued script fed to bash on stdin', () => {
+    const text = ['bash \\', "  <<'EOF'", 'true', 'EOF'];
+    expect(lint(text.join('\n')).map((f) => [f.rule, f.detail])).toEqual([
+      ['SHC-009', 'script fed to bash on stdin'],
+    ]);
+  });
+
+  it('lints the redirect after a continued wrapper', () => {
+    const text = [
+      'out=$(mktemp)',
+      'bash /dev/fd/3 \\',
+      `3<<'__W__' >"$out"`,
+      'true',
+      '__W__',
+    ];
+    expect(lint(text.join('\n')).map((f) => [f.rule, f.line])).toEqual([
+      ['SHC-001', 3],
+    ]);
+  });
 });
