@@ -27,6 +27,7 @@ scripts/validate-shell-compat.js
   s_e3ae526d137cfd::t_cbf2268b27b700 468-470,474-479,481,646-652
   s_e3ae526d137cfd::t_fc31c455e448e1 493,622-623,1094-1095
   s_e3ae526d137cfd::t_62abac9fdaf1df 15-16,20-26,45,89,109,112-113,190-200,343-344,346,353-359,401,549,564-565,578,606-609,760
+  s_e3ae526d137cfd::t_c73a5545d75f8a 181-183,758
 plugins/yellow-ruvector/tests/status-provenance.bats
   s_e3ae526d137cfd::t_e0a870120c3a61 34
 plugins/yellow-debt/CLAUDE.md
