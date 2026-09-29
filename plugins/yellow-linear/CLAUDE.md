@@ -44,8 +44,10 @@ cycles, and documents.
 - `/linear:status` — Generate project and initiative health report
 - `/linear:delegate` — Delegate a Linear issue to a remote coding agent via the
   `remote-agent` capability group. Resolves the enabled provider automatically
-  (`--provider cursor|devin` breaks a tie only when both are enabled) —
-  yellow-cursor is the preferred provider, yellow-devin is the legacy path.
+  (`--provider cursor|devin|jules` breaks a tie only when more than one is
+  enabled) — yellow-cursor is the preferred provider, yellow-devin is the
+  legacy path, and experimental yellow-jules stops before any vendor call
+  until its delegate command ships.
   Requires yellow-core installed (owns the group's classifier)
 
 ### Agents (3)
@@ -110,6 +112,10 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   `remote-agent` provider, it invokes the existing `/devin:delegate` command via
   `Skill`, which owns its own credential validation and Devin session creation
   entirely.
+- **yellow-jules** (optional, experimental remote-agent provider) — recognized
+  by the classifier (`READY_JULES`, `--tooling-jules`), but `/linear:delegate`
+  has no launch path for it yet: a resolved `jules` provider stops with an
+  explanation, writes no packet, and makes no vendor call.
 
 ## Testing
 

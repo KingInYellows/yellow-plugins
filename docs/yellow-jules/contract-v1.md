@@ -1,8 +1,9 @@
 # yellow-jules provider CLI contract, version 1
 
-**Version:** 1 **Status:** Draft until PR2 lands **Reconciled to:** `main`
-`8baa0bdd` (2026-09-10) **Spec:** `plans/specs/yellow-jules-integration.md`
-**Evidence:** [sdk-investigation.md](sdk-investigation.md),
+**Version:** 1 **Status:** Accepted (PR2 landed read-only surface, 2026-09-29)
+**Reconciled to:** `main` `8baa0bdd` (2026-09-10); PR2 revisions below **Spec:**
+`plans/specs/yellow-jules-integration.md` **Evidence:**
+[sdk-investigation.md](sdk-investigation.md),
 [capability-matrix.md](capability-matrix.md)
 
 This is the contract every later yellow-jules shell implements: subcommands,
@@ -30,6 +31,55 @@ documents in this directory are the standing evidence record after the plugin
 ships: none is folded into the plugin, none is archived, and a re-verification
 updates them in place; this file stays the canonical CLI contract, and
 `plugins/yellow-jules/CLAUDE.md` (PR3) links here rather than restating it.
+
+## PR2 revisions (2026-09-29)
+
+Recorded as the Provenance paragraph permits; each revises a PR1 default or
+mechanism, and none widens a guarantee.
+
+- **External sessions.** PR2 ships no `delegate`, so every session it can
+  observe was created outside yellow. `status` and `collect` on a
+  `sessions/{id}` absent from the journal mint a local id and write an operation
+  record with `origin: "external"`, `kind: "observe"`, and `status: "observed"`.
+  R13's `policy-deviation` applies only to records whose create requested
+  `autoPr: false`, which PR2 reaches only through test-planted create records;
+  an external session's vendor PR is an external reference (R42).
+- **Runtime lockfile location.** The data-dir install manifest and lockfile ship
+  as `plugins/yellow-jules/runtime/package.json` and `runtime/package-lock.json`
+  (outside the pnpm workspace glob); `setup --install-sdk` copies both into
+  `<dataDir>/runtime/` and runs `npm ci --ignore-scripts`. `runtime/pin.json`
+  records `sdkVersion`, `sdkIntegrity`, `sdkEntrySha256`, and the installed tree
+  (`@google/jules-sdk` 0.2.0, `yaml` 2.9.1, `zod` 3.25.76).
+- **Workspace resolution.** The workspace branch reads
+  `<pluginRoot>/node_modules/@google/jules-sdk` directly instead of walking
+  `createRequire` resolution, which would also accept an unverified install in
+  an ancestor directory. The resolved version must equal the pin.
+- **Raw REST state.** The pinned SDK's session mapper overwrites the REST
+  `state` with its own enum, so an unknown REST state is visible only as
+  `unspecified`. It still lands in `needs-inspection` (R10); the adapter does
+  not carry the raw string.
+- **Sources probe.** The SDK exposes sources only as an auto-paginating iterator
+  with no page token. `setup` reads up to `pageSize + 1` sources (at most two
+  `GET sources` pages) to report `truncated`.
+- **`collect` filter.** `collect` sends no `changeSet` filter, since its grammar
+  is unknown; the filter was an optimization only.
+- **No-progress restarts.** A stored resume token the vendor rejects
+  (`400`/`404`) restarts the walk from the watermark within the same invocation.
+  A resumed walk that finds nothing new discards the token so the next `status`
+  starts from the watermark. Either counts toward `JULES_NO_PROGRESS` on the
+  second consecutive occurrence.
+- **Lock timing.** A lock older than 60 s, or held by a dead pid on this host,
+  is stale (`JULES_STALE_LOCK`, never taken over). A live holder is waited on
+  for at most 15 s, then the call fails with `JULES_STALE_LOCK`,
+  `retryable: true`, and a recovery action that names the contention.
+- **`status --reconcile` in PR2.** With no reachable reservation it returns
+  `reconciled: []`. A hand-planted unresolved record is reported as
+  `not-reached` with `reason: "reconcile ships with delegate in PR3"` rather
+  than ignored.
+- **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
+  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
+  `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors
+  (exit 2) until they ship.
 
 ## Motivation
 

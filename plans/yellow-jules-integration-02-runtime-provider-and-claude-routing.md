@@ -693,7 +693,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
 
 ### Checkpoint 5 — Documentation, changesets, full validation, ready for review
 
-- [ ] Step 5.1: `plugins/yellow-jules/README.md` (Install, Prerequisites incl.
+- [x] Step 5.1: `plugins/yellow-jules/README.md` (Install, Prerequisites incl.
   `JULES_API_KEY` and consented SDK install, Commands for the four v0
   commands, Security model: artifact-first, no mutating command until PR3,
   data dir, redaction, Limitations: experimental, SDK "not an officially
@@ -704,13 +704,13 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   `docs/yellow-jules/contract-v1.md` rather than restating it, Local state,
   Testing layers, Build discipline, Component catalog). The R38 handoff
   procedure is shell 03's.
-- [ ] Step 5.2: `docs/yellow-jules/contract-v1.md` — flip `**Status:**` to
+- [x] Step 5.2: `docs/yellow-jules/contract-v1.md` — flip `**Status:**` to
   "Accepted (PR2 landed read-only surface)"; add dated notes for the PR2
   revisions (external-session minting with `origin: "external"`, the
   `runtime/` lockfile location, any revised default); update
   `docs/yellow-jules/capability-matrix.md` rows now
   `packed-artifact-tested`.
-- [ ] Step 5.3: Counts and cross-references (R28): "19 plugins" → "20" at
+- [x] Step 5.3: Counts and cross-references (R28): "19 plugins" → "20" at
   `CLAUDE.md:10`, `README.md:3`, `docs/architecture-overview.md:3,60`; add
   yellow-jules to `README.md:33-35` and the ~:272 tree, `AGENTS.md:20-21`,
   `docs/architecture-overview.md:70,106,139,249`,
@@ -720,12 +720,12 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   section to `docs/upstream-pins.md` beside the `@cursor/sdk` one with the
   pinned tree and "treat any bump as a re-verification of the four R3
   criteria". `docs/codex-distribution.md` is untouched (Codex stays disabled).
-- [ ] Step 5.4: Changesets via `pnpm changeset`: `yellow-jules` minor (initial
+- [x] Step 5.4: Changesets via `pnpm changeset`: `yellow-jules` minor (initial
   release), `yellow-core` minor (third remote-agent provider, READY_JULES),
   `yellow-linear` minor (`--provider jules` recognized, fail-closed until
   PR3), and `yellow-cursor` patch only if Step 3.5's replica markers changed
   its `dist/`.
-- [ ] Step 5.5: Full local gate: `pnpm build` then confirm
+- [x] Step 5.5: Full local gate: `pnpm build` then confirm
   `git status --porcelain --untracked-files=all -- plugins/yellow-jules/dist plugins/yellow-cursor/dist`
   is empty; `pnpm validate:schemas`, `pnpm validate:versions`,
   `pnpm validate:generated`, `pnpm release:check` (doc counts),

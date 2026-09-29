@@ -1,8 +1,10 @@
 # yellow-jules vendor capability matrix
 
-**Status:** PR1 baseline (2026-09-10) **Reconciled to:** `main` `8baa0bdd`
-**SDK:** `@google/jules-sdk@0.2.0`, integrity recorded in
-[sdk-investigation.md](sdk-investigation.md) **Spec:**
+**Status:** PR1 baseline (2026-09-10); PR2 relabels four rows
+`packed-artifact-tested` from
+`plugins/yellow-jules/tests/packed-sdk-transport.test.ts` (2026-09-29)
+**Reconciled to:** `main` `8baa0bdd` **SDK:** `@google/jules-sdk@0.2.0`,
+integrity recorded in [sdk-investigation.md](sdk-investigation.md) **Spec:**
 `plans/specs/yellow-jules-integration.md` (R49)
 
 ## Evidence labels

@@ -292,7 +292,8 @@ than sourced:
   `commands/setup/all.md`'s dashboard still inlines its own `gt` / `gh`
   checks, so a readiness change must update it too
 - `remote-agent-provider-state.js` — classifies which `remote-agent` provider
-  (yellow-cursor or yellow-devin) is active for `/linear:delegate`; a smaller
+  (yellow-cursor, yellow-devin, or yellow-jules) is active for
+  `/linear:delegate` and `/setup:all` Step 2.5; a smaller
   sibling of `stack-provider-state.js` with no intent file and no switch plan
 - `context-observer.py` — opt-in statusline stage (installed as
   `<config>/yellow-context-observer.py`): passes the payload through, always
