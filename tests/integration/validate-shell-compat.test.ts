@@ -81,6 +81,11 @@ describe('inline rules', () => {
     ],
     ['SHC-006 single-bracket ==', 'if [ "$a" == "b" ]; then :; fi', 'SHC-006'],
     ['SHC-007 rcquotes', "printf '%s\\n' 'it''s'", 'SHC-007'],
+    [
+      'SHC-001 redirect onto a mktemp file with a /dev/null fallback',
+      'e=$(mktemp)\ncmd 2>"${e:-/dev/null}"',
+      'SHC-001',
+    ],
   ])('%s', (_name, text, rule) => {
     expect(rules(text)).toContain(rule);
   });
@@ -97,7 +102,7 @@ describe('inline rules', () => {
     ['>| on a mktemp file', 'f=$(mktemp)\necho hi >| "$f"'],
     ['>> on a mktemp file', 'f=$(mktemp)\necho hi >> "$f"'],
     ['mktemp -u path', 'f=$(mktemp -u)\necho hi > "$f"'],
-    ['/dev/null fallback', 'e=$(mktemp)\ncmd 2>"${e:-/dev/null}"'],
+    ['>| with a /dev/null fallback', 'e=$(mktemp)\ncmd 2>|"${e:-/dev/null}"'],
     ['a path built from the variable', 'f=$(mktemp)\ncmd 2>"$f.err"'],
     ['single-digit fd on a subshell', '( flock -x 9; true ) 9>>"$lock"'],
     ['arithmetic comparison', 'x=$(( 10 > 3 ))'],

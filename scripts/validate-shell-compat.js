@@ -626,7 +626,8 @@ function* clobberRedirects(code) {
   CLOBBER_REDIRECT_RE.lastIndex = 0;
   let m;
   while ((m = CLOBBER_REDIRECT_RE.exec(code)) !== null) {
-    if (m[2]) continue; // ${var:-/dev/null} may fall back to /dev/null
+    // `${var:-/dev/null}` still writes to $var whenever it is set — the
+    // mktemp file — so noclobber refuses it like a bare `$var`.
     yield m[1] || m[3];
   }
 }
