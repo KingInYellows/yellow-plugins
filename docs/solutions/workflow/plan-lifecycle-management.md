@@ -255,7 +255,7 @@ ejection, or external close) and names the PR's `merged` boolean as the
 authoritative check. `merged: true` settles it; `merged: false` does not rule
 out a Graphite direct push to trunk, where GitHub never performs the PR merge.
 In that case confirm the delivered commit on `origin/main` with the
-patch-id check below before using the override.
+landed-content check below before using the override.
 
 - **File-provenance tier** — `gh api repos/{owner}/{repo}/commits/{sha}/pulls
   --jq '[.[]|select(.state=="closed")]'` against the squash commit returned 0
@@ -280,30 +280,26 @@ override; if a PR shows this state, expect the provenance → strict → loose �
 override fallthrough as a possibility: check `merged` first, then the
 commit on `origin/main` when `merged` is false.
 
-### Verifying an MQ merge when Gate C has nothing: patch-id equality
+### Verifying an MQ merge when Gate C has nothing: landed-content equality
 
 With a PR number already known from context (not discovered by search),
-comparing the patch content of the squash commit and the reviewed branch is
-fast corroboration before taking the override path. Compare verbatim patch
-ids, not `--stat`: two different changes to the same files with the same
-insertion and deletion counts produce identical diffstats, and
-`git patch-id --stable` ignores whitespace, so it would also equate patches
-that differ only in whitespace. `--verbatim` (git 2.40+) hashes the patch as
-written.
+checking that the squash commit left the branch's changed files exactly as
+the reviewed branch head has them is fast corroboration before taking the
+override path. Compare the resulting files, not `--stat` or patch ids: two
+different changes can share a diffstat, and patch ids ignore hunk positions,
+so a change to one of two identical blocks can match a change to the other.
 
 ```bash
 MERGE_BASE=$(git merge-base "$BRANCH_HEAD_SHA" "$SQUASH_SHA"^)
-git diff "$SQUASH_SHA"^ "$SQUASH_SHA" | git patch-id --verbatim     # squash commit's own patch
-git diff "$MERGE_BASE" "$BRANCH_HEAD_SHA" | git patch-id --verbatim # branch patch vs. its merge-base
-# the first field (the patch id) must be identical: the squash landed the
-# reviewed patch byte-for-byte
+git diff -z --name-only "$MERGE_BASE" "$BRANCH_HEAD_SHA" \
+  | xargs -0 git diff --quiet "$SQUASH_SHA" "$BRANCH_HEAD_SHA" -- \
+  && echo "landed content matches the reviewed branch"
 ```
 
-The ids match only when the branch's changes applied to trunk unchanged. If
-they differ because trunk moved under the branch, compare the content
-directly (`git diff "$SQUASH_SHA" "$BRANCH_HEAD_SHA" -- <changed paths>`
-should show only the unrelated trunk changes) rather than accepting a
-matching diffstat.
+This holds only when no other trunk commit between `MERGE_BASE` and the
+squash touched the same paths; if one did, inspect
+`git diff "$SQUASH_SHA" "$BRANCH_HEAD_SHA" -- <changed paths>` and confirm
+the remaining differences come from those trunk commits.
 
 This is corroborating evidence, not proof — treat it as sufficient only when
 paired with an independently-known candidate PR number, never as a blind
