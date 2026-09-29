@@ -152,27 +152,35 @@ __YELLOW_DEBT_BASH__
    same finding's main options (Accept/Reject/Defer/Stop). Do not increment
    any count.
 
-   **On Defer — Submit reason:** Use a heredoc to pass the reason safely
-   (avoids quoting issues with special characters). Use `__EOF_DEFER_REASON__`
-   as the delimiter (avoids collision if the reason text contains common words).
-   Ensure the closing delimiter is at column 0 with no leading whitespace:
-   ```bash
+   **On Defer — Submit reason:** The reason is untrusted free text. Never place
+   it in shell text (no heredoc, no quoting): a line matching a heredoc
+   delimiter would end the heredoc and run the following lines as commands.
+   Pass it through a file instead.
+
+   1. Reserve a fresh, unused path (this creates nothing):
+      ```bash
+      mktemp -u "${TMPDIR:-/tmp}/debt-defer-reason.XXXXXX"
+      ```
+   2. Use the Write tool (not Bash) to create that exact path with the reason
+      text as its content.
+   3. Run the transition with the reason-file path as a single-quoted operand.
+      The child strips newlines, transitions, then removes the file:
+      ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (the script is an argument, so stdin stays free).
 bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-DEFER_REASON=$(cat <<'__EOF_DEFER_REASON__'
-<paste the actual defer reason text verbatim here>
-__EOF_DEFER_REASON__
-)
-DEFER_REASON=$(printf '%s' "$DEFER_REASON" | tr -d '\n\r')
+DEFER_REASON=$(tr -d '\n\r' < "$1")
+rc=0
 transition_todo_state "/absolute/path/to/file.md" deferred "$DEFER_REASON" || {
 printf '[debt:triage] Error: transition failed\n' >&2
-exit 1
+rc=1
 }
+rm -f -- "$1"
+exit "$rc"
 __YELLOW_DEBT_BASH__
-)"
-   ```
+)" debt-triage '<reason-file>'
+      ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 

@@ -26,6 +26,12 @@ files.
 
 ## Implementation
 
+Replace each placeholder after the closing `)"` with the matching command
+argument, single-quoted. Pass `'.'` as the path when none was given. Omit the
+`'--category' '<category>'` and `'--severity' '<severity>'` operand pairs when
+those flags are absent. Stop with an error instead of running the block if any
+value contains a single quote.
+
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (the script is an argument, so stdin stays free).
@@ -137,7 +143,7 @@ fi
 printf '[audit] Prepared scanner list in .debt/scanners-to-run.txt\n' >&2
 printf '[audit] Run the listed scanner agents in parallel, then run yellow-debt:audit-synthesizer.\n' >&2
 __YELLOW_DEBT_BASH__
-)"
+)" debt-audit '<path-or-.>' '--category' '<category>' '--severity' '<severity>'
 ```
 
 ## Agent Orchestration
