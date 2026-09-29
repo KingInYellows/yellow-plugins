@@ -283,13 +283,17 @@ commit on `origin/main` when `merged` is false.
 ### Verifying an MQ merge when Gate C has nothing: landed-content equality
 
 With a PR number already known from context (not discovered by search),
-checking that the squash commit left the branch's changed files exactly as
+checking that the squash commit is on `origin/main` and left the branch's
+changed files exactly as
 the reviewed branch head has them is fast corroboration before taking the
 override path. Compare the resulting files, not `--stat` or patch ids: two
 different changes can share a diffstat, and patch ids ignore hunk positions,
 so a change to one of two identical blocks can match a change to the other.
 
 ```bash
+git fetch origin main
+git merge-base --is-ancestor "$SQUASH_SHA" origin/main \
+  || echo "squash commit is not on origin/main: nothing landed"
 MERGE_BASE=$(git merge-base "$BRANCH_HEAD_SHA" "$SQUASH_SHA"^)
 git diff -z --name-only "$MERGE_BASE" "$BRANCH_HEAD_SHA" \
   | xargs -0 git diff --quiet "$SQUASH_SHA" "$BRANCH_HEAD_SHA" -- \
