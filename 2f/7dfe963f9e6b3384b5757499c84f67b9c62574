@@ -1,0 +1,20 @@
+tests/shell-compat/tier4-libraries.bats
+  s_e3ae526d137cfd::t_63071f2555cb95 69-75,79
+  s_e3ae526d137cfd::t_9dd9f0570dae08 66-68,76-78,80-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2f7dfe963f9e6b3384b5757499c84f67b9c62574",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
