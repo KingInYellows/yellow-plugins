@@ -1,0 +1,21 @@
+docs/CONCEPTS.md
+  s_2bf3a37c3fe1a7::t_c7215a8c120f6e 82-91
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_2bf3a37c3fe1a7::t_53580e2da60bde 237-328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b3296bba2daed5fda608ab7a641e163668d006c9",
+  "prompts": {},
+  "sessions": {
+    "s_2bf3a37c3fe1a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84692cd2-e8b5-46ff-9c63-485bc5e597c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
