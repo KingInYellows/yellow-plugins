@@ -116,6 +116,31 @@ pattern today, so both are lint hardening):
       balancer skip quoted text and backslash escapes (reuse `scanQuotes`).
       (PR #921 thread PRRT_kwDOQ3SUys6nJ-1z.)
 
+Review-bot findings from the fourth round (promised in PR #921 replies):
+
+- [ ] 18: `classifyLines` reads heredoc text inside a trailing comment as a
+      real opener: `true # example: cat <<'EOF'` hides the following lines
+      from the rules until `EOF`. Cut the comment (`scanQuotes` already
+      finds it) before `HEREDOC_RE` runs. (PR #921 thread
+      PRRT_kwDOQ3SUys6nKQUY.)
+- [ ] 19: `stripComparisons` ends a `[[ … ]]` span at a quoted `"]]"`, so
+      `f=$(mktemp); [[ "]]" > "$f" ]]` gives a false SHC-001. Make the span
+      matcher quote-aware. (PR #921 thread PRRT_kwDOQ3SUys6nKQUg.)
+- [ ] 20 (P1, CI coverage): the fork workflow
+      (`.github/workflows/validate-schemas-fork.yml`, `shell-compat` target)
+      runs the lint and the zsh parse check but not the `tests/shell-compat`
+      bats runtime suite, and the main workflow's `shell-compat-tests` job
+      skips fork PRs. Add the suite to the fork target with the same zsh,
+      `bats@1.11.0` and kislyuk `yq==3.4.3` (pipx) installs as the main job;
+      no secrets and no new actions. Update task 4.2's decision text in
+      `plans/bash-zsh-shell-compatibility.md`. (PR #921 thread
+      PRRT_kwDOQ3SUys6nKi8Q.)
+- [ ] 21: an fd wrapper split with a line continuation (`bash /dev/fd/3 \`
+      then `3<<'TAG'`) is not recognised, so its body is treated as data and
+      skipped by both checks. Join `\`-continued lines before wrapper
+      detection, or reject the form with SHC-009 and a specific detail.
+      (PR #921 thread PRRT_kwDOQ3SUys6nKi8Z.)
+
 ## Acceptance Criteria
 
 - Items 1–2 have regression tests (symlinked target refused; a `$(…)`
