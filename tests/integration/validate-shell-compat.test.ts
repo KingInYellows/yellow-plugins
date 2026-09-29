@@ -216,6 +216,7 @@ describe('inline rules', () => {
     ['after if', "if bash /dev/fd/3 3<<'__W__'"],
     ['in a command substitution', "out=$(bash /dev/fd/3 3<<'__W__'"],
     ['after command', "command bash /dev/fd/3 3<<'__W__'"],
+    ['with a placeholder operand', "bash /dev/fd/3 '<todo-path>' 3<<'__W__'"],
   ])('accepts the fd wrapper %s', (_name, opener) => {
     expect(lint([opener, 'mapfile -t a < f', '__W__'].join('\n'))).toEqual([]);
   });

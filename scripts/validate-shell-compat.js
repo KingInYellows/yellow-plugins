@@ -179,7 +179,11 @@ function listShellFiles(root) {
 const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
 // The command in front of the heredoc is a bash interpreter: `bash`,
 // `bash -s -- "$x"`, `command bash`, possibly after `&&`/`;`/`|`.
-const BASH_WRAPPER_PREFIX_RE = /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s[^<]*)?$/;
+// A quoted operand may contain `<` (`'<todo-path>'`); an unquoted `<` is a
+// redirect, so the heredoc is not the script. A quote still open at the
+// heredoc (`bash -c "$(cat <<'TAG'`) is allowed.
+const BASH_WRAPPER_PREFIX_RE =
+  /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s(?:'[^']*'|"[^"]*"|[^<'"]|["'](?=[^'"]*$))*)?$/;
 // The supported wrapper, `bash /dev/fd/3 3<<'TAG'`: bash reads the script
 // from fd 3, so stdin stays the caller's, and the git-push hook can inspect
 // the body. `bash` must be the command itself (no sudo/ssh/env prefix); only
