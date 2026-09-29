@@ -95,7 +95,7 @@ printf '%s' "$BRANCH" | grep -qE '^[a-zA-Z0-9/_.-]+$' || {
   exit 1
 }
 _PR_STDERR_FILE="$(mktemp)"
-PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,files,closingIssuesReferences 2>"$_PR_STDERR_FILE")"
+PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,files,closingIssuesReferences 2>|"$_PR_STDERR_FILE")"
 GH_RC=$?
 PR_ERR="$(cat "$_PR_STDERR_FILE")"
 rm -f "$_PR_STDERR_FILE"

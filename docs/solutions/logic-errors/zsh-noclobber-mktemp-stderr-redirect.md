@@ -181,8 +181,16 @@ redirects onto mktemp-created files were still live in
 on the fix itself: `codex exec … 2>/tmp/codex-probe-err.txt` run twice from
 a zsh session stopped with `file exists`, so the second probe never ran.
 
-All are now `>|` / `2>|`. Two greps make up the done-criterion; both must
-return nothing:
+All are now `>|` / `2>|`.
+
+**Superseded (2026-09-28):** lint rule SHC-001 in
+`scripts/validate-shell-compat.js` now enforces this in CI (`pnpm
+validate:shell-compat`, also part of `pnpm validate:schemas`) — including
+cross-block and cross-file handoff variables and `: >` truncation — so the
+done-criterion is "the lint passes", not a manual sweep. See
+`docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md`. The two
+greps below are kept for history; both returned nothing when the sweep
+closed:
 
 ```bash
 # the original, 12-line window after each mktemp

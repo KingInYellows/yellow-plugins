@@ -11,7 +11,7 @@ load helpers/shells
 
 setup() {
   require_zsh
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  command -v jq >/dev/null 2>&1 || skip_or_fail "jq not installed"
 }
 
 driver_for() { # $1 = repo-relative library path

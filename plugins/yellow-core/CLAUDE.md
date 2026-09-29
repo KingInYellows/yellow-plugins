@@ -11,6 +11,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - Keep code simple and direct. No premature abstractions
 - Prefer explicit over implicit. Name things clearly
 - Write tests for non-trivial logic
+- **Shell libraries and zsh:** Markdown blocks run under the user's shell,
+  often zsh with `noclobber`. `lib/compound-staging.sh`, `lib/repo-profile.sh`
+  and `lib/validate-fs.sh` are dual-shell (Tier 4) and are sourced directly;
+  keep them that way — `tests/shell-compat/` runs them under bash and zsh.
+  Bash-only code goes in a `bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'` wrapper
+  (as in `staging-reviewer`); see CONTRIBUTING.md "Bash and zsh".
 - Review agents (`security-sentinel`, `security-reviewer`, `security-lens`,
   `architecture-strategist`, `polyglot-reviewer`, `test-coverage-analyst`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,

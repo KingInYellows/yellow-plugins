@@ -69,8 +69,8 @@ patterns and style.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 _validate_sh="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT is unset}/lib/validate.sh"
 [ -f "$_validate_sh" ] || { printf '[debt-fixer] ERROR: validate.sh not found at %s\n' "$_validate_sh" >&2; exit 1; }
 . "$_validate_sh"
@@ -117,7 +117,6 @@ if [ "$OUT_OF_SCOPE" -eq 1 ]; then
   exit 1
 fi
 __YELLOW_DEBT_BASH__
-)"
 ```
 
 ### 4. Show Diff
@@ -154,8 +153,8 @@ Resolve the active stacked-PR provider first: invoke the `Skill` tool with
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
@@ -179,7 +178,6 @@ else
   exit 1
 fi
 __YELLOW_DEBT_BASH__
-)"
 ```
 
 `gt modify` has no file-based message flag (`--help` confirms only `-m`/
@@ -194,8 +192,8 @@ complete either.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
@@ -233,7 +231,6 @@ else
   exit 1
 fi
 __YELLOW_DEBT_BASH__
-)"
 ```
 
 The `ALLOWED` entries come from todo frontmatter (attacker/collaborator
@@ -253,8 +250,8 @@ provider-specific mutation.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 while IFS= read -r changed_file; do
   [ -z "$changed_file" ] && continue
   git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
@@ -263,7 +260,6 @@ done < <(git status --porcelain | cut -c4-)
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 transition_todo_state "$todo_path" "ready"
 __YELLOW_DEBT_BASH__
-)"
 ```
 
 Inform user: "Changes reverted. Todo reset to 'ready' state."

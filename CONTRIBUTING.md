@@ -583,6 +583,78 @@ solution doc draft and the MEMORY.md entry side-by-side before any write.
 - Reject path traversal: `..`, `/`, `~` in names
 - Use `jq` for JSON construction, never string interpolation
 
+#### Bash and zsh
+
+Claude Code's Bash tool runs fenced shell blocks in command, skill and agent
+markdown under the user's login shell — often zsh — and replays the user's
+shell options and aliases (commonly `noclobber`, `extendedglob`, `rcquotes`).
+`.sh` files with a bash shebang still run under bash. The contract, enforced by
+`pnpm validate:shell-compat` and `pnpm check:shell-parse`:
+
+| Tier | Code | Rule |
+|---|---|---|
+| 1 | Inline fenced blocks | Run as written in bash and zsh (the list below). |
+| 2 | Blocks that need bash-only code | Run in a bash child that reads the script from fd 3 (see below). |
+| 3 | Bash-only libraries (`tier3Libraries`) | Sourced from markdown only inside a Tier 2 wrapper. |
+| 4 | Dual-shell libraries (`tier4Libraries`) | Sourced directly; linted like inline blocks and tested under both shells by `pnpm test:shell-compat` (add a driver in `tests/shell-compat/drivers/`). |
+
+Inline blocks:
+
+- Write `>|` wherever a redirect overwrites a file that may exist (anything
+  from `mktemp`, `touch`, or an earlier run). zsh's `noclobber` refuses `>`
+  and skips the command; `: > file` truncation fails the same way.
+- Never name a variable `status`, `path`, `argv`, `pipestatus`, `fpath`,
+  `cdpath` or `manpath`: in zsh `status` is read-only and `path` is tied to
+  `$PATH`, so `path=x` or `for path in …` breaks every later command.
+- No `mapfile`/`readarray`, `read -a`/`-p`, `${!var}`/`${!arr[@]}`,
+  `${v,,}`/`${v^}`, `local -n`, `BASH_REMATCH`, `BASH_SOURCE`,
+  `BASH_VERSINFO`, `PIPESTATUS`, `trap … RETURN`, or multi-digit fds
+  (`exec 200>f`). Use `while IFS= read -r -d '' f; do a+=("$f"); done`,
+  `case`, awk, or a Tier 2 wrapper.
+- Iterate arrays with `"${arr[@]}"`; never index them (`${arr[0]}` is the
+  first element in bash and empty in zsh).
+- `printf`, not `echo -e` or `echo` with backslashes; `[ "$a" = "$b" ]`, not
+  `==` inside single brackets; no `'a''b'` adjacent quoting.
+- Quote every expansion: zsh does not word-split unquoted `$var`.
+- Where flags matter, call `command ls` / `command cat`: users' aliases
+  (`cat=bat`, `ls=eza`) apply to these blocks.
+
+Tier 2 wrapper — use a distinctive tag, never `EOF`:
+
+```bash
+bash /dev/fd/3 3<<'__YELLOW_EXAMPLE_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/bash-only.sh"
+bash_only_function "/literal/value"
+__YELLOW_EXAMPLE_BASH__
+```
+
+bash reads the script from file descriptor 3, so the caller's stdin stays
+free and the exit status passes through. Lint rule SHC-009 rejects the two
+look-alikes: `bash <<'TAG'` feeds the script on stdin, so any command in the
+body that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare `cat`)
+silently swallows the rest of it; and `bash -c "$(cat <<'TAG' …)"` is refused
+as unverifiable by the stacked-PR providers' git-push PreToolUse hook. `bash`
+must be the command itself (no `sudo`/`ssh`/`env` prefix); only `--norc`,
+`--noprofile`, `-e`/`-u`/`-x` and `-o pipefail` may precede `/dev/fd/N`, and
+only quoted operands (`'value'`, `"$var"`) may follow it — pass untrusted
+values that way, never inside the body. The tag must be quoted
+(`3<<'TAG'`): an unquoted tag expands the body in the caller's shell, and
+SHC-009 rejects it. Redirects after the heredoc operator
+run in the caller's shell and are linted like inline code. To call one
+function from prose, pass values as single-quoted arguments (reject values
+that contain a single quote): `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'`.
+
+Tier 4 libraries may start functions with
+`if [ -n "${ZSH_VERSION:-}" ]; then emulate -L sh; fi` (never the `&&` form,
+which trips `set -e` under bash), but never use `emulate` in inline blocks:
+it turns `noclobber` off and hides the failure.
+
+Without zsh installed, `pnpm check:shell-parse` and `pnpm test:shell-compat`
+print SKIP and exit 0 locally. A SKIP verifies nothing: set
+`SHELL_COMPAT_REQUIRE_ZSH=1` to make a missing zsh fail, as it does in CI
+(any `CI` value other than empty, `false` or `0`). The parse check also runs
+`bash -n` on every Tier 2 wrapper body, which zsh sees only as heredoc data.
+
 ### Naming Conventions
 
 - Files: `kebab-case.ts` / `kebab-case.md`

@@ -63,6 +63,12 @@ one minor release, then remove the bare form in the next major.
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
 - Keep commits atomic and focused — one concern per PR in a stack
+- **Shell libraries and zsh:** Command and skill blocks run under the user's
+  shell, often zsh, and the plugin has no bash-only library, so every block
+  must run in both: parse arguments with `set --`/`shift` or a `case` loop
+  (no 0-based array indexing), compare versions with awk (not `read -a`),
+  and write `>|` over files that may exist. See CONTRIBUTING.md "Bash and
+  zsh".
 
 ## Key `gt` Commands
 

@@ -29,8 +29,11 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration (validator tests live here)
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + flow-namespace + provider-neutral-commands + council-roster + doc-counts
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + flow-namespace + provider-neutral-commands + council-roster + doc-counts + shell-compat
 pnpm validate:agents          # agent-authoring rules only (fast; run after any plugin markdown edit)
+pnpm validate:shell-compat    # bash/zsh lint of fenced shell blocks + tier 4 libs (run after any shell edit)
+pnpm check:shell-parse        # blocks bash parses but zsh does not (skips locally without zsh; CI fails)
+pnpm test:shell-compat        # tests/shell-compat bats suite: libraries under bash, zsh, zsh+noclobber
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
 pnpm validate:versions        # cross-manifest version drift check
@@ -50,15 +53,17 @@ tests live under `plugins/<name>/tests/` for `github-workflow`,
 `yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`
 — run `bats tests/`
 from inside the plugin directory (`yellow-core` also has a required nested
-suite at `skills/git-worktree/tests/`; CI runs both separately). CI installs
-`bats@1.11.0` via npm; locally `pnpm dlx bats@1.11.0 tests/` works when it
-is not on PATH).
+suite at `skills/git-worktree/tests/`; CI runs both separately). The
+cross-plugin bash/zsh suite lives at `tests/shell-compat/` (`pnpm
+test:shell-compat`; needs zsh). CI installs `bats@1.11.0` via npm; locally
+`pnpm dlx bats@1.11.0 tests/` works when it is not on PATH).
 
 `pnpm validate:schemas && pnpm test:unit && pnpm test:integration && pnpm lint
 && pnpm typecheck` is a local baseline, not the full CI gate — the
 `ci-status` job in `.github/workflows/validate-schemas.yml` additionally
 requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
-`changeset-check`, `plugin-shell-tests`, and `goal-engine-compat`.
+`changeset-check`, `plugin-shell-tests`, `shell-compat-tests`, and
+`goal-engine-compat`.
 
 ## Architecture in Four Facts
 
@@ -131,6 +136,10 @@ the colon.
    `validate:schemas` nor `validate:agents` alone runs the
    `lint-plugins.yml` convention lint. See AGENTS.md's Targeted
    Validation Matrix for the rest.
+   Fenced shell blocks run under the user's login shell, often zsh with
+   `noclobber`: they must work in bash and zsh (`pnpm validate:shell-compat`),
+   and bash-only code runs in a `bash /dev/fd/3 3<<'TAG'` child —
+   CONTRIBUTING.md "Shell Scripts" has the tier contract.
 2. Run `pnpm changeset` and commit the file — CI blocks the PR without it.
 3. Adding or removing a plugin: update `catalog/` (then
    `pnpm generate:manifests` regenerates `.claude-plugin/marketplace.json`)

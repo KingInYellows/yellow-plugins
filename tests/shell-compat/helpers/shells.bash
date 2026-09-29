@@ -12,8 +12,26 @@
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 PROFILES=(bash zsh zsh-snapshot)
 
+# Locally a missing tool skips the test — a skip verifies nothing. It fails
+# instead when SHELL_COMPAT_REQUIRE_ZSH=1 or CI is set (to anything but '',
+# false or 0), so a required job cannot pass by skipping everything.
+skip_or_fail() {
+  case "${CI:-}" in
+    '' | false | 0) ;;
+    *)
+      printf '%s (required in CI)\n' "$1" >&2
+      return 1
+      ;;
+  esac
+  if [ "${SHELL_COMPAT_REQUIRE_ZSH:-}" = 1 ]; then
+    printf '%s (required by SHELL_COMPAT_REQUIRE_ZSH=1)\n' "$1" >&2
+    return 1
+  fi
+  skip "$1"
+}
+
 require_zsh() {
-  command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
+  command -v zsh >/dev/null 2>&1 || skip_or_fail "zsh not installed"
 }
 
 # Sets PROFILE_CMD to the argv that runs a script file under profile $1.

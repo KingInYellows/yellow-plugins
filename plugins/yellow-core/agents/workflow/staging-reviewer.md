@@ -202,9 +202,9 @@ suppressed.
 
 ```bash
 # Associative arrays with += and read -ra are bash-only: run this block in bash
-# even when the Bash tool's shell is zsh (the script is an argument, so stdin
-# stays free). Paste the STAGING assignment inside the wrapper.
-bash -c "$(cat <<'__YELLOW_CORE_BASH__'
+# even when the Bash tool's shell is zsh (bash reads the script from fd 3, so
+# stdin stays free). Paste the STAGING assignment inside the wrapper.
+bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'
 # Re-paste $STAGING from Phase 0's dispatch prompt — fresh subprocess.
 # Re-derive MOVED_THIS_DRAIN_FILE from .drain-lock mtime — see Phase 1
 # rationale. stat MUST succeed (fail-closed) for the same reason.
@@ -297,7 +297,6 @@ for h in "${!by_hash[@]}"; do
   done
 done
 __YELLOW_CORE_BASH__
-)"
 ```
 
 ## Phase 3: Discover ruvector availability

@@ -12,6 +12,12 @@ Technical debt audit and remediation with parallel scanner agents.
 - Todo files follow atomic state transitions via `transition_todo_state()`
   function
 - Path arguments validated before use: source `lib/validate.sh` in all commands
+- **Shell libraries and zsh:** `lib/validate.sh` is bash-only (its
+  transition lock uses `exec 200>` and a RETURN trap) and markdown blocks run
+  under the user's shell, often zsh: every block that sources it runs in a
+  bash child —
+  `bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'` … `__YELLOW_DEBT_BASH__`.
+  `pnpm validate:shell-compat` (SHC-008) fails an unwrapped source.
 - All shell scripts use LF line endings (run `sed -i 's/\r$//'` after Write tool
   creates them)
 

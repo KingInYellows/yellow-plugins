@@ -131,8 +131,8 @@ Call `list_issue_labels` for `TEAM_ID`. Search for a label named exactly
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 # shellcheck disable=SC2154
 # Source shared validation helpers
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
@@ -161,7 +161,6 @@ fi
 
 printf '[sync] Found %d finding(s) to sync\n' "${#TODOS_TO_SYNC[@]}"
 __YELLOW_DEBT_BASH__
-)"
 ```
 
 ### Step 7.5: Pre-flight Confirmation (user confirmation gate)

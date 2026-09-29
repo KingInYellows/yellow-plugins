@@ -5,10 +5,9 @@
  * shell-compat checks (validate-shell-compat.js, check-shell-parse.js).
  *
  * Two readings of the same markdown, deliberately separate:
- *   - CommonMark (`scanFences`, with `stripFencedContent` and
- *     `extractFencedBlocks` as views over it): what a renderer shows. The
- *     authoring validator strips these fences so illustrative examples never
- *     trip its prose rules.
+ *   - CommonMark (`scanFences` and `stripFencedContent` over it): what a
+ *     renderer shows. The authoring validator strips these fences so
+ *     illustrative examples never trip its prose rules.
  *   - Raw reader (`extractRawFencedBlocks`): what Claude sees when it reads
  *     the file as text and runs a ```bash block. The shell-compat checks
  *     lint what runs, so they use this one.
@@ -185,8 +184,7 @@ function fenceOpenerAt(rest, column) {
 //   - 'closer'    a matching closing marker (endIndex is that line)
 //   - 'container' the enclosing block quote / list item ended first
 //   - 'eof'       unterminated, runs to the end of the document
-// plus what a body extractor needs: marker, info string, and the column the
-// opener sat at (container content column + the opener's own 0-3 indent).
+// plus the marker, info string and the closer pattern built once at open.
 function scanFences(lines) {
   const fences = [];
   let current = null;
@@ -217,10 +215,7 @@ function scanFences(lines) {
       }
       const contentForClose =
         indent >= current.listColumn ? rest.slice(current.listColumn) : rest;
-      const closerRe = new RegExp(
-        `^[ \\t]{0,3}\\${current.char}{${current.len},}[ \\t]*\\r?$`
-      );
-      if (depth === current.depth && closerRe.test(contentForClose)) {
+      if (depth === current.depth && current.closerRe.test(contentForClose)) {
         current.endIndex = i;
         current.endReason = 'closer';
         fences.push(current);
@@ -292,7 +287,9 @@ function scanFences(lines) {
         info: opener.info,
         depth,
         listColumn: openerColumn,
-        bodyColumn: openerColumn + leadingIndentOf(rest.slice(openerColumn)),
+        closerRe: new RegExp(
+          `^[ \\t]{0,3}\\${opener.char}{${opener.len},}[ \\t]*\\r?$`
+        ),
       };
     }
 
@@ -347,9 +344,9 @@ function languageOf(info) {
   return match ? match[1].toLowerCase() : '';
 }
 
-// Remove up to `columns` leading spaces/tabs — the container indent plus the
-// opener's own indent, which CommonMark strips from each content line. Lines
-// indented less than that simply lose all their leading whitespace.
+// Remove up to `columns` leading spaces/tabs — the opener's indent, which is
+// stripped from each body line. Lines indented less than that simply lose all
+// their leading whitespace.
 function dedent(text, columns) {
   let i = 0;
   while (
@@ -374,38 +371,6 @@ function stripQuoteMarkers(line, depth) {
   return rest;
 }
 
-// Every fenced code block in `content`, in document order, with the body
-// dedented and stripped of block-quote markers so it can be handed straight
-// to a shell or a linter. Line numbers are 1-based and refer to `content` as
-// given (frontmatter is NOT stripped here, so numbers match the file).
-//   startLine      the opener line
-//   bodyStartLine  the first body line (startLine + 1)
-//   endLine        the closer line, or the last body line when unclosed
-//   closed         true only for a fence ended by a matching closer
-//   endReason      'closer' | 'container' | 'eof' (see scanFences)
-function extractFencedBlocks(content) {
-  const lines = content.split('\n');
-  return scanFences(lines).map((fence) => {
-    const bodyLines = [];
-    for (let i = fence.openIndex + 1; i < fence.endIndex; i++) {
-      const rest = stripQuoteMarkers(lines[i], fence.depth);
-      bodyLines.push(dedent(rest.replace(/\r$/, ''), fence.bodyColumn));
-    }
-    const closed = fence.endReason === 'closer';
-    return {
-      startLine: fence.openIndex + 1,
-      bodyStartLine: fence.openIndex + 2,
-      endLine: closed ? fence.endIndex + 1 : fence.endIndex,
-      closed,
-      endReason: fence.endReason,
-      info: fence.info,
-      lang: languageOf(fence.info),
-      indent: fence.bodyColumn,
-      body: bodyLines.join('\n'),
-    };
-  });
-}
-
 // Raw-reader fence scan. Claude reads command/skill/agent markdown as text,
 // not as rendered CommonMark, so a ```bash opener indented under a list item
 // whose body sits at column 0 is — to the reader that executes it — still a
@@ -414,8 +379,15 @@ function extractFencedBlocks(content) {
 // use this reading: a fence opens on any fence-shaped line (any indentation;
 // block-quote markers stripped) and closes at the next line that is only a
 // marker of the same character and at least the same length. List
-// containers are ignored. Records have the same shape as
-// extractFencedBlocks'; endReason is 'closer' or 'eof'.
+// containers are ignored. Each record:
+//   startLine      the opener line (1-based, frontmatter not stripped)
+//   bodyStartLine  the first body line (startLine + 1)
+//   endLine        the closer line, or the last body line when unclosed
+//   closed         true when a matching closer ended the fence
+//   endReason      'closer' | 'eof'
+//   info, lang     the info string and its language tag
+//   indent         the opener's indent, stripped from each body line
+//   body           the dedented body, block-quote markers removed
 function extractRawFencedBlocks(content) {
   const lines = content.split('\n');
   const blocks = [];
@@ -442,11 +414,9 @@ function extractRawFencedBlocks(content) {
   };
   for (let i = 0; i < lines.length; i++) {
     if (current) {
-      const rest = stripQuoteMarkers(lines[i], current.depth);
-      const closerRe = new RegExp(
-        `^[ \\t]*\\${current.char}{${current.len},}[ \\t]*\\r?$`
-      );
-      if (closerRe.test(rest)) finish(i, 'closer');
+      if (current.closerRe.test(stripQuoteMarkers(lines[i], current.depth))) {
+        finish(i, 'closer');
+      }
       continue;
     }
     const { depth, rest } = splitBlockquotePrefix(lines[i]);
@@ -457,9 +427,10 @@ function extractRawFencedBlocks(content) {
         openIndex: i,
         depth,
         indent,
-        char: opener.char,
-        len: opener.len,
         info: opener.info,
+        closerRe: new RegExp(
+          `^[ \\t]*\\${opener.char}{${opener.len},}[ \\t]*\\r?$`
+        ),
       };
     }
   }
@@ -470,7 +441,6 @@ function extractRawFencedBlocks(content) {
 module.exports = {
   scanFences,
   stripFencedContent,
-  extractFencedBlocks,
   extractRawFencedBlocks,
   languageOf,
 };

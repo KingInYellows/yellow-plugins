@@ -8,26 +8,11 @@
  * markdown under the user's login shell — often zsh, with whatever options
  * and aliases the user's shell snapshot carries (noclobber, extendedglob,
  * rcquotes, ...). `.sh` files with a bash shebang still run under bash.
- * The tiered contract this lint enforces (plans/bash-zsh-shell-compatibility.md):
- *
- *   Tier 1  Inline fenced blocks must run as written in bash AND zsh.
- *   Tier 2  A block that needs bash-only constructs runs them in a bash
- *           child passed the script as an argument:
- *             bash -c "$(cat <<'TAG'
- *             …
- *             TAG
- *             )"
- *           The body is exempt from the inline rules (a `bash` child also
- *           ignores the parent's noclobber). Not `bash <<'TAG'`: that feeds
- *           the script on stdin, so any command in the body that reads
- *           stdin (gt, gh, node, claude -p, a bare `cat`) silently consumes
- *           the rest of the script (SHC-009).
- *   Tier 3  Bash-shebang libraries listed in `tier3Libraries` are
- *           bash-by-contract: markdown may only source them inside a
- *           Tier 2 wrapper.
- *   Tier 4  Libraries listed in `tier4Libraries` are sourced directly into
- *           the user's shell, so their whole file is linted with the inline
- *           rules.
+ * It enforces the four-tier contract in CONTRIBUTING.md "Bash and zsh":
+ * inline blocks must run in bash and zsh; bash-only code runs in a
+ * `bash /dev/fd/3 3<<'TAG'` wrapper, whose body is exempt from the inline
+ * rules; `tier3Libraries` may be sourced only inside that wrapper; and
+ * `tier4Libraries` are sourced directly, so their whole file is linted.
  *
  * Rules (each finding prints file, line, rule and a one-line fix):
  *   SHC-001  redirect that zsh noclobber refuses (onto a mktemp/touch file,
@@ -40,7 +25,7 @@
  *   SHC-007  adjacent single-quoted strings (`'a''b'` changes under rcquotes)
  *   SHC-008  markdown sources a Tier 3 library outside a wrapper, or sources
  *            a plugin library that is in neither tier list
- *   SHC-009  `bash <<'TAG'` wrapper that feeds the script on stdin
+ *   SHC-009  a bash wrapper other than `bash /dev/fd/3 3<<'TAG'`
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
  *   SHC-900  shell-compat-config.json problem (unknown path, missing reason,
  *            stale allowlist cap, ...)
@@ -56,8 +41,7 @@
  * an empty reason fails. Keyed by file + rule, never by line, so edits
  * elsewhere in the file do not churn it.
  *
- * Usage: node scripts/validate-shell-compat.js [--report] [--json]
- *   --report  print findings but always exit 0 (rollout mode)
+ * Usage: node scripts/validate-shell-compat.js [--json]
  *   --json    print findings as JSON (for measurement runs)
  * VALIDATE_SHELL_COMPAT_ROOT overrides the repo root (tests use fixtures).
  */
@@ -84,7 +68,7 @@ const RULES = {
   },
   'SHC-003': {
     summary: 'bash-only construct outside a bash wrapper',
-    hint: 'rewrite with a construct both shells accept, or run the block in bash: bash -c "$(cat <<\'TAG\' … TAG + newline + )"',
+    hint: "rewrite with a construct both shells accept, or run the block in bash: bash /dev/fd/3 3<<'TAG' … TAG",
   },
   'SHC-004': {
     summary: 'echo with escapes behaves differently in zsh',
@@ -104,11 +88,11 @@ const RULES = {
   },
   'SHC-008': {
     summary: 'library sourced into the user shell',
-    hint: 'source Tier 3 (bash-only) libraries inside a bash -c "$(cat <<\'TAG\' … )" wrapper; classify new libraries in scripts/shell-compat-config.json',
+    hint: "source Tier 3 (bash-only) libraries inside a bash /dev/fd/3 3<<'TAG' … TAG wrapper; classify new libraries in scripts/shell-compat-config.json",
   },
   'SHC-009': {
-    summary: 'bash wrapper reads its script from stdin',
-    hint: "use bash -c \"$(cat <<'TAG' … TAG + newline + )\" — with bash <<'TAG' any command that reads stdin swallows the rest of the script",
+    summary: 'unsupported bash wrapper form',
+    hint: "use bash /dev/fd/3 3<<'TAG' … TAG: bash <<'TAG' lets any stdin reader swallow the script, and the git-push hook refuses bash -c \"$(…)\"",
   },
   'SHC-101': {
     summary: 'shell file without a shebang or library marker',
@@ -123,12 +107,15 @@ const RULES = {
 // ---------------------------------------------------------------------------
 // File discovery
 
+// A directory that cannot be read would silently drop every file under it,
+// so only a directory that vanished mid-walk is skipped.
 function walk(dir, predicate, out = []) {
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
+  } catch (err) {
+    if (err.code === 'ENOENT') return out;
+    throw err;
   }
   for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.git'))
@@ -153,15 +140,23 @@ function isExcludedPluginPath(rel) {
   return path.basename(rel) === 'CHANGELOG.md';
 }
 
+function pluginsDir(root) {
+  const dir = path.join(root, 'plugins');
+  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`no plugins/ directory under ${root}`);
+  }
+  return dir;
+}
+
 function listMarkdownFiles(root) {
-  return walk(path.join(root, 'plugins'), (name) => name.endsWith('.md'))
+  return walk(pluginsDir(root), (name) => name.endsWith('.md'))
     .map((abs) => toRelative(root, abs))
     .filter((rel) => !isExcludedPluginPath(rel))
     .sort();
 }
 
 function listShellFiles(root) {
-  return walk(path.join(root, 'plugins'), (name) => name.endsWith('.sh'))
+  return walk(pluginsDir(root), (name) => name.endsWith('.sh'))
     .map((abs) => toRelative(root, abs))
     .sort();
 }
@@ -176,20 +171,78 @@ function listShellFiles(root) {
 //            heredoc body or the inside of a multi-line double-quoted string.
 //            Only the expansion rules apply (`${reviewer^}` there is still a
 //            zsh `bad substitution`).
-//   pinned   runs under a bash child (a quoted-tag heredoc fed to bash —
-//            `bash -c "$(cat <<'TAG'` or `bash <<'TAG'`). A `bash -c '…'` line
-//            stays `code` with the script blanked; the outer command is linted
+//   pinned   runs under a bash child (a quoted-tag heredoc fed to bash). A
+//            `bash -c '…'` line stays `code` with the script blanked, so the
+//            outer command is linted
 
 // `<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"` — but never the `<<<` here-string.
 const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
 // The command in front of the heredoc is a bash interpreter: `bash`,
 // `bash -s -- "$x"`, `command bash`, possibly after `&&`/`;`/`|`.
-const BASH_WRAPPER_PREFIX_RE = /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s[^<]*)?$/;
-// `bash -c "$(cat <<'TAG'`: the script arrives as an argument, stdin stays
-// the caller's. Any other bash-fed heredoc passes the script on stdin.
-const BASH_ARG_WRAPPER_PREFIX_RE =
-  /(?:^|[\s;&|(])(?:command\s+)?bash\s+(?:-\w+\s+)*-c\s+"\$\(cat\s*$/;
+// A quoted operand may contain `<` (`'<todo-path>'`); an unquoted `<` is a
+// redirect, so the heredoc is not the script. A quote still open at the
+// heredoc (`bash -c "$(cat <<'TAG'`) is allowed.
+const BASH_WRAPPER_PREFIX_RE =
+  /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s(?:'[^']*'|"[^"]*"|[^<'"]|["'](?=[^'"]*$))*)?$/;
+// The supported wrapper, `bash /dev/fd/3 3<<'TAG'`: bash reads the script
+// from fd 3, so stdin stays the caller's, and the git-push hook can inspect
+// the body. `bash` must be the command itself (no sudo/ssh/env prefix); only
+// harmless options may precede /dev/fd/N and only quoted operands follow it.
+// Every other bash-fed heredoc is SHC-009.
+const WRAPPER_OPTION = String.raw`(?:--norc|--noprofile|--|-[eux]+|-o\s+(?:pipefail|errexit|nounset|xtrace))`;
+const WRAPPER_OPERAND = String.raw`(?:'[^']*'|"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")`;
+const BASH_FD_WRAPPER_RE = new RegExp(
+  String.raw`(?:^|(?<=[\s;&|(){!]))(?:command\s+)?bash((?:\s+${WRAPPER_OPTION})*)\s+\/dev\/fd\/(\d+)((?:\s+${WRAPPER_OPERAND})*)\s+(\d+)$`
+);
+// What may stand before `bash` for it to be the command word. A case-arm
+// pattern `y)` / `(a|b)` also counts, but only at line start, after `in` or
+// after `;;`/`;&` — a bare `)` (`$(foo)`, `(cd x)`) does not.
+const COMMAND_POSITION_RE =
+  /(?:^|[;&|({!]|(?:^|\s)(?:then|do|else|elif|if|while|until|time)|(?:^\s*|;[;&]\s*|\bin\s+)\(?[^\s()|;&]+(?:\|[^\s()|;&]+)*\))$/;
+// `$((…))` / `((…))` spans: `<<` and `>` inside them are arithmetic shifts
+// and comparisons, not heredocs or redirects.
+const ARITHMETIC_RE = /\$?\(\((?:[^()]|\([^()]*\))*\)\)/g;
+function stripArithmetic(code) {
+  return code.replace(ARITHMETIC_RE, '0');
+}
 const BASH_DASH_C_RE = /(?:^|[\s;&|(])bash\s+(?:-\w+\s+)*-c\s/;
+
+// Checks the text in front of a heredoc that feeds bash. Returns
+// { start, problem }: `start` is where the wrapper command begins and
+// `problem` is '' for the supported fd form, else the SHC-009 detail.
+function parseFdWrapper(prefix) {
+  const m = BASH_FD_WRAPPER_RE.exec(prefix);
+  if (!m) {
+    let problem = 'script fed to bash on stdin';
+    if (/\s-[A-Za-z]*c\b/.test(prefix)) {
+      problem = 'bash -c "$(…)" is refused by the git-push hook';
+    } else if (/\/dev\/fd\//.test(prefix)) {
+      problem =
+        'only --norc, --noprofile, -e/-u/-x and -o pipefail may precede /dev/fd/N, and only quoted operands may follow it';
+    }
+    return { start: -1, problem };
+  }
+  if (!COMMAND_POSITION_RE.test(prefix.slice(0, m.index).trimEnd())) {
+    return {
+      start: m.index,
+      problem: 'bash must be the command itself (no sudo, ssh or env prefix)',
+    };
+  }
+  if (m[2] !== m[4]) {
+    return {
+      start: m.index,
+      problem: `bash reads /dev/fd/${m[2]} but the heredoc feeds fd ${m[4]}`,
+    };
+  }
+  if (!/^[3-9]$/.test(m[2])) {
+    return {
+      start: m.index,
+      problem:
+        'use a single-digit fd from 3 to 9 (0-2 are stdio; zsh has no multi-digit fds)',
+    };
+  }
+  return { start: m.index, problem: '' };
+}
 
 // Scan one line for shell quoting. `open` is the quote character a string
 // left open by an earlier line ('' when none). Returns where that string
@@ -301,8 +354,13 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
     if (heredoc) {
       const candidate = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
       const trimmed = candidate.trimEnd();
-      if (trimmed === heredoc.tag || trimmed === `${heredoc.tag})`) {
-        out[i] = { kind: 'data', code: '' };
+      // `TAG)` closes only a command-substitution heredoc; an fd wrapper
+      // needs a line that is exactly the tag.
+      if (
+        trimmed === heredoc.tag ||
+        (!heredoc.wrapper && trimmed === `${heredoc.tag})`)
+      ) {
+        out[i] = { kind: 'data', code: '', closesWrapper: heredoc.wrapper };
         heredoc = null;
       } else {
         out[i] = {
@@ -331,20 +389,43 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       out[i] = { kind: 'comment', code: '' };
       continue;
     }
-    const match = HEREDOC_RE.exec(code);
+    const heredocScan = stripArithmetic(code);
+    const match = HEREDOC_RE.exec(heredocScan);
     if (match) {
-      const prefix = code.slice(0, match.index);
+      const prefix = heredocScan.slice(0, match.index);
       const bashFed = BASH_WRAPPER_PREFIX_RE.test(prefix);
       // An unquoted tag means the CURRENT shell expands the body before the
       // command sees it — even when that command is a bash wrapper.
       let kind = 'expand';
       if (match[2] !== '') kind = bashFed ? 'pinned' : 'data';
       heredoc = { tag: match[3], stripTabs: match[1] === '-', kind };
-      out[i] = {
-        kind: bashFed ? 'pinned' : 'code',
-        code,
-        stdinWrapper: bashFed && !BASH_ARG_WRAPPER_PREFIX_RE.test(prefix),
-      };
+      if (!bashFed) {
+        out[i] = { kind: 'code', code };
+        continue;
+      }
+      const wrapper = parseFdWrapper(prefix);
+      if (wrapper.problem) {
+        out[i] = { kind: 'pinned', code, badWrapper: wrapper.problem };
+      } else if (match[2] === '') {
+        // Not a wrapper: the body stays 'expand' and is linted as the
+        // calling shell's text.
+        out[i] = {
+          kind: 'pinned',
+          code,
+          badWrapper:
+            "quote the heredoc tag (3<<'TAG'): an unquoted tag expands the body in the calling shell",
+        };
+      } else {
+        // The rest of the wrapper line (redirects, a pipe) runs in the
+        // current shell: lint it with the wrapper itself replaced by `:`.
+        const rest = heredocScan.slice(match.index + match[0].length);
+        heredoc.wrapper = true;
+        out[i] = {
+          kind: 'code',
+          code: `${prefix.slice(0, wrapper.start)}:${rest}`,
+          opensWrapper: match[3],
+        };
+      }
       continue;
     }
     if (BASH_DASH_C_RE.test(code)) {
@@ -386,7 +467,7 @@ const ZSH_SPECIAL_PARAMS = [
   'manpath',
 ];
 const SPECIAL_ALT = ZSH_SPECIAL_PARAMS.join('|');
-const CMD_START = String.raw`(?:^\s*|[;&|(]\s*|\b(?:then|do|else|elif)\s+)`;
+const CMD_START = String.raw`(?:^\s*|[;&|({]\s*|\b(?:then|do|else|elif)\s+)`;
 const SPECIAL_ASSIGN_RE = new RegExp(
   `${CMD_START}(${SPECIAL_ALT})(?:\\[[^\\]]*\\])?\\+?=`,
   'g'
@@ -453,14 +534,20 @@ function ruleSpecialParams(code) {
   return hits;
 }
 
-// Expansion-level constructs. These break wherever the shell expands text,
-// including unquoted heredoc bodies and multi-line double-quoted strings.
-const BASH_ONLY_EXPANSIONS = [
+// `${…}` syntax that zsh rejects (`bad substitution`) — shared by the
+// statement rules and the expansion-only rules below.
+const BASH_ONLY_EXPANSION_SYNTAX = [
   [/\$\{!/, '${!…} indirection/keys'],
   [/\$\{\w+(?:\[[^\]]*\])?(?:,,?|\^\^?)\}/, '${v,,}/${v^^} case modification'],
   [/\$\{\w+(?:\[[^\]]*\])?@[QEPAaUuLK]\}/, '${v@op} transformation'],
+];
+
+// Expansion-level constructs. These break wherever the shell expands text,
+// including unquoted heredoc bodies and multi-line double-quoted strings.
+const BASH_ONLY_EXPANSIONS = [
+  ...BASH_ONLY_EXPANSION_SYNTAX,
   [
-    /\$\{?(?:BASH_REMATCH|BASH_SOURCE|BASH_VERSINFO|PIPESTATUS|FUNCNAME|BASHPID)\b/,
+    /\$\{?#?(?:BASH_REMATCH|BASH_SOURCE|BASH_VERSINFO|PIPESTATUS|FUNCNAME|BASHPID)\b/,
     'bash-only variable',
   ],
 ];
@@ -472,10 +559,8 @@ function ruleBashOnlyExpansion(text) {
 }
 
 const BASH_ONLY_PATTERNS = [
+  ...BASH_ONLY_EXPANSION_SYNTAX,
   [/(?:^|[\s;&|(])(?:mapfile|readarray)\b/, 'mapfile/readarray'],
-  [/\$\{!/, '${!…} indirection/keys'],
-  [/\$\{\w+(?:\[[^\]]*\])?(?:,,?|\^\^?)\}/, '${v,,}/${v^^} case modification'],
-  [/\$\{\w+(?:\[[^\]]*\])?@[QEPAaUuLK]\}/, '${v@op} transformation'],
   [
     /(?:^|[\s;&|(])(?:local|declare|typeset)\s+(?:-[a-zA-Z]*\s+)*-[a-zA-Z]*n\b/,
     'nameref (-n)',
@@ -530,7 +615,7 @@ function ruleEcho(code) {
       .filter((t) => /^-[a-zA-Z]+$/.test(t));
     if (flags.some((f) => f.includes('e') && !f.includes('E')))
       hits.push('echo -e');
-    else if (/\\[abcefnrtv0]/.test(args))
+    else if (/\\[abcefnrtv0\\xuU]/.test(args))
       hits.push('echo with backslash escape');
   }
   return hits;
@@ -545,7 +630,8 @@ const BASH_ARRAYS = new Set([
 ]);
 function literalIndexHits(code) {
   const hits = [];
-  const literal = /\$\{(\w+)\[(\d+)\]\}/g;
+  // No trailing `}`: `${a[0]:-x}` and `${a[1]#p}` index the same way.
+  const literal = /\$\{(\w+)\[(\d+)\]/g;
   let m;
   while ((m = literal.exec(code)) !== null) {
     if (!BASH_ARRAYS.has(m[1])) hits.push(`\${${m[1]}[${m[2]}]}`);
@@ -558,7 +644,7 @@ function ruleArrayIndex(rawCode, blockCode) {
   const hits = literalIndexHits(code);
   let m;
   if (/(?:^|[\s;&|(])\w+\[0\]=/.test(code)) hits.push('assignment to [0]');
-  const variable = /\$\{(\w+)\[\$?\{?([A-Za-z_]\w*)\}?\]\}/g;
+  const variable = /\$\{(\w+)\[\$?\{?([A-Za-z_]\w*)\}?\]/g;
   while ((m = variable.exec(code)) !== null) {
     const idx = m[2];
     const zeroInit = new RegExp(
@@ -586,12 +672,15 @@ function ruleRcQuotes(code) {
 
 // SHC-001 needs block context: which variables name files that already
 // exist when the redirect runs.
-const MKTEMP_ASSIGN_RE = /\b([A-Za-z_]\w*)=\$\(\s*mktemp\b([^)]*)\)/g;
-const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*["']?\$\{?([A-Za-z_]\w*)/g;
+// `f=$(mktemp …)`, `f="$(mktemp …)"` (never single-quoted: that is literal text) or `f=\`mktemp …\``; group 2 or 3
+// holds the options (a `-u`/`--dry-run` name does not create the file).
+const MKTEMP_ASSIGN_RE =
+  /\b([A-Za-z_]\w*)="?(?:\$\(\s*mktemp\b([^)]*)\)|`\s*mktemp\b([^`]*)`)/g;
+const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*"?\$\{?([A-Za-z_]\w*)/g;
 // `>`, `2>`, `&>`, `3>` — but not `>>`, `>|`, `>&`, `2>&1`, `<>` — onto a
 // bare variable (`$f`, `${f}`), not a path built from one (`$f.err`).
 const CLOBBER_REDIRECT_RE =
-  /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*["']?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["'\s;&|)<>]|$)/g;
+  /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*"?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["\s;&|)<>]|$)/g;
 
 function existingFileVars(codeLines) {
   const vars = new Set();
@@ -599,7 +688,8 @@ function existingFileVars(codeLines) {
     let m;
     MKTEMP_ASSIGN_RE.lastIndex = 0;
     while ((m = MKTEMP_ASSIGN_RE.exec(line)) !== null) {
-      if (!/(?:^|\s)(?:-u|--dry-run)\b/.test(m[2])) vars.add(m[1]);
+      if (!/(?:^|\s)(?:-u|--dry-run)\b/.test(m[2] || m[3] || ''))
+        vars.add(m[1]);
     }
     TOUCH_RE.lastIndex = 0;
     while ((m = TOUCH_RE.exec(line)) !== null) vars.add(m[1]);
@@ -622,7 +712,44 @@ function truncationTargets(code) {
   return targets;
 }
 
-function* clobberRedirects(code) {
+// `$( … )` and backtick substitutions inside a span (nested parens balanced).
+// They run as real commands, so their redirects still count.
+function commandSubstitutions(span) {
+  const found = [];
+  for (let i = 0; i < span.length; i++) {
+    if (span[i] === '`') {
+      const end = span.indexOf('`', i + 1);
+      if (end === -1) break;
+      found.push(span.slice(i, end + 1));
+      i = end;
+    } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+      let depth = 0;
+      let j = i + 1;
+      for (; j < span.length; j++) {
+        if (span[j] === '(') depth++;
+        else if (span[j] === ')' && --depth === 0) break;
+      }
+      found.push(span.slice(i, j + 1));
+      i = j;
+    }
+  }
+  return found;
+}
+
+// `(( n > $max ))` and `[[ $a > $b ]]` compare; they do not redirect. Blank
+// the span but keep its command substitutions so their redirects are scanned.
+function stripComparisons(code) {
+  const blank = (placeholder) => (span) => {
+    const subs = commandSubstitutions(span);
+    return subs.length ? `${placeholder} ; ${subs.join(' ; ')} ;` : placeholder;
+  };
+  return code
+    .replace(ARITHMETIC_RE, blank('0'))
+    .replace(/\[\[(?:[^\]]|\](?!\]))*\]\]/g, blank('[[ ]]'));
+}
+
+function* clobberRedirects(rawCode) {
+  const code = stripComparisons(rawCode);
   CLOBBER_REDIRECT_RE.lastIndex = 0;
   let m;
   while ((m = CLOBBER_REDIRECT_RE.exec(code)) !== null) {
@@ -729,9 +856,9 @@ function lintShellText(
     });
 
   for (let i = 0; i < lines.length; i++) {
-    const { kind, code: line, stdinWrapper, sourceCode } = classes[i];
+    const { kind, code: line, badWrapper, sourceCode } = classes[i];
     if (kind === 'comment' || kind === 'data') continue;
-    if (stdinWrapper) add('SHC-009', i, 'script fed to bash on stdin');
+    if (badWrapper) add('SHC-009', i, badWrapper);
     if (kind === 'expand') {
       for (const detail of ruleBashOnlyExpansion(line)) {
         add('SHC-003', i, detail);
@@ -791,6 +918,18 @@ function lintShellText(
     }
   }
   return findings;
+}
+
+// The supported fd wrappers in a block, as line indexes:
+// { open, close, tag }. `close` is -1 when the tag is never closed.
+function findFdWrappers(lines) {
+  const wrappers = [];
+  classifyLines(lines).forEach((c, i) => {
+    if (c.opensWrapper)
+      wrappers.push({ open: i, close: -1, tag: c.opensWrapper });
+    else if (c.closesWrapper) wrappers[wrappers.length - 1].close = i;
+  });
+  return wrappers;
 }
 
 function shellBlocks(content) {
@@ -1019,29 +1158,32 @@ function formatFinding(f) {
 }
 
 function main(argv) {
-  const report = argv.includes('--report');
   const json = argv.includes('--json');
   const root = process.env.VALIDATE_SHELL_COMPAT_ROOT
     ? path.resolve(process.env.VALIDATE_SHELL_COMPAT_ROOT)
     : path.join(__dirname, '..');
-  const result = run(root);
+  const tag = '[validate-shell-compat]';
+  let result;
+  try {
+    result = run(root);
+  } catch (err) {
+    console.error(`${tag} ERROR: ${err.message}`);
+    return 1;
+  }
   const problems = [...result.violations, ...result.configErrors];
 
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return report || problems.length === 0 ? 0 : 1;
+    return problems.length === 0 ? 0 : 1;
   }
 
-  const tag = '[validate-shell-compat]';
   const summary = `${result.scanned.markdown} markdown and ${result.scanned.shell} shell file(s) scanned, ${result.allowed.length} allowlisted finding(s)`;
   if (problems.length === 0) {
     console.log(`${tag} OK: ${summary}.`);
     return 0;
   }
-  const out = report ? console.log : console.error;
-  out(
-    `${tag} ${report ? 'REPORT' : 'FAILED'}: ${problems.length} finding(s); ${summary}.\n`
-  );
+  const out = console.error;
+  out(`${tag} FAILED: ${problems.length} finding(s); ${summary}.\n`);
   const byRule = new Map();
   for (const f of problems) {
     if (!byRule.has(f.rule)) byRule.set(f.rule, []);
@@ -1057,7 +1199,7 @@ function main(argv) {
   out(
     `${tag} Style-level or false-positive hits may be capped in scripts/shell-compat-config.json "allowlist" with a reason (keyed by file and rule).`
   );
-  return report ? 0 : 1;
+  return 1;
 }
 
 if (require.main === module) {
@@ -1065,6 +1207,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  listMarkdownFiles,
+  findFdWrappers,
+  SHELL_LANGS,
   RULES,
   classifyLines,
   lintShellText,

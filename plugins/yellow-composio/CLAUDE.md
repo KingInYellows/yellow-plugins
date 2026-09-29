@@ -92,6 +92,12 @@ Composio has no billing API. This is the only way to monitor execution budget.
 - **Content fencing** -- Wrap all Composio responses in `--- begin/end ---`
   delimiters per repository convention
 - **Usage counter** -- Contains only execution counts, no sensitive data
+- **Shell libraries and zsh:** The counter update in `composio-patterns` runs
+  under the user's shell, often zsh. It locks with `flock` on fd 9 opened
+  `>>` (zsh has no multi-digit fds, and `noclobber` refuses `>` on the
+  existing lock file), writes through a `mktemp` file, and refuses a
+  symlinked `.claude`, usage file or lock file. See CONTRIBUTING.md "Bash
+  and zsh".
 
 ## Cross-Plugin Dependencies
 

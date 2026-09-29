@@ -6,7 +6,7 @@
 Make shell blocks work when Claude Code's Bash tool runs them under zsh:
 
 - yellow-debt: every command and agent block that sources `lib/validate.sh`
-  now runs it in a bash child (`bash -c "$(cat <<'TAG' … )"`). Under zsh the
+  now runs it in a bash child (`bash /dev/fd/3 3<<'TAG'`). Under zsh the
   library's state-transition lock ran a command named `200` and its RETURN
   trap was undefined, so `/debt:triage`, `/debt:fix` and the remediation
   agent left todos untransitioned with a stale `.lock`.

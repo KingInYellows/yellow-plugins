@@ -24,15 +24,18 @@ agent workflows and generates a `.graphite.yml` convention file.
 Run a single Bash call:
 
 ```bash
+# awk rather than splitting into a 0-based array: zsh does not word-split
+# `a=($1)` and its arrays start at 1, so the old loop passed every version.
 version_gte() {
-  local IFS=.
-  local i a=($1) b=($2)
-  for ((i=0; i<${#b[@]}; i++)); do
-    local av="${a[i]:-0}" bv="${b[i]:-0}"
-    if ((av > bv)); then return 0; fi
-    if ((av < bv)); then return 1; fi
-  done
-  return 0
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    na = split(a, x, "."); nb = split(b, y, ".")
+    n = (na > nb) ? na : nb
+    for (i = 1; i <= n; i++) {
+      if (x[i] + 0 > y[i] + 0) exit 0
+      if (x[i] + 0 < y[i] + 0) exit 1
+    }
+    exit 0
+  }'
 }
 
 printf '=== Prerequisites ===\n'

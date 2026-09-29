@@ -8,7 +8,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
@@ -18,6 +24,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 const {
   lintShellText,
   classifyLines,
+  findFdWrappers,
 } = require('../../scripts/validate-shell-compat.js');
 /* eslint-enable @typescript-eslint/no-var-requires */
 
@@ -58,6 +65,16 @@ describe('inline rules', () => {
       'cmd > "$out"\ncmd2 > "$out"',
       'SHC-001',
     ],
+    [
+      'SHC-001 redirect inside a [[ ]] substitution',
+      'f=$(mktemp)\n[[ -n $(cmd > "$f") ]]',
+      'SHC-001',
+    ],
+    [
+      'SHC-001 redirect inside a (( )) substitution',
+      'f=$(mktemp)\n(( $(cmd > "$f") > 0 ))',
+      'SHC-001',
+    ],
     ['SHC-002 path assignment', 'path="docs/x.md"', 'SHC-002'],
     ['SHC-002 local status', 'f() { local status="$1"; }', 'SHC-002'],
     ['SHC-002 for loop over path', 'for path in a b; do :; done', 'SHC-002'],
@@ -74,6 +91,10 @@ describe('inline rules', () => {
     ['SHC-004 echo -e', 'echo -e "a\\tb"', 'SHC-004'],
     ['SHC-004 echo with escape', "echo 'line1\\nline2'", 'SHC-004'],
     ['SHC-005 literal index', 'first=${arr[0]}', 'SHC-005'],
+    ['SHC-005 index with a modifier', 'i=0\nx="${a[i]:-0}"', 'SHC-005'],
+    ['SHC-001 quoted mktemp', 'f="$(mktemp)"\ncmd 2>"$f"', 'SHC-001'],
+    ['SHC-001 backtick mktemp', 'f=`mktemp`\ncmd >"$f"', 'SHC-001'],
+    ['SHC-004 echo with \\x escape', "echo 'caf\\xc3'", 'SHC-004'],
     [
       'SHC-005 variable index from 0',
       'i=0\nwhile :; do x=${arr[$i]}; done',
@@ -86,6 +107,8 @@ describe('inline rules', () => {
       'e=$(mktemp)\ncmd 2>"${e:-/dev/null}"',
       'SHC-001',
     ],
+    ['SHC-002 path assignment in a brace group', '{ path=x; }', 'SHC-002'],
+    ['SHC-003 BASH_SOURCE length', 'n=${#BASH_SOURCE[@]}', 'SHC-003'],
   ])('%s', (_name, text, rule) => {
     expect(rules(text)).toContain(rule);
   });
@@ -101,6 +124,11 @@ describe('inline rules', () => {
   it.each([
     ['>| on a mktemp file', 'f=$(mktemp)\necho hi >| "$f"'],
     ['>> on a mktemp file', 'f=$(mktemp)\necho hi >> "$f"'],
+    ['single-quoted mktemp literal', 'f=\'$(mktemp)\'\necho hi > "$f"'],
+    [
+      'single-quoted touch operand',
+      'f=$(mktemp -u)\ntouch \'$f\'\necho hi > "$f"',
+    ],
     ['mktemp -u path', 'f=$(mktemp -u)\necho hi > "$f"'],
     ['>| with a /dev/null fallback', 'e=$(mktemp)\ncmd 2>|"${e:-/dev/null}"'],
     ['a path built from the variable', 'f=$(mktemp)\ncmd 2>"$f.err"'],
@@ -116,6 +144,7 @@ describe('inline rules', () => {
     ['double-bracket ==', '[[ "$a" == b* ]]'],
     ['escaped quote idiom', "printf 'it'\\''s\\n'"],
     ['bash-only text inside an awk program', "awk '{ print ${!x} }' f"],
+    ['string comparison in [[ ]]', '[[ $a > $b ]]'],
   ])('does not flag %s', (_name, text) => {
     expect(lint(text)).toEqual([]);
   });
@@ -126,24 +155,22 @@ describe('inline rules', () => {
       "cat <<'EOF'",
       'path=/not/shell/here',
       'EOF',
-      `bash -c "$(cat <<'__W__'`,
+      "bash /dev/fd/3 3<<'__W__'",
       'mapfile -t lines < f',
       'for k in "${!m[@]}"; do :; done',
       '__W__',
-      ')"',
     ].join('\n');
     expect(lint(text)).toEqual([]);
   });
 
   it('flags bash-only code after the wrapper closes', () => {
     const text = [
-      `bash -c "$(cat <<'__W__'`,
+      "bash /dev/fd/3 3<<'__W__'",
       'mapfile -t a < f',
       '__W__',
-      ')"',
       'mapfile -t b < f',
     ].join('\n');
-    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 5]]);
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 4]]);
   });
 
   it('keeps linting the outer shell after `bash -c`', () => {
@@ -155,7 +182,98 @@ describe('inline rules', () => {
 
   it('flags a wrapper that feeds the script to bash on stdin (SHC-009)', () => {
     const text = ["bash <<'EOF'", 'mapfile -t a < f', 'EOF'].join('\n');
-    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-009', 1]]);
+    expect(lint(text).map((f) => [f.rule, f.line, f.detail])).toEqual([
+      ['SHC-009', 1, 'script fed to bash on stdin'],
+    ]);
+  });
+
+  it('flags the bash -c "$(cat <<TAG …)" wrapper the git-push hook refuses (SHC-009)', () => {
+    const text = [
+      `bash -c "$(cat <<'__W__'`,
+      'mapfile -t a < f',
+      '__W__',
+      ')"',
+    ].join('\n');
+    const [finding] = lint(text);
+    expect(finding.rule).toBe('SHC-009');
+    expect(finding.detail).toContain('git-push hook');
+  });
+
+  it.each([
+    ['fd mismatch', "bash /dev/fd/3 4<<'__W__'", 'heredoc feeds fd 4'],
+    ['bash -c with the fd path', "bash -c /dev/fd/3 3<<'__W__'", 'git-push'],
+    ['bash -ec with the fd path', "bash -ec /dev/fd/3 3<<'__W__'", 'git-push'],
+    [
+      'bash -s before the fd path',
+      "bash -s /dev/fd/3 3<<'__W__'",
+      'may precede',
+    ],
+    ['an unquoted operand', "bash /dev/fd/3 $x 3<<'__W__'", 'may precede'],
+    ['a sudo prefix', "sudo bash /dev/fd/3 3<<'__W__'", 'no sudo'],
+    ['an env prefix', "env X=1 bash /dev/fd/3 3<<'__W__'", 'no sudo'],
+    [
+      'a command-substitution `)` prefix',
+      "$(foo) bash /dev/fd/3 3<<'__W__'",
+      'no sudo',
+    ],
+    ['a multi-digit fd', "bash /dev/fd/10 10<<'__W__'", 'single-digit'],
+    ['stdin with options', "bash -s -- x <<'__W__'", 'on stdin'],
+    [
+      'an unquoted heredoc tag',
+      'bash /dev/fd/3 3<<__W__',
+      'quote the heredoc tag',
+    ],
+  ])('rejects %s as a wrapper (SHC-009)', (_name, opener, detail) => {
+    const text = [opener, 'true', '__W__'].join('\n');
+    const findings = lint(text).filter((f) => f.rule === 'SHC-009');
+    expect(findings).toHaveLength(1);
+    expect(findings[0].detail).toContain(detail);
+  });
+
+  it.each([
+    ['after &&', "cd /x && bash /dev/fd/3 3<<'__W__'"],
+    ['with --norc', "bash --norc /dev/fd/3 3<<'__W__'"],
+    [
+      'with every allowed option',
+      "bash --norc --noprofile -eu -x -o pipefail -- /dev/fd/3 3<<'__W__'",
+    ],
+    ['on fd 5', "bash /dev/fd/5 5<<'__W__'"],
+    ['with quoted operands', `bash /dev/fd/3 'a b' "$x" "\${y}" 3<<'__W__'`],
+    ['after if', "if bash /dev/fd/3 3<<'__W__'"],
+    ['in a command substitution', "out=$(bash /dev/fd/3 3<<'__W__'"],
+    ['after command', "command bash /dev/fd/3 3<<'__W__'"],
+    ['with a placeholder operand', "bash /dev/fd/3 '<todo-path>' 3<<'__W__'"],
+    ['in a same-line case arm', `case "$x" in y) bash /dev/fd/3 3<<'__W__'`],
+    ['in a line-leading case arm', "  y) bash /dev/fd/3 3<<'__W__'"],
+    ['in an alternation case arm', "a|b) bash /dev/fd/3 3<<'__W__'"],
+    ['with a double-quoted tag', 'bash /dev/fd/3 3<<"__W__"'],
+    ['with a tab-stripping quoted tag', "bash /dev/fd/3 3<<-'__W__'"],
+  ])('accepts the fd wrapper %s', (_name, opener) => {
+    expect(lint([opener, 'mapfile -t a < f', '__W__'].join('\n'))).toEqual([]);
+  });
+
+  it('lints the rest of the wrapper line in the current shell', () => {
+    const text = [
+      'out=$(mktemp)',
+      `bash /dev/fd/3 3<<'__W__' >"$out"`,
+      'mapfile -t a < f',
+      '__W__',
+    ].join('\n');
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-001', 2]]);
+  });
+
+  it('treats arithmetic `<<` and `>` as operators, not heredocs or redirects', () => {
+    const text = [
+      'x=$((1 << n))',
+      'mapfile -t a < f',
+      '(( n > $limit )) && (( m > $limit ))',
+    ].join('\n');
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 2]]);
+  });
+
+  it('does not read `[[ a > $f ]]` or `(( n > $f ))` comparisons as redirects', () => {
+    const text = 'f=$(mktemp)\n[[ $a > $f ]]\n(( n > $f ))\nx=$(( 1 << n ))';
+    expect(lint(text)).toEqual([]);
   });
 
   it('skips the inside of a multi-line quoted program but lints the closing line', () => {
@@ -279,14 +397,33 @@ describe('fixture runs', () => {
     expect(result.stdout).toContain('[validate-shell-compat] OK');
   });
 
-  it('fails with file, line and rule, and --report exits 0 with the same findings', () => {
+  it('fails with file, line and rule', () => {
     write('plugins/demo/commands/bad.md', md('path=x'));
     const failed = run();
     expect(failed.status).toBe(1);
     expect(failed.stderr).toContain('plugins/demo/commands/bad.md:4 [SHC-002]');
-    const report = run('--report');
-    expect(report.status).toBe(0);
-    expect(report.stdout).toContain('plugins/demo/commands/bad.md:4 [SHC-002]');
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'fails when a plugin directory cannot be read',
+    () => {
+      mkdirSync(join(root, 'plugins/demo/locked'));
+      chmodSync(join(root, 'plugins/demo/locked'), 0o000);
+      try {
+        const result = run();
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('ERROR: EACCES');
+      } finally {
+        chmodSync(join(root, 'plugins/demo/locked'), 0o755);
+      }
+    }
+  );
+
+  it('fails when there is no plugins/ directory', () => {
+    rmSync(join(root, 'plugins'), { recursive: true, force: true });
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('ERROR: no plugins/ directory');
   });
 
   it('flags a tier 3 library sourced outside a wrapper, not inside one', () => {
@@ -297,7 +434,7 @@ describe('fixture runs', () => {
     write(
       'plugins/demo/commands/wrapped.md',
       md(
-        `bash -c "$(cat <<'__W__'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\n__W__\n)"`
+        `bash /dev/fd/3 3<<'__W__'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\n__W__`
       )
     );
     const result = run();
@@ -344,7 +481,7 @@ describe('fixture runs', () => {
     write('plugins/demo/commands/t3.md', md(src('b3.sh')));
     write(
       'plugins/demo/commands/t3w.md',
-      md(`bash -c "$(cat <<'__W__'\n${src('b3.sh')}\n__W__\n)"`)
+      md(`bash /dev/fd/3 3<<'__W__'\n${src('b3.sh')}\n__W__`)
     );
     write('plugins/demo/commands/t4.md', md(src('b4.sh')));
     write('plugins/demo/commands/un.md', md(src('new.sh')));
@@ -451,5 +588,24 @@ describe('fixture runs', () => {
     expect(run().stderr).toContain(
       'listed library plugins/demo/lib/missing.sh does not exist'
     );
+  });
+});
+
+describe('heredoc terminators', () => {
+  it('does not close an fd wrapper on `TAG)`', () => {
+    const lines = ["bash /dev/fd/3 3<<'TAG'", 'true', 'TAG)'];
+    expect(findFdWrappers(lines)).toEqual([{ open: 0, close: -1, tag: 'TAG' }]);
+  });
+
+  it('closes an fd wrapper on an exact tag line', () => {
+    const lines = ["bash /dev/fd/3 3<<'TAG'", 'true', 'TAG'];
+    expect(findFdWrappers(lines)).toEqual([{ open: 0, close: 2, tag: 'TAG' }]);
+  });
+
+  it('still closes a command-substitution heredoc on `EOF)`', () => {
+    const lines = ["x=$(cat <<'EOF'", 'hello', 'EOF)', 'echo after'];
+    const classes = classifyLines(lines);
+    expect(classes[2].kind).toBe('data');
+    expect(classes[3].kind).toBe('code');
   });
 });

@@ -198,21 +198,28 @@ TODAY=$(date -u +%Y-%m-%d)
 MONTH=$(date -u +%Y-%m)
 
 do_increment() {
+  # A fresh mktemp name, not a fixed `.tmp`: a repo could ship the fixed name
+  # as a symlink, and `>|` would write through it.
+  local tmp
+  tmp=$(mktemp "${USAGE_FILE}.XXXXXX") || return 1
   if jq --arg tool "$TOOL_SLUG" --arg day "$TODAY" --arg month "$MONTH" '
     .updated = (now | todate) |
     .periods[$month] //= {"total": 0, "by_tool": {}, "by_day": {}} |
     .periods[$month].total += 1 |
     .periods[$month].by_tool[$tool] = ((.periods[$month].by_tool[$tool] // 0) + 1) |
     .periods[$month].by_day[$day] = ((.periods[$month].by_day[$day] // 0) + 1)
-  ' "$USAGE_FILE" >| "${USAGE_FILE}.tmp"; then
-    mv "${USAGE_FILE}.tmp" "$USAGE_FILE"
+  ' "$USAGE_FILE" >| "$tmp"; then
+    mv "$tmp" "$USAGE_FILE"
   else
-    rm -f "${USAGE_FILE}.tmp"
+    rm -f "$tmp"
     return 1
   fi
 }
 
-if [ -f "$USAGE_FILE" ]; then
+# A repo could ship these paths as symlinks; never read or write through one.
+if [ -L .claude ] || [ -L "$USAGE_FILE" ] || [ -L "$LOCK_FILE" ]; then
+  printf '[composio] Warning: usage counter path is a symlink; not updating\n' >&2
+elif [ -f "$USAGE_FILE" ]; then
   if command -v flock >/dev/null 2>&1; then
     # fd 9, not 200: zsh cannot parse a multi-digit fd on a subshell
     # redirect. `>>` because the lock file already exists and zsh's

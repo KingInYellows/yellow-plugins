@@ -1,5 +1,5 @@
 {
-  "$comment": "Tier lists and allowlist for scripts/validate-shell-compat.js. tier3Libraries: bash-only libraries; markdown may source them only inside a `bash <<'EOF'` wrapper. tier4Libraries: libraries sourced directly into the user's shell (bash or zsh); the whole file is linted with the inline rules. allowlist: { file: { rule: { max, reason } } } caps style-level or false-positive findings.",
+  "$comment": "Tier lists and allowlist for scripts/validate-shell-compat.js. tier3Libraries: bash-only libraries; markdown may source them only inside a `bash /dev/fd/3 3<<'TAG'` wrapper (CONTRIBUTING.md \"Bash and zsh\"). tier4Libraries: libraries sourced directly into the user's shell (bash or zsh); the whole file is linted with the inline rules. allowlist: { file: { rule: { max, reason } } } caps style-level or false-positive findings.",
   "tier3Libraries": [
     "plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh",
     "plugins/yellow-ci/hooks/scripts/lib/validate.sh",

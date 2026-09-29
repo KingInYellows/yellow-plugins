@@ -77,6 +77,13 @@ ruvector.
 - **MCP write schema:** `hooks_remember` accepts `content` and optional `type`.
   Preferred `type` values in this plugin are `decision`, `context`, `project`,
   `code`, and `general`. Do not invent `namespace` or `metadata` parameters.
+- **Shell libraries and zsh:** `lib/install-ruvector.sh` and
+  `hooks/scripts/lib/resolve.sh` are bash-only (`BASHPID`, `${!…}`,
+  `BASH_SOURCE`); command blocks that source them run in a bash child
+  (`bash /dev/fd/3 3<<'__YELLOW_RUVECTOR_BASH__'`) because the Bash
+  tool may run zsh. `hooks/scripts/lib/validate.sh` is dual-shell (Tier 4).
+  `tests/status-provenance.bats` extracts the status block up to the
+  wrapper tag.
 - **MCP tool naming:** All tools referenced as
   `mcp__plugin_yellow-ruvector_ruvector__*` (e.g.,
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)

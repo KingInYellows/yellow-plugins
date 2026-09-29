@@ -112,15 +112,14 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
    **On Accept:**
    ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "/absolute/path/to/file.md" ready || {
   printf '[debt:triage] Error: transition failed\n' >&2
   exit 1
 }
 __YELLOW_DEBT_BASH__
-)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your accepted count.
@@ -128,15 +127,14 @@ __YELLOW_DEBT_BASH__
    **On Reject:**
    ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "/absolute/path/to/file.md" deleted || {
   printf '[debt:triage] Error: transition failed\n' >&2
   exit 1
 }
 __YELLOW_DEBT_BASH__
-)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your rejected count.
@@ -169,8 +167,8 @@ __YELLOW_DEBT_BASH__
       child strips newlines, transitions, then removes the file and directory:
       ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 DEFER_REASON=$(tr -d '\n\r' < "$1/reason.txt")
 rc=0
@@ -182,7 +180,6 @@ rm -f -- "$1/reason.txt"
 rmdir -- "$1"
 exit "$rc"
 __YELLOW_DEBT_BASH__
-)" debt-triage '<reason-dir>'
       ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
@@ -190,15 +187,14 @@ __YELLOW_DEBT_BASH__
    **On Defer — empty reason (blank "Other" input):** Call without third argument:
    ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "/absolute/path/to/file.md" deferred || {
 printf '[debt:triage] Error: transition failed\n' >&2
 exit 1
 }
 __YELLOW_DEBT_BASH__
-)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.

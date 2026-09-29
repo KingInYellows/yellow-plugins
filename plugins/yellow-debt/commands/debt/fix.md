@@ -20,14 +20,14 @@ human approval before committing changes.
 
 ## Implementation
 
-Replace `<todo-path>` after the closing `)"` with the todo path from the
-command arguments, single-quoted. Stop with an error instead of running the
+Replace `<todo-path>` on the `bash /dev/fd/3` line with the todo path from
+the command arguments, single-quoted. Stop with an error instead of running the
 block if the value contains a single quote.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-path>' 3<<'__YELLOW_DEBT_BASH__'
 set -euo pipefail
 
 # Source shared validation library for extract_frontmatter and transition_todo_state
@@ -116,7 +116,6 @@ if [ -n "$NEXT_READY" ]; then
   printf '\nNext ready finding: %s\n' "$NEXT_READY"
 fi
 __YELLOW_DEBT_BASH__
-)" debt-fix '<todo-path>'
 ```
 
 ## Agent Orchestration
