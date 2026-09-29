@@ -1,0 +1,29 @@
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_0c5d2b5e7dc373 288-294
+  s_e3ae526d137cfd::t_aae9793bf8a432 481,488-494
+  s_e3ae526d137cfd::t_220666c6e65233 545-559
+  s_e3ae526d137cfd::t_203528bbe3a3a4 256
+  s_e3ae526d137cfd::t_db7640ecf76216 652-658
+  s_e3ae526d137cfd::t_22b98cdeb2abe3 682-685,687-690
+  s_e3ae526d137cfd::t_506d4819943389 158-167
+  s_e3ae526d137cfd::t_72b1dd271206e7 266-269
+  s_e3ae526d137cfd::t_e64e539d2389d2 395-412
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_2426e938077883 140-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d6185c153b0ae2cfe18951e247ce30aa442d52d2",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
