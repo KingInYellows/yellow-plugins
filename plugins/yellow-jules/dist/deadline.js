@@ -31,11 +31,42 @@ function isRetryableRead(err) {
     return (err instanceof errors_js_1.AdapterError &&
         (err.kind === 'server-error' || err.kind === 'network'));
 }
+/**
+ * Race one read attempt against the remaining deadline. The underlying request
+ * is not cancelled (deferred follow-up); the caller just stops waiting for it.
+ * The timer is a real one because the injected clock's sleep may be virtual.
+ */
+async function boundByDeadline(fn, options) {
+    const remaining = remainingMs(options.clock, options.deadline);
+    const expire = () => (0, errors_js_1.throwAppError)('JULES_DEADLINE_EXCEEDED', 'the operation deadline expired while a read was in flight', { recoveryAction: 'Retry with a larger --deadline-ms.' });
+    if (remaining <= 0)
+        return expire();
+    let timer;
+    const expired = new Promise((_resolve, reject) => {
+        timer = setTimeout(() => {
+            try {
+                expire();
+            }
+            catch (err) {
+                reject(err);
+            }
+        }, remaining);
+    });
+    const attempt = fn();
+    // If the timer wins, the abandoned attempt may reject later; swallow it.
+    attempt.catch(() => undefined);
+    try {
+        return await Promise.race([attempt, expired]);
+    }
+    finally {
+        clearTimeout(timer);
+    }
+}
 async function withReadRetry(fn, options) {
     const random = options.random ?? Math.random;
     for (let attempt = 0;; attempt += 1) {
         try {
-            return await fn();
+            return await boundByDeadline(fn, options);
         }
         catch (err) {
             if (attempt >= exports.READ_RETRIES || !isRetryableRead(err))

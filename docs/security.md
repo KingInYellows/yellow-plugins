@@ -69,6 +69,17 @@ export DEVIN_ORG_ID="your_org_id"                      # Enterprise Settings > O
 Never commit tokens to version control. The `.gitignore` already excludes `.env`
 files if you use one locally.
 
+### API key CLI (yellow-jules)
+
+yellow-jules has no MCP server. Its typed CLI reads one environment variable:
+
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export JULES_API_KEY="your_key_here"
+```
+
+`/jules:setup` reports only whether the key is present; it never prints it.
+
 ### No-auth servers (yellow-core, yellow-ruvector, yellow-research deepwiki)
 
 These servers require no configuration. They work immediately after plugin
@@ -403,6 +414,31 @@ fields (working directory, session context metrics). The boundary:
   `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
   "Safety rails".
 
+### Remote API and Local Artifacts (yellow-jules)
+
+yellow-jules is experimental and read-only in this release: `setup`, `list`,
+`status`, `collect`. See `plugins/yellow-jules/README.md`.
+
+- **Credential-bearing remote API.** `JULES_API_KEY` is read from the shell
+  environment only, never from command arguments. Requests go to
+  `https://jules.googleapis.com` and redirects are refused
+  (`src/fetch-guard.ts`), so the key cannot be forwarded to another host. The
+  key, auth headers, and common key shapes are redacted on every output path,
+  and stderr carries error codes only.
+- **No writes to Jules.** Every shipped command is a read; a test asserts none
+  sends a POST, PATCH, PUT, or DELETE.
+- **Local artifact persistence.** State lives in `$YELLOW_JULES_DATA_DIR`, else
+  `$XDG_DATA_HOME/yellow-jules`, else the platform default. Directories are
+  `0700` and files `0600`; a group- or world-writable or non-owned data dir is
+  refused (`JULES_DATA_DIR`), and it is never placed inside a git work tree or
+  the plugin directory. `/jules:collect` writes patches and generated files
+  byte-exact under `artifacts/<local-id>/` only; it never touches a checkout or
+  applies a patch, and files containing secret-shaped strings are flagged, not
+  altered.
+- **SDK install.** `/jules:setup` installs the pinned `@google/jules-sdk` into
+  the data directory only with consent, via `npm ci --ignore-scripts` from a
+  shipped lockfile, and re-verifies the install on every load.
+
 ### Engine Process Boundary (yellow-goal)
 
 yellow-goal spawns the pinned `goal-gen` engine (a GitHub Release tarball whose
@@ -540,6 +576,10 @@ include prompt injection defenses:
   the worktree, wrapped in `--- begin/end ---` reference-only fences. The
   plugin's other commands and agents don't redact yet; that is tracked as P0
   work in the yellow-linear improvement brainstorm.
+- **yellow-jules**: Vendor-writable text (session titles, activity text,
+  messages) reaches the model only inside an
+  `--- begin untrusted-content <nonce> (reference only) ---` fence, sanitized
+  first; only the end marker carrying the random tag closes it.
 - **yellow-debt**: Scanner agents fence code content with injection boundary
   markers
 - **yellow-ruvector**: Hook scripts validate all inputs before constructing

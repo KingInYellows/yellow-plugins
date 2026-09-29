@@ -242,6 +242,36 @@ describe('data dir location (R15)', () => {
     expect(findGitWorkTree(repo)).toBe(fs.realpathSync(repo));
   });
 
+  it('refuses a data dir inside a different git checkout than the cwd', () => {
+    const cwdRepo = path.join(tmp, 'cwd-repo');
+    const otherRepo = path.join(tmp, 'other-repo');
+    fs.mkdirSync(path.join(cwdRepo, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(otherRepo, '.git'), { recursive: true });
+    expect(
+      codeOf(() =>
+        assertDataDirLocation(path.join(otherRepo, 'not-yet', 'data'), {
+          pluginRoot: path.join(tmp, 'plugin'),
+          cwd: cwdRepo,
+        })
+      )
+    ).toBe('JULES_DATA_DIR');
+  });
+
+  it('refuses a data dir inside a checkout when the cwd is outside any checkout', () => {
+    const repo = path.join(tmp, 'repo');
+    const outside = path.join(tmp, 'outside');
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    fs.mkdirSync(outside);
+    expect(
+      codeOf(() =>
+        assertDataDirLocation(path.join(repo, 'data'), {
+          pluginRoot: path.join(tmp, 'plugin'),
+          cwd: outside,
+        })
+      )
+    ).toBe('JULES_DATA_DIR');
+  });
+
   it('accepts a data dir outside both', () => {
     expect(() =>
       assertDataDirLocation(path.join(tmp, 'data'), {

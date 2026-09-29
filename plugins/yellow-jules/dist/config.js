@@ -175,6 +175,12 @@ function assertDataDirLocation(dataDir, context) {
     if (workTree !== undefined && isInside(workTree, real)) {
         (0, errors_js_1.throwAppError)('JULES_DATA_DIR', 'the data directory must not be inside the git work tree containing the current directory');
     }
+    // The data dir's own ancestry: a different checkout than cwd's, or cwd
+    // outside any checkout, must not let state land in a source clone.
+    const dataWorkTree = findGitWorkTree(real);
+    if (dataWorkTree !== undefined) {
+        (0, errors_js_1.throwAppError)('JULES_DATA_DIR', 'the data directory must not be inside any git work tree');
+    }
 }
 function currentUid() {
     return typeof process.getuid === 'function' ? process.getuid() : undefined;

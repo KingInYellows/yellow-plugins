@@ -259,6 +259,60 @@ describe('collect', () => {
     expect(record?.artifactResumePageToken).toBeUndefined();
   });
 
+  it('a resumed walk that makes no progress restarts from the beginning, then fails on the second', async () => {
+    fake.sessions.set(S, makeSession());
+    fake.activities.set(S, makeActivities(25));
+    const base = fake.listActivitiesImpl;
+    fake.listActivitiesImpl = async (s, o) => {
+      if (o.pageToken === 'p10') throw new AdapterError('network', 'reset');
+      return base(s, o);
+    };
+    await collect(makeDeps(dataDir, fake), { session: S });
+    const recordFor = async () =>
+      Object.values((await readJournal(dataDir)).operations)[0];
+    expect((await recordFor())?.artifactResumePageToken).toBe('p10');
+
+    // The vendor keeps handing back the same token with empty pages.
+    fake.listActivitiesImpl = async () => ({
+      activities: [],
+      nextPageToken: 'p10',
+    });
+    const stuck = await collect(makeDeps(dataDir, fake), { session: S });
+    expect(stuck.activities.partialPagination).toBe(true);
+    let record = await recordFor();
+    expect(record?.artifactResumePageToken).toBeUndefined();
+    expect(record?.artifactResumeRestartCount).toBe(1);
+
+    // Restart from the session beginning: a partial walk stores a token again
+    // (empty pages, so nothing new resets the guard).
+    fake.listActivitiesImpl = async () => ({
+      activities: [],
+      nextPageToken: 'p10',
+    });
+    fake.calls.length = 0;
+    await collect(makeDeps(dataDir, fake), { session: S });
+    expect(
+      (fake.callsTo('listActivities')[0]?.args[1] as { pageToken?: string })
+        .pageToken
+    ).toBeUndefined();
+    record = await recordFor();
+    expect(record?.artifactResumePageToken).toBe('p10');
+
+    // Second consecutive no-progress restart fails.
+    fake.listActivitiesImpl = async () => ({
+      activities: [],
+      nextPageToken: 'p10',
+    });
+    await expect(
+      collect(makeDeps(dataDir, fake), { session: S })
+    ).rejects.toMatchObject({
+      appError: { code: 'JULES_NO_PROGRESS' },
+    });
+    record = await recordFor();
+    expect(record?.artifactResumePageToken).toBeUndefined();
+    expect(record?.artifactResumeRestartCount).toBe(2);
+  });
+
   it('a resumed collect never overwrites patch.diff and merges the manifest', async () => {
     fake.sessions.set(S, makeSession());
     fake.activities.set(S, [
@@ -293,6 +347,45 @@ describe('collect', () => {
     expect(manifest.artifacts).toHaveLength(2);
     const record = Object.values((await readJournal(dataDir)).operations)[0];
     expect(record?.artifacts.filter((a) => a.kind === 'patch')).toHaveLength(2);
+  });
+
+  it('overlapping collects for one session never share a patch slot', async () => {
+    fake.sessions.set(S, makeSession());
+    fake.activities.set(S, [changeSetActivity(PATCH)]);
+    const base = fake.listActivitiesImpl;
+    let calls = 0;
+    // The second collect reads a different patch after the first has read.
+    fake.listActivitiesImpl = async (s, o) => {
+      const page = await base(s, o);
+      calls += 1;
+      if (calls === 1) fake.activities.set(S, [changeSetActivity(PATCH2)]);
+      await new Promise((r) => setTimeout(r, 20));
+      return page;
+    };
+    const [a, b] = await Promise.all([
+      collect(makeDeps(dataDir, fake), { session: S }),
+      collect(makeDeps(dataDir, fake), { session: S }),
+    ]);
+    const dir = path.join(resolveArtifactsDir(dataDir), a.localId);
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+    );
+    const paths = manifest.artifacts.map((x: { path: string }) => x.path);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(paths).toContain('patch.diff');
+    for (const art of manifest.artifacts as Array<{
+      path: string;
+      sha256: string;
+    }>) {
+      const bytes = fs.readFileSync(path.join(dir, art.path));
+      expect(
+        (await import('node:crypto'))
+          .createHash('sha256')
+          .update(bytes)
+          .digest('hex')
+      ).toBe(art.sha256);
+    }
+    expect(a.localId).toBe(b.localId);
   });
 
   it('a tampered manifest is rebuilt from validated fields only', async () => {

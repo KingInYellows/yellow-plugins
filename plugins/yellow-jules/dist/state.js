@@ -171,6 +171,9 @@ function isValidRecord(key, value) {
         return false;
     if (!isNonNegativeInt(value['resumeRestartCount']))
         return false;
+    if (value['artifactResumeRestartCount'] !== undefined &&
+        !isNonNegativeInt(value['artifactResumeRestartCount']))
+        return false;
     if (!Array.isArray(value['artifacts']) ||
         !value['artifacts'].every(isPlainObject))
         return false;
@@ -573,16 +576,24 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
         return next;
     }, config);
 }
-/** The one read-state field `collect` owns. `null` clears it. */
-async function upsertArtifactResumeToken(dataDir, localRequestId, token, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
+/**
+ * The read-state fields `collect` owns. `null` clears the token; `restartCount`
+ * (when given) replaces the artifact restart guard counter.
+ */
+async function upsertArtifactResumeToken(dataDir, localRequestId, token, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG, restartCount) {
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);
-        if ((current.artifactResumePageToken ?? null) === token)
+        if ((current.artifactResumePageToken ?? null) === token &&
+            (restartCount === undefined ||
+                (current.artifactResumeRestartCount ?? 0) === restartCount))
             return current;
         const { artifactResumePageToken: _drop, ...rest } = current;
         const next = applyRetention({
             ...rest,
             ...(token !== null ? { artifactResumePageToken: token } : {}),
+            ...(restartCount !== undefined
+                ? { artifactResumeRestartCount: restartCount }
+                : {}),
             updatedAt: now().toISOString(),
         });
         operations[localRequestId] = next;

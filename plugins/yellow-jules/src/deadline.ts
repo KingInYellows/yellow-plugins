@@ -6,7 +6,7 @@
  * exposes no Retry-After). Writes never go through this helper.
  */
 
-import { AdapterError } from './errors.js';
+import { AdapterError, throwAppError } from './errors.js';
 import type { Clock } from './types.js';
 
 export const DEFAULT_READ_DEADLINE_MS = 120_000;
@@ -44,6 +44,43 @@ export interface ReadRetryOptions {
   readonly random?: () => number;
 }
 
+/**
+ * Race one read attempt against the remaining deadline. The underlying request
+ * is not cancelled (deferred follow-up); the caller just stops waiting for it.
+ * The timer is a real one because the injected clock's sleep may be virtual.
+ */
+async function boundByDeadline<T>(
+  fn: () => Promise<T>,
+  options: ReadRetryOptions
+): Promise<T> {
+  const remaining = remainingMs(options.clock, options.deadline);
+  const expire = (): never =>
+    throwAppError(
+      'JULES_DEADLINE_EXCEEDED',
+      'the operation deadline expired while a read was in flight',
+      { recoveryAction: 'Retry with a larger --deadline-ms.' }
+    );
+  if (remaining <= 0) return expire();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      try {
+        expire();
+      } catch (err) {
+        reject(err);
+      }
+    }, remaining);
+  });
+  const attempt = fn();
+  // If the timer wins, the abandoned attempt may reject later; swallow it.
+  attempt.catch(() => undefined);
+  try {
+    return await Promise.race([attempt, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function withReadRetry<T>(
   fn: () => Promise<T>,
   options: ReadRetryOptions
@@ -51,7 +88,7 @@ export async function withReadRetry<T>(
   const random = options.random ?? Math.random;
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await fn();
+      return await boundByDeadline(fn, options);
     } catch (err) {
       if (attempt >= READ_RETRIES || !isRetryableRead(err)) throw err;
       const delay =

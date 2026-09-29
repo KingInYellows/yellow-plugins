@@ -211,9 +211,11 @@ Decide the provider:
 - **`READY_JULES`** → provider = `jules`. Jules delegation has not shipped:
   skip Steps 4-6 and go straight to Step 7's **Jules** branch, which stops.
 - **`CONFLICT`** → if `--provider` was given (`cursor`, `devin`, or `jules`),
-  use it (this is the ONLY state `--provider` may override). Otherwise stop,
-  print the fenced `detail`, and tell the user to disable the extra providers
-  or pass `--provider`.
+  use it only if `classification.providers[<requested>].enabled` is `true`
+  (this is the ONLY state `--provider` may override). If the requested
+  provider is not enabled, or `--provider` was not given, stop, print the
+  fenced `detail`, and tell the user to disable the extra providers or pass
+  `--provider` naming an enabled one.
 <!-- linear-delegate-providers:end -->
 - **`UNSELECTED`**, **`PARTIAL_TOOLING`**, **`CONFIG_INVALID`** → stop, print
   the fenced `detail`, and do not proceed. `--provider` does **not** apply

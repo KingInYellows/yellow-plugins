@@ -57,6 +57,7 @@ import {
   UNRESOLVED_STATUSES,
   upsertArtifactResumeToken,
   upsertReadState,
+  withJournalLock,
 } from './state.js';
 import type {
   AdapterActivity,
@@ -1110,21 +1111,22 @@ export async function collect(
     ensureOwnerOnlyDir(artifactsRoot);
     const dir = path.join(artifactsRoot, record.localId);
     ensureOwnerOnlyDir(dir);
-    const stager = new Stager(
-      dir,
-      deps.aggregateCapBytes ?? AGGREGATE_ARTIFACT_CAP_BYTES,
-      session.sourceResource
-    );
+    // Vendor reads run unlocked; staging is buffered here and replayed inside
+    // one critical section, so slot allocation never races another collect.
+    const pending: Array<(stager: Stager) => void> = [];
 
     for (const output of session.outputs) {
       if (output.type === 'changeSet') {
-        stager.patch(output.unidiffPatch, output.baseCommitId);
+        pending.push((s) => s.patch(output.unidiffPatch, output.baseCommitId));
       } else if (session.sourceResource !== undefined) {
         const check = validatePullRequestUrl(
           output.url,
           session.sourceResource
         );
-        if (check.valid) stager.prRef(check.url);
+        if (check.valid) {
+          const url = check.url;
+          pending.push((s) => s.prRef(url));
+        }
       }
     }
 
@@ -1146,33 +1148,48 @@ export async function collect(
       ring: record.recentActivityIds,
       onActivity: (activity: AdapterActivity) => {
         for (const artifact of activity.artifacts) {
-          if (artifact.type === 'changeSet')
-            stager.patch(artifact.unidiffPatch, artifact.baseCommitId);
+          if (artifact.type === 'changeSet') {
+            const { unidiffPatch, baseCommitId } = artifact;
+            pending.push((s) => s.patch(unidiffPatch, baseCommitId));
+          }
         }
       },
     });
 
     for (const file of session.generatedFiles) {
       if (file.changeType === 'deleted' || file.content === '') continue;
-      stager.generated(file.path, file.content);
+      const { path: vendorPath, content } = file;
+      pending.push((s) => s.generated(vendorPath, content));
     }
 
     const collectedAt = new Date(deps.clock.now()).toISOString();
-    writeStaged(
-      path.join(dir, 'manifest.json'),
-      `${JSON.stringify(
-        {
-          localId: record.localId,
-          sessionResource,
-          collectedAt,
-          artifacts: stager.artifacts,
-          skipped: stager.skipped,
-          partialPagination: walk.partialPagination,
-        },
-        null,
-        2
-      )}\n`
-    );
+    // Seed from the manifest, allocate slots, rename, and rewrite the manifest
+    // as one critical section. The journal lock is not reentrant, so the
+    // journal write (recordArtifacts) follows after release.
+    const stager = await withJournalLock(deps.dataDir, async () => {
+      const s = new Stager(
+        dir,
+        deps.aggregateCapBytes ?? AGGREGATE_ARTIFACT_CAP_BYTES,
+        session.sourceResource
+      );
+      for (const apply of pending) apply(s);
+      writeStaged(
+        path.join(dir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            localId: record.localId,
+            sessionResource,
+            collectedAt,
+            artifacts: s.artifacts,
+            skipped: s.skipped,
+            partialPagination: walk.partialPagination,
+          },
+          null,
+          2
+        )}\n`
+      );
+      return s;
+    });
 
     const journalArtifacts: ArtifactRecord[] = stager.artifacts.map((a) => ({
       ...a,
@@ -1185,14 +1202,45 @@ export async function collect(
       journalArtifacts,
       nowFn(deps)
     );
+    // Restart guard, as in `status`: a stored token the vendor rejected, or one
+    // whose walk read pages, found nothing new, and handed back the same token,
+    // is discarded so the next collect restarts from the session beginning; the
+    // second consecutive such restart fails. Unmapped pages never count.
+    const noProgress =
+      token !== undefined &&
+      walk.startedFromResume &&
+      !walk.resumeRejected &&
+      walk.pages > 0 &&
+      !walk.complete &&
+      !walk.unmappedActivity &&
+      walk.newIds.length === 0 &&
+      walk.resumePageToken === token;
+    const restarted =
+      walk.startedFromResume && (walk.resumeRejected || noProgress);
+    const restartCount = restarted
+      ? (record.artifactResumeRestartCount ?? 0) + 1
+      : walk.newIds.length > 0
+        ? 0
+        : (record.artifactResumeRestartCount ?? 0);
+    const exhausted = restarted && restartCount >= 2;
     record = await upsertArtifactResumeToken(
       deps.dataDir,
       record.localRequestId,
       // A token the vendor rejected is never re-stored; a resumed walk that
       // failed before reading keeps it (the walk returns it as resumePageToken).
-      walk.complete ? null : (walk.resumePageToken ?? null),
-      nowFn(deps)
+      walk.complete || noProgress || exhausted
+        ? null
+        : (walk.resumePageToken ?? null),
+      nowFn(deps),
+      undefined,
+      restartCount
     );
+    if (exhausted) {
+      return throwAppError(
+        'JULES_NO_PROGRESS',
+        `two consecutive artifact walks for ${sessionResource} restarted without advancing`
+      );
+    }
 
     const partialStaging = stager.partialStaging;
     const policyDeviation = hasUnreconciledDeviation(record);

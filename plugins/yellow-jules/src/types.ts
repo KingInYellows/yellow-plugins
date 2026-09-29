@@ -243,6 +243,7 @@ export interface OperationRecord {
   readonly resumeRestartCount: number;
   // Written only by `collect`.
   readonly artifactResumePageToken?: string;
+  readonly artifactResumeRestartCount?: number;
   readonly artifacts: readonly ArtifactRecord[];
   readonly deviations: readonly DeviationRecord[];
   readonly createdAt: string;
