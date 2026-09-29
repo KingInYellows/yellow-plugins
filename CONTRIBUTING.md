@@ -594,7 +594,7 @@ shell options and aliases (commonly `noclobber`, `extendedglob`, `rcquotes`).
 | Tier | Code | Rule |
 |---|---|---|
 | 1 | Inline fenced blocks | Run as written in bash and zsh (the list below). |
-| 2 | Blocks that need bash-only code | Run in a bash child that gets the script as an argument (see below). |
+| 2 | Blocks that need bash-only code | Run in a bash child that reads the script from fd 3 (see below). |
 | 3 | Bash-only libraries (`tier3Libraries`) | Sourced from markdown only inside a Tier 2 wrapper. |
 | 4 | Dual-shell libraries (`tier4Libraries`) | Sourced directly; linted like inline blocks and tested under both shells by `pnpm test:shell-compat` (add a driver in `tests/shell-compat/drivers/`). |
 
@@ -633,8 +633,13 @@ free and the exit status passes through. Lint rule SHC-009 rejects the two
 look-alikes: `bash <<'TAG'` feeds the script on stdin, so any command in the
 body that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare `cat`)
 silently swallows the rest of it; and `bash -c "$(cat <<'TAG' …)"` is refused
-as unverifiable by the stacked-PR providers' git-push PreToolUse hook. To call
-one function from prose, pass values as single-quoted arguments (reject values
+as unverifiable by the stacked-PR providers' git-push PreToolUse hook. `bash`
+must be the command itself (no `sudo`/`ssh`/`env` prefix); only `--norc`,
+`--noprofile`, `-e`/`-u`/`-x` and `-o pipefail` may precede `/dev/fd/N`, and
+only quoted operands (`'value'`, `"$var"`) may follow it — pass untrusted
+values that way, never inside the body. Redirects after the heredoc operator
+run in the caller's shell and are linted like inline code. To call one
+function from prose, pass values as single-quoted arguments (reject values
 that contain a single quote): `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'`.
 
 Tier 4 libraries may start functions with
@@ -643,7 +648,10 @@ which trips `set -e` under bash), but never use `emulate` in inline blocks:
 it turns `noclobber` off and hides the failure.
 
 Without zsh installed, `pnpm check:shell-parse` and `pnpm test:shell-compat`
-skip locally; CI runs both with zsh.
+print SKIP and exit 0 locally. A SKIP verifies nothing: set
+`SHELL_COMPAT_REQUIRE_ZSH=1` to make a missing zsh fail, as it does in CI
+(any `CI` value other than empty, `false` or `0`). The parse check also runs
+`bash -n` on every Tier 2 wrapper body, which zsh sees only as heredoc data.
 
 ### Naming Conventions
 

@@ -8,28 +8,11 @@
  * markdown under the user's login shell — often zsh, with whatever options
  * and aliases the user's shell snapshot carries (noclobber, extendedglob,
  * rcquotes, ...). `.sh` files with a bash shebang still run under bash.
- * The tiered contract this lint enforces (plans/bash-zsh-shell-compatibility.md):
- *
- *   Tier 1  Inline fenced blocks must run as written in bash AND zsh.
- *   Tier 2  A block that needs bash-only constructs runs them in a bash
- *           child that reads the script from file descriptor 3:
- *             bash /dev/fd/3 3<<'TAG'
- *             …
- *             TAG
- *           The body is exempt from the inline rules (a `bash` child also
- *           ignores the parent's noclobber). SHC-009 rejects the two
- *           look-alikes: `bash <<'TAG'` feeds the script on stdin, so any
- *           command in the body that reads stdin (gt, gh, node, claude -p, a
- *           bare `cat`) silently consumes the rest of the script; and
- *           `bash -c "$(cat <<'TAG' …)"` is refused as unverifiable by the
- *           stacked-PR providers' git-push PreToolUse hook, which does
- *           inspect an fd-3 heredoc body.
- *   Tier 3  Bash-shebang libraries listed in `tier3Libraries` are
- *           bash-by-contract: markdown may only source them inside a
- *           Tier 2 wrapper.
- *   Tier 4  Libraries listed in `tier4Libraries` are sourced directly into
- *           the user's shell, so their whole file is linted with the inline
- *           rules.
+ * It enforces the four-tier contract in CONTRIBUTING.md "Bash and zsh":
+ * inline blocks must run in bash and zsh; bash-only code runs in a
+ * `bash /dev/fd/3 3<<'TAG'` wrapper, whose body is exempt from the inline
+ * rules; `tier3Libraries` may be sourced only inside that wrapper; and
+ * `tier4Libraries` are sourced directly, so their whole file is linted.
  *
  * Rules (each finding prints file, line, rule and a one-line fix):
  *   SHC-001  redirect that zsh noclobber refuses (onto a mktemp/touch file,
@@ -58,8 +41,7 @@
  * an empty reason fails. Keyed by file + rule, never by line, so edits
  * elsewhere in the file do not churn it.
  *
- * Usage: node scripts/validate-shell-compat.js [--report] [--json]
- *   --report  print findings but always exit 0 (rollout mode)
+ * Usage: node scripts/validate-shell-compat.js [--json]
  *   --json    print findings as JSON (for measurement runs)
  * VALIDATE_SHELL_COMPAT_ROOT overrides the repo root (tests use fixtures).
  */
@@ -125,12 +107,15 @@ const RULES = {
 // ---------------------------------------------------------------------------
 // File discovery
 
+// A directory that cannot be read would silently drop every file under it,
+// so only a directory that vanished mid-walk is skipped.
 function walk(dir, predicate, out = []) {
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
+  } catch (err) {
+    if (err.code === 'ENOENT') return out;
+    throw err;
   }
   for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.git'))
@@ -155,15 +140,23 @@ function isExcludedPluginPath(rel) {
   return path.basename(rel) === 'CHANGELOG.md';
 }
 
+function pluginsDir(root) {
+  const dir = path.join(root, 'plugins');
+  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`no plugins/ directory under ${root}`);
+  }
+  return dir;
+}
+
 function listMarkdownFiles(root) {
-  return walk(path.join(root, 'plugins'), (name) => name.endsWith('.md'))
+  return walk(pluginsDir(root), (name) => name.endsWith('.md'))
     .map((abs) => toRelative(root, abs))
     .filter((rel) => !isExcludedPluginPath(rel))
     .sort();
 }
 
 function listShellFiles(root) {
-  return walk(path.join(root, 'plugins'), (name) => name.endsWith('.sh'))
+  return walk(pluginsDir(root), (name) => name.endsWith('.sh'))
     .map((abs) => toRelative(root, abs))
     .sort();
 }
@@ -189,9 +182,17 @@ const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
 const BASH_WRAPPER_PREFIX_RE = /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s[^<]*)?$/;
 // The supported wrapper, `bash /dev/fd/3 3<<'TAG'`: bash reads the script
 // from fd 3, so stdin stays the caller's, and the git-push hook can inspect
-// the body. Every other bash-fed heredoc is SHC-009.
-const BASH_FD_WRAPPER_PREFIX_RE =
-  /(?:^|[\s;&|(])(?:command\s+)?bash\s+(?:-(?![A-Za-z]*c)\S+\s+)*\/dev\/fd\/([3-9])\s+\1$/;
+// the body. `bash` must be the command itself (no sudo/ssh/env prefix); only
+// harmless options may precede /dev/fd/N and only quoted operands follow it.
+// Every other bash-fed heredoc is SHC-009.
+const WRAPPER_OPTION = String.raw`(?:--norc|--noprofile|--|-[eux]+|-o\s+(?:pipefail|errexit|nounset|xtrace))`;
+const WRAPPER_OPERAND = String.raw`(?:'[^']*'|"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")`;
+const BASH_FD_WRAPPER_RE = new RegExp(
+  String.raw`(?:^|(?<=[\s;&|(){!]))(?:command\s+)?bash((?:\s+${WRAPPER_OPTION})*)\s+\/dev\/fd\/(\d+)((?:\s+${WRAPPER_OPERAND})*)\s+(\d+)$`
+);
+// What may stand before `bash` for it to be the command word.
+const COMMAND_POSITION_RE =
+  /(?:^|[;&|({!]|(?:^|\s)(?:then|do|else|elif|if|while|until|time))$/;
 // `$((…))` / `((…))` spans: `<<` and `>` inside them are arithmetic shifts
 // and comparisons, not heredocs or redirects.
 const ARITHMETIC_RE = /\$?\(\((?:[^()]|\([^()]*\))*\)\)/g;
@@ -199,6 +200,43 @@ function stripArithmetic(code) {
   return code.replace(ARITHMETIC_RE, '0');
 }
 const BASH_DASH_C_RE = /(?:^|[\s;&|(])bash\s+(?:-\w+\s+)*-c\s/;
+
+// Checks the text in front of a heredoc that feeds bash. Returns
+// { start, problem }: `start` is where the wrapper command begins and
+// `problem` is '' for the supported fd form, else the SHC-009 detail.
+function parseFdWrapper(prefix) {
+  const m = BASH_FD_WRAPPER_RE.exec(prefix);
+  if (!m) {
+    let problem = 'script fed to bash on stdin';
+    if (/\s-[A-Za-z]*c\b/.test(prefix)) {
+      problem = 'bash -c "$(…)" is refused by the git-push hook';
+    } else if (/\/dev\/fd\//.test(prefix)) {
+      problem =
+        'only --norc, --noprofile, -e/-u/-x and -o pipefail may precede /dev/fd/N, and only quoted operands may follow it';
+    }
+    return { start: -1, problem };
+  }
+  if (!COMMAND_POSITION_RE.test(prefix.slice(0, m.index).trimEnd())) {
+    return {
+      start: m.index,
+      problem: 'bash must be the command itself (no sudo, ssh or env prefix)',
+    };
+  }
+  if (m[2] !== m[4]) {
+    return {
+      start: m.index,
+      problem: `bash reads /dev/fd/${m[2]} but the heredoc feeds fd ${m[4]}`,
+    };
+  }
+  if (!/^[3-9]$/.test(m[2])) {
+    return {
+      start: m.index,
+      problem:
+        'use a single-digit fd from 3 to 9 (0-2 are stdio; zsh has no multi-digit fds)',
+    };
+  }
+  return { start: m.index, problem: '' };
+}
 
 // Scan one line for shell quoting. `open` is the quote character a string
 // left open by an earlier line ('' when none). Returns where that string
@@ -311,7 +349,7 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       const candidate = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
       const trimmed = candidate.trimEnd();
       if (trimmed === heredoc.tag || trimmed === `${heredoc.tag})`) {
-        out[i] = { kind: 'data', code: '' };
+        out[i] = { kind: 'data', code: '', closesWrapper: heredoc.wrapper };
         heredoc = null;
       } else {
         out[i] = {
@@ -350,13 +388,24 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       let kind = 'expand';
       if (match[2] !== '') kind = bashFed ? 'pinned' : 'data';
       heredoc = { tag: match[3], stripTabs: match[1] === '-', kind };
-      let badWrapper = '';
-      if (bashFed && !BASH_FD_WRAPPER_PREFIX_RE.test(prefix)) {
-        badWrapper = /\s-c\s/.test(prefix)
-          ? 'bash -c "$(…)" is refused by the git-push hook'
-          : 'script fed to bash on stdin';
+      if (!bashFed) {
+        out[i] = { kind: 'code', code };
+        continue;
       }
-      out[i] = { kind: bashFed ? 'pinned' : 'code', code, badWrapper };
+      const wrapper = parseFdWrapper(prefix);
+      if (wrapper.problem) {
+        out[i] = { kind: 'pinned', code, badWrapper: wrapper.problem };
+      } else {
+        // The rest of the wrapper line (redirects, a pipe) runs in the
+        // current shell: lint it with the wrapper itself replaced by `:`.
+        const rest = heredocScan.slice(match.index + match[0].length);
+        heredoc.wrapper = true;
+        out[i] = {
+          kind: 'code',
+          code: `${prefix.slice(0, wrapper.start)}:${rest}`,
+          opensWrapper: match[3],
+        };
+      }
       continue;
     }
     if (BASH_DASH_C_RE.test(code)) {
@@ -820,6 +869,18 @@ function lintShellText(
   return findings;
 }
 
+// The supported fd wrappers in a block, as line indexes:
+// { open, close, tag }. `close` is -1 when the tag is never closed.
+function findFdWrappers(lines) {
+  const wrappers = [];
+  classifyLines(lines).forEach((c, i) => {
+    if (c.opensWrapper)
+      wrappers.push({ open: i, close: -1, tag: c.opensWrapper });
+    else if (c.closesWrapper) wrappers[wrappers.length - 1].close = i;
+  });
+  return wrappers;
+}
+
 function shellBlocks(content) {
   return extractRawFencedBlocks(content).filter((block) =>
     SHELL_LANGS.has(block.lang)
@@ -1046,29 +1107,32 @@ function formatFinding(f) {
 }
 
 function main(argv) {
-  const report = argv.includes('--report');
   const json = argv.includes('--json');
   const root = process.env.VALIDATE_SHELL_COMPAT_ROOT
     ? path.resolve(process.env.VALIDATE_SHELL_COMPAT_ROOT)
     : path.join(__dirname, '..');
-  const result = run(root);
+  const tag = '[validate-shell-compat]';
+  let result;
+  try {
+    result = run(root);
+  } catch (err) {
+    console.error(`${tag} ERROR: ${err.message}`);
+    return 1;
+  }
   const problems = [...result.violations, ...result.configErrors];
 
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return report || problems.length === 0 ? 0 : 1;
+    return problems.length === 0 ? 0 : 1;
   }
 
-  const tag = '[validate-shell-compat]';
   const summary = `${result.scanned.markdown} markdown and ${result.scanned.shell} shell file(s) scanned, ${result.allowed.length} allowlisted finding(s)`;
   if (problems.length === 0) {
     console.log(`${tag} OK: ${summary}.`);
     return 0;
   }
-  const out = report ? console.log : console.error;
-  out(
-    `${tag} ${report ? 'REPORT' : 'FAILED'}: ${problems.length} finding(s); ${summary}.\n`
-  );
+  const out = console.error;
+  out(`${tag} FAILED: ${problems.length} finding(s); ${summary}.\n`);
   const byRule = new Map();
   for (const f of problems) {
     if (!byRule.has(f.rule)) byRule.set(f.rule, []);
@@ -1084,7 +1148,7 @@ function main(argv) {
   out(
     `${tag} Style-level or false-positive hits may be capped in scripts/shell-compat-config.json "allowlist" with a reason (keyed by file and rule).`
   );
-  return report ? 0 : 1;
+  return 1;
 }
 
 if (require.main === module) {
@@ -1093,6 +1157,7 @@ if (require.main === module) {
 
 module.exports = {
   listMarkdownFiles,
+  findFdWrappers,
   SHELL_LANGS,
   RULES,
   classifyLines,

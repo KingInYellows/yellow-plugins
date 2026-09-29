@@ -113,7 +113,7 @@ unaffected today and must stay unaffected.
   block gets the same hook verdict as its bare body. Use a distinctive tag
   (`__YELLOW_DEBT_BASH__`), never `EOF`: bodies may contain `cat <<EOF` or
   user-pasted text.
-`emulate -L sh` is allowed only as the first
+- **`emulate -L sh`** is allowed only as the first
   line of functions in Tier 4 libraries, and it must be guarded with
   `if [ -n "${ZSH_VERSION:-}" ]; then emulate -L sh; fi`. The `&&` form of that
   guard trips `set -e` under bash. Never use `emulate` in inline blocks,
@@ -478,7 +478,7 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 - [x] 4.1: Remove `--report` from the `validate:schemas` chain and from the
       `shell-compat` matrix arm in both workflows.
 - [x] 4.2: Make `shell-compat-tests` required. Drop `continue-on-error` and
-      edit `ci-status` in four places (lines around 1642-1706): `needs:`, the
+      edit `ci-status` in four places: `needs:`, the
       `env:` result variable (`SHELL_COMPAT_RESULT`), the `if` chain, and the
       echo summary. Decide whether the fork workflow needs the job. It has no
       shell-test jobs today, so the lint and parse target cover forks.
@@ -600,8 +600,8 @@ npm.
   keep the existing path-resolution method unchanged inside the wrapper, and
   confirm it during the manual smoke test.
 - **Untrusted input:** never interpolate untrusted values (PR text, issue
-  titles) into a heredoc body. Pass them as arguments
-  (`bash -s -- "$arg" <<'EOF'`) or through the environment.
+  titles) into a heredoc body. Pass them as quoted operands of the
+  wrapper (`bash /dev/fd/3 "$arg" 3<<'TAG'`) or through the environment.
 - **Exit codes through wrappers:** `bash /dev/fd/3 3<<'TAG'` returns the exit status of
   the last command in the body. Call sites that branched on a library
   function's status must keep that branch inside the wrapper, or end the
@@ -665,9 +665,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - Fence logic to extract: `scripts/validate-agent-authoring.js` (around lines
   547, 594 and 610).
 - CI: `.github/workflows/validate-schemas.yml`:
-  - `plugin-shell-tests`: line 1404
-  - `ruvector-shell-tests`: line 1508
-  - `ci-status`: line 1642
+  - the `plugin-shell-tests`, `ruvector-shell-tests` and `ci-status` jobs
 - Claude Code shell behavior:
   - https://code.claude.com/docs/en/env-vars (`CLAUDE_CODE_SHELL`)
   - https://code.claude.com/docs/en/tools-reference (separate process per

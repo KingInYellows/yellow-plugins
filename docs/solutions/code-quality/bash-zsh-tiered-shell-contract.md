@@ -40,31 +40,14 @@ was not only the known `noclobber` class:
 
 ## Solution
 
-A tiered contract, enforced by a lint, a parse check and a runtime suite:
-
-| Tier | Code | Rule |
-|---|---|---|
-| 1 | Inline fenced blocks | Run as written in bash and zsh |
-| 2 | Blocks needing bash-only code | `bash /dev/fd/3 3<<'TAG'` … `TAG` |
-| 3 | Bash-only libraries | Sourced from markdown only inside a Tier 2 wrapper |
-| 4 | Dual-shell libraries | Sourced directly; linted and tested under both shells |
-
-The tier lists live in `scripts/shell-compat-config.json`. The authoring
-rules are in CONTRIBUTING.md "Shell Scripts → Bash and zsh".
-
-Guards:
-
-- `scripts/validate-shell-compat.js` (in `pnpm validate:schemas` and the
-  `shell-compat` CI matrix target) — rules SHC-001..009. SHC-001 replaces the
-  two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`: it flags `>`
-  onto any file a `mktemp`/`touch` created in the same markdown file (or,
-  for UPPERCASE handoff variables, anywhere in the plugin), second writes, and
-  `: >` truncation.
-- `scripts/check-shell-parse.js` — fails only when bash parses a block and zsh
-  does not, so `<PLACEHOLDER>` templates (which fail both) need no allowlist.
-- `tests/shell-compat/` — each Tier 4 library's driver must print identical
-  output under bash, zsh and zsh with snapshot options; each Tier 3 library
-  must source through the wrapper from a zsh `noclobber` parent.
+A four-tier contract — inline blocks portable, bash-only code in a
+`bash /dev/fd/3 3<<'TAG'` wrapper, bash-only libraries sourced only inside
+it, dual-shell libraries sourced directly — enforced by
+`scripts/validate-shell-compat.js` (SHC-001..009), `scripts/check-shell-parse.js`
+and the `tests/shell-compat/` bats suite. CONTRIBUTING.md "Shell Scripts →
+Bash and zsh" is the authoritative statement of the tiers and authoring
+rules; the tier lists live in `scripts/shell-compat-config.json`. SHC-001
+replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
 
 ## Key Insights
 
@@ -89,6 +72,16 @@ Guards:
   list-item fence whose body sits at column 0; Claude still runs it as one
   block. The shell checks use `extractRawFencedBlocks`
   (`scripts/lib/markdown-fences.js`), which follows the raw reading.
+- **A required check must be able to fail.** Review of the first cut found
+  checks that were required but passed while verifying nothing, all now
+  fixed: a missing zsh skipped locally and in any CI whose `CI` was not the
+  literal `true` (now `SHELL_COMPAT_REQUIRE_ZSH=1` or any `CI` value but
+  empty/`false`/`0` fails); zero shell blocks, an unreadable plugin
+  directory, or a killed or hung parse driver passed (each now errors);
+  wrapper bodies are heredoc data to `zsh -n`, so nothing parsed them (now
+  `bash -n` on each); a rollout `--report` flag that forced exit 0 stayed
+  available (removed); and the hook-parity test used floors that let new
+  unverifiable blocks in (now an exact per-file ratchet).
 - **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
   string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
   though it is not a command.

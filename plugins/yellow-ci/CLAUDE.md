@@ -31,8 +31,7 @@ Three-layer plugin where each layer is independently useful:
 - **Error logging:** Component-prefixed `[yellow-ci]`, never suppress with
   `|| true` or `2>/dev/null`
 - **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`
-
-- **Shell libraries and zsh.** Markdown blocks run under the user's shell,
+- **Shell libraries and zsh:** Markdown blocks run under the user's shell,
   often zsh. `hooks/scripts/lib/validate.sh` and `resolve-runner-targets.sh`
   are bash-only: source them in a bash child
   (`bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'` … `__YELLOW_CI_BASH__`, or

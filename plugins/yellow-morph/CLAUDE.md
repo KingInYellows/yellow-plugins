@@ -119,6 +119,10 @@ do not apply.
   `WORKSPACE_MODE=true`; `npm ci` runs under `env -i` so postinstall scripts
   inherit no secrets.
 - No automated tests exist for the wrapper/lock logic.
+- **Shell libraries and zsh:** `lib/install-morphmcp.sh` is dual-shell
+  (Tier 4) because `/morph:setup` sources it into the user's shell, often
+  zsh; `tests/shell-compat/` runs its driver under bash and zsh. Keep it
+  free of bash-only constructs (CONTRIBUTING.md "Bash and zsh").
 
 ## Prerequisites
 

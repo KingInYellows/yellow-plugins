@@ -18,6 +18,7 @@ const {
   extractRawFencedBlocks,
 } = require('../../scripts/lib/markdown-fences.js');
 const {
+  findFdWrappers,
   listMarkdownFiles,
   SHELL_LANGS,
 } = require('../../scripts/validate-shell-compat.js');
@@ -28,54 +29,108 @@ const detectors = {
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 const ROOT = join(__dirname, '..', '..');
-const WRAPPER_RE = /^bash \/dev\/fd\/3 3<<'(__[A-Z0-9_]+__)'$/m;
+
+// Wrapped blocks the hook already could not verify before they were
+// wrapped (plans/shell-compat-followups.md item 4), counted per file. Every
+// other wrapped block must be allowed outright. Lower a count when a block
+// starts passing; never raise one to admit a new block.
+const KNOWN_UNVERIFIABLE: Record<string, number> = {
+  'plugins/yellow-debt/agents/remediation/debt-fixer.md': 2,
+  'plugins/yellow-debt/commands/debt/audit.md': 1,
+  'plugins/yellow-debt/commands/debt/fix.md': 1,
+  'plugins/yellow-debt/commands/debt/status.md': 1,
+  'plugins/yellow-ruvector/commands/ruvector/status.md': 1,
+};
 
 type Block = { startLine: number; lang: string; body: string };
+type Wrapper = { open: number; close: number; tag: string };
 
-// The heredoc body of a wrapped block: what the same block would run bare.
-function unwrap(body: string): string {
-  const tag = (WRAPPER_RE.exec(body) as RegExpExecArray)[1];
-  const lines = body.split('\n');
-  const open = lines.findIndex((l) => WRAPPER_RE.test(l));
-  const close = lines.indexOf(tag, open + 1);
-  if (close === -1) throw new Error(`wrapper tag ${tag} is never closed`);
-  return lines.slice(open + 1, close).join('\n');
+// What the block would run bare: every wrapper's opening line and closing
+// tag removed, its body and all lines outside it kept.
+function unwrap(body: string, wrappers: Wrapper[]): string {
+  const drop = new Set(wrappers.flatMap((w) => [w.open, w.close]));
+  return body
+    .split('\n')
+    .filter((_line, i) => !drop.has(i))
+    .join('\n');
 }
 
-const wrappedBlocks: { where: string; body: string }[] = [];
+const wrappedBlocks: {
+  rel: string;
+  where: string;
+  body: string;
+  wrappers: Wrapper[];
+}[] = [];
 for (const rel of listMarkdownFiles(ROOT) as string[]) {
   const content = readFileSync(join(ROOT, rel), 'utf8');
   for (const block of extractRawFencedBlocks(content) as Block[]) {
-    if (SHELL_LANGS.has(block.lang) && WRAPPER_RE.test(block.body)) {
-      wrappedBlocks.push({
-        where: `${rel}:${block.startLine}`,
-        body: block.body,
-      });
+    if (!SHELL_LANGS.has(block.lang)) continue;
+    const wrappers = findFdWrappers(block.body.split('\n')) as Wrapper[];
+    if (wrappers.length === 0) continue;
+    for (const w of wrappers) {
+      if (w.close === -1) {
+        throw new Error(
+          `${rel}:${block.startLine}: wrapper tag ${w.tag} is never closed`
+        );
+      }
     }
+    wrappedBlocks.push({
+      rel,
+      where: `${rel}:${block.startLine}`,
+      body: block.body,
+      wrappers,
+    });
   }
 }
+
+describe('unwrap', () => {
+  it('keeps lines outside the wrapper and handles several wrappers', () => {
+    const body = [
+      'echo before',
+      "bash /dev/fd/3 3<<'__A__'",
+      'echo a',
+      '__A__',
+      'echo between',
+      "bash /dev/fd/3 3<<'__B__'",
+      'echo b',
+      '__B__',
+      'echo after',
+    ].join('\n');
+    const wrappers = findFdWrappers(body.split('\n')) as Wrapper[];
+    expect(wrappers.map((w) => w.tag)).toEqual(['__A__', '__B__']);
+    expect(unwrap(body, wrappers)).toBe(
+      ['echo before', 'echo a', 'echo between', 'echo b', 'echo after'].join(
+        '\n'
+      )
+    );
+  });
+});
 
 describe.each(Object.entries(detectors))(
   '%s git-push detector',
   (_name, detector) => {
-    it('finds the wrapped blocks this suite is meant to cover', () => {
-      expect(wrappedBlocks.length).toBeGreaterThanOrEqual(15);
+    it('finds wrapped blocks to check', () => {
+      expect(wrappedBlocks.length).toBeGreaterThan(0);
     });
 
-    it.each(wrappedBlocks.map((b) => [b.where, b.body]))(
+    it.each(wrappedBlocks.map((b) => [b.where, b]))(
       'gives %s the same verdict wrapped and bare',
-      (_where, body) => {
-        expect(detector.classifyGitPushCommand(body)).toBe(
-          detector.classifyGitPushCommand(unwrap(body))
+      (_where, b) => {
+        expect(detector.classifyGitPushCommand(b.body)).toBe(
+          detector.classifyGitPushCommand(unwrap(b.body, b.wrappers))
         );
       }
     );
 
-    it('allows most wrapped blocks outright', () => {
-      const allowed = wrappedBlocks.filter(
-        (b) => detector.classifyGitPushCommand(b.body) === 'allow'
-      );
-      expect(allowed.length).toBeGreaterThanOrEqual(10);
+    it('allows every wrapped block except the known-unverifiable ones', () => {
+      const counts: Record<string, number> = {};
+      for (const b of wrappedBlocks) {
+        const verdict = detector.classifyGitPushCommand(b.body);
+        if (verdict === 'allow') continue;
+        expect(verdict, b.where).toBe('unverifiable');
+        counts[b.rel] = (counts[b.rel] || 0) + 1;
+      }
+      expect(counts).toEqual(KNOWN_UNVERIFIABLE);
     });
 
     it('still catches a git push inside an fd-3 wrapper', () => {
