@@ -103,18 +103,30 @@ if ! git diff-index --quiet HEAD -- 2>/dev/null; then
   printf 'WARNING: You have uncommitted changes. Audit results may include work-in-progress code.\n' >&2
 fi
 
+# A cloned repository can ship .debt/ or its files as symlinks; refuse
+# rather than write through them. debt_write_file writes via mktemp + mv.
+debt_refuse_symlinks .debt .debt/scanner-output .debt/file-list.txt \
+  .debt/scanners-to-run.txt .debt/severity-filter.txt || exit 1
+
 # Create scanner output directory
 mkdir -p .debt/scanner-output || {
   printf '[audit] ERROR: Failed to create .debt/scanner-output/\n' >&2
   exit 1
 }
+if [ -n "$(find .debt/scanner-output -type l -print -quit)" ]; then
+  printf '[audit] ERROR: .debt/scanner-output/ contains symlinks; remove them first\n' >&2
+  exit 1
+fi
 
 # Determine file list using extension-based filtering (performance optimization)
 # Filters for common source code extensions instead of using file --mime-type
 printf '[audit] Enumerating files...\n' >&2
-git ls-files -z "$PATH_FILTER" 2>/dev/null | \
-  grep -zE '\.(ts|tsx|js|jsx|py|rs|go|rb|java|c|cpp|h|hpp|cs|php|swift|kt|scala|sh|bash|zsh|md|yaml|yml|json|toml|sql)$' | \
-  tr '\0' '\n' > .debt/file-list.txt || true
+{ git ls-files -z "$PATH_FILTER" 2>/dev/null | \
+  grep -zE '\.(ts|tsx|js|jsx|py|rs|go|rb|java|c|cpp|h|hpp|cs|php|swift|kt|scala|sh|bash|zsh|md|yaml|yml|json|toml|sql)$' || true; } | \
+  tr '\0' '\n' | debt_write_file .debt/file-list.txt || {
+  printf '[audit] ERROR: Failed to write .debt/file-list.txt\n' >&2
+  exit 1
+}
 
 if [ ! -s .debt/file-list.txt ]; then
   printf '[audit] Warning: No source files found in %s\n' "$PATH_FILTER" >&2
@@ -133,9 +145,9 @@ fi
 
 # Persist the scanner plan for the command body to orchestrate directly.
 printf '[audit] Launching %d scanner(s)...\n' "${#SCANNERS[@]}" >&2
-printf '%s\n' "${SCANNERS[@]}" > .debt/scanners-to-run.txt
+printf '%s\n' "${SCANNERS[@]}" | debt_write_file .debt/scanners-to-run.txt || exit 1
 if [ -n "$SEVERITY_FILTER" ]; then
-  printf '%s\n' "$SEVERITY_FILTER" > .debt/severity-filter.txt
+  printf '%s\n' "$SEVERITY_FILTER" | debt_write_file .debt/severity-filter.txt || exit 1
   printf '[audit] Severity filter: %s (written to .debt/severity-filter.txt)\n' "$SEVERITY_FILTER" >&2
 else
   rm -f .debt/severity-filter.txt

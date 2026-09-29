@@ -96,22 +96,26 @@ SCRIPT
 }
 
 @test "/debt:triage accept block transitions a todo when run under zsh" {
-  command -v flock >/dev/null 2>&1 || skip_or_fail "flock not installed"
   yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' || skip_or_fail "kislyuk yq not installed"
   local work block todo
   work="$BATS_TEST_TMPDIR/work"
   mkdir -p "$work/todos/debt"
+  git -C "$work" init -q
   todo="$work/todos/debt/001-pending-high-complexity-long-fn-abc123.md"
   printf -- '---\nid: "001"\nstatus: pending\ncategory: complexity\nseverity: high\ntitle: Long function\n---\nBody.\n' > "$todo"
+  # A repository-controlled name that would run if pasted into shell text;
+  # the block takes only the numeric id, so it is never touched.
+  : > "$work/todos/debt/001-pending-high-x\$(touch pwned)y.md"
   # The first wrapped block in triage.md is "On Accept".
   block="$BATS_TEST_TMPDIR/accept.zsh"
-  awk '/^bash \/dev\/fd\/3 3<<.__YELLOW_DEBT_BASH__.$/{f=1} f{print} f&&/^__YELLOW_DEBT_BASH__$/{exit}' \
+  awk '/^bash \/dev\/fd\/3 .<todo-id>. 3<<.__YELLOW_DEBT_BASH__.$/{f=1} f{print} f&&/^__YELLOW_DEBT_BASH__$/{exit}' \
     "$REPO_ROOT/plugins/yellow-debt/commands/debt/triage.md" \
-    | sed "s#/absolute/path/to/file.md#$todo#" > "$block"
+    | sed "s#'<todo-id>'#'001'#" > "$block"
   grep -q 'transition_todo_state' "$block"
   cd "$work"
   CLAUDE_PLUGIN_ROOT="$REPO_ROOT/plugins/yellow-debt" run --separate-stderr "${PROFILE_CMD[@]}" "$block"
   [ "$status" -eq 0 ]
   [ -f "$work/todos/debt/001-ready-high-complexity-long-fn-abc123.md" ]
   [ ! -e "$todo.lock" ]
+  [ -z "$(find "$work" -name pwned)" ]
 }

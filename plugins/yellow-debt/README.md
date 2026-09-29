@@ -87,12 +87,13 @@ Interactively review and prioritize pending findings.
 **Actions:** Accept (→ ready), Reject (→ deleted), Defer (→ deferred with
 reason)
 
-### `/debt:fix <path>`
+### `/debt:fix <id | path>`
 
 Agent-driven remediation of a specific finding with human approval.
 
 ```bash
-# Fix a specific todo
+# Fix a specific todo by id or path
+/debt:fix 042
 /debt:fix todos/debt/042-ready-high-complexity.md
 ```
 
@@ -130,7 +131,7 @@ Push accepted findings to Linear as issues.
    writability
 2. **Run audit**: `/debt:audit` to scan your codebase
 3. **Review findings**: `/debt:triage` to accept/reject/defer
-4. **Fix issues**: `/debt:fix <path>` for agent-assisted remediation
+4. **Fix issues**: `/debt:fix <id>` for agent-assisted remediation
 5. **Track progress**: `/debt:status` to see current state
 6. **Sync to Linear**: `/debt:sync` for team visibility
 
@@ -197,11 +198,11 @@ in-progress → complete/ready
 deferred → pending
 ```
 
-All state transitions are atomic and TOCTOU-safe via `flock`.
+All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
 
 ## Dependencies
 
-- **Required**: git, jq, yq, realpath, flock, Graphite CLI (gt)
+- **Required**: git, jq, yq, realpath, Graphite CLI (gt)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
 
 **Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML
