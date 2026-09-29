@@ -1,0 +1,117 @@
+tests/shell-compat/tier4-libraries.bats
+  s_e3ae526d137cfd::t_d5459fbcca4484 14
+tests/shell-compat/drivers/yellow-core--repo-profile.sh
+  s_e3ae526d137cfd::t_d5459fbcca4484 3-4
+scripts/check-shell-parse.js
+  s_e3ae526d137cfd::t_ba140d8659502a 35,37,40-42,75-76,80-84,94-99,105
+  s_e3ae526d137cfd::t_a1e94e9e425fb3 62
+  s_e3ae526d137cfd::t_e0a870120c3a61 177
+scripts/lib/markdown-fences.js
+  s_e3ae526d137cfd::t_61a3035a82e6d4 8-10
+  s_e3ae526d137cfd::t_8191c1e0360832 187,218,278-280,335-337,370-378,405-407,419-421
+.changeset/zsh-compat-core-debt.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 9
+.github/workflows/validate-schemas.yml
+  s_e3ae526d137cfd::t_dbcdf05d386461 171-172,183,1565-1568,1571,1573-1574,1578-1579
+  s_e3ae526d137cfd::t_3899521313f173 1580
+plugins/yellow-debt/commands/debt/triage.md
+  s_e3ae526d137cfd::t_534651aa51e2da 114-115,129-130,168,187-188
+  s_e3ae526d137cfd::t_cdabedeac43384 169
+plans/shell-compat-followups.md
+  s_e3ae526d137cfd::t_e2254328d7208a 1-31,36-68
+  s_e3ae526d137cfd::t_4d006928b49ed8 32-35
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_4d006928b49ed8 27-28,30-38
+plugins/yellow-debt/commands/debt/fix.md
+  s_e3ae526d137cfd::t_534651aa51e2da 29
+  s_e3ae526d137cfd::t_cdabedeac43384 30
+  s_e3ae526d137cfd::t_1772af936282db 23-24
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_cbf2268b27b700 468-470,474-479,481,646-652
+  s_e3ae526d137cfd::t_fc31c455e448e1 493,622-623,1094-1095
+  s_e3ae526d137cfd::t_62abac9fdaf1df 15-16,20-26,45,89,109,112-113,190-200,343-344,346,353-359,401,549,564-565,578,606-609,760
+  s_e3ae526d137cfd::t_c73a5545d75f8a 181-183,758
+plugins/yellow-ruvector/tests/status-provenance.bats
+  s_e3ae526d137cfd::t_e0a870120c3a61 34
+plugins/yellow-debt/CLAUDE.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 18
+plugins/yellow-core/commands/flow/compound.md
+  s_e3ae526d137cfd::t_53b7941c7af753 98
+tests/shell-compat/wrappers.bats
+  s_e3ae526d137cfd::t_d5459fbcca4484 4,38,56-60,69,74,99-100,108
+.changeset/zsh-compat-review-fixes.md
+  s_e3ae526d137cfd::t_bca0f55621261d 1-22
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e3ae526d137cfd::t_534651aa51e2da 43-44,98-99,148-149
+plugins/yellow-debt/commands/debt/status.md
+  s_e3ae526d137cfd::t_534651aa51e2da 28
+  s_e3ae526d137cfd::t_cdabedeac43384 29
+  s_e3ae526d137cfd::t_1772af936282db 22-23
+plugins/yellow-ci/CLAUDE.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 38
+  s_e3ae526d137cfd::t_564893a3d1fabb 39-40
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_e3ae526d137cfd::t_613edca4182388 201-204,211-212,214
+plugins/yellow-debt/commands/debt/sync.md
+  s_e3ae526d137cfd::t_534651aa51e2da 134-135
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e3ae526d137cfd::t_534651aa51e2da 72-73,156-157,195-196,253-254
+.changeset/zsh-compat-ci-ruvector.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 10
+tests/shell-compat/helpers/shells.bash
+  s_e3ae526d137cfd::t_d5459fbcca4484 15-24,26
+CONTRIBUTING.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 625,631-638
+CLAUDE.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 141
+.changeset/zsh-compat-docs.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 9
+tests/integration/markdown-fences.test.ts
+  s_e3ae526d137cfd::t_a22398c352a87b 2-9,16,28,35,47,49-50,65,69-70,73,75,77-81,84-89,92-97,100-104,109,112-114,116,119-120,129,133-135,138,140-141,143-144,147-149,168,172-173
+  s_e3ae526d137cfd::t_373759533ea0f7 37,42,45
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_a166a1375c3c47 77-80,128,138,143,155-160,167-172,178,320
+  s_e3ae526d137cfd::t_a1e94e9e425fb3 161-166,173-177
+tests/integration/shell-compat-hook-parity.test.ts
+  s_e3ae526d137cfd::t_0192f454d80c5d 18-20
+  s_e3ae526d137cfd::t_a1e94e9e425fb3 1,9-12,15-17,21-34,44-64,66,70-71,79-90
+  s_e3ae526d137cfd::t_18b17865dbb957 2-8,13-14,35-43,65,67-69,72-78
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_e3ae526d137cfd::t_534651aa51e2da 23-24,63-64,188-189
+plugins/yellow-ruvector/CLAUDE.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 83
+plugins/yellow-ci/commands/ci/setup-runner-targets.md
+  s_e3ae526d137cfd::t_534651aa51e2da 36
+  s_e3ae526d137cfd::t_564893a3d1fabb 26-28
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e3ae526d137cfd::t_534651aa51e2da 205-207
+plugins/yellow-ci/commands/ci/setup.md
+  s_e3ae526d137cfd::t_564893a3d1fabb 26-29
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_afeea6dc0b25ca 57,99-116,222-224,446,605,681-712
+  s_e3ae526d137cfd::t_34fb6326425c04 713
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_e3ae526d137cfd::t_e0a870120c3a61 48,71-80
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_53b7941c7af753 28-29,31-39
+plugins/yellow-debt/commands/debt/audit.md
+  s_e3ae526d137cfd::t_534651aa51e2da 37
+  s_e3ae526d137cfd::t_cdabedeac43384 38
+  s_e3ae526d137cfd::t_1772af936282db 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1810d8d0315c442bb5287dbfb6b88a195e948290",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+plugins/yellow-ci/CLAUDE.md
+  s_e3ae526d137cfd::t_af6cd351dec787 40
+plans/shell-compat-followups.md
+  s_e3ae526d137cfd::t_4a6f0d87a02ca8 53,63
+  s_e3ae526d137cfd::t_af6cd351dec787 54-62
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_e3c0a2313b1a74 172-191
+tests/integration/shell-compat-hook-parity.test.ts
+  s_e3ae526d137cfd::t_e3c0a2313b1a74 41
+scripts/check-shell-parse.js
+  s_e3ae526d137cfd::t_e3c0a2313b1a74 165-171
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_e3c0a2313b1a74 194
+.github/workflows/validate-schemas.yml
+  s_e3ae526d137cfd::t_e3c0a2313b1a74 160-162,171,1576
+plugins/yellow-ci/commands/ci/setup-runner-targets.md
+  s_e3ae526d137cfd::t_af6cd351dec787 27
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_e3ae526d137cfd::t_af6cd351dec787 219-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ad0ead358b703c3516b6f21397da5c2435c445ef",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
