@@ -204,7 +204,7 @@ failures and continue.
 
    ```bash
    PC_OUT=$(mktemp)
-   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" "<owner/repo>" "<PR#>" >"$PC_OUT" 2>"$PC_OUT.err"
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" "<owner/repo>" "<PR#>" >|"$PC_OUT" 2>"$PC_OUT.err"
    PC_EC=$?
    if [ "$PC_EC" -ne 0 ]; then
      printf '[review:resolve-stack] PR #<PR#>: self-verify inconclusive (get-pr-comments exit %s)\n' "$PC_EC" >&2

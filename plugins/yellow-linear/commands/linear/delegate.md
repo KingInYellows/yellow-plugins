@@ -520,8 +520,8 @@ case "$REPO_URL" in
   git@*)
     host_and_path="${REPO_URL#git@}"
     host="${host_and_path%%:*}"
-    path="${host_and_path#*:}"
-    CURSOR_REPO_URL="https://${host}/${path%.git}"
+    repo_path="${host_and_path#*:}"   # not `path`: tied to $PATH in zsh
+    CURSOR_REPO_URL="https://${host}/${repo_path%.git}"
     ;;
   *) CURSOR_REPO_URL="" ;;
 esac

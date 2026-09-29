@@ -112,7 +112,7 @@ containing backticks, `$`, or embedded newlines:
 
 ```bash
 docs_file=$(mktemp) && {
-  printf '%s' "$docs_body" > "$docs_file"
+  printf '%s' "$docs_body" >| "$docs_file"
   bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write" tier2 "$library_id" "$topic" "$docs_file" 2>/dev/null || true
   rm -f "$docs_file"
 }

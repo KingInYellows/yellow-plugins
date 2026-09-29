@@ -87,13 +87,14 @@ fi
 
 printf '\n=== Graphite Auth ===\n'
 auth_ok=0
-for path in \
+# `cfg`, not `path`: in zsh a loop over `path` rewrites $PATH.
+for cfg in \
   "$HOME/.graphite_user_config" \
   "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" \
   "$HOME/.config/graphite/user_config"; do
-  if [ -f "$path" ]; then
+  if [ -f "$cfg" ]; then
     auth_ok=1
-    printf 'auth_config:    present (%s)\n' "$path"
+    printf 'auth_config:    present (%s)\n' "$cfg"
     break
   fi
 done
@@ -114,7 +115,7 @@ mq_err_log=$(mktemp 2>/dev/null) || mq_err_log=""
 # (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's
 # scoped to the current repo's host and its stderr is captured below.
 if command -v gh >/dev/null 2>&1; then
-  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>"${mq_err_log:-/dev/null}")
+  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>|"${mq_err_log:-/dev/null}")
   repo_view_status=$?
   if [ "$repo_view_status" -ne 0 ]; then
     if [ -n "$mq_err_log" ] && [ -s "$mq_err_log" ]; then
@@ -128,12 +129,12 @@ if command -v gh >/dev/null 2>&1; then
   else
     repo_owner="${repo_nwo%/*}"
     repo_name="${repo_nwo#*/}"
-    [ -n "$mq_err_log" ] && : > "$mq_err_log"  # truncate before next probe
+    [ -n "$mq_err_log" ] && : >| "$mq_err_log"  # truncate before next probe
     # shellcheck disable=SC2016  # $owner/$name are GraphQL variable refs, not shell vars — intentionally literal in single quotes
     mq_check=$(gh api graphql -f query='
       query($owner:String!,$name:String!){
         repository(owner:$owner,name:$name){ mergeQueue { url } }
-      }' -f owner="$repo_owner" -f name="$repo_name" --jq 'if .data.repository == null then error("repo null") else (.data.repository.mergeQueue | if . != null then "configured" else empty end) end' 2>"${mq_err_log:-/dev/null}")
+      }' -f owner="$repo_owner" -f name="$repo_name" --jq 'if .data.repository == null then error("repo null") else (.data.repository.mergeQueue | if . != null then "configured" else empty end) end' 2>|"${mq_err_log:-/dev/null}")
     mq_status=$?
     if [ "$mq_status" -ne 0 ]; then
       if [ -n "$mq_err_log" ] && [ -s "$mq_err_log" ]; then

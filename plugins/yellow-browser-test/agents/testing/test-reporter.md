@@ -80,7 +80,7 @@ ISSUE_TITLE="[browser-test] ${ROUTE} — ${FINDING_TITLE}"
 
 # Write body to temp file (prevents heredoc injection)
 BODY_FILE=$(mktemp)
-cat > "$BODY_FILE" <<'EOF'
+cat >| "$BODY_FILE" <<'EOF'
 ## Browser Test Finding
 
 **Severity:** {severity}

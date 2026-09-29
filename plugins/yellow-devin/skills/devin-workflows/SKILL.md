@@ -105,7 +105,8 @@ if [ -z "$session" ]; then
   printf 'ERROR: Session %s not found\n' "$SESSION_ID" >&2
   exit 1
 fi
-status=$(printf '%s' "$session" | jq -r '.status')
+# `session_status`, not `status`: `status` is read-only in zsh.
+session_status=$(printf '%s' "$session" | jq -r '.status')
 ```
 
 **Security:** When agents consume API response data in their reasoning, wrap raw

@@ -69,22 +69,18 @@ Then re-run /semgrep:setup
 MIN_SEMGREP_VERSION="1.146.0"
 semgrep_version_output=$(semgrep --version 2>/dev/null || true)
 installed_version=$(printf '%s\n' "$semgrep_version_output" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
+# awk rather than `read -a` into 0-based arrays, which zsh does not support.
+# `x[i] + 0` keeps a component's leading digits ("1rc2" -> 1, "" -> 0).
 version_gte() {
-  local i av bv
-  local -a a b
-  IFS='.' read -r -a a <<< "$1"
-  IFS='.' read -r -a b <<< "$2"
-  for ((i=0; i<${#b[@]}; i++)); do
-    av="${a[i]:-0}"
-    bv="${b[i]:-0}"
-    av="${av%%[^0-9]*}"
-    bv="${bv%%[^0-9]*}"
-    av="${av:-0}"
-    bv="${bv:-0}"
-    if ((av > bv)); then return 0; fi
-    if ((av < bv)); then return 1; fi
-  done
-  return 0
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    na = split(a, x, "."); nb = split(b, y, ".")
+    n = (na > nb) ? na : nb
+    for (i = 1; i <= n; i++) {
+      if (x[i] + 0 > y[i] + 0) exit 0
+      if (x[i] + 0 < y[i] + 0) exit 1
+    }
+    exit 0
+  }'
 }
 ```
 

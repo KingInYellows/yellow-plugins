@@ -60,7 +60,10 @@ since a crafted filename (containing `$(...)`, backticks, or a leading
 `-`) would otherwise execute or be parsed as a flag when staged:
 
 ```bash
-mapfile -d '' -t files < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
+# A read loop, not `mapfile -d ''`: mapfile is bash-only and the Bash tool
+# may run zsh.
+files=()
+while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff -z --name-only; git ls-files -z --others --exclude-standard)
 ```
 
 Review `files` and exclude anything that looks like a `.env*` file, a
