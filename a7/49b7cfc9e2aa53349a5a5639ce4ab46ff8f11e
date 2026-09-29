@@ -1,0 +1,36 @@
+plugins/yellow-core/lib/context-observer.py
+  s_edee9afa1a05cc::t_84747c84e8777d 278-279,281-287
+  s_edee9afa1a05cc::t_a0f22e2576df92 280
+  s_edee9afa1a05cc::t_a0332cabdf7b86 260
+plugins/yellow-core/lib/statusline-settings.py
+  s_edee9afa1a05cc::t_8e83560339617f 541-542,544-546,548-559
+  s_edee9afa1a05cc::t_397515613a1503 25
+  s_edee9afa1a05cc::t_344c6e769606c7 629-630
+  s_edee9afa1a05cc::t_f90ae637723780 90,250-251,254-259
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_edee9afa1a05cc::t_370f73bebfa34d 85-86
+plugins/yellow-core/commands/statusline/setup.md
+  s_edee9afa1a05cc::t_f5f532a5661d60 336-337
+  s_edee9afa1a05cc::t_f4df4d61739bc9 139-140
+  s_edee9afa1a05cc::t_6c1a701affc73d 69,188-189,194,197,207,262,266,303,323,352,377,402
+docs/security.md
+  s_edee9afa1a05cc::t_cc47c6c1829241 339,359-360
+plugins/yellow-core/tests/context-observer.bats
+  s_edee9afa1a05cc::t_d399faeb7a54a8 1239-1284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a749b7cfc9e2aa53349a5a5639ce4ab46ff8f11e",
+  "prompts": {},
+  "sessions": {
+    "s_edee9afa1a05cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c0b4660-3047-4907-8249-d56cc3832d29",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
