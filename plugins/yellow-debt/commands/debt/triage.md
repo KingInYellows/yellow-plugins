@@ -110,7 +110,7 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
    path of the current finding file (from Step 2's discovery results).
 
    **On Accept:**
-   ```bash
+```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
@@ -120,12 +120,12 @@ transition_todo_state "/absolute/path/to/file.md" ready || {
   exit 1
 }
 __YELLOW_DEBT_BASH__
-   ```
+```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your accepted count.
 
    **On Reject:**
-   ```bash
+```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
@@ -135,7 +135,7 @@ transition_todo_state "/absolute/path/to/file.md" deleted || {
   exit 1
 }
 __YELLOW_DEBT_BASH__
-   ```
+```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your rejected count.
 
@@ -165,7 +165,7 @@ __YELLOW_DEBT_BASH__
       printed directory, with the reason text as its content.
    3. Run the transition with the directory as a single-quoted operand. The
       child strips newlines, transitions, then removes the file and directory:
-      ```bash
+```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
@@ -180,12 +180,12 @@ rm -f -- "$1/reason.txt"
 rmdir -- "$1"
 exit "$rc"
 __YELLOW_DEBT_BASH__
-      ```
+```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 
    **On Defer — empty reason (blank "Other" input):** Call without third argument:
-   ```bash
+```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
@@ -195,7 +195,7 @@ printf '[debt:triage] Error: transition failed\n' >&2
 exit 1
 }
 __YELLOW_DEBT_BASH__
-   ```
+```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 
