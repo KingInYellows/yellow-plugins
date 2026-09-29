@@ -242,32 +242,40 @@ three returned zero evidence, including the file-provenance tier the
 2026-07-19 update above added specifically to sidestep the other two tiers'
 text-matching blind spots.
 
-### Graphite MQ merges are invisible to all three tiers, not just strict/loose
+### A Graphite MQ merge was invisible to all three tiers, not just strict/loose
 
 **Confirmed case:** PR #808 — draft, then `gh pr ready 808`, then `gt merge`
 (queued as MQ PR #811, ~20s Graphite cache delay before the queue picked it
 up), landed on `main` as squash commit `80f125dd`. `gh pr view 808` shows
-`state: CLOSED`, `mergedAt: null`, `mergeCommit: null` — indefinitely, not a
-propagation-lag artifact that clears on retry.
+`state: CLOSED`, `mergedAt: null`, `mergeCommit: null`, and a retry ~15s later
+showed the same. That is one PR and one short retry: it does not rule out
+propagation lag over a longer window, and it does not distinguish a merge from
+an ejection. The detection record treats null `mergedAt` as ambiguous (lag,
+ejection, or external close) and names the PR's `merged` boolean as the
+authoritative check, so confirm `merged` before treating any such PR as
+merged.
 
 - **File-provenance tier** — `gh api repos/{owner}/{repo}/commits/{sha}/pulls
   --jq '[.[]|select(.state=="closed")]'` against the squash commit returned 0
   PRs, unchanged on a retry ~15s later. GitHub's commit→PR association
   endpoint does not link a Graphite-MQ squash commit back to its source PR —
-  this lines up with
-  [merge-queue-closed-pr-null-mergedat-detection.md](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md)'s
-  finding that `mergeCommit`/`mergedAt` never populate for MQ merges: there is
-  nothing for this endpoint to return regardless of how long you wait.
+  consistent with #808's null `mergeCommit`/`mergedAt`, though this is our
+  inference, not a finding of
+  [merge-queue-closed-pr-null-mergedat-detection.md](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md),
+  which describes null `mergedAt` as ambiguous rather than permanent. Whether
+  the association would appear later was not tested.
 - **Strict tier** (`gh pr list --state merged` slug search) — 0 matches.
   `--state merged` filters on PR *state*; an MQ-closed PR's state is
-  `closed`, never `merged`, independent of slug/title.
+  `closed`, not `merged` (as observed for #808), independent of slug/title.
 - **Loose tier** (100 most-recent `--state merged` PRs, scored by
-  slug-token coverage) — 0 matches for the same root cause: the PR never
-  enters either tier's candidate set before scoring starts.
+  slug-token coverage) — 0 matches for the same likely cause: #808 never
+  entered the loose tier's candidate set (the same `--state merged` filter as
+  the strict tier) before scoring started.
 
-For a Graphite-MQ-merged PR, expect the full provenance → strict → loose →
-override fallthrough every time — this is the normal path for that merge
-type, not a rare edge case.
+Treat this as an observation for #808 only. Other Graphite-MQ merges may
+behave differently, so no claim is made that they all fall through to the
+override; if a PR shows this state, expect the provenance → strict → loose →
+override fallthrough as a possibility and check `merged` first.
 
 ### Verifying an MQ merge when Gate C has nothing: diff-stat equality
 
@@ -290,39 +298,44 @@ trailer format needed for this case.
 
 ### Stale main-clone trunk breaks Phase 6 *and* Phase 8, distinct from a Graphite API outage
 
-Separately, in the same session: Phase 6 (`gt checkout --trunk` / sync) can
-fail for a reason unrelated to Gate C — a shared main clone's local `main`
-had untracked files that collided with paths a just-merged PR had committed,
-so `git pull --ff-only` refused to update. Archiving from a disposable
+Separately, in the same session: the Phase 6 trunk refresh can fail for a
+reason unrelated to Gate C — a shared main clone's local `main` had
+untracked files that collided with paths a just-merged PR had committed, so
+the fast-forward of local `main` was refused. On the Graphite path Phase 6
+runs `gt repo sync` with stderr discarded, so it only warns ("proceeding on
+possibly-stale trunk") and the failure surfaces later at Phase 8
+`gt submit`. (`git pull --ff-only` is the GitHub-provider path; see
+`plugins/yellow-core/commands/plan/complete.md`.) Archiving from a disposable
 worktree tracked straight off `origin/main` instead
 (`git worktree add -b plan/archive-<slug> <path> origin/main` +
 `gt track --parent main --force`) unblocks the *commit*, but not the
 *submit*: `gt submit --no-interactive` still aborted with "Aborting submit
-because trunk branch is out of date and could not be updated," and after
-falling back to a manual `git push` + `gh pr create`, `gt merge` reported
-"The following branches do not have associated PRs" for a PR that
-demonstrably existed (PR #812).
+because trunk branch is out of date and could not be updated," and the
+session then fell back to a manual `git push` + `gh pr create` (history, not
+policy), after which `gt merge` reported "The following branches do not have
+associated PRs" for a PR that demonstrably existed (PR #812). That PR landed
+as squash commit `22cfd85b`, before this recovery order was written down.
 
 Treat either message as `gt`'s local trunk being stale relative to GitHub.
-This differs from [the Graphite API outage fallback](./graphite-api-outage-fallback.md),
-where the Graphite API itself fails while local git is healthy. Recover with
-`gt` first:
-
-1. Clear the cause: move or delete the untracked files in the main clone
-   that collide with the merged PR's paths (check `git status` first — other
-   sessions may share the clone), then run `gt repo sync` (`gt sync`) so
-   local `main` fast-forwards.
-2. Retry `gt submit --no-interactive` / `gt merge` from the archive
-   worktree.
-
-Only when trunk cannot be repaired locally, and with the user's explicit
-approval, use the direct-GitHub path that
+This is not a Graphite API outage: there the Graphite API itself fails
+(503s) while local git is healthy, which is the only case
 [graphite-api-outage-fallback.md](./graphite-api-outage-fallback.md)
-documents (`git push` plus `gh pr create`). That doc remains the single
-policy for bypassing `gt`; CLAUDE.md's rule against falling back to raw
-`git push` or `gh pr create` applies everywhere else. PR #812 landed through
-that exception as squash commit `22cfd85b`, before this recovery order was
-written down.
+covers. A stale local trunk does not license bypassing `gt`. The enabled
+stacked-PR provider is mandatory (CLAUDE.md): never fall back to raw
+`git push` or `gh pr create`. Recover within the provider:
+
+1. Re-run `gt repo sync` (`gt sync`) visibly, without discarding stderr, to
+   see which paths collide.
+2. Clear the cause. The colliding untracked files may belong to the user or
+   another session sharing the clone, and `git status` does not establish
+   ownership. Do not delete or move them on your own: ask the user for
+   explicit confirmation first, and prefer moving them to a user-approved
+   backup location over deleting.
+3. Re-run `gt repo sync` so local `main` fast-forwards, then retry
+   `gt submit --no-interactive` / `gt merge` from the archive worktree.
+
+If trunk still cannot be repaired, stop and report the `gt repo sync`
+error to the user rather than routing around `gt`.
 
 ---
 
