@@ -1,0 +1,49 @@
+plugins/yellow-jules/CLAUDE.md
+  s_b2d61b25087e73::t_3c2eb51333e70e 1-122
+plugins/yellow-jules/README.md
+  s_b2d61b25087e73::t_b1fa4bf2ef743c 1-79
+.changeset/core-remote-agent-jules.md
+  s_b2d61b25087e73::t_9694aac55eb7c8 1-8
+.changeset/cursor-replica-markers.md
+  s_b2d61b25087e73::t_7c3d64fbbcecbe 1-8
+.changeset/jules-initial-release.md
+  s_b2d61b25087e73::t_f651aee1063f29 1-14
+.changeset/linear-delegate-jules-provider.md
+  s_b2d61b25087e73::t_004d507303641e 1-8
+AGENTS.md
+  s_b2d61b25087e73::t_2f33ce687f521a 21
+CLAUDE.md
+  s_b2d61b25087e73::t_cd56e47c275d2e 10,32
+README.md
+  s_b2d61b25087e73::t_d421ec4e63fff0 3,36,278
+docs/architecture-overview.md
+  s_b2d61b25087e73::t_f78c130f815c91 3,60,111-113,142-143
+docs/upstream-pins.md
+  s_b2d61b25087e73::t_60b95cfd690a9e 69-91
+docs/yellow-jules/capability-matrix.md
+  s_b2d61b25087e73::t_14cc543d5b621b 3-7
+docs/yellow-jules/contract-v1.md
+  s_b2d61b25087e73::t_7f2f2bc1d9f202 3-6,35-83
+plans/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_b2d61b25087e73::t_b4a8153c16185b 696,707,713,723,728
+plugins/yellow-core/CLAUDE.md
+  s_b2d61b25087e73::t_0c23d6a9d3e7d0 295-296
+plugins/yellow-linear/CLAUDE.md
+  s_b2d61b25087e73::t_f64dcc15986231 47-50,115-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ecde27fd220838a77eac4d7495e4cf8d37e8d2e5",
+  "prompts": {},
+  "sessions": {
+    "s_b2d61b25087e73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fb24ea8-ce14-46c0-a1d0-12bc75490ced",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
