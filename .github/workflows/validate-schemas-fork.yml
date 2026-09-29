@@ -65,7 +65,7 @@ jobs:
     name: Validate Schemas (${{ matrix.target }})
     if: github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.target == 'yellow-goal' && 10 || 5 }}
+    timeout-minutes: ${{ (matrix.target == 'yellow-goal' || matrix.target == 'shell-compat') && 10 || 5 }}
 
     strategy:
       fail-fast: false
@@ -109,14 +109,26 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/ajv-tools" ajv-cli@5.0.0 ajv-formats@3.0.1
           echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
-      - name: Install zsh
-        # The shell-compat target also runs the zsh parse check. Fork PRs skip
-        # the main workflow's shell-compat-tests job, so this is their only
-        # zsh gate; CI=true makes a missing zsh fail the check.
+      - name: Install zsh, bats and kislyuk yq
+        # Fork PRs skip the main workflow's shell-compat-tests job, so the
+        # shell-compat target runs its zsh parse check and tests/shell-compat
+        # bats suite here, with the same installs. kislyuk yq (the jq wrapper)
+        # is what yellow-debt's library calls; the runner image ships mikefarah
+        # yq, so put pipx's bin dir first on PATH. CI=true makes a missing zsh
+        # fail the checks rather than skip them.
         if: matrix.target == 'shell-compat'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends zsh
+          sudo npm install -g bats@1.11.0
+          pipx install 'yq==3.4.3'
+          pipx environment --value PIPX_BIN_DIR >> "$GITHUB_PATH"
+          zsh --version
+          bats --version
+
+      - name: Verify kislyuk yq is first on PATH
+        if: matrix.target == 'shell-compat'
+        run: yq --help 2>&1 | grep -qi 'jq wrapper' || { echo "::error::kislyuk yq not first on PATH ($(command -v yq))"; exit 1; }
 
       - name: Run schema validations
         env:
@@ -253,9 +265,11 @@ jobs:
               ;;
             shell-compat)
               # Mirror of the main workflow's `shell-compat` target, plus the
-              # zsh parse check that shell-compat-tests runs for same-repo PRs.
+              # zsh parse check and bats runtime suite that shell-compat-tests
+              # runs for same-repo PRs.
               node scripts/validate-shell-compat.js
               node scripts/check-shell-parse.js
+              bats tests/shell-compat/
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"
