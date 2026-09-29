@@ -1,0 +1,47 @@
+.changeset/zsh-compat-core-debt.md
+  s_e3ae526d137cfd::t_546a28c953593e 1-19
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_6a7c13c4786692 57,65,70-71,76-78,94-102,194-197,208-209,307,328,331-334,341-347,410-411,443,519,549,690
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e3ae526d137cfd::t_594cc9a69137b8 148,204-207,299-300
+plugins/yellow-core/commands/compound/review-staged.md
+  s_e3ae526d137cfd::t_3d1da33ad3dc26 189
+plugins/yellow-core/commands/flow/review.md
+  s_e3ae526d137cfd::t_cf28fd939e945d 208-215
+plugins/yellow-core/commands/setup/all.md
+  s_e3ae526d137cfd::t_9da66d88be67a2 83,203-206
+plugins/yellow-core/commands/worktree/cleanup.md
+  s_e3ae526d137cfd::t_744e7b49ebab9c 37-39,42
+plugins/yellow-core/lib/compound-staging.sh
+  s_e3ae526d137cfd::t_764dbcce70f1bf 93-96,100,103,105,107,162,164,173
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e3ae526d137cfd::t_141754b5c5fae9 71-73,119-120,156-158,167,181-182,196-198,221,235-236,255-257,265-266
+plugins/yellow-debt/commands/debt/audit.md
+  s_e3ae526d137cfd::t_0e1e4034f5e540 30-32,139-140
+plugins/yellow-debt/commands/debt/fix.md
+  s_e3ae526d137cfd::t_066e28035cf2bb 24-26,114-115
+plugins/yellow-debt/commands/debt/status.md
+  s_e3ae526d137cfd::t_e7c6722a75a462 23-25,244-245
+plugins/yellow-debt/commands/debt/sync.md
+  s_e3ae526d137cfd::t_05a02469eae810 133-135,163-164
+plugins/yellow-debt/commands/debt/triage.md
+  s_e3ae526d137cfd::t_f9b9a676ec2349 113-122,129-138,160-162,170-171,173-174,181-183,186-187,189-190
+scripts/shell-compat-config.json
+  s_e3ae526d137cfd::t_b911b737f2c401 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa7ed56a760419b1aff494ec9583296ce519b8ce",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
