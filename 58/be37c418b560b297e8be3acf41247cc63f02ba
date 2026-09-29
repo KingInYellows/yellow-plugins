@@ -1,0 +1,19 @@
+tests/shell-compat/controls.bats
+  s_e23df78d9c2b73::t_7d52ffcafcd685 39-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "58be37c418b560b297e8be3acf41247cc63f02ba",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
