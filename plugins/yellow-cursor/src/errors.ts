@@ -63,6 +63,7 @@ export type AppErrorCode =
   | 'CURSOR_CONCURRENCY_LIMIT'
   | 'CURSOR_UNKNOWN_OUTCOME';
 
+// replica:AppError:start
 export interface AppError {
   readonly code: AppErrorCode;
   readonly message: string;
@@ -75,6 +76,7 @@ interface CodeDefaults {
   readonly retryable: boolean;
   readonly recoveryAction: string;
 }
+// replica:AppError:end
 
 const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   CURSOR_AUTH_FAILED: {
@@ -152,6 +154,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   },
 };
 
+// replica:makeAppError:start
 export function makeAppError(
   code: AppErrorCode,
   message: string,
@@ -191,6 +194,7 @@ export function throwAppError(
 ): never {
   throw new AppErrorException(makeAppError(code, message, overrides));
 }
+// replica:makeAppError:end
 
 const KIND_TO_CODE: Record<AdapterErrorKind, AppErrorCode> = {
   auth: 'CURSOR_AUTH_FAILED',

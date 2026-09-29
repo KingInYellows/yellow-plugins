@@ -226,6 +226,24 @@ export const ERROR_CODES = {
   CURSOR_LIFECYCLE_LEAKED: 'ERROR-CURSOR-007',
   CURSOR_SKILL_MISSING: 'ERROR-CURSOR-008',
 
+  // yellow-jules Replica Errors (JULES) — scripts/validate-jules.js keeps the
+  // units yellow-jules deliberately copies from yellow-cursor (an installed
+  // plugin cannot import across plugins: validateRef, validateIdempotencyKey,
+  // assertNoSecretShapedValues, redactDeep, resolveDataDir, the AppError
+  // shape, makeAppError) identical inside `// replica:<unit>:start/end`
+  // markers, after a declared CURSOR->JULES substitution and whitespace
+  // normalization. Not an ErrorCategory member, like CURSOR above.
+  //
+  // Prefix choice: JULES is substring-safe against every existing prefix in
+  // both directions (lint-error-codes.js findPrefixCollisions, R14).
+  //
+  // Same ESM/CJS bridge constraint as the categories above: the validator
+  // assembles these strings via concatenation (`const JULES = 'ERROR-' +
+  // 'JULES';`). Any change to the entries below requires a paired edit in
+  // scripts/validate-jules.js.
+  JULES_REPLICA_MARKER_MISSING: 'ERROR-JULES-001',
+  JULES_REPLICA_DRIFT: 'ERROR-JULES-002',
+
   // Codex Distribution Errors (DIST) — see ./error-codes.json for the
   // canonical values; re-exported here (not redeclared as literals) so
   // scripts/lint-error-codes.js's CATALOG must scan error-codes.json too

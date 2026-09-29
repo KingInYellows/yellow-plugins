@@ -55,9 +55,10 @@ Error codes follow the pattern: `ERROR-{CATEGORY}-{NUMBER}`
 | `DIST`      | `DISTRIBUTION`        | Codex distribution codes in `error-codes.json`           |
 | `NAMESPACE` | `NAMESPACE_MIGRATION` | Retired `workflows:` namespace checks                    |
 | `CURSOR`    | —                     | Cursor distribution codes; not an `ErrorCategory` member |
+| `JULES`     | —                     | yellow-jules replica drift, not an `ErrorCategory`       |
 
-`ERROR-CURSOR-*` values are `ERROR_CODES` entries. They are not listed in the
-`ErrorCategory` grouping map in `errorCatalog.ts`. The six categories above
+`ERROR-CURSOR-*` and `ERROR-JULES-*` values are `ERROR_CODES` entries. They are
+not listed in the `ErrorCategory` grouping map in `errorCatalog.ts`. The six categories above
 `SOL` keep the specification references in the sections below; the later
 categories do not have FR or CRIT ids in that file.
 
@@ -940,6 +941,21 @@ version and marketplace membership in prose; it does not emit these codes.
 | `ERROR-CURSOR-006` | `CURSOR_LIFECYCLE_INVALID` | **reserved** | Catalog constant only — no assembler under `scripts/`                         |
 | `ERROR-CURSOR-007` | `CURSOR_LIFECYCLE_LEAKED`  | emitted      | Generated artifact contains a `lifecycle` key                                 |
 | `ERROR-CURSOR-008` | `CURSOR_SKILL_MISSING`     | emitted      | Skill declared in `targets.cursor.skillAllowlist` has no generated `SKILL.md` |
+
+## yellow-jules Replica Errors (JULES)
+
+Defined on `ERROR_CODES`. Not an `ErrorCategory` enum value.
+`scripts/validate-jules.js` assembles both. yellow-jules copies named units from
+yellow-cursor (`validateRef`, `validateIdempotencyKey`,
+`assertNoSecretShapedValues`, `redactDeep`, `resolveDataDir`, the `AppError`
+shape, `makeAppError`); each copy sits between `// replica:<unit>:start` and
+`// replica:<unit>:end` lines in both plugins and must match after the declared
+`CURSOR`→`JULES` substitution and whitespace normalization.
+
+| Code              | Constant                       | Status  | Meaning                                                        |
+| ----------------- | ------------------------------ | ------- | -------------------------------------------------------------- |
+| `ERROR-JULES-001` | `JULES_REPLICA_MARKER_MISSING` | emitted | A registered unit lacks exactly one marker pair in either file |
+| `ERROR-JULES-002` | `JULES_REPLICA_DRIFT`          | emitted | A yellow-jules unit differs from its yellow-cursor source      |
 
 ## Codex Distribution Errors (DIST)
 

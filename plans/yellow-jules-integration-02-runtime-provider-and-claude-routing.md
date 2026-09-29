@@ -516,7 +516,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
 
 ### Checkpoint 3 — Fake HTTP server, packed-SDK transport suite, offline coverage, wrappers
 
-- [ ] Step 3.1: `tests/fake-http-server.ts` — productized
+- [x] Step 3.1: `tests/fake-http-server.ts` — productized
   `docs/yellow-jules/sdk-investigation.md` Appendix A with its hardening list:
   `node:http` on `127.0.0.1:0` only (refuse any other bind), optional HTTPS
   mode with a self-signed certificate trusted only inside the test, request
@@ -531,7 +531,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   seam) and `tests/support/path-traps.ts` (prepends a temp dir whose
   `claude`, `codex`, `gh`, `gt`, `jules`, `curl` stubs log argv and exit 97;
   every suite asserts the trap log is empty, R51).
-- [ ] Step 3.2: `tests/packed-sdk-transport.test.ts` — `beforeAll` installs
+- [x] Step 3.2: `tests/packed-sdk-transport.test.ts` — `beforeAll` installs
   the real pinned artifact once into a `mkdtemp` data dir by running the
   shipped `installSdk` path (`npm ci --ignore-scripts` from
   `runtime/package-lock.json`; this also exercises the install and `pin.json`
@@ -551,7 +551,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   `TMPDIR`, or the data dir's `sdk-scratch/` (`find -newer marker`); every
   contacted origin is loopback. Label these rows `packed-artifact-tested` in
   `docs/yellow-jules/capability-matrix.md` (R49).
-- [ ] Step 3.3: `tests/cli-json-contract.test.ts` and
+- [x] Step 3.3: `tests/cli-json-contract.test.ts` and
   `tests/offline-coverage.test.ts` — build with `tsc --outDir <mkdtemp>` in
   `beforeAll` (never touching committed `dist/`), then spawn the CLI with the
   loopback preload. Cover the R52 PR2 set by name: credential absence;
@@ -567,7 +567,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   `status --reconcile`, `collect`) against the fake server and assert zero
   `POST`/`PATCH`/`PUT`/`DELETE` requests. (Generated manifest drift and
   provider conflicts/scope filtering are covered in Checkpoint 4.)
-- [ ] Step 3.4: Command wrappers `plugins/yellow-jules/commands/jules/setup.md`,
+- [x] Step 3.4: Command wrappers `plugins/yellow-jules/commands/jules/setup.md`,
   `list.md`, `status.md`, `collect.md` modeled on
   `plugins/yellow-cursor/commands/cursor/{setup,list,status,artifacts}.md`:
   frontmatter `name: jules:<cmd>`, single-line quoted `description` with "Use
@@ -581,7 +581,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   "Redaction" layer 7); `requiresAttention` surfaced; closing Error Handling
   table. No API logic (R8). Run `pnpm validate:agents`, `pnpm lint:plugins`,
   `pnpm validate:shell-compat`, `pnpm check:shell-parse`.
-- [ ] Step 3.5: Drift check over the units copied from yellow-cursor
+- [x] Step 3.5: Drift check over the units copied from yellow-cursor
   (contract "Redaction" and integration-plan "PR2 checklist additions"): wrap
   each copied unit in `// replica:<unit>:start` / `// replica:<unit>:end` in
   both `plugins/yellow-cursor/src/{redact,validate,config,errors}.ts` and the

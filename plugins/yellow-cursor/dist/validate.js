@@ -87,6 +87,7 @@ function validateRepoUrl(input) {
     return url.toString();
 }
 const REF_METACHAR_RE = /[\s~^:?*[\\`;|&$()<>'"\r\n]/;
+// replica:validateRef:start
 function validateRef(input) {
     if (input.length === 0 || input.length > 255) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'ref must be 1-255 characters');
@@ -109,6 +110,7 @@ function validateRef(input) {
     }
     return input;
 }
+// replica:validateRef:end
 function validateModelId(input) {
     if (input === undefined)
         return undefined;
@@ -139,12 +141,14 @@ function validateRunId(input) {
     return input;
 }
 const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._:-]{1,200}$/;
+// replica:validateIdempotencyKey:start
 function validateIdempotencyKey(input) {
     if (!IDEMPOTENCY_KEY_RE.test(input)) {
         return (0, errors_js_1.throwAppError)('CURSOR_INVALID_INPUT', 'idempotency key must be 1-200 characters of [A-Za-z0-9._:-]');
     }
     return input;
 }
+// replica:validateIdempotencyKey:end
 const MAX_PROMPT_BYTES = 100 * 1024;
 function validatePrompt(input) {
     if (input.length === 0) {

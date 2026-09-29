@@ -26,6 +26,7 @@ class AdapterError extends Error {
     }
 }
 exports.AdapterError = AdapterError;
+// replica:AppError:end
 const CODE_TABLE = {
     CURSOR_AUTH_FAILED: {
         retryable: false,
@@ -92,6 +93,7 @@ const CODE_TABLE = {
         recoveryAction: 'Outcome unknown after a network interruption; run status --reconcile to determine what happened.',
     },
 };
+// replica:makeAppError:start
 function makeAppError(code, message, overrides = {}) {
     const defaults = CODE_TABLE[code];
     return {
@@ -117,6 +119,7 @@ exports.AppErrorException = AppErrorException;
 function throwAppError(code, message, overrides = {}) {
     throw new AppErrorException(makeAppError(code, message, overrides));
 }
+// replica:makeAppError:end
 const KIND_TO_CODE = {
     auth: 'CURSOR_AUTH_FAILED',
     rate_limited: 'CURSOR_RATE_LIMITED',
