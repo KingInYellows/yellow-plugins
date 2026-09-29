@@ -1,0 +1,39 @@
+docs/security.md
+  s_f36320406d9ff9::t_669f904a6fce53 346-350
+  s_f36320406d9ff9::t_fba4debfff22fa 351-353
+  s_f36320406d9ff9::t_e142239a297951 354-358
+.changeset/yellow-core-context-observer.md
+  s_f36320406d9ff9::t_c7bea4070610ae 9-10,22-24
+docs/solutions/code-quality/fail-open-observer-stage-patterns.md
+  s_f36320406d9ff9::t_c6aa00efde9ed8 30-32,45,48-51,64-65,88,92,112-113,138-139
+plans/context-observer-review-followups.md
+  s_f36320406d9ff9::t_a943766fb92c70 109,121,149,157,161,168
+plugins/yellow-core/CLAUDE.md
+  s_f36320406d9ff9::t_69233e24ab69f0 295-297
+plugins/yellow-core/commands/statusline/setup.md
+  s_f36320406d9ff9::t_578c945d6f64ca 3-4,38,47,354-356,368-370
+plugins/yellow-core/lib/context-observer.py
+  s_f36320406d9ff9::t_ed7f545cff319a 17-23
+plugins/yellow-core/lib/statusline-settings.py
+  s_f36320406d9ff9::t_a4d4adbba1bcfd 232-233
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_f36320406d9ff9::t_d2da34fc8c30a8 30-32,49-53,89-90,122
+plugins/yellow-core/tests/context-observer.bats
+  s_f36320406d9ff9::t_378775bfd51290 327
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dbd380db0601941742ea23469b886db237cb56eb",
+  "prompts": {},
+  "sessions": {
+    "s_f36320406d9ff9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9387e4c1-8943-48e7-941f-afb1ab71923b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
