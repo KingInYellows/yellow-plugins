@@ -1,8 +1,10 @@
 /**
  * Integration tests for `scripts/check-shell-parse.js`, the differential
  * `bash -n` / `zsh -n` check. The parse cases need a real zsh and skip when
- * it is not installed; the missing-zsh behaviour is tested with a bogus
- * SHELL_PARSE_ZSH so it runs everywhere.
+ * it is not installed — except where the checker itself would require zsh
+ * (CI, or SHELL_COMPAT_REQUIRE_ZSH=1), where a missing zsh fails instead. The
+ * missing-zsh behaviour is tested with a bogus SHELL_PARSE_ZSH so it runs
+ * everywhere.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -26,6 +28,12 @@ const CHECKER = resolve(
   'check-shell-parse.js'
 );
 const HAS_ZSH = spawnSync('zsh', ['-c', 'exit 0']).status === 0;
+// Same rule as the checker's zshRequired(): CI set to anything but '',
+// 'false' or '0', or SHELL_COMPAT_REQUIRE_ZSH=1.
+const CI_VALUE = (process.env.CI ?? '').trim().toLowerCase();
+const ZSH_REQUIRED =
+  process.env.SHELL_COMPAT_REQUIRE_ZSH === '1' ||
+  !['', 'false', '0'].includes(CI_VALUE);
 
 let root: string;
 
@@ -60,6 +68,15 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
+
+it.runIf(ZSH_REQUIRED && !HAS_ZSH)(
+  'has zsh installed where it is required',
+  () => {
+    expect.fail(
+      'zsh not found: CI or SHELL_COMPAT_REQUIRE_ZSH=1 requires it, and the zsh parse cases below would otherwise skip silently'
+    );
+  }
+);
 
 describe.skipIf(!HAS_ZSH)('with zsh installed', () => {
   it('passes blocks both shells parse', () => {
