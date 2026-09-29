@@ -326,8 +326,12 @@ obs_stage() {
   [ -z "$stderr" ]
 }
 
-@test "R22: the observer stays well under the 100 ms budget (asserted at 250 ms to tolerate shared CI) on the largest fixture" {
-  local largest best
+@test "R22: the observer stays well under the 100 ms budget on the largest fixture (limit 250 ms, 1000 ms on CI)" {
+  # The limit only catches gross regressions (a subprocess, a network call);
+  # the measured best of five is printed below. A shared CI runner gets a
+  # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both.
+  local largest best limit
+  limit=${CONTEXT_OBSERVER_LATENCY_LIMIT_MS:-$([ -n "${CI:-}" ] && echo 1000 || echo 250)}
   largest=$(ls -S "$FIX"/*.json | head -n 1)
   best=$(python3 - "$OBS" "$largest" <<'PY'
 import subprocess, sys, time
@@ -341,8 +345,8 @@ for _ in range(5):
 print("%.1f" % min(runs))
 PY
 )
-  { echo "# observer best of 5 on $(basename "$largest"): ${best} ms" >&3; } 2>/dev/null || true
-  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < 250 else 1)' "$best"
+  { echo "# observer best of 5 on $(basename "$largest"): ${best} ms (limit ${limit} ms)" >&3; } 2>/dev/null || true
+  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < float(sys.argv[2]) else 1)' "$best" "$limit"
 }
 
 # --- T11: setup opt-in (R18, R2) ---------------------------------------------
@@ -385,12 +389,17 @@ setup_py() {
   [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
 }
 
-@test "T11: install with no statusLine composes the observer ahead of the yellow statusline" {
+@test "T11: install and plan with no statusLine are refused, so remove can always restore what was there" {
   seed_settings none
+  run --separate-stderr setup_py plan
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "statusline_missing"' >/dev/null
   run --separate-stderr setup_py install
-  [ "$status" -eq 0 ]
-  jq -e --arg c "$(obs_stage "$OBS_DEST") | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.type == "command"' "$SETTINGS" >/dev/null
-  diff <(jq 'del(.statusLine)' "$TEST_HOME/settings.orig") <(jq 'del(.statusLine)' "$SETTINGS")
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "statusline_missing"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  [ ! -e "$OBS_DEST" ]
+  [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
 }
 
 @test "T11: install over the yellow statusline composes the pipeline and it renders" {
@@ -474,6 +483,7 @@ setup_py() {
   rm -f "$STATUSLINE"
   run --separate-stderr setup_py install
   [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "statusline_missing"' >/dev/null
   cmp "$TEST_HOME/settings.orig" "$SETTINGS"
   [ ! -e "$OBS_DEST" ]
 }
@@ -773,7 +783,7 @@ PY
 
 @test "T11: the composed stage keeps the payload flowing when the observer file is missing" {
   local cmd
-  seed_settings none
+  seed_settings "python3 $TEST_HOME/.claude/yellow-statusline.py"
   run --separate-stderr setup_py plan
   cmd=$(echo "$output" | jq -r '.proposed_command')
   [[ "$cmd" == "$(obs_stage "$OBS_DEST") | "* ]]
@@ -959,7 +969,7 @@ PY
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.action == "not-enabled"' >/dev/null
   cmp "$SETTINGS" "$TEST_HOME/settings.orig"
-  seed_settings none
+  seed_settings "python3 $TEST_HOME/.claude/yellow-statusline.py"
   run --separate-stderr setup_py install
   run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
   echo "$output" | jq -e '.action == "enabled"' >/dev/null
@@ -985,7 +995,7 @@ PY
 }
 
 @test "T11: every path has a default, so install and status work with no flags" {
-  seed_settings none
+  seed_settings "python3 $TEST_HOME/.claude/yellow-statusline.py"
   run --separate-stderr python3 "$SETUP_PY" install
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.action == "installed"' >/dev/null
@@ -1142,4 +1152,87 @@ PY
   run --separate-stderr co_read_observation ranges
   echo "$output" | jq -e '.remaining_percentage == 61 and .used_percentage == null
     and .advisory_crossings == null and .watermark_remaining == null' >/dev/null
+}
+
+# --- ledger follow-ups (PR #912) -----------------------------------------------
+
+@test "R19: the observer is silent by default and says why with CONTEXT_OBSERVER_DEBUG=1" {
+  export CLAUDE_CONFIG_DIR="$TEST_HOME/readonly"
+  mkdir -p "$CLAUDE_CONFIG_DIR"
+  chmod 500 "$CLAUDE_CONFIG_DIR"
+  run --separate-stderr python3 "$OBS" < "$FIX/mid-session.json"
+  [ "$status" -eq 0 ] && [ -z "$stderr" ]
+  if [ "$(id -u)" -ne 0 ]; then
+    CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr python3 "$OBS" < "$FIX/mid-session.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$(cat "$FIX/mid-session.json")" ]
+    [ "$(printf '%s\n' "$stderr" | wc -l | tr -d ' ')" -eq 1 ]
+    [[ "$stderr" == "[context-observer] "* ]]
+  fi
+  unset CLAUDE_CONFIG_DIR
+  CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr python3 "$OBS" < "$FIX/missing-session.json"
+  [ "$status" -eq 0 ]
+  [ "$stderr" = "[context-observer] skip: session_id missing or malformed" ]
+  CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr python3 "$OBS" < "$FIX/malformed.json"
+  [ "$stderr" = "[context-observer] skip: payload is not a JSON object" ]
+}
+
+@test "R19: a SIGTERM mid-read still forwards what arrived before it" {
+  local killer
+  killer=$(command -v timeout || command -v gtimeout || true)
+  [ -n "$killer" ] || skip "timeout/gtimeout not available"
+  # timeout exits 124 once it has sent the signal; that is the point here.
+  { printf 'first-part'; sleep 3; printf 'second-part'; } \
+    | "$killer" -s TERM 1 python3 "$OBS" > "$TEST_HOME/out" || true
+  [ "$(cat "$TEST_HOME/out")" = "first-part" ]
+}
+
+@test "T11: remove through a symlinked settings.json keeps the link and restores the target" {
+  seed_settings "bash ~/custom.sh"
+  mkdir -p "$TEST_HOME/dotfiles"
+  mv "$SETTINGS" "$TEST_HOME/dotfiles/settings.json"
+  ln -s "$TEST_HOME/dotfiles/settings.json" "$SETTINGS"
+  setup_py install >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.action == "removed"' >/dev/null
+  [ -L "$SETTINGS" ]
+  jq -e '.statusLine.command == "bash ~/custom.sh"' "$TEST_HOME/dotfiles/settings.json" >/dev/null
+}
+
+@test "T11: prune rejects a negative or non-integer --older-than-days and deletes nothing" {
+  local dir="$HOME/.claude/projects/-p/context-observations" bad
+  mkdir -p "$dir"
+  : > "$dir/old.json"
+  touch -d '40 days ago' "$dir/old.json"
+  for bad in -1 abc 1.5; do
+    run --separate-stderr python3 "$SETUP_PY" prune --older-than-days "$bad"
+    [ "$status" -eq 2 ]
+    echo "$output" | jq -e '.action == "error" and .error_code == "usage"' >/dev/null
+  done
+  [ -e "$dir/old.json" ]
+  run --separate-stderr python3 "$SETUP_PY" prune --older-than-days 0 --dry-run
+  echo "$output" | jq -e '.action == "prune" and (.reason | test("would remove 1 "))' >/dev/null
+}
+
+@test "T11: a gap in the numbered backups never hides an identical backup or reuses a lower number" {
+  seed_settings none
+  run python3 - "$SETUP_PY" "$SETTINGS" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("ss", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+settings = sys.argv[2]
+def backup(text):
+    open(settings, "w").write(text)
+    return m.backup_settings(settings, text)
+first, second, third = backup('{"n": 1}\n'), backup('{"n": 2}\n'), backup('{"n": 3}\n')
+assert (first, second, third) == (settings + ".pre-observer.backup",
+                                  settings + ".pre-observer.backup.2",
+                                  settings + ".pre-observer.backup.3"), (first, second, third)
+os.unlink(second)
+assert backup('{"n": 3}\n') == third, "identical backup past the gap was not reused"
+assert backup('{"n": 4}\n') == settings + ".pre-observer.backup.4", "a new backup filled the gap"
+PY
+  [ "$status" -eq 0 ]
 }

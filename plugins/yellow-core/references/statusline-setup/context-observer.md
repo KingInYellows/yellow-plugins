@@ -25,7 +25,9 @@ status. Installing or updating yellow-core never changes `statusLine`.
 { command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; }
 ```
 
-- no `statusLine` → `<stage> | python3 <statusline>`
+- no `statusLine` → refused with `statusline_missing`: the observer only wraps
+  an existing command, so `remove` always restores exactly what was there.
+  Run the full `/statusline:setup` first.
 - any existing command → `<stage> | <existing>`; a command that
   contains `;`, `&`, `|`, `#` or a newline is wrapped as
 
@@ -111,7 +113,7 @@ that recovers from invalid settings.json resets it, saves the original as
 | `settings_invalid` | settings.json is not valid JSON: fix it, or run `statusline` to reset it |
 | `settings_unreadable`, `settings_not_object` | settings.json cannot be read, or is not an object: fix it by hand |
 | `statusline_not_object`, `command_not_string` | `statusLine` has an unexpected shape: use the manual merge |
-| `statusline_missing` | no `statusLine` and no yellow statusline script: run the full `/statusline:setup` first |
+| `statusline_missing` | no `statusLine` is configured, so there is nothing to wrap: run the full `/statusline:setup` first |
 | `observer_src_missing` | the plugin's `lib/context-observer.py` is missing: pass `--observer-src` or reinstall yellow-core |
 | `observer_not_removable` | the observer stage has nothing after it: edit `statusLine.command` by hand |
 | `prune_incomplete` | some old records could not be deleted: `reason` names the first failure |
@@ -121,4 +123,7 @@ that recovers from invalid settings.json resets it, saves the original as
 `handoff.sh context` (session-handoff) reads the context back without git and
 adds a `reason` code when it is `unknown`; a `format-mismatch` reason means the
 installed observer copy no longer matches the plugin, so re-run
-`/statusline:setup observer`.
+`/statusline:setup observer`. A `stale` or `no-record` reason while the
+observer is enabled can mean it cannot write: the observer is silent by
+default, so set `CONTEXT_OBSERVER_DEBUG=1` in the environment Claude Code
+runs the statusline with, and it says on stderr why nothing was recorded.

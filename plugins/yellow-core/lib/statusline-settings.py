@@ -28,7 +28,9 @@ would happen and writes nothing.
 
 Composition (the existing command is statusLine.command; STAGE is
 "{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; }"):
-  absent                   -> STAGE | python3 <statusline>
+  absent                   -> refused with statusline_missing: the observer only
+                              wraps an existing command, so remove can always
+                              restore exactly what the user had
   any command              -> STAGE | <existing>
                               (STAGE falls back to cat when python3 or the observer
                               file is missing, so the payload still reaches the next
@@ -53,13 +55,13 @@ Composition (the existing command is statusLine.command; STAGE is
 
 Refuses with exit 1 and no write: JSONC or otherwise invalid settings.json
 (statusline instead backs up invalid, non-JSONC settings, starts fresh, and
-reports action recovered), a non-object statusLine, and an absent statusLine
-when <statusline> does not exist. Never reads or writes autoCompactEnabled,
+reports action recovered), a non-object statusLine, and (install and plan) an
+absent statusLine. Never reads or writes autoCompactEnabled,
 autoCompactWindow, hooks, or any other key (R2).
 
-Backups: settings.json.pre-observer.backup, then .2, .3, ... when the file
-differs from every earlier backup; the original and the newest
-MAX_BACKUPS - 1 are kept.
+Backups: settings.json.pre-observer.backup, then .2, .3, ... (always one past
+the highest) when the file differs from every existing backup; the original
+and the newest MAX_BACKUPS - 1 are kept.
 
 Every run prints one JSON object on stdout with the same keys:
   {action, error_code, existing_command, proposed_command, settings, backup,
@@ -274,7 +276,7 @@ def wrap(command):
     return command
 
 
-def compose(existing, observer_dest, statusline):
+def compose(existing, observer_dest):
     """Return (action, proposed_command) for install."""
     if existing is not None and contains_observer(existing, observer_dest):
         if stage_is_current(existing):
@@ -287,12 +289,13 @@ def compose(existing, observer_dest, statusline):
             )
         return "upgrade", observer_stage(observer_dest) + " | " + wrap(rest)
     if existing is None:
-        if not os.path.isfile(normalize(statusline)):
-            raise SetupError(
-                "statusline_missing",
-                "no statusLine is configured and %s does not exist; install the statusline first" % statusline,
-            )
-        return "install", observer_stage(observer_dest) + " | " + statusline_stage(statusline)
+        # The observer only wraps an existing command. Composing it ahead of a
+        # statusline the user never configured would leave that statusline on
+        # after remove, which cannot tell it apart from one the user chose.
+        raise SetupError(
+            "statusline_missing",
+            "no statusLine is configured; run /statusline:setup to install the statusline first",
+        )
     return "install", observer_stage(observer_dest) + " | " + wrap(existing)
 
 
@@ -325,22 +328,39 @@ def observer_copy_state(src, dest):
     return "current"
 
 
+def numbered_backups(path, suffix):
+    """Existing numbered backups (<path><suffix>.N), oldest first by N."""
+    base = path + suffix
+    found = []
+    for candidate in glob.glob(glob.escape(base) + ".*"):
+        tail = candidate[len(base) + 1:]
+        if tail.isdigit():
+            found.append((int(tail), candidate))
+    return [candidate for _, candidate in sorted(found)]
+
+
 def numbered_backup(path, suffix, raw):
     """Copy path aside; reuse an identical backup, never clobber a different one.
 
-    Keeps the first backup (the original) and the newest MAX_BACKUPS - 1.
+    Every existing backup is checked for identical content, so a gap left by
+    pruning never hides a match. A new numbered backup takes the next number
+    after the highest, so the suffix orders backups by creation. Keeps the
+    first backup (the original) and the newest MAX_BACKUPS - 1.
     """
-    candidate = path + suffix
-    n = 1
-    while os.path.exists(candidate):
+    original = path + suffix
+    numbered = numbered_backups(path, suffix)
+    for candidate in ([original] if os.path.exists(original) else []) + numbered:
         try:
             with open(candidate, "r", encoding="utf-8") as handle:
                 if handle.read() == raw:
                     return candidate
         except (OSError, UnicodeDecodeError):
             pass
-        n += 1
-        candidate = "%s%s.%d" % (path, suffix, n)
+    if not os.path.exists(original):
+        candidate = original
+    else:
+        last = int(numbered[-1][len(original) + 1:]) if numbered else 1
+        candidate = "%s%s.%d" % (path, suffix, last + 1)
     shutil.copy2(path, candidate)
     prune_backups(path, suffix, keep=candidate)
     return candidate
@@ -348,10 +368,7 @@ def numbered_backup(path, suffix, raw):
 
 def prune_backups(path, suffix, keep):
     """Delete the oldest numbered backups beyond MAX_BACKUPS; never the original or `keep`."""
-    numbered = sorted(
-        (b for b in glob.glob(glob.escape(path + suffix) + ".*") if b != keep),
-        key=lambda b: os.stat(b).st_mtime,
-    )
+    numbered = [b for b in numbered_backups(path, suffix) if b != keep]
     excess = len(numbered) + 2 - MAX_BACKUPS  # + the original + `keep`
     for old in numbered[:max(excess, 0)]:
         try:
@@ -461,7 +478,7 @@ def plan_install(args):
     """What install would do: (settings, raw, existing, action, proposed)."""
     settings, raw, _ = load_settings(args.settings)
     existing = existing_command(settings)
-    action, proposed = compose(existing, args.observer_dest, args.statusline)
+    action, proposed = compose(existing, args.observer_dest)
     return settings, raw, existing, action, proposed
 
 

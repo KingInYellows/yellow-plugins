@@ -30,7 +30,10 @@
 #   other-session, no-percentage, out-of-range, observed-at-unparseable,
 #   clock-unavailable, stale.
 # format-mismatch usually means an installed observer copy older or newer than
-# the plugin: re-run /statusline:setup observer.
+# the plugin: re-run /statusline:setup observer. stale (and no-record) is also
+# what an enabled observer that can no longer write looks like: the writer is
+# silent unless CONTEXT_OBSERVER_DEBUG=1 is set in the statusline's
+# environment, which makes it say why on stderr.
 #
 # Keep in sync with lib/context-observer.py: SESSION_ID_RE, config_dir() and
 # the CLAUDE_CONFIG_DIR / HOME rules below are the same rules written twice

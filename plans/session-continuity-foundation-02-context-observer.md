@@ -385,6 +385,11 @@ Counts are from the final commit, restacked on `main` at `28220d1a`.
   <observer>; exec cat; } | <existing>`: the `{ python3 <observer> || cat; }`
   group kept the pipe open in its subshell, so the statusline waited for the
   record write. `install` upgrades the earlier form.
+- Ledger follow-ups after that round: `install`/`plan` now refuse an absent
+  `statusLine` (`statusline_missing`) instead of composing ahead of the
+  yellow statusline, because `remove` could not tell that statusline from one
+  the user chose. The full setup writes `statusLine` before Step 5b, so only
+  `observer enable` on an unconfigured host is affected.
 - Not run: installed-host smoke of the composed pipeline inside a live
   statusline, including interruption and debounce behaviour.
 

@@ -38,14 +38,17 @@ Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
     50 %); crossing it below is counted in the record and nothing else
     happens: no stdout, no stderr, no spawn, no model call.
   - No git, no network, no subprocess; stdlib only; Python 3.7+.
-  - Silent: one stderr line only when CONTEXT_OBSERVER_DEBUG=1.
+  - Silent: with CONTEXT_OBSERVER_DEBUG=1 it writes one stderr line saying
+    why nothing was recorded (a skipped payload, or a recording failure);
+    otherwise nothing. Without the flag, a failing writer shows up only as a
+    stale record on the reader side.
   - Run by hand with -h/--help, or with a terminal on stdin, it prints this
     text instead of waiting for a payload.
 
 Environment:
   CLAUDE_CONFIG_DIR                          overrides ~/.claude as the record root
   YELLOW_CONTEXT_WATERMARK                   remaining-% watermark, integer 1-99 (default 50)
-  CONTEXT_OBSERVER_DEBUG=1                   report a recording failure on stderr
+  CONTEXT_OBSERVER_DEBUG=1                   say on stderr why nothing was recorded
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME  test only: seconds to sleep before the rename
 """
 import calendar
@@ -65,6 +68,7 @@ TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 STALE_PART_SECONDS = 10
 REWRITE_AFTER_SECONDS = 60
 DEADLINE_SECONDS = 2
+PASS_THROUGH_CHUNK = 65536
 
 
 def parse_payload(raw):
@@ -309,15 +313,64 @@ def write_record(path, record):
 
 
 def record_observation(raw):
+    """Record the payload; return None, or why nothing was written (a debug reason)."""
     payload = parse_payload(raw)
     if payload is None:
-        return
+        return "payload is not a JSON object"
     session_id = sanitize_session_id(payload.get("session_id"))
+    if session_id is None:
+        return "session_id missing or malformed"
     slug = project_slug(payload)
+    if slug is None:
+        return "workspace.project_dir and cwd are missing or unsafe"
     path = record_path(slug, session_id)
     if path is None:
-        return
+        return "no config dir (CLAUDE_CONFIG_DIR and HOME unset)"
     write_record(path, build_record(payload, session_id))
+    return None
+
+
+def pass_through():
+    """Copy stdin to stdout chunk by chunk and return every byte read.
+
+    Each chunk is forwarded as it arrives, so an interruption mid-read
+    (SIGTERM, a read error) still leaves the next stage everything read so
+    far. A failed write (a downstream that closed early) stops forwarding but
+    not reading, so the record is still built from the whole payload.
+    """
+    raw = bytearray()
+    source = getattr(sys.stdin, "buffer", None)
+    sink = getattr(sys.stdout, "buffer", None)
+    if source is None:
+        return bytes(raw)
+    read = source.read1 if hasattr(source, "read1") else source.read
+    try:
+        while True:
+            chunk = read(PASS_THROUGH_CHUNK)
+            if not chunk:
+                break
+            raw += chunk
+            if sink is not None:
+                try:
+                    sink.write(chunk)
+                    sink.flush()
+                except (OSError, ValueError):
+                    sink = None
+    except BaseException:
+        # SIGTERM (SystemExit from on_sigterm) or a read error: forward and
+        # record what arrived.
+        pass
+    return bytes(raw)
+
+
+def debug(message):
+    """One stderr line, only with CONTEXT_OBSERVER_DEBUG=1."""
+    if os.environ.get("CONTEXT_OBSERVER_DEBUG") != "1":
+        return
+    try:
+        sys.stderr.write("[context-observer] %s\n" % message)
+    except BaseException:
+        pass
 
 
 def release_stdout():
@@ -361,27 +414,17 @@ def main():
         sys.stdout.write(__doc__)
         sys.exit(0)
     signal.signal(signal.SIGTERM, on_sigterm)
-    raw = b""
-    try:
-        raw = sys.stdin.buffer.read()
-        sys.stdout.buffer.write(raw)
-        sys.stdout.buffer.flush()
-    except BaseException:
-        # BrokenPipeError from a closed downstream, or anything else: still
-        # record what was read.
-        pass
+    raw = pass_through()
     release_stdout()
     try:
         if hasattr(signal, "SIGALRM"):
             signal.signal(signal.SIGALRM, on_deadline)
             signal.alarm(DEADLINE_SECONDS)
-        record_observation(raw)
+        skipped = record_observation(raw)
+        if skipped is not None:
+            debug("skip: " + skipped)
     except BaseException as exc:  # never let recording affect the statusline
-        if os.environ.get("CONTEXT_OBSERVER_DEBUG") == "1":
-            try:
-                sys.stderr.write(f"[context-observer] {type(exc).__name__}: {exc}\n")
-            except BaseException:
-                pass
+        debug("%s: %s" % (type(exc).__name__, exc))
     sys.exit(0)
 
 
