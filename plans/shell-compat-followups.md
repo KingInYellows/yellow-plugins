@@ -151,7 +151,7 @@ Found while landing items 1–21:
       failure is reported. Done without an allowlist: a block both shells
       reject is parsed again with its `<placeholder>` tokens replaced, and
       fails unless both shells then accept it. All 36 are templates.
-- [ ] 23: `docs/operations/ci.md` omits the `shell-compat-tests` job and the
+- [x] 23: `docs/operations/ci.md` omits the `shell-compat-tests` job and the
       `shell-compat` matrix target.
 
 ## Acceptance Criteria
