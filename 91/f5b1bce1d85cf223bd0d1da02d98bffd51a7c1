@@ -1,0 +1,30 @@
+scripts/validate-shell-compat.js
+  s_e23df78d9c2b73::t_b5ed52cee4eb36 1062-1068,1071,1075,1077-1078,1080
+  s_e23df78d9c2b73::t_e7137d4df9ffd0 592-594
+  s_e23df78d9c2b73::t_eaa1d2971bebc9 540-543,547
+  s_e23df78d9c2b73::t_d9a1b2542468b7 811-812,814
+  s_e23df78d9c2b73::t_907c6a77b3097c 809-810,813,815-817,820
+  s_e23df78d9c2b73::t_9c4bec9f90275a 849-851,853-855,859,862-864,873-892,896-900,903-905,908-909,915-920
+  s_e23df78d9c2b73::t_c798695af6bde2 307-408
+  s_e23df78d9c2b73::t_7401b49c7f4283 454-456,459-460,465-466,468,473-478
+  s_e23df78d9c2b73::t_899437ff8c6683 507-510,512-513
+tests/integration/validate-shell-compat.test.ts
+  s_e23df78d9c2b73::t_e50cbfa7f16649 611-665,667-752
+  s_e23df78d9c2b73::t_9cef631dd13b9a 666
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "91f5b1bce1d85cf223bd0d1da02d98bffd51a7c1",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
