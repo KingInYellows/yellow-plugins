@@ -5,9 +5,12 @@
  *
  * Differential syntax check for fenced shell blocks in plugin markdown.
  * Every block tagged bash/sh/shell is parsed with `bash -n` and `zsh -n`;
- * a block FAILS only when bash accepts it and zsh rejects it. Template
- * blocks with `<PLACEHOLDER>` tokens and pseudo-code fail both shells, so
- * they are skipped without an allowlist or a markdown edit.
+ * a block FAILS when bash accepts it and zsh rejects it. Template blocks
+ * with `<placeholder>` tokens fail both shells, so a block both shells
+ * reject is parsed again with every placeholder replaced by a plain word:
+ * it passes as a template only when both shells then accept it. Anything
+ * else (a quote closed early, pseudo-code) FAILS, so a real syntax error
+ * cannot hide among the templates.
  *
  * The body of each Tier 2 wrapper (`bash /dev/fd/3 3<<'TAG'`) is data to
  * zsh, so it is also parsed on its own with `bash -n` and fails when bash
@@ -50,6 +53,10 @@ const TAG = '[check-shell-parse]';
 // Per shell driver: ~800 `-n` parses take seconds; a stuck parser must not
 // hold a required CI job until its job-level timeout.
 const PARSE_TIMEOUT_MS = 120000;
+// A template placeholder: `<PR#>`, `<finding_id>`, `<specific files, never
+// -A/.>`. It starts with a letter, # or _, so `< file`, `<(…)` and `<<TAG`
+// (the lookbehind skips the second `<`) are not placeholders.
+const PLACEHOLDER = /(?<!<)<[A-Za-z#_][^<>\n]*>/g;
 
 function isTruthy(value) {
   return value !== undefined && !['', 'false', '0'].includes(value);
@@ -143,6 +150,38 @@ function wrapperBodies(rel, block, failures) {
   return bodies;
 }
 
+// Blocks both shells reject: parse again with placeholders replaced. Both
+// shells accepting the result makes the block a template; otherwise the
+// first shell that still rejects it names the failure. Returns the number
+// of templates.
+function checkTemplates(bothFail, failures, write, { bash, zsh, timeout }) {
+  if (bothFail.length === 0) return 0;
+  const files = bothFail.map(({ block }, i) =>
+    write(`template-${i}.sh`, block.body.replace(PLACEHOLDER, 'PLACEHOLDER'))
+  );
+  const bashResult = parseAll(bash, '--norc --noprofile', files, timeout);
+  const zshResult = parseAll(zsh, '-f', files, timeout);
+  let templates = 0;
+  bothFail.forEach(({ rel, block }, i) => {
+    if (bashResult.status.get(i) && zshResult.status.get(i)) {
+      templates++;
+      return;
+    }
+    const [shell, result] = bashResult.status.get(i)
+      ? ['zsh', zshResult]
+      : ['bash', bashResult];
+    const error = (result.errors.get(i) || `${shell} -n failed with no message`)
+      .replace(/^.*?template-\d+\.sh: ?/, '')
+      .replace(/^(\d+):/, 'line $1:');
+    failures.push({
+      file: rel,
+      line: block.startLine,
+      error: `both shells reject it (${shell}, placeholders replaced): ${error}`,
+    });
+  });
+  return templates;
+}
+
 function run(
   root,
   { zsh = 'zsh', bash = 'bash', timeout = PARSE_TIMEOUT_MS } = {}
@@ -176,7 +215,7 @@ function run(
     );
     const bashResult = parseAll(bash, '--norc --noprofile', files, timeout);
     const zshResult = parseAll(zsh, '-f', files, timeout);
-    let bothFail = 0;
+    const bothFail = [];
     blocks.forEach(({ rel, block }, i) => {
       const bashOk = bashResult.status.get(i);
       const zshOk = zshResult.status.get(i);
@@ -189,8 +228,13 @@ function run(
           ).replace(/^.*?block-\d+\.sh:/, 'line '),
         });
       } else if (bashOk === false && zshOk === false) {
-        bothFail++;
+        bothFail.push({ rel, block });
       }
+    });
+    const templates = checkTemplates(bothFail, failures, write, {
+      bash,
+      zsh,
+      timeout,
     });
     if (wrappedFiles.length > 0) {
       const wrappedResult = parseAll(
@@ -211,7 +255,7 @@ function run(
     return {
       blocks: blocks.length,
       wrapped: wrapped.length,
-      bothFail,
+      templates,
       failures,
     };
   } finally {
@@ -247,19 +291,19 @@ function main(env = process.env) {
     console.error(`${TAG} ERROR: ${err.message}`);
     return 1;
   }
-  const summary = `${result.blocks} shell block(s) and ${result.wrapped} wrapper body(ies) parsed; ${result.bothFail} fail both shells (templates/pseudo-code, ignored)`;
+  const summary = `${result.blocks} shell block(s) and ${result.wrapped} wrapper body(ies) parsed; ${result.templates} template(s) parsed with placeholders replaced`;
   if (result.failures.length === 0) {
     console.log(`${TAG} OK: ${summary}.`);
     return 0;
   }
   console.error(
-    `${TAG} FAILED: ${result.failures.length} block(s) parse in bash but not in zsh, or are wrapper bodies bash rejects; ${summary}.`
+    `${TAG} FAILED: ${result.failures.length} block(s) parse in bash but not in zsh, fail both shells with placeholders replaced, or are wrapper bodies bash rejects; ${summary}.`
   );
   for (const f of result.failures) {
     console.error(`  ${f.file}:${f.line} — ${f.error}`);
   }
   console.error(
-    `${TAG} Rewrite the construct so both shells accept it, or run the block in bash: bash /dev/fd/3 3<<'TAG' … TAG.`
+    `${TAG} Rewrite the construct so both shells accept it (a template placeholder must read <name>), or run the block in bash: bash /dev/fd/3 3<<'TAG' … TAG.`
   );
   return 1;
 }

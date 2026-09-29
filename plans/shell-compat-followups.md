@@ -143,12 +143,14 @@ Review-bot findings from the fourth round (promised in PR #921 replies):
 
 Found while landing items 1–21:
 
-- [ ] 22: `pnpm check:shell-parse` ignores the 36 blocks that fail to parse in
+- [x] 22: `pnpm check:shell-parse` ignores the 36 blocks that fail to parse in
       both shells as templates or pseudo-code. One of them was a real bug
       (an apostrophe closing the `awk '…'` program in
       `yellow-council/skills/council-patterns/SKILL.md`, fixed here). Triage
       the rest and allowlist the genuine templates, so a new both-shell
-      failure is reported.
+      failure is reported. Done without an allowlist: a block both shells
+      reject is parsed again with its `<placeholder>` tokens replaced, and
+      fails unless both shells then accept it. All 36 are templates.
 - [ ] 23: `docs/operations/ci.md` omits the `shell-compat-tests` job and the
       `shell-compat` matrix target.
 

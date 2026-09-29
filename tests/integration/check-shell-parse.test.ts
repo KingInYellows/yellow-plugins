@@ -89,14 +89,69 @@ describe.skipIf(!HAS_ZSH)('with zsh installed', () => {
     expect(result.stdout).toContain('1 shell block(s) and 0 wrapper');
   });
 
-  it('ignores template blocks that fail in both shells', () => {
+  it('passes template blocks once their placeholders are replaced', () => {
     write(
       'plugins/demo/commands/tpl.md',
-      '```bash\ngt checkout <branch>\n```\n'
+      [
+        '```bash',
+        'gt checkout <branch>',
+        'git add -- <specific files, never -A/.>',
+        'git commit -m "fix: resolve PR #<PR#> review comments"',
+        'cat <<EOF >out.txt',
+        'body',
+        'EOF',
+        '```',
+        '',
+      ].join('\n')
     );
     const result = run();
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('1 fail both shells');
+    expect(result.stdout).toContain('1 template(s)');
+  });
+
+  it('fails a block both shells reject that has no placeholder', () => {
+    // An apostrophe in an awk comment closes the single-quoted program early
+    // (the yellow-council bug that hid among the templates).
+    write(
+      'plugins/demo/skills/awk/SKILL.md',
+      [
+        '# Awk',
+        '',
+        '```bash',
+        "awk '",
+        "  # skip the character's escape",
+        '  { print $1 }',
+        "' file.txt",
+        '```',
+        '',
+      ].join('\n')
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'plugins/demo/skills/awk/SKILL.md:3 — both shells reject it (bash, placeholders replaced)'
+    );
+  });
+
+  it('fails a template block with a real syntax error besides its placeholders', () => {
+    write(
+      'plugins/demo/commands/tpl.md',
+      '```bash\ngt checkout <branch>\nif true; then\n  echo hi\n```\n'
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('plugins/demo/commands/tpl.md:1');
+    expect(result.stderr).toContain('(bash, placeholders replaced)');
+  });
+
+  it('fails a template block whose placeholder hid a zsh-only parse error', () => {
+    write(
+      'plugins/demo/commands/tpl.md',
+      '```bash\ngt checkout <branch>\n( flock -x 200; true ) 200>"$LOCK_FILE"\n```\n'
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('(zsh, placeholders replaced)');
   });
 
   it('fails a block that parses in bash but not in zsh, with file and line', () => {
