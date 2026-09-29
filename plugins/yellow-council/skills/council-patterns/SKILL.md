@@ -796,7 +796,7 @@ if [ "$DIFF_BYTES" -gt 60000 ]; then
         linelen = length($0) + 1
         if (linelen > remaining) {
           s = substr($0, 1, remaining)
-          # Walk back to the final character's LEAD byte, then drop that
+          # Walk back to the LEAD byte of the final character, then drop that
           # character only if the cut actually split it. Stripping every
           # trailing continuation byte unconditionally would also discard a
           # COMPLETE trailing character whenever the cut happens to land on a
