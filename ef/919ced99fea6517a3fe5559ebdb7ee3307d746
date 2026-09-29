@@ -1,0 +1,24 @@
+scripts/lib/markdown-fences.js
+  s_e23df78d9c2b73::t_fefe9ff06d2227 381-384,389
+  s_e23df78d9c2b73::t_26fde814100989 418,420-429
+tests/integration/markdown-fences.test.ts
+  s_e23df78d9c2b73::t_4d429dfddbf003 28
+  s_e23df78d9c2b73::t_c7919222f545da 165-190
+  s_e23df78d9c2b73::t_83e6438e69c968 161-164,191-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ef919ced99fea6517a3fe5559ebdb7ee3307d746",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
