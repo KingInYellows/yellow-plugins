@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.0.1
+
+### Patch Changes
+
+- [`383c5b1`](https://github.com/KingInYellows/yellow-plugins/commit/383c5b1b509585f1a536814e7f4f0673dbc47f15)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-ruvector: `/ruvector:setup` and `/ruvector:status` blocks that source
+    `lib/install-ruvector.sh` or `hooks/scripts/lib/resolve.sh` now run in a
+    bash child (`bash /dev/fd/3 3<<'TAG'`); both libraries use bash-only
+    constructs (`BASHPID`, `${!…}`, `BASH_SOURCE`).
+  - yellow-ci: the runner-targets merge block runs in a bash child, and the
+    `/ci:setup` and `/ci:setup-runner-targets` validation instructions call the
+    bash-only `validate.sh` through `bash -c`. `ci-runner-health` no longer
+    declares `local status` (read-only in zsh). `redact.sh` is now tested under
+    both shells.
+  - yellow-ci: `fence_log_content` printed no begin fence under bash — bash's
+    `printf` read the `---` format as an option — leaving CI logs wrapped in an
+    unbalanced injection fence. It now prints both fence lines.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  bash/zsh contract for sourced shell libraries in each plugin's CLAUDE.md:
+  which libraries are bash-only and must be sourced in a
+  `bash /dev/fd/3 3<<'TAG'` child, and which are dual-shell.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Follow-up zsh
+  fixes from review:
+  - Bash-only blocks now run as `bash /dev/fd/3 3<<'TAG'`, which the stacked-PR
+    providers' git-push hook can inspect (the earlier
+    `bash -c "$(cat <<'TAG' …)"` form was refused as unverifiable) and which
+    keeps the caller's stdin.
+  - gt-workflow: `gt-setup`'s version check split the version into a 0-based
+    array and passed every version under zsh; it now compares with awk.
+  - yellow-core: `/flow:compound --in-pr` no longer loses `gh pr view` to zsh's
+    `noclobber` (`2>|` onto its mktemp file).
+  - yellow-composio: the usage counter writes through a fresh `mktemp` name
+    rather than a fixed `.tmp` a repo could ship as a symlink.
+  - yellow-ci: validation one-liners single-quote the value.
+
 ## 2.0.0
 
 ### Major Changes

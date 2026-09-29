@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.0.2
+
+### Patch Changes
+
+- [`f0072e0`](https://github.com/KingInYellows/yellow-plugins/commit/f0072e00255cb96be5b6cf5935339dec87368941)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-composio: the usage-counter lock no longer fails to parse in zsh (fd
+    9 instead of a multi-digit fd, appended rather than truncated) and the temp
+    write uses `>|` so a stale `.tmp` cannot block it under `noclobber`.
+  - yellow-council: `/council` and `/council:setup` no longer refuse to run
+    under zsh (the bash 4.3 check now applies only to bash), the report no
+    longer uses bash-only `${!arr[@]}` and `${var^}` expansions, overwriting
+    redirects onto existing temp and state files use `>|`, and the
+    `build_target_path` helper no longer shadows zsh's `path`/`PATH`.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document each
+  plugin's shell tier under a consistent `**Shell libraries and zsh:**` note in
+  its CLAUDE.md: which libraries are dual-shell or bash-only, and how blocks
+  stay runnable under zsh.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Follow-up zsh
+  fixes from review:
+  - Bash-only blocks now run as `bash /dev/fd/3 3<<'TAG'`, which the stacked-PR
+    providers' git-push hook can inspect (the earlier
+    `bash -c "$(cat <<'TAG' …)"` form was refused as unverifiable) and which
+    keeps the caller's stdin.
+  - gt-workflow: `gt-setup`'s version check split the version into a 0-based
+    array and passed every version under zsh; it now compares with awk.
+  - yellow-core: `/flow:compound --in-pr` no longer loses `gh pr view` to zsh's
+    `noclobber` (`2>|` onto its mktemp file).
+  - yellow-composio: the usage counter writes through a fresh `mktemp` name
+    rather than a fixed `.tmp` a repo could ship as a symlink.
+  - yellow-ci: validation one-liners single-quote the value.
+
 ## 3.0.1
 
 ### Patch Changes

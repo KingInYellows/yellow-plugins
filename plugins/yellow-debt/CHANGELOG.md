@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.7.4
+
+### Patch Changes
+
+- [`9ad2fd2`](https://github.com/KingInYellows/yellow-plugins/commit/9ad2fd241602bc0307f56c7bb1e2b178a7273d52)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Harden todo and
+  `.debt/` handling against hostile repository content:
+  - Never write through a symlink a cloned repository ships. `/debt:audit`,
+    `/debt:sync` and every todo transition refuse a symlinked `.debt/`,
+    `todos/`, `todos/debt/` or todo file, and write through a `mktemp` file in
+    the same directory that is then renamed into place. The transition lock is
+    now a `mkdir` lock, so a planted `*.lock` or `*.tmp` symlink is never
+    written through and `flock` is no longer required.
+  - Take a numeric todo id, never a pasted path. `/debt:triage`, `/debt:sync`
+    and the `debt-fixer` agent pass only the id to their bash blocks, which
+    resolve the file themselves; a filename containing `$(…)` or backticks can
+    no longer run. `/debt:fix` accepts an id (`/debt:fix 042`) or the todo path.
+    Todo names outside `{id}-{status}-{severity}-{slug}.md` are skipped by
+    triage discovery, sync and the SessionStart counter.
+  - Fix `/debt:sync` step 8a, which called `extract_frontmatter` without
+    sourcing `lib/validate.sh`; it now runs in the bash wrapper and prints the
+    fields as JSON.
+  - `debt-fixer`: the scope check and the rejected-fix revert skip everything
+    under `todos/`. `/debt:fix` renames the todo to in-progress without
+    committing, so the scope check used to count the old name (or an untracked
+    `todos/`) as an out-of-scope edit and abort every fix, and the revert
+    restored the old name and then failed to reset the todo to ready.
+
+- [`2ed5522`](https://github.com/KingInYellows/yellow-plugins/commit/2ed5522de351370bc8f77bbabc0edd695f5b97b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make shell
+  blocks work when Claude Code's Bash tool runs them under zsh:
+  - yellow-debt: every command and agent block that sources `lib/validate.sh`
+    now runs it in a bash child (`bash /dev/fd/3 3<<'TAG'`). Under zsh the
+    library's state-transition lock ran a command named `200` and its RETURN
+    trap was undefined, so `/debt:triage`, `/debt:fix` and the remediation agent
+    left todos untransitioned with a stale `.lock`.
+  - yellow-core: `lib/compound-staging.sh` no longer declares `local path` (tied
+    to `$PATH` in zsh) and is now tested under both shells; `/setup:all` no
+    longer loops over `path`; `/worktree:cleanup` parses `--dry-run` correctly
+    under zsh (its 0-based index loop missed it); `/flow:review` and the
+    staging-reviewer dedup pass no longer rely on bash-only array key expansion;
+    overwriting redirects use `>|` where zsh's `noclobber` would refuse them.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  bash/zsh contract for sourced shell libraries in each plugin's CLAUDE.md:
+  which libraries are bash-only and must be sourced in a
+  `bash /dev/fd/3 3<<'TAG'` child, and which are dual-shell.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document each
+  plugin's shell tier under a consistent `**Shell libraries and zsh:**` note in
+  its CLAUDE.md: which libraries are dual-shell or bash-only, and how blocks
+  stay runnable under zsh.
+
+- [`86b8e23`](https://github.com/KingInYellows/yellow-plugins/commit/86b8e23ea411f89c3f935ef1fc1fbdf0998c177d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Follow-up zsh
+  fixes from review:
+  - Bash-only blocks now run as `bash /dev/fd/3 3<<'TAG'`, which the stacked-PR
+    providers' git-push hook can inspect (the earlier
+    `bash -c "$(cat <<'TAG' …)"` form was refused as unverifiable) and which
+    keeps the caller's stdin.
+  - gt-workflow: `gt-setup`'s version check split the version into a 0-based
+    array and passed every version under zsh; it now compares with awk.
+  - yellow-core: `/flow:compound --in-pr` no longer loses `gh pr view` to zsh's
+    `noclobber` (`2>|` onto its mktemp file).
+  - yellow-composio: the usage counter writes through a fresh `mktemp` name
+    rather than a fixed `.tmp` a repo could ship as a symlink.
+  - yellow-ci: validation one-liners single-quote the value.
+
 ## 1.7.3
 
 ### Patch Changes
