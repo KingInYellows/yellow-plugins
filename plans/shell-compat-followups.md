@@ -26,13 +26,11 @@ review; the user chose to track them here rather than widen the stack.
       (`^[0-9]{1,6}$`); the block globs `todos/debt/${id}-*.md`, requires one
       match whose basename fits the todo pattern, and filters nonconforming
       names in triage Step 2 and the SessionStart counter.
-- [ ] 3: yellow-debt — positional arguments inside wrapped blocks (SS-5).
-      `fix.md`, `audit.md` and `status.md` parse `$1`/`$#`, which are empty
-      both in the Bash tool and in the wrapper, so `/debt:fix` prints its
-      usage error. Document one hand-off — e.g.
-      `bash /dev/fd/3 '<arg1>' 3<<'TAG'`, values single-quoted and any value
-      containing `'` rejected — teach SHC-009's wrapper pattern to accept
-      trailing arguments, and keep the in-block validators as the gate.
+- [x] 3: yellow-debt — positional arguments inside wrapped blocks (SS-5).
+      Done in the PR #917 review round: `fix.md`, `audit.md` and
+      `status.md` pass their arguments as single-quoted operands
+      (`bash /dev/fd/3 '<todo-path>' 3<<'TAG'`, values containing `'`
+      rejected), and SHC-009 accepts quoted operands.
 - [ ] 4: git-push hook friction on six blocks (pre-existing on main). The
       detector already classified these as `unverifiable` before the stack;
       wrapping did not change that (asserted by
@@ -63,6 +61,34 @@ review; the user chose to track them here rather than widen the stack.
 - [ ] 9: Run `tests/integration/check-shell-parse.test.ts` somewhere zsh is
       installed (the vitest integration job has none, so its parse cases
       skip in CI; the real-repo parse check does run in the zsh job).
+
+Review-bot findings from the second `/review:resolve-stack` pass (P2,
+recorded instead of fixed so the stack can merge; each thread links here):
+
+- [ ] 10: `scripts/lib/markdown-fences.js` `scanFences` — an unterminated
+      fence inside a block quote (`> ```text`, quoted content, a blank line)
+      stays open past the end of the quote and swallows a following
+      top-level ```` ```bash ```` fence, so the lint and parse check never
+      see that block. End `current` when its block-quote depth is lost
+      (blank line or a line with a shallower depth), matching the list-exit
+      rules. Keep `stripFencedContent` byte-identical on the repo's markdown.
+      (PR #913 thread PRRT_kwDOQ3SUys6nJZD8.)
+- [ ] 11: `scripts/validate-shell-compat.js` `classifyLines` — heredoc
+      detection runs on the raw line, so a quoted example such as
+      `printf '%s\n' "use cat <<'EOF'"` opens a heredoc and hides every
+      following line until `EOF` from the rules. Detect `<<` only outside
+      quotes (reuse `scanQuotes`). (PR #914 thread PRRT_kwDOQ3SUys6nJXzg.)
+- [ ] 12: SHC-001 second-write tracking covers only bare-variable targets
+      (`> "$f"`); two `>` onto the same literal path (`cmd > result`,
+      `cmd2 > result`) are not flagged although noclobber refuses the
+      second. Track literal targets in the per-block `written` set, minding
+      `/dev/null`, `/dev/std*` and paths built from expansions.
+      (PR #914 thread PRRT_kwDOQ3SUys6nJXzp.)
+- [ ] 13: SHC-002 misses a special-parameter assignment used as a
+      condition (`if status=0; then`, `while path=x; do`): `CMD_START` omits
+      the control keywords that the source and truncation scanners already
+      accept. Add `if|while|until|then|do|else|elif|!` there.
+      (PR #914 thread PRRT_kwDOQ3SUys6nJXz2.)
 
 ## Acceptance Criteria
 
