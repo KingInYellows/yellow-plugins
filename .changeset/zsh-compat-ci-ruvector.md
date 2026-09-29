@@ -7,7 +7,7 @@ Make shell blocks work when Claude Code's Bash tool runs them under zsh:
 
 - yellow-ruvector: `/ruvector:setup` and `/ruvector:status` blocks that
   source `lib/install-ruvector.sh` or `hooks/scripts/lib/resolve.sh` now run
-  in a bash child (`bash -c "$(cat <<'TAG' … )"`); both libraries use
+  in a bash child (`bash /dev/fd/3 3<<'TAG'`); both libraries use
   bash-only constructs (`BASHPID`, `${!…}`, `BASH_SOURCE`).
 - yellow-ci: the runner-targets merge block runs in a bash child, and the
   `/ci:setup` and `/ci:setup-runner-targets` validation instructions call

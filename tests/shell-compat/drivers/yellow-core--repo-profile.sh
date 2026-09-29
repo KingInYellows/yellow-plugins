@@ -1,5 +1,7 @@
 # Driver for plugins/yellow-core/lib/repo-profile.sh (sourced by /flow:plan).
 # Runs under bash and zsh; output must be identical. Env: REPO_ROOT, TMPD.
+# Isolate from the contributor's git config (signing, hooks, templates).
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 cd "$TMPD" && git init -q repo && cd repo || exit 1
 git -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init || exit 1
 export CLAUDE_PLUGIN_DATA="$TMPD/data"

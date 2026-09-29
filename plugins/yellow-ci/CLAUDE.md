@@ -35,8 +35,9 @@ Three-layer plugin where each layer is independently useful:
 - **Shell libraries and zsh.** Markdown blocks run under the user's shell,
   often zsh. `hooks/scripts/lib/validate.sh` and `resolve-runner-targets.sh`
   are bash-only: source them in a bash child
-  (`bash -c "$(cat <<'__YELLOW_CI_BASH__'` … `)"`, or
-  `bash -c '. "$1" && fn "$2"' _ "$lib" "$value"` for one call).
+  (`bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'` … `__YELLOW_CI_BASH__`, or
+  `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'` for one call, with the
+  value single-quoted).
   `redact.sh` is dual-shell (Tier 4) and may be sourced directly; keep it
   that way — `tests/shell-compat/` runs it under bash and zsh.
 

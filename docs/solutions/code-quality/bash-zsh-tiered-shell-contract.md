@@ -45,7 +45,7 @@ A tiered contract, enforced by a lint, a parse check and a runtime suite:
 | Tier | Code | Rule |
 |---|---|---|
 | 1 | Inline fenced blocks | Run as written in bash and zsh |
-| 2 | Blocks needing bash-only code | `bash -c "$(cat <<'TAG' … TAG` + `)"` |
+| 2 | Blocks needing bash-only code | `bash /dev/fd/3 3<<'TAG'` … `TAG` |
 | 3 | Bash-only libraries | Sourced from markdown only inside a Tier 2 wrapper |
 | 4 | Dual-shell libraries | Sourced directly; linted and tested under both shells |
 
@@ -68,10 +68,16 @@ Guards:
 
 ## Key Insights
 
-- **`bash <<'EOF'` is the wrong wrapper.** It feeds the script on stdin, so
-  any command in the body that reads stdin (`gt`, a `node` CLI, `claude -p`,
-  a bare `cat`) silently swallows the rest of the script. Pass the script as
-  an argument instead; SHC-009 flags the stdin form.
+- **The wrapper form is constrained twice.** `bash <<'EOF'` feeds the script
+  on stdin, so any command in the body that reads stdin (`gt`, a `node` CLI,
+  `claude -p`, a bare `cat`) silently swallows the rest of the script.
+  `bash -c "$(cat <<'EOF' …)"` fixes that but is refused as unverifiable by
+  the stacked-PR providers' git-push PreToolUse hook, which cannot see into a
+  command substitution. `bash /dev/fd/3 3<<'EOF'` satisfies both: bash reads
+  the script from fd 3 and the hook inspects the heredoc body (it still
+  catches a `git push` inside). SHC-009 flags the other two forms, and
+  `tests/integration/shell-compat-hook-parity.test.ts` runs every wrapped
+  block through the hook's classifier.
 - **A clean lint is not proof.** yellow-debt's `validate.sh` linted almost
   clean until it was run under zsh; the multi-digit fd and RETURN-trap rules
   came from that run. Classify a library only after running it in both

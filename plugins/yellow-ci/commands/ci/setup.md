@@ -23,8 +23,10 @@ gate, not just the skill's prose: **invoke `validate_ssh_host` and
 `validate_ssh_key_path` via Bash on every collected host and key path before
 accepting it** — reject and re-prompt on a non-zero exit. The library
 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh` is bash-only and the Bash
-tool may run zsh, so source it in a bash child and pass values as arguments:
-`bash -c '. "$1" && validate_ssh_host "$2"' _ "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" "<host>"`
+tool may run zsh, so source it in a bash child and pass the value as a
+single-quoted argument (reject any value containing a single quote first, so
+the outer shell never expands it):
+`bash -c '. "$1" && validate_ssh_host "$2"' _ "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" '<host>'`
 (this preserves the pre-conversion `|| exit 1` gate; the skill's regex prose is
 the host-neutral fallback for Codex, where the lib is unavailable).
 

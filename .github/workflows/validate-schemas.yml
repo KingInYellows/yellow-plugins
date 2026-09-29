@@ -168,6 +168,8 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
+        # The shell-compat lint uses only Node built-ins.
+        if: matrix.target != 'shell-compat'
         run: pnpm install ${PNPM_INSTALL_FLAGS}
         # @vscode/ripgrep (transitive, via yellow-morph's @morphllm/morphmcp) downloads its binary
         # from GitHub Releases in a postinstall step. Unauthenticated downloads from GitHub-hosted
@@ -178,6 +180,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install AJV CLI
+        if: matrix.target != 'shell-compat'
         run: |
           npm install --prefix "$RUNNER_TEMP/ajv-tools" ajv-cli@5.0.0 ajv-formats@3.0.1
           echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
@@ -1562,7 +1565,7 @@ jobs:
       - name: Install zsh, bats and kislyuk yq
         # kislyuk yq (the jq wrapper) is what yellow-debt's library calls; the
         # runner image ships mikefarah yq, so put pipx's bin dir first on PATH.
-        # Without it the /debt:triage end-to-end test skips.
+        # Missing tools fail the suite in CI rather than skipping it.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends zsh

@@ -54,7 +54,7 @@ unaffected today and must stay unaffected.
 | Tier | Surface | Rule | Guard |
 |---|---|---|---|
 | 1 | Inline fenced `bash`/`sh`/`shell` blocks in plugin markdown | Must run as written in bash and zsh. Use constructs both shells accept. Write `>\|` where an overwrite is intended. | Lint, differential parse check |
-| 2 | Blocks that need bash-only constructs | Wrap the whole block in `bash -c "$(cat <<'TAG'` … `TAG` / `)"` (script as an argument; see the stdin decision below). The block is then exempt from the inline rules. | Lint (wrapper detection, SHC-009) |
+| 2 | Blocks that need bash-only constructs | Wrap the whole block in `bash /dev/fd/3 3<<'TAG'` … `TAG` (see the wrapper decision below). The block is then exempt from the inline rules. | Lint (wrapper detection, SHC-009), hook-parity test |
 | 3 | `.sh` files with a bash shebang, hooks, `bin/` launchers | Bash-by-contract: never sourced into zsh or run as `zsh x.sh`. Hooks are invoked directly, so the user's shell does not matter. | Lint (contract rule), existing bats |
 | 4 | Libraries sourced from markdown that contain no bash-only constructs | Dual-shell. Tested under bash and zsh (default and snapshot profile). | zsh runtime bats suite |
 
@@ -96,15 +96,24 @@ unaffected today and must stay unaffected.
   land in report-only mode. Per-plugin fixes follow. The last PR makes both
   blocking, including `ci-status` and the fork workflow. There is no permanent
   baseline allowlist.
-- **One mechanism for bash-only code.** Use `bash -c "$(cat <<'TAG'` … `TAG` / `)"` for inline
-  blocks and `bash script.sh` for files. Decided in item 4: the originally
-  planned `bash <<'EOF'` feeds the script to bash on stdin, so any command in
-  the body that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare
-  `cat`) silently swallows the rest of the script — verified. The argument
-  form leaves stdin alone and passes the exit status through (verified in
-  bash and in zsh with noclobber). SHC-009 flags the stdin form. Use a
-  distinctive tag (`__YELLOW_DEBT_BASH__`), never `EOF`: bodies may already
-  contain `cat <<EOF` or user-pasted text. `emulate -L sh` is allowed only as the first
+- **One mechanism for bash-only code.** Use `bash /dev/fd/3 3<<'TAG'` …
+  `TAG` for inline blocks and `bash script.sh` for files. The form was
+  settled in two steps. Item 4: the planned `bash <<'EOF'` feeds the script
+  to bash on stdin, so any command in the body that reads stdin (`gt`, `gh`,
+  a `node` CLI, `claude -p`, a bare `cat`) silently swallows the rest of the
+  script (verified), so the stack switched to `bash -c "$(cat <<'TAG' …)"`.
+  Quality review (security P1): the stacked-PR providers' git-push
+  PreToolUse hook refuses that form as unverifiable — it cannot see into a
+  command substitution — so every wrapped block would have been blocked in
+  real use. `bash /dev/fd/3 3<<'TAG'` satisfies both: bash reads the script
+  from fd 3 (stdin stays free; exit status passes through) and the hook
+  inspects the heredoc body (verified: a benign body is allowed, a
+  `git push` inside is caught). SHC-009 flags both other forms;
+  `tests/integration/shell-compat-hook-parity.test.ts` asserts every wrapped
+  block gets the same hook verdict as its bare body. Use a distinctive tag
+  (`__YELLOW_DEBT_BASH__`), never `EOF`: bodies may contain `cat <<EOF` or
+  user-pasted text.
+`emulate -L sh` is allowed only as the first
   line of functions in Tier 4 libraries, and it must be guarded with
   `if [ -n "${ZSH_VERSION:-}" ]; then emulate -L sh; fi`. The `&&` form of that
   guard trips `set -e` under bash. Never use `emulate` in inline blocks,
@@ -210,8 +219,9 @@ mutation, and use only the enabled provider.
     - SHC-008 (sourcing): `source`/`.` in command position of a Tier 3
       library outside a wrapper, or of a plugin library in neither tier
       list (so every new sourced library gets classified).
-    - SHC-009 (stdin wrapper): a bash-fed heredoc other than the
-      `bash -c "$(cat <<'TAG'` form (added in item 4).
+    - SHC-009 (wrapper form): a bash-fed heredoc other than
+      `bash /dev/fd/3 3<<'TAG'` — the stdin form or `bash -c "$(…)"`
+      (added in item 4, narrowed in the quality pass).
   - **Rules for `.sh` files:**
     - SHC-101: a `.sh` file under `plugins/` has no shebang and no
       `# shell-compat: library` marker.
@@ -433,7 +443,7 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
       (`plugins/yellow-core/tests/mocks/`).
 - [x] 3.4: Test Tier 2/3 invocation from a zsh parent. For each Tier 3
       library, run the documented wrapper form
-      (`bash -c "$(cat <<'TAG'` … `source lib; fn` … `TAG` / `)"`) from
+      (`bash /dev/fd/3 3<<'TAG'` … `source lib; fn` … `TAG`) from
       `zsh -f -o noclobber`, and
       assert that it succeeds and can overwrite an existing temp file.
   - Implemented as `tests/shell-compat/` (16 tests):
@@ -592,7 +602,7 @@ npm.
 - **Untrusted input:** never interpolate untrusted values (PR text, issue
   titles) into a heredoc body. Pass them as arguments
   (`bash -s -- "$arg" <<'EOF'`) or through the environment.
-- **Exit codes through wrappers:** `bash -c "$(cat <<'TAG' …)"` returns the exit status of
+- **Exit codes through wrappers:** `bash /dev/fd/3 3<<'TAG'` returns the exit status of
   the last command in the body. Call sites that branched on a library
   function's status must keep that branch inside the wrapper, or end the
   wrapper with an explicit `exit`.
@@ -667,6 +677,39 @@ The parse check batches blocks into one shell loop per shell, instead of about
   - ShellCheck zsh support: koalaman/shellcheck#809
   - nvm multi-shell CI:
     https://github.com/nvm-sh/nvm/blob/master/AGENTS.md
+
+## Quality Review (flow:work Phase 3, 2026-09-28)
+
+Four reviewers ran over `git diff main...HEAD` (simplicity, security,
+performance, language idioms). Applied in the final commit on
+`agent/chore/shell-compat-required`:
+
+- Security P1: the `bash -c "$(…)"` wrapper was refused by the git-push hook
+  → switched every wrapper to `bash /dev/fd/3 3<<'TAG'`; SHC-009 now flags
+  both other forms; new hook-parity integration test.
+- Lint gaps (language review): quoted `f="$(mktemp)"` and backtick forms,
+  `${a[i]:-0}` indexing, arithmetic `<<`/`>` misread as heredoc/redirect,
+  `\\`/`\x`/`\u` echo escapes, `{` in command position. Two live bugs the
+  gaps hid are fixed: `yellow-core/commands/flow/compound.md` (`2>` onto a
+  quoted mktemp file, so `gh pr view` never ran under zsh) and
+  `gt-workflow/skills/gt-setup` `version_gte` (0-based split array; passed
+  every version under zsh — confirmed).
+- Parse check: fails if a driver dies or any block lacks a verdict; 120 s
+  timeout; reuses the lint's file list; no `head` subprocess per failure.
+- CI: the zsh job installs kislyuk yq (the `/debt:triage` end-to-end test no
+  longer skips) and bats tests fail instead of skipping when a tool is
+  missing under `CI=true`; the `shell-compat` matrix target skips
+  `pnpm install`/AJV.
+- yellow-ci validation prose single-quotes the value (SS-6); the composio
+  usage counter writes through a `mktemp` name, not a fixed `.tmp` (SS-7).
+- Simplicity: removed the unused CommonMark `extractFencedBlocks`; shared the
+  expansion-syntax patterns; closer regexes built once per fence.
+
+Not applied (P3, recorded): concurrent parse drivers, single-pass file
+parsing in the lint, broader zsh special-parameter list, SOURCE_RE quoted
+prefixes, the vitest parse tests skipping in the zsh-less integration job.
+The yellow-debt P2s (symlinked write targets, pasted paths) and other
+follow-ups are in `plans/shell-compat-followups.md` (user decision).
 
 ## Stack Decomposition
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env bats
 # wrappers.bats — Tier 2/3: bash-only libraries are only ever run in a bash
 # child. From a zsh parent with snapshot options (noclobber on), the wrapper
-#   bash -c "$(cat <<'TAG'
+#   bash /dev/fd/3 3<<'TAG'
 #   …
 #   TAG
-#   )"
 # must source each Tier 3 library, keep the caller's stdin, and pass the
 # exit status through. The real /debt:triage block is run end to end.
 
@@ -36,13 +35,12 @@ write_wrapper_script() {
     *resolve-runner-targets.sh) pre=". \"$REPO_ROOT/plugins/yellow-ci/hooks/scripts/lib/validate.sh\"" ;;
   esac
   cat > "$BATS_TEST_TMPDIR/wrapped.zsh" <<SCRIPT
-bash -c "\$(cat <<'__TEST_BASH__'
+bash /dev/fd/3 3<<'__TEST_BASH__'
 $pre
 . "$REPO_ROOT/$lib" || exit 90
 type $fn >/dev/null 2>&1 || exit 91
 printf 'sourced %s\n' "$fn"
 __TEST_BASH__
-)"
 SCRIPT
 }
 
@@ -55,8 +53,11 @@ SCRIPT
 }
 
 @test "each Tier 3 library sources through the wrapper from a zsh noclobber parent" {
-  local lib fn
-  while IFS= read -r lib; do
+  local lib fn libs
+  # Read the list first: a child reading stdin must not consume the loop's.
+  mapfile -t libs < <(jq -r '.tier3Libraries[]' "$REPO_ROOT/scripts/shell-compat-config.json")
+  [ "${#libs[@]}" -gt 0 ]
+  for lib in "${libs[@]}"; do
     fn=$(tier3_probe "$lib")
     write_wrapper_script "$lib" "$fn"
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT/$(printf '%s' "$lib" | cut -d/ -f1-2)" \
@@ -65,17 +66,16 @@ SCRIPT
       printf '%s: exit %s\nstdout: %s\nstderr: %s\n' "$lib" "$status" "$output" "$stderr" >&2
       return 1
     fi
-  done < <(jq -r '.tier3Libraries[]' "$REPO_ROOT/scripts/shell-compat-config.json")
+  done
 }
 
 @test "the wrapper keeps the caller's stdin and passes the exit status through" {
   cat > "$BATS_TEST_TMPDIR/stdin.zsh" <<'SCRIPT'
-bash -c "$(cat <<'__TEST_BASH__'
+bash /dev/fd/3 3<<'__TEST_BASH__'
 printf 'read: %s\n' "$(cat)"
 printf 'after\n'
 exit 7
 __TEST_BASH__
-)"
 SCRIPT
   run --separate-stderr "${PROFILE_CMD[@]}" "$BATS_TEST_TMPDIR/stdin.zsh" <<< "caller-data"
   [ "$status" -eq 7 ]
@@ -96,8 +96,8 @@ SCRIPT
 }
 
 @test "/debt:triage accept block transitions a todo when run under zsh" {
-  command -v flock >/dev/null 2>&1 || skip "flock not installed"
-  yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' || skip "kislyuk yq not installed"
+  command -v flock >/dev/null 2>&1 || skip_or_fail "flock not installed"
+  yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' || skip_or_fail "kislyuk yq not installed"
   local work block todo
   work="$BATS_TEST_TMPDIR/work"
   mkdir -p "$work/todos/debt"
@@ -105,7 +105,7 @@ SCRIPT
   printf -- '---\nid: "001"\nstatus: pending\ncategory: complexity\nseverity: high\ntitle: Long function\n---\nBody.\n' > "$todo"
   # The first wrapped block in triage.md is "On Accept".
   block="$BATS_TEST_TMPDIR/accept.zsh"
-  awk '/^bash -c "\$\(cat <<.__YELLOW_DEBT_BASH__.$/{f=1} f{print} f&&/^\)"$/{exit}' \
+  awk '/^bash \/dev\/fd\/3 3<<.__YELLOW_DEBT_BASH__.$/{f=1} f{print} f&&/^__YELLOW_DEBT_BASH__$/{exit}' \
     "$REPO_ROOT/plugins/yellow-debt/commands/debt/triage.md" \
     | sed "s#/absolute/path/to/file.md#$todo#" > "$block"
   grep -q 'transition_todo_state' "$block"

@@ -40,8 +40,8 @@ reports false negatives for plugin-managed hooks.
 
 ```bash
 # install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
-# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
+# when the Bash tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_RUVECTOR_BASH__'
 printf '=== Prerequisites ===\n'
 node --version 2>/dev/null || printf 'node: not found\n'
 npm --version 2>/dev/null || printf 'npm: not found\n'
@@ -79,7 +79,6 @@ printf '\n=== .ruvector/ ===\n'
 printf '\n=== .gitignore ===\n'
 grep -q '\.ruvector' "$ROOT/.gitignore" 2>/dev/null && printf 'entry present\n' || printf 'entry missing\n'
 __YELLOW_RUVECTOR_BASH__
-)"
 ```
 
 **Decision tree from output:**
@@ -96,8 +95,8 @@ __YELLOW_RUVECTOR_BASH__
 
 ```bash
 # install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
-# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
+# when the Bash tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_RUVECTOR_BASH__'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 yellow_ruvector_validate_paths || exit 1
@@ -123,7 +122,6 @@ ver=$(node "$(yellow_ruvector_pinned_entry)" --version 2>/dev/null | head -n 1)
 printf '%s' "$ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.]{1,32})?$' || ver="unrecognized"
 printf 'Installed: %s (version %s)\n' "install-$(yellow_ruvector_lock_hash)" "$ver"
 __YELLOW_RUVECTOR_BASH__
-)"
 ```
 
 If the install fails behind a proxy, confirm `HTTPS_PROXY` / `npm_config_*`
@@ -147,8 +145,8 @@ store too.
 
 ```bash
 # install-ruvector.sh and resolve.sh are bash-only: run this block in bash even
-# when the Bash tool's shell is zsh (the script is an argument, so stdin stays free).
-bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'
+# when the Bash tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_RUVECTOR_BASH__'
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 . "${CLAUDE_PLUGIN_ROOT}/lib/install-ruvector.sh"
 yellow_ruvector_validate_paths || exit 1
@@ -198,7 +196,6 @@ else
     || printf 'FAILED: recall errored or took >10s\n'
 fi
 __YELLOW_RUVECTOR_BASH__
-)"
 ```
 
 The lines between the legacy-hook fences are commands read from a settings

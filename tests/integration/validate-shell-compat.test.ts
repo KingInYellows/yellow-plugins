@@ -74,6 +74,10 @@ describe('inline rules', () => {
     ['SHC-004 echo -e', 'echo -e "a\\tb"', 'SHC-004'],
     ['SHC-004 echo with escape', "echo 'line1\\nline2'", 'SHC-004'],
     ['SHC-005 literal index', 'first=${arr[0]}', 'SHC-005'],
+    ['SHC-005 index with a modifier', 'i=0\nx="${a[i]:-0}"', 'SHC-005'],
+    ['SHC-001 quoted mktemp', 'f="$(mktemp)"\ncmd 2>"$f"', 'SHC-001'],
+    ['SHC-001 backtick mktemp', 'f=`mktemp`\ncmd >"$f"', 'SHC-001'],
+    ['SHC-004 echo with \\x escape', "echo 'caf\\xc3'", 'SHC-004'],
     [
       'SHC-005 variable index from 0',
       'i=0\nwhile :; do x=${arr[$i]}; done',
@@ -126,24 +130,22 @@ describe('inline rules', () => {
       "cat <<'EOF'",
       'path=/not/shell/here',
       'EOF',
-      `bash -c "$(cat <<'__W__'`,
+      "bash /dev/fd/3 3<<'__W__'",
       'mapfile -t lines < f',
       'for k in "${!m[@]}"; do :; done',
       '__W__',
-      ')"',
     ].join('\n');
     expect(lint(text)).toEqual([]);
   });
 
   it('flags bash-only code after the wrapper closes', () => {
     const text = [
-      `bash -c "$(cat <<'__W__'`,
+      "bash /dev/fd/3 3<<'__W__'",
       'mapfile -t a < f',
       '__W__',
-      ')"',
       'mapfile -t b < f',
     ].join('\n');
-    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 5]]);
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 4]]);
   });
 
   it('keeps linting the outer shell after `bash -c`', () => {
@@ -155,7 +157,30 @@ describe('inline rules', () => {
 
   it('flags a wrapper that feeds the script to bash on stdin (SHC-009)', () => {
     const text = ["bash <<'EOF'", 'mapfile -t a < f', 'EOF'].join('\n');
-    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-009', 1]]);
+    expect(lint(text).map((f) => [f.rule, f.line, f.detail])).toEqual([
+      ['SHC-009', 1, 'script fed to bash on stdin'],
+    ]);
+  });
+
+  it('flags the bash -c "$(cat <<TAG …)" wrapper the git-push hook refuses (SHC-009)', () => {
+    const text = [
+      `bash -c "$(cat <<'__W__'`,
+      'mapfile -t a < f',
+      '__W__',
+      ')"',
+    ].join('\n');
+    const [finding] = lint(text);
+    expect(finding.rule).toBe('SHC-009');
+    expect(finding.detail).toContain('git-push hook');
+  });
+
+  it('treats arithmetic `<<` and `>` as operators, not heredocs or redirects', () => {
+    const text = [
+      'x=$((1 << n))',
+      'mapfile -t a < f',
+      '(( n > $limit )) && (( m > $limit ))',
+    ].join('\n');
+    expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 2]]);
   });
 
   it('skips the inside of a multi-line quoted program but lints the closing line', () => {
@@ -297,7 +322,7 @@ describe('fixture runs', () => {
     write(
       'plugins/demo/commands/wrapped.md',
       md(
-        `bash -c "$(cat <<'__W__'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\n__W__\n)"`
+        `bash /dev/fd/3 3<<'__W__'\n. "\${CLAUDE_PLUGIN_ROOT}/lib/bashonly.sh"\n__W__`
       )
     );
     const result = run();

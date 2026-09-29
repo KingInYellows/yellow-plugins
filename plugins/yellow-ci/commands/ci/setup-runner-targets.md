@@ -23,8 +23,9 @@ Configure runner pool definitions, routing rules, and semantic metadata.
   `!.claude/yellow-ci-runner-targets.yaml` to share it with the team.
 - **Import validation:** run `validate_runner_targets_file` from
   `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh` against a temp copy of
-  imported YAML. The library is bash-only, so run it in a bash child:
-  `bash -c '. "$1" && validate_runner_targets_file "$2"' _ "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" "<temp-copy>"`.
+  imported YAML. The library is bash-only, so run it in a bash child with the
+  path single-quoted:
+  `bash -c '. "$1" && validate_runner_targets_file "$2"' _ "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" '<temp-copy>'`.
 - **Merged routing cache (after write):** source the plugin's resolution library
   and run the merge, which reads the global config plus the per-repo `.claude/`
   override and rewrites the routing-summary + merged-JSON cache:
@@ -32,13 +33,12 @@ Configure runner pool definitions, routing rules, and semantic metadata.
   ```bash
 # validate.sh and resolve-runner-targets.sh are bash-only: run this block in
 # bash even when the Bash tool's shell is zsh.
-bash -c "$(cat <<'__YELLOW_CI_BASH__'
+bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'
 SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT}/hooks/scripts"
 . "${SCRIPT_DIR}/lib/validate.sh"
 . "${SCRIPT_DIR}/lib/resolve-runner-targets.sh"
 resolve_runner_targets
 __YELLOW_CI_BASH__
-)"
   ```
 
 ## Usage

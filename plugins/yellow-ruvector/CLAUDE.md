@@ -80,7 +80,7 @@ ruvector.
 - **Shell libraries and zsh:** `lib/install-ruvector.sh` and
   `hooks/scripts/lib/resolve.sh` are bash-only (`BASHPID`, `${!…}`,
   `BASH_SOURCE`); command blocks that source them run in a bash child
-  (`bash -c "$(cat <<'__YELLOW_RUVECTOR_BASH__'` … `)"`) because the Bash
+  (`bash /dev/fd/3 3<<'__YELLOW_RUVECTOR_BASH__'`) because the Bash
   tool may run zsh. `hooks/scripts/lib/validate.sh` is dual-shell (Tier 4).
   `tests/status-provenance.bats` extracts the status block up to the
   wrapper tag.

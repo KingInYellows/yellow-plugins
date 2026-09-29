@@ -32,36 +32,14 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Same scope and fence reading as the lint, so both layers see the same blocks.
 const { extractRawFencedBlocks } = require('./lib/markdown-fences');
+const { listMarkdownFiles, SHELL_LANGS } = require('./validate-shell-compat');
 
-const SHELL_LANGS = new Set(['bash', 'sh', 'shell']);
 const TAG = '[check-shell-parse]';
-
-function findMarkdown(root) {
-  // Reuse the lint's scope rules so both layers see the same blocks.
-  const { isExcludedPluginPath } = require('./validate-shell-compat');
-  const out = [];
-  const walk = (dir) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.git'))
-        continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.isFile() && entry.name.endsWith('.md')) out.push(full);
-    }
-  };
-  walk(path.join(root, 'plugins'));
-  return out
-    .map((abs) => path.relative(root, abs).split(path.sep).join('/'))
-    .filter((rel) => !isExcludedPluginPath(rel))
-    .sort();
-}
+// Per shell driver: ~800 `-n` parses take seconds; a stuck parser must not
+// hold a required CI job until its job-level timeout.
+const PARSE_TIMEOUT_MS = 120000;
 
 function shellAvailable(bin) {
   const result = spawnSync(bin, ['-c', 'exit 0'], { stdio: 'ignore' });
@@ -81,7 +59,7 @@ const DRIVER = [
   '    printf "%s 0\\n" "$i"',
   '  else',
   '    printf "%s 1\\n" "$i"',
-  '    printf "%s err %s\\n" "$i" "$(printf "%s" "$err" | head -1)"',
+  '    printf \'%s err %s\\n\' "$i" "${err%%$\'\\n\'*}"',
   '  fi',
   '  i=$((i+1))',
   'done',
@@ -94,9 +72,16 @@ function parseAll(bin, flags, files) {
     {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
+      timeout: PARSE_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     }
   );
   if (result.error) throw result.error;
+  if (result.signal || result.status !== 0) {
+    throw new Error(
+      `${bin} parse driver ${result.signal ? `killed by ${result.signal}` : `exited ${result.status}`}`
+    );
+  }
   const status = new Map();
   const errors = new Map();
   for (const line of result.stdout.split('\n')) {
@@ -106,12 +91,18 @@ function parseAll(bin, flags, files) {
     if (m[2] !== undefined) status.set(index, m[2] === '0');
     else errors.set(index, m[3]);
   }
+  // Every block must get a verdict; a hole would read as "not a failure".
+  if (status.size !== files.length) {
+    throw new Error(
+      `${bin} parse driver reported ${status.size} of ${files.length} blocks`
+    );
+  }
   return { status, errors };
 }
 
 function run(root, { zsh = 'zsh', bash = 'bash' } = {}) {
   const blocks = [];
-  for (const rel of findMarkdown(root)) {
+  for (const rel of listMarkdownFiles(root)) {
     const content = fs.readFileSync(path.join(root, rel), 'utf8');
     for (const block of extractRawFencedBlocks(content)) {
       if (SHELL_LANGS.has(block.lang)) blocks.push({ rel, block });
@@ -183,7 +174,7 @@ function main(argv) {
   );
   for (const f of result.failures) out(`  ${f.file}:${f.line} — ${f.error}`);
   out(
-    `${TAG} Rewrite the construct so both shells accept it, or run the block in bash: bash -c "$(cat <<'TAG' … TAG + newline + )".`
+    `${TAG} Rewrite the construct so both shells accept it, or run the block in bash: bash /dev/fd/3 3<<'TAG' … TAG.`
   );
   return report ? 0 : 1;
 }

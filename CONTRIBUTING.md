@@ -622,19 +622,20 @@ Inline blocks:
 Tier 2 wrapper — use a distinctive tag, never `EOF`:
 
 ```bash
-bash -c "$(cat <<'__YELLOW_EXAMPLE_BASH__'
+bash /dev/fd/3 3<<'__YELLOW_EXAMPLE_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/bash-only.sh"
 bash_only_function "/literal/value"
 __YELLOW_EXAMPLE_BASH__
-)"
 ```
 
-Not `bash <<'TAG'`: that feeds the script on stdin, so any command in the body
-that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare `cat`)
-silently swallows the rest of the script (lint rule SHC-009). The argument
-form keeps the caller's stdin and passes the exit status through. To call one
-function from prose, pass values as arguments:
-`bash -c '. "$1" && fn "$2"' _ "$lib" "$value"`.
+bash reads the script from file descriptor 3, so the caller's stdin stays
+free and the exit status passes through. Lint rule SHC-009 rejects the two
+look-alikes: `bash <<'TAG'` feeds the script on stdin, so any command in the
+body that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare `cat`)
+silently swallows the rest of it; and `bash -c "$(cat <<'TAG' …)"` is refused
+as unverifiable by the stacked-PR providers' git-push PreToolUse hook. To call
+one function from prose, pass values as single-quoted arguments (reject values
+that contain a single quote): `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'`.
 
 Tier 4 libraries may start functions with
 `if [ -n "${ZSH_VERSION:-}" ]; then emulate -L sh; fi` (never the `&&` form,

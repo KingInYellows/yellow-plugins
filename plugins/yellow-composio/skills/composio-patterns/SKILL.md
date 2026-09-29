@@ -198,16 +198,20 @@ TODAY=$(date -u +%Y-%m-%d)
 MONTH=$(date -u +%Y-%m)
 
 do_increment() {
+  # A fresh mktemp name, not a fixed `.tmp`: a repo could ship the fixed name
+  # as a symlink, and `>|` would write through it.
+  local tmp
+  tmp=$(mktemp "${USAGE_FILE}.XXXXXX") || return 1
   if jq --arg tool "$TOOL_SLUG" --arg day "$TODAY" --arg month "$MONTH" '
     .updated = (now | todate) |
     .periods[$month] //= {"total": 0, "by_tool": {}, "by_day": {}} |
     .periods[$month].total += 1 |
     .periods[$month].by_tool[$tool] = ((.periods[$month].by_tool[$tool] // 0) + 1) |
     .periods[$month].by_day[$day] = ((.periods[$month].by_day[$day] // 0) + 1)
-  ' "$USAGE_FILE" >| "${USAGE_FILE}.tmp"; then
-    mv "${USAGE_FILE}.tmp" "$USAGE_FILE"
+  ' "$USAGE_FILE" >| "$tmp"; then
+    mv "$tmp" "$USAGE_FILE"
   else
-    rm -f "${USAGE_FILE}.tmp"
+    rm -f "$tmp"
     return 1
   fi
 }

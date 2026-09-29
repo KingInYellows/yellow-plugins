@@ -12,8 +12,18 @@
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 PROFILES=(bash zsh zsh-snapshot)
 
+# Locally a missing tool skips the test; in CI (CI=true) it fails, so a
+# required job cannot pass by skipping everything.
+skip_or_fail() {
+  if [ "${CI:-}" = true ]; then
+    printf '%s (required in CI)\n' "$1" >&2
+    return 1
+  fi
+  skip "$1"
+}
+
 require_zsh() {
-  command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
+  command -v zsh >/dev/null 2>&1 || skip_or_fail "zsh not installed"
 }
 
 # Sets PROFILE_CMD to the argv that runs a script file under profile $1.

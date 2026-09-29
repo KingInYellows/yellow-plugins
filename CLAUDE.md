@@ -138,7 +138,7 @@ the colon.
    Validation Matrix for the rest.
    Fenced shell blocks run under the user's login shell, often zsh with
    `noclobber`: they must work in bash and zsh (`pnpm validate:shell-compat`),
-   and bash-only code runs in a `bash -c "$(cat <<'TAG' … )"` child —
+   and bash-only code runs in a `bash /dev/fd/3 3<<'TAG'` child —
    CONTRIBUTING.md "Shell Scripts" has the tier contract.
 2. Run `pnpm changeset` and commit the file — CI blocks the PR without it.
 3. Adding or removing a plugin: update `catalog/` (then
