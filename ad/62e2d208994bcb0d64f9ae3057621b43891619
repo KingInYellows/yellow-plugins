@@ -1,0 +1,50 @@
+tests/integration/validate-jules.test.ts
+  s_c4c48e9a92a0cf::t_b6e9e469caaa61 105-126
+plugins/yellow-jules/tests/state-store.test.ts
+  s_c4c48e9a92a0cf::t_a3b07bb875badc 361-362,367,370,372,378-380,382,384,386-387,397,399,401,403-433
+  s_2e00293b5714a6::t_5f5b1b9bf11396 360,363-366,368-369,371,373-377,381,383,385,388-396,398,400,402
+scripts/validate-jules.js
+  s_c4c48e9a92a0cf::t_c00b9986ed9cfa 96-104,106-160
+  s_c4c48e9a92a0cf::t_c77a8dd6e8db91 17,19-20
+plugins/yellow-jules/src/state.ts
+  s_c4c48e9a92a0cf::t_3097596488e6cb 771-787,791-792,797
+  s_c4c48e9a92a0cf::t_934651ab9aa842 768-770
+  s_c4c48e9a92a0cf::t_7ff6dbcd0f5940 788-790
+  s_c4c48e9a92a0cf::t_b95ec53bd11322 793-796
+  s_c4c48e9a92a0cf::t_992ab2168e4a33 798-800
+  s_c4c48e9a92a0cf::t_d9eb67b3543094 21,693-709,737-738,742-767,801-814,823,825-826,831-832
+AGENTS.md
+  s_c4c48e9a92a0cf::t_6b7eb86210830c 195,197-199
+plugins/yellow-jules/dist/runtime.js
+  s_c4c48e9a92a0cf::t_15f6e7a02ed619 86-94,474-482
+plugins/yellow-jules/dist/state.js
+  s_c4c48e9a92a0cf::t_4c14b40027f30a 72,552-553,556-615,624,626-627,632-633
+plugins/yellow-jules/src/runtime.ts
+  s_c4c48e9a92a0cf::t_0b3a0581c70175 41-46,126-135,777-785
+plugins/yellow-jules/tests/runtime-list.test.ts
+  s_c4c48e9a92a0cf::t_5748435c9eb353 8,128-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ad62e2d208994bcb0d64f9ae3057621b43891619",
+  "prompts": {},
+  "sessions": {
+    "s_2e00293b5714a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "286ac4b4-5f77-4c04-a3d8-d207423ce3a1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c4c48e9a92a0cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4bc583f-a87e-464c-8e90-76629c1e94d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
