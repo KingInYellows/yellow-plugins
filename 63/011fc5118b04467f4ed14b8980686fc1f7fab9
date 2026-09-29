@@ -1,0 +1,66 @@
+plugins/yellow-jules/tests/error-mapping.test.ts
+  s_b2d61b25087e73::t_7dced501a34097 1-86
+  s_b2d61b25087e73::t_1f608ab16b6054 87-110
+plugins/yellow-jules/tests/state-store.test.ts
+  s_b2d61b25087e73::t_69f60360eb9971 1-290
+  s_b2d61b25087e73::t_760d9099a4a8f5 291-388
+plugins/yellow-jules/src/state.ts
+  s_b2d61b25087e73::t_1ed8d939c07998 1-692
+  s_b2d61b25087e73::t_4f7465ec513e3b 693-792
+plugins/yellow-jules/tests/credential-redaction.test.ts
+  s_b2d61b25087e73::t_700b2e988872a1 1-149
+  s_b2d61b25087e73::t_dd16dcbd57f90c 150-182
+plugins/yellow-jules/src/types.ts
+  s_b2d61b25087e73::t_fd7a89c13b6fc1 1-245
+  s_b2d61b25087e73::t_d63d45c03d2935 246-253
+plugins/yellow-jules/tests/config-resolution.test.ts
+  s_b2d61b25087e73::t_c9039ea12adc83 1-218
+  s_b2d61b25087e73::t_8407759b68f513 219-264
+plugins/yellow-jules/src/errors.ts
+  s_b2d61b25087e73::t_f6bd2dfbdd5235 1-308
+  s_b2d61b25087e73::t_e2da71b2a2a8a8 309-312
+plugins/yellow-jules/src/redact.ts
+  s_b2d61b25087e73::t_6e942684667c63 1-185
+  s_b2d61b25087e73::t_d487f43338c076 186-193
+plugins/yellow-jules/src/config.ts
+  s_b2d61b25087e73::t_b39fdc6ca96a5b 1-285
+  s_b2d61b25087e73::t_cb2943f75848d7 286-294
+plugins/yellow-jules/src/validate.ts
+  s_b2d61b25087e73::t_a81c2be1f03305 1-306
+  s_b2d61b25087e73::t_097e55756b4b8f 307-341
+plugins/yellow-jules/tests/input-validation.test.ts
+  s_b2d61b25087e73::t_784a4ab345bb7d 1-191
+  s_b2d61b25087e73::t_c64407f1e0d03f 192-280
+.gitignore
+  s_b2d61b25087e73::t_9a2c3a95034977 54,59,63
+plans/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_b2d61b25087e73::t_e319fb93e6ac96 1,3,9-11,17-826
+plugins/yellow-jules/package.json
+  s_b2d61b25087e73::t_7c87e7a2c30976 1-22
+plugins/yellow-jules/runtime/package-lock.json
+  s_b2d61b25087e73::t_a2a09be1671b93 1-49
+plugins/yellow-jules/runtime/package.json
+  s_b2d61b25087e73::t_94fed36308db9b 1-9
+plugins/yellow-jules/tests/support/app-error.ts
+  s_b2d61b25087e73::t_3b0f0ffbef1c87 1-24
+plugins/yellow-jules/tsconfig.json
+  s_b2d61b25087e73::t_405318c3432fee 1-15
+pnpm-lock.yaml
+  s_b2d61b25087e73::t_2bb7a7bbfc8618 165-180,1003-1009
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "63011fc5118b04467f4ed14b8980686fc1f7fab9",
+  "prompts": {},
+  "sessions": {
+    "s_b2d61b25087e73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fb24ea8-ce14-46c0-a1d0-12bc75490ced",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
