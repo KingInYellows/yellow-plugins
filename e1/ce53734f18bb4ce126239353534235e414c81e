@@ -1,0 +1,60 @@
+plugins/yellow-review/commands/review/review-all.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 385
+plugins/yellow-codex/commands/codex/setup.md
+  s_e3ae526d137cfd::t_806c4e86fd8ac5 58-59,61-69
+plugins/yellow-semgrep/commands/semgrep/setup.md
+  s_e3ae526d137cfd::t_806c4e86fd8ac5 72-73,75-83
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 207
+plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 246
+plugins/yellow-browser-test/agents/testing/test-reporter.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 83
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 133
+  s_e3ae526d137cfd::t_ab0c46a185b221 91-92,96,98
+plugins/yellow-devin/skills/devin-workflows/SKILL.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 108-109
+plugins/yellow-linear/commands/linear/delegate.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 523-524
+plugins/yellow-devin/commands/devin/review-prs.md
+  s_e3ae526d137cfd::t_6c4ebca3ab478b 438-441
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_78a68a68153594 380,388-389,395,402,405-409
+  s_e3ae526d137cfd::t_374d6802d4f86f 410-411
+  s_e3ae526d137cfd::t_6ac852ffcdb25a 715
+plugins/github-workflow/skills/github-stack-submit/SKILL.md
+  s_e3ae526d137cfd::t_98cfa640c65d1d 63-66
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_e3ae526d137cfd::t_ab0c46a185b221 41-47,50,54-61,64-65,68
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_e3ae526d137cfd::t_111258d4ee0d46 90-91,95,97,132
+.changeset/zsh-compat-remaining.md
+  s_e3ae526d137cfd::t_78a68a68153594 1-30
+plugins/yellow-browser-test/commands/browser-test/test.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 78,105
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 85
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_e3ae526d137cfd::t_d242ef7d7dbf1b 115
+plugins/github-workflow/skills/github-stack-amend/SKILL.md
+  s_e3ae526d137cfd::t_98cfa640c65d1d 51-54
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_e3ae526d137cfd::t_111258d4ee0d46 40-46,49,53-60,63-64,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e1ce53734f18bb4ce126239353534235e414c81e",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
