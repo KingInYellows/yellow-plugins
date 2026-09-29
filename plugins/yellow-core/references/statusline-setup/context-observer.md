@@ -46,11 +46,12 @@ The `exec cat` fallback keeps the payload flowing when `python3` or the
 observer file is missing; without it the next stage would get empty stdin and
 the whole statusline would go blank. `exec` matters too: a stage such as
 `{ python3 <observer> || cat; }` keeps the pipe open in its subshell until the
-observer exits, so the statusline script cannot start until the record write
-ends. With `exec` it computes its output as soon as the observer releases
-stdout. Claude Code still shows the statusline only once the whole command
-exits, which waits for the observer's record write (bounded by a 2 s deadline), and a new
-statusline update in that window cancels the run. `install` upgrades that
+observer exits, so the statusline script does not see EOF, and cannot finish
+reading its payload, until the record write ends. With `exec` it gets EOF and
+computes its output as soon as the observer releases stdout. Claude Code still
+shows the statusline only once the whole command exits, which waits for the
+observer's record write (bounded by a 2 s deadline), and a new statusline
+update in that window cancels the run. `install` upgrades that
 earlier stage, and the plain `python3 <observer> |` prefix, to the current
 form (action `upgraded`); `status` reports either as `refresh`.
 

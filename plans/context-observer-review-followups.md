@@ -226,10 +226,13 @@ together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 - A symlinked `settings.json` whose link directory is unwritable now fails the
   corrupt backup there instead of in the target directory, the same as the
   pre-observer backup; noted in the changeset.
-- Known limitation, not tested: when `settings.json` does not exist and its
-  directory is unwritable, `install` copies the observer before the settings
-  write fails, leaving the copy without a composed stage. `status` reports it
-  as not enabled and a later `install` completes it.
+- Known limitation, not tested: when `settings.json` is a symlink into a
+  read-only directory, `install` writes the `.pre-observer.backup` next to the
+  link and copies the observer, then the settings write fails with `io_error`,
+  leaving the copy without a composed stage. `status` reports it as not
+  enabled and a later `install` completes it once the target is writable. (A
+  missing `settings.json` cannot reach this state: `install` refuses it with
+  `statusline_missing` before copying anything.)
 <!-- deepen-plan: external -->
 > **Research:** A 2 s observer run holds the whole statusline update, and Claude Code cancels an in-flight
 > run when the next update fires, discarding output already computed. Normal observer runs are ~20 ms,

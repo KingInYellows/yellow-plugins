@@ -109,8 +109,8 @@ Time until the next stage sees EOF, with a 1 s simulated recording step:
 | `{ … && exec python3 obs; exec cat; } \| existing` | 0.02 s |
 
 Codex reproduced it independently at about 1.06 s against 0.10 s. The
-next stage could not even start until the recording ended because the brace
-group held the pipe's write end. The fix is the `exec` stage in Guidance item 1; `install`
+next stage did not see EOF until the recording ended because the brace group
+held the pipe's write end. The fix is the `exec` stage in Guidance item 1; `install`
 upgrades the earlier guarded and plain forms in place (action `upgraded`).
 The T10 EOF-timing bats test now runs the installed command under
 `bash -c`. The original piped the bare observer, so it could not see this
