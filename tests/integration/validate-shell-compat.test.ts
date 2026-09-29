@@ -24,6 +24,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 const {
   lintShellText,
   classifyLines,
+  findFdWrappers,
 } = require('../../scripts/validate-shell-compat.js');
 /* eslint-enable @typescript-eslint/no-var-requires */
 
@@ -113,6 +114,11 @@ describe('inline rules', () => {
   it.each([
     ['>| on a mktemp file', 'f=$(mktemp)\necho hi >| "$f"'],
     ['>> on a mktemp file', 'f=$(mktemp)\necho hi >> "$f"'],
+    ['single-quoted mktemp literal', 'f=\'$(mktemp)\'\necho hi > "$f"'],
+    [
+      'single-quoted touch operand',
+      'f=$(mktemp -u)\ntouch \'$f\'\necho hi > "$f"',
+    ],
     ['mktemp -u path', 'f=$(mktemp -u)\necho hi > "$f"'],
     ['>| with a /dev/null fallback', 'e=$(mktemp)\ncmd 2>|"${e:-/dev/null}"'],
     ['a path built from the variable', 'f=$(mktemp)\ncmd 2>"$f.err"'],
@@ -195,6 +201,11 @@ describe('inline rules', () => {
     ['an unquoted operand', "bash /dev/fd/3 $x 3<<'__W__'", 'may precede'],
     ['a sudo prefix', "sudo bash /dev/fd/3 3<<'__W__'", 'no sudo'],
     ['an env prefix', "env X=1 bash /dev/fd/3 3<<'__W__'", 'no sudo'],
+    [
+      'a command-substitution `)` prefix',
+      "$(foo) bash /dev/fd/3 3<<'__W__'",
+      'no sudo',
+    ],
     ['a multi-digit fd', "bash /dev/fd/10 10<<'__W__'", 'single-digit'],
     ['stdin with options', "bash -s -- x <<'__W__'", 'on stdin'],
   ])('rejects %s as a wrapper (SHC-009)', (_name, opener, detail) => {
@@ -217,6 +228,9 @@ describe('inline rules', () => {
     ['in a command substitution', "out=$(bash /dev/fd/3 3<<'__W__'"],
     ['after command', "command bash /dev/fd/3 3<<'__W__'"],
     ['with a placeholder operand', "bash /dev/fd/3 '<todo-path>' 3<<'__W__'"],
+    ['in a same-line case arm', `case "$x" in y) bash /dev/fd/3 3<<'__W__'`],
+    ['in a line-leading case arm', "  y) bash /dev/fd/3 3<<'__W__'"],
+    ['in an alternation case arm', "a|b) bash /dev/fd/3 3<<'__W__'"],
   ])('accepts the fd wrapper %s', (_name, opener) => {
     expect(lint([opener, 'mapfile -t a < f', '__W__'].join('\n'))).toEqual([]);
   });
@@ -552,5 +566,24 @@ describe('fixture runs', () => {
     expect(run().stderr).toContain(
       'listed library plugins/demo/lib/missing.sh does not exist'
     );
+  });
+});
+
+describe('heredoc terminators', () => {
+  it('does not close an fd wrapper on `TAG)`', () => {
+    const lines = ["bash /dev/fd/3 3<<'TAG'", 'true', 'TAG)'];
+    expect(findFdWrappers(lines)).toEqual([{ open: 0, close: -1, tag: 'TAG' }]);
+  });
+
+  it('closes an fd wrapper on an exact tag line', () => {
+    const lines = ["bash /dev/fd/3 3<<'TAG'", 'true', 'TAG'];
+    expect(findFdWrappers(lines)).toEqual([{ open: 0, close: 2, tag: 'TAG' }]);
+  });
+
+  it('still closes a command-substitution heredoc on `EOF)`', () => {
+    const lines = ["x=$(cat <<'EOF'", 'hello', 'EOF)', 'echo after'];
+    const classes = classifyLines(lines);
+    expect(classes[2].kind).toBe('data');
+    expect(classes[3].kind).toBe('code');
   });
 });

@@ -482,8 +482,9 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
       `env:` result variable (`SHELL_COMPAT_RESULT`), the `if` chain, and the
       echo summary. Decide whether the fork workflow needs the job. It has no
       shell-test jobs today, so the lint and parse target cover forks.
-      Decision: the fork workflow keeps only the lint target (now blocking);
-      the zsh job and parse check run in the main workflow.
+      Decision: the fork workflow's shell-compat target runs the lint and
+      (after PR #921 review) installs zsh for the parse check, since fork PRs
+      skip shell-compat-tests; the bats runtime suite stays main-only.
 - [x] 4.3: Update the docs.
   - `CLAUDE.md`:
     - `validate:schemas` comment list (line 32)

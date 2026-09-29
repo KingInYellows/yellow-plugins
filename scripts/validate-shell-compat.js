@@ -194,9 +194,11 @@ const WRAPPER_OPERAND = String.raw`(?:'[^']*'|"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")`
 const BASH_FD_WRAPPER_RE = new RegExp(
   String.raw`(?:^|(?<=[\s;&|(){!]))(?:command\s+)?bash((?:\s+${WRAPPER_OPTION})*)\s+\/dev\/fd\/(\d+)((?:\s+${WRAPPER_OPERAND})*)\s+(\d+)$`
 );
-// What may stand before `bash` for it to be the command word.
+// What may stand before `bash` for it to be the command word. A case-arm
+// pattern `y)` / `(a|b)` also counts, but only at line start, after `in` or
+// after `;;`/`;&` — a bare `)` (`$(foo)`, `(cd x)`) does not.
 const COMMAND_POSITION_RE =
-  /(?:^|[;&|({!]|(?:^|\s)(?:then|do|else|elif|if|while|until|time))$/;
+  /(?:^|[;&|({!]|(?:^|\s)(?:then|do|else|elif|if|while|until|time)|(?:^\s*|;[;&]\s*|\bin\s+)\(?[^\s()|;&]+(?:\|[^\s()|;&]+)*\))$/;
 // `$((…))` / `((…))` spans: `<<` and `>` inside them are arithmetic shifts
 // and comparisons, not heredocs or redirects.
 const ARITHMETIC_RE = /\$?\(\((?:[^()]|\([^()]*\))*\)\)/g;
@@ -352,7 +354,12 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
     if (heredoc) {
       const candidate = heredoc.stripTabs ? line.replace(/^\t+/, '') : line;
       const trimmed = candidate.trimEnd();
-      if (trimmed === heredoc.tag || trimmed === `${heredoc.tag})`) {
+      // `TAG)` closes only a command-substitution heredoc; an fd wrapper
+      // needs a line that is exactly the tag.
+      if (
+        trimmed === heredoc.tag ||
+        (!heredoc.wrapper && trimmed === `${heredoc.tag})`)
+      ) {
         out[i] = { kind: 'data', code: '', closesWrapper: heredoc.wrapper };
         heredoc = null;
       } else {
@@ -656,15 +663,15 @@ function ruleRcQuotes(code) {
 
 // SHC-001 needs block context: which variables name files that already
 // exist when the redirect runs.
-// `f=$(mktemp …)`, `f="$(mktemp …)"` or `f=\`mktemp …\``; group 2 or 3
+// `f=$(mktemp …)`, `f="$(mktemp …)"` (never single-quoted: that is literal text) or `f=\`mktemp …\``; group 2 or 3
 // holds the options (a `-u`/`--dry-run` name does not create the file).
 const MKTEMP_ASSIGN_RE =
-  /\b([A-Za-z_]\w*)=["']?(?:\$\(\s*mktemp\b([^)]*)\)|`\s*mktemp\b([^`]*)`)/g;
-const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*["']?\$\{?([A-Za-z_]\w*)/g;
+  /\b([A-Za-z_]\w*)="?(?:\$\(\s*mktemp\b([^)]*)\)|`\s*mktemp\b([^`]*)`)/g;
+const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*"?\$\{?([A-Za-z_]\w*)/g;
 // `>`, `2>`, `&>`, `3>` — but not `>>`, `>|`, `>&`, `2>&1`, `<>` — onto a
 // bare variable (`$f`, `${f}`), not a path built from one (`$f.err`).
 const CLOBBER_REDIRECT_RE =
-  /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*["']?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["'\s;&|)<>]|$)/g;
+  /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*"?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["\s;&|)<>]|$)/g;
 
 function existingFileVars(codeLines) {
   const vars = new Set();
