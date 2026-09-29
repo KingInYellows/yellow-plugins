@@ -30,7 +30,7 @@ Configure runner pool definitions, routing rules, and semantic metadata.
   and run the merge, which reads the global config plus the per-repo `.claude/`
   override and rewrites the routing-summary + merged-JSON cache:
 
-  ```bash
+```bash
 # validate.sh and resolve-runner-targets.sh are bash-only: run this block in
 # bash even when the Bash tool's shell is zsh.
 bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'
@@ -39,7 +39,7 @@ SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT}/hooks/scripts"
 . "${SCRIPT_DIR}/lib/resolve-runner-targets.sh"
 resolve_runner_targets
 __YELLOW_CI_BASH__
-  ```
+```
 
 ## Usage
 
