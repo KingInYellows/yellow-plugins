@@ -99,7 +99,9 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
   blocks in plugin markdown and the Tier 4 (dual-shell) libraries listed in
   `scripts/shell-compat-config.json` (rules SHC-001..009, SHC-101, SHC-900).
 - `pnpm check:shell-parse`: Flag shell blocks that bash parses but zsh does
-  not. Skips with a warning when zsh is missing locally; fails in CI.
+  not, and Tier 2 wrapper bodies bash rejects. Without zsh it prints SKIP
+  and exits 0 locally — a SKIP verifies nothing; `SHELL_COMPAT_REQUIRE_ZSH=1`
+  or any `CI` value (except empty, `false`, `0`) makes a missing zsh fail.
 - `pnpm test:shell-compat`: Run `tests/shell-compat/` (needs zsh): Tier 4
   libraries under bash, zsh and zsh with snapshot options; Tier 3 libraries
   through the bash wrapper from a zsh `noclobber` parent.
