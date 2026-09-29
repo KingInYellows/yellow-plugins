@@ -599,7 +599,7 @@ mitigation; the closing re-anchor alone is insufficient.
 
 ```bash
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  <cli-invocation> > "$OUTPUT_FILE" 2> "$STDERR_FILE"
+  <cli-invocation> >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 ```
 
@@ -669,19 +669,20 @@ build_slug() {
 }
 
 build_target_path() {
-  local mode="$1" slug="$2" today path n
+  # `target`, not `path`: in zsh `path` is tied to $PATH.
+  local mode="$1" slug="$2" today target n
   today=$(date +%Y-%m-%d)
-  path="docs/council/${today}-${mode}-${slug}.md"
+  target="docs/council/${today}-${mode}-${slug}.md"
   n=2
-  while [ -f "$path" ] && [ "$n" -le 10 ]; do
-    path="docs/council/${today}-${mode}-${slug}-${n}.md"
+  while [ -f "$target" ] && [ "$n" -le 10 ]; do
+    target="docs/council/${today}-${mode}-${slug}-${n}.md"
     n=$((n + 1))
   done
-  if [ -f "$path" ]; then
+  if [ -f "$target" ]; then
     printf '[council] Error: too many same-day collisions for slug "%s" (>10)\n' "$slug" >&2
     return 1
   fi
-  printf '%s' "$path"
+  printf '%s' "$target"
 }
 ```
 
@@ -974,7 +975,7 @@ timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
     --print-timeout "$(( 10#$CT + 30 ))s" \
     -p "Read the file ${PACK_FILE} in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
-  > "$OUTPUT_FILE" 2> "$STDERR_FILE"
+  >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 ```
 - `-p`/`--print`/`--prompt`: non-interactive single prompt, plain-text
   response (agy has no `--output-format`/`-o` flag)
@@ -1006,7 +1007,7 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
     --format json \
     --variant "${COUNCIL_OPENCODE_VARIANT:-high}" \
     "<full-pack-prompt>" \
-  > "$OUTPUT_FILE" 2> "$STDERR_FILE"
+  >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
 ASSISTANT_TEXT=$(jq -r 'select(.type=="text") | .part.text' "$OUTPUT_FILE" | tr -d '\000')

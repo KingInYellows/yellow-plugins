@@ -51,11 +51,17 @@ for tool in bash git timeout jq mktemp awk sed grep find; do
   fi
 done
 
-# Bash 4.3+ check
-BASH_MAJOR=${BASH_VERSINFO[0]:-0}
-BASH_MINOR=${BASH_VERSINFO[1]:-0}
-if [ "$BASH_MAJOR" -lt 4 ] || ([ "$BASH_MAJOR" -eq 4 ] && [ "$BASH_MINOR" -lt 3 ]); then
-  printf '[council] Error: bash 4.3+ required, found %d.%d\n' "$BASH_MAJOR" "$BASH_MINOR" >&2
+# Shell check — the blocks below need bash 4.3+ or zsh (the Bash tool uses
+# the user's login shell). Under bash, enforce 4.3+; zsh has associative
+# arrays natively; any other shell (dash, ksh) lacks the syntax, so reject it.
+if [ -n "${BASH_VERSION:-}" ]; then
+  case "$BASH_VERSION" in
+    [0-3].*|4.[0-2].*)
+      printf '[council] Error: bash 4.3+ required, found %s\n' "$BASH_VERSION" >&2
+      exit 1 ;;
+  esac
+elif [ -z "${ZSH_VERSION:-}" ]; then
+  printf '[council] Error: bash 4.3+ or zsh required (running under an unsupported shell)\n' >&2
   exit 1
 fi
 
@@ -345,7 +351,7 @@ GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Err
 # collisions). Concurrent /council runs in the same checkout are NOT
 # supported: the second run truncates this file.
 STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
-: > "$STATE_FILE" || { printf '[council] Error: cannot create state file at %s\n' "$STATE_FILE" >&2; exit 1; }
+: >| "$STATE_FILE" || { printf '[council] Error: cannot create state file at %s\n' "$STATE_FILE" >&2; exit 1; }
 
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
            REVIEWER_FENCED_PATHS REVIEWER_FINDINGS
@@ -826,7 +832,7 @@ parse_reviewer_return() {
         printf '[council] Error: cannot stage redaction of %s — truncating\n' \
           "$fenced_path" >&2
         claude_truncate_failed=1
-      elif ! awk "$redact_awk" "$fenced_path" > "$redacted_tmp"; then
+      elif ! awk "$redact_awk" "$fenced_path" >| "$redacted_tmp"; then
         rm -f "$redacted_tmp"
         printf '[council] Error: redaction of %s failed — truncating\n' \
           "$fenced_path" >&2
@@ -838,7 +844,7 @@ parse_reviewer_return() {
         claude_truncate_failed=1
       fi
       if [ "${claude_truncate_failed:-0}" -eq 1 ]; then
-        if : > "$fenced_path"; then
+        if : >| "$fenced_path"; then
           printf '[council] Error: %s truncated after a redaction failure — failing the slot\n' \
             "$fenced_path" >&2
         else
@@ -1356,6 +1362,8 @@ __EOF_COUNCIL_SYNTHESIS__
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
 
 for reviewer in claude codex gemini opencode; do
+  # Title-case for the report heading (`${reviewer^}` is bash-only).
+  reviewer_title=$(printf '%s' "$reviewer" | awk '{ print toupper(substr($0, 1, 1)) substr($0, 2) }')
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   omit_reason=""
   # Identity check for the leg whose path we minted; shape check for the rest.
@@ -1843,7 +1851,7 @@ ${section_body}
     fi
     REPORT_CONTENT="${REPORT_CONTENT}
 
-## ${reviewer^} Output
+## ${reviewer_title} Output
 
 ${section_body}
 "
@@ -1863,7 +1871,7 @@ ${section_body}
     fi
     REPORT_CONTENT="${REPORT_CONTENT}
 
-## ${reviewer^} Output
+## ${reviewer_title} Output
 
 (verdict ${REVIEWER_VERDICTS[$reviewer]} — ${omit_reason})
 "
@@ -1899,22 +1907,27 @@ If user selects **Cancel**:
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || GIT_ROOT=""
 STATE_FILE="${GIT_ROOT:+$GIT_ROOT/.git/council-state.tsv}"
 declare -A REVIEWER_FENCED_PATHS
+STATE_REVIEWERS=()
 if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
-  while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
+  while IFS=$'\t' read -r r v c fp; do
+    REVIEWER_FENCED_PATHS[$r]=$fp
+    STATE_REVIEWERS+=("$r")
+  done < "$STATE_FILE"
 fi
 printf '[council] Report not saved.\n'
 # Shape-check before unlinking, exactly as Step 7 does before reading. Step 7's
 # guard filters only that block's local copy; $STATE_FILE still holds the RAW
 # value `parse_reviewer_return` persisted, so an unguarded `rm -f` here would
 # delete an attacker-chosen path — a strictly worse outcome than the arbitrary
-# READ the Step 7 guard closed. Iterate keys, not values: the pattern is
-# per-reviewer.
+# READ the Step 7 guard closed. Iterate reviewer names, not values: the
+# pattern is per-reviewer. (A plain name list, not "${!array[@]}" — key
+# expansion is bash-only and these blocks may run under zsh.)
 # Skip claude here: a shape match alone (e.g. an injected
 # /tmp/council-claude-fenced-victim.txt) is not proof this run minted it, only
 # an identity check against the literal CLAUDE_FENCED_FILE value is — the
 # dedicated block below this loop applies that check and is unconditional, so
 # claude's temp file is still reclaimed.
-for reviewer in "${!REVIEWER_FENCED_PATHS[@]}"; do
+for reviewer in "${STATE_REVIEWERS[@]}"; do
   [ "$reviewer" = "claude" ] && continue
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   case "$fenced_path" in
@@ -1999,21 +2012,26 @@ fi
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || GIT_ROOT=""
 STATE_FILE="${GIT_ROOT:+$GIT_ROOT/.git/council-state.tsv}"
 declare -A REVIEWER_FENCED_PATHS
+STATE_REVIEWERS=()
 if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
-  while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
+  while IFS=$'\t' read -r r v c fp; do
+    REVIEWER_FENCED_PATHS[$r]=$fp
+    STATE_REVIEWERS+=("$r")
+  done < "$STATE_FILE"
 fi
 # Shape-check before unlinking, exactly as Step 7 does before reading. Step 7's
 # guard filters only that block's local copy; $STATE_FILE still holds the RAW
 # value `parse_reviewer_return` persisted, so an unguarded `rm -f` here would
 # delete an attacker-chosen path — a strictly worse outcome than the arbitrary
-# READ the Step 7 guard closed. Iterate keys, not values: the pattern is
-# per-reviewer.
+# READ the Step 7 guard closed. Iterate reviewer names, not values: the
+# pattern is per-reviewer. (A plain name list, not "${!array[@]}" — key
+# expansion is bash-only and these blocks may run under zsh.)
 # Skip claude here: a shape match alone (e.g. an injected
 # /tmp/council-claude-fenced-victim.txt) is not proof this run minted it, only
 # an identity check against the literal CLAUDE_FENCED_FILE value is — the
 # dedicated block below this loop applies that check and is unconditional, so
 # claude's temp file is still reclaimed.
-for reviewer in "${!REVIEWER_FENCED_PATHS[@]}"; do
+for reviewer in "${STATE_REVIEWERS[@]}"; do
   [ "$reviewer" = "claude" ] && continue
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   case "$fenced_path" in

@@ -155,6 +155,11 @@ mutation, and use only the enabled provider.
     the closing quote. Single-quoted arguments are blanked before the
     SHC-002/003/005/006 checks so awk/jq/`bash -c` program text is not read
     as shell. An unclosed quote falls back to plain lines (fail open).
+    Text the shell expands but does not run — unquoted-tag heredoc bodies
+    and the inside of multi-line double-quoted strings — gets only the
+    expansion rules (bash-only `${…}` forms and variables, literal array
+    indexes): `${reviewer^}` inside council's multi-line report string is
+    a zsh `bad substitution` even though it is not a command.
   - **Rules.** All inline rules are skipped inside a Tier 2 wrapper body
     (`bash <<'TAG'` and `bash -c` lines): a bash child has no zsh specials
     and ignores the parent's noclobber. Every finding prints file, line,
@@ -164,8 +169,10 @@ mutation, and use only the enabled provider.
       the same file, or an UPPERCASE `mktemp` variable anywhere in the same
       plugin (the cross-file handoff convention: an agent creates
       `OUTPUT_FILE`, the skill it follows documents `> "$OUTPUT_FILE"`), or a
-      second `>` onto the same target in one block. `${var:-/dev/null}` and
-      paths built from a variable (`$f.err`) are exempt.
+      second `>` onto the same target in one block, or the truncation idiom
+      `: > file` / `true > file` (which exists to truncate a file that may
+      already be there). `${var:-/dev/null}`, `/dev/*` and paths built from
+      a variable (`$f.err`) are exempt.
     - SHC-002 (special parameter): assigning, declaring, `for`/`select`
       looping over, or `read`ing into `status`, `path`, `argv`, `pipestatus`,
       `fpath`, `cdpath` or `manpath`.
@@ -280,12 +287,13 @@ Each PR fixes the source files, regenerates the Codex/Cursor copies
 changeset per touched plugin. The file:line lists below are the measured
 inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 
-- [ ] 2.1: yellow-composio `skills/composio-patterns/SKILL.md:192`. Fix the
+- [x] 2.1: yellow-composio `skills/composio-patterns/SKILL.md:192`. Fix the
       zsh parse failure in `( flock -x 200; … ) 200>"$LOCK_FILE"` (and the
       noclobber hit after `touch "$LOCK_FILE"`, which the parse failure hides
       from the lint). Use `exec 200>>"$LOCK_FILE"` or a `bash <<'EOF'`
       wrapper.
-- [ ] 2.2: yellow-council (26 findings).
+- [x] 2.2: yellow-council (26 findings; 31 after the truncation and
+      expand-class rules added while fixing it).
   - SHC-003: `commands/council/council.md:55-56` and
     `commands/council/setup.md:33` read `BASH_VERSINFO`, which is empty in
     zsh, so `/council` and `/council:setup` refuse to run under zsh
@@ -298,6 +306,11 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
     `skills/council-patterns/SKILL.md:602,977,1009` (the canonical pattern
     the reviewer agents copy).
   - SHC-002: `council-patterns/SKILL.md:672,674,677` (`path`).
+  - Found while fixing: `council.md:1846,1866` `${reviewer^}` inside a
+    multi-line report string, and `: > "$STATE_FILE"` (`:348`) /
+    `: > "$fenced_path"` (`:841`) truncations — the latter is the wipe of
+    raw reviewer output after a redaction failure, which zsh's noclobber
+    silently refused.
 - [ ] 2.3: yellow-core (8 findings).
   - Wrap `agents/workflow/staging-reviewer.md:249,251` (`${!`, `read -ra`).
   - Rewrite the `${!BRANCHES[@]}` loop at `commands/flow/review.md:209`.
@@ -306,6 +319,9 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
   - `commands/setup/all.md:83` (SHC-001, `>"$out"` after `mktemp`) and
     `:203` (SHC-002, `for path in`).
   - `commands/worktree/cleanup.md:51` (SHC-005, `${args_copy[$i]}` from 0).
+  - Truncations (SHC-001): `agents/workflow/staging-reviewer.md:148`
+    (`: > "$MOVED_THIS_DRAIN_FILE"`) and
+    `commands/compound/review-staged.md:189` (`: > "$DRAIN_LOG"`).
 - [ ] 2.4: yellow-debt (14 findings).
   - Wrap every markdown block that sources `lib/validate.sh`:
     `commands/debt/fix.md:29`, `audit.md:35`, `status.md:28`, `sync.md:135`,
@@ -647,7 +663,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/refactor/shared-markdown-fences (completed 2026-09-28)
-- [ ] 2. agent/feat/shell-compat-lint
+- [x] 2. agent/feat/shell-compat-lint (completed 2026-09-28)
 - [ ] 3. agent/fix/zsh-composio-council
 - [ ] 4. agent/fix/zsh-core-debt-wrappers
 - [ ] 5. agent/fix/zsh-ci-ruvector-wrappers

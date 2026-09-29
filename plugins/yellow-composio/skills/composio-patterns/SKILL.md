@@ -204,7 +204,7 @@ do_increment() {
     .periods[$month].total += 1 |
     .periods[$month].by_tool[$tool] = ((.periods[$month].by_tool[$tool] // 0) + 1) |
     .periods[$month].by_day[$day] = ((.periods[$month].by_day[$day] // 0) + 1)
-  ' "$USAGE_FILE" > "${USAGE_FILE}.tmp"; then
+  ' "$USAGE_FILE" >| "${USAGE_FILE}.tmp"; then
     mv "${USAGE_FILE}.tmp" "$USAGE_FILE"
   else
     rm -f "${USAGE_FILE}.tmp"
@@ -214,8 +214,11 @@ do_increment() {
 
 if [ -f "$USAGE_FILE" ]; then
   if command -v flock >/dev/null 2>&1; then
+    # fd 9, not 200: zsh cannot parse a multi-digit fd on a subshell
+    # redirect. `>>` because the lock file already exists and zsh's
+    # noclobber refuses a plain `>` onto it (append never truncates).
     touch "$LOCK_FILE"
-    ( flock -x 200; do_increment ) 200>"$LOCK_FILE"
+    ( flock -x 9; do_increment ) 9>>"$LOCK_FILE"
   else
     do_increment
   fi

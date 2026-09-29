@@ -524,8 +524,8 @@ function checkDefinitionSites(roster, errors) {
   const lines = councilBody.split(/\r?\n/);
   const rel = toPosix(path.relative(ROOT, COUNCIL_MD));
 
-  // D1 — the fixed-list loop. The character class excludes the key-iteration
-  // loops (`for reviewer in "${!REVIEWER_FENCED_PATHS[@]}"`), which are
+  // D1 — the fixed-list loop. The character class excludes the state-driven
+  // loops (`for reviewer in "${STATE_REVIEWERS[@]}"`), which are
   // deliberately roster-agnostic and must not be touched.
   const loops = [];
   lines.forEach((line, i) => {
