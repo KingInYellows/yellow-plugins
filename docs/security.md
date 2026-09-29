@@ -336,7 +336,7 @@ fields (working directory, session context metrics). The boundary:
 - **Storage.** One record per session at
   `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/<session_id>.json`,
   written through a temp file plus atomic rename. The directory is created
-  0700 and the file 0600. Stored fields: `session_id`, `observed_at`, `cwd`,
+  0700 and the file 0600. Stored fields: `session_id`, `observed_at`,
   `transcript_present` (a boolean; the transcript path itself is never
   stored), context-window percentages/size, and advisory-watermark
   crossings. `session_id` is allowlisted to `[A-Za-z0-9_-]{1,128}`, and the
@@ -356,7 +356,8 @@ fields (working directory, session context metrics). The boundary:
   malformed, cross-session, or out of range; and exposes only six known
   fields into the handoff note — five numbers or timestamps (each nulled
   when outside the range the observer writes) and the `advisory_state` enum.
-  `cwd` is never read back out. The reader always takes the newest
+  `cwd` is never stored (it can carry credential-bearing path components);
+  it only keys the slug when `project_dir` is absent. The reader always takes the newest
   `projects/*/context-observations/<sid>.json` for the session id, since a
   linked worktree or subdirectory launch can key the write under a
   different slug than the read.

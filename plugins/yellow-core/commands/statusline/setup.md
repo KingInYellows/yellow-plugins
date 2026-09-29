@@ -66,7 +66,7 @@ fi
 
 printf '\n=== Existing State ===\n'
 [ -d "$CONFIG" ] && printf 'claude_dir: exists\n' || printf 'claude_dir: missing\n'
-[ -f ~/.claude/yellow-statusline.py ] && printf 'script: exists\n' || printf 'script: missing\n'
+[ -f "$CONFIG/yellow-statusline.py" ] && printf 'script: exists\n' || printf 'script: missing\n'
 [ -f "$CONFIG/settings.json" ] && printf 'settings: exists\n' || printf 'settings: missing\n'
 
 if [ -f "$CONFIG/settings.json" ]; then
@@ -136,6 +136,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" status --settings "$C
   (for example `settings_jsonc` when a manual merge lives in a JSONC file):
   report "observer state unknown" with the code and reason, never "not
   enabled", and do not offer to enable it. Carry this into Steps 4, 5b and 6.
+  Exception: when the code is `settings_invalid` and Step 5 then returns
+  `action: "recovered"`, re-run this probe before Step 5b and use the new result.
 
 ### Step 2: Build Configuration from Detected Plugins
 
@@ -183,15 +185,16 @@ Resolve the absolute home path first:
 python3 -c "import os; print(os.path.expanduser('~'))"
 ```
 
-Use the Write tool to create `~/.claude/yellow-statusline.py` from the
+Use the Write tool to create `$CONFIG/yellow-statusline.py` (with
+`CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"` resolved to an absolute path) from the
 template below, replacing every `REPLACE_WITH_…` placeholder: `GENERATED_AT`
 (ISO timestamp), `DETECTED_PLUGINS`, `ENV_REQUIREMENTS` (Step 2), and
 `RUVECTOR_CHECK` (`True` when yellow-ruvector is installed).
 
-Create `~/.claude/` if it does not exist:
+Create `$CONFIG` if it does not exist:
 
 ```bash
-mkdir -p ~/.claude
+mkdir -p "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 ```
 
 The generated script content is the template at
@@ -201,7 +204,7 @@ Read it and write it verbatim except for those placeholders.
 After writing, set executable:
 
 ```bash
-chmod +x ~/.claude/yellow-statusline.py
+chmod +x "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statusline.py"
 ```
 
 ### Step 4: Preview and Conflict Check
@@ -256,11 +259,11 @@ Use AskUserQuestion to get confirmation.
 > Options: "Replace existing" / "Back up existing and replace" / "Cancel"
 
 If the user cancels the fresh install: print "Setup cancelled. statusLine was
-not set (the generated script at ~/.claude/yellow-statusline.py remains)." and
+not set (the generated script at $CONFIG/yellow-statusline.py remains)." and
 stop.
 
 If the user cancels replacing an existing statusline: print "statusLine not
-replaced (the generated script at ~/.claude/yellow-statusline.py was
+replaced (the generated script at $CONFIG/yellow-statusline.py was
 updated).", run Step 5b (the observer can still be composed ahead of the
 existing statusline), report what it changed, and stop without Step 6.
 
@@ -297,7 +300,7 @@ fresh:
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" statusline --settings "$CONFIG/settings.json" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
-  --statusline "$HOME/.claude/yellow-statusline.py"
+  --statusline "$CONFIG/yellow-statusline.py"
 ```
 
 On `action: "statusline-set"` report `proposed_command`. On
@@ -317,7 +320,7 @@ composition rules, the manual merge or the removal steps, Read
 Every command below uses `CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"`,
 `--settings "$CONFIG/settings.json"`, `--observer-dest
 "$CONFIG/yellow-context-observer.py"` and `--statusline
-"$HOME/.claude/yellow-statusline.py"`; `install` also takes `--observer-src
+"$CONFIG/yellow-statusline.py"`; `install` also takes `--observer-src
 "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py"` (all of these are the
 script's defaults, so they may be left out). Each prints one JSON object
 (`action`, `error_code`, `existing_command`, `proposed_command`, `settings`,
@@ -330,7 +333,8 @@ stop. `enable --yes`: skip the questions and run `install` (report
 `installed`, `upgraded` or `refreshed`, `backup`, and `proposed_command`).
 `disable --yes`: skip the question and run `remove`. Any `action: "error"` is
 handled as below. Without `--yes`, use the questions. When Step 1 reported
-the observer state unknown, stop with its `error_code` and `reason` instead
+the observer state unknown (after re-probing if Step 5 returned
+`action: "recovered"`), stop with its `error_code` and `reason` instead
 of changing anything.
 
 **Observer not enabled (Step 1).** Ask via AskUserQuestion: "Record context
@@ -345,7 +349,7 @@ CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" install --settings "$CONFIG/settings.json" \
   --observer-src "${CLAUDE_PLUGIN_ROOT}/lib/context-observer.py" \
   --observer-dest "$CONFIG/yellow-context-observer.py" \
-  --statusline "$HOME/.claude/yellow-statusline.py"
+  --statusline "$CONFIG/yellow-statusline.py"
 ```
 
 `installed` → report `backup`; only `statusLine.command` changed.
@@ -370,7 +374,7 @@ with `${CLAUDE_PLUGIN_ROOT}` resolved.
 Run the generated script with mock data to verify it works:
 
 ```bash
-echo '{"model":{"display_name":"Test","id":"test"},"context_window":{"used_percentage":45,"remaining_percentage":55,"context_window_size":200000},"cost":{"total_duration_ms":120000},"cwd":"/tmp"}' | python3 ~/.claude/yellow-statusline.py
+echo '{"model":{"display_name":"Test","id":"test"},"context_window":{"used_percentage":45,"remaining_percentage":55,"context_window_size":200000},"cost":{"total_duration_ms":120000},"cwd":"/tmp"}' | python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statusline.py"
 ```
 
 If the output is non-empty and the exit code is 0, report success.
@@ -395,7 +399,7 @@ Display the final report, substituting the actual `$CONFIG` value:
 Yellow Plugins Statusline — Installed
 ======================================
 
-  Script:    ~/.claude/yellow-statusline.py
+  Script:    $CONFIG/yellow-statusline.py
   Settings:  $CONFIG/settings.json (statusLine key added)
   Plugins:   X detected (Y with MCP servers)
   Observer:  enabled | not enabled | unknown (<error_code>)   (measured)

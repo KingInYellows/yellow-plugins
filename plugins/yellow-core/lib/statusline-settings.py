@@ -22,7 +22,7 @@ Subcommands:
 Every path has a default, so `install` alone works: --settings is
 ${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, --observer-dest is
 <config>/yellow-context-observer.py, --statusline is
-~/.claude/yellow-statusline.py and --observer-src is context-observer.py next
+<config>/yellow-statusline.py and --observer-src is context-observer.py next
 to this script. --dry-run (statusline, install, remove, prune) reports what
 would happen and writes nothing.
 
@@ -87,6 +87,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import sys
 import tempfile
 import time
@@ -246,10 +247,16 @@ def leading_observer(command):
     if match is None:
         return None
     form = next(f for f in OBSERVER_FORMS if match.group(f + "_path") is not None)
-    parts = tokens(match.group(form + "_path"))
+    raw = match.group(form + "_path")
+    parts = tokens(raw)
     if not parts or len(parts) != 1:
         return None
-    return normalize(os.path.expandvars(parts[0])), form
+    path = parts[0]
+    # Expand variables only where the shell would: observer_stage() single-quotes
+    # its path, so a "$" there (or after a backslash) is literal and must stay so.
+    if "'" not in raw and "\\" not in raw:
+        path = os.path.expandvars(path)
+    return normalize(path), form
 
 
 def contains_observer(command, observer_dest):
@@ -531,18 +538,25 @@ def run_remove(args, result):
 def run_prune(args, result):
     """Delete observation records (and stale part files) not modified for --older-than-days."""
     cutoff = time.time() - args.older_than_days * 86400
-    base = os.path.join(glob.escape(config_dir()), "projects", "*", "context-observations")
+    projects_root = os.path.realpath(os.path.join(config_dir(), "projects"))
+    dirs = glob.glob(os.path.join(glob.escape(config_dir()), "projects", "*", "context-observations"))
     doomed = []
-    # "*" does not match dot files, and the writer's part files are dot files.
-    for path in glob.glob(os.path.join(base, "*")) + glob.glob(os.path.join(base, ".*")):
-        name = os.path.basename(path)
-        if not (name.endswith(".json") or name.endswith(".part")):
+    for obs_dir in dirs:
+        # Never follow a symlinked observation directory out of the projects root.
+        if os.path.islink(obs_dir) or not os.path.realpath(obs_dir).startswith(projects_root + os.sep):
             continue
-        try:
-            if os.path.isfile(path) and os.stat(path).st_mtime < cutoff:
-                doomed.append(path)
-        except OSError:
-            continue
+        base = glob.escape(obs_dir)
+        # "*" does not match dot files, and the writer's part files are dot files.
+        for path in glob.glob(os.path.join(base, "*")) + glob.glob(os.path.join(base, ".*")):
+            name = os.path.basename(path)
+            if not (name.endswith(".json") or name.endswith(".part")):
+                continue
+            try:
+                st = os.lstat(path)
+                if stat.S_ISREG(st.st_mode) and st.st_mtime < cutoff:
+                    doomed.append(path)
+            except OSError:
+                continue
     if args.dry_run:
         result["action"] = "prune"
         result["reason"] = "would remove %d observation file(s) not modified for %d day(s)" % (
@@ -612,8 +626,8 @@ def parse_args(argv):
                          help="path to settings.json (default: <config dir>/settings.json)")
         cmd.add_argument("--observer-dest", default=os.path.join(config_dir(), OBSERVER_NAME),
                          help="installed observer path (default: <config dir>/%s)" % OBSERVER_NAME)
-        cmd.add_argument("--statusline", default=os.path.join(os.path.expanduser("~"), ".claude", "yellow-statusline.py"),
-                         help="yellow statusline script path (default: ~/.claude/yellow-statusline.py)")
+        cmd.add_argument("--statusline", default=os.path.join(config_dir(), "yellow-statusline.py"),
+                         help="yellow statusline script path (default: <config dir>/yellow-statusline.py)")
         cmd.add_argument("--observer-src", default=os.path.join(here, "context-observer.py"),
                          help="lib/context-observer.py to copy (default: next to this script)")
         if name in ("statusline", "install", "remove", "prune"):

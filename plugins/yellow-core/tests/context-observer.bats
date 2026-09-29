@@ -1236,3 +1236,49 @@ assert backup('{"n": 4}\n') == settings + ".pre-observer.backup.4", "a new backu
 PY
   [ "$status" -eq 0 ]
 }
+
+# --- sweep follow-ups (PR #912 bot threads) ------------------------------------
+
+@test "T09: the record does not store cwd" {
+  observe nocwd 61
+  jq -e 'has("cwd") | not' "$(record_for nocwd)" >/dev/null
+}
+
+@test "T09: a symlinked observations directory is refused and nothing is written through it" {
+  local slug dir target
+  slug=$(printf '%s' "$PROJECT" | tr '/' '-')
+  dir="$HOME/.claude/projects/$slug"
+  target="$TEST_HOME/elsewhere"
+  mkdir -p "$dir" "$target"
+  chmod 755 "$target"
+  ln -s "$target" "$dir/context-observations"
+  run --separate-stderr bash -c 'payload() { jq -c --arg dir "$1" ".session_id = \"linked\" | .cwd = \$dir | .workspace.project_dir = \$dir" "$2"; }
+    payload "$1" "$2" | CONTEXT_OBSERVER_DEBUG=1 python3 "$3" >/dev/null' _ "$PROJECT" "$FIX/mid-session.json" "$OBS"
+  [ "$status" -eq 0 ]
+  [ -z "$(ls -A "$target")" ]
+  [ "$(stat -c '%a' "$target")" = "755" ]
+  [[ "$stderr" == *"outside"* ]]
+}
+
+@test "T11: prune does not follow a symlinked observations directory" {
+  local target="$TEST_HOME/elsewhere"
+  mkdir -p "$target" "$HOME/.claude/projects/-p"
+  : > "$target/old.json"
+  touch -d '40 days ago' "$target/old.json"
+  ln -s "$target" "$HOME/.claude/projects/-p/context-observations"
+  run --separate-stderr python3 "$SETUP_PY" prune --older-than-days 30
+  echo "$output" | jq -e '.action == "pruned" and (.reason | test("removed 0 "))' >/dev/null
+  [ -e "$target/old.json" ]
+}
+
+@test "T11: an observer destination with a literal \$ is recognised after install" {
+  seed_settings "bash ~/custom.sh"
+  OBS_DEST="$TEST_HOME/lit\$HOME/yellow-context-observer.py"
+  run --separate-stderr setup_py install
+  echo "$output" | jq -e '.action == "installed"' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-src "$OBS" \
+    --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "enabled"' >/dev/null
+  run --separate-stderr setup_py install
+  echo "$output" | jq -e '.action == "already-installed"' >/dev/null
+}

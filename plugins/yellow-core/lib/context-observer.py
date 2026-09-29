@@ -161,8 +161,6 @@ def build_record(payload, session_id):
         "observer_format": OBSERVER_FORMAT,
         "session_id": session_id,
         "observed_at": time.strftime(TIMESTAMP_FORMAT, time.gmtime()),
-        # Private state: stays in this untracked record and is never printed.
-        "cwd": payload.get("cwd") if isinstance(payload.get("cwd"), str) else None,
         "transcript_present": bool(payload.get("transcript_path")),
         "context_window": {
             "used_percentage": number_or_none(window.get("used_percentage")),
@@ -259,7 +257,7 @@ def unchanged(previous, record):
     """True when previous carries the same numbers and is recent enough to keep."""
     if not isinstance(previous, dict):
         return False
-    for key in ("context_window", "advisory", "transcript_present", "cwd"):
+    for key in ("context_window", "advisory", "transcript_present"):
         if previous.get(key) != record.get(key):
             return False
     age = age_seconds(previous.get("observed_at"))
@@ -277,6 +275,16 @@ def write_record(path, record):
     """
     directory = os.path.dirname(path)
     session_id = record["session_id"]
+    # Refuse a symlinked slug or observations directory (projects/ itself may be
+    # a symlink, as prune allows): makedirs, chmod and the publish would follow it.
+    root = config_dir()
+    expected = os.path.join(
+        os.path.realpath(os.path.join(root or "", "projects")),
+        os.path.basename(os.path.dirname(directory)),
+        "context-observations",
+    )
+    if root is None or os.path.realpath(directory) != expected:
+        raise OSError("observation directory resolves outside %s/projects" % root)
     os.makedirs(directory, mode=0o700, exist_ok=True)
     try:
         os.chmod(directory, 0o700)

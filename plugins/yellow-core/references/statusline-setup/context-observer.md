@@ -82,8 +82,8 @@ observer stage has nothing after it), edit the command by hand.
 
 Agents can call the script directly instead of the Step 5b questions, or use
 `/statusline:setup observer enable|disable|status --yes`. Every path has a
-default (`--settings` and `--observer-dest` follow `CLAUDE_CONFIG_DIR`,
-`--statusline` is `~/.claude/yellow-statusline.py`, `--observer-src` is the
+default (`--settings`, `--observer-dest` and `--statusline` follow
+`CLAUDE_CONFIG_DIR`, `--observer-src` is the
 copy next to the script), so `statusline-settings.py status` works with no
 flags.
 
