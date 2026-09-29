@@ -444,7 +444,7 @@ describe('fixture runs', () => {
     write('plugins/demo/commands/t3.md', md(src('b3.sh')));
     write(
       'plugins/demo/commands/t3w.md',
-      md(`bash -c "$(cat <<'__W__'\n${src('b3.sh')}\n__W__\n)"`)
+      md(`bash /dev/fd/3 3<<'__W__'\n${src('b3.sh')}\n__W__`)
     );
     write('plugins/demo/commands/t4.md', md(src('b4.sh')));
     write('plugins/demo/commands/un.md', md(src('new.sh')));
