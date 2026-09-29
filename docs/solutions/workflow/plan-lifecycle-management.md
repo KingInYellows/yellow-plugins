@@ -252,8 +252,10 @@ showed the same. That is one PR and one short retry: it does not rule out
 propagation lag over a longer window, and it does not distinguish a merge from
 an ejection. The detection record treats null `mergedAt` as ambiguous (lag,
 ejection, or external close) and names the PR's `merged` boolean as the
-authoritative check, so confirm `merged` before treating any such PR as
-merged.
+authoritative check. `merged: true` settles it; `merged: false` does not rule
+out a Graphite direct push to trunk, where GitHub never performs the PR merge.
+In that case confirm the delivered commit on `origin/main` with the
+diff-stat equality check below before using the override.
 
 - **File-provenance tier** — `gh api repos/{owner}/{repo}/commits/{sha}/pulls
   --jq '[.[]|select(.state=="closed")]'` against the squash commit returned 0
@@ -275,7 +277,8 @@ merged.
 Treat this as an observation for #808 only. Other Graphite-MQ merges may
 behave differently, so no claim is made that they all fall through to the
 override; if a PR shows this state, expect the provenance → strict → loose →
-override fallthrough as a possibility and check `merged` first.
+override fallthrough as a possibility: check `merged` first, then the
+commit on `origin/main` when `merged` is false.
 
 ### Verifying an MQ merge when Gate C has nothing: diff-stat equality
 
@@ -332,7 +335,11 @@ stacked-PR provider is mandatory (CLAUDE.md): never fall back to raw
    explicit confirmation first, and prefer moving them to a user-approved
    backup location over deleting.
 3. Re-run `gt repo sync` so local `main` fast-forwards, then retry
-   `gt submit --no-interactive` / `gt merge` from the archive worktree.
+   `gt submit --no-interactive` from the archive worktree.
+4. Merging is a separate step: land the PR only through `/gt-merge`, which
+   previews the exact PRs it will merge and asks for confirmation first.
+   Never run a bare `gt merge` as part of submit recovery — it lands every PR
+   from trunk up to the current branch.
 
 If trunk still cannot be repaired, stop and report the `gt repo sync`
 error to the user rather than routing around `gt`.
