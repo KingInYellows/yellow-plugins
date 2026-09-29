@@ -1,6 +1,6 @@
 /**
- * Shared runtime types for the yellow-jules CLI. Nothing here imports
- * `@google/jules-sdk` — these are normalized, already-validated shapes the
+ * Shared runtime types for the yellow-jules CLI. Nothing here imports the
+ * Jules SDK — these are normalized, already-validated shapes the
  * adapter translates SDK responses into, so runtime.ts, state.ts, and tests
  * only ever depend on this module.
  */
@@ -48,7 +48,11 @@ export interface AdapterGeneratedFile {
 export interface AdapterSession {
   /** Validated `sessions/{id}`. */
   readonly sessionResource: string;
-  /** The SDK's SessionState, or the raw REST state string when the SDK reports `unspecified` for it (R10). */
+  /**
+   * The SDK's SessionState. The pinned SDK maps any unknown REST state to
+   * `unspecified` and does not keep the raw string, so an unknown state
+   * surfaces as `unspecified` (condition `needs-inspection`, R10).
+   */
   readonly vendorState: string;
   readonly title: string;
   readonly createTime?: string;
@@ -119,8 +123,9 @@ export interface AdapterSource {
 
 export interface SourcePage {
   readonly sources: readonly AdapterSource[];
-  readonly nextPageToken?: string;
-  /** Set when a source on the page is not a GitHub repository the adapter can map. */
+  /** More sources exist beyond `pageSize` (the SDK exposes sources only as an auto-paginating iterator). */
+  readonly truncated: boolean;
+  /** Set when a source is not a GitHub repository the SDK mapper understands. */
   readonly unsupportedReason?: string;
 }
 
@@ -144,7 +149,7 @@ export interface SdkAdapter {
     options: PageOptions
   ): Promise<ActivityPage>;
   getSource(owner: string, repo: string): Promise<AdapterSource>;
-  listSources(options: Omit<PageOptions, 'filter'>): Promise<SourcePage>;
+  listSources(options: { readonly pageSize: number }): Promise<SourcePage>;
   close(): Promise<void>;
 }
 

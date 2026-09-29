@@ -1,0 +1,49 @@
+"use strict";
+/**
+ * Absolute operation deadlines and the bounded read retry (R14, contract
+ * "Ambiguous-outcome design"): reads retry at most twice, with exponential
+ * backoff from 500 ms plus jitter, on 5xx and network errors only, and only
+ * while the deadline leaves room. A 429 returns control immediately (the SDK
+ * exposes no Retry-After). Writes never go through this helper.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
+exports.deadlineIn = deadlineIn;
+exports.remainingMs = remainingMs;
+exports.isExpired = isExpired;
+exports.withReadRetry = withReadRetry;
+const errors_js_1 = require("./errors.js");
+exports.DEFAULT_READ_DEADLINE_MS = 120_000;
+exports.DEFAULT_COLLECT_DEADLINE_MS = 180_000;
+exports.READ_RETRIES = 2;
+exports.READ_BACKOFF_BASE_MS = 500;
+function deadlineIn(clock, ms) {
+    return { expiresAt: clock.now() + ms };
+}
+function remainingMs(clock, deadline) {
+    return deadline.expiresAt - clock.now();
+}
+function isExpired(clock, deadline) {
+    return remainingMs(clock, deadline) <= 0;
+}
+function isRetryableRead(err) {
+    return (err instanceof errors_js_1.AdapterError &&
+        (err.kind === 'server-error' || err.kind === 'network'));
+}
+async function withReadRetry(fn, options) {
+    const random = options.random ?? Math.random;
+    for (let attempt = 0;; attempt += 1) {
+        try {
+            return await fn();
+        }
+        catch (err) {
+            if (attempt >= exports.READ_RETRIES || !isRetryableRead(err))
+                throw err;
+            const delay = exports.READ_BACKOFF_BASE_MS * 2 ** attempt +
+                Math.floor(random() * exports.READ_BACKOFF_BASE_MS);
+            if (remainingMs(options.clock, options.deadline) <= delay)
+                throw err;
+            await options.clock.sleep(delay);
+        }
+    }
+}

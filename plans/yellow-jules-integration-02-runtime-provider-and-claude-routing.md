@@ -373,7 +373,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   byte-identical, stale lock fails loud and is left in place, reservation
   lookup, retention). Run `pnpm --filter yellow-jules test` and
   `pnpm --filter yellow-jules typecheck`.
-- [ ] Step 1.10: Commit (`feat(yellow-jules): scaffold package, config, errors, redaction, validation, journal`)
+- [x] Step 1.10: Commit (`feat(yellow-jules): scaffold package, config, errors, redaction, validation, journal`)
   and submit as a **draft PR** through the active stack provider. The PR body
   starts with the literal enumeration-site checklist from
   `docs/yellow-jules/integration-plan.md` "PR2 enumeration-site checklist",
@@ -384,7 +384,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
 
 ### Checkpoint 2 — SDK resolver, adapter, runtime, CLI
 
-- [ ] Step 2.1: `src/sdk-resolver.ts` — `resolveSdk(deps)`: run
+- [x] Step 2.1: `src/sdk-resolver.ts` — `resolveSdk(deps)`: run
   `assertOwnerOnlyDir` first; resolve `@google/jules-sdk/package.json`
   through the workspace (`createRequire(__filename)`) then
   `<dataDir>/runtime/node_modules` (`createRequire` rooted there); read
@@ -404,19 +404,19 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   post-stream); on success write `runtime/pin.json` with `sdkVersion`,
   `sdkIntegrity` (from the lockfile), `sdkEntrySha256`, and the verified tree
   (R4, contract `setup`). Never installs per task.
-- [ ] Step 2.2: `src/fetch-guard.ts` — `installFetchGuard({ allowedOrigins, readTimeoutMs, onPostDispatch })`
+- [x] Step 2.2: `src/fetch-guard.ts` — `installFetchGuard({ allowedOrigins, readTimeoutMs, onPostDispatch })`
   wrapping `globalThis.fetch` exactly once (second install throws): refuse any
   origin other than `https://jules.googleapis.com` (plus loopback origins
   wired only by the test seam), refuse non-`https:` except that loopback,
   force `redirect: "manual"` and **throw** on any 3xx, race a 30 000 ms
   `AbortController` on non-POST requests, and record POST dispatch time
   (contract "Network guard").
-- [ ] Step 2.3: `src/test-seam.ts` — the only path to a loopback `baseUrl`:
+- [x] Step 2.3: `src/test-seam.ts` — the only path to a loopback `baseUrl`:
   an exported `__setTestTransport({ baseUrl, allowedOrigins })` that the CLI
   consults, called only by `tests/support/loopback-preload.cjs` (loaded with
   `node --require`) or in-process tests. It is never read from config, env,
   or argv; `baseUrl` must parse as `http(s)://127.0.0.1:<port>`.
-- [ ] Step 2.4: `src/sdk-adapter.ts` — the only file that touches the SDK API
+- [x] Step 2.4: `src/sdk-adapter.ts` — the only file that touches the SDK API
   (type imports from `@google/jules-sdk` plus the module namespace handed in
   by the resolver, R2). Export `buildClientOptions({ apiKey, baseUrl? })`
   returning exactly the contract `connect()` shape (`config.requestTimeoutMs:
@@ -439,7 +439,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   every returned id before returning it (R7); carry the raw REST state when it
   differs from `unspecified` (R10). Never call `run`, `all`, `result`, `ask`,
   `waitFor`, `stream`, `updates`, `history`, `hydrate`, or `sync` (R9).
-- [ ] Step 2.5: `src/activity-walk.ts` — the single walk unit from contract
+- [x] Step 2.5: `src/activity-walk.ts` — the single walk unit from contract
   "Activity walk": parameters `pageSize` (50 / 10 for collect), start point
   (watermark filter, resume token, or session start), `writeReadState`
   capability (true only for `status`), page cap 20, deadline; stops on page
@@ -451,7 +451,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   with `JULES_NO_PROGRESS` on the second consecutive no-progress restart;
   `pendingPlan` rule (newest `planGenerated` replaces, `planApproved`
   clears); filtered-request `400` retried once unfiltered.
-- [ ] Step 2.6: `src/runtime.ts` — `RuntimeDeps` (`adapterFactory`, `clock`,
+- [x] Step 2.6: `src/runtime.ts` — `RuntimeDeps` (`adapterFactory`, `clock`,
   `env`, `dataDir`), bounded read retry helper (2 retries, 500 ms exponential
   backoff with jitter, 5xx/network only, never on 429, inside the absolute
   deadline, R14), and the four read operations:
@@ -488,7 +488,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
     `CapabilityResult` reason (R11).
   Every result sets `requiresAttention`/`attention` per contract "Output
   envelope".
-- [ ] Step 2.7: `src/cli.ts` — `#!/usr/bin/env node`; `KNOWN_OPERATIONS =
+- [x] Step 2.7: `src/cli.ts` — `#!/usr/bin/env node`; `KNOWN_OPERATIONS =
   ['setup','list','status','collect']`; per-subcommand strict `parseArgs`
   (no positionals; `--deadline-ms` everywhere, defaults 120 000 for reads and
   180 000 for `collect`); `printJson` = one line of
@@ -497,7 +497,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   errors (R7); install the fetch guard before building the adapter; any other
   subcommand name (including `delegate`, `reply`, `approve`) is a usage error
   in PR2.
-- [ ] Step 2.8: `tests/fake-sdk.ts` (`FakeSdkAdapter implements SdkAdapter`
+- [x] Step 2.8: `tests/fake-sdk.ts` (`FakeSdkAdapter implements SdkAdapter`
   with overridable `*Impl` fields and call recorders, mirroring
   `plugins/yellow-cursor/tests/fake-sdk.ts`) and fake-adapter suites:
   `runtime-status.test.ts` (condition mapping incl. unknown states, activity

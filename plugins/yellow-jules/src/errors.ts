@@ -1,7 +1,7 @@
 /**
  * Stable app-level error codes for the yellow-jules CLI, plus the
  * transport-neutral adapter-error normalization boundary. This module has
- * zero dependency on `@google/jules-sdk` — sdk-adapter.ts is the only file
+ * zero dependency on the Jules SDK — sdk-adapter.ts is the only file
  * that classifies SDK error classes (by `instanceof`, most-derived first);
  * it constructs AdapterError instances (defined here), and this module maps
  * those to the JULES_* code table below by call phase.

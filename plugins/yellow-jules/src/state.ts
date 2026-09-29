@@ -28,6 +28,7 @@ import {
 import { throwAppError } from './errors.js';
 import { assertNoSecretShapedValues } from './redact.js';
 import type {
+  ArtifactRecord,
   DeviationRecord,
   Journal,
   OperationKind,
@@ -748,6 +749,41 @@ export async function upsertArtifactResumeToken(
         ...(token !== null ? { artifactResumePageToken: token } : {}),
         updatedAt: now().toISOString(),
       });
+      operations[localRequestId] = next;
+      return next;
+    },
+    config
+  );
+}
+
+function artifactKey(a: ArtifactRecord): string {
+  return `${a.kind}:${a.sha256 ?? ''}:${a.prUrl ?? ''}:${a.path ?? ''}`;
+}
+
+/**
+ * Artifact provenance with digests (R35), written only by `collect`. An
+ * artifact already recorded keeps its `verification` value — only the R43
+ * verification step (PR4) may change it.
+ */
+export async function recordArtifacts(
+  dataDir: string,
+  localRequestId: string,
+  artifacts: readonly ArtifactRecord[],
+  now: () => Date = () => new Date(),
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<OperationRecord> {
+  return updateJournal(
+    dataDir,
+    (operations) => {
+      const current = requireRecord(operations, localRequestId);
+      const known = new Set(current.artifacts.map(artifactKey));
+      const added = artifacts.filter((a) => !known.has(artifactKey(a)));
+      if (added.length === 0) return current;
+      const next: OperationRecord = {
+        ...current,
+        artifacts: [...current.artifacts, ...added],
+        updatedAt: now().toISOString(),
+      };
       operations[localRequestId] = next;
       return next;
     },

@@ -1,0 +1,1090 @@
+/**
+ * Operation layer: one exported async function per CLI subcommand, each
+ * taking a RuntimeDeps bag (the adapter factory is injected so tests use
+ * fake-sdk.ts) plus its own already-parsed args. cli.ts is the only caller —
+ * it owns argv, the JSON envelope, and exit codes; this module owns the
+ * contract rules.
+ *
+ * PR2 ships reads only (`setup`, `list`, `status`, `collect`). No function
+ * here issues a vendor-mutating request; `delegate`, `reply`, and `approve`
+ * arrive with `authorize` in PR3 (contract "Open Question 6, decided").
+ */
+
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+import {
+  COLLECT_PAGE_SIZE,
+  nextRing,
+  STATUS_PAGE_SIZE,
+  walkActivities,
+  type WalkStart,
+} from './activity-walk.js';
+import {
+  type CredentialSource,
+  ensureOwnerOnlyDir,
+  hasEnvApiKey,
+  prepareDataDir,
+  resolveArtifactsDir,
+  resolvePluginRoot,
+} from './config.js';
+import {
+  DEFAULT_COLLECT_DEADLINE_MS,
+  DEFAULT_READ_DEADLINE_MS,
+  type Deadline,
+  deadlineIn,
+  isExpired,
+  withReadRetry,
+} from './deadline.js';
+import { AdapterError, mapAdapterError, throwAppError } from './errors.js';
+import { scanSecretShapes } from './redact.js';
+import {
+  installSdk as realInstallSdk,
+  probeSdkResolution,
+  type SdkProbe,
+  type SdkResolution,
+} from './sdk-resolver.js';
+import {
+  ensureObservedRecord,
+  findByLocalId,
+  findBySessionResource,
+  hasUnreconciledDeviation,
+  readJournal,
+  recordArtifacts,
+  recordDeviation,
+  UNRESOLVED_STATUSES,
+  upsertArtifactResumeToken,
+  upsertReadState,
+} from './state.js';
+import type {
+  AdapterActivity,
+  AdapterSession,
+  ArtifactRecord,
+  CapabilityResult,
+  Clock,
+  Journal,
+  OperationRecord,
+  PendingPlan,
+  SdkAdapter,
+} from './types.js';
+import {
+  extractTitleTag,
+  parseSessionRef,
+  validateBaseCommitId,
+  validatePageToken,
+  validatePullRequestUrl,
+} from './validate.js';
+
+export interface RuntimeDeps {
+  /** Resolves the SDK and connects lazily; only called by operations that read from the vendor. */
+  readonly adapterFactory: () => Promise<SdkAdapter>;
+  readonly clock: Clock;
+  readonly env: NodeJS.ProcessEnv;
+  readonly dataDir: string;
+  readonly pluginRoot?: string;
+  readonly cwd?: string;
+  readonly probeSdk?: (dataDir: string) => SdkProbe;
+  readonly installSdk?: (dataDir: string) => Promise<SdkProbe>;
+  /** Test seam for the aggregate staging cap; production uses AGGREGATE_ARTIFACT_CAP_BYTES. */
+  readonly aggregateCapBytes?: number;
+}
+
+export const REAL_CLOCK: Clock = {
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+function nowFn(deps: RuntimeDeps): () => Date {
+  return () => new Date(deps.clock.now());
+}
+
+function prepare(deps: RuntimeDeps): void {
+  prepareDataDir(deps.dataDir, {
+    pluginRoot: deps.pluginRoot ?? resolvePluginRoot(),
+    cwd: deps.cwd ?? process.cwd(),
+  });
+}
+
+/** Every vendor read goes through one adapter per invocation, closed (scratch tripwire) before returning. */
+async function withAdapter<T>(
+  deps: RuntimeDeps,
+  fn: (adapter: SdkAdapter) => Promise<T>
+): Promise<T> {
+  const adapter = await deps.adapterFactory();
+  let result: T;
+  try {
+    result = await fn(adapter);
+  } catch (err) {
+    await adapter.close().catch(() => undefined);
+    throw err;
+  }
+  await adapter.close();
+  return result;
+}
+
+/** Adapter failures on a read are mapped with the pre-dispatch/read column; nothing here is after dispatch. */
+async function read<T>(
+  deps: RuntimeDeps,
+  deadline: Deadline,
+  fn: () => Promise<T>
+): Promise<T> {
+  if (isExpired(deps.clock, deadline)) {
+    return throwAppError(
+      'JULES_DEADLINE_EXCEEDED',
+      'the operation deadline expired before the read',
+      {
+        recoveryAction: 'Retry with a larger --deadline-ms.',
+      }
+    );
+  }
+  try {
+    return await withReadRetry(fn, { clock: deps.clock, deadline });
+  } catch (err) {
+    if (err instanceof AdapterError) {
+      const app = mapAdapterError(err, 'read');
+      return throwAppError(app.code, app.message, {
+        ...(app.requestId !== undefined ? { requestId: app.requestId } : {}),
+      });
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Status vocabulary (R10) and the attention envelope
+// ---------------------------------------------------------------------------
+
+const CONDITION_BY_STATE: Readonly<Record<string, string>> = Object.freeze({
+  queued: 'starting',
+  planning: 'starting',
+  awaitingPlanApproval: 'awaiting-approval',
+  awaitingUserFeedback: 'awaiting-reply',
+  inProgress: 'working',
+  paused: 'paused',
+  failed: 'failed',
+  completed: 'remote-completed',
+});
+
+/** Unknown states — including `unspecified` — are never placed in a completed bucket. */
+export function conditionOf(vendorState: string): string {
+  return Object.prototype.hasOwnProperty.call(CONDITION_BY_STATE, vendorState)
+    ? (CONDITION_BY_STATE[vendorState] as string)
+    : 'needs-inspection';
+}
+
+export interface Attention {
+  readonly requiresAttention?: true;
+  readonly attention?: readonly string[];
+}
+
+function attentionOf(flags: readonly string[]): Attention {
+  return flags.length > 0 ? { requiresAttention: true, attention: flags } : {};
+}
+
+// ---------------------------------------------------------------------------
+// Unsupported capabilities (R11)
+// ---------------------------------------------------------------------------
+
+export type UnsupportedCapability =
+  | 'cancel'
+  | 'pause'
+  | 'resume'
+  | 'cost'
+  | 'exactly-once';
+
+export const UNSUPPORTED_CAPABILITIES: Readonly<
+  Record<UnsupportedCapability, CapabilityResult<never>>
+> = Object.freeze({
+  cancel: {
+    supported: false,
+    reason:
+      'the Jules API exposes no session cancel; stop it from the Jules console',
+  },
+  pause: { supported: false, reason: 'the Jules API exposes no session pause' },
+  resume: {
+    supported: false,
+    reason: 'the Jules API exposes no session resume',
+  },
+  cost: {
+    supported: false,
+    reason: 'the Jules API exposes no per-session cost',
+  },
+  'exactly-once': {
+    supported: false,
+    reason:
+      'the Jules API offers no idempotency key; the local request id deduplicates locally only',
+  },
+});
+
+export function unsupportedCapability(name: UnsupportedCapability): never {
+  const result = UNSUPPORTED_CAPABILITIES[name];
+  return throwAppError(
+    'JULES_UNSUPPORTED_CAPABILITY',
+    `${name} is not supported: ${result.supported ? '' : result.reason}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// setup
+// ---------------------------------------------------------------------------
+
+export const SOURCES_PROBE_PAGE_SIZE = 20;
+
+export interface SetupArgs {
+  readonly installSdk: boolean;
+  readonly deadlineMs?: number;
+}
+
+export interface SetupResult extends Attention {
+  readonly operation: 'setup';
+  readonly credentialSource: CredentialSource;
+  readonly sdkResolution: SdkResolution;
+  readonly sdkVersion?: string;
+  readonly sdkIntegrity?: string;
+  readonly sdkEntrySha256?: string;
+  readonly installed?: true;
+  readonly sourcesReachable: CapabilityResult<{
+    readonly count: number;
+    readonly truncated: boolean;
+  }>;
+}
+
+export async function setup(
+  deps: RuntimeDeps,
+  args: SetupArgs
+): Promise<SetupResult> {
+  prepare(deps);
+  const deadline = deadlineIn(
+    deps.clock,
+    args.deadlineMs ?? DEFAULT_READ_DEADLINE_MS
+  );
+  const credentialSource: CredentialSource = hasEnvApiKey(deps.env)
+    ? 'env'
+    : 'none';
+
+  const probe = args.installSdk
+    ? await (
+        deps.installSdk ??
+        ((d) =>
+          realInstallSdk(d, {
+            pluginRoot: deps.pluginRoot ?? resolvePluginRoot(),
+          }))
+      )(deps.dataDir)
+    : (
+        deps.probeSdk ??
+        ((d) =>
+          probeSdkResolution(d, {
+            pluginRoot: deps.pluginRoot ?? resolvePluginRoot(),
+          }))
+      )(deps.dataDir);
+
+  let sourcesReachable: SetupResult['sourcesReachable'];
+  if (probe.resolution === 'missing') {
+    sourcesReachable = {
+      supported: false,
+      reason: 'the Jules SDK is not installed',
+    };
+  } else if (credentialSource === 'none') {
+    // No credential: never contact the vendor.
+    sourcesReachable = { supported: false, reason: 'JULES_API_KEY is not set' };
+  } else {
+    const page = await withAdapter(deps, (adapter) =>
+      read(deps, deadline, () =>
+        adapter.listSources({ pageSize: SOURCES_PROBE_PAGE_SIZE })
+      )
+    );
+    sourcesReachable =
+      page.unsupportedReason !== undefined
+        ? { supported: false, reason: page.unsupportedReason }
+        : {
+            supported: true,
+            value: { count: page.sources.length, truncated: page.truncated },
+          };
+  }
+
+  const flags: string[] = [];
+  if (credentialSource === 'none') flags.push('credentialSource');
+  if (probe.resolution === 'missing') flags.push('sdkResolution');
+  if (!sourcesReachable.supported) flags.push('sourcesReachable');
+
+  return {
+    operation: 'setup',
+    credentialSource,
+    sdkResolution: probe.resolution,
+    ...(probe.sdkVersion !== undefined ? { sdkVersion: probe.sdkVersion } : {}),
+    ...(probe.sdkIntegrity !== undefined
+      ? { sdkIntegrity: probe.sdkIntegrity }
+      : {}),
+    ...(probe.sdkEntrySha256 !== undefined
+      ? { sdkEntrySha256: probe.sdkEntrySha256 }
+      : {}),
+    ...(args.installSdk ? { installed: true as const } : {}),
+    sourcesReachable,
+    ...attentionOf(flags),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// list
+// ---------------------------------------------------------------------------
+
+export const LIST_DEFAULT_LIMIT = 20;
+export const LIST_MAX_LIMIT = 100;
+
+export interface ListArgs {
+  readonly limit?: number;
+  readonly pageToken?: string;
+  readonly deadlineMs?: number;
+}
+
+export interface ListedSession {
+  readonly localId?: string;
+  readonly sessionResource: string;
+  readonly vendorState: string;
+  readonly condition: string;
+  readonly title: string;
+  readonly createTime?: string;
+}
+
+export interface ListResult extends Attention {
+  readonly operation: 'list';
+  readonly sessions: readonly ListedSession[];
+  readonly nextPageToken?: string;
+  /** Journal rows whose session did not appear on this page — page-scoped, never "gone". */
+  readonly journalOnly: ReadonlyArray<{
+    readonly localId: string;
+    readonly sessionResource?: string;
+    readonly condition: string;
+  }>;
+}
+
+export async function list(
+  deps: RuntimeDeps,
+  args: ListArgs
+): Promise<ListResult> {
+  prepare(deps);
+  const deadline = deadlineIn(
+    deps.clock,
+    args.deadlineMs ?? DEFAULT_READ_DEADLINE_MS
+  );
+  const journal = await readJournal(deps.dataDir);
+  const pageToken =
+    args.pageToken !== undefined
+      ? validatePageToken(args.pageToken, 'input')
+      : undefined;
+
+  const page = await withAdapter(deps, (adapter) =>
+    read(deps, deadline, () =>
+      adapter.listSessions({
+        pageSize: args.limit ?? LIST_DEFAULT_LIMIT,
+        ...(pageToken !== undefined ? { pageToken } : {}),
+      })
+    )
+  );
+
+  const onPage = new Set<string>();
+  const sessions = page.sessions.map((s): ListedSession => {
+    onPage.add(s.sessionResource);
+    const tag = extractTitleTag(s.title);
+    const localId =
+      findBySessionResource(journal, s.sessionResource)?.localId ?? tag.localId;
+    return {
+      ...(localId !== undefined ? { localId } : {}),
+      sessionResource: s.sessionResource,
+      vendorState: s.vendorState,
+      condition: conditionOf(s.vendorState),
+      title: tag.title,
+      ...(s.createTime !== undefined ? { createTime: s.createTime } : {}),
+    };
+  });
+
+  const journalOnly = Object.values(journal.operations)
+    .filter(
+      (r) => r.sessionResource === undefined || !onPage.has(r.sessionResource)
+    )
+    .map((r) => ({
+      localId: r.localId,
+      ...(r.sessionResource !== undefined
+        ? { sessionResource: r.sessionResource }
+        : {}),
+      condition: r.condition ?? r.status,
+    }));
+
+  const nextPageToken =
+    page.nextPageToken !== undefined
+      ? validatePageToken(page.nextPageToken, 'response')
+      : undefined;
+  return {
+    operation: 'list',
+    sessions,
+    ...(nextPageToken !== undefined ? { nextPageToken } : {}),
+    journalOnly,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// shared: session resolution and the R13 policy check
+// ---------------------------------------------------------------------------
+
+function resolveSessionResource(journal: Journal, ref: string): string {
+  const parsed = parseSessionRef(ref);
+  if (parsed.kind === 'resource') return parsed.sessionResource;
+  const record = findByLocalId(journal, parsed.localId);
+  if (record === undefined) {
+    return throwAppError(
+      'JULES_NOT_FOUND',
+      `no journal record for local id ${parsed.localId}`
+    );
+  }
+  if (record.sessionResource === undefined) {
+    return throwAppError(
+      'JULES_NOT_FOUND',
+      `local id ${parsed.localId} has no bound session yet`,
+      {
+        recoveryAction:
+          'Run status --reconcile to bind or release the reservation.',
+      }
+    );
+  }
+  return record.sessionResource;
+}
+
+async function boundRecord(
+  deps: RuntimeDeps,
+  journal: Journal,
+  sessionResource: string
+): Promise<OperationRecord> {
+  return (
+    findBySessionResource(journal, sessionResource) ??
+    (await ensureObservedRecord(deps.dataDir, sessionResource, nowFn(deps)))
+  );
+}
+
+/**
+ * R13: a vendor PR on a session whose create requested `autoPr: false` is a
+ * policy deviation. External sessions (PR2: every observable session) have
+ * no such request, so their PRs are collectable references only (R42).
+ */
+async function checkPolicyDeviation(
+  deps: RuntimeDeps,
+  record: OperationRecord,
+  session: AdapterSession
+): Promise<OperationRecord> {
+  let current = record;
+  if (record.autoPrRequested !== false) return current;
+  for (const output of session.outputs) {
+    if (output.type !== 'pullRequest') continue;
+    const source = record.sourceResource ?? session.sourceResource;
+    const check =
+      source !== undefined
+        ? validatePullRequestUrl(output.url, source)
+        : undefined;
+    current = await recordDeviation(
+      deps.dataDir,
+      record.localRequestId,
+      {
+        kind: 'policy-deviation',
+        reason:
+          'vendor pull request observed on a session created with autoPr: false',
+        ...(check?.valid === true ? { prUrl: check.url } : {}),
+      },
+      nowFn(deps)
+    );
+  }
+  return current;
+}
+
+export type RenderedOutput =
+  | {
+      readonly type: 'pullRequest';
+      readonly prUrl?: string;
+      readonly title: string;
+      readonly external: true;
+    }
+  | {
+      readonly type: 'changeSet';
+      readonly baseCommit?: string;
+      readonly patchBytes: number;
+    };
+
+function renderOutputs(session: AdapterSession): RenderedOutput[] {
+  return session.outputs.map((output): RenderedOutput => {
+    if (output.type === 'pullRequest') {
+      const check =
+        session.sourceResource !== undefined
+          ? validatePullRequestUrl(output.url, session.sourceResource)
+          : undefined;
+      return {
+        type: 'pullRequest',
+        ...(check?.valid === true ? { prUrl: check.url } : {}),
+        title: output.title,
+        external: true,
+      };
+    }
+    const baseCommit = optionalBaseCommit(output.baseCommitId);
+    return {
+      type: 'changeSet',
+      ...(baseCommit !== undefined ? { baseCommit } : {}),
+      patchBytes: Buffer.byteLength(output.unidiffPatch, 'utf8'),
+    };
+  });
+}
+
+function optionalBaseCommit(value: string): string | undefined {
+  try {
+    return validateBaseCommitId(value, 'response');
+  } catch {
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// status
+// ---------------------------------------------------------------------------
+
+export interface StatusArgs {
+  readonly session?: string;
+  readonly reconcile: boolean;
+  readonly deadlineMs?: number;
+}
+
+export interface ReconciledEntry {
+  readonly localRequestId: string;
+  readonly kind: string;
+  readonly outcome:
+    | 'bound'
+    | 'released'
+    | 'ambiguous-reconcile'
+    | 'policy-deviation'
+    | 'unknown-outcome'
+    | 'not-reached';
+  readonly reason?: string;
+  readonly sessionResource?: string;
+}
+
+export interface StatusActivities {
+  readonly processed: number;
+  readonly new: number;
+  readonly pages: number;
+  readonly partialPagination: boolean;
+  readonly dedupWindowExceeded: boolean;
+  readonly unmappedActivity: boolean;
+  readonly resumePageToken?: string;
+}
+
+export interface StatusResult extends Attention {
+  readonly operation: 'status';
+  readonly localId?: string;
+  readonly sessionResource?: string;
+  readonly vendorState?: string;
+  readonly condition?: string;
+  readonly title?: string;
+  readonly url?: string;
+  readonly activities?: StatusActivities;
+  readonly pendingPlan?: PendingPlan;
+  readonly outputs?: readonly RenderedOutput[];
+  readonly policyDeviation?: true;
+  readonly reconciled?: readonly ReconciledEntry[];
+}
+
+/**
+ * PR2 has no `delegate`, so no reservation is reachable and `--reconcile`
+ * normally returns `reconciled: []`. A hand-planted unresolved record is
+ * reported as `not-reached` rather than silently ignored: the reconcile
+ * walk ships with `delegate` in PR3.
+ */
+function reconcileInPr2(
+  journal: Journal,
+  sessionResource: string | undefined
+): ReconciledEntry[] {
+  return Object.values(journal.operations)
+    .filter((r) => UNRESOLVED_STATUSES.has(r.status))
+    .filter(
+      (r) =>
+        sessionResource === undefined || r.sessionResource === sessionResource
+    )
+    .map((r) => ({
+      localRequestId: r.localRequestId,
+      kind: r.kind,
+      outcome: 'not-reached' as const,
+      reason: 'reconcile ships with delegate in PR3',
+      ...(r.sessionResource !== undefined
+        ? { sessionResource: r.sessionResource }
+        : {}),
+    }));
+}
+
+function walkStartFor(
+  record: OperationRecord,
+  token: string | undefined
+): WalkStart {
+  const watermark =
+    record.lastActivityCreateTime !== undefined &&
+    record.lastActivityId !== undefined
+      ? {
+          kind: 'watermark' as const,
+          createTime: record.lastActivityCreateTime,
+          activityId: record.lastActivityId,
+        }
+      : undefined;
+  if (token !== undefined) {
+    return {
+      kind: 'resume',
+      pageToken: token,
+      fallback: watermark ?? { kind: 'session-start' },
+    };
+  }
+  return watermark ?? { kind: 'session-start' };
+}
+
+export async function status(
+  deps: RuntimeDeps,
+  args: StatusArgs
+): Promise<StatusResult> {
+  if (args.session === undefined && !args.reconcile) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--session is required unless --reconcile is given'
+    );
+  }
+  prepare(deps);
+  const deadline = deadlineIn(
+    deps.clock,
+    args.deadlineMs ?? DEFAULT_READ_DEADLINE_MS
+  );
+  const journal = await readJournal(deps.dataDir);
+  const sessionResource =
+    args.session !== undefined
+      ? resolveSessionResource(journal, args.session)
+      : undefined;
+  const reconciled = args.reconcile
+    ? reconcileInPr2(journal, sessionResource)
+    : undefined;
+  const reconcileFlags = (reconciled ?? [])
+    .filter((r) => r.outcome !== 'bound' && r.outcome !== 'released')
+    .map((r) => `reconciled:${r.outcome}`);
+
+  if (sessionResource === undefined) {
+    return {
+      operation: 'status',
+      reconciled: reconciled ?? [],
+      ...attentionOf(reconcileFlags),
+    };
+  }
+
+  return withAdapter(deps, async (adapter) => {
+    const session = await read(deps, deadline, () =>
+      adapter.getSession(sessionResource)
+    );
+    let record = await boundRecord(deps, journal, sessionResource);
+
+    const walk = await walkActivities({
+      adapter,
+      sessionResource,
+      pageSize: STATUS_PAGE_SIZE,
+      start: walkStartFor(record, record.resumePageToken),
+      clock: deps.clock,
+      deadline,
+      ring: record.recentActivityIds,
+      ...(record.lastActivityCreateTime !== undefined &&
+      record.lastActivityId !== undefined
+        ? {
+            watermark: {
+              createTime: record.lastActivityCreateTime,
+              activityId: record.lastActivityId,
+            },
+          }
+        : {}),
+      ...(record.pendingPlan !== undefined
+        ? { pendingPlan: record.pendingPlan }
+        : {}),
+    });
+
+    // Restart guard: a stored token the vendor rejected, or one that yielded
+    // nothing new, is discarded; the second consecutive such restart fails.
+    const noProgress =
+      walk.startedFromResume &&
+      !walk.resumeRejected &&
+      walk.newIds.length === 0;
+    const restarted =
+      walk.startedFromResume && (walk.resumeRejected || noProgress);
+    const restartCount = restarted
+      ? record.resumeRestartCount + 1
+      : walk.newIds.length > 0
+        ? 0
+        : record.resumeRestartCount;
+    if (restarted && restartCount >= 2) {
+      await upsertReadState(
+        deps.dataDir,
+        record.localRequestId,
+        { resumePageToken: null, resumeRestartCount: restartCount },
+        nowFn(deps)
+      );
+      return throwAppError(
+        'JULES_NO_PROGRESS',
+        `two consecutive activity walks for ${sessionResource} restarted without advancing`
+      );
+    }
+
+    const { ring, dedupWindowExceeded } = nextRing(
+      record.recentActivityIds,
+      walk
+    );
+    const advance =
+      walk.complete &&
+      walk.newest !== undefined &&
+      (record.lastActivityCreateTime === undefined ||
+        record.lastActivityId === undefined ||
+        Date.parse(walk.newest.createTime) >
+          Date.parse(record.lastActivityCreateTime) ||
+        (walk.newest.createTime === record.lastActivityCreateTime &&
+          walk.newest.activityId > record.lastActivityId));
+    const resumePageToken =
+      walk.complete || noProgress
+        ? null
+        : (walk.resumePageToken ??
+          (restarted ? null : (record.resumePageToken ?? null)));
+    const vendorState = session.vendorState;
+    const condition = conditionOf(vendorState);
+
+    record = await upsertReadState(
+      deps.dataDir,
+      record.localRequestId,
+      {
+        vendorState,
+        condition,
+        ...(advance && walk.newest !== undefined
+          ? { watermark: walk.newest }
+          : {}),
+        resumePageToken,
+        recentActivityIds: ring,
+        activityCountDelta: walk.newIds.length,
+        ...(walk.pendingPlan !== record.pendingPlan
+          ? { pendingPlan: walk.pendingPlan ?? null }
+          : {}),
+        resumeRestartCount: restartCount,
+      },
+      nowFn(deps)
+    );
+    record = await checkPolicyDeviation(deps, record, session);
+    const policyDeviation = hasUnreconciledDeviation(record);
+
+    const flags: string[] = [];
+    if (walk.partialPagination) flags.push('partialPagination');
+    if (walk.unmappedActivity) flags.push('unmappedActivity');
+    if (dedupWindowExceeded) flags.push('dedupWindowExceeded');
+    if (policyDeviation) flags.push('policyDeviation');
+    flags.push(...reconcileFlags);
+
+    const tag = extractTitleTag(session.title);
+    return {
+      operation: 'status',
+      localId: record.localId,
+      sessionResource,
+      vendorState,
+      condition,
+      title: tag.title,
+      ...(session.url !== undefined ? { url: session.url } : {}),
+      activities: {
+        processed: walk.processed,
+        new: walk.newIds.length,
+        pages: walk.pages,
+        partialPagination: walk.partialPagination,
+        dedupWindowExceeded,
+        unmappedActivity: walk.unmappedActivity,
+        ...(record.resumePageToken !== undefined
+          ? { resumePageToken: record.resumePageToken }
+          : {}),
+      },
+      ...(record.pendingPlan !== undefined
+        ? { pendingPlan: record.pendingPlan }
+        : {}),
+      outputs: renderOutputs(session),
+      ...(policyDeviation ? { policyDeviation: true as const } : {}),
+      ...(reconciled !== undefined ? { reconciled } : {}),
+      ...attentionOf(flags),
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// collect
+// ---------------------------------------------------------------------------
+
+export const AGGREGATE_ARTIFACT_CAP_BYTES = 100 * 1024 * 1024;
+
+export interface CollectArgs {
+  readonly session: string;
+  readonly deadlineMs?: number;
+}
+
+export interface CollectedArtifact {
+  readonly kind: 'patch' | 'pr-ref' | 'generated-file';
+  readonly path?: string;
+  readonly sha256?: string;
+  readonly baseCommit?: string;
+  readonly prUrl?: string;
+  readonly vendorPath?: string;
+  readonly secretShapedContent: boolean;
+  readonly verification: 'unverified';
+}
+
+export interface SkippedArtifact {
+  readonly kind: CollectedArtifact['kind'];
+  readonly reason: 'aggregate-cap-reached';
+  readonly bytes?: number;
+}
+
+export interface CollectResult extends Attention {
+  readonly operation: 'collect';
+  readonly localId: string;
+  readonly sessionResource: string;
+  readonly artifacts: readonly CollectedArtifact[];
+  readonly skipped: readonly SkippedArtifact[];
+  readonly activities: {
+    readonly pages: number;
+    readonly partialPagination: boolean;
+    readonly unmappedActivity: boolean;
+  };
+  readonly partialStaging: boolean;
+  readonly noSupportedArtifact: boolean;
+  readonly policyDeviation?: true;
+}
+
+function sha256(content: string): string {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+/** Atomic 0600 write inside a directory ensureOwnerOnlyDir already vetted (no symlinks). */
+function writeStaged(filePath: string, content: string): void {
+  const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomUUID()}`;
+  fs.writeFileSync(tmp, content, { mode: 0o600, flag: 'wx' });
+  fs.renameSync(tmp, filePath);
+}
+
+class Stager {
+  readonly artifacts: CollectedArtifact[] = [];
+  readonly skipped: SkippedArtifact[] = [];
+  private staged = 0;
+  private readonly seenDigests = new Set<string>();
+  private readonly seenPrs = new Set<string>();
+  private patchSeq = 0;
+  private generatedSeq = 0;
+
+  constructor(
+    private readonly dir: string,
+    private readonly capBytes: number
+  ) {}
+
+  get partialStaging(): boolean {
+    return this.skipped.length > 0;
+  }
+
+  private admit(kind: CollectedArtifact['kind'], bytes: number): boolean {
+    if (this.staged + bytes > this.capBytes) {
+      this.skipped.push({ kind, reason: 'aggregate-cap-reached', bytes });
+      return false;
+    }
+    this.staged += bytes;
+    return true;
+  }
+
+  /** Patches are staged byte-exact and scanned, never redacted (contract "Redaction" layer 8). */
+  patch(unidiffPatch: string, baseCommitId: string): void {
+    if (unidiffPatch === '') return;
+    const digest = sha256(unidiffPatch);
+    if (this.seenDigests.has(digest)) return;
+    const bytes = Buffer.byteLength(unidiffPatch, 'utf8');
+    if (!this.admit('patch', bytes)) return;
+    this.seenDigests.add(digest);
+    this.patchSeq += 1;
+    const rel =
+      this.patchSeq === 1
+        ? 'patch.diff'
+        : path.join(
+            'patches',
+            `${String(this.patchSeq).padStart(2, '0')}-${digest.slice(0, 12)}.diff`
+          );
+    if (this.patchSeq > 1) ensureOwnerOnlyDir(path.join(this.dir, 'patches'));
+    writeStaged(path.join(this.dir, rel), unidiffPatch);
+    const baseCommit = optionalBaseCommit(baseCommitId);
+    this.artifacts.push({
+      kind: 'patch',
+      path: rel,
+      sha256: digest,
+      ...(baseCommit !== undefined ? { baseCommit } : {}),
+      secretShapedContent: scanSecretShapes(unidiffPatch),
+      verification: 'unverified',
+    });
+  }
+
+  /** Named locally by sequence and digest; the vendor path is recorded as data only. */
+  generated(vendorPath: string, content: string): void {
+    const digest = sha256(content);
+    const bytes = Buffer.byteLength(content, 'utf8');
+    if (!this.admit('generated-file', bytes)) return;
+    this.generatedSeq += 1;
+    ensureOwnerOnlyDir(path.join(this.dir, 'generated'));
+    const rel = path.join(
+      'generated',
+      `${String(this.generatedSeq).padStart(2, '0')}-${digest.slice(0, 12)}`
+    );
+    writeStaged(path.join(this.dir, rel), content);
+    this.artifacts.push({
+      kind: 'generated-file',
+      path: rel,
+      sha256: digest,
+      vendorPath,
+      secretShapedContent: scanSecretShapes(content),
+      verification: 'unverified',
+    });
+  }
+
+  /** R42: an existing vendor PR is an external reference only, never adopted. */
+  prRef(prUrl: string): void {
+    if (this.seenPrs.has(prUrl)) return;
+    this.seenPrs.add(prUrl);
+    this.artifacts.push({
+      kind: 'pr-ref',
+      prUrl,
+      secretShapedContent: false,
+      verification: 'unverified',
+    });
+  }
+}
+
+export async function collect(
+  deps: RuntimeDeps,
+  args: CollectArgs
+): Promise<CollectResult> {
+  prepare(deps);
+  const deadline = deadlineIn(
+    deps.clock,
+    args.deadlineMs ?? DEFAULT_COLLECT_DEADLINE_MS
+  );
+  const journal = await readJournal(deps.dataDir);
+  const sessionResource = resolveSessionResource(journal, args.session);
+
+  return withAdapter(deps, async (adapter) => {
+    const session = await read(deps, deadline, () =>
+      adapter.getSession(sessionResource)
+    );
+    let record = await boundRecord(deps, journal, sessionResource);
+    record = await checkPolicyDeviation(deps, record, session);
+
+    // Staging path derives from the local id only (R40); never from vendor data.
+    const artifactsRoot = resolveArtifactsDir(deps.dataDir);
+    ensureOwnerOnlyDir(artifactsRoot);
+    const dir = path.join(artifactsRoot, record.localId);
+    ensureOwnerOnlyDir(dir);
+    const stager = new Stager(
+      dir,
+      deps.aggregateCapBytes ?? AGGREGATE_ARTIFACT_CAP_BYTES
+    );
+
+    for (const output of session.outputs) {
+      if (output.type === 'changeSet') {
+        stager.patch(output.unidiffPatch, output.baseCommitId);
+      } else if (session.sourceResource !== undefined) {
+        const check = validatePullRequestUrl(
+          output.url,
+          session.sourceResource
+        );
+        if (check.valid) stager.prRef(check.url);
+      }
+    }
+
+    const token = record.artifactResumePageToken;
+    const walk = await walkActivities({
+      adapter,
+      sessionResource,
+      pageSize: COLLECT_PAGE_SIZE,
+      start:
+        token !== undefined
+          ? {
+              kind: 'resume',
+              pageToken: token,
+              fallback: { kind: 'session-start' },
+            }
+          : { kind: 'session-start' },
+      clock: deps.clock,
+      deadline,
+      ring: record.recentActivityIds,
+      onActivity: (activity: AdapterActivity) => {
+        for (const artifact of activity.artifacts) {
+          if (artifact.type === 'changeSet')
+            stager.patch(artifact.unidiffPatch, artifact.baseCommitId);
+        }
+      },
+    });
+
+    for (const file of session.generatedFiles) {
+      if (file.changeType === 'deleted' || file.content === '') continue;
+      stager.generated(file.path, file.content);
+    }
+
+    const collectedAt = new Date(deps.clock.now()).toISOString();
+    writeStaged(
+      path.join(dir, 'manifest.json'),
+      `${JSON.stringify(
+        {
+          localId: record.localId,
+          sessionResource,
+          collectedAt,
+          artifacts: stager.artifacts,
+          skipped: stager.skipped,
+          partialPagination: walk.partialPagination,
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    const journalArtifacts: ArtifactRecord[] = stager.artifacts.map((a) => ({
+      ...a,
+      sessionResource,
+      collectedAt,
+    }));
+    record = await recordArtifacts(
+      deps.dataDir,
+      record.localRequestId,
+      journalArtifacts,
+      nowFn(deps)
+    );
+    record = await upsertArtifactResumeToken(
+      deps.dataDir,
+      record.localRequestId,
+      walk.complete ? null : (walk.resumePageToken ?? token ?? null),
+      nowFn(deps)
+    );
+
+    const partialStaging = stager.partialStaging;
+    const policyDeviation = hasUnreconciledDeviation(record);
+    const flags: string[] = [];
+    if (walk.partialPagination) flags.push('partialPagination');
+    if (walk.unmappedActivity) flags.push('unmappedActivity');
+    if (partialStaging) flags.push('partialStaging');
+    if (policyDeviation) flags.push('policyDeviation');
+
+    return {
+      operation: 'collect',
+      localId: record.localId,
+      sessionResource,
+      artifacts: stager.artifacts,
+      skipped: stager.skipped,
+      activities: {
+        pages: walk.pages,
+        partialPagination: walk.partialPagination,
+        unmappedActivity: walk.unmappedActivity,
+      },
+      partialStaging,
+      noSupportedArtifact:
+        stager.artifacts.length === 0 &&
+        !walk.partialPagination &&
+        !partialStaging,
+      ...(policyDeviation ? { policyDeviation: true as const } : {}),
+      ...attentionOf(flags),
+    };
+  });
+}
