@@ -1,0 +1,31 @@
+.changeset/yellow-core-context-observer.md
+  s_f36320406d9ff9::t_1b0522445b9478 9-10
+docs/security.md
+  s_f36320406d9ff9::t_af1bd739dbf030 359-363
+docs/solutions/code-quality/fail-open-observer-stage-patterns.md
+  s_f36320406d9ff9::t_21383eef8b9d80 32-35,45,51-52,114-116,141-142
+plugins/yellow-core/CLAUDE.md
+  s_f36320406d9ff9::t_d4b1e3a691f10c 295-296
+plugins/yellow-core/commands/statusline/setup.md
+  s_f36320406d9ff9::t_49e9e693913a6a 3
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_f36320406d9ff9::t_33308a2c76ebda 30
+plugins/yellow-core/tests/context-observer.bats
+  s_f36320406d9ff9::t_c5343dc2bf8c0d 332-333,337,340,343,348-352,1332-1334,1344-1349,1352,1354,1356-1364,1399-1406
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e316bf7a46028b877021af2e591c78d0f2c3cee4",
+  "prompts": {},
+  "sessions": {
+    "s_f36320406d9ff9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9387e4c1-8943-48e7-941f-afb1ab71923b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
