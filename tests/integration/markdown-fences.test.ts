@@ -25,7 +25,7 @@ type Block = {
   bodyStartLine: number;
   endLine: number;
   closed: boolean;
-  endReason: 'closer' | 'eof';
+  endReason: 'closer' | 'container' | 'eof';
   info: string;
   lang: string;
   indent: number;
@@ -157,6 +157,41 @@ describe('extractRawFencedBlocks', () => {
       closed: true,
       body: 'echo crlf',
     });
+  });
+
+  // Follow-up 10: an unterminated quoted fence must not swallow a later
+  // top-level ```bash block, whose opener it used to read as its closer.
+  it.each([
+    [
+      'a blank line',
+      ['> ```text', '> quoted', '', '```bash', 'x', '```'],
+      '\n',
+    ],
+    [
+      'an unquoted line',
+      ['> ```text', '> quoted', '```bash', 'x', '```'],
+      // The CommonMark reading keeps the line that ended the quote as prose.
+      '```bash\nx',
+    ],
+  ])(
+    'ends a quoted fence where the block quote ends (%s)',
+    (_name, lines, stripped) => {
+      const md = lines.join('\n');
+      const blocks = raw(md);
+      expect(blocks.map((b) => [b.lang, b.endReason, b.body])).toEqual([
+        ['text', 'container', 'quoted'],
+        ['bash', 'closer', 'x'],
+      ]);
+      expect(blocks[0]).toMatchObject({ closed: false, endLine: 2 });
+      expect(stripFencedContent(md, { stripFrontmatter: false })).toBe(
+        stripped
+      );
+    }
+  );
+
+  it('keeps a quoted fence open across deeper-quoted lines', () => {
+    const md = ['> ```bash', '> > x', '> ```'].join('\n');
+    expect(raw(md)[0]).toMatchObject({ closed: true, body: '> x' });
   });
 });
 
