@@ -190,7 +190,7 @@ def load_settings(path, recover_invalid=False, result=None, dry_run=False):
         if not recover_invalid:
             raise SetupError("settings_invalid", "settings.json is not valid JSON; fix it or use the manual merge")
         if result is not None:
-            corrupt = None if dry_run else numbered_backup(os.path.realpath(path), CORRUPT_SUFFIX, raw)
+            corrupt = None if dry_run else numbered_backup(path, CORRUPT_SUFFIX, raw)
             result["backup"] = corrupt
             result["reason"] = "settings.json is not valid JSON and %s; the original %s" % (
                 "would be reset" if dry_run else "was reset",
