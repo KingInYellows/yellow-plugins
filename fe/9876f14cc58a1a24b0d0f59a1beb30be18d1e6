@@ -16,6 +16,7 @@ scripts/lib/markdown-fences.js
   s_e3ae526d137cfd::t_3899521313f173 1580
 plugins/yellow-debt/commands/debt/triage.md
   s_e3ae526d137cfd::t_534651aa51e2da 114-115,129-130,168,187-188
+  s_e3ae526d137cfd::t_cdabedeac43384 169
 plans/shell-compat-followups.md
   s_e3ae526d137cfd::t_e2254328d7208a 1-31,36-68
   s_e3ae526d137cfd::t_4d006928b49ed8 32-35
@@ -23,6 +24,8 @@ plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
   s_e3ae526d137cfd::t_4d006928b49ed8 27-28,30-38
 plugins/yellow-debt/commands/debt/fix.md
   s_e3ae526d137cfd::t_534651aa51e2da 29
+  s_e3ae526d137cfd::t_cdabedeac43384 30
+  s_e3ae526d137cfd::t_1772af936282db 23-24
 scripts/validate-shell-compat.js
   s_e3ae526d137cfd::t_cbf2268b27b700 468-470,474-479,481,646-652
   s_e3ae526d137cfd::t_fc31c455e448e1 493,622-623,1094-1095
@@ -42,6 +45,8 @@ plugins/yellow-ruvector/commands/ruvector/setup.md
   s_e3ae526d137cfd::t_534651aa51e2da 43-44,98-99,148-149
 plugins/yellow-debt/commands/debt/status.md
   s_e3ae526d137cfd::t_534651aa51e2da 28
+  s_e3ae526d137cfd::t_cdabedeac43384 29
+  s_e3ae526d137cfd::t_1772af936282db 22-23
 plugins/yellow-ci/CLAUDE.md
   s_e3ae526d137cfd::t_e0a870120c3a61 38
   s_e3ae526d137cfd::t_564893a3d1fabb 39-40
@@ -91,6 +96,8 @@ plugins/gt-workflow/skills/gt-setup/SKILL.md
   s_e3ae526d137cfd::t_53b7941c7af753 28-29,31-39
 plugins/yellow-debt/commands/debt/audit.md
   s_e3ae526d137cfd::t_534651aa51e2da 37
+  s_e3ae526d137cfd::t_cdabedeac43384 38
+  s_e3ae526d137cfd::t_1772af936282db 29-30
 ---
 {
   "schema_version": "authorship/3.0.0",
