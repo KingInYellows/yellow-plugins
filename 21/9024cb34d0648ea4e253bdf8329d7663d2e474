@@ -1,0 +1,74 @@
+plans/session-continuity-foundation-02-context-observer.md
+  s_2bf3a37c3fe1a7::t_260dbe1bdca599 375,377-379
+  s_2bf3a37c3fe1a7::t_146108fc42d665 323
+  s_2bf3a37c3fe1a7::t_e9fd241626f32f 380-387
+docs/security.md
+  s_2bf3a37c3fe1a7::t_11084cb2bd61c2 325-329
+  s_2bf3a37c3fe1a7::t_95ed6dce579750 347-350,356-368
+plugins/yellow-core/skills/session-handoff/scripts/handoff.sh
+  s_2bf3a37c3fe1a7::t_8ba3094b7a3a77 730-732
+  s_2bf3a37c3fe1a7::t_f50971f1578204 6-7
+  s_2bf3a37c3fe1a7::t_cd4551657ec8de 264
+plugins/yellow-core/tests/context-observer.bats
+  s_2bf3a37c3fe1a7::t_fabd745b61f3d4 923-924
+  s_2bf3a37c3fe1a7::t_7d531f38bf3985 838
+  s_2bf3a37c3fe1a7::t_06ee501edf85fc 84-89
+  s_2bf3a37c3fe1a7::t_a83bbaefa2e588 689-691,694
+  s_2bf3a37c3fe1a7::t_5b777774c654e7 293-299,302,779
+  s_2bf3a37c3fe1a7::t_891a9ca70a7eac 162,165,168,171,178,180,182,190,200,207,211,261,392,400,410,422,445,485,564,569,572,672,681,709,712,723,729,732,809,876,974,1041-1145
+plugins/yellow-core/references/statusline-setup/context-observer.md
+  s_2bf3a37c3fe1a7::t_e77fdd0c534dc4 64-68,72-77
+  s_2bf3a37c3fe1a7::t_770c17e1bcf6f9 22,24-29,33,39-48
+  s_2bf3a37c3fe1a7::t_c597c665d7ec9e 90,92
+  s_2bf3a37c3fe1a7::t_3ceda8fe69b8ea 101-102,104-119
+.changeset/yellow-core-context-observer.md
+  s_2bf3a37c3fe1a7::t_70b6018ec94148 16-20
+plugins/yellow-core/lib/statusline-settings.py
+  s_2bf3a37c3fe1a7::t_4617be1b4a0b29 488,492
+  s_2bf3a37c3fe1a7::t_94d4c840d5e205 194,197
+  s_2bf3a37c3fe1a7::t_d882285d28cadc 586
+  s_2bf3a37c3fe1a7::t_afcf1b578ca129 169-172,174
+  s_2bf3a37c3fe1a7::t_53d8e67d4465bc 427-428,435,439,444,450-453,462
+  s_2bf3a37c3fe1a7::t_b91e4f661e76c4 529-549
+  s_2bf3a37c3fe1a7::t_581fa44e25eef5 140-142
+  s_2bf3a37c3fe1a7::t_2c9e7dd0471339 223-229,236-242,246-248,250,260-267
+  s_2bf3a37c3fe1a7::t_f21c5756ab7eb3 29-42,45-52,55-58
+  s_2bf3a37c3fe1a7::t_3adc1fb19299cb 280-288
+  s_2bf3a37c3fe1a7::t_cd81f095c2d97e 67-77
+  s_2bf3a37c3fe1a7::t_48304759caf6e2 99-101,105-106,109-118,120-125,127
+plugins/yellow-core/lib/context-observer.py
+  s_2bf3a37c3fe1a7::t_434c1b8df51c1d 5,7-12,19-22
+  s_2bf3a37c3fe1a7::t_9d1580db7fc023 54
+  s_2bf3a37c3fe1a7::t_2916eaf01afcf1 138-142,145-147
+  s_2bf3a37c3fe1a7::t_cb6c1f52ebbc83 290-296
+plugins/yellow-core/lib/context-observer.sh
+  s_2bf3a37c3fe1a7::t_6e7297eb1e1bdb 50-52,60-61,63-64,66-67
+plugins/yellow-core/commands/statusline/setup.md
+  s_2bf3a37c3fe1a7::t_0061e78f51ef65 355-366
+  s_2bf3a37c3fe1a7::t_b2b7b24825c945 379-382
+  s_2bf3a37c3fe1a7::t_daaaf5ef89bd8a 328-334
+  s_2bf3a37c3fe1a7::t_dbdf928c1a4996 287
+  s_2bf3a37c3fe1a7::t_0c539519580f72 19-40,47-48
+  s_2bf3a37c3fe1a7::t_cce597064d7cc7 3
+  s_2bf3a37c3fe1a7::t_46fe0f042cf317 134-138
+  s_2bf3a37c3fe1a7::t_ec56f795bf09ac 429-430
+  s_2bf3a37c3fe1a7::t_b2307fdedf80e0 272-273
+  s_2bf3a37c3fe1a7::t_c9debbd0a5b897 401
+  s_2bf3a37c3fe1a7::t_f1ef0bddb2703f 303-306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "219024cb34d0648ea4e253bdf8329d7663d2e474",
+  "prompts": {},
+  "sessions": {
+    "s_2bf3a37c3fe1a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84692cd2-e8b5-46ff-9c63-485bc5e597c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
