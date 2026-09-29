@@ -1290,3 +1290,15 @@ PY
   echo "$output" | jq -e '.action == "removed"' >/dev/null
   jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
 }
+
+@test "T11: a command starting with shell negation is wrapped so the composed stage parses" {
+  seed_settings "! cat > $TEST_HOME/seen"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 0 ]
+  bash -n -c "$(jq -r '.statusLine.command' "$SETTINGS")"
+  run bash -c "$(jq -r '.statusLine.command' "$SETTINGS")" < "$FIX/mid-session.json"
+  cmp "$FIX/mid-session.json" "$TEST_HOME/seen"
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  echo "$output" | jq -e '.action == "removed"' >/dev/null
+  jq -e --arg c "! cat > $TEST_HOME/seen" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+}

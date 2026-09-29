@@ -280,7 +280,8 @@ def stage_is_current(command):
 
 def wrap(command):
     command = command.strip()
-    if SHELL_CONTROL_RE.search(command):
+    # A leading `!` negates a pipeline and is a syntax error after `|`.
+    if SHELL_CONTROL_RE.search(command) or re.match(r"!(\s|$)", command):
         return "(\n" + command + "\n)"
     return command
 
