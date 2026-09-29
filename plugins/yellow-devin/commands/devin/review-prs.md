@@ -435,8 +435,10 @@ tracking every file modified during remediation:
 CHANGED_FILES=()
 # After each file edit, append the path:
 CHANGED_FILES+=("path/to/edited/file.ext")
-# Deduplicate before use:
-mapfile -t CHANGED_FILES < <(printf '%s\n' "${CHANGED_FILES[@]}" | sort -u)
+# Deduplicate before use (a read loop, not bash-only `mapfile`):
+DEDUPED=()
+while IFS= read -r f; do DEDUPED+=("$f"); done < <(printf '%s\n' "${CHANGED_FILES[@]}" | sort -u)
+CHANGED_FILES=("${DEDUPED[@]}")
 ```
 
 If the router state (Step 1b) is `READY_GRAPHITE`:

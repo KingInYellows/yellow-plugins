@@ -75,7 +75,7 @@ Check if the server is already running:
 
 ```bash
 CURL_ERROR=$(mktemp)
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>"$CURL_ERROR")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>|"$CURL_ERROR")
 CURL_EXIT=$?
 rm -f "$CURL_ERROR"
 ```
@@ -102,7 +102,7 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
   printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
 
   CURL_ERROR=$(mktemp)
-  if curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>"$CURL_ERROR"; then
+  if curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>|"$CURL_ERROR"; then
     rm -f "$CURL_ERROR"
     break
   fi

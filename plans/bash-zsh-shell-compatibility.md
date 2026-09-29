@@ -377,7 +377,7 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
       `resolve.sh` call sites in `commands/ruvector/setup.md` (`:56`, `:94`,
       `:106`, `:140`, `:178`) and `status.md` (`:23`, `:59`, `:78`, `:189`,
       `:264`).
-- [ ] 2.7: github-workflow, yellow-devin and yellow-codex.
+- [x] 2.7: github-workflow, yellow-devin and yellow-codex.
   - Rewrite the `mapfile -d '' -t` calls in
     `github-workflow/skills/github-stack-amend/SKILL.md:51` and
     `github-stack-submit/SKILL.md:63` (NUL-delimited, so a
@@ -385,22 +385,30 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
   - yellow-devin: `commands/devin/review-prs.md:439` (`mapfile`) and
     `skills/devin-workflows/SKILL.md:108` (`status=`).
   - yellow-codex: `commands/codex/setup.md:61-62` (`read -r -a`).
-- [ ] 2.8: gt-workflow (5 findings).
+- [x] 2.8: gt-workflow (5 findings). `gt-cleanup` now shifts positional
+      parameters; four argument sets verified identical in bash and zsh.
   - `skills/gt-cleanup/SKILL.md:46,55,56`: `${args_copy[$i]}` indexed from
     a 0-based counter is off by one in zsh. Iterate values or shift
     positional parameters.
   - `skills/gt-setup/SKILL.md:91` (SHC-002, `for path in`) and `:132`
     (SHC-001, `: > "$mq_err_log"` after `mktemp`).
-- [ ] 2.9: yellow-linear `commands/linear/delegate.md:523` (`path=`);
+- [x] 2.9: yellow-linear `commands/linear/delegate.md:523` (`path=`);
       yellow-semgrep `commands/semgrep/setup.md:75-76` (`read -r -a`) and
       `skills/semgrep-conventions/SKILL.md:246` (SHC-001); and the SHC-001
       hits in yellow-browser-test (`agents/testing/test-reporter.md:83`,
       `commands/browser-test/explore.md:85`, `test.md:78,105`), yellow-review
       (`commands/review/resolve-stack.md:207`, `review-all.md:385`) and
       yellow-research (`skills/library-context/SKILL.md:115`).
-- [ ] 2.10: Allowlist every remaining style-level or false-positive finding
+- [x] 2.10: Allowlist every remaining style-level or false-positive finding
       with a reason. Target: the lint is clean in non-report mode, with fewer
       than 10 allowlist entries. Explain any larger number in the PR body.
+      Result: the lint and the parse check pass in blocking mode with zero
+      allowlist entries. The version-check rewrite (codex/semgrep setup) was
+      compared against the original over 12 version pairs: identical in
+      bash, and the original always passed under zsh (`read -a` errored).
+      Pre-existing, unrelated: `yellow-research/tests/context7-cache.bats`
+      test 6 fails on code this branch does not touch (cause not
+      investigated; follow-up).
 
 ### Phase 3: zsh runtime suite (PR after Phase 2)
 
@@ -704,7 +712,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - [x] 2. agent/feat/shell-compat-lint (completed 2026-09-28)
 - [x] 3. agent/fix/zsh-composio-council (completed 2026-09-28)
 - [x] 4. agent/fix/zsh-core-debt-wrappers (completed 2026-09-28)
-- [ ] 5. agent/fix/zsh-ci-ruvector-wrappers
+- [x] 5. agent/fix/zsh-ci-ruvector-wrappers (completed 2026-09-28)
 - [ ] 6. agent/fix/zsh-remaining-plugins
 - [ ] 7. agent/test/zsh-runtime-suite
 - [ ] 8. agent/chore/shell-compat-required

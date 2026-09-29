@@ -382,7 +382,7 @@ aggregation rules change there, propagate the same change here.
     ```bash
     git add -- <specific files, never -A/.>
     msgfile=$(mktemp)
-    printf 'fix: address review findings from %s\n' "<reviewer-categories>" > "$msgfile"
+    printf 'fix: address review findings from %s\n' "<reviewer-categories>" >| "$msgfile"
     git commit -F "$msgfile"
     rm -f "$msgfile"
     node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit

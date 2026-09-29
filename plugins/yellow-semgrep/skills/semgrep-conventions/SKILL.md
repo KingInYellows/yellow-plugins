@@ -243,7 +243,7 @@ Semgrep emits progress and config-parse errors on stderr. Never suppress with
 
 ```bash
 SCAN_STDERR=$(mktemp)
-semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}" 2>"$SCAN_STDERR"
+semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}" 2>|"$SCAN_STDERR"
 scan_exit=$?
 if [ "$scan_exit" -ne 0 ]; then
   printf '[yellow-semgrep] Warning: semgrep scan errors:\n' >&2

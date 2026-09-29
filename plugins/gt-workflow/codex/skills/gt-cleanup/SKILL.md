@@ -37,34 +37,34 @@ messages if any fail.
 DRY_RUN=false
 STALE_DAYS=30
 
-# Populate args_copy by splitting the argument text provided after the
-# skill name on whitespace (e.g., args_copy=(--dry-run --stale-days 14)).
-args_copy=(...)
-i=0
-while [ $i -lt ${#args_copy[@]} ]; do
-  arg="${args_copy[$i]}"
-  case "$arg" in
+# Set the positional parameters from the argument text provided after the
+# skill name, split on whitespace (e.g., set -- --dry-run --stale-days 14).
+# Shift through them rather than indexing an array: array indexes are 0-based
+# in bash but 1-based in zsh, and the Bash tool may run either.
+set -- ...
+while [ $# -gt 0 ]; do
+  case "$1" in
     --dry-run)
       DRY_RUN=true
-      i=$((i + 1))
+      shift
       ;;
     --stale-days)
-      i=$((i + 1))
       # Guard: next arg must exist and not be another flag
-      if [ $i -lt ${#args_copy[@]} ] && ! [[ "${args_copy[$i]}" =~ ^-- ]]; then
-        STALE_DAYS="${args_copy[$i]}"
-        i=$((i + 1))
-      else
-        echo "ERROR: --stale-days requires a value (e.g., --stale-days 60)"
-        exit 1
-      fi
+      case "${2-}" in
+        ''|--*)
+          echo "ERROR: --stale-days requires a value (e.g., --stale-days 60)"
+          exit 1
+          ;;
+      esac
+      STALE_DAYS="$2"
+      shift 2
       ;;
     --stale-days=*)
-      STALE_DAYS="${arg#*=}"
-      i=$((i + 1))
+      STALE_DAYS="${1#*=}"
+      shift
       ;;
     *)
-      i=$((i + 1))
+      shift
       ;;
   esac
 done

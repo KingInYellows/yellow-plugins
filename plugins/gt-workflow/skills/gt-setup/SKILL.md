@@ -88,13 +88,14 @@ fi
 
 printf '\n=== Graphite Auth ===\n'
 auth_ok=0
-for path in \
+# `cfg`, not `path`: in zsh a loop over `path` rewrites $PATH.
+for cfg in \
   "$HOME/.graphite_user_config" \
   "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" \
   "$HOME/.config/graphite/user_config"; do
-  if [ -f "$path" ]; then
+  if [ -f "$cfg" ]; then
     auth_ok=1
-    printf 'auth_config:    present (%s)\n' "$path"
+    printf 'auth_config:    present (%s)\n' "$cfg"
     break
   fi
 done
@@ -129,7 +130,7 @@ if command -v gh >/dev/null 2>&1; then
   else
     repo_owner="${repo_nwo%/*}"
     repo_name="${repo_nwo#*/}"
-    [ -n "$mq_err_log" ] && : > "$mq_err_log"  # truncate before next probe
+    [ -n "$mq_err_log" ] && : >| "$mq_err_log"  # truncate before next probe
     # shellcheck disable=SC2016  # $owner/$name are GraphQL variable refs, not shell vars — intentionally literal in single quotes
     mq_check=$(gh api graphql -f query='
       query($owner:String!,$name:String!){

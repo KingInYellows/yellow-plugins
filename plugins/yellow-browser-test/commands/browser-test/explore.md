@@ -82,7 +82,7 @@ else
     ATTEMPT=$((ATTEMPT + 1))
     printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
     CURL_ERR=$(mktemp)
-    if curl -s --max-time 5 -o /dev/null "$BASE_URL$READY_PATH" 2>"$CURL_ERR"; then
+    if curl -s --max-time 5 -o /dev/null "$BASE_URL$READY_PATH" 2>|"$CURL_ERR"; then
       rm -f "$CURL_ERR"; READY=1; break
     fi
     LAST_CURL_ERROR=$(cat "$CURL_ERR"); rm -f "$CURL_ERR"
