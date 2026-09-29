@@ -406,6 +406,15 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       const wrapper = parseFdWrapper(prefix);
       if (wrapper.problem) {
         out[i] = { kind: 'pinned', code, badWrapper: wrapper.problem };
+      } else if (match[2] === '') {
+        // Not a wrapper: the body stays 'expand' and is linted as the
+        // calling shell's text.
+        out[i] = {
+          kind: 'pinned',
+          code,
+          badWrapper:
+            "quote the heredoc tag (3<<'TAG'): an unquoted tag expands the body in the calling shell",
+        };
       } else {
         // The rest of the wrapper line (redirects, a pipe) runs in the
         // current shell: lint it with the wrapper itself replaced by `:`.
@@ -703,9 +712,40 @@ function truncationTargets(code) {
   return targets;
 }
 
-// `(( n > $max ))` and `[[ $a > $b ]]` compare; they do not redirect.
+// `$( … )` and backtick substitutions inside a span (nested parens balanced).
+// They run as real commands, so their redirects still count.
+function commandSubstitutions(span) {
+  const found = [];
+  for (let i = 0; i < span.length; i++) {
+    if (span[i] === '`') {
+      const end = span.indexOf('`', i + 1);
+      if (end === -1) break;
+      found.push(span.slice(i, end + 1));
+      i = end;
+    } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+      let depth = 0;
+      let j = i + 1;
+      for (; j < span.length; j++) {
+        if (span[j] === '(') depth++;
+        else if (span[j] === ')' && --depth === 0) break;
+      }
+      found.push(span.slice(i, j + 1));
+      i = j;
+    }
+  }
+  return found;
+}
+
+// `(( n > $max ))` and `[[ $a > $b ]]` compare; they do not redirect. Blank
+// the span but keep its command substitutions so their redirects are scanned.
 function stripComparisons(code) {
-  return stripArithmetic(code).replace(/\[\[(?:[^\]]|\](?!\]))*\]\]/g, '[[ ]]');
+  const blank = (placeholder) => (span) => {
+    const subs = commandSubstitutions(span);
+    return subs.length ? `${placeholder} ; ${subs.join(' ; ')} ;` : placeholder;
+  };
+  return code
+    .replace(ARITHMETIC_RE, blank('0'))
+    .replace(/\[\[(?:[^\]]|\](?!\]))*\]\]/g, blank('[[ ]]'));
 }
 
 function* clobberRedirects(rawCode) {

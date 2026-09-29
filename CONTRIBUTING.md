@@ -637,7 +637,9 @@ as unverifiable by the stacked-PR providers' git-push PreToolUse hook. `bash`
 must be the command itself (no `sudo`/`ssh`/`env` prefix); only `--norc`,
 `--noprofile`, `-e`/`-u`/`-x` and `-o pipefail` may precede `/dev/fd/N`, and
 only quoted operands (`'value'`, `"$var"`) may follow it — pass untrusted
-values that way, never inside the body. Redirects after the heredoc operator
+values that way, never inside the body. The tag must be quoted
+(`3<<'TAG'`): an unquoted tag expands the body in the caller's shell, and
+SHC-009 rejects it. Redirects after the heredoc operator
 run in the caller's shell and are linted like inline code. To call one
 function from prose, pass values as single-quoted arguments (reject values
 that contain a single quote): `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'`.

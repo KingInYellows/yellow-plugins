@@ -65,6 +65,16 @@ describe('inline rules', () => {
       'cmd > "$out"\ncmd2 > "$out"',
       'SHC-001',
     ],
+    [
+      'SHC-001 redirect inside a [[ ]] substitution',
+      'f=$(mktemp)\n[[ -n $(cmd > "$f") ]]',
+      'SHC-001',
+    ],
+    [
+      'SHC-001 redirect inside a (( )) substitution',
+      'f=$(mktemp)\n(( $(cmd > "$f") > 0 ))',
+      'SHC-001',
+    ],
     ['SHC-002 path assignment', 'path="docs/x.md"', 'SHC-002'],
     ['SHC-002 local status', 'f() { local status="$1"; }', 'SHC-002'],
     ['SHC-002 for loop over path', 'for path in a b; do :; done', 'SHC-002'],
@@ -208,6 +218,11 @@ describe('inline rules', () => {
     ],
     ['a multi-digit fd', "bash /dev/fd/10 10<<'__W__'", 'single-digit'],
     ['stdin with options', "bash -s -- x <<'__W__'", 'on stdin'],
+    [
+      'an unquoted heredoc tag',
+      'bash /dev/fd/3 3<<__W__',
+      'quote the heredoc tag',
+    ],
   ])('rejects %s as a wrapper (SHC-009)', (_name, opener, detail) => {
     const text = [opener, 'true', '__W__'].join('\n');
     const findings = lint(text).filter((f) => f.rule === 'SHC-009');
@@ -231,6 +246,8 @@ describe('inline rules', () => {
     ['in a same-line case arm', `case "$x" in y) bash /dev/fd/3 3<<'__W__'`],
     ['in a line-leading case arm', "  y) bash /dev/fd/3 3<<'__W__'"],
     ['in an alternation case arm', "a|b) bash /dev/fd/3 3<<'__W__'"],
+    ['with a double-quoted tag', 'bash /dev/fd/3 3<<"__W__"'],
+    ['with a tab-stripping quoted tag', "bash /dev/fd/3 3<<-'__W__'"],
   ])('accepts the fd wrapper %s', (_name, opener) => {
     expect(lint([opener, 'mapfile -t a < f', '__W__'].join('\n'))).toEqual([]);
   });
@@ -252,6 +269,11 @@ describe('inline rules', () => {
       '(( n > $limit )) && (( m > $limit ))',
     ].join('\n');
     expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 2]]);
+  });
+
+  it('does not read `[[ a > $f ]]` or `(( n > $f ))` comparisons as redirects', () => {
+    const text = 'f=$(mktemp)\n[[ $a > $f ]]\n(( n > $f ))\nx=$(( 1 << n ))';
+    expect(lint(text)).toEqual([]);
   });
 
   it('skips the inside of a multi-line quoted program but lints the closing line', () => {
