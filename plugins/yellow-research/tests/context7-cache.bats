@@ -112,8 +112,11 @@ JSON
   _stub_now_returns 2000000000
   local cache_path
   cache_path=$(_lc_cache_path)
-  # Seed a fresh cache: warmed 1 hour ago
-  printf '{"schema":"1","warmed_at":1999996400,"tier1":{"seeded":{"library_id":"/seed/seed","fetched_at":1999996400}},"tier2":{},"lockfile_fingerprint":{}}' >"$cache_path"
+  # Seed a fresh cache: warmed 1 hour ago, with the current lockfile
+  # fingerprint — package.json is fingerprinted, so an empty one would
+  # (correctly) invalidate the cache.
+  jq -cn --argjson fp "$(_lc_lockfile_fingerprint)" \
+    '{schema: "1", warmed_at: 1999996400, tier1: {seeded: {library_id: "/seed/seed", fetched_at: 1999996400}}, tier2: {}, lockfile_fingerprint: $fp}' >"$cache_path"
   local before
   before=$(cat "$cache_path")
 
