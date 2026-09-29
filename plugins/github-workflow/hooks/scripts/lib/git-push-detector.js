@@ -40,7 +40,13 @@
  * command's stdin through every level, and a source attached to a whole
  * group (`{ sh; } <<EOF`) reaches every command inside it. The
  * `$(…)`/backtick bodies of an unquoted-delimiter heredoc are commands in
- * their own right whatever reads the body.
+ * their own right whatever reads the body. `case` pattern lists and
+ * `$((…))` arithmetic are data, except the substitutions inside them. A
+ * shell told to read `/dev/fd/N`, `/dev/stdin` or `/proc/self/fd/N` is read
+ * only when that descriptor has a heredoc, here-string, pipe or `N< <(…)`
+ * on the same command (or the one whose `-c` string, git alias or
+ * `PAGER=`/`core.pager` value it is); otherwise it is denied
+ * (`exec 3<<'X' … X; bash /dev/fd/3`).
  *
  * Still a backstop: `${IFS}` and variable indirection (`$GIT push`, a
  * runtime-built `eval` string), shell aliases and `hash -p` bindings,
@@ -352,8 +358,34 @@ function expansionCommands(text) {
 }
 
 /**
+ * End of the `$((…))` arithmetic expansion whose `$` is at `start`, or -1
+ * when the text is a command substitution that begins with a subshell
+ * (`$((cmd); cmd)`): bash reads `$((` as arithmetic only when the paren
+ * that closes the inner `(` is followed directly by the outer `)`.
+ * `budget.left` bounds the characters scanned across one lex, so a run of
+ * unclosed `$((` stays linear; once spent, `$((` lexes as a command
+ * substitution, which reads more text as commands, never less.
+ */
+function arithmeticEnd(src, start, budget) {
+  let depth = 1;
+  let quote = null;
+  for (let j = start + 3; j < src.length; j += 1) {
+    if ((budget.left -= 1) < 0) return -1;
+    const c = src[j];
+    if (quote) {
+      if (c === quote) quote = null;
+      else if (c === '\\' && quote === '"') j += 1;
+    } else if (c === '\\') j += 1;
+    else if (c === "'" || c === '"') quote = c;
+    else if (c === '(') depth += 1;
+    else if (c === ')' && (depth -= 1) === 0) return src[j + 1] === ')' ? j + 2 : -1;
+  }
+  return -1;
+}
+
+/**
  * Lex `command` into simple-command segments:
- *   { argv, heredocs, procsubs, pipedFrom, inOutputProcsub, feeds }
+ *   { argv, heredocs, procsubs, pipedFrom, inOutputProcsub, feeds, fds }
  * with quotes and backslashes already removed from argv and redirections
  * (operator + operand) dropped. Segment boundaries are `;` `&` `|` newline
  * `(` `)` `{` `}`; a `$(…)`/backtick body becomes its own segment while
@@ -369,12 +401,19 @@ function expansionCommands(text) {
  * stdin sources (`{ sh; } <<EOF`); a post-pass shares those sources with
  * every command in the group that has none of its own and records the
  * source on `stdinFrom` so memoised scans are per source, not per reader.
+ * `fds` holds the descriptor numbers (as strings) that a heredoc,
+ * here-string or `N< <(…)` on the segment gives a readable source, so a
+ * shell told to read `/dev/fd/N` can be matched to it. The words of a
+ * `case` pattern list (`*)`, `a|b)`) are not commands and are dropped,
+ * and a `$((…))` arithmetic expansion is runtime text whose only commands
+ * are the `$(…)`/backtick substitutions inside it.
  */
 function lexSegments(command, nesting = 0) {
   const segments = [];
   let argv = [];
   let heredocs = [];
   let procsubs = [];
+  let fds = new Set();
   let word = '';
   let inWord = false;
   let wordExpands = false; // unquoted `*`, `?`, `[…]`, `{a,b}` seen in this word
@@ -404,6 +443,15 @@ function lexSegments(command, nesting = 0) {
   let outputProcsubDepth = 0;
   // Saved outer state for each open `$(` / backtick / `<(` / `>(`.
   const substitutionStack = [];
+  // The fd a `N< <(…)` redirect binds its process substitution to.
+  let procsubFd = null;
+  // `case WORD in` pattern lists: `casePattern` while reading one (up to
+  // its unquoted `)`), `patternWords`/`patternParens` inside it, and the
+  // group depth of each open `case` so `;;` knows a pattern list follows.
+  let casePattern = false;
+  let patternWords = 0;
+  let patternParens = 0;
+  let caseLevels = [];
   // Heredoc delimiters declared on the current line, consumed at newline,
   // each bound to the heredocs array of the segment that declared it.
   const pendingHeredocs = [];
@@ -433,13 +481,14 @@ function lexSegments(command, nesting = 0) {
       // A segment that is only a group closer plus stdin sources (`}
       // <<EOF`, `) <<< x`, `fi < <(…)`) feeds the group it closes.
       const feeds = groupJustClosed && argv.every((w) => GROUP_CLOSERS.has(w)) ? lastGroupStart : -1;
-      const segment = { argv, heredocs, procsubs, pipedFrom: pipeFrom, inOutputProcsub: outputProcsubDepth > 0, feeds };
+      const segment = { argv, heredocs, procsubs, pipedFrom: pipeFrom, inOutputProcsub: outputProcsubDepth > 0, feeds, fds };
       segments.push(segment);
       const frame = substitutionStack[substitutionStack.length - 1];
       if (frame) frame.body.push(segment);
       argv = [];
       heredocs = [];
       procsubs = [];
+      fds = new Set();
       // A pipe feeds one simple command — unless that command opened a
       // group, in which case every segment until the group closes shares
       // the stdin.
@@ -462,6 +511,15 @@ function lexSegments(command, nesting = 0) {
       heredocs.push(w);
       return;
     }
+    if (casePattern) {
+      // A pattern word is matched, never run — unless it is the `esac`
+      // that ends the whole `case`.
+      if (patternWords > 0 || w !== 'esac') {
+        patternWords += 1;
+        return;
+      }
+      casePattern = false;
+    }
     if (w === '{' || w === '}') {
       // Group braces are reserved words only as standalone words; they
       // delimit commands like `;` does.
@@ -476,11 +534,21 @@ function lexSegments(command, nesting = 0) {
     groupJustClosed = false;
     if (argv.length === 0 && GROUP_OPENERS.has(w)) openGroup();
     if (argv.length === 0 && GROUP_CLOSERS.has(w)) {
+      if (w === 'esac' && caseLevels[caseLevels.length - 1] === groupDepth) caseLevels.pop();
       closeGroup();
       groupJustClosed = true;
     }
     if (expands) w += SUBST;
     argv.push(w);
+    if (w === 'in' && argv.length >= 3 && argv[argv.length - 3] === 'case' && argv.slice(0, -3).every((r) => LEADING_RESERVED.has(r))) {
+      // `case WORD in` (also after `then`, `do`, `!`…): a pattern list
+      // follows, not a command.
+      endSegmentAfterWord();
+      caseLevels.push(groupDepth);
+      casePattern = true;
+      patternWords = 0;
+      patternParens = 0;
+    }
   };
   const endSegment = () => {
     endWord();
@@ -488,14 +556,17 @@ function lexSegments(command, nesting = 0) {
   };
   // A fd (`2`, `{fd}`) immediately before a redirection operator is part
   // of the operator, not a word.
+  // Returns the dropped fd, or null when the operator had none.
   const dropFdOrEndWord = () => {
     if (inWord && FD_RE.test(word)) {
+      const fd = word;
       word = '';
       inWord = false;
       resetWordFlags();
-    } else {
-      endWord();
+      return fd;
     }
+    endWord();
+    return null;
   };
   const separator = () => {
     // `;`, `&&`, `||`, newline at the pipe's own depth end the pipe's reach
@@ -507,10 +578,16 @@ function lexSegments(command, nesting = 0) {
   const openSubstitution = (kind, outerQuote) => {
     // Freeze the outer simple command; the substitution body lexes as its
     // own segment(s), then the outer resumes.
-    substitutionStack.push({ kind, quote: outerQuote, argv, heredocs, procsubs, word, inWord, wordExpands, bracketOpen, braceOpen, braceSeparator, skipNextWord, nextWordIsHereString, pipeFrom, pipeDepth, groupDepth, groupJustClosed, groupStarts, lastGroupStart, lastCh, body: [] });
+    substitutionStack.push({ kind, quote: outerQuote, argv, heredocs, procsubs, fds, procFd: procsubFd, word, inWord, wordExpands, bracketOpen, braceOpen, braceSeparator, skipNextWord, nextWordIsHereString, pipeFrom, pipeDepth, groupDepth, groupJustClosed, groupStarts, lastGroupStart, lastCh, casePattern, patternWords, patternParens, caseLevels, body: [] });
+    procsubFd = null;
     argv = [];
     heredocs = [];
     procsubs = [];
+    fds = new Set();
+    casePattern = false;
+    patternWords = 0;
+    patternParens = 0;
+    caseLevels = [];
     word = '';
     inWord = false;
     resetWordFlags();
@@ -533,6 +610,11 @@ function lexSegments(command, nesting = 0) {
     argv = outer.argv;
     heredocs = outer.heredocs;
     procsubs = outer.procsubs;
+    fds = outer.fds;
+    casePattern = outer.casePattern;
+    patternWords = outer.patternWords;
+    patternParens = outer.patternParens;
+    caseLevels = outer.caseLevels;
     word = outer.word;
     inWord = outer.inWord;
     wordExpands = outer.wordExpands;
@@ -560,9 +642,37 @@ function lexSegments(command, nesting = 0) {
       // too), but only the direct body is attached — a nested `<(…)` is
       // already attached to the command inside the body that reads it.
       procsubs.push(...outer.body);
+      if (outer.kind === 'inproc' && outer.procFd !== null) fds.add(outer.procFd);
       skipNextWord = false;
       nextWordIsHereString = false;
     }
+  };
+  // The `$(…)`/backtick bodies inside `text` (an expanding heredoc body, a
+  // `$((…))` expression) are commands the shell runs: lex each as its own.
+  const pushExpansionCommands = (text) => {
+    for (const inner of expansionCommands(text)) {
+      const frame = substitutionStack[substitutionStack.length - 1];
+      // Past the cap: one runtime-decided segment (fails closed). A
+      // fresh object, not OPAQUE_PRODUCER — `feeds` is assigned below
+      // and that constant is frozen.
+      const innerSegments = nesting >= MAX_SHELL_DEPTH ? [{ argv: [SUBST], heredocs: [], procsubs: [], pipedFrom: null, inOutputProcsub: false, feeds: -1 }] : lexSegments(inner, nesting + 1);
+      for (const segment of innerSegments) {
+        segment.feeds = -1; // the inner lex ran its own post-pass; its indices are not ours
+        segments.push(segment);
+        if (frame) frame.body.push(segment);
+      }
+    }
+  };
+  // `$((…))` at src[i]: returns the index after it, or -1 when it is not
+  // arithmetic. The word gets a runtime placeholder.
+  const arithmeticBudget = { left: 4 * command.length };
+  const arithmetic = (i) => {
+    const end = arithmeticEnd(src, i, arithmeticBudget);
+    if (end === -1) return -1;
+    pushExpansionCommands(src.slice(i + 3, end - 2));
+    word += SUBST;
+    inWord = true;
+    return end;
   };
   const appendUnquoted = (ch) => {
     // Track unquoted expansion characters so the finished word can be
@@ -634,6 +744,11 @@ function lexSegments(command, nesting = 0) {
         continue;
       }
       if (ch === '$' && src[i + 1] === '(') {
+        const end = src[i + 2] === '(' ? arithmetic(i) : -1;
+        if (end !== -1) {
+          i = end;
+          continue;
+        }
         openSubstitution('paren', '"');
         i += 2;
         continue;
@@ -706,20 +821,7 @@ function lexSegments(command, nesting = 0) {
           // `cat <<EOF … $(git push) … EOF`: the shell runs the
           // substitution whatever consumes the body, so each one is lexed
           // as its own top-level command.
-          if (expands) {
-            for (const inner of expansionCommands(body)) {
-              const frame = substitutionStack[substitutionStack.length - 1];
-              // Past the cap: one runtime-decided segment (fails closed). A
-              // fresh object, not OPAQUE_PRODUCER — `feeds` is assigned below
-              // and that constant is frozen.
-              const innerSegments = nesting >= MAX_SHELL_DEPTH ? [{ argv: [SUBST], heredocs: [], procsubs: [], pipedFrom: null, inOutputProcsub: false, feeds: -1 }] : lexSegments(inner, nesting + 1);
-              for (const segment of innerSegments) {
-                segment.feeds = -1; // the inner lex ran its own post-pass; its indices are not ours
-                segments.push(segment);
-                if (frame) frame.body.push(segment);
-              }
-            }
-          }
+          if (expands) pushExpansionCommands(body);
           if (!closed) break;
         }
         if (i > len) i = len;
@@ -735,7 +837,7 @@ function lexSegments(command, nesting = 0) {
     if (ch === '<' && src[i + 1] === '<' && src[i + 2] === '<') {
       // Here-string: the next word is stdin for the command, same role as
       // a heredoc body.
-      dropFdOrEndWord();
+      fds.add(dropFdOrEndWord() ?? '0');
       nextWordIsHereString = true;
       i += 3;
       continue;
@@ -744,7 +846,7 @@ function lexSegments(command, nesting = 0) {
       // Heredoc operator: `<<WORD`, `<<-WORD`, `<< "WORD"`. A quoted or
       // backslashed delimiter suppresses expansion of the body; an
       // unquoted one leaves `$(…)`/backticks in the body live.
-      dropFdOrEndWord();
+      fds.add(dropFdOrEndWord() ?? '0');
       i += 2;
       let stripTabs = false;
       if (src[i] === '-') {
@@ -795,7 +897,8 @@ function lexSegments(command, nesting = 0) {
       // Redirection: `>`, `>>`, `>|`, `<`, `<>`, `>&`, `<&`, `&>`, `&>>`,
       // optionally preceded by a fd (`2>`, `{fd}>`) that is part of the
       // operator, not a word. Drop the operator and its operand.
-      dropFdOrEndWord();
+      const fd = dropFdOrEndWord();
+      const input = ch === '<' && src[i + 1] !== '>' && src[i + 1] !== '&';
       i += 1;
       if (ch === '&') i += 1; // consumed the `>`/`<` after `&`
       while (i < len && (src[i] === '>' || src[i] === '<' || src[i] === '&' || src[i] === '|')) i += 1;
@@ -803,11 +906,20 @@ function lexSegments(command, nesting = 0) {
       // `cmd < <(…)`: the operand is a process substitution, lexed as a
       // stdin source by the branch above on the next iteration — nothing
       // to skip. A bare `(` is a subshell boundary.
-      if (src[i] === '(' || (src[i] === '<' && src[i + 1] === '(')) continue;
+      if (src[i] === '<' && src[i + 1] === '(') {
+        if (input) procsubFd = fd ?? '0';
+        continue;
+      }
+      if (src[i] === '(') continue;
       skipNextWord = true;
       continue;
     }
     if (ch === '$' && src[i + 1] === '(') {
+      const end = src[i + 2] === '(' ? arithmetic(i) : -1;
+      if (end !== -1) {
+        i = end;
+        continue;
+      }
       openSubstitution('paren', null);
       i += 2;
       continue;
@@ -822,6 +934,14 @@ function lexSegments(command, nesting = 0) {
       i += 1;
       continue;
     }
+    if (ch === ')' && casePattern) {
+      // `(a|b))` nests; the unmatched `)` ends the pattern list.
+      endWord();
+      if (patternParens > 0) patternParens -= 1;
+      else casePattern = false;
+      i += 1;
+      continue;
+    }
     if (ch === ')') {
       // A `(` opened inside this frame closes first: `$( (sh) <<< x )`.
       const top = substitutionStack[substitutionStack.length - 1];
@@ -832,6 +952,14 @@ function lexSegments(command, nesting = 0) {
         closeGroup();
         groupJustClosed = true;
       }
+      i += 1;
+      continue;
+    }
+    if ((ch === '|' || ch === '(') && casePattern) {
+      // Alternation and extglob groups inside a pattern; a `(` before the
+      // first pattern is the optional opening paren (`(a|b) cmd;;`).
+      endWord();
+      if (ch === '(' && patternWords > 0) patternParens += 1;
       i += 1;
       continue;
     }
@@ -857,6 +985,16 @@ function lexSegments(command, nesting = 0) {
     }
     if (ch === ';' || ch === '&') {
       separator();
+      if (ch === ';' && (src[i + 1] === ';' || src[i + 1] === '&')) {
+        // `;;`, `;&`, `;;&` end a case item; another pattern list follows.
+        i += src[i + 1] === ';' && src[i + 2] === '&' ? 3 : 2;
+        if (caseLevels.length > 0 && caseLevels[caseLevels.length - 1] === groupDepth) {
+          casePattern = true;
+          patternWords = 0;
+          patternParens = 0;
+        }
+        continue;
+      }
       i += 1;
       continue;
     }
@@ -891,6 +1029,7 @@ function lexSegments(command, nesting = 0) {
       fed.heredocs = trailing.heredocs;
       fed.procsubs = trailing.procsubs;
       fed.inOutputProcsub = trailing.inOutputProcsub;
+      fed.fds = trailing.fds;
       fed.stdinFrom = trailing;
     }
     fedThrough.set(trailing.feeds, k);
@@ -937,18 +1076,41 @@ function computeProducedText(segment, hops) {
 }
 
 /**
+ * The stdin context of a command git runs from a config or environment
+ * value (a pager, an editor, `core.sshCommand`): it inherits the outer
+ * command's extra descriptors (`3<<'T'`), but its stdin is data git
+ * produces — so a shell reading stdin there reads an opaque pipe.
+ */
+function gitChildStdin(stdinCtx) {
+  return {
+    argv: [],
+    heredocs: stdinCtx ? stdinCtx.heredocs : [],
+    procsubs: stdinCtx ? stdinCtx.procsubs : [],
+    pipedFrom: OPAQUE_PRODUCER,
+    inOutputProcsub: false,
+    feeds: -1,
+    fds: stdinCtx && stdinCtx.fds ? stdinCtx.fds : new Set(),
+  };
+}
+
+/**
  * Scan a value that git or the shell will run as a command: `PAGER=…`,
  * `GIT_SSH_COMMAND=…` assignment prefixes (and `env` operands).
  */
-function commandValueInvokesGitPush(assignment, depth) {
+function commandValueInvokesGitPush(assignment, depth, stdinCtx) {
   const m = ASSIGNMENT_NAME_RE.exec(assignment);
   if (!m) return false;
   const [, name, value] = m;
-  return COMMAND_ENV_VARS.has(name) && value !== '' && commandInvokesGitPushAtDepth(value, depth + 1, null);
+  return COMMAND_ENV_VARS.has(name) && value !== '' && commandInvokesGitPushAtDepth(value, depth + 1, gitChildStdin(stdinCtx));
 }
 
-/** Scan a `-c key=value` git config override that git may execute. */
-function gitConfigInvokesGitPush(kv, depth) {
+/**
+ * Scan a `-c key=value` git config override that git may execute.
+ * `stdinCtx` is the invoking command's stdin context (an alias inherits
+ * its stdin and descriptors), or null for a persisted `git config` write,
+ * whose value runs later with descriptors nobody can see now.
+ */
+function gitConfigInvokesGitPush(kv, depth, stdinCtx) {
   const eq = kv.indexOf('=');
   if (eq === -1) return false;
   const key = kv.slice(0, eq).toLowerCase();
@@ -956,14 +1118,14 @@ function gitConfigInvokesGitPush(kv, depth) {
   if (key.startsWith('alias.')) {
     // `-c alias.p=push p` / `-c alias.p='!git push' p`
     if (PUSH_SUBCOMMANDS.has(value.trim().split(/\s+/)[0])) return denyVerified();
-    return value.startsWith('!') && commandInvokesGitPushAtDepth(value.slice(1), depth + 1, null);
+    return value.startsWith('!') && commandInvokesGitPushAtDepth(value.slice(1), depth + 1, stdinCtx);
   }
   // core.pager, core.fsmonitor, diff.external, core.sshCommand, … are
   // handed to `sh -c`: re-scan the value as a shell string. A leading `!`
   // (credential.helper, and the forms git strips before `sh -c`) is not
   // part of the command. Other keys (`user.name='git push'`) are data.
   if (!COMMAND_CONFIG_KEY_RE.test(key)) return false;
-  return commandInvokesGitPushAtDepth(value.replace(/^\s*!/, ''), depth + 1, null);
+  return commandInvokesGitPushAtDepth(value.replace(/^\s*!/, ''), depth + 1, stdinCtx === null ? null : gitChildStdin(stdinCtx));
 }
 
 /**
@@ -1006,7 +1168,7 @@ function gitSubcommandInvokesGitPush(sub, rest, depth, stdinCtx) {
     if (value.includes(SUBST)) {
       return (key.toLowerCase().startsWith('alias.') || COMMAND_CONFIG_KEY_RE.test(key)) ? denyUnverifiable() : false;
     }
-    return gitConfigInvokesGitPush(`${key}=${value}`, depth);
+    return gitConfigInvokesGitPush(`${key}=${value}`, depth, null);
   }
   if (spec.shellOptions) {
     for (let j = 0; j < rest.length; j += 1) {
@@ -1070,7 +1232,7 @@ function segmentVerdict(segment, depth, outerStdin) {
   while (i < argv.length && LEADING_RESERVED.has(argv[i])) i += 1;
   // `FOO=bar git push` — and `PAGER='git push' git log`.
   while (i < argv.length && ASSIGNMENT_RE.test(argv[i])) {
-    if (commandValueInvokesGitPush(argv[i], depth)) return true;
+    if (commandValueInvokesGitPush(argv[i], depth, stdinCtx)) return true;
     i += 1;
   }
 
@@ -1109,7 +1271,7 @@ function segmentVerdict(segment, depth, outerStdin) {
           !(wrapper.positionalOnlyWithoutOptions && optionsSeen) &&
           (!wrapper.positionalRe || wrapper.positionalRe.test(opt));
         if (envAssignment) {
-          if (commandValueInvokesGitPush(opt, depth)) return true;
+          if (commandValueInvokesGitPush(opt, depth, stdinCtx)) return true;
         } else if (positional) {
           positionalsSeen += 1;
         } else {
@@ -1193,9 +1355,9 @@ function segmentVerdict(segment, depth, outerStdin) {
       }
       if (GIT_OPTION_TAKES_VALUE.has(tok)) {
         // `-c core.pager='git push'`: git runs the value.
-        if (tok === '-c' && i < argv.length && gitConfigInvokesGitPush(argv[i], depth)) return true;
+        if (tok === '-c' && i < argv.length && gitConfigInvokesGitPush(argv[i], depth, stdinCtx)) return true;
         i += 1;
-      } else if (tok.startsWith('-c') && tok.length > 2 && gitConfigInvokesGitPush(tok.slice(2), depth)) {
+      } else if (tok.startsWith('-c') && tok.length > 2 && gitConfigInvokesGitPush(tok.slice(2), depth, stdinCtx)) {
         return true;
       }
     }
@@ -1213,7 +1375,7 @@ function segmentVerdict(segment, depth, outerStdin) {
     return commandInvokesGitPushAtDepth(argv.slice(j).join(' '), depth + 1, stdinCtx);
   }
 
-  if (SOURCE_BUILTINS.has(program)) return null;
+  if (SOURCE_BUILTINS.has(program)) return scriptOperandVerdict(segment, argv[i + 1], outerStdin);
 
   if (SHELLS.has(program) || OPAQUE_SHELLS.has(program)) {
     const opaque = OPAQUE_SHELLS.has(program);
@@ -1243,10 +1405,40 @@ function segmentVerdict(segment, depth, outerStdin) {
       if (argv[i].includes(SUBST)) return denyUnverifiable(); // replacement token / substitution
       return commandInvokesGitPushAtDepth(argv[i], depth + 1, stdinCtx);
     }
-    return null; // no -c: caller checks stdin sources
+    // No -c: the script comes from stdin or a file operand; the caller
+    // checks stdin sources.
+    return scriptOperandVerdict(segment, argv[i], outerStdin);
   }
 
   return false;
+}
+
+// Script operands that name a descriptor rather than a file.
+const FD_SCRIPT_RE = /^\/dev\/(?:fd\/|stdin$)|^\/proc\/[^/]*\/fd\//;
+const FD_NUMBER_RE = /^\/(?:dev|proc\/self)\/fd\/([0-9]+)$/;
+
+/** Whether `segment` gives descriptor `fd` a source the detector reads. */
+function fdHasSource(segment, fd) {
+  if (fd === '0' && segment.pipedFrom !== null) return true;
+  return Boolean(segment.fds && segment.fds.has(fd));
+}
+
+/**
+ * Verdict for a shell (or `source`) whose script is `operand` — null (the
+ * caller scans the stdin sources) or a denial. A script file is out of
+ * scope, but `/dev/fd/N`, `/dev/stdin` and `/proc/self/fd/N` read a
+ * descriptor: that descriptor must carry a heredoc, here-string, pipe or
+ * `N< <(…)` on this command (or the one whose `-c` string this is), or the
+ * script cannot be read (`exec 3<<'X' … X` then `bash /dev/fd/3`).
+ */
+function scriptOperandVerdict(segment, operand, outerStdin) {
+  if (operand === undefined || !FD_SCRIPT_RE.test(operand)) return null;
+  const m = FD_NUMBER_RE.exec(operand);
+  const fd = operand === '/dev/stdin' ? '0' : m ? String(Number(m[1])) : null;
+  if (fd === null) return denyUnverifiable();
+  const source = hasOwnStdin(segment) ? segment : outerStdin;
+  if (source && hasOwnStdin(source) && fdHasSource(source, fd)) return null;
+  return denyUnverifiable();
 }
 
 // Per-top-level-call memo of stdin text verdicts, keyed by the text itself

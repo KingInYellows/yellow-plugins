@@ -251,6 +251,31 @@ JSON
 )"
 }
 
+@test "check-git-push: exec 3<<X … then bash /dev/fd/3 is blocked (script descriptor has no source on the reader)" {
+  assert_push_unverifiable "$(cat <<'JSON'
+{"tool_input":{"command":"exec 3<<'X'\ngit push origin HEAD\nX\nbash /dev/fd/3"}}
+JSON
+)"
+}
+
+@test "check-git-push: git -c alias.x='!bash /dev/fd/3' x 3<<T keeps the heredoc (a push in it is blocked)" {
+  assert_push_blocked "$(cat <<'JSON'
+{"tool_input":{"command":"git -c alias.x='!bash /dev/fd/3' x 3<<'T'\ngit push\nT"}}
+JSON
+)"
+}
+
+@test "check-git-push: the fd-3 wrapper with a harmless body is allowed" {
+  assert_push_allowed "$(cat <<'JSON'
+{"tool_input":{"command":"bash /dev/fd/3 3<<'T'\necho hi\nT"}}
+JSON
+)"
+}
+
+@test "check-git-push: a glob case pattern (*)) is allowed (patterns are matched, not run)" {
+  assert_push_allowed '{"tool_input":{"command":"case \"$1\" in R*|C*) echo a ;; *) echo b ;; esac"}}'
+}
+
 @test "check-git-push: diff <(git status) <(git log) is allowed (process substitution of non-push commands)" {
   assert_push_allowed '{"tool_input":{"command":"diff <(git status) <(git log)"}}'
 }

@@ -310,6 +310,14 @@ assert_parity() {
   assert_parity check-git-push git-config-pager-value
 }
 
+@test "check-git-push: exec 3<<X … then bash /dev/fd/3 is blocked (script descriptor has no source on the reader)" {
+  assert_parity check-git-push fd-script-without-source
+}
+
+@test "check-git-push: a glob case pattern (R*|C*) or *)) is allowed (patterns are matched, not run)" {
+  assert_parity check-git-push case-glob-pattern
+}
+
 # --- check-commit-message ---
 
 @test "check-commit-message: conventional-allow-silent matches golden" {

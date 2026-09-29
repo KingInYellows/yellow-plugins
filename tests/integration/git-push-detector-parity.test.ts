@@ -329,6 +329,32 @@ const DENY = [
   'git config alias.p "$(x)"',
   "printf 'push refs/heads/main:refs/heads/main\\n\\n' | git remote-https origin https://host/r.git",
   "{ { { sh; } <<A; } <<B; } <<C\ngit push\nA\ny\nB\nz\nC",
+  // Descriptor scripts (plans/shell-compat-followups.md item 8).
+  "bash /dev/fd/3 3<<'T'\ngit push\nT",
+  "exec 3<<'X'\ngit push\nX\nbash /dev/fd/3",
+  "exec 3<<'X'\necho hi\nX\nbash /dev/fd/3",
+  "exec 3<<'X'\necho hi\nX\n. /dev/fd/3",
+  "bash /dev/fd/4 3<<'T'\necho hi\nT",
+  'bash /dev/stdin',
+  'bash /proc/self/fd/3',
+  'bash /dev/fd/3 3< script.sh',
+  "bash /dev/fd/3 3< <(echo 'git push')",
+  "bash -c 'bash /dev/fd/3' 3<<'T'\ngit push\nT",
+  "git -c alias.x='!bash /dev/fd/3' x 3<<'T'\ngit push\nT",
+  "git -c alias.x='!bash /dev/fd/3' x",
+  "git -c alias.x='!bash' x <<'T'\ngit push\nT",
+  "GIT_SSH_COMMAND='bash /dev/fd/3' git fetch 3<<'T'\ngit push\nT",
+  "PAGER='bash /dev/fd/3' git log 3<<'T'\ngit push\nT",
+  "PAGER='bash /dev/fd/3' git log",
+  "git config alias.x '!bash /dev/fd/3' 3<<'T'\necho hi\nT",
+  // case patterns and arithmetic (item 4): the commands inside still count.
+  'case "$x" in *) git push ;; esac',
+  'case $x in *) true;& b) git push;;& esac',
+  'case $x in $(git push)) true;; esac',
+  'case $x in a) case $y in *) true;; esac;; *) git push;; esac',
+  'echo $(( $(git push) + 1 ))',
+  'echo "$(( `git push` + 1 ))"',
+  'echo $((echo a); git push)',
 ];
 
 const ALLOW = [
@@ -441,6 +467,26 @@ const ALLOW = [
   'git config --get alias.p push',
   "git config set http.proxy 'git push'",
   'git config url.https://x.insteadOf "$(cat f)"',
+  // Descriptor scripts with a readable source (item 8).
+  "bash /dev/fd/3 3<<'T'\necho hi\nT",
+  "bash --norc -e -o pipefail /dev/fd/3 'arg' 3<<'T'\necho hi\nT",
+  "bash /dev/stdin <<< 'echo hi'",
+  'bash /dev/fd/3 3< <(echo hi)',
+  "{ bash /dev/fd/3; } 3<<'T'\necho hi\nT",
+  "bash -c 'bash /dev/fd/3' 3<<'T'\necho hi\nT",
+  "git -c alias.x='!bash /dev/fd/3' x 3<<'T'\necho hi\nT",
+  'bash script.sh',
+  // case patterns are matched, not run; arithmetic is not a command (item 4).
+  'case "$x" in R*|C*) y=1 ;; esac',
+  'case "$x" in\n  a) true ;;\n  *) echo no ;;\nesac\ngit status',
+  'if true; then case $x in *) :;; esac; fi',
+  'case $x in (a|b) true;; @(c|d)) true;; esac',
+  'for f in *; do case $f in *.md) echo $f;; esac; done',
+  'case $x in esac',
+  `case "$COUNT" in ''|*[!0-9]*) COUNT="?";; esac`,
+  'x=$((\n  ${a[small]:-0} * 1 +\n  ${a[big]:-0} * 5\n))',
+  'echo "$(( ${a[x]} * 2 ))"',
+  'echo $(( (1 + 2) * 3 ))',
 ];
 
 describe('git-push-detector cross-plugin parity', () => {
@@ -515,6 +561,11 @@ describe('git-push-detector cross-plugin parity', () => {
       `${'eval '.repeat(13000)}git status`,
       `$'${'\\n'.repeat(30000)}'`,
       `${'<<A '.repeat(16000)}\nx\nA\n`,
+      // unclosed arithmetic and long case pattern lists (follow-up item 4)
+      '$(('.repeat(20000),
+      `echo ${'$((1'.repeat(15000)}`,
+      `${'case x in *) '.repeat(4000)}`,
+      `case x in ${'a|'.repeat(20000)}b) true;; esac`,
       `${'echo x | '.repeat(7000)}bash`,
       '<('.repeat(20000),
       `git ${'-c a=b '.repeat(9000)}status`,
