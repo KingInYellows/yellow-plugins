@@ -327,22 +327,27 @@ obs_stage() {
 @test "R22: the observer stays near its 100 ms latency target on the largest fixture (limit 250 ms, 1000 ms on CI)" {
   # The limit only catches gross regressions (a subprocess, a network call);
   # the measured best of five is printed below. A shared CI runner gets a
-  # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both.
-  local largest best limit
+  # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both. Each
+  # run uses its own session id, so every timed run writes a record instead
+  # of taking the unchanged-sample early return.
+  local largest best limit n
   limit=${CONTEXT_OBSERVER_LATENCY_LIMIT_MS:-$([ -n "${CI:-}" ] && echo 1000 || echo 250)}
   largest=$(ls -S "$FIX"/*.json | head -n 1)
   best=$(python3 - "$OBS" "$largest" <<'PY'
-import subprocess, sys, time
+import json, subprocess, sys, time
 obs, fixture = sys.argv[1], sys.argv[2]
-data = open(fixture, "rb").read()
+payload = json.load(open(fixture, "rb"))
 runs = []
-for _ in range(5):
+for n in range(5):
+    payload["session_id"] = "r22-%d" % n
+    data = json.dumps(payload).encode()
     start = time.perf_counter()
     subprocess.run([sys.executable, obs], input=data, stdout=subprocess.DEVNULL, check=True)
     runs.append((time.perf_counter() - start) * 1000)
 print("%.1f" % min(runs))
 PY
 )
+  for n in 0 1 2 3 4; do [ -f "$(co_find_record "r22-$n")" ]; done
   { echo "# observer best of 5 on $(basename "$largest"): ${best} ms (limit ${limit} ms)" >&3; } 2>/dev/null || true
   python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < float(sys.argv[2]) else 1)' "$best" "$limit"
 }
@@ -1311,7 +1316,7 @@ PY
   jq -r '.statusLine.command' "$SETTINGS" | grep -qF "$TEST_HOME/rel/yellow-context-observer.py"
 }
 
-# --- review ledger follow-ups (PR #912) ---------------------------------------
+# --- symlinked recovery, error paths and cross-language invariants ------------
 
 @test "T11: a symlinked invalid settings.json is recovered with the corrupt backup next to the link" {
   seed_settings none
@@ -1322,7 +1327,8 @@ PY
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup" '.action == "recovered" and .backup == $b' >/dev/null
-  [ -f "$SETTINGS.corrupt.backup" ] && [ ! -L "$SETTINGS.corrupt.backup" ]
+  [ -f "$SETTINGS.corrupt.backup" ]
+  [ ! -L "$SETTINGS.corrupt.backup" ]
   [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
   [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
   [ -L "$SETTINGS" ]

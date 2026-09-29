@@ -49,7 +49,7 @@ the whole statusline would go blank. `exec` matters too: a stage such as
 observer exits, so the statusline script cannot start until the record write
 ends. With `exec` it computes its output as soon as the observer releases
 stdout. Claude Code still shows the statusline only once the whole command
-exits, which waits for the observer's record write (capped at 2 s), and a new
+exits, which waits for the observer's record write (bounded by a 2 s deadline), and a new
 statusline update in that window cancels the run. `install` upgrades that
 earlier stage, and the plain `python3 <observer> |` prefix, to the current
 form (action `upgraded`); `status` reports either as `refresh`.

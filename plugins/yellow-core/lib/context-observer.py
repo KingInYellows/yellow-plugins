@@ -18,7 +18,7 @@ Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
     broken observer cannot blank the statusline. Claude Code shows the
     statusline only once the whole statusLine command exits, and the shell
     waits for the observer, so the display still waits for the record write
-    (capped by DEADLINE_SECONDS). A stage that wraps the observer without
+    (bounded by DEADLINE_SECONDS). A stage that wraps the observer without
     exec, such as "{ python3 OBS || cat; }", keeps the pipe open in its
     subshell, so the next stage cannot even start until recording ends.
   - Exits 0 on every path: malformed input, missing session id, unwritable

@@ -21,7 +21,7 @@ stage is `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
 back to `cat` so the statusline never blanks, and `exec` lets the statusline
 script compute its output as soon as the observer releases stdout, while the
 observer records (Claude Code shows the statusline once the whole command
-exits; recording is capped at 2 s). The generated statusline template moved to
+exits; recording has a 2 s deadline). The generated statusline template moved to
 `references/statusline-setup/statusline-template.py`; its git cache and error
 log now also follow `CLAUDE_CONFIG_DIR`, and `/setup:all` probes the statusline
 and settings in the selected config dir. The observer passes the statusline payload through byte-for-byte,
