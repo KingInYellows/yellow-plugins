@@ -51,15 +51,18 @@ for tool in bash git timeout jq mktemp awk sed grep find; do
   fi
 done
 
-# Bash 4.3+ check — only when these blocks run under bash. Under zsh (the
-# Bash tool uses the user's login shell) the associative arrays below work
-# natively and $BASH_VERSION is unset, so there is nothing to check.
+# Shell check — the blocks below need bash 4.3+ or zsh (the Bash tool uses
+# the user's login shell). Under bash, enforce 4.3+; zsh has associative
+# arrays natively; any other shell (dash, ksh) lacks the syntax, so reject it.
 if [ -n "${BASH_VERSION:-}" ]; then
   case "$BASH_VERSION" in
     [0-3].*|4.[0-2].*)
       printf '[council] Error: bash 4.3+ required, found %s\n' "$BASH_VERSION" >&2
       exit 1 ;;
   esac
+elif [ -z "${ZSH_VERSION:-}" ]; then
+  printf '[council] Error: bash 4.3+ or zsh required (running under an unsupported shell)\n' >&2
+  exit 1
 fi
 
 # Verify we're in a git repo (most modes need git context)
