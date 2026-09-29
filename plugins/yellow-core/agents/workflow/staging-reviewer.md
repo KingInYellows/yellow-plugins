@@ -145,7 +145,7 @@ LOCK_MTIME=$(stat -c '%Y' "$STAGING/.drain-lock" 2>/dev/null \
   exit 1
 }
 MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-${LOCK_MTIME}.txt"
-: > "$MOVED_THIS_DRAIN_FILE"
+: >| "$MOVED_THIS_DRAIN_FILE"
 for f in "$STAGING"/pending/*.jsonl; do
   [ -f "$f" ] || continue
   base=$(basename -- "$f")
@@ -201,6 +201,10 @@ the seen-hash set so that any duplicate moved by this drain is correctly
 suppressed.
 
 ```bash
+# Associative arrays with += and read -ra are bash-only: run this block in bash
+# even when the Bash tool's shell is zsh (the script is an argument, so stdin
+# stays free). Paste the STAGING assignment inside the wrapper.
+bash -c "$(cat <<'__YELLOW_CORE_BASH__'
 # Re-paste $STAGING from Phase 0's dispatch prompt — fresh subprocess.
 # Re-derive MOVED_THIS_DRAIN_FILE from .drain-lock mtime — see Phase 1
 # rationale. stat MUST succeed (fail-closed) for the same reason.
@@ -292,6 +296,8 @@ for h in "${!by_hash[@]}"; do
     esac
   done
 done
+__YELLOW_CORE_BASH__
+)"
 ```
 
 ## Phase 3: Discover ruvector availability

@@ -19,8 +19,14 @@ category, severity, and effort.
 
 ## Implementation
 
+Omit the `'--json'` operand after the closing `)"` unless the command
+arguments include `--json`. Stop with an error instead of running the block if
+any argument value contains a single quote.
+
 ```bash
-#!/usr/bin/env bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 set -euo pipefail
 
 # Source shared validation library for extract_frontmatter helper
@@ -239,6 +245,8 @@ EOF
     printf 'Run /debt:audit to scan for new technical debt.\n'
   fi
 fi
+__YELLOW_DEBT_BASH__
+)" debt-status '--json'
 ```
 
 ## Example Usage

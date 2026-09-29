@@ -54,7 +54,7 @@ unaffected today and must stay unaffected.
 | Tier | Surface | Rule | Guard |
 |---|---|---|---|
 | 1 | Inline fenced `bash`/`sh`/`shell` blocks in plugin markdown | Must run as written in bash and zsh. Use constructs both shells accept. Write `>\|` where an overwrite is intended. | Lint, differential parse check |
-| 2 | Blocks that need bash-only constructs | Wrap the whole block in `bash <<'EOF' … EOF`. The block is then exempt from the bash-only rules. | Lint (wrapper detection) |
+| 2 | Blocks that need bash-only constructs | Wrap the whole block in `bash -c "$(cat <<'TAG'` … `TAG` / `)"` (script as an argument; see the stdin decision below). The block is then exempt from the inline rules. | Lint (wrapper detection, SHC-009) |
 | 3 | `.sh` files with a bash shebang, hooks, `bin/` launchers | Bash-by-contract: never sourced into zsh or run as `zsh x.sh`. Hooks are invoked directly, so the user's shell does not matter. | Lint (contract rule), existing bats |
 | 4 | Libraries sourced from markdown that contain no bash-only constructs | Dual-shell. Tested under bash and zsh (default and snapshot profile). | zsh runtime bats suite |
 
@@ -62,17 +62,20 @@ unaffected today and must stay unaffected.
 
 - **Sourced libraries, handled one library at a time (user decision).**
   - Wrap call sites for libraries that contain bash-only constructs. Each
-    markdown block that sources one of these gets a `bash <<'EOF'` wrapper, so
+    markdown block that sources one of these gets a Tier 2 bash wrapper, so
     the `source` and the function calls run in one bash process. Return values
     and variables therefore stay in scope. The libraries are:
     - yellow-ci `hooks/scripts/lib/validate.sh`, `resolve-runner-targets.sh`
       and `redact.sh`
-    - yellow-debt `lib/validate.sh`
-    - yellow-core `lib/compound-staging.sh`
+    - yellow-debt `lib/validate.sh` (its lock uses `exec 200>` and a RETURN
+      trap — both fail under zsh; confirmed by running it)
     - yellow-ruvector `lib/install-ruvector.sh` and `hooks/scripts/lib/resolve.sh`
   - Libraries with zero bash-only constructs move to Tier 4 and keep their
     direct `source` call sites:
     - yellow-core `lib/repo-profile.sh`
+    - yellow-core `lib/compound-staging.sh` (moved from Tier 3 in item 4,
+      user decision: its only issue was two `local path` declarations; the
+      research's "5 bash-only constructs" were `[[:space:]]` inside sed)
     - yellow-morph `lib/install-morphmcp.sh`
     - yellow-ruvector `hooks/scripts/lib/validate.sh`
   - The Phase 1 measurement re-confirms which bucket each library is in.
@@ -88,8 +91,15 @@ unaffected today and must stay unaffected.
   land in report-only mode. Per-plugin fixes follow. The last PR makes both
   blocking, including `ci-status` and the fork workflow. There is no permanent
   baseline allowlist.
-- **One mechanism for bash-only code.** Use `bash <<'EOF'` for inline blocks
-  and `bash script.sh` for files. `emulate -L sh` is allowed only as the first
+- **One mechanism for bash-only code.** Use `bash -c "$(cat <<'TAG'` … `TAG` / `)"` for inline
+  blocks and `bash script.sh` for files. Decided in item 4: the originally
+  planned `bash <<'EOF'` feeds the script to bash on stdin, so any command in
+  the body that reads stdin (`gt`, `gh`, a `node` CLI, `claude -p`, a bare
+  `cat`) silently swallows the rest of the script — verified. The argument
+  form leaves stdin alone and passes the exit status through (verified in
+  bash and in zsh with noclobber). SHC-009 flags the stdin form. Use a
+  distinctive tag (`__YELLOW_DEBT_BASH__`), never `EOF`: bodies may already
+  contain `cat <<EOF` or user-pasted text. `emulate -L sh` is allowed only as the first
   line of functions in Tier 4 libraries, and it must be guarded with
   `if [ -n "${ZSH_VERSION:-}" ]; then emulate -L sh; fi`. The `&&` form of that
   guard trips `set -e` under bash. Never use `emulate` in inline blocks,
@@ -181,8 +191,10 @@ mutation, and use only the enabled provider.
       `-u`), `${!…}`, `${v,,}`/`${v^^}`, `${v@op}`, `local -n`/`declare -n`,
       `BASH_REMATCH`, `BASH_SOURCE`, `BASH_VERSINFO`, `PIPESTATUS`,
       `FUNCNAME`, `BASHPID`, `EPOCHSECONDS`/`EPOCHREALTIME`, `shopt`,
-      `export -f`, `type -t`/`-P`, `;;&`, `wait -n`. `declare -A` alone is
-      not flagged, because it works in zsh.
+      `export -f`, `type -t`/`-P`, `;;&`, `wait -n`, a multi-digit fd
+      redirect (`exec 200>f` — zsh runs a command named `200`) and
+      `trap … RETURN` (undefined signal in zsh). `declare -A` alone is not
+      flagged, because it works in zsh.
     - SHC-004 (echo escapes): `echo -e`, or `echo` with a backslash escape
       in its arguments. Fix: use `printf`.
     - SHC-005 (array indexing): a literal numeric index `${a[N]}`, `a[0]=`,
@@ -193,6 +205,8 @@ mutation, and use only the enabled provider.
     - SHC-008 (sourcing): `source`/`.` in command position of a Tier 3
       library outside a wrapper, or of a plugin library in neither tier
       list (so every new sourced library gets classified).
+    - SHC-009 (stdin wrapper): a bash-fed heredoc other than the
+      `bash -c "$(cat <<'TAG'` form (added in item 4).
   - **Rules for `.sh` files:**
     - SHC-101: a `.sh` file under `plugins/` has no shebang and no
       `# shell-compat: library` marker.
@@ -290,7 +304,7 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 - [x] 2.1: yellow-composio `skills/composio-patterns/SKILL.md:192`. Fix the
       zsh parse failure in `( flock -x 200; … ) 200>"$LOCK_FILE"` (and the
       noclobber hit after `touch "$LOCK_FILE"`, which the parse failure hides
-      from the lint). Use `exec 200>>"$LOCK_FILE"` or a `bash <<'EOF'`
+      from the lint). Use fd 9 with `>>` (done), or a Tier 2
       wrapper.
 - [x] 2.2: yellow-council (26 findings; 31 after the truncation and
       expand-class rules added while fixing it).
@@ -311,18 +325,26 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
     `: > "$fenced_path"` (`:841`) truncations — the latter is the wipe of
     raw reviewer output after a redaction failure, which zsh's noclobber
     silently refused.
-- [ ] 2.3: yellow-core (8 findings).
+- [x] 2.3: yellow-core (8 findings, 10 with the truncation rule).
   - Wrap `agents/workflow/staging-reviewer.md:249,251` (`${!`, `read -ra`).
   - Rewrite the `${!BRANCHES[@]}` loop at `commands/flow/review.md:209`.
-  - Wrap the `compound-staging.sh` call sites in
-    `commands/compound/review-staged.md:33,161`.
+  - `compound-staging.sh` call sites in `commands/compound/review-staged.md:33,161`:
+    resolved by making the library Tier 4 instead of wrapping (user
+    decision): `local path` renamed; smoke-tested identical under bash, zsh
+    and zsh with the snapshot options; its 30 bats tests pass.
   - `commands/setup/all.md:83` (SHC-001, `>"$out"` after `mktemp`) and
     `:203` (SHC-002, `for path in`).
   - `commands/worktree/cleanup.md:51` (SHC-005, `${args_copy[$i]}` from 0).
   - Truncations (SHC-001): `agents/workflow/staging-reviewer.md:148`
     (`: > "$MOVED_THIS_DRAIN_FILE"`) and
     `commands/compound/review-staged.md:189` (`: > "$DRAIN_LOG"`).
-- [ ] 2.4: yellow-debt (14 findings).
+- [x] 2.4: yellow-debt (14 findings; 16 with the raw-reader fence view).
+      All 12 blocks that source `lib/validate.sh` are wrapped
+      (`__YELLOW_DEBT_BASH__`); `/debt:status` and a triage transition were
+      run under zsh with noclobber and work (before: exit 127 and a stale
+      `.lock`). Not changed: the `commands/debt/sync.md` step-8a fragment
+      calls `extract_frontmatter` without sourcing the library, so it fails
+      in every shell — a pre-existing bug outside this plan.
   - Wrap every markdown block that sources `lib/validate.sh`:
     `commands/debt/fix.md:29`, `audit.md:35`, `status.md:28`, `sync.md:135`,
     `triage.md:113,124,150,166`, `agents/remediation/debt-fixer.md:151,186,
@@ -385,7 +407,8 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
       (`plugins/yellow-core/tests/mocks/`).
 - [ ] 3.4: Test Tier 2/3 invocation from a zsh parent. For each Tier 3
       library, run the documented wrapper form
-      (`bash <<'EOF' … source lib; fn … EOF`) from `zsh -f -o noclobber`, and
+      (`bash -c "$(cat <<'TAG'` … `source lib; fn` … `TAG` / `)"`) from
+      `zsh -f -o noclobber`, and
       assert that it succeeds and can overwrite an existing temp file.
 - [ ] 3.5: Add the CI job `shell-compat-tests` to `validate-schemas.yml`.
   - Settings: `ubuntu-latest`, `timeout-minutes: 10`,
@@ -417,7 +440,7 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
     - Command aliases.
   - `CONTRIBUTING.md` `### Shell Scripts` (around line 578):
     - The tier contract.
-    - The rules: `>|`, `printf`, no `status`/`path` names, `bash <<'EOF'` for
+    - The rules: `>|`, `printf`, no `status`/`path` names, the Tier 2 wrapper for
       bash-only code, the guarded `emulate -L sh` for Tier 4 only, and
       `command <tool>` where user aliases (`cat=bat`, `ls=eza`) could change
       flags.
@@ -493,7 +516,7 @@ npm.
    zsh rejects. It runs in CI with zsh installed.
 3. SHC-001 finds no noclobber-class hits in plugin markdown sources. This
    replaces the two manual greps in the noclobber solution doc.
-4. No markdown block sources a Tier 3 library outside a `bash <<'EOF'` wrapper
+4. No markdown block sources a Tier 3 library outside a Tier 2 wrapper
    (SHC-008 clean).
 5. `bats tests/shell-compat/` passes locally and in CI, including the positive
    controls.
@@ -523,7 +546,7 @@ npm.
 - **Untrusted input:** never interpolate untrusted values (PR text, issue
   titles) into a heredoc body. Pass them as arguments
   (`bash -s -- "$arg" <<'EOF'`) or through the environment.
-- **Exit codes through wrappers:** `bash <<'EOF'` returns the exit status of
+- **Exit codes through wrappers:** `bash -c "$(cat <<'TAG' …)"` returns the exit status of
   the last command in the body. Call sites that branched on a library
   function's status must keep that branch inside the wrapper, or end the
   wrapper with an explicit `exit`.
@@ -664,7 +687,7 @@ The parse check batches blocks into one shell loop per shell, instead of about
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/refactor/shared-markdown-fences (completed 2026-09-28)
 - [x] 2. agent/feat/shell-compat-lint (completed 2026-09-28)
-- [ ] 3. agent/fix/zsh-composio-council
+- [x] 3. agent/fix/zsh-composio-council (completed 2026-09-28)
 - [ ] 4. agent/fix/zsh-core-debt-wrappers
 - [ ] 5. agent/fix/zsh-ci-ruvector-wrappers
 - [ ] 6. agent/fix/zsh-remaining-plugins

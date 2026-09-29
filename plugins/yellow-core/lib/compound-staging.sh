@@ -90,19 +90,21 @@ cs_iso_to_epoch() {
 #   $1 — destination path
 #   $2 — content (passed via printf %s; no trailing newline added)
 cs_atomic_jsonl_write() {
-  local path="$1" content="$2"
-  if [ -z "$path" ]; then
+  # `dest`, not `path`: this file is sourced into zsh too, where `path`
+  # is tied to $PATH.
+  local dest="$1" content="$2"
+  if [ -z "$dest" ]; then
     return 1
   fi
   local dir
-  dir=$(dirname -- "$path")
+  dir=$(dirname -- "$dest")
   mkdir -p -- "$dir" 2>/dev/null || return 1
   chmod 700 -- "$dir" 2>/dev/null || true
-  local tmp="${path}.tmp.$$"
+  local tmp="${dest}.tmp.$$"
   # Subshell scopes umask to the write only; sibling shell state untouched.
-  ( umask 077; printf '%s' "$content" > "$tmp" ) 2>/dev/null \
+  ( umask 077; printf '%s' "$content" >| "$tmp" ) 2>/dev/null \
     || { rm -f -- "$tmp" 2>/dev/null; return 1; }
-  mv -- "$tmp" "$path" 2>/dev/null || { rm -f -- "$tmp" 2>/dev/null; return 1; }
+  mv -- "$tmp" "$dest" 2>/dev/null || { rm -f -- "$tmp" 2>/dev/null; return 1; }
 }
 
 # Redact secrets from stdin, write to stdout.
@@ -157,9 +159,9 @@ cs_redact_secrets() {
 #   $1 — staging dir
 cs_read_drain_budget() {
   local staging="$1"
-  local path="${staging}/drain-budget.json"
+  local budget_file="${staging}/drain-budget.json"
   local empty='{"window_start_iso":"","drains_in_window":0,"last_drain_iso":"","auth_route":"unknown"}'
-  if [ ! -f "$path" ]; then
+  if [ ! -f "$budget_file" ]; then
     printf '%s' "$empty"
     return 0
   fi
@@ -168,7 +170,7 @@ cs_read_drain_budget() {
     return 0
   fi
   local parsed
-  parsed=$(jq -c '.' < "$path" 2>/dev/null) || {
+  parsed=$(jq -c '.' < "$budget_file" 2>/dev/null) || {
     printf '%s' "$empty"
     return 0
   }

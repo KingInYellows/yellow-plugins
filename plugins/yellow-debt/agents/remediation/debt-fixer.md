@@ -68,6 +68,9 @@ patterns and style.
 **Implementation** (run as one Bash call; substitute the actual todo path):
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 _validate_sh="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT is unset}/lib/validate.sh"
 [ -f "$_validate_sh" ] || { printf '[debt-fixer] ERROR: validate.sh not found at %s\n' "$_validate_sh" >&2; exit 1; }
 . "$_validate_sh"
@@ -113,6 +116,8 @@ if [ "$OUT_OF_SCOPE" -eq 1 ]; then
   printf '[debt-fixer] Out-of-scope edits reverted; todo reset to ready (see warnings above if any). Aborting.\n' >&2
   exit 1
 fi
+__YELLOW_DEBT_BASH__
+)"
 ```
 
 ### 4. Show Diff
@@ -148,6 +153,9 @@ Resolve the active stacked-PR provider first: invoke the `Skill` tool with
 #### Graphite
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
@@ -156,7 +164,7 @@ severity=$(extract_frontmatter "$todo_path" | yq -r '.severity')
 safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 msgfile=$(mktemp)
 printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s\n' \
-  "$safe_title" "$todo_path" "$category" "$severity" > "$msgfile"
+  "$safe_title" "$todo_path" "$category" "$severity" >| "$msgfile"
 if gt modify -m "$(cat "$msgfile")"; then
   rm -f "$msgfile"
   if gt submit --no-interactive; then
@@ -170,6 +178,8 @@ else
   printf '[debt-fixer] ERROR: gt modify failed; no commit created. Todo left in its current state — retry the fix.\n' >&2
   exit 1
 fi
+__YELLOW_DEBT_BASH__
+)"
 ```
 
 `gt modify` has no file-based message flag (`--help` confirms only `-m`/
@@ -183,6 +193,9 @@ complete either.
 #### GitHub
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
@@ -205,7 +218,7 @@ done
 git add -- "${ALLOWED[@]}"
 msgfile=$(mktemp)
 printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s\n' \
-  "$safe_title" "$todo_path" "$category" "$severity" > "$msgfile"
+  "$safe_title" "$todo_path" "$category" "$severity" >| "$msgfile"
 git commit -F "$msgfile"
 rm -f "$msgfile"
 SUBMIT_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit)
@@ -219,6 +232,8 @@ else
     "$SUBMIT_STATUS" "$RECOVERY" >&2
   exit 1
 fi
+__YELLOW_DEBT_BASH__
+)"
 ```
 
 The `ALLOWED` entries come from todo frontmatter (attacker/collaborator
@@ -237,6 +252,9 @@ provider-specific mutation.
 **If rejected**:
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 while IFS= read -r changed_file; do
   [ -z "$changed_file" ] && continue
   git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
@@ -244,6 +262,8 @@ done < <(git status --porcelain | cut -c4-)
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 transition_todo_state "$todo_path" "ready"
+__YELLOW_DEBT_BASH__
+)"
 ```
 
 Inform user: "Changes reverted. Todo reset to 'ready' state."

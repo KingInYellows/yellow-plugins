@@ -20,8 +20,14 @@ human approval before committing changes.
 
 ## Implementation
 
+Replace `<todo-path>` after the closing `)"` with the todo path from the
+command arguments, single-quoted. Stop with an error instead of running the
+block if the value contains a single quote.
+
 ```bash
-#!/usr/bin/env bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 set -euo pipefail
 
 # Source shared validation library for extract_frontmatter and transition_todo_state
@@ -109,6 +115,8 @@ NEXT_READY=$(find todos/debt -name '*-ready-*.md' 2>/dev/null | head -1)
 if [ -n "$NEXT_READY" ]; then
   printf '\nNext ready finding: %s\n' "$NEXT_READY"
 fi
+__YELLOW_DEBT_BASH__
+)" debt-fix '<todo-path>'
 ```
 
 ## Agent Orchestration

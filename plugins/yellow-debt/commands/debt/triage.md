@@ -6,9 +6,10 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
-  # Note: Write is intentionally absent — all file transitions happen via
-  # transition_todo_state() in validate.sh using Bash shell I/O (>, mv, rm),
-  # not via the Claude Code Write tool.
+  # Write is used only to create the defer-reason file in a private temp
+  # directory. Todo transitions still go through transition_todo_state() in
+  # validate.sh using Bash shell I/O (>, mv, rm).
+  - Write
 ---
 
 # Technical Debt Triage Command
@@ -110,22 +111,32 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
 
    **On Accept:**
    ```bash
-   . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-   transition_todo_state "/absolute/path/to/file.md" ready || {
-     printf '[debt:triage] Error: transition failed\n' >&2
-     exit 1
-   }
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+transition_todo_state "/absolute/path/to/file.md" ready || {
+  printf '[debt:triage] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your accepted count.
 
    **On Reject:**
    ```bash
-   . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-   transition_todo_state "/absolute/path/to/file.md" deleted || {
-     printf '[debt:triage] Error: transition failed\n' >&2
-     exit 1
-   }
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+transition_todo_state "/absolute/path/to/file.md" deleted || {
+  printf '[debt:triage] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your rejected count.
@@ -142,32 +153,52 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
    same finding's main options (Accept/Reject/Defer/Stop). Do not increment
    any count.
 
-   **On Defer — Submit reason:** Use a heredoc to pass the reason safely
-   (avoids quoting issues with special characters). Use `__EOF_DEFER_REASON__`
-   as the delimiter (avoids collision if the reason text contains common words).
-   Ensure the closing delimiter is at column 0 with no leading whitespace:
-   ```bash
+   **On Defer — Submit reason:** The reason is untrusted free text. Never place
+   it in shell text (no heredoc, no quoting): a line matching a heredoc
+   delimiter would end the heredoc and run the following lines as commands.
+   Pass it through a file instead.
+
+   1. Create a private directory atomically (mode 0700, so no other user can
+      claim paths inside it):
+      ```bash
+      mktemp -d "${TMPDIR:-/tmp}/debt-defer.XXXXXX"
+      ```
+   2. Use the Write tool (not Bash) to create `<dir>/reason.txt` inside the
+      printed directory, with the reason text as its content.
+   3. Run the transition with the directory as a single-quoted operand. The
+      child strips newlines, transitions, then removes the file and directory:
+      ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-DEFER_REASON=$(cat <<'__EOF_DEFER_REASON__'
-<paste the actual defer reason text verbatim here>
-__EOF_DEFER_REASON__
-)
-DEFER_REASON=$(printf '%s' "$DEFER_REASON" | tr -d '\n\r')
+DEFER_REASON=$(tr -d '\n\r' < "$1/reason.txt")
+rc=0
 transition_todo_state "/absolute/path/to/file.md" deferred "$DEFER_REASON" || {
-  printf '[debt:triage] Error: transition failed\n' >&2
-  exit 1
+printf '[debt:triage] Error: transition failed\n' >&2
+rc=1
 }
-   ```
+rm -f -- "$1/reason.txt"
+rmdir -- "$1"
+exit "$rc"
+__YELLOW_DEBT_BASH__
+)" debt-triage '<reason-dir>'
+      ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 
    **On Defer — empty reason (blank "Other" input):** Call without third argument:
    ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "/absolute/path/to/file.md" deferred || {
-  printf '[debt:triage] Error: transition failed\n' >&2
-  exit 1
+printf '[debt:triage] Error: transition failed\n' >&2
+exit 1
 }
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
