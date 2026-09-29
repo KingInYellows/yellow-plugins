@@ -80,7 +80,7 @@ _rv_probe() {
       && { "$t" --kill-after=2 10 node "$1" --version 2>/dev/null; return; }
   done
   out=$(mktemp) || return 1
-  node "$1" --version >"$out" 2>/dev/null &
+  node "$1" --version >|"$out" 2>/dev/null &
   p=$!
   ( sleep 10; kill -9 "$p" 2>/dev/null ) >/dev/null 2>&1 &
   w=$!
@@ -200,9 +200,10 @@ fi
 graphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)
 [ -n "$graphite_repo_config" ] && [ -f "$graphite_repo_config" ] && printf 'graphite_repo:      present (%s)\n' "$graphite_repo_config" || printf 'graphite_repo:      missing\n'
 auth_path=''
-for path in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" "$HOME/.config/graphite/user_config"; do
-  if [ -f "$path" ]; then
-    auth_path="$path"
+# `cfg`, not `path`: in zsh a loop over `path` rewrites $PATH.
+for cfg in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" "$HOME/.config/graphite/user_config"; do
+  if [ -f "$cfg" ]; then
+    auth_path="$cfg"
     break
   fi
 done

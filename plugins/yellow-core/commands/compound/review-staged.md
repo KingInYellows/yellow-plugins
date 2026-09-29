@@ -186,7 +186,7 @@ Use this when:
    mkdir -p -- "$STAGING_DIR/drain-logs" 2>/dev/null || true
    chmod 700 -- "$STAGING_DIR/drain-logs" 2>/dev/null || true
    DRAIN_LOG="$STAGING_DIR/drain-logs/manual-$(date +%Y%m%d-%H%M%S).log"
-   ( umask 077; : > "$DRAIN_LOG" ) 2>/dev/null || true
+   ( umask 077; : >| "$DRAIN_LOG" ) 2>/dev/null || true
 
    AUTH_ROUTE=$(cs_detect_auth_route)
    # Strip newlines from interpolated paths as defense-in-depth against

@@ -205,15 +205,14 @@ Collect the combined diff for all session branches:
 For **linear** stacks, diff each branch against its parent to isolate per-branch changes:
 
 ```bash
-# For each branch in order (first branch against trunk, rest against parent)
-for i in "${!BRANCHES[@]}"; do
-  BRANCH="${BRANCHES[$i]}"
-  if [ "$i" -eq 0 ]; then
-    PARENT="<trunk>"
-  else
-    PARENT="${BRANCHES[$((i-1))]}"
-  fi
-  
+# For each branch in order (first branch against trunk, rest against parent).
+# Track the previous branch instead of indexing: array indexes are 0-based in
+# bash but 1-based in zsh, and `${!BRANCHES[@]}` is bash-only.
+PREV_BRANCH=""
+for BRANCH in "${BRANCHES[@]}"; do
+  PARENT="${PREV_BRANCH:-<trunk>}"
+  PREV_BRANCH="$BRANCH"
+
   gt checkout "$BRANCH" || {
     printf '[session-review] Error: failed to checkout %s — skipping\n' "$BRANCH" >&2
     continue

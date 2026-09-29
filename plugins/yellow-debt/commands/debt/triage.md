@@ -110,22 +110,32 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
 
    **On Accept:**
    ```bash
-   . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-   transition_todo_state "/absolute/path/to/file.md" ready || {
-     printf '[debt:triage] Error: transition failed\n' >&2
-     exit 1
-   }
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+transition_todo_state "/absolute/path/to/file.md" ready || {
+  printf '[debt:triage] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your accepted count.
 
    **On Reject:**
    ```bash
-   . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-   transition_todo_state "/absolute/path/to/file.md" deleted || {
-     printf '[debt:triage] Error: transition failed\n' >&2
-     exit 1
-   }
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+transition_todo_state "/absolute/path/to/file.md" deleted || {
+  printf '[debt:triage] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your rejected count.
@@ -147,6 +157,9 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
    as the delimiter (avoids collision if the reason text contains common words).
    Ensure the closing delimiter is at column 0 with no leading whitespace:
    ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 DEFER_REASON=$(cat <<'__EOF_DEFER_REASON__'
 <paste the actual defer reason text verbatim here>
@@ -154,20 +167,27 @@ __EOF_DEFER_REASON__
 )
 DEFER_REASON=$(printf '%s' "$DEFER_REASON" | tr -d '\n\r')
 transition_todo_state "/absolute/path/to/file.md" deferred "$DEFER_REASON" || {
-  printf '[debt:triage] Error: transition failed\n' >&2
-  exit 1
+printf '[debt:triage] Error: transition failed\n' >&2
+exit 1
 }
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 
    **On Defer — empty reason (blank "Other" input):** Call without third argument:
    ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "/absolute/path/to/file.md" deferred || {
-  printf '[debt:triage] Error: transition failed\n' >&2
-  exit 1
+printf '[debt:triage] Error: transition failed\n' >&2
+exit 1
 }
+__YELLOW_DEBT_BASH__
+)"
    ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.

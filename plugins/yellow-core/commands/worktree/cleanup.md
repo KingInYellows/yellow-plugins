@@ -34,29 +34,14 @@ messages if any fail.
 ### 1. Parse Flags
 
 ```bash
-# Validate arguments
+# Validate and parse arguments in one pass. (Iterate values, not indexes:
+# array indexes are 0-based in bash but 1-based in zsh.)
+DRY_RUN=false
 for arg in $ARGUMENTS; do
   case "$arg" in
-    --dry-run) ;;
+    --dry-run) DRY_RUN=true ;;
     --*) echo "ERROR: Unknown option: $arg"; exit 1 ;;
     *) echo "ERROR: Unexpected argument: $arg"; exit 1 ;;
-  esac
-done
-
-DRY_RUN=false
-
-args_copy=($ARGUMENTS)
-i=0
-while [ $i -lt ${#args_copy[@]} ]; do
-  arg="${args_copy[$i]}"
-  case "$arg" in
-    --dry-run)
-      DRY_RUN=true
-      i=$((i + 1))
-      ;;
-    *)
-      i=$((i + 1))
-      ;;
   esac
 done
 ```

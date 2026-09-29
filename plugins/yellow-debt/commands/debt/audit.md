@@ -27,7 +27,9 @@ files.
 ## Implementation
 
 ```bash
-#!/usr/bin/env bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (the script is an argument, so stdin stays free).
+bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 set -euo pipefail
 
 # Source validation library
@@ -134,6 +136,8 @@ else
 fi
 printf '[audit] Prepared scanner list in .debt/scanners-to-run.txt\n' >&2
 printf '[audit] Run the listed scanner agents in parallel, then run yellow-debt:audit-synthesizer.\n' >&2
+__YELLOW_DEBT_BASH__
+)"
 ```
 
 ## Agent Orchestration
