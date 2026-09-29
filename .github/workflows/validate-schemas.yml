@@ -1538,6 +1538,53 @@ jobs:
       - name: Run yellow-ruvector bats suite (advisory)
         run: bats plugins/yellow-ruvector/tests/
 
+  shell-compat-tests:
+    # zsh runtime layer of the bash/zsh compatibility contract
+    # (plans/bash-zsh-shell-compatibility.md): the zsh-only parse check over
+    # every fenced shell block, and tests/shell-compat/ (Tier 4 libraries
+    # under bash, zsh and zsh with snapshot options; Tier 3 libraries through
+    # the bash wrapper from a zsh noclobber parent). Advisory until the final
+    # PR of the stack makes it required in ci-status.
+    name: Shell Compatibility (bash + zsh, advisory)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-schemas]
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install zsh, bats and kislyuk yq
+        # kislyuk yq (the jq wrapper) is what yellow-debt's library calls; the
+        # runner image ships mikefarah yq, so put pipx's bin dir first on PATH.
+        # Without it the /debt:triage end-to-end test skips.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends zsh
+          sudo npm install -g bats@1.11.0
+          pipx install 'yq==3.4.3'
+          pipx environment --value PIPX_BIN_DIR >> "$GITHUB_PATH"
+          zsh --version
+          bats --version
+
+      - name: Verify kislyuk yq is first on PATH
+        run: yq --help 2>&1 | grep -qi 'jq wrapper' || { echo "::error::kislyuk yq not first on PATH ($(command -v yq))"; exit 1; }
+
+      - name: zsh-only parse check (report-only)
+        run: node scripts/check-shell-parse.js --report
+
+      - name: Run tests/shell-compat bats suite
+        run: bats tests/shell-compat/
+
   # ============================================================================
   # AGGREGATE METRICS AND REPORT
   # ============================================================================

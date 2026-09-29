@@ -80,6 +80,9 @@ unaffected today and must stay unaffected.
     - yellow-ruvector `hooks/scripts/lib/validate.sh`
     - yellow-ci `hooks/scripts/lib/redact.sh` (moved from Tier 3 in item 5:
       lints clean, identical output under both shells)
+    - yellow-core `lib/validate-fs.sh` (added in item 7: sourced by the
+      Tier 4 ruvector `validate.sh` and, per the debugging skill's prose,
+      straight into the Bash tool's shell; lints clean)
   - The Phase 1 measurement re-confirms which bucket each library is in.
 - **The parse check flags zsh-only failures (user decision).** A block fails
   only when `bash -n` accepts it and `zsh -n` rejects it. Template blocks with
@@ -412,28 +415,44 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 
 ### Phase 3: zsh runtime suite (PR after Phase 2)
 
-- [ ] 3.1: Add the `tests/shell-compat/` bats suite, with a
+- [x] 3.1: Add the `tests/shell-compat/` bats suite, with a
       `helpers/zsh.bash` that provides `run_in_zsh <profile> <script>`.
   - It runs `zsh -f` so a contributor's `~/.zshrc` cannot change the result.
   - Profiles:
     - `default`
     - `snapshot`: `-o noclobber -o extendedglob -o rcquotes -o nocaseglob`
-- [ ] 3.2: Add positive controls, so a silently dropped option cannot give a
+- [x] 3.2: Add positive controls, so a silently dropped option cannot give a
       false green:
   - Under `snapshot`, `echo x > existing` fails.
   - Under `default`, it succeeds.
-- [ ] 3.3: Test the Tier 4 libraries (`repo-profile.sh`, `install-morphmcp.sh`,
+- [x] 3.3: Test the Tier 4 libraries (`repo-profile.sh`, `install-morphmcp.sh`,
       ruvector `hooks/scripts/lib/validate.sh`). Source each one under bash,
       zsh `default` and zsh `snapshot`, and exercise its public functions with
       `run --separate-stderr`. Assert on stdout, stderr and the exit code
       separately. Reuse existing plugin mocks where relevant
       (`plugins/yellow-core/tests/mocks/`).
-- [ ] 3.4: Test Tier 2/3 invocation from a zsh parent. For each Tier 3
+- [x] 3.4: Test Tier 2/3 invocation from a zsh parent. For each Tier 3
       library, run the documented wrapper form
       (`bash -c "$(cat <<'TAG'` … `source lib; fn` … `TAG` / `)"`) from
       `zsh -f -o noclobber`, and
       assert that it succeeds and can overwrite an existing temp file.
-- [ ] 3.5: Add the CI job `shell-compat-tests` to `validate-schemas.yml`.
+  - Implemented as `tests/shell-compat/` (16 tests):
+    - `controls.bats`: noclobber really refuses under `zsh-snapshot`, plain
+      zsh and bash overwrite, extendedglob/rcquotes are on, and `zsh -f`
+      ignores `~/.zshrc` (verified the marker appears without `-f`).
+    - `tier4-libraries.bats`: one driver per Tier 4 library
+      (`drivers/<plugin>--<basename>`), run under bash, zsh and
+      zsh-snapshot; requires exit 0, empty stderr and identical stdout, plus
+      per-library spot checks. A governance test fails when a Tier 4
+      library has no driver. Mutation check: main's `compound-staging.sh`
+      (with `local path`) fails it — `command not found: dirname` under zsh.
+    - `wrappers.bats`: every Tier 3 library sources through the wrapper
+      from a zsh-snapshot parent (governance test: each needs a probe
+      function); the wrapper keeps stdin and passes the exit status; a
+      control shows `bash <<'TAG'` swallowing the script (SHC-009); the real
+      `/debt:triage` accept block, extracted from the markdown, transitions
+      a todo under zsh (skips without flock or kislyuk yq).
+- [x] 3.5: Add the CI job `shell-compat-tests` to `validate-schemas.yml`.
   - Settings: `ubuntu-latest`, `timeout-minutes: 10`,
     `needs: [validate-schemas]`, SHA-pinned actions, and the same fork `if:`
     guard as the other jobs.
@@ -441,6 +460,8 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
     `zsh --version`, and runs `bats tests/shell-compat/`.
   - It starts as `continue-on-error: true` and is not in `ci-status`.
   - Add a local alias `test:shell-compat` in `package.json`.
+  - The job also runs `node scripts/check-shell-parse.js --report` (the
+    parse check moved here from the 2-minute matrix target; see 1.6).
 
 ### Phase 4: Flip to required, then docs (final PR)
 
@@ -713,6 +734,6 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - [x] 3. agent/fix/zsh-composio-council (completed 2026-09-28)
 - [x] 4. agent/fix/zsh-core-debt-wrappers (completed 2026-09-28)
 - [x] 5. agent/fix/zsh-ci-ruvector-wrappers (completed 2026-09-28)
-- [ ] 6. agent/fix/zsh-remaining-plugins
+- [x] 6. agent/fix/zsh-remaining-plugins (completed 2026-09-28)
 - [ ] 7. agent/test/zsh-runtime-suite
 - [ ] 8. agent/chore/shell-compat-required
