@@ -1,0 +1,76 @@
+plugins/yellow-debt/CLAUDE.md
+  s_e23df78d9c2b73::t_a80ade16c4a50d 37-42
+  s_e23df78d9c2b73::t_59f874950eaa01 43,45
+plugins/yellow-debt/commands/debt/setup.md
+  s_e23df78d9c2b73::t_b1246e612147bc 23,68
+.changeset/yellow-debt-symlink-todo-ids.md
+  s_e23df78d9c2b73::t_e0d7b5009f736b 1-21
+plugins/yellow-debt/commands/debt/audit.md
+  s_e23df78d9c2b73::t_06a6b84c912c5d 148,150
+  s_e23df78d9c2b73::t_98d181f236a4b0 106-110,116-119,124-129
+tests/shell-compat/wrappers.bats
+  s_e23df78d9c2b73::t_6fefccdc999201 103,106-108,111,113,120
+plugins/yellow-debt/commands/debt/triage.md
+  s_e23df78d9c2b73::t_cd9497af9e30b8 126-129,135,137-139
+  s_e23df78d9c2b73::t_37e0175f82a58a 258
+  s_e23df78d9c2b73::t_1f66eb5651bd58 189-191,195,197-202,204
+  s_e23df78d9c2b73::t_0846b6fd74333f 47-63,66-68
+  s_e23df78d9c2b73::t_758b2115552131 152,154-156
+  s_e23df78d9c2b73::t_b78094b5b74d7b 215,217-219
+plugins/yellow-debt/commands/debt/sync.md
+  s_e23df78d9c2b73::t_1418fde0188e40 150,156,159,161-163,165,170-174,181-182,186-188
+  s_e23df78d9c2b73::t_11f3e84d3fb2bf 120
+  s_e23df78d9c2b73::t_cd50bf60b8f599 203-208,211-218,220,222,225-228,233
+  s_e23df78d9c2b73::t_a758b184035b66 124
+  s_e23df78d9c2b73::t_bc3cb4de2d424c 272-278,280-287,289-294,297
+  s_e23df78d9c2b73::t_31a0a37e15c54d 105-110,112,121-123
+  s_e23df78d9c2b73::t_b19373edabb752 189
+plugins/yellow-debt/commands/debt/fix.md
+  s_e23df78d9c2b73::t_0e6d8428140c7c 4
+  s_e23df78d9c2b73::t_3238a6dd4d8f5f 19-21,25-27,32
+  s_e23df78d9c2b73::t_9ad1c78f2915fd 70
+  s_e23df78d9c2b73::t_505fe8567fc931 206-208
+  s_e23df78d9c2b73::t_3b561cdf0d69e4 125,131-133
+  s_e23df78d9c2b73::t_30d8a7277c012f 144-145
+  s_e23df78d9c2b73::t_b92c65150c7ada 94,104-105,108-115
+  s_e23df78d9c2b73::t_555a334002ba7f 40-42,46,48-55,57,59-64
+plugins/yellow-debt/hooks/scripts/session-start.sh
+  s_e23df78d9c2b73::t_0acae28376147a 28-30,35-40,43,45
+plugins/yellow-debt/tests/security.bats
+  s_e23df78d9c2b73::t_d961a63cb23e36 82-83,88-89,94,203-204,206,256,290,298,306,313,446,449
+  s_e23df78d9c2b73::t_079090c6738580 35-40
+  s_e23df78d9c2b73::t_9bcc295cad5488 404-425
+  s_e23df78d9c2b73::t_e793890320fe5f 371-403
+  s_e23df78d9c2b73::t_4c7b7e1b41b7de 1-34,41-72,81,84-87,90-93,95-202,205,207-255,257-289,291-297,299-305,307-312,314-370,426-445,447-448,450
+  s_e23df78d9c2b73::t_6287d1beef2b16 73-80
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_e23df78d9c2b73::t_0b0a9d1a8752a7 74,79,83-84
+  s_e23df78d9c2b73::t_af98d74fefaadf 38-43
+  s_e23df78d9c2b73::t_ca1b8a899892ad 164,166-167,204,206-207,263,269-270
+plugins/yellow-debt/README.md
+  s_e23df78d9c2b73::t_a80ade16c4a50d 90,95-96,134
+  s_e23df78d9c2b73::t_b1246e612147bc 201,205
+plugins/yellow-debt/lib/validate.sh
+  s_e23df78d9c2b73::t_0244a31fc75f98 206-207,209-213,215-217,221
+  s_e23df78d9c2b73::t_dc37995297dc96 159
+  s_e23df78d9c2b73::t_f734449189c58d 253-255,261-275,277-278,284-285,287
+  s_e23df78d9c2b73::t_2aef399de0acee 218
+  s_e23df78d9c2b73::t_5ac7f9163543e8 177,183
+  s_e23df78d9c2b73::t_7da59472828c7f 23-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a4dc7029e5d054f5b6455265a74450b2746416cc",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

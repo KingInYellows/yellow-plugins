@@ -1,0 +1,19 @@
+plugins/yellow-debt/commands/debt/triage.md
+  s_e23df78d9c2b73::t_27a9d357484a82 113,123,128,138,168,183,188,198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "82c0dc2ed768d15800bb7f5ab7668fa49c0b158e",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
