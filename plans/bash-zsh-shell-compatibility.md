@@ -465,14 +465,16 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
 
 ### Phase 4: Flip to required, then docs (final PR)
 
-- [ ] 4.1: Remove `--report` from the `validate:schemas` chain and from the
+- [x] 4.1: Remove `--report` from the `validate:schemas` chain and from the
       `shell-compat` matrix arm in both workflows.
-- [ ] 4.2: Make `shell-compat-tests` required. Drop `continue-on-error` and
+- [x] 4.2: Make `shell-compat-tests` required. Drop `continue-on-error` and
       edit `ci-status` in four places (lines around 1642-1706): `needs:`, the
       `env:` result variable (`SHELL_COMPAT_RESULT`), the `if` chain, and the
       echo summary. Decide whether the fork workflow needs the job. It has no
       shell-test jobs today, so the lint and parse target cover forks.
-- [ ] 4.3: Update the docs.
+      Decision: the fork workflow keeps only the lint target (now blocking);
+      the zsh job and parse check run in the main workflow.
+- [x] 4.3: Update the docs.
   - `CLAUDE.md`:
     - `validate:schemas` comment list (line 32)
     - Common Commands (the new aliases)
@@ -489,12 +491,12 @@ inventory from 1.5 (86 findings); re-run the lint for current line numbers.
       `command <tool>` where user aliases (`cat=bat`, `ls=eza`) could change
       flags.
     - How to run the checks locally without zsh.
-- [ ] 4.4: Add a solution doc,
+- [x] 4.4: Add a solution doc,
       `docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md`, with
       `validate-solutions.js` frontmatter. Update
       `zsh-noclobber-mktemp-stderr-redirect.md` so its done-criteria points to
       lint rule SHC-001 instead of the two manual greps.
-- [ ] 4.5: Update the per-plugin `CLAUDE.md` where a plugin documents library
+- [x] 4.5: Update the per-plugin `CLAUDE.md` where a plugin documents library
       sourcing (yellow-debt, yellow-ci, yellow-ruvector) to show the wrapper
       form.
 
@@ -735,5 +737,5 @@ The parse check batches blocks into one shell loop per shell, instead of about
 - [x] 4. agent/fix/zsh-core-debt-wrappers (completed 2026-09-28)
 - [x] 5. agent/fix/zsh-ci-ruvector-wrappers (completed 2026-09-28)
 - [x] 6. agent/fix/zsh-remaining-plugins (completed 2026-09-28)
-- [ ] 7. agent/test/zsh-runtime-suite
-- [ ] 8. agent/chore/shell-compat-required
+- [x] 7. agent/test/zsh-runtime-suite (completed 2026-09-28)
+- [x] 8. agent/chore/shell-compat-required (completed 2026-09-28)

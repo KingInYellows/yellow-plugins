@@ -1,0 +1,95 @@
+---
+title: 'Bash/zsh tiered shell contract for plugin markdown and libraries'
+date: 2026-09-28
+category: code-quality
+track: knowledge
+problem: 'Fenced shell blocks run under the user login shell (often zsh with noclobber), so bash-only code in 19 plugins failed silently or aborted under zsh'
+tags: [zsh, bash, noclobber, shell-portability, skill-authoring, command-authoring, validator, bats]
+components: [yellow-core, yellow-debt, yellow-council, yellow-ci, yellow-ruvector, yellow-codex, yellow-semgrep, gt-workflow, github-workflow, yellow-linear, yellow-devin, yellow-composio]
+---
+
+# Bash/zsh tiered shell contract for plugin markdown and libraries
+
+## Problem
+
+Claude Code's Bash tool runs every fenced shell block in command, skill and
+agent markdown under the user's login shell (`CLAUDE_CODE_SHELL` or `$SHELL`)
+and replays a snapshot of the user's options and aliases. On a zsh machine
+that is zsh with whatever the user set — `noclobber`, `extendedglob` and
+`rcquotes` are common. `.sh` files with a bash shebang still run under bash,
+so plugins were written and tested as if everything were bash.
+
+Measured across all 19 plugins (784 fenced shell blocks), the zsh breakage
+was not only the known `noclobber` class:
+
+- `/council` and `/council:setup` refused to run: they checked
+  `${BASH_VERSINFO[0]}`, which is empty in zsh ("bash 4.3+ required, found
+  0.0").
+- `/debt:triage` and `/debt:fix` sourced `lib/validate.sh`, whose lock used
+  `exec 200>"$lock"` (zsh runs a command named `200`) and `trap … RETURN`
+  (undefined signal): exit 127, todo untransitioned, stale `.lock`.
+- The codex and semgrep setup version checks used `read -a`; under zsh the
+  function errored and returned "new enough" for every version.
+- `path=`/`for path in` rewrote `$PATH` (`/linear:delegate`, `/setup:all`,
+  `gt-setup`, `compound-staging.sh`), and `local status` hit zsh's read-only
+  `status`.
+- 0-based array indexing read an empty first element (`/worktree:cleanup`
+  and `gt-cleanup` ignored `--dry-run`).
+- `: > "$fenced_path"` — the wipe of raw reviewer output after a council
+  redaction failure — was refused by `noclobber`, leaving raw output on disk.
+
+## Solution
+
+A tiered contract, enforced by a lint, a parse check and a runtime suite:
+
+| Tier | Code | Rule |
+|---|---|---|
+| 1 | Inline fenced blocks | Run as written in bash and zsh |
+| 2 | Blocks needing bash-only code | `bash -c "$(cat <<'TAG' … TAG` + `)"` |
+| 3 | Bash-only libraries | Sourced from markdown only inside a Tier 2 wrapper |
+| 4 | Dual-shell libraries | Sourced directly; linted and tested under both shells |
+
+The tier lists live in `scripts/shell-compat-config.json`. The authoring
+rules are in CONTRIBUTING.md "Shell Scripts → Bash and zsh".
+
+Guards:
+
+- `scripts/validate-shell-compat.js` (in `pnpm validate:schemas` and the
+  `shell-compat` CI matrix target) — rules SHC-001..009. SHC-001 replaces the
+  two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`: it flags `>`
+  onto any file a `mktemp`/`touch` created in the same markdown file (or,
+  for UPPERCASE handoff variables, anywhere in the plugin), second writes, and
+  `: >` truncation.
+- `scripts/check-shell-parse.js` — fails only when bash parses a block and zsh
+  does not, so `<PLACEHOLDER>` templates (which fail both) need no allowlist.
+- `tests/shell-compat/` — each Tier 4 library's driver must print identical
+  output under bash, zsh and zsh with snapshot options; each Tier 3 library
+  must source through the wrapper from a zsh `noclobber` parent.
+
+## Key Insights
+
+- **`bash <<'EOF'` is the wrong wrapper.** It feeds the script on stdin, so
+  any command in the body that reads stdin (`gt`, a `node` CLI, `claude -p`,
+  a bare `cat`) silently swallows the rest of the script. Pass the script as
+  an argument instead; SHC-009 flags the stdin form.
+- **A clean lint is not proof.** yellow-debt's `validate.sh` linted almost
+  clean until it was run under zsh; the multi-digit fd and RETURN-trap rules
+  came from that run. Classify a library only after running it in both
+  shells.
+- **Dual-shell testing finds bash bugs too.** yellow-ci's
+  `fence_log_content` ran `printf '--- begin …'`, which bash's `printf` reads
+  as an invalid option — the begin fence around CI logs was never printed.
+- **Read the markdown the way Claude does.** A CommonMark renderer ends a
+  list-item fence whose body sits at column 0; Claude still runs it as one
+  block. The shell checks use `extractRawFencedBlocks`
+  (`scripts/lib/markdown-fences.js`), which follows the raw reading.
+- **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
+  string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
+  though it is not a command.
+
+## Prevention
+
+- Run `pnpm validate:shell-compat` after any shell edit in plugin markdown;
+  CI requires it and the `shell-compat-tests` job.
+- A newly sourced plugin library fails SHC-008 until it is classified; a new
+  Tier 4 library fails `tests/shell-compat` until it has a driver.

@@ -427,14 +427,12 @@ jobs:
                 ;;
               shell-compat)
                 # Static bash/zsh compatibility lint over fenced shell blocks
-                # in plugin markdown and the tier 4 (dual-shell) libraries.
-                # Report-only while the per-plugin fix stack lands
-                # (plans/bash-zsh-shell-compatibility.md); the final PR drops
-                # --report here and in `pnpm validate:schemas`. The zsh parse
-                # check needs zsh installed, so it runs in the dedicated zsh
-                # job rather than this 2-minute matrix target.
-                echo "::group::Shell compatibility lint (report-only)"
-                node scripts/validate-shell-compat.js --report
+                # in plugin markdown and the tier 4 (dual-shell) libraries
+                # (plans/bash-zsh-shell-compatibility.md). The zsh parse check
+                # needs zsh installed, so it runs in the shell-compat-tests job
+                # rather than this 2-minute matrix target.
+                echo "::group::Shell compatibility lint"
+                node scripts/validate-shell-compat.js
                 echo "::endgroup::"
                 ;;
               *)
@@ -1543,14 +1541,12 @@ jobs:
     # (plans/bash-zsh-shell-compatibility.md): the zsh-only parse check over
     # every fenced shell block, and tests/shell-compat/ (Tier 4 libraries
     # under bash, zsh and zsh with snapshot options; Tier 3 libraries through
-    # the bash wrapper from a zsh noclobber parent). Advisory until the final
-    # PR of the stack makes it required in ci-status.
-    name: Shell Compatibility (bash + zsh, advisory)
+    # the bash wrapper from a zsh noclobber parent). Required in ci-status.
+    name: Shell Compatibility (bash + zsh)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [validate-schemas]
-    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -1579,8 +1575,8 @@ jobs:
       - name: Verify kislyuk yq is first on PATH
         run: yq --help 2>&1 | grep -qi 'jq wrapper' || { echo "::error::kislyuk yq not first on PATH ($(command -v yq))"; exit 1; }
 
-      - name: zsh-only parse check (report-only)
-        run: node scripts/check-shell-parse.js --report
+      - name: zsh-only parse check
+        run: node scripts/check-shell-parse.js
 
       - name: Run tests/shell-compat bats suite
         run: bats tests/shell-compat/
@@ -1716,6 +1712,7 @@ jobs:
         build,
         changeset-check,
         plugin-shell-tests,
+        shell-compat-tests,
         goal-engine-compat,
       ]
 
@@ -1730,6 +1727,7 @@ jobs:
           CONTRACT_DRIFT_RESULT: ${{ needs.contract-drift.result }}
           SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
           PLUGIN_SHELL_TESTS_RESULT: ${{ needs.plugin-shell-tests.result }}
+          SHELL_COMPAT_RESULT: ${{ needs.shell-compat-tests.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           GOAL_ENGINE_COMPAT_RESULT: ${{ needs.goal-engine-compat.result }}
           CHANGESET_CHECK_RESULT: ${{ needs.changeset-check.result }}
@@ -1742,6 +1740,7 @@ jobs:
              [ "$CONTRACT_DRIFT_RESULT" == "success" ] && \
              [ "$SECURITY_AUDIT_RESULT" == "success" ] && \
              [ "$PLUGIN_SHELL_TESTS_RESULT" == "success" ] && \
+             [ "$SHELL_COMPAT_RESULT" == "success" ] && \
              [ "$BUILD_RESULT" == "success" ] && \
              [ "$GOAL_ENGINE_COMPAT_RESULT" == "success" ] && \
              { [ "$CHANGESET_CHECK_RESULT" == "success" ] || [ "$CHANGESET_CHECK_RESULT" == "skipped" ]; }; then
@@ -1757,6 +1756,7 @@ jobs:
             echo "Contract Drift: $CONTRACT_DRIFT_RESULT"
             echo "Security Audit: $SECURITY_AUDIT_RESULT"
             echo "Plugin Shell Tests: $PLUGIN_SHELL_TESTS_RESULT"
+            echo "Shell Compatibility: $SHELL_COMPAT_RESULT"
             echo "Build Verification: $BUILD_RESULT"
             echo "Released Goal Engine Compatibility: $GOAL_ENGINE_COMPAT_RESULT"
             echo "Changeset Required: $CHANGESET_CHECK_RESULT"

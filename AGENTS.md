@@ -95,6 +95,14 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
   rewrite generated blocks in install scripts from `scripts/snippets/`
   canonical sources. Run after editing any `scripts/snippets/*.sh`.
 - `pnpm validate:agents`: Run the agent and markdown authoring validator only.
+- `pnpm validate:shell-compat`: bash/zsh compatibility lint of fenced shell
+  blocks in plugin markdown and the Tier 4 (dual-shell) libraries listed in
+  `scripts/shell-compat-config.json` (rules SHC-001..009, SHC-101, SHC-900).
+- `pnpm check:shell-parse`: Flag shell blocks that bash parses but zsh does
+  not. Skips with a warning when zsh is missing locally; fails in CI.
+- `pnpm test:shell-compat`: Run `tests/shell-compat/` (needs zsh): Tier 4
+  libraries under bash, zsh and zsh with snapshot options; Tier 3 libraries
+  through the bash wrapper from a zsh `noclobber` parent.
 - `pnpm validate:marketplace`: Validate `.claude-plugin/marketplace.json`.
 - `pnpm validate:plugins`: Validate plugin manifests plus plugin-specific
   filesystem and hook rules.
@@ -135,10 +143,16 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - Plugin manifest, marketplace, examples, or CLI contract changes:
   `pnpm validate:schemas` and `pnpm validate:versions`.
 - Agent, command, or skill markdown changes: `pnpm validate:agents` and
-  `pnpm lint:plugins`.
+  `pnpm lint:plugins`. When the change touches a fenced shell block, also
+  `pnpm validate:shell-compat` and `pnpm check:shell-parse` — the block runs
+  under the user's login shell, often zsh with `noclobber`.
 - Hook or shell-script changes: `pnpm validate:plugins` plus the affected Bats
-  suite. Current Bats coverage exists for `yellow-core`, `yellow-ci`,
-  `yellow-council`, `yellow-debt`, `yellow-review`, and `yellow-ruvector`.
+  suite. Current Bats coverage exists for `github-workflow`, `gt-workflow`,
+  `yellow-ci`, `yellow-codex`, `yellow-core`, `yellow-council`, `yellow-debt`,
+  `yellow-linear`, `yellow-research`, `yellow-review`, `yellow-ruvector`, and
+  `yellow-semgrep`. A library sourced from markdown also needs its tier in
+  `scripts/shell-compat-config.json` and `pnpm test:shell-compat` (a Tier 4
+  library needs a driver in `tests/shell-compat/drivers/`).
 - Edits to any file carrying the council credential-redaction awk program
   (`plugins/yellow-council/skills/council-patterns/SKILL.md`,
   `agents/review/gemini-reviewer.md`, `agents/review/opencode-reviewer.md`,

@@ -32,6 +32,14 @@ Three-layer plugin where each layer is independently useful:
   `|| true` or `2>/dev/null`
 - **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`
 
+- **Shell libraries and zsh.** Markdown blocks run under the user's shell,
+  often zsh. `hooks/scripts/lib/validate.sh` and `resolve-runner-targets.sh`
+  are bash-only: source them in a bash child
+  (`bash -c "$(cat <<'__YELLOW_CI_BASH__'` … `)"`, or
+  `bash -c '. "$1" && fn "$2"' _ "$lib" "$value"` for one call).
+  `redact.sh` is dual-shell (Tier 4) and may be sourced directly; keep it
+  that way — `tests/shell-compat/` runs it under bash and zsh.
+
 ## Plugin Components
 
 ### Commands (9)

@@ -243,9 +243,8 @@ jobs:
               node scripts/validate-provider-groups.js
               ;;
             shell-compat)
-              # Mirror of the main workflow's `shell-compat` target
-              # (report-only until the fix stack lands).
-              node scripts/validate-shell-compat.js --report
+              # Mirror of the main workflow's `shell-compat` target.
+              node scripts/validate-shell-compat.js
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"
