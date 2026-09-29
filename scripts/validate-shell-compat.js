@@ -177,7 +177,8 @@ function listShellFiles(root) {
 //            Only the expansion rules apply (`${reviewer^}` there is still a
 //            zsh `bad substitution`).
 //   pinned   runs under a bash child (a quoted-tag heredoc fed to bash —
-//            `bash -c "$(cat <<'TAG'` or `bash <<'TAG'` — or a `bash -c` line)
+//            `bash -c "$(cat <<'TAG'` or `bash <<'TAG'`). A `bash -c '…'` line
+//            stays `code` with the script blanked; the outer command is linted
 
 // `<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"` — but never the `<<<` here-string.
 const HEREDOC_RE = /(?<!<)<<(-?)[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
@@ -250,6 +251,42 @@ function scanQuotes(line, open) {
   return { resume, open: '' };
 }
 
+// Blank the script argument of each `bash -c` on the line (to the end of the
+// line when its quote stays open), keeping the surrounding command intact.
+function blankBashDashC(text) {
+  const re = new RegExp(BASH_DASH_C_RE.source, 'g');
+  let result = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const start = m.index + m[0].length;
+    if (start < last) continue;
+    const quote = text[start];
+    let end = start;
+    if (quote === "'" || quote === '"') {
+      end = -1;
+      for (let j = start + 1; j < text.length; j++) {
+        if (quote === '"' && text[j] === '\\') {
+          j++;
+          continue;
+        }
+        if (text[j] === quote) {
+          end = j + 1;
+          break;
+        }
+      }
+      if (end === -1) end = text.length;
+      result += text.slice(last, start) + quote + quote;
+    } else {
+      while (end < text.length && !/\s/.test(text[end])) end++;
+      result += text.slice(last, start) + "''";
+    }
+    last = end;
+    re.lastIndex = end;
+  }
+  return result + text.slice(last);
+}
+
 // Returns one { kind, code } per line. `code` is the part of the line a
 // rule should look at: the whole line for ordinary code, or what follows
 // the closing quote when the line finishes a multi-line string (an awk or
@@ -311,7 +348,9 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       continue;
     }
     if (BASH_DASH_C_RE.test(code)) {
-      out[i] = { kind: 'pinned', code };
+      // Only the quoted script runs in bash; the rest of the line still runs
+      // in the caller's shell, so blank the script and keep linting.
+      out[i] = { kind: 'code', code: blankBashDashC(code), sourceCode: code };
       continue;
     }
     out[i] = { kind: 'code', code };
@@ -552,7 +591,7 @@ const TOUCH_RE = /(?:^|[\s;&|(])touch\s+(?:-\w+\s+)*["']?\$\{?([A-Za-z_]\w*)/g;
 // `>`, `2>`, `&>`, `3>` — but not `>>`, `>|`, `>&`, `2>&1`, `<>` — onto a
 // bare variable (`$f`, `${f}`), not a path built from one (`$f.err`).
 const CLOBBER_REDIRECT_RE =
-  /(?:^|[^<>|&\d])(?:\d?|&)>(?![>|&])\s*["']?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["'\s;&|)<>]|$)/g;
+  /(?<![<>|&\d])(?:\d?|&)>(?![>|&])\s*["']?\$(?:\{([A-Za-z_]\w*)(:-[^}]*)?\}|([A-Za-z_]\w*))(?=["'\s;&|)<>]|$)/g;
 
 function existingFileVars(codeLines) {
   const vars = new Set();
@@ -615,16 +654,32 @@ function pluginOf(rel) {
     : '';
 }
 
+const CROSS_PLUGIN_RE =
+  /\$(?:\{CLAUDE_PLUGIN_ROOT\}|CLAUDE_PLUGIN_ROOT)\/\.\.\/([^/]+)\/(.+)$/;
+
 function classifySource(target, rel, ctx) {
   const tail = sourceTail(target);
   if (!tail) return null;
   const plugin = pluginOf(rel);
   if (!plugin) return null;
-  const candidates = ctx.shellFiles.filter(
-    (file) =>
-      file.startsWith(plugin) &&
-      (file === plugin + tail || file.endsWith(`/${tail}`))
-  );
+  // `${CLAUDE_PLUGIN_ROOT}/../<plugin>/<rest>` names a sibling plugin's file
+  // exactly; resolve it under plugins/ and refuse any further `..`.
+  const sibling = CROSS_PLUGIN_RE.exec(target);
+  let candidates;
+  if (sibling) {
+    const [, name, rest] = sibling;
+    if (name === '..' || rest.split('/').includes('..') || rest.includes('$')) {
+      return null;
+    }
+    const exact = `plugins/${name}/${rest.replace(/^\.\//, '')}`;
+    candidates = ctx.shellFiles.filter((file) => file === exact);
+  } else {
+    candidates = ctx.shellFiles.filter(
+      (file) =>
+        file.startsWith(plugin) &&
+        (file === plugin + tail || file.endsWith(`/${tail}`))
+    );
+  }
   if (candidates.length === 0) return null;
   if (candidates.some((file) => ctx.tier3.has(file))) return 'tier3';
   if (candidates.some((file) => ctx.tier4.has(file))) return 'tier4';
@@ -673,7 +728,7 @@ function lintShellText(
     });
 
   for (let i = 0; i < lines.length; i++) {
-    const { kind, code: line, stdinWrapper } = classes[i];
+    const { kind, code: line, stdinWrapper, sourceCode } = classes[i];
     if (kind === 'comment' || kind === 'data') continue;
     if (stdinWrapper) add('SHC-009', i, 'script fed to bash on stdin');
     if (kind === 'expand') {
@@ -685,11 +740,15 @@ function lintShellText(
     }
 
     if (checkSources) {
+      // A `bash -c` script is scanned too, but tier 3 there is fine: only
+      // sources left in the outer (blanked) text are flagged.
+      const scanText = sourceCode ?? line;
       SOURCE_RE.lastIndex = 0;
       let m;
-      while ((m = SOURCE_RE.exec(line)) !== null) {
+      while ((m = SOURCE_RE.exec(scanText)) !== null) {
         const cls = classifySource(m[1], rel, ctx);
-        if (cls === 'tier3' && kind !== 'pinned') {
+        const outer = sourceCode === undefined || line.includes(m[0]);
+        if (cls === 'tier3' && kind !== 'pinned' && outer) {
           add(
             'SHC-008',
             i,

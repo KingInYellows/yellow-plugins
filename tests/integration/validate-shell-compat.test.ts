@@ -85,6 +85,14 @@ describe('inline rules', () => {
     expect(rules(text)).toContain(rule);
   });
 
+  it('flags each of two adjacent redirects onto bare variables', () => {
+    const findings = lint('f=$(mktemp)\ng=$(mktemp)\ncmd >$f>$g');
+    expect(findings.map((f) => [f.rule, f.detail])).toEqual([
+      ['SHC-001', expect.stringContaining('$f')],
+      ['SHC-001', expect.stringContaining('$g')],
+    ]);
+  });
+
   it.each([
     ['>| on a mktemp file', 'f=$(mktemp)\necho hi >| "$f"'],
     ['>> on a mktemp file', 'f=$(mktemp)\necho hi >> "$f"'],
@@ -131,6 +139,13 @@ describe('inline rules', () => {
       'mapfile -t b < f',
     ].join('\n');
     expect(lint(text).map((f) => [f.rule, f.line])).toEqual([['SHC-003', 5]]);
+  });
+
+  it('keeps linting the outer shell after `bash -c`', () => {
+    expect(rules("bash -c 'true'; mapfile -t x < f")).toEqual(['SHC-003']);
+    expect(rules("if bash -c 'true'; then path=x; fi")).toEqual(['SHC-002']);
+    expect(rules("bash -c 'mapfile -t x < f'")).toEqual([]);
+    expect(rules('bash -c "mapfile -t x < f"')).toEqual([]);
   });
 
   it('flags a wrapper that feeds the script to bash on stdin (SHC-009)', () => {
@@ -306,6 +321,36 @@ describe('fixture runs', () => {
       md('. "${CLAUDE_PLUGIN_ROOT}/lib/new.sh"')
     );
     expect(run().stderr).toContain('plugins/demo/lib/new.sh is not classified');
+  });
+
+  it('resolves cross-plugin sourced libraries against their own tier', () => {
+    write('plugins/other/lib/b3.sh', '#!/usr/bin/env bash\n');
+    write('plugins/other/lib/b4.sh', '#!/usr/bin/env bash\n');
+    write('plugins/other/lib/new.sh', '#!/usr/bin/env bash\n');
+    config({
+      tier3Libraries: [
+        'plugins/demo/lib/bashonly.sh',
+        'plugins/other/lib/b3.sh',
+      ],
+      tier4Libraries: ['plugins/demo/lib/dual.sh', 'plugins/other/lib/b4.sh'],
+    });
+    const src = (lib: string) =>
+      `. "\${CLAUDE_PLUGIN_ROOT}/../other/lib/${lib}"`;
+    write('plugins/demo/commands/t3.md', md(src('b3.sh')));
+    write(
+      'plugins/demo/commands/t3w.md',
+      md(`bash -c "$(cat <<'__W__'\n${src('b3.sh')}\n__W__\n)"`)
+    );
+    write('plugins/demo/commands/t4.md', md(src('b4.sh')));
+    write('plugins/demo/commands/un.md', md(src('new.sh')));
+    const result = run();
+    expect(result.stderr).toContain('commands/t3.md:4 [SHC-008]');
+    expect(result.stderr).not.toContain('t3w.md');
+    expect(result.stderr).not.toContain('t4.md');
+    expect(result.stderr).toContain('commands/un.md:4 [SHC-008]');
+    expect(result.stderr).toContain(
+      'plugins/other/lib/new.sh is not classified'
+    );
   });
 
   it('shares UPPERCASE mktemp handoff variables across files of a plugin', () => {
