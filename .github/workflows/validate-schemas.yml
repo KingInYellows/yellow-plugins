@@ -1563,13 +1563,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install zsh and bats
+      - name: Install zsh, bats and kislyuk yq
+        # kislyuk yq (the jq wrapper) is what yellow-debt's library calls; the
+        # runner image ships mikefarah yq, so put pipx's bin dir first on PATH.
+        # Without it the /debt:triage end-to-end test skips.
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh
+          sudo apt-get install -y --no-install-recommends zsh
           sudo npm install -g bats@1.11.0
+          pipx install 'yq==3.4.3'
+          pipx environment --value PIPX_BIN_DIR >> "$GITHUB_PATH"
           zsh --version
           bats --version
+
+      - name: Verify kislyuk yq is first on PATH
+        run: yq --help 2>&1 | grep -qi 'jq wrapper' || { echo "::error::kislyuk yq not first on PATH ($(command -v yq))"; exit 1; }
 
       - name: zsh-only parse check (report-only)
         run: node scripts/check-shell-parse.js --report
