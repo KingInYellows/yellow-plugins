@@ -253,8 +253,10 @@ def leading_observer(command):
         return None
     path = parts[0]
     # Expand variables only where the shell would: observer_stage() single-quotes
-    # its path, so a "$" there (or after a backslash) is literal and must stay so.
-    if "'" not in raw and "\\" not in raw:
+    # its path, so a "$" there (or after a backslash) is literal and must stay so;
+    # a wholly double-quoted path expands even when it holds an apostrophe.
+    double_quoted = raw.startswith('"') and raw.endswith('"') and raw.count('"') == 2
+    if "\\" not in raw and ("'" not in raw or double_quoted):
         path = os.path.expandvars(path)
     return normalize(path), form
 

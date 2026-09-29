@@ -1282,3 +1282,11 @@ PY
   run --separate-stderr setup_py install
   echo "$output" | jq -e '.action == "already-installed"' >/dev/null
 }
+
+@test "T11: a double-quoted observer path with an apostrophe still expands \$HOME" {
+  seed_settings "python3 \"\$HOME/it's/yellow-context-observer.py\" | bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" \
+    --observer-dest "$TEST_HOME/it's/yellow-context-observer.py"
+  echo "$output" | jq -e '.action == "removed"' >/dev/null
+  jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
+}

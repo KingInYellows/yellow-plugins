@@ -11,8 +11,10 @@ it again (or non-interactively with `observer enable|disable|status --yes`).
 (`statusline`, `status`, `plan`, `install`, `remove`, `prune`; every path has a
 default and `--dry-run` writes nothing), so re-running
 setup keeps an enabled observer, a symlinked settings.json stays a symlink, and
-settings.json, the observer copy and the records follow `CLAUDE_CONFIG_DIR`
-(the statusline script stays at `~/.claude/yellow-statusline.py`). The composed
+settings.json, the generated statusline script, the observer copy and the
+records all follow `CLAUDE_CONFIG_DIR` (the statusline script moves from
+`~/.claude/yellow-statusline.py` to `<config>/yellow-statusline.py`, the same
+path unless a custom profile is selected). The composed
 stage is `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
 <observer>; exec cat; } | <existing>`: a missing observer or `python3` falls
 back to `cat` so the statusline never blanks, and `exec` lets the statusline
@@ -20,7 +22,7 @@ render as soon as the observer releases stdout instead of waiting for the
 record write. The generated statusline template moved to
 `references/statusline-setup/statusline-template.py` unchanged. The observer passes the statusline payload through byte-for-byte,
 always exits 0, and records context-window numbers per session under
-`~/.claude/projects/<slug>/context-observations/`, counting one advisory
+`${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/`, counting one advisory
 crossing per drop below a 50 % remaining watermark (`YELLOW_CONTEXT_WATERMARK`)
 and doing nothing else. `session-handoff` now fills `context_at_capture` from
 a fresh, same-session record (found by session id even when the session works
