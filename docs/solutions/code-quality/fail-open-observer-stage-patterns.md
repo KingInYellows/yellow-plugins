@@ -27,7 +27,9 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
    The `exec cat` covers a missing python3 or an unreadable observer file, so
    the downstream statusline still renders. `exec` makes the observer the only
    holder of the pipe's write end, so its early stdout release gives the next
-   stage EOF. Two forms to avoid:
+   stage EOF and lets it compute while the observer records. The host still
+   shows the output only once the whole command exits, so recording needs its
+   own deadline. Two forms to avoid:
    - A bare `python3 <observer> | <existing>` blanks the statusline on any
      startup failure.
    - The guarded group `{ python3 <observer> || cat; } | <existing>` keeps the
@@ -40,11 +42,13 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
 2. **Deadline exceptions must not derive from `OSError`.** `TimeoutError`
    subclasses `OSError`, so a `signal.alarm` handler raising it is swallowed
    by every `except OSError:` I/O guard. Raise a dedicated
-   `class Deadline(BaseException)` and catch it only at the top level.
+   `class DeadlineReached(BaseException)` and catch it only at the top level.
 3. **Distinguish unreadable from absent.** A loader that returns `None` for
    both "no record" and "record exists but unreadable" lets callers treat
-   corruption as a fresh start. Return a distinct sentinel (for example
-   `UNREADABLE`) and let the caller choose to skip or report.
+   corruption as a fresh start. The observer's `load_previous` returns `None`
+   only for an absent, malformed or other-session record, and lets the
+   `OSError` from a record that exists but cannot be read propagate, so the
+   write is abandoned and the old record, with its advisory state, is kept.
 4. **Never overwrite an earlier backup; report recovery distinctly.**
    Corrupt-settings recovery that writes a fixed `.corrupt.backup` destroys
    the previous backup on the second corruption. Use numbered backups
@@ -54,12 +58,11 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
 
 Related smaller lessons from the same review:
 
-- Newest-record scans must include the primary-slug path in the mtime
-  comparison, or a stale primary record hides a newer same-session record.
 - Add bats cases for future-dated timestamps (`observed_at` in the future)
   wherever age or staleness is computed.
 - A slash command that gates behaviour behind an interactive prompt needs a
-  `--yes` / explicit `enable|disable|status` path for agents.
+  non-interactive path for agents: `enable|disable --yes`, plus a read-only
+  `status` that needs no confirmation.
 - Do not persist advisory state (watermarks) that has no consumer; either
   expose it to the reader (`last_state`, `watermark_remaining`) or remove it.
 
@@ -82,11 +85,11 @@ flow and that touches user-owned config.
 ```
 
 ```python
-class Deadline(BaseException):
+class DeadlineReached(BaseException):
     pass
 
 def on_deadline(signum, frame):
-    raise Deadline()
+    raise DeadlineReached("recording deadline reached")
 ```
 
 ---
@@ -106,8 +109,8 @@ Time until the next stage sees EOF, with a 1 s simulated recording step:
 | `{ … && exec python3 obs; exec cat; } \| existing` | 0.02 s |
 
 Codex reproduced it independently at about 1.06 s against 0.10 s. The
-statusline waited for the recording because the brace group held the pipe's
-write end. The fix is the `exec` stage in Guidance item 1; `install`
+next stage could not even start until the recording ended because the brace
+group held the pipe's write end. The fix is the `exec` stage in Guidance item 1; `install`
 upgrades the earlier guarded and plain forms in place (action `upgraded`).
 The T10 EOF-timing bats test now runs the installed command under
 `bash -c`. The original piped the bare observer, so it could not see this
@@ -132,8 +135,8 @@ throttles such as `unchanged()` (`NaN != NaN`). Guard with `math.isfinite`.
 
 - `docs/security.md` drifted three ways: it said no code path prunes
   records (on-demand `prune` ships), that the reader exposes four fields (it
-  returns six), and that lookup is primary-slug-first (it takes the newest
-  record across projects). Re-check enumerated claims when a feature grows.
+  returns six), and that lookup tries the primary slug first (the reader
+  takes the newest record across all projects). Re-check enumerated claims when a feature grows.
 - A slash command whose `argument-hint` lists subcommands needs a fenced
   Arguments section that parses `$ARGUMENTS`.
 - Drop tool-call-budget claims once later steps add calls.

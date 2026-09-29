@@ -324,7 +324,7 @@ obs_stage() {
   [ -z "$stderr" ]
 }
 
-@test "R22: the observer stays well under the 100 ms budget on the largest fixture (limit 250 ms, 1000 ms on CI)" {
+@test "R22: the observer stays near its 100 ms latency target on the largest fixture (limit 250 ms, 1000 ms on CI)" {
   # The limit only catches gross regressions (a subprocess, a network call);
   # the measured best of five is printed below. A shared CI runner gets a
   # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both.

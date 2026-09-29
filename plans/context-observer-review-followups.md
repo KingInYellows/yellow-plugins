@@ -106,7 +106,7 @@ in place and add a patch changeset for the new behaviour change only.
 Before each edit, grep the repo for the claim so every restatement changes
 together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 
-- [ ] 3.1: `status --yes`. `--yes` applies only to `enable|disable`
+- [x] 3.1: `status --yes`. `--yes` applies only to `enable|disable`
   (`setup.md:37`). Fix `references/statusline-setup/context-observer.md`
   (~84: `observer enable|disable --yes` or `observer status`), `setup.md`
   frontmatter `description` (3) and `argument-hint` (4), the usage line (~38),
@@ -118,7 +118,7 @@ together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 > separate `observer [enable|disable] [--yes]` and `observer status` forms. Drop the "fail-open doc
 > (~62)" item: that doc never mentions `--yes`.
 <!-- /deepen-plan -->
-- [ ] 3.2: Render vs complete. `exec` lets the next stage see EOF and render
+- [x] 3.2: Render vs complete. `exec` lets the next stage see EOF and render
   while the observer records, but the statusLine command completes only when
   the observer exits (≤ 2 s deadline). Reword wherever the doc says the
   statusline renders "without waiting": `docs/security.md` (~348-350), the
@@ -146,7 +146,7 @@ together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 > `docs/solutions/code-quality/fail-open-observer-stage-patterns.md:28` and `:109`, and
 > `.changeset/yellow-core-context-observer.md:21` ("instead of waiting for the record write").
 <!-- /deepen-plan -->
-- [ ] 3.3: `docs/security.md` "No side channels" (~345-347): the observer
+- [x] 3.3: `docs/security.md` "No side channels" (~345-347): the observer
   prints nothing to stdout beyond the pass-through; it writes one stderr line
   only when `CONTEXT_OBSERVER_DEBUG=1`, and usage text on `--help` or a
   terminal stdin.
@@ -154,18 +154,18 @@ together (`rg -n '<phrase>' plugins/yellow-core docs .changeset`).
 > **Codebase:** `main()` handles `--help`/TTY via `wants_help` (`context-observer.py:414`); `DeadlineReached`
 > is at `:405`. The `CONTEXT_OBSERVER_DEBUG` stderr line is covered by the R19 bats test (~1159).
 <!-- /deepen-plan -->
-- [ ] 3.4: Budget framing: a 2 s hard recording deadline
+- [x] 3.4: Budget framing: a 2 s hard recording deadline
   (`DEADLINE_SECONDS`) and a 100 ms latency target checked by R22 (250 ms
   limit, 1000 ms on CI). Apply to `plugins/yellow-core/CLAUDE.md:295`, and keep
   `security.md` and the R22 test title consistent with it.
-- [ ] 3.5: `docs/solutions/code-quality/fail-open-observer-stage-patterns.md`:
+- [x] 3.5: `docs/solutions/code-quality/fail-open-observer-stage-patterns.md`:
   `Deadline` → `DeadlineReached` in guidance item 2 and the example (~40-43,
   ~85-89); replace the `UNREADABLE` sentinel (~44-47) with the actual
   mechanism (`load_previous` raises `OSError` for an unreadable record so the
   caller keeps the old one, and returns `None` only for absent or malformed);
   delete the primary-slug bullet (~57-58) and fix the ~135 restatement to "the
   reader takes the newest record across all projects".
-- [ ] 3.6: `setup.md`: delete the tool-call count (~47-48) and keep the
+- [x] 3.6: `setup.md`: delete the tool-call count (~47-48) and keep the
   batching guidance; at ~355 say `installed` changed only `statusLine.command`
   in settings.json and also wrote the observer copy to
   `$CONFIG/yellow-context-observer.py`; at ~366-367 say a non-interactive

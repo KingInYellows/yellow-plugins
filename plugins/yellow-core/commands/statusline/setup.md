@@ -1,7 +1,7 @@
 ---
 name: statusline:setup
-description: "Generate and install an adaptive Python statusline for yellow-plugins. Auto-detects installed plugins and their MCP servers, previews the result, and writes to ${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json on confirmation; `observer enable|disable|status [--yes]` manages the opt-in context observer alone. Re-run after installing new plugins."
-argument-hint: '[observer [enable|disable|status] [--yes]]'
+description: "Generate and install an adaptive Python statusline for yellow-plugins. Auto-detects installed plugins and their MCP servers, previews the result, and writes to ${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json on confirmation; `observer enable|disable [--yes]` and `observer status` manage the opt-in context observer alone. Re-run after installing new plugins."
+argument-hint: '[observer [enable|disable [--yes] | status]]'
 allowed-tools:
   - Bash
   - Read
@@ -35,7 +35,7 @@ Split it on whitespace and match the words exactly:
   action with its confirmation question; add `--yes` to skip the question.
 
 `--yes` is accepted only after `enable` or `disable`. Any other text: print
-`Usage: /statusline:setup [observer [enable|disable|status] [--yes]]` and stop
+`Usage: /statusline:setup [observer [enable|disable [--yes] | status]]` and stop
 without running anything. Without `--yes` every question stays, and its
 default stays No. Automation can also call
 `${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py` directly (`status`, `plan`,
@@ -44,8 +44,7 @@ nothing), which the reference file lists.
 
 ## Workflow
 
-Batch operations into single Bash calls to minimize round-trips; the base
-flow takes about five tool calls, and Step 5b adds its own.
+Batch operations into single Bash calls to minimize round-trips.
 
 ### Step 1: Check Prerequisites and Existing State (ONE Bash call)
 
@@ -352,7 +351,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" install --settings "$
   --statusline "$CONFIG/yellow-statusline.py"
 ```
 
-`installed` → report `backup`; only `statusLine.command` changed.
+`installed` → report `backup`: in settings.json only `statusLine.command`
+changed, and the observer copy was written to
+`$CONFIG/yellow-context-observer.py`.
 
 **Observer enabled (Step 1).** Ask: "The context observer is enabled. Keep
 it?" — "Keep it" (first) / "Disable it". Keep → when Step 1 said `refresh`,
@@ -364,7 +365,9 @@ run `remove` with the same `--settings` and `--observer-dest` and report
 **Any `action: "error"`** (from `plan`, `install` or `remove`): show `reason`
 and say `statusLine.command` is unchanged. Then act on `error_code` (the
 reference file's table lists each one): `statusline_missing` → run the full
-`/statusline:setup` first; `observer_not_removable` → show the reference
+`/statusline:setup` first, except that a non-interactive caller
+(`enable --yes`) stops and reports `statusline_missing`, because the base
+install asks questions; `observer_not_removable` → show the reference
 file's Removal section (edit the prefix by hand); `settings_jsonc` and the
 other settings-shape codes → offer the manual merge from the reference file
 with `${CLAUDE_PLUGIN_ROOT}` resolved.

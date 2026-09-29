@@ -27,7 +27,9 @@ status. Installing or updating yellow-core never changes `statusLine`.
 
 - no `statusLine` → refused with `statusline_missing`: the observer only wraps
   an existing command, so `remove` always restores exactly what was there.
-  Run the full `/statusline:setup` first.
+  Run the full `/statusline:setup` first; a non-interactive caller
+  (`observer enable --yes`) stops and reports `statusline_missing` instead,
+  because the base install is interactive.
 - any existing command → `<stage> | <existing>`; a command that
   contains `;`, `&`, `|`, `#` or a newline is wrapped as
 
@@ -44,8 +46,11 @@ The `exec cat` fallback keeps the payload flowing when `python3` or the
 observer file is missing; without it the next stage would get empty stdin and
 the whole statusline would go blank. `exec` matters too: a stage such as
 `{ python3 <observer> || cat; }` keeps the pipe open in its subshell until the
-observer exits, so the statusline would wait for the record write instead of
-rendering as soon as the observer releases stdout. `install` upgrades that
+observer exits, so the statusline script cannot start until the record write
+ends. With `exec` it computes its output as soon as the observer releases
+stdout. Claude Code still shows the statusline only once the whole command
+exits, which waits for the observer's record write (capped at 2 s), and a new
+statusline update in that window cancels the run. `install` upgrades that
 earlier stage, and the plain `python3 <observer> |` prefix, to the current
 form (action `upgraded`); `status` reports either as `refresh`.
 
@@ -81,7 +86,8 @@ observer stage has nothing after it), edit the command by hand.
 ## Non-interactive use
 
 Agents can call the script directly instead of the Step 5b questions, or use
-`/statusline:setup observer enable|disable|status --yes`. Every path has a
+`/statusline:setup observer enable --yes` or `observer disable --yes`
+(`observer status` is read-only and takes no flag). Every path has a
 default (`--settings`, `--observer-dest` and `--statusline` follow
 `CLAUDE_CONFIG_DIR`, `--observer-src` is the
 copy next to the script), so `statusline-settings.py status` works with no
@@ -113,7 +119,7 @@ that recovers from invalid settings.json resets it, saves the original as
 | `settings_invalid` | settings.json is not valid JSON: fix it, or run `statusline` to reset it |
 | `settings_unreadable`, `settings_not_object` | settings.json cannot be read, or is not an object: fix it by hand |
 | `statusline_not_object`, `command_not_string` | `statusLine` has an unexpected shape: use the manual merge |
-| `statusline_missing` | no `statusLine` is configured, so there is nothing to wrap: run the full `/statusline:setup` first |
+| `statusline_missing` | no `statusLine` is configured, so there is nothing to wrap: run the full `/statusline:setup` first (interactive; a non-interactive caller stops and reports this code) |
 | `observer_src_missing` | the plugin's `lib/context-observer.py` is missing: pass `--observer-src` or reinstall yellow-core |
 | `observer_not_removable` | the observer stage has nothing after it: edit `statusLine.command` by hand |
 | `prune_incomplete` | some old records could not be deleted: `reason` names the first failure |

@@ -14,12 +14,13 @@ observer as the only holder of the pipe's write end.
 Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
   - Reads the statusline JSON payload from stdin, writes it to stdout
     byte-for-byte, and releases stdout BEFORE any other work, so the next
-    stage sees EOF and renders without waiting on the record write, and a
-    broken observer cannot blank the statusline. (The shell still waits for
-    the observer to exit before the whole statusLine command finishes. A
-    stage that wraps the observer without exec, such as
-    "{ python3 OBS || cat; }", keeps the pipe open in its subshell and so
-    delays the next stage until recording ends.)
+    stage sees EOF and computes its output while the observer records, and a
+    broken observer cannot blank the statusline. Claude Code shows the
+    statusline only once the whole statusLine command exits, and the shell
+    waits for the observer, so the display still waits for the record write
+    (capped by DEADLINE_SECONDS). A stage that wraps the observer without
+    exec, such as "{ python3 OBS || cat; }", keeps the pipe open in its
+    subshell, so the next stage cannot even start until recording ends.
   - Exits 0 on every path: malformed input, missing session id, unwritable
     disk, SIGPIPE from a closed downstream, anything else.
   - Records one observation per session to

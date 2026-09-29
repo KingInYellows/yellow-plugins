@@ -229,7 +229,8 @@ def observer_stage(observer_dest):
     # next stage. exec, not "python3 <observer> || cat": the group's subshell must
     # not keep the pipe's write end open while the observer records, or the next
     # stage waits for recording instead of seeing EOF when the observer releases
-    # stdout.
+    # stdout. The statusLine command as a whole still completes (and Claude Code
+    # shows its output) only once the observer exits.
     path = shlex.quote(normalize(observer_dest))
     return "{ command -v python3 >/dev/null && [ -r %s ] && exec python3 %s; exec cat; }" % (path, path)
 
