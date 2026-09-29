@@ -1,0 +1,44 @@
+plugins/yellow-ci/commands/ci/setup.md
+  s_e3ae526d137cfd::t_874241410cc639 22-27
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_e3ae526d137cfd::t_874241410cc639 455-457
+plugins/yellow-ruvector/tests/status-provenance.bats
+  s_e3ae526d137cfd::t_21fc85f5e8de1b 33-35
+.changeset/zsh-compat-ci-ruvector.md
+  s_e3ae526d137cfd::t_25d77273ec3a25 1-19
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_e3ae526d137cfd::t_f2c4c87a2014f9 454-456
+plugins/yellow-ruvector/commands/ruvector/status.md
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 22-24,51-52,63-65,97-98,189-191,361-362
+plugins/yellow-ci/tests/redaction.bats
+  s_e3ae526d137cfd::t_817ab4b7f0aeae 542-543,546-550
+  s_e3ae526d137cfd::t_e2d61222527b6c 544-545
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 42-44,81-82,98-100,125-126,149-151,200-201
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_25d77273ec3a25 68-69,81-82,358-366,371-376
+  s_e3ae526d137cfd::t_d315c4dd062069 706
+plugins/yellow-ci/commands/ci/setup-runner-targets.md
+  s_e3ae526d137cfd::t_874241410cc639 26-27
+  s_e3ae526d137cfd::t_eb7a97c8d79e5d 33-41
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_e3ae526d137cfd::t_817ab4b7f0aeae 199-201,203
+scripts/shell-compat-config.json
+  s_e3ae526d137cfd::t_83d09a08a4d23c 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "067378a0b674794725bb56c139284cd7ebee2795",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
