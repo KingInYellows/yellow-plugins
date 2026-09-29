@@ -33,6 +33,14 @@ type Block = {
 const extract = (md: string): Block[] => extractFencedBlocks(md);
 
 describe('extractFencedBlocks', () => {
+  it('drops a quoted list item when the block quote ends, so a following 4-space code line is not a fence', () => {
+    const md = ['> - item', '', '    ```bash', '    x', '    ```', ''].join(
+      '\n'
+    );
+    expect(extract(md)).toHaveLength(0);
+    expect(stripFencedContent(md, { stripFrontmatter: false })).toBe(md);
+  });
+
   it('returns body, language and 1-based line numbers for a plain fence', () => {
     const md = [
       '# Title',

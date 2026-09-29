@@ -190,7 +190,9 @@ function fenceOpenerAt(rest, column) {
 function scanFences(lines) {
   const fences = [];
   let current = null;
-  const listStack = []; // ascending content columns of active list items
+  // Active list items, innermost last: content column plus the blockquote
+  // depth the item was opened at.
+  const listStack = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -227,15 +229,23 @@ function scanFences(lines) {
       continue;
     }
 
-    // Not in a fence. Pop any list contexts this line has outdented past
-    // (blank lines never end a list item on their own — see block comment).
+    // Not in a fence. Pop list items opened inside a block quote this line
+    // has left (blank lines included: a blank line ends the quote), then any
+    // this line has outdented past. Blank lines never end a list item on
+    // their own — see block comment.
+    while (listStack.length && listStack[listStack.length - 1].depth > depth) {
+      listStack.pop();
+    }
     if (!isBlank) {
-      while (listStack.length && indent < listStack[listStack.length - 1]) {
+      while (
+        listStack.length &&
+        indent < listStack[listStack.length - 1].column
+      ) {
         listStack.pop();
       }
     }
     const containerColumn = listStack.length
-      ? listStack[listStack.length - 1]
+      ? listStack[listStack.length - 1].column
       : 0;
 
     // The content column this line's own list marker establishes, if it
@@ -274,7 +284,7 @@ function scanFences(lines) {
       };
     }
 
-    if (openedColumn !== -1) listStack.push(openedColumn);
+    if (openedColumn !== -1) listStack.push({ column: openedColumn, depth });
   }
   if (current) {
     current.endIndex = lines.length;
