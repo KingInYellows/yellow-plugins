@@ -104,6 +104,17 @@ pattern today, so both are lint hardening):
       a false SHC-001. Scan only code outside comments and quotes (reuse
       `scanQuotes` and the comment cut). (PR #921 thread
       PRRT_kwDOQ3SUys6nJqQx.)
+- [ ] 16: `tests/shell-compat/controls.bats` has positive controls for
+      `noclobber`, `extendedglob` and `rcquotes` but not `nocaseglob`, so
+      dropping it from `profile_cmd`'s zsh-snapshot profile would go
+      unnoticed. Add `[[ -o nocaseglob ]]` (or a mixed-case glob assertion)
+      to the snapshot control. (PR #920 thread PRRT_kwDOQ3SUys6nJ-yR.)
+- [ ] 17: `commandSubstitutions` (used when blanking `[[ ]]` / `(( ))`
+      spans for SHC-001) balances parentheses without regard to quoting, so
+      a quoted `)` ends the substitution early and a later redirect in it
+      (`[[ -n $(printf ')'; printf x > "$f") ]]`) is erased. Make the
+      balancer skip quoted text and backslash escapes (reuse `scanQuotes`).
+      (PR #921 thread PRRT_kwDOQ3SUys6nJ-1z.)
 
 ## Acceptance Criteria
 
