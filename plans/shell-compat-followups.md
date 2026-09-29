@@ -50,7 +50,17 @@ review; the user chose to track them here rather than widen the stack.
 - [ ] 7: Alias leakage: users' shell snapshots apply aliases (`cat=bat`,
       `ls=eza`, `ps=procs`) to markdown blocks. Consider a lint rule for
       flag-sensitive aliased commands at command position.
-- [ ] 8: Run `tests/integration/check-shell-parse.test.ts` somewhere zsh is
+- [ ] 8: git-push detector gaps around the fd-3 wrapper (second-pass
+      security review, P3): `exec 3<<'X' … X` followed by `bash /dev/fd/3`
+      is allowed because a bare `exec` heredoc is never scanned; and
+      `git -c alias.x='!bash /dev/fd/3' x 3<<'T'` (also `GIT_SSH_COMMAND=`,
+      `PAGER=`) loses the heredoc context — the latter predates the stack.
+      Fix in both detector copies (keep them byte-identical): deny as
+      unverifiable a shell whose script operand is `/dev/fd/N`,
+      `/dev/stdin` or `/proc/self/fd/N` with no readable source of its own,
+      and thread `stdinCtx` into `commandValueInvokesGitPush` /
+      `gitConfigInvokesGitPush`.
+- [ ] 9: Run `tests/integration/check-shell-parse.test.ts` somewhere zsh is
       installed (the vitest integration job has none, so its parse cases
       skip in CI; the real-repo parse check does run in the zsh job).
 

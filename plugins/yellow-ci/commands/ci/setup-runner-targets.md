@@ -24,7 +24,7 @@ Configure runner pool definitions, routing rules, and semantic metadata.
 - **Import validation:** run `validate_runner_targets_file` from
   `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh` against a temp copy of
   imported YAML. The library is bash-only, so run it in a bash child with the
-  path single-quoted:
+  path single-quoted (reject a path containing a single quote first):
   `bash -c '. "$1" && validate_runner_targets_file "$2"' _ "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" '<temp-copy>'`.
 - **Merged routing cache (after write):** source the plugin's resolution library
   and run the merge, which reads the global config plus the per-repo `.claude/`

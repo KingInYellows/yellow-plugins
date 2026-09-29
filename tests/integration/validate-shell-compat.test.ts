@@ -174,6 +174,26 @@ describe('inline rules', () => {
     expect(finding.detail).toContain('git-push hook');
   });
 
+  it.each([
+    ['fd mismatch', "bash /dev/fd/3 4<<'__W__'"],
+    ['bash -c with the fd path', "bash -c /dev/fd/3 3<<'__W__'"],
+    ['stdin with options', "bash -s -- x <<'__W__'"],
+  ])('rejects %s as a wrapper (SHC-009)', (_name, opener) => {
+    const text = [opener, 'true', '__W__'].join('\n');
+    expect(lint(text).map((f) => f.rule)).toContain('SHC-009');
+  });
+
+  it('accepts the fd-3 wrapper after && and with bash options', () => {
+    for (const opener of [
+      "cd /x && bash /dev/fd/3 3<<'__W__'",
+      "bash --norc /dev/fd/3 3<<'__W__'",
+    ]) {
+      expect(lint([opener, 'mapfile -t a < f', '__W__'].join('\n'))).toEqual(
+        []
+      );
+    }
+  });
+
   it('treats arithmetic `<<` and `>` as operators, not heredocs or redirects', () => {
     const text = [
       'x=$((1 << n))',

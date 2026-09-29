@@ -38,6 +38,7 @@ function unwrap(body: string): string {
   const lines = body.split('\n');
   const open = lines.findIndex((l) => WRAPPER_RE.test(l));
   const close = lines.indexOf(tag, open + 1);
+  if (close === -1) throw new Error(`wrapper tag ${tag} is never closed`);
   return lines.slice(open + 1, close).join('\n');
 }
 

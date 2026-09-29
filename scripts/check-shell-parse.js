@@ -162,7 +162,13 @@ function main(argv) {
     return 0;
   }
 
-  const result = run(root, { zsh, bash });
+  let result;
+  try {
+    result = run(root, { zsh, bash });
+  } catch (err) {
+    console.error(`${TAG} ERROR: ${err.message}`);
+    return 1;
+  }
   const summary = `${result.blocks} shell block(s) parsed; ${result.bothFail} fail both shells (templates/pseudo-code, ignored)`;
   if (result.failures.length === 0) {
     console.log(`${TAG} OK: ${summary}.`);

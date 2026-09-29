@@ -216,7 +216,10 @@ do_increment() {
   fi
 }
 
-if [ -f "$USAGE_FILE" ]; then
+# A repo could ship these paths as symlinks; never read or write through one.
+if [ -L .claude ] || [ -L "$USAGE_FILE" ] || [ -L "$LOCK_FILE" ]; then
+  printf '[composio] Warning: usage counter path is a symlink; not updating\n' >&2
+elif [ -f "$USAGE_FILE" ]; then
   if command -v flock >/dev/null 2>&1; then
     # fd 9, not 200: zsh cannot parse a multi-digit fd on a subshell
     # redirect. `>>` because the lock file already exists and zsh's

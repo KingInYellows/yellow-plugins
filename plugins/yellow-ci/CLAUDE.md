@@ -37,7 +37,7 @@ Three-layer plugin where each layer is independently useful:
   are bash-only: source them in a bash child
   (`bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'` … `__YELLOW_CI_BASH__`, or
   `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'` for one call, with the
-  value single-quoted).
+  value single-quoted — reject any value containing a single quote first).
   `redact.sh` is dual-shell (Tier 4) and may be sourced directly; keep it
   that way — `tests/shell-compat/` runs it under bash and zsh.
 

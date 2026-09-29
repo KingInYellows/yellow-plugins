@@ -191,7 +191,7 @@ const BASH_WRAPPER_PREFIX_RE = /(?:^|[\s;&|(])(?:command\s+)?bash(?:\s[^<]*)?$/;
 // from fd 3, so stdin stays the caller's, and the git-push hook can inspect
 // the body. Every other bash-fed heredoc is SHC-009.
 const BASH_FD_WRAPPER_PREFIX_RE =
-  /(?:^|[\s;&|(])(?:command\s+)?bash\s+(?:-\S+\s+)*\/dev\/fd\/([3-9])\s+\1$/;
+  /(?:^|[\s;&|(])(?:command\s+)?bash\s+(?:-(?![A-Za-z]*c)\S+\s+)*\/dev\/fd\/([3-9])\s+\1$/;
 // `$((…))` / `((…))` spans: `<<` and `>` inside them are arithmetic shifts
 // and comparisons, not heredocs or redirects.
 const ARITHMETIC_RE = /\$?\(\((?:[^()]|\([^()]*\))*\)\)/g;
