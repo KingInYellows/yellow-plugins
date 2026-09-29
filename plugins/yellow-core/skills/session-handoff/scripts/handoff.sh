@@ -3,6 +3,8 @@
 #
 # Subcommands:
 #   measure                      print the measured workspace block as JSON
+#   context                      context only: {context, reason} as JSON; runs
+#                                no git (reason codes: lib/context-observer.sh)
 #   write --slug S --title T [--task-ref P] [--evidence P]... < body
 #                                publish plans/handoff/<date>-<slug>.md
 #   read  plans/handoff/<f>.md   parse a note (v1 or legacy) as JSON
@@ -25,7 +27,9 @@
 # shared safety flags: hooks and fsmonitor disabled, no optional locks. git
 # status still refreshes the index (no lock is taken); that is the one write
 # git performs. pi_report is handed the already-resolved root so it runs no
-# git here. Nothing checks out, stashes, fetches, resets or launches.
+# git here, and so is co_read_observation (lib/context-observer.sh), which
+# only reads the opt-in observer's record. Nothing checks out, stashes,
+# fetches, resets or launches.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
@@ -35,6 +39,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 . "${SCRIPT_DIR}/../../../lib/validate-fs.sh"
 # shellcheck source=../../../lib/plugin-identity.sh
 . "${SCRIPT_DIR}/../../../lib/plugin-identity.sh"
+# shellcheck source=../../../lib/context-observer.sh
+. "${SCRIPT_DIR}/../../../lib/context-observer.sh"
 
 HANDOFF_FORMAT=1
 HANDOFF_DIR="plans/handoff"
@@ -112,6 +118,7 @@ ho_require_jq() {
 ho_require_libs() {
   command -v cs_redact_secrets >/dev/null 2>&1 && command -v validate_file_path >/dev/null 2>&1 \
     && command -v pi_report >/dev/null 2>&1 && command -v pi_git_readonly >/dev/null 2>&1 \
+    && command -v co_read_observation >/dev/null 2>&1 \
     || { ho_err "yellow-core lib/ helpers are missing; refusing to run"; exit 2; }
 }
 
@@ -220,6 +227,14 @@ ho_measure() {
   case "$repository_id" in sha256:unknown) repository_id=unknown ;; esac
   case "$dirty_digest" in sha256:unknown) dirty_digest=unknown ;; esac
 
+  # Context comes from the opt-in observer's record for this session (R20):
+  # an object only when the record is fresh, same-session and in range;
+  # otherwise the JSON string "unknown". The reader finds the record by
+  # session id and runs no git.
+  local ctx
+  ctx=$(co_read_observation "$source_session")
+  if ! printf '%s' "$ctx" | jq -e 'type == "object"' >/dev/null 2>&1; then ctx='"unknown"'; fi
+
   jq -nc \
     --arg captured_at "$captured_at" --arg source_session "$source_session" \
     --arg plugin_version "$plugin_version" --arg repository_id "$repository_id" \
@@ -227,16 +242,39 @@ ho_measure() {
     --arg remote_origin "$remote_origin" --arg branch "$branch" --arg head "$head" \
     --arg dirty_digest "$dirty_digest" \
     --arg staged "$staged" --arg unstaged "$unstaged" --arg untracked "$untracked" \
+    --argjson context_at_capture "$ctx" \
     '{captured_at: $captured_at, source_session: $source_session, plugin_version: $plugin_version,
       repository_id: $repository_id, worktree_id: $worktree_id, worktree_kind: $worktree_kind,
       remote_origin: $remote_origin, branch: $branch, head: $head, dirty_digest: $dirty_digest,
       dirty_staged: ($staged | tonumber? // "unknown"),
       dirty_unstaged: ($unstaged | tonumber? // "unknown"),
       dirty_untracked: ($untracked | tonumber? // "unknown"),
-      context_at_capture: "unknown"}'
+      context_at_capture: $context_at_capture}'
 }
 
 cmd_measure() { ho_require_libs; ho_require_jq measure; ho_measure; }
+
+# --- context -----------------------------------------------------------------
+
+# Context only, no git: {"context": <object|"unknown">, "reason": <code|null>}.
+# reason is the reader's stable code (lib/context-observer.sh) when context is
+# "unknown", so a caller can tell "observer not enabled" (no-record) from
+# "stale", "format-mismatch" (re-run /statusline:setup observer) and the rest.
+cmd_context() {
+  if [ $# -gt 0 ]; then usage >&2; ho_err "context takes no arguments"; exit 2; fi
+  ho_require_libs; ho_require_jq context
+  local sid="${CLAUDE_CODE_SESSION_ID:-unknown}" rf ctx reason=""
+  rf=$(mktemp) || { ho_err "cannot create a temp file"; exit 2; }
+  ctx=$(CO_REASON_FILE="$rf" co_read_observation "$sid")
+  if [ -s "$rf" ]; then reason=$(head -n 1 "$rf"); fi
+  rm -f -- "$rf"
+  if ! printf '%s' "$ctx" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    ctx='"unknown"'
+    [ -n "$reason" ] || reason=unspecified
+  fi
+  jq -nc --argjson context "$ctx" --arg reason "$reason" \
+    '{context: $context, reason: (if $reason == "" then null else $reason end)}'
+}
 
 # --- write -------------------------------------------------------------------
 
@@ -521,7 +559,7 @@ ho_read_json() {
     --argjson complete "$complete" --arg id "$m_id" --arg ts "$m_ts" --arg sess "$m_sess" \
     --arg ver "$m_ver" --arg repo "$m_repo" --arg wt "$m_wt" --arg kind "$m_kind" --arg remote "$m_remote" \
     --arg branch "$m_branch" --arg head "$m_head" --arg dirty "$m_dirty" --arg task "$task_ref" \
-    --argjson ev "$evidence_json" '
+    --argjson ev "$evidence_json" "$CO_CONTEXT_JQ"'
     {format: "v1", reference: $ref, handoff_id: $id, title: $heading,
      measured: {captured_at: $ts, source_session: $sess, plugin_version: $ver, repository_id: $repo,
                 worktree_id: $wt, worktree_kind: $kind, remote_origin: $remote, branch: $branch, head: $head,
@@ -529,7 +567,7 @@ ho_read_json() {
                 dirty_staged: ($fm.dirty_staged | if type == "number" then . else "unknown" end),
                 dirty_unstaged: ($fm.dirty_unstaged | if type == "number" then . else "unknown" end),
                 dirty_untracked: ($fm.dirty_untracked | if type == "number" then . else "unknown" end),
-                context_at_capture: ($fm.context_at_capture | if type == "object" then . else "unknown" end)},
+                context_at_capture: ($fm.context_at_capture | co_context)},
      body_digest_ok: $digest_ok,
      task_ref: $task,
      evidence_refs: $ev,
@@ -682,12 +720,16 @@ usage() {
   cat <<'__EOF_USAGE__'
 usage: handoff.sh <subcommand> [args]
   measure                                  measured workspace block as JSON
+  context                                  context only: {context, reason} as JSON (no git)
   write --slug S --title T [--task-ref P] [--evidence P]... < body
                                            publish plans/handoff/<date>-<slug>.md
   read  plans/handoff/<file>.md            parse a note (v1 or legacy) as JSON
   body  plans/handoff/<file>.md            full narrative inside the untrusted-content fence
   preflight plans/handoff/<file>.md        read-only resume check
 env:  HANDOFF_DATE=YYYY-MM-DD  HANDOFF_MAX_BODY_BYTES=65536
+      context/measure/preflight read CLAUDE_CODE_SESSION_ID (the live session),
+      CLAUDE_CONFIG_DIR (record root) and CONTEXT_OBSERVER_DEBUG=1 (why unknown);
+      context reason codes are listed in lib/context-observer.sh
 exit: 0 ready/ok, 2 usage or invalid reference, 10 mismatched, 11 unsupported, 12 blocked
 __EOF_USAGE__
 }
@@ -697,6 +739,7 @@ main() {
   [ $# -gt 0 ] && shift
   case "$cmd" in
     measure) cmd_measure "$@" ;;
+    context) cmd_context "$@" ;;
     write) cmd_write "$@" ;;
     read) cmd_read "$@" ;;
     body) cmd_body "$@" ;;

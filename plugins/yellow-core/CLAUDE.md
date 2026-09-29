@@ -147,7 +147,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   with an empty plan, aborts at the first failed step, and directs the
   user to `/reload-plugins`. Never edits settings JSON and never falls
   back to the other provider
-- `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
+- `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health;
+  Step 5b (or `/statusline:setup observer`) enables, refreshes or disables the opt-in context
+  observer. `lib/statusline-settings.py` is the only writer of `statusLine.command`
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
   Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`,
@@ -219,11 +221,13 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   yellow-core's three Codex-distributed skills (see "Codex Distribution"
   below)
 - `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
-- `session-handoff` — write a tracked session-handoff artifact at
-  `plans/handoff/<date>-<slug>.md` (six fields: current task, workflow
-  status, active artifact, open decisions, in-flight changes, next action),
-  secret-redacted via `cs_redact_secrets`, so a fresh session resumes
-  without re-deriving context
+- `session-handoff` — write a handoff note at
+  `plans/handoff/<date>-<slug>.md` whose front matter is measured by
+  `scripts/handoff.sh` (hashed repository/worktree identity, HEAD, dirty
+  fingerprint, `context_at_capture` from the opt-in context observer) and
+  whose narrative is redacted via `cs_redact_secrets`; resume only from an
+  explicitly named note after a read-only preflight
+  (`ready | mismatched | unsupported | blocked`)
 - `session-history` — cross-vendor session-history user surface — dispatches
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend
@@ -255,7 +259,8 @@ for why that opt-out exists.
 
 ### Shared Libraries
 
-`lib/` also carries four Node modules, invoked rather than sourced:
+`lib/` also carries four Node modules and two Python scripts, invoked rather
+than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
   Classifies `claude plugin list --json` plus the repository's optional
@@ -283,6 +288,17 @@ for why that opt-out exists.
 - `remote-agent-provider-state.js` — classifies which `remote-agent` provider
   (yellow-cursor or yellow-devin) is active for `/linear:delegate`; a smaller
   sibling of `stack-provider-state.js` with no intent file and no switch plan
+- `context-observer.py` — opt-in statusline stage (installed as
+  `<config>/yellow-context-observer.py`): passes the payload through, always
+  exits 0, and records context-window numbers to
+  `<config>/projects/<slug>/context-observations/<session_id>.json`
+  (stdlib only, no git, 100 ms budget). Bats coverage at
+  `tests/context-observer.bats` with real-host fixtures under
+  `tests/fixtures/statusline/<client-version>/`
+- `statusline-settings.py` — the only writer of `statusLine.command`
+  (`statusline`, `status`, `plan`, `install`, `remove`, `prune`); every path
+  has a default, `--dry-run` writes nothing, one JSON object per run. Used by
+  `/statusline:setup` Steps 1, 5, 5b and 6
 
 `lib/` otherwise contains sourceable shell helpers that consumer plugins
 reach via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`
@@ -320,6 +336,14 @@ cross-plugin pattern:
   checkout. Always exits 0 and never installs anything. Used by the
   `session-handoff` preflight. Bats coverage at
   `plugins/yellow-core/tests/plugin-identity.bats`
+- `context-observer.sh` — `co_read_observation <session_id>` (the newest
+  record for the session id wins) prints
+  the observer's record reduced to `{remaining_percentage, used_percentage,
+  observed_at, advisory_crossings, advisory_state, watermark_remaining}`,
+  or `unknown` (missing, stale beyond 300 s, cross-session, malformed, out of
+  range) with a stable reason code in `CO_REASON_FILE`. `CO_CONTEXT_JQ` is the
+  shared jq validator for that object. Runs no git; needs `compound-staging.sh`
+  sourced first. Used by `session-handoff`'s `measure` and `context`
 
 ### Optional Plugin Dependencies
 
@@ -457,9 +481,10 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 ## Testing
 
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
-`compound-staging`, `compound-stop-hook`, `credential-status`, `handoff`,
-`plan-commands`, `plan-status-parity`, `plugin-identity`, `pre-compact-hook`,
-`repo-profile`, `validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
+`compound-staging`, `compound-stop-hook`, `context-observer`,
+`credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
+`plugin-identity`, `pre-compact-hook`, `repo-profile`,
+`setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
 (`catalog/plugins/yellow-core.json`).
 
