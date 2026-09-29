@@ -1,0 +1,19 @@
+plans/shell-compat-followups.md
+  s_e23df78d9c2b73::t_ad951e952d32b2 119-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ac1f530f19e9ade31ad26e7a066ef80e7e84db2b",
+  "prompts": {},
+  "sessions": {
+    "s_e23df78d9c2b73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "027e0294-b281-431a-b01c-ee24097e253e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
