@@ -1,0 +1,30 @@
+tests/integration/validate-shell-compat.test.ts
+  s_e3ae526d137cfd::t_81f2e4b92b16ba 27,566-583
+  s_e3ae526d137cfd::t_d72d7575c3a8b3 112-116,199,203
+  s_e3ae526d137cfd::t_1be21cbb118535 200-202,226-228,584
+scripts/validate-shell-compat.js
+  s_e3ae526d137cfd::t_8fda5025596604 666,669-670,674
+  s_e3ae526d137cfd::t_a752aceccdf524 357-362
+  s_e3ae526d137cfd::t_8bacd2b9c0c8c2 197-199
+  s_e3ae526d137cfd::t_c535a7b3f634d0 201
+.github/workflows/validate-schemas-fork.yml
+  s_e3ae526d137cfd::t_2d64c52041f0c3 112-120,255-256,258
+plans/bash-zsh-shell-compatibility.md
+  s_e3ae526d137cfd::t_7fbdecfd39dd27 485-487
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6df1563f3b26620e9782d32522615cca397f67a4",
+  "prompts": {},
+  "sessions": {
+    "s_e3ae526d137cfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c9a3151-c782-4681-a8fa-8f3faec1c7ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
