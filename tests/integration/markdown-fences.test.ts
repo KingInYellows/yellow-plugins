@@ -41,6 +41,29 @@ describe('extractFencedBlocks', () => {
     expect(stripFencedContent(md, { stripFrontmatter: false })).toBe(md);
   });
 
+  it('drops a list item when a block quote starts at column 0, so a 4-space quoted code line is not a fence', () => {
+    const md = [
+      '- item',
+      '>     ```text',
+      '>   skill: "missing:target"',
+      '>     ```',
+    ].join('\n');
+    expect(extract(md)).toHaveLength(0);
+    expect(stripFencedContent(md, { stripFrontmatter: false })).toBe(md);
+  });
+
+  it('still recognizes a fence in a block quote nested inside a list item', () => {
+    const md = ['- item', '  > ```bash', '  > x', '  > ```', 'after'].join(
+      '\n'
+    );
+    const blocks = extract(md);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ lang: 'bash', closed: true, body: 'x' });
+    expect(stripFencedContent(md, { stripFrontmatter: false })).toBe(
+      '- item\n\nafter'
+    );
+  });
+
   it('returns body, language and 1-based line numbers for a plain fence', () => {
     const md = [
       '# Title',

@@ -230,11 +230,23 @@ function scanFences(lines) {
     }
 
     // Not in a fence. Pop list items opened inside a block quote this line
-    // has left (blank lines included: a blank line ends the quote), then any
-    // this line has outdented past. Blank lines never end a list item on
-    // their own — see block comment.
-    while (listStack.length && listStack[listStack.length - 1].depth > depth) {
-      listStack.pop();
+    // has left (blank lines included: a blank line ends the quote), and list
+    // items a NEW block quote does not belong to: a deeper quote stays inside
+    // a shallower item only when its first `>` is indented to the item's
+    // content column (`- item` then `  > q` nests; `- item` then `> q` ends
+    // the item). Then pop any this line has outdented past. Blank lines never
+    // end a list item on their own — see block comment.
+    const quoteIndent = leadingIndentOf(line);
+    while (listStack.length) {
+      const top = listStack[listStack.length - 1];
+      if (
+        top.depth > depth ||
+        (top.depth < depth && quoteIndent < top.column)
+      ) {
+        listStack.pop();
+      } else {
+        break;
+      }
     }
     if (!isBlank) {
       while (
