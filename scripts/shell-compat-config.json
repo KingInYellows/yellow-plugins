@@ -11,6 +11,7 @@
     "plugins/yellow-ci/hooks/scripts/lib/redact.sh",
     "plugins/yellow-core/lib/compound-staging.sh",
     "plugins/yellow-core/lib/repo-profile.sh",
+    "plugins/yellow-core/lib/validate-fs.sh",
     "plugins/yellow-morph/lib/install-morphmcp.sh",
     "plugins/yellow-ruvector/hooks/scripts/lib/validate.sh"
   ],

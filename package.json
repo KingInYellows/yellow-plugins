@@ -34,6 +34,7 @@
     "validate:provider-neutral": "node scripts/validate-provider-neutral-commands.js",
     "validate:shell-compat": "node scripts/validate-shell-compat.js",
     "check:shell-parse": "node scripts/check-shell-parse.js",
+    "test:shell-compat": "bats tests/shell-compat/",
     "generate:manifests": "node scripts/generate-manifests.js",
     "validate:setup-all": "node scripts/validate-setup-all.js",
     "validate:doc-counts": "node scripts/validate-doc-counts.js",
