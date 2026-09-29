@@ -45,7 +45,7 @@ review; the user chose to track them here rather than widen the stack.
       every shell).
 - [x] 6: `yellow-research/tests/context7-cache.bats` test 6 ("cache age <
       24h → skips") fails on code the stack did not touch; investigate.
-- [ ] 7 (optional, deferred): Alias leakage: users' shell snapshots apply aliases (`cat=bat`,
+- [x] 7 (optional, deferred; moved to issue #939): Alias leakage: users' shell snapshots apply aliases (`cat=bat`,
       `ls=eza`, `ps=procs`) to markdown blocks. Consider a lint rule for
       flag-sensitive aliased commands at command position.
 - [x] 8: git-push detector gaps around the fd-3 wrapper (second-pass
