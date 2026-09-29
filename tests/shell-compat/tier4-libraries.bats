@@ -63,6 +63,22 @@ assert_same_under_all_profiles() {
   [ "$missing" -eq 0 ]
 }
 
+# Catch-all so a newly listed library's driver always runs under every
+# profile, even before a library-specific test exists below.
+@test "every Tier 4 library driver behaves the same under all profiles" {
+  # Read the list first: a driver that reads stdin inside a `while read`
+  # loop would swallow the remaining library names.
+  local lib libs=()
+  mapfile -t libs < <(tier4_libraries)
+  [ "${#libs[@]}" -gt 0 ]
+  for lib in "${libs[@]}"; do
+    assert_same_under_all_profiles "$lib" </dev/null || {
+      printf 'Tier 4 library failed: %s\n' "$lib" >&2
+      return 1
+    }
+  done
+}
+
 @test "yellow-core repo-profile.sh behaves the same in bash and zsh" {
   assert_same_under_all_profiles plugins/yellow-core/lib/repo-profile.sh
   [[ "$LIB_OUTPUT" == *"get1=MISS"* && "$LIB_OUTPUT" == *"put_rc=0"* && "$LIB_OUTPUT" == *"get2=HIT"* ]]
