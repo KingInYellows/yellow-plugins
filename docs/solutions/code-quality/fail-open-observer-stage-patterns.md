@@ -29,7 +29,10 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
    holder of the pipe's write end, so its early stdout release gives the next
    stage EOF and lets it compute while the observer records. The host still
    shows the output only once the whole command exits, so recording needs its
-   own deadline. Two forms to avoid:
+   own deadline. Recording inline under that deadline is the accepted
+   trade-off: detaching it after stdout is released would need a background
+   process, which the observer's no-subprocess contract rules out. Two forms
+   to avoid:
    - A bare `python3 <observer> | <existing>` blanks the statusline on any
      startup failure.
    - The guarded group `{ python3 <observer> || cat; } | <existing>` keeps the
@@ -39,16 +42,14 @@ existing user-owned flow. Each was a silent-failure path, not a crash.
    Trade-off: a python3 that starts but crashes before reading stdin no
    longer falls back to `cat`; the observer's own top-level try/except keeps
    that path fail-open.
-2. **Deadline exceptions must not derive from `OSError`.** `TimeoutError`
+2. **Deadline exception classes must not derive from `OSError`.** `TimeoutError`
    subclasses `OSError`, so a `signal.alarm` handler raising it is swallowed
    by every `except OSError:` I/O guard. Raise a dedicated
    `class DeadlineReached(BaseException)` and catch it only at the top level.
 3. **Distinguish unreadable from absent.** A loader that returns `None` for
    both "no record" and "record exists but unreadable" lets callers treat
-   corruption as a fresh start. The observer's `load_previous` returns `None`
-   only for an absent, malformed or other-session record, and lets the
-   `OSError` from a record that exists but cannot be read propagate, so the
-   write is abandoned and the old record, with its advisory state, is kept.
+   corruption as a fresh start. Report the two differently (the observer's
+   `load_previous` lets the `OSError` propagate, so the old record is kept).
 4. **Never overwrite an earlier backup; report recovery distinctly.**
    Corrupt-settings recovery that writes a fixed `.corrupt.backup` destroys
    the previous backup on the second corruption. Use numbered backups
@@ -110,8 +111,9 @@ Time until the next stage sees EOF, with a 1 s simulated recording step:
 
 Codex reproduced it independently at about 1.06 s against 0.10 s. The
 next stage did not see EOF until the recording ended because the brace group
-held the pipe's write end. The fix is the `exec` stage in Guidance item 1; `install`
-upgrades the earlier guarded and plain forms in place (action `upgraded`).
+held the pipe's write end. The fix is the `exec` stage in Guidance item 1;
+`install` upgrades the earlier guarded and plain forms in place (action
+`upgraded`).
 The T10 EOF-timing bats test now runs the installed command under
 `bash -c`. The original piped the bare observer, so it could not see this
 bug. Test the composed command, not the component.
@@ -136,7 +138,8 @@ throttles such as `unchanged()` (`NaN != NaN`). Guard with `math.isfinite`.
 - `docs/security.md` drifted three ways: it said no code path prunes
   records (on-demand `prune` ships), that the reader exposes four fields (it
   returns six), and that lookup tries the primary slug first (the reader
-  takes the newest record across all projects). Re-check enumerated claims when a feature grows.
+  takes the newest record across all projects). Re-check enumerated claims
+  when a feature grows.
 - A slash command whose `argument-hint` lists subcommands needs a fenced
   Arguments section that parses `$ARGUMENTS`.
 - Drop tool-call-budget claims once later steps add calls.

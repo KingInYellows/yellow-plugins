@@ -27,9 +27,7 @@ status. Installing or updating yellow-core never changes `statusLine`.
 
 - no `statusLine` → refused with `statusline_missing`: the observer only wraps
   an existing command, so `remove` always restores exactly what was there.
-  Run the full `/statusline:setup` first; a non-interactive caller
-  (`observer enable --yes`) stops and reports `statusline_missing` instead,
-  because the base install is interactive.
+  Run the full `/statusline:setup` first.
 - any existing command → `<stage> | <existing>`; a command that
   contains `;`, `&`, `|`, `#` or a newline is wrapped as
 

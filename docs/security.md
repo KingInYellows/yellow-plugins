@@ -356,12 +356,11 @@ fields (working directory, session context metrics). The boundary:
   pipe open: the statusline script sees EOF and computes its output while
   the observer records. Claude Code shows the statusline only once the whole
   command exits, which waits for the record write. Recording has a 100 ms
-  latency target, which the R22 bats test checks with a 250 ms limit
-  (1000 ms on CI), and a 2 s deadline (`DEADLINE_SECONDS`) armed once the
-  payload is read; a filesystem call that cannot be interrupted can outlast
-  it. A new statusline update that arrives while a stalled write holds the
-  command cancels that run, so a persistently stalled filesystem can keep
-  the statusline from refreshing.
+  latency target, checked by the R22 bats test, and a 2 s deadline
+  (`DEADLINE_SECONDS`) armed once the payload is read; a filesystem call
+  that cannot be interrupted can outlast it. A new statusline update that
+  arrives while a stalled write holds the command cancels that run, so a
+  persistently stalled filesystem can keep the statusline from refreshing.
 - **Read path treats the record as untrusted.** The reader
   (`lib/context-observer.sh`'s `co_read_observation`, wired into
   session-handoff to fill `context_at_capture`) revalidates

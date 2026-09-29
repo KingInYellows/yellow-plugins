@@ -6,8 +6,8 @@ Add an opt-in context observer for session handoffs. `/statusline:setup` gains
 Step 5b (also reachable as `/statusline:setup observer`), which asks before
 composing `lib/context-observer.py` ahead of the existing statusline command
 (default: leave it off), refreshes an outdated installed copy, and can disable
-it again (non-interactively with `observer enable --yes` or `observer disable --yes`;
-`observer status` only reports).
+it again (non-interactively with `observer enable --yes` or
+`observer disable --yes`; `observer status` only reports).
 `lib/statusline-settings.py` is now the only writer of `statusLine.command`
 (`statusline`, `status`, `plan`, `install`, `remove`, `prune`; every path has a
 default and `--dry-run` writes nothing), so re-running

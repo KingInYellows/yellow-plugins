@@ -329,25 +329,30 @@ obs_stage() {
   # the measured best of five is printed below. A shared CI runner gets a
   # looser limit, and CONTEXT_OBSERVER_LATENCY_LIMIT_MS overrides both. Each
   # run uses its own session id, so every timed run writes a record instead
-  # of taking the unchanged-sample early return.
-  local largest best limit n
+  # of taking the unchanged-sample early return; the script checks each one.
+  local largest best limit
   limit=${CONTEXT_OBSERVER_LATENCY_LIMIT_MS:-$([ -n "${CI:-}" ] && echo 1000 || echo 250)}
   largest=$(ls -S "$FIX"/*.json | head -n 1)
   best=$(python3 - "$OBS" "$largest" <<'PY'
-import json, subprocess, sys, time
+import glob, json, os, subprocess, sys, time
 obs, fixture = sys.argv[1], sys.argv[2]
 payload = json.load(open(fixture, "rb"))
+records = os.path.join(os.environ["HOME"], ".claude", "projects", "*", "context-observations")
 runs = []
 for n in range(5):
-    payload["session_id"] = "r22-%d" % n
+    sid = payload["session_id"] = "r22-%d" % n
     data = json.dumps(payload).encode()
     start = time.perf_counter()
     subprocess.run([sys.executable, obs], input=data, stdout=subprocess.DEVNULL, check=True)
     runs.append((time.perf_counter() - start) * 1000)
+    found = glob.glob(os.path.join(records, sid + ".json"))
+    record = json.load(open(found[0])) if len(found) == 1 else {}
+    if record.get("session_id") != sid or record.get("context_window", {}).get(
+            "remaining_percentage") != payload["context_window"]["remaining_percentage"]:
+        sys.exit("run %d wrote no complete record" % n)
 print("%.1f" % min(runs))
 PY
 )
-  for n in 0 1 2 3 4; do [ -f "$(co_find_record "r22-$n")" ]; done
   { echo "# observer best of 5 on $(basename "$largest"): ${best} ms (limit ${limit} ms)" >&3; } 2>/dev/null || true
   python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < float(sys.argv[2]) else 1)' "$best" "$limit"
 }
@@ -1324,6 +1329,9 @@ PY
   printf '{"a": ' > "$TEST_HOME/dotfiles/settings.json"
   rm -f "$SETTINGS"
   ln -s "$TEST_HOME/dotfiles/settings.json" "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "recover" and .backup == null' >/dev/null
+  [ -z "$(find "$TEST_HOME" -name '*.corrupt.backup*')" ]
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup" '.action == "recovered" and .backup == $b' >/dev/null
@@ -1333,17 +1341,27 @@ PY
   [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
   [ -L "$SETTINGS" ]
   jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$TEST_HOME/dotfiles/settings.json" >/dev/null
+  printf '{"b": ' > "$TEST_HOME/dotfiles/settings.json"
+  run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup.2" '.action == "recovered" and .backup == $b' >/dev/null
+  [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
+  [ "$(cat "$SETTINGS.corrupt.backup.2")" = '{"b": ' ]
+  [ -z "$(find "$TEST_HOME/dotfiles" -name '*.corrupt.backup*')" ]
 }
 
-@test "T11: status on an unreadable settings.json fails with settings_unreadable" {
+@test "T11: status and statusline on an unreadable settings.json fail with settings_unreadable and write nothing" {
   [ "$(id -u)" -ne 0 ] || skip "root ignores file modes"
+  local sub
   seed_settings "bash ~/custom.sh"
-  chmod 000 "$SETTINGS"
-  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
-  chmod 600 "$SETTINGS"
-  [ "$status" -eq 1 ]
-  echo "$output" | jq -e '.error_code == "settings_unreadable"' >/dev/null
-  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  for sub in status statusline; do
+    chmod 000 "$SETTINGS"
+    run --separate-stderr python3 "$SETUP_PY" "$sub" --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+    chmod 600 "$SETTINGS"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.error_code == "settings_unreadable"' >/dev/null
+    cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  done
+  [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
 }
 
 @test "T11: install into an unwritable observer directory fails with io_error and leaves settings unchanged" {
@@ -1357,7 +1375,6 @@ PY
   [ "$status" -eq 1 ]
   echo "$output" | jq -e '.error_code == "io_error"' >/dev/null
   cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
-  jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
   cmp "$TEST_HOME/settings.orig" "$SETTINGS"
   [ ! -e "$dir/yellow-context-observer.py" ]
   [ -z "$(find "$dir" -name '.observer.*')" ]
@@ -1379,7 +1396,14 @@ PY
 
 @test "parity: REWRITE_AFTER_SECONDS stays below CO_STALE_AFTER, so an unchanged session never reads as stale" {
   local rewrite
-  rewrite=$(sed -nE 's/^REWRITE_AFTER_SECONDS *= *([0-9]+).*/\1/p' "$OBS")
+  rewrite=$(python3 - "$OBS" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+print(m.REWRITE_AFTER_SECONDS)
+PY
+)
   [ -n "$rewrite" ]
   [ -n "${CO_STALE_AFTER:-}" ]
   [ "$rewrite" -lt "$CO_STALE_AFTER" ]
