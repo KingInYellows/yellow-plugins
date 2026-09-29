@@ -320,7 +320,7 @@ reported unsupported.
 > superseded by the shipped code: the session-id check uses `fullmatch` (Python)
 > and `\A…\z` (jq), the writer uses an exclusive lock plus a per-pid `.part`
 > file (no `tempfile.NamedTemporaryFile`, no `fsync`), and the composed stage
-> is `{ python3 <observer> || cat; } | <existing>`. The observer's docstring is
+> is an `exec` stage with a `cat` fallback (see Results and Deviations). The observer's docstring is
 > authoritative. Later review rounds also removed the lock (writers are
 > last-writer-wins), made the staleness window (300 s) and deadline (2 s)
 > constants, renamed `lib/context-observer-setup.py` to
@@ -372,12 +372,19 @@ Counts are from the final commit, restacked on `main` at `28220d1a`.
   used by the reader and by `handoff.sh read`, anchored with `\A…\z`.
 - Scope widened beyond R23's list: `plugins/yellow-core/references/`,
   `plugins/yellow-core/{CLAUDE,README}.md` (PR #750 has landed),
-  `commands/setup/claude-web.md` (pointer to the moved settings writer), the
-  planning session's `docs/CONCEPTS.md` and
-  `docs/solutions/workflow/plan-lifecycle-management.md` updates, and
+  `commands/setup/claude-web.md` (pointer to the moved settings writer), and
   `docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md`.
-- Follow-ups not done here: prune old observation records, and the flaky
-  `git-worktree` teardown above.
+  The planning session's `docs/CONCEPTS.md` Gate C entry and
+  `docs/solutions/workflow/plan-lifecycle-management.md` update were split
+  into their own PR in the third review round.
+- Follow-ups not done here: the flaky `git-worktree` teardown above.
+  (On-demand pruning shipped as `statusline-settings.py prune`; nothing
+  prunes automatically.)
+- The third review round replaced the composed stage with
+  `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
+  <observer>; exec cat; } | <existing>`: the `{ python3 <observer> || cat; }`
+  group kept the pipe open in its subshell, so the statusline waited for the
+  record write. `install` upgrades the earlier form.
 - Not run: installed-host smoke of the composed pipeline inside a live
   statusline, including interruption and debounce behaviour.
 

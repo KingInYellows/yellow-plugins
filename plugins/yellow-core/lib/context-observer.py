@@ -2,16 +2,24 @@
 """yellow-core: opt-in context observer for the Claude Code statusline pipeline.
 
 Installed by /statusline:setup (or a manual merge) as the first stage of the
-user's statusLine command:
+user's statusLine command, as lib/statusline-settings.py composes it:
 
-    python3 ~/.claude/yellow-context-observer.py | python3 ~/.claude/yellow-statusline.py
+    { command -v python3 >/dev/null && [ -r OBS ] && exec python3 OBS; exec cat; } \
+      | python3 ~/.claude/yellow-statusline.py
+
+where OBS is ~/.claude/yellow-context-observer.py. The cat fallback keeps the
+payload flowing when python3 or the observer file is missing; exec leaves the
+observer as the only holder of the pipe's write end.
 
 Contract (spec R19-R22, plans/specs/session-continuity-foundation.md):
   - Reads the statusline JSON payload from stdin, writes it to stdout
     byte-for-byte, and releases stdout BEFORE any other work, so the next
     stage sees EOF and renders without waiting on the record write, and a
     broken observer cannot blank the statusline. (The shell still waits for
-    the observer to exit before the whole statusLine command finishes.)
+    the observer to exit before the whole statusLine command finishes. A
+    stage that wraps the observer without exec, such as
+    "{ python3 OBS || cat; }", keeps the pipe open in its subshell and so
+    delays the next stage until recording ends.)
   - Exits 0 on every path: malformed input, missing session id, unwritable
     disk, SIGPIPE from a closed downstream, anything else.
   - Records one observation per session to
@@ -43,6 +51,7 @@ Environment:
 import calendar
 import glob
 import json
+import math
 import os
 import re
 import signal
@@ -126,10 +135,16 @@ def record_path(slug, session_id):
 
 
 def number_or_none(value):
-    """int or float (bool excluded) passes through; everything else is None."""
+    """A finite int or float (bool excluded) passes through; everything else is None.
+
+    json.loads accepts NaN and Infinity; they would be written back as
+    non-JSON tokens, and NaN != NaN would defeat unchanged().
+    """
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
         return value
     return None
 
@@ -272,7 +287,13 @@ def write_record(path, record):
         )
         if unchanged(previous, record):
             return
-        part_fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # A leftover with this pid's name (pid reuse) is removed, then the part
+        # file is created exclusively: never through a planted symlink.
+        try:
+            os.unlink(part)
+        except FileNotFoundError:
+            pass
+        part_fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
         with os.fdopen(part_fd, "w", encoding="utf-8") as handle:
             json.dump(record, handle, sort_keys=True)
             handle.write("\n")

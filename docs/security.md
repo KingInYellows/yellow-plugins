@@ -322,9 +322,11 @@ session-bound observation derived from externally supplied statusline
 fields (working directory, session context metrics). The boundary:
 
 - **Opt-in only.** Default is No. `lib/statusline-settings.py` composes
-  `{ python3 ~/.claude/yellow-context-observer.py || cat; } | <existing
-  statusLine command>` (the `|| cat` keeps a missing observer from blanking
-  the statusline), backing up `settings.json` before each change
+  `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
+  <observer>; exec cat; } | <existing statusLine command>`, where
+  `<observer>` is `${CLAUDE_CONFIG_DIR:-~/.claude}/yellow-context-observer.py`
+  (the `exec cat` fallback keeps a missing observer or `python3` from
+  blanking the statusline), backing up `settings.json` before each change
   (`.pre-observer.backup`, with a numeric suffix when an earlier backup
   differs; an identical earlier backup is reused) and rewriting only
   `statusLine.command` — no other settings key is touched.
@@ -342,23 +344,28 @@ fields (working directory, session context metrics). The boundary:
   `.`/`..` component or control character; anything else writes nothing.
 - **No side channels.** The observer does no network calls, spawns no
   subprocess, runs no git, and prints nothing beyond passing its stdin
-  payload through to stdout byte-for-byte before it does any of this work,
-  so a broken or slow observer cannot blank or delay the statusline.
+  payload through to stdout byte-for-byte before it does any of this work.
+  It then releases stdout, and the composed stage `exec`s it so no shell
+  keeps the pipe open, so the statusline renders without waiting for the
+  record write (bounded by a 2 s deadline in any case).
 - **Read path treats the record as untrusted.** The reader
   (`lib/context-observer.sh`'s `co_read_observation`, wired into
   session-handoff to fill `context_at_capture`) revalidates
   `session_id`, `observer_format`, and an anchored `observed_at` timestamp;
   returns `unknown` for anything stale (> 300 s, either direction),
-  malformed, cross-session, or out of range; and exposes only four
-  numeric/timestamp fields into the handoff note — `cwd` is never read back
-  out. When no record exists at the current toplevel's slug, the reader
-  falls back to searching every `projects/*/context-observations/<sid>.json`
-  for a matching session id, since a linked worktree or subdirectory launch
-  can key the write under a different slug than the read.
-- **Retention (residual).** Records are not pruned by any code path yet
-  (tracked as a residual, not fixed by this change). Delete a project's
-  `context-observations/` directory to clear its history, or disable the
-  observer entirely with `statusline-settings.py remove`.
+  malformed, cross-session, or out of range; and exposes only six known
+  fields into the handoff note — five numbers or timestamps (each nulled
+  when outside the range the observer writes) and the `advisory_state` enum.
+  `cwd` is never read back out. The reader always takes the newest
+  `projects/*/context-observations/<sid>.json` for the session id, since a
+  linked worktree or subdirectory launch can key the write under a
+  different slug than the read.
+- **Retention.** Nothing prunes records automatically.
+  `statusline-settings.py prune [--older-than-days N] [--dry-run]` (default
+  30 days) deletes old records and stale part files on demand, and reports
+  `prune_incomplete` when a file cannot be removed. Deleting a project's
+  `context-observations/` directory also clears its history, and
+  `statusline-settings.py remove` disables the observer entirely.
 
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 

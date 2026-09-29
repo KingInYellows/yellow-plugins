@@ -47,7 +47,9 @@ CO_STALE_AFTER=300
 # jq definition shared with handoff.sh: validates a reduced context object
 # and returns it rebuilt from its six known fields, or the string "unknown".
 # observed_at is anchored with \A…\z because Oniguruma's $ also matches
-# before a trailing newline.
+# before a trailing newline. The optional fields are nulled when out of the
+# range the observer can write: used_percentage 0-100, advisory_crossings a
+# non-negative integer, watermark_remaining 1-99.
 # shellcheck disable=SC2016
 CO_CONTEXT_JQ='def co_context:
   if type == "object"
@@ -55,11 +57,14 @@ CO_CONTEXT_JQ='def co_context:
      and (.observed_at | type == "string"
           and test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\z"))
   then {remaining_percentage,
-        used_percentage: (.used_percentage | if type == "number" then . else null end),
+        used_percentage: (.used_percentage
+          | if type == "number" and . >= 0 and . <= 100 then . else null end),
         observed_at,
-        advisory_crossings: (.advisory_crossings | if type == "number" then . else null end),
+        advisory_crossings: (.advisory_crossings
+          | if type == "number" and . >= 0 and . == floor then . else null end),
         advisory_state: (.advisory_state | if . == "above" or . == "below" then . else null end),
-        watermark_remaining: (.watermark_remaining | if type == "number" then . else null end)}
+        watermark_remaining: (.watermark_remaining
+          | if type == "number" and . >= 1 and . <= 99 then . else null end)}
   else "unknown" end;'
 
 co_warn() {

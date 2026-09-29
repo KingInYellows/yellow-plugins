@@ -3,6 +3,8 @@
 #
 # Subcommands:
 #   measure                      print the measured workspace block as JSON
+#   context                      context only: {context, reason} as JSON; runs
+#                                no git (reason codes: lib/context-observer.sh)
 #   write --slug S --title T [--task-ref P] [--evidence P]... < body
 #                                publish plans/handoff/<date>-<slug>.md
 #   read  plans/handoff/<f>.md   parse a note (v1 or legacy) as JSON
@@ -259,6 +261,7 @@ cmd_measure() { ho_require_libs; ho_require_jq measure; ho_measure; }
 # "unknown", so a caller can tell "observer not enabled" (no-record) from
 # "stale", "format-mismatch" (re-run /statusline:setup observer) and the rest.
 cmd_context() {
+  if [ $# -gt 0 ]; then usage >&2; ho_err "context takes no arguments"; exit 2; fi
   ho_require_libs; ho_require_jq context
   local sid="${CLAUDE_CODE_SESSION_ID:-unknown}" rf ctx reason=""
   rf=$(mktemp) || { ho_err "cannot create a temp file"; exit 2; }
@@ -724,6 +727,9 @@ usage: handoff.sh <subcommand> [args]
   body  plans/handoff/<file>.md            full narrative inside the untrusted-content fence
   preflight plans/handoff/<file>.md        read-only resume check
 env:  HANDOFF_DATE=YYYY-MM-DD  HANDOFF_MAX_BODY_BYTES=65536
+      context/measure/preflight read CLAUDE_CODE_SESSION_ID (the live session),
+      CLAUDE_CONFIG_DIR (record root) and CONTEXT_OBSERVER_DEBUG=1 (why unknown);
+      context reason codes are listed in lib/context-observer.sh
 exit: 0 ready/ok, 2 usage or invalid reference, 10 mismatched, 11 unsupported, 12 blocked
 __EOF_USAGE__
 }

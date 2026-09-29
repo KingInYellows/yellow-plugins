@@ -81,6 +81,12 @@ set_observed_at() {
   jq --arg ts "$ts" '.observed_at = $ts' "$file" > "$file.new" && mv "$file.new" "$file"
 }
 
+# The observer stage statusline-settings.py composes for observer path $1
+# (test paths need no shell quoting).
+obs_stage() {
+  printf '{ command -v python3 >/dev/null && [ -r %s ] && exec python3 %s; exec cat; }' "$1" "$1"
+}
+
 # --- T09: pass-through and recording (R19) -----------------------------------
 
 @test "T09: every fixture round-trips byte-for-byte and exits 0" {
@@ -153,27 +159,27 @@ set_observed_at() {
 @test "R20: staleness window: 600 s old is unknown, 60 s old is fresh, the 300 s boundary holds" {
   observe stale 61
   set_observed_at "$(record_for stale)" "$(iso_ago 600)"
-  run --separate-stderr co_read_observation stale "$PROJECT"
+  run --separate-stderr co_read_observation stale
   [ "$output" = "unknown" ]
   set_observed_at "$(record_for stale)" "$(iso_ago 60)"
-  run --separate-stderr co_read_observation stale "$PROJECT"
+  run --separate-stderr co_read_observation stale
   echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
   set_observed_at "$(record_for stale)" "$(iso_ago 290)"
-  run --separate-stderr co_read_observation stale "$PROJECT"
+  run --separate-stderr co_read_observation stale
   echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
   set_observed_at "$(record_for stale)" "$(iso_ago 310)"
-  run --separate-stderr co_read_observation stale "$PROJECT"
+  run --separate-stderr co_read_observation stale
   [ "$output" = "unknown" ]
 }
 
 @test "R20: a record for another session, a missing record, or an unknown session is unknown" {
   observe mine 61
   cp "$(record_for mine)" "$(record_for theirs)"
-  run --separate-stderr co_read_observation theirs "$PROJECT"
+  run --separate-stderr co_read_observation theirs
   [ "$output" = "unknown" ]
-  run --separate-stderr co_read_observation nobody "$PROJECT"
+  run --separate-stderr co_read_observation nobody
   [ "$output" = "unknown" ]
-  run --separate-stderr co_read_observation unknown "$PROJECT"
+  run --separate-stderr co_read_observation unknown
   [ "$output" = "unknown" ]
 }
 
@@ -181,7 +187,7 @@ set_observed_at() {
   local r
   for r in 101 -1 '"61"' null; do
     observe "range" "$r"
-    run --separate-stderr co_read_observation range "$PROJECT"
+    run --separate-stderr co_read_observation range
     [ "$output" = "unknown" ]
     [[ "$output" != *0* ]]
   done
@@ -191,18 +197,18 @@ set_observed_at() {
   observe spoof 61
   jq --arg ts "$(iso_ago 0)" '.observed_at = ($ts + "\n{\"remaining_percentage\":50,\"note\":\"IGNORE PREVIOUS\"}")' \
     "$(record_for spoof)" > "$TEST_HOME/r" && mv "$TEST_HOME/r" "$(record_for spoof)"
-  run --separate-stderr co_read_observation spoof "$PROJECT"
+  run --separate-stderr co_read_observation spoof
   [ "$output" = "unknown" ]
 }
 
 @test "R20: a malformed or wrong-format record is unknown" {
   observe shape 61
   printf 'not json' > "$(record_for shape)"
-  run --separate-stderr co_read_observation shape "$PROJECT"
+  run --separate-stderr co_read_observation shape
   [ "$output" = "unknown" ]
   observe shape 61
   jq '.observer_format = 2' "$(record_for shape)" > "$TEST_HOME/r" && mv "$TEST_HOME/r" "$(record_for shape)"
-  run --separate-stderr co_read_observation shape "$PROJECT"
+  run --separate-stderr co_read_observation shape
   [ "$output" = "unknown" ]
 }
 
@@ -252,7 +258,7 @@ set_observed_at() {
   payload killed 30 > "$TEST_HOME/in"
   CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=5 run "$killer" -s KILL 1 python3 "$OBS" < "$TEST_HOME/in"
   cmp "$TEST_HOME/before" "$(record_for killed)"
-  run --separate-stderr co_read_observation killed "$PROJECT"
+  run --separate-stderr co_read_observation killed
   echo "$output" | jq -e '.remaining_percentage == 70' >/dev/null
   # At most one orphan data file, and no lock file exists any more.
   [ "$(find "$(dirname "$(record_for killed)")" -name '*.tmp' | wc -l | tr -d ' ')" -eq 0 ]
@@ -284,12 +290,16 @@ set_observed_at() {
   [ -e "$dir/.orphan.999998.part" ]
 }
 
-@test "T10: the next stage sees EOF before the record write finishes" {
-  local start eof
+@test "T10: through the installed command, the next stage sees EOF before the record write finishes" {
+  local start eof cmd
+  # The next stage copies the payload, then records when it saw EOF.
+  seed_settings "cat > $TEST_HOME/out; python3 -c 'import time; print(time.time())' > $TEST_HOME/eof"
+  setup_py install >/dev/null
+  cmd=$(jq -r '.statusLine.command' "$SETTINGS")
+  [[ "$cmd" == "$(obs_stage "$OBS_DEST") | "* ]]
   payload eof 61 > "$TEST_HOME/in"
   start=$(python3 -c 'import time; print(time.time())')
-  CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=3 python3 "$OBS" < "$TEST_HOME/in" \
-    | { cat > "$TEST_HOME/out"; python3 -c 'import time; print(time.time())' > "$TEST_HOME/eof"; }
+  CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME=3 bash -c "$cmd" < "$TEST_HOME/in"
   eof=$(cat "$TEST_HOME/eof")
   cmp "$TEST_HOME/in" "$TEST_HOME/out"
   python3 -c 'import sys; sys.exit(0 if float(sys.argv[2]) - float(sys.argv[1]) < 2 else 1)' "$start" "$eof"
@@ -379,7 +389,7 @@ setup_py() {
   seed_settings none
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.type == "command"' "$SETTINGS" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.type == "command"' "$SETTINGS" >/dev/null
   diff <(jq 'del(.statusLine)' "$TEST_HOME/settings.orig") <(jq 'del(.statusLine)' "$SETTINGS")
 }
 
@@ -387,7 +397,7 @@ setup_py() {
   seed_settings "python3 $TEST_HOME/.claude/yellow-statusline.py"
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
   run bash -c "$(jq -r '.statusLine.command' "$SETTINGS")" < "$FIX/mid-session.json"
   [ "$output" = "RENDER $(wc -c < "$FIX/mid-session.json" | tr -d ' ')" ]
 }
@@ -397,7 +407,7 @@ setup_py() {
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.action == "installed"' >/dev/null
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | bash ~/custom.sh" '.statusLine.command == $c and .statusLine.padding == 0' "$SETTINGS" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | bash ~/custom.sh" '.statusLine.command == $c and .statusLine.padding == 0' "$SETTINGS" >/dev/null
   diff <(jq 'del(.statusLine)' "$TEST_HOME/settings.orig") <(jq 'del(.statusLine)' "$SETTINGS")
   jq -e '.hooks == {Stop: []} and .autoCompactEnabled == false and .autoCompactWindow == 3' "$SETTINGS" >/dev/null
   cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
@@ -409,7 +419,7 @@ setup_py() {
   seed_settings "cat > $TEST_HOME/seen && echo done"
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | ("$'\n'"cat > $TEST_HOME/seen && echo done"$'\n'")" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | ("$'\n'"cat > $TEST_HOME/seen && echo done"$'\n'")" '.statusLine.command == $c' "$SETTINGS" >/dev/null
   run bash -c "$(jq -r '.statusLine.command' "$SETTINGS")" < "$FIX/mid-session.json"
   [ "$output" = "done" ]
   cmp "$FIX/mid-session.json" "$TEST_HOME/seen"
@@ -432,7 +442,7 @@ setup_py() {
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
   [ -L "$SETTINGS" ]
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | bash ~/custom.sh" '.statusLine.command == $c' "$TEST_HOME/dotfiles/settings.json" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | bash ~/custom.sh" '.statusLine.command == $c' "$TEST_HOME/dotfiles/settings.json" >/dev/null
 }
 
 @test "T11: a second install is already-installed and changes nothing" {
@@ -472,7 +482,7 @@ setup_py() {
   seed_settings "bash ~/custom.sh"
   run --separate-stderr python3 "$SETUP_PY" plan --settings "$SETTINGS" \
     --observer-dest '~/.claude/yellow-context-observer.py' --statusline "$STATUSLINE"
-  echo "$output" | jq -e --arg c "{ python3 $HOME/.claude/yellow-context-observer.py || cat; } | bash ~/custom.sh" '.proposed_command == $c' >/dev/null
+  echo "$output" | jq -e --arg c "$(obs_stage "$HOME/.claude/yellow-context-observer.py") | bash ~/custom.sh" '.proposed_command == $c' >/dev/null
 }
 
 # --- review round 2 (PR #912): observer ------------------------------------
@@ -543,13 +553,6 @@ setup_py() {
 
 # --- review round 2: reader --------------------------------------------------
 
-@test "R20: the reader finds the record when the handoff root differs from the launch directory" {
-  observe moved 61
-  mkdir -p "$TEST_HOME/worktree"
-  run --separate-stderr co_read_observation moved "$TEST_HOME/worktree"
-  echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
-}
-
 @test "R20: with records under two project directories the newest one wins" {
   local other
   observe twice 70
@@ -558,15 +561,15 @@ setup_py() {
   jq '.context_window.remaining_percentage = 20' "$(record_for twice)" > "$other/twice.json"
   touch -d '2 minutes ago' "$(record_for twice)" 2>/dev/null \
     || python3 -c 'import os, sys, time; t = time.time() - 120; os.utime(sys.argv[1], (t, t))' "$(record_for twice)"
-  run --separate-stderr co_read_observation twice "$TEST_HOME/unrelated"
+  run --separate-stderr co_read_observation twice
   echo "$output" | jq -e '.remaining_percentage == 20' >/dev/null
 }
 
 @test "R20: CONTEXT_OBSERVER_DEBUG=1 says why the reading is unknown" {
-  CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr co_read_observation nobody "$PROJECT"
+  CONTEXT_OBSERVER_DEBUG=1 run --separate-stderr co_read_observation nobody
   [ "$output" = "unknown" ]
   [[ "$stderr" == *"no record for this session"* ]]
-  run --separate-stderr co_read_observation nobody "$PROJECT"
+  run --separate-stderr co_read_observation nobody
   [ -z "$stderr" ]
 }
 
@@ -666,7 +669,7 @@ setup_py() {
   run --separate-stderr setup_py install
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.action == "installed"' >/dev/null
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | ("$'\n'"test -f $OBS_DEST && python3 custom.py"$'\n'")" \
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | ("$'\n'"test -f $OBS_DEST && python3 custom.py"$'\n'")" \
     '.statusLine.command == $c' "$SETTINGS" >/dev/null
 }
 
@@ -675,7 +678,7 @@ setup_py() {
   setup_py install >/dev/null
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   [ "$status" -eq 0 ]
-  jq -e --arg c "{ python3 $OBS_DEST || cat; } | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.padding == 0' "$SETTINGS" >/dev/null
+  jq -e --arg c "$(obs_stage "$OBS_DEST") | python3 $STATUSLINE" '.statusLine.command == $c and .statusLine.padding == 0' "$SETTINGS" >/dev/null
   diff <(jq 'del(.statusLine)' "$TEST_HOME/settings.orig") <(jq 'del(.statusLine)' "$SETTINGS")
 
   seed_settings "bash ~/custom.sh"
@@ -683,8 +686,12 @@ setup_py() {
   jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
 
   printf '{"a": ' > "$SETTINGS"
+  run --separate-stderr python3 "$SETUP_PY" statusline --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "recover"' >/dev/null
+  [ "$(cat "$SETTINGS")" = '{"a": ' ]
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg b "$SETTINGS.corrupt.backup" '.action == "recovered" and .backup == $b' >/dev/null
   [ "$(cat "$SETTINGS.corrupt.backup")" = '{"a": ' ]
   jq -e --arg c "python3 $STATUSLINE" '.statusLine.command == $c' "$SETTINGS" >/dev/null
 
@@ -699,10 +706,10 @@ setup_py() {
 @test "R20: a future-dated observed_at is unknown; a small forward skew is fresh" {
   observe future 61
   set_observed_at "$(record_for future)" "$(iso_ago -600)"
-  run --separate-stderr co_read_observation future "$PROJECT"
+  run --separate-stderr co_read_observation future
   [ "$output" = "unknown" ]
   set_observed_at "$(record_for future)" "$(iso_ago -30)"
-  run --separate-stderr co_read_observation future "$PROJECT"
+  run --separate-stderr co_read_observation future
   echo "$output" | jq -e '.remaining_percentage == 61' >/dev/null
 }
 
@@ -713,16 +720,16 @@ setup_py() {
   jq '.context_window.remaining_percentage = 42 | .context_window.used_percentage = 58' \
     "$(record_for newest)" > "$other/newest.json"
   touch -d '+5 seconds' "$other/newest.json"
-  run --separate-stderr co_read_observation newest "$PROJECT"
+  run --separate-stderr co_read_observation newest
   echo "$output" | jq -e '.remaining_percentage == 42' >/dev/null
 }
 
 @test "R20: the reduced object carries the advisory state and the watermark in effect" {
   YELLOW_CONTEXT_WATERMARK=60 observe adv2 30
-  run --separate-stderr co_read_observation adv2 "$PROJECT"
+  run --separate-stderr co_read_observation adv2
   echo "$output" | jq -e '.advisory_crossings == 1 and .advisory_state == "below" and .watermark_remaining == 60' >/dev/null
   observe adv2 90
-  run --separate-stderr co_read_observation adv2 "$PROJECT"
+  run --separate-stderr co_read_observation adv2
   echo "$output" | jq -e '.advisory_crossings == 1 and .advisory_state == "above"' >/dev/null
 }
 
@@ -769,7 +776,7 @@ PY
   seed_settings none
   run --separate-stderr setup_py plan
   cmd=$(echo "$output" | jq -r '.proposed_command')
-  [[ "$cmd" == "{ python3 "*" || cat; } | "* ]]
+  [[ "$cmd" == "$(obs_stage "$OBS_DEST") | "* ]]
   [ ! -e "$OBS_DEST" ]
   run --separate-stderr bash -c "printf abc | $cmd"
   [ "$output" = "RENDER 3" ]
@@ -799,7 +806,7 @@ PY
 }
 
 @test "T11: plan reports refresh when the installed copy is missing and no source is given" {
-  seed_settings "{ python3 $TEST_HOME/.claude/yellow-context-observer.py || cat; } | python3 $TEST_HOME/.claude/yellow-statusline.py"
+  seed_settings "$(obs_stage "$TEST_HOME/.claude/yellow-context-observer.py") | python3 $TEST_HOME/.claude/yellow-statusline.py"
   [ ! -e "$OBS_DEST" ]
   run --separate-stderr setup_py plan
   echo "$output" | jq -e '.action == "refresh"' >/dev/null
@@ -828,7 +835,7 @@ PY
   seed_settings none
   printf '{"first": ' > "$SETTINGS"
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
-  echo "$output" | jq -e '.reason | test("not valid JSON")' >/dev/null
+  echo "$output" | jq -e '.action == "recovered" and (.reason | test("not valid JSON"))' >/dev/null
   printf '{"second": ' > "$SETTINGS"
   run --separate-stderr python3 "$SETUP_PY" statusline --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   [ "$(cat "$SETTINGS.corrupt.backup")" = '{"first": ' ]
@@ -866,7 +873,7 @@ PY
   # numbers nulled, as the host sends them right after /compact.
   observe compact 30
   payload compact null | jq -c '.context_window.current_usage = null' | python3 "$OBS" >/dev/null
-  run --separate-stderr co_read_observation compact "$PROJECT"
+  run --separate-stderr co_read_observation compact
   [ "$output" = "unknown" ]
   jq -e '.advisory.crossings == 1 and .advisory.last_state == "below"' "$(record_for compact)" >/dev/null
 }
@@ -913,6 +920,8 @@ reason_for() {
   echo "$output" | jq -e '.context == "unknown" and .reason == "no-record"' >/dev/null
   run --separate-stderr env -u CLAUDE_CODE_SESSION_ID bash "$ho" context
   echo "$output" | jq -e '.context == "unknown" and .reason == "no-session-id"' >/dev/null
+  run --separate-stderr bash "$ho" context extra
+  [ "$status" -eq 2 ]
 }
 
 @test "parity: the Python and bash session-id rules and config-dir rules agree" {
@@ -962,7 +971,7 @@ PY
 @test "T11: --dry-run reports the change and writes nothing" {
   seed_settings "bash ~/custom.sh"
   run --separate-stderr python3 "$SETUP_PY" install --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
-  echo "$output" | jq -e '.action == "install" and (.proposed_command | startswith("{ python3 "))' >/dev/null
+  echo "$output" | jq -e '.action == "install" and (.proposed_command | startswith("{ command -v python3 "))' >/dev/null
   run --separate-stderr python3 "$SETUP_PY" statusline --dry-run --settings "$SETTINGS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
   echo "$output" | jq -e '.action == "statusline"' >/dev/null
   cmp "$SETTINGS" "$TEST_HOME/settings.orig"
@@ -1028,4 +1037,109 @@ PY
   [ "$status" -eq 1 ]
   [[ "$stderr" == "settings_not_object: "* ]]
   echo "$output" | jq -e '.error_code == "settings_not_object"' >/dev/null
+}
+
+# --- third review round (PR #912) ------------------------------------------------
+
+@test "T11: install upgrades an older observer stage, guarded or plain, keeping the wrapped command" {
+  local old
+  for old in "{ python3 $TEST_HOME/.claude/yellow-context-observer.py || cat; }" \
+             "python3 $TEST_HOME/.claude/yellow-context-observer.py"; do
+    seed_settings "$old | bash ~/custom.sh"
+    cp "$OBS" "$OBS_DEST"
+    run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+    echo "$output" | jq -e '.action == "refresh" and (.reason | test("older form"))' >/dev/null
+    run --separate-stderr setup_py plan
+    echo "$output" | jq -e '.action == "upgrade"' >/dev/null
+    cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+    run --separate-stderr setup_py install
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.action == "upgraded" and (.backup | type == "string")' >/dev/null
+    jq -e --arg c "$(obs_stage "$OBS_DEST") | bash ~/custom.sh" '.statusLine.command == $c' "$SETTINGS" >/dev/null
+    run --separate-stderr setup_py install
+    echo "$output" | jq -e '.action == "already-installed"' >/dev/null
+    rm -f "$SETTINGS".pre-observer.backup*
+  done
+}
+
+@test "T11: a custom --observer-dest file name is recognised by status, install and remove" {
+  local dest="$TEST_HOME/custom-observer.py"
+  seed_settings "bash ~/custom.sh"
+  run --separate-stderr python3 "$SETUP_PY" install --settings "$SETTINGS" --observer-src "$OBS" \
+    --observer-dest "$dest" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "installed"' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" status --settings "$SETTINGS" --observer-src "$OBS" --observer-dest "$dest"
+  echo "$output" | jq -e '.action == "enabled"' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" install --settings "$SETTINGS" --observer-src "$OBS" \
+    --observer-dest "$dest" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "already-installed"' >/dev/null
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$dest"
+  echo "$output" | jq -e '.action == "removed"' >/dev/null
+  jq -e '.statusLine.command == "bash ~/custom.sh"' "$SETTINGS" >/dev/null
+}
+
+@test "T11: remove refuses an observer stage with nothing after it and writes nothing" {
+  seed_settings "$(obs_stage "$TEST_HOME/.claude/yellow-context-observer.py") | "
+  run --separate-stderr python3 "$SETUP_PY" remove --settings "$SETTINGS" --observer-dest "$OBS_DEST"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.action == "error" and .error_code == "observer_not_removable"' >/dev/null
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS"
+  [ -z "$(find "$TEST_HOME/.claude" -name '*.backup*')" ]
+}
+
+@test "T11: prune reports prune_incomplete when a file cannot be removed" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory modes"
+  local dir="$HOME/.claude/projects/-p/context-observations"
+  mkdir -p "$dir"
+  : > "$dir/old.json"
+  touch -d '40 days ago' "$dir/old.json"
+  chmod 500 "$dir"
+  run --separate-stderr python3 "$SETUP_PY" prune --older-than-days 30
+  chmod 700 "$dir"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e '.error_code == "prune_incomplete" and (.reason | test("removed 0 of 1"))' >/dev/null
+  [ -e "$dir/old.json" ]
+}
+
+@test "T11: every emitted error_code is in ERROR_CODES, and fail() maps an unknown one to internal" {
+  run python3 - "$SETUP_PY" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("setup_mod", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+assert {"usage", "io_error", "internal", "prune_incomplete"} <= m.ERROR_CODES
+r = m.new_result(None)
+m.fail(r, "typo_code", "x")
+assert r["error_code"] == "internal" and "typo_code" in r["reason"], r
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "R19: the record directory is 0700 and the record 0600, even when the directory pre-exists as 0755" {
+  local dir
+  dir=$(dirname "$(record_for modes)")
+  mkdir -p "$dir"
+  chmod 755 "$dir"
+  observe modes 61
+  [ "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$dir")" = "0o700" ]
+  [ "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$(record_for modes)")" = "0o600" ]
+}
+
+@test "R19: NaN and Infinity in the payload are recorded as null, and the record stays strict JSON" {
+  payload nonfinite 61 | sed -e 's/"remaining_percentage":61/"remaining_percentage":NaN/' \
+    -e 's/"used_percentage":39/"used_percentage":Infinity/' | python3 "$OBS" >/dev/null
+  ! grep -qE 'NaN|Infinity' "$(record_for nonfinite)"
+  python3 -c 'import json, sys; json.load(open(sys.argv[1]), parse_constant=lambda c: sys.exit("non-JSON token " + c))' \
+    "$(record_for nonfinite)"
+  jq -e '.context_window.remaining_percentage == null and .context_window.used_percentage == null' \
+    "$(record_for nonfinite)" >/dev/null
+}
+
+@test "R20: out-of-range optional fields are nulled by the reader" {
+  observe ranges 61
+  jq '.context_window.used_percentage = 150 | .advisory.crossings = -1 | .advisory.watermark_remaining = 0' \
+    "$(record_for ranges)" > "$TEST_HOME/r" && mv "$TEST_HOME/r" "$(record_for ranges)"
+  run --separate-stderr co_read_observation ranges
+  echo "$output" | jq -e '.remaining_percentage == 61 and .used_percentage == null
+    and .advisory_crossings == null and .watermark_remaining == null' >/dev/null
 }

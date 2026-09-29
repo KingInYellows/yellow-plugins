@@ -26,30 +26,36 @@ ${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, --observer-dest is
 to this script. --dry-run (statusline, install, remove, prune) reports what
 would happen and writes nothing.
 
-Composition (the existing command is statusLine.command):
-  absent                   -> { python3 <observer> || cat; } | python3 <statusline>
-  any command              -> { python3 <observer> || cat; } | <existing>
-                              (the "|| cat" keeps the payload flowing to the next
-                              stage when the observer file is missing or cannot
-                              start; the existing command is wrapped in "(" ... ")"
-                              on their own lines when it
-                              contains shell control characters, so the payload
-                              reaches its first stage and a trailing comment or
-                              heredoc stays closed)
+Composition (the existing command is statusLine.command; STAGE is
+"{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; }"):
+  absent                   -> STAGE | python3 <statusline>
+  any command              -> STAGE | <existing>
+                              (STAGE falls back to cat when python3 or the observer
+                              file is missing, so the payload still reaches the next
+                              stage; exec hands the group's pipe end to the observer,
+                              so its early stdout release gives the next stage EOF
+                              before recording; "{ python3 <observer> || cat; }"
+                              would hold the pipe open until recording ends. The
+                              existing command is wrapped in "(" ... ")" on their
+                              own lines when it contains shell control characters,
+                              so the payload reaches its first stage and a trailing
+                              comment or heredoc stays closed)
   already contains observer -> no change to settings; the observer copy is
                               refreshed when missing or different from the source
-                              ("contains" means a leading observer stage, guarded or
-                              the older plain "python3 <observer> |", that resolves
-                              to --observer-dest; a command
-                              that only mentions the observer's path elsewhere,
-                              e.g. in a `test -f <observer> && ...` guard, is
-                              treated as not installed)
+                              ("contains" means a leading observer stage that
+                              resolves to --observer-dest; a command that only
+                              mentions the observer's path elsewhere, e.g. in a
+                              `test -f <observer> && ...` guard, is treated as not
+                              installed)
+  older observer stage     -> upgrade: "{ python3 <observer> || cat; } |" or the
+                              plain manual-merge "python3 <observer> |" is replaced
+                              by STAGE, keeping the command it wraps
 
 Refuses with exit 1 and no write: JSONC or otherwise invalid settings.json
-(statusline instead backs up invalid, non-JSONC settings and starts fresh),
-a non-object statusLine, and an absent statusLine when <statusline> does not
-exist. Never reads or writes autoCompactEnabled, autoCompactWindow, hooks, or
-any other key (R2).
+(statusline instead backs up invalid, non-JSONC settings, starts fresh, and
+reports action recovered), a non-object statusLine, and an absent statusLine
+when <statusline> does not exist. Never reads or writes autoCompactEnabled,
+autoCompactWindow, hooks, or any other key (R2).
 
 Backups: settings.json.pre-observer.backup, then .2, .3, ... when the file
 differs from every earlier backup; the original and the newest
@@ -58,11 +64,17 @@ MAX_BACKUPS - 1 are kept.
 Every run prints one JSON object on stdout with the same keys:
   {action, error_code, existing_command, proposed_command, settings, backup,
    observer, reason}
-action: statusline-set, install, installed, refresh, refreshed,
-already-installed, remove, removed, not-installed, enabled, not-enabled,
-prune, pruned, statusline (a --dry-run statusline), or error (exit 1; exit 2
-for a usage error). error_code is null unless action is error. A failure also
-prints "error_code: reason" on stderr.
+action: statusline-set, recovered (statusline reset invalid settings.json),
+install, installed, upgrade, upgraded, refresh, refreshed, already-installed,
+remove, removed, not-installed, enabled, not-enabled, prune, pruned,
+statusline and recover (--dry-run statusline), or error (exit 1; exit 2 for a
+usage error). A dry run reports the present-tense action (install, upgrade,
+refresh, remove, prune, statusline, recover); a write reports the past tense.
+error_code is null unless action is error, and is then one of ERROR_CODES:
+settings_unreadable, settings_jsonc, settings_invalid, settings_not_object,
+statusline_not_object, command_not_string, statusline_missing,
+observer_src_missing, observer_not_removable, prune_incomplete, io_error,
+internal, usage. A failure also prints "error_code: reason" on stderr.
 
 Stdlib only; Python 3.7+.
 """
@@ -84,24 +96,35 @@ BACKUP_SUFFIX = ".pre-observer.backup"
 CORRUPT_SUFFIX = ".corrupt.backup"
 MAX_BACKUPS = 5
 
-# Stable error_code values of the JSON contract; SetupError rejects anything else.
+# Every error_code the JSON contract can carry. SetupError accepts only these;
+# usage, io_error and internal come from the argument parser and main()'s
+# last-resort handlers, and fail() refuses anything outside the set.
 ERROR_CODES = frozenset((
     "settings_unreadable", "settings_jsonc", "settings_invalid", "settings_not_object",
     "statusline_not_object", "command_not_string", "statusline_missing",
-    "observer_src_missing", "observer_not_removable",
+    "observer_src_missing", "observer_not_removable", "prune_incomplete",
+    "io_error", "internal", "usage",
 ))
 
-# A leading observer stage, guarded ("{ python3 <observer> || cat; } |", the
-# installer's form) or plain ("python3 <observer> |", the older form and the
-# simplest manual merge). "path" is one shell word, possibly several quoted
-# segments joined (shlex.quote emits '...'"'"'...' for a path containing an
-# apostrophe); leading_observer_path() tokenises it and compares the result to
-# --observer-dest. A command that only mentions the observer elsewhere never
-# matches here.
+# One shell word, possibly several quoted segments joined (shlex.quote emits
+# '...'"'"'...' for a path containing an apostrophe).
+_WORD = r"(?:'[^']*'|\"[^\"]*\"|[^\s'\"|;])+"
+
+# A leading observer stage in one of three forms, each naming the observer in
+# its own group: "exec" (the installer's current form), "guarded" (the earlier
+# "{ python3 <observer> || cat; } |") and "plain" ("python3 <observer> |", the
+# simplest manual merge). leading_observer() tokenises the path and
+# contains_observer() compares it to --observer-dest. A command that only
+# mentions the observer elsewhere never matches here.
 OBSERVER_PREFIX_RE = re.compile(
-    r"\A\s*(?P<guard>\{\s*)?python3?\s+(?P<path>(?:'[^']*'|\"[^\"]*\"|[^\s'\"|;])+)"
-    r"(?(guard)\s*\|\|\s*cat\s*;\s*\}|)\s*\|(?!\|)\s*"
+    r"\A\s*(?:"
+    r"\{\s*command\s+-v\s+python3\s*>\s*/dev/null\s*&&\s*\[\s+-r\s+(?P<exec_path>" + _WORD + r")\s+\]\s*&&\s*"
+    r"exec\s+python3\s+(?P=exec_path)\s*;\s*exec\s+cat\s*;\s*\}"
+    r"|\{\s*python3?\s+(?P<guarded_path>" + _WORD + r")\s*\|\|\s*cat\s*;\s*\}"
+    r"|python3?\s+(?P<plain_path>" + _WORD + r")"
+    r")\s*\|(?!\|)\s*"
 )
+OBSERVER_FORMS = ("exec", "guarded", "plain")
 
 
 class SetupError(Exception):
@@ -114,6 +137,9 @@ class SetupError(Exception):
 
 def fail(result, code, reason):
     """Fill result as the one error shape shared by every failure path."""
+    if code not in ERROR_CODES:
+        reason = "unknown error code %r: %s" % (code, reason)
+        code = "internal"
     result.update(action="error", error_code=code, reason=reason)
 
 
@@ -140,9 +166,12 @@ def config_dir():
 
 
 def load_settings(path, recover_invalid=False, result=None, dry_run=False):
-    """Return (settings_dict, raw_text_or_None). Raise SetupError on JSONC/invalid."""
+    """Return (settings_dict, raw_text_or_None, recovered). Raise SetupError on JSONC/invalid.
+
+    recovered is True when recover_invalid reset invalid (non-JSONC) settings to {}.
+    """
     if not os.path.exists(path):
-        return {}, None
+        return {}, None, False
     try:
         with open(path, "r", encoding="utf-8") as handle:
             raw = handle.read()
@@ -162,10 +191,10 @@ def load_settings(path, recover_invalid=False, result=None, dry_run=False):
                 "would be reset" if dry_run else "was reset",
                 "would be saved as a .corrupt.backup" if dry_run else "is saved at %s" % corrupt,
             )
-        return {}, raw
+        return {}, raw, True
     if not isinstance(settings, dict):
         raise SetupError("settings_not_object", "settings.json is not a JSON object")
-    return settings, raw
+    return settings, raw, False
 
 
 def existing_command(settings):
@@ -191,23 +220,34 @@ def tokens(command):
 
 def observer_stage(observer_dest):
     # Expand "~" before quoting: a quoted "~/..." would reach the shell literally.
-    # "|| cat": a missing or unstartable observer must not starve the next stage.
-    return "{ python3 " + shlex.quote(normalize(observer_dest)) + " || cat; }"
+    # The cat fallback keeps a missing python3 or observer file from starving the
+    # next stage. exec, not "python3 <observer> || cat": the group's subshell must
+    # not keep the pipe's write end open while the observer records, or the next
+    # stage waits for recording instead of seeing EOF when the observer releases
+    # stdout.
+    path = shlex.quote(normalize(observer_dest))
+    return "{ command -v python3 >/dev/null && [ -r %s ] && exec python3 %s; exec cat; }" % (path, path)
 
 
 def statusline_stage(statusline):
     return "python3 " + shlex.quote(normalize(statusline))
 
 
-def leading_observer_path(command):
-    """Return the normalized path of a leading observer stage, or None."""
+def leading_observer(command):
+    """Return (normalized path, form) of a leading observer stage, or None.
+
+    form is one of OBSERVER_FORMS. Any script path matches here;
+    contains_observer() decides whether it is the observer at --observer-dest,
+    so a custom destination name is recognised too.
+    """
     match = OBSERVER_PREFIX_RE.match(command)
     if match is None:
         return None
-    parts = tokens(match.group("path"))
-    if not parts or len(parts) != 1 or os.path.basename(parts[0]) != OBSERVER_NAME:
+    form = next(f for f in OBSERVER_FORMS if match.group(f + "_path") is not None)
+    parts = tokens(match.group(form + "_path"))
+    if not parts or len(parts) != 1:
         return None
-    return normalize(os.path.expandvars(parts[0]))
+    return normalize(os.path.expandvars(parts[0])), form
 
 
 def contains_observer(command, observer_dest):
@@ -217,7 +257,14 @@ def contains_observer(command, observer_dest):
     later stage, or in a `test -f <observer> && ...` guard) does not count:
     that path is never executed as the observer stage.
     """
-    return leading_observer_path(command) == normalize(observer_dest)
+    found = leading_observer(command)
+    return found is not None and found[0] == normalize(observer_dest)
+
+
+def stage_is_current(command):
+    """True when the leading observer stage is the installer's current exec form."""
+    found = leading_observer(command)
+    return found is not None and found[1] == "exec"
 
 
 def wrap(command):
@@ -230,7 +277,15 @@ def wrap(command):
 def compose(existing, observer_dest, statusline):
     """Return (action, proposed_command) for install."""
     if existing is not None and contains_observer(existing, observer_dest):
-        return "already-installed", existing
+        if stage_is_current(existing):
+            return "already-installed", existing
+        rest = decompose(existing)
+        if rest is None:
+            raise SetupError(
+                "observer_not_removable",
+                "statusLine.command has an older observer stage with nothing after it; edit it by hand",
+            )
+        return "upgrade", observer_stage(observer_dest) + " | " + wrap(rest)
     if existing is None:
         if not os.path.isfile(normalize(statusline)):
             raise SetupError(
@@ -369,27 +424,32 @@ def set_command(settings, command):
 
 
 def run_statusline(args, result):
-    settings, _ = load_settings(args.settings, recover_invalid=True, result=result, dry_run=args.dry_run)
+    settings, _, recovered = load_settings(
+        args.settings, recover_invalid=True, result=result, dry_run=args.dry_run)
     existing = existing_command(settings)
     command = statusline_stage(args.statusline)
     if existing is not None and contains_observer(existing, args.observer_dest):
         command = observer_stage(args.observer_dest) + " | " + command
     result.update(existing_command=existing, proposed_command=command)
     if args.dry_run:
-        result["action"] = "statusline"
+        result["action"] = "recover" if recovered else "statusline"
         return
     set_command(settings, command)
     write_settings(args.settings, settings)
-    result["action"] = "statusline-set"
+    result["action"] = "recovered" if recovered else "statusline-set"
 
 
 def run_status(args, result):
     """Read-only: enabled / refresh / not-enabled; a missing statusline is not an error."""
-    settings, _ = load_settings(args.settings)
+    settings, _, _ = load_settings(args.settings)
     existing = existing_command(settings)
     result["existing_command"] = existing
     if existing is None or not contains_observer(existing, args.observer_dest):
         result["action"] = "not-enabled"
+        return
+    if not stage_is_current(existing):
+        result["action"] = "refresh"
+        result["reason"] = "the composed observer stage is an older form; run install to upgrade it"
         return
     state = observer_copy_state(args.observer_src, args.observer_dest)
     result["action"] = "refresh" if state == "refresh" else "enabled"
@@ -399,7 +459,7 @@ def run_status(args, result):
 
 def plan_install(args):
     """What install would do: (settings, raw, existing, action, proposed)."""
-    settings, raw = load_settings(args.settings)
+    settings, raw, _ = load_settings(args.settings)
     existing = existing_command(settings)
     action, proposed = compose(existing, args.observer_dest, args.statusline)
     return settings, raw, existing, action, proposed
@@ -425,11 +485,11 @@ def run_install(args, result):
     result["observer"] = install_observer(args.observer_src, args.observer_dest)
     set_command(settings, proposed)
     write_settings(args.settings, settings)
-    result["action"] = "installed"
+    result["action"] = "upgraded" if action == "upgrade" else "installed"
 
 
 def run_remove(args, result):
-    settings, raw = load_settings(args.settings)
+    settings, raw, _ = load_settings(args.settings)
     existing = existing_command(settings)
     result["existing_command"] = existing
     if existing is None or not contains_observer(existing, args.observer_dest):
@@ -466,15 +526,27 @@ def run_prune(args, result):
                 doomed.append(path)
         except OSError:
             continue
-    if not args.dry_run:
-        for path in doomed:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-    result["action"] = "prune" if args.dry_run else "pruned"
-    result["reason"] = "%s %d observation file(s) not modified for %d day(s)" % (
-        "would remove" if args.dry_run else "removed", len(doomed), args.older_than_days)
+    if args.dry_run:
+        result["action"] = "prune"
+        result["reason"] = "would remove %d observation file(s) not modified for %d day(s)" % (
+            len(doomed), args.older_than_days)
+        return
+    removed, failures = 0, []
+    for path in doomed:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass  # a concurrent writer or prune got there first; nothing to count
+        except OSError as exc:
+            failures.append("%s: %s" % (path, exc.strerror or exc))
+        else:
+            removed += 1
+    if failures:
+        raise SetupError("prune_incomplete", "removed %d of %d observation file(s); could not remove %d (first: %s)" % (
+            removed, len(doomed), len(failures), failures[0]))
+    result["action"] = "pruned"
+    result["reason"] = "removed %d observation file(s) not modified for %d day(s)" % (
+        removed, args.older_than_days)
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -511,7 +583,7 @@ def parse_args(argv):
                                 parser_class=JsonArgumentParser)
     helps = {
         "statusline": "point statusLine.command at the yellow statusline, keeping a composed observer",
-        "status": "read-only: enabled, refresh (outdated copy) or not-enabled",
+        "status": "read-only: enabled, refresh (outdated copy or older stage form) or not-enabled",
         "plan": "print what install would do; writes nothing",
         "install": "copy the observer, back up settings.json, compose the observer ahead of statusLine.command",
         "remove": "strip the observer stage from statusLine.command, restoring the command it wrapped",
