@@ -1,0 +1,73 @@
+.claude-plugin/marketplace.json
+  s_b2d61b25087e73::t_426a553648849d 74-83
+.github/workflows/validate-schemas-fork.yml
+  s_b2d61b25087e73::t_c94cef2c9f6537 68,83,241-248
+.github/workflows/validate-schemas.yml
+  s_b2d61b25087e73::t_bad1d55cbc87d9 1190-1194
+catalog/catalog.json
+  s_b2d61b25087e73::t_32f9e2e008e633 19
+catalog/plugins/yellow-jules.json
+  s_b2d61b25087e73::t_76cd142129f233 1-30
+docs/contracts/error-codes.md
+  s_b2d61b25087e73::t_160aab5d435546 913
+package.json
+  s_b2d61b25087e73::t_90357a71c342cf 16,18
+packages/domain/src/validation/errorCatalog.ts
+  s_b2d61b25087e73::t_9dde8ac1b4ca1c 171,486
+plans/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_b2d61b25087e73::t_5dc5535568272e 604,614,625,632,650,668,672,683
+plugins/yellow-core/commands/setup/all.md
+  s_b2d61b25087e73::t_16512d6c007a75 183,344,390-398,400-402,411,417-421,428-433,593-608,795,821-822,831,838-840,849,851,857-858,865,871-872,935-948,962
+plugins/yellow-core/lib/remote-agent-provider-state.js
+  s_b2d61b25087e73::t_8f554e501e3a3b 6-7,13-14,17-18,21,29,44-45,69,81,88,92,99,109,180,220-221,230,244,247-249,261,365,368
+plugins/yellow-jules/.claude-plugin/plugin.json
+  s_b2d61b25087e73::t_91f8cc93285eaf 1-21
+plugins/yellow-linear/commands/linear/delegate.md
+  s_b2d61b25087e73::t_f1b41caefb1404 3-4,25-27,33-36,42-44,162-165,169-170,182-183,186,208,211-217,577-586,652-654,669-670,688-689
+plugins/yellow-linear/tests/delegate.bats
+  s_b2d61b25087e73::t_bc79f27a329f76 207-243
+scripts/validate-provider-groups.js
+  s_b2d61b25087e73::t_c3f825a60c0f2b 6-8,28-32,80,113-150,679-746,780
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_b2d61b25087e73::t_8f691bd3952e26 77-86,237,750-774
+tests/integration/fixtures/remote-agent-provider/README.md
+  s_b2d61b25087e73::t_52477eb1eea9ac 16-20
+tests/integration/fixtures/remote-agent-provider/cursor-and-jules-enabled.json
+  s_b2d61b25087e73::t_93342a20b828b7 1-29
+tests/integration/fixtures/remote-agent-provider/foreign-project-jules.json
+  s_b2d61b25087e73::t_35b0c247620b43 1-21
+tests/integration/fixtures/remote-agent-provider/jules-enabled.json
+  s_b2d61b25087e73::t_222aad3c74d164 1-11
+tests/integration/fixtures/remote-agent-provider/three-enabled.json
+  s_b2d61b25087e73::t_3c32067502650d 1-29
+tests/integration/fixtures/remote-agent-provider/three-installed-jules-enabled.json
+  s_b2d61b25087e73::t_c03a971c176e7a 1-29
+tests/integration/remote-agent-provider-state.test.ts
+  s_83729537d45a8a::t_8d38b513fe392b 6-8,66,71,76,80-93,96,107,212-278,348-374
+tests/integration/validate-provider-groups.test.ts
+  s_b2d61b25087e73::t_70d38c446a5dcc 81-87,114-188,275-282,284-286,466,537-619
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2e9efe748349e9e949ec3c50bb24cd583142954c",
+  "prompts": {},
+  "sessions": {
+    "s_83729537d45a8a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09ec157c-09f4-4581-9f87-0f070657b474",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_b2d61b25087e73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fb24ea8-ce14-46c0-a1d0-12bc75490ced",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
