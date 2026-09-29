@@ -1302,3 +1302,13 @@ PY
   echo "$output" | jq -e '.action == "removed"' >/dev/null
   jq -e --arg c "! cat > $TEST_HOME/seen" '.statusLine.command == $c' "$SETTINGS" >/dev/null
 }
+
+@test "T11: a relative --observer-dest is stored as an absolute path" {
+  seed_settings "bash ~/custom.sh"
+  cd "$TEST_HOME"
+  run --separate-stderr python3 "$SETUP_PY" install --settings "$SETTINGS" --observer-src "$OBS" \
+    --observer-dest "rel/yellow-context-observer.py" --statusline "$STATUSLINE"
+  echo "$output" | jq -e '.action == "installed"' >/dev/null
+  [ -f "$TEST_HOME/rel/yellow-context-observer.py" ]
+  jq -r '.statusLine.command' "$SETTINGS" | grep -qF "$TEST_HOME/rel/yellow-context-observer.py"
+}

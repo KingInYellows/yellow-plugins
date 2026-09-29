@@ -160,7 +160,9 @@ def new_result(settings):
 
 
 def normalize(path):
-    return os.path.normpath(os.path.expanduser(path))
+    # Absolute, so a relative --observer-dest or CLAUDE_CONFIG_DIR is resolved
+    # once here instead of against whatever directory the statusline runs in.
+    return os.path.abspath(os.path.expanduser(path))
 
 
 def config_dir():
