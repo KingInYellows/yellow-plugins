@@ -6,9 +6,10 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
-  # Note: Write is intentionally absent — all file transitions happen via
-  # transition_todo_state() in validate.sh using Bash shell I/O (>, mv, rm),
-  # not via the Claude Code Write tool.
+  # Write is used only to create the defer-reason file in a private temp
+  # directory. Todo transitions still go through transition_todo_state() in
+  # validate.sh using Bash shell I/O (>, mv, rm).
+  - Write
 ---
 
 # Technical Debt Triage Command
@@ -157,29 +158,31 @@ __YELLOW_DEBT_BASH__
    delimiter would end the heredoc and run the following lines as commands.
    Pass it through a file instead.
 
-   1. Reserve a fresh, unused path (this creates nothing):
+   1. Create a private directory atomically (mode 0700, so no other user can
+      claim paths inside it):
       ```bash
-      mktemp -u "${TMPDIR:-/tmp}/debt-defer-reason.XXXXXX"
+      mktemp -d "${TMPDIR:-/tmp}/debt-defer.XXXXXX"
       ```
-   2. Use the Write tool (not Bash) to create that exact path with the reason
-      text as its content.
-   3. Run the transition with the reason-file path as a single-quoted operand.
-      The child strips newlines, transitions, then removes the file:
+   2. Use the Write tool (not Bash) to create `<dir>/reason.txt` inside the
+      printed directory, with the reason text as its content.
+   3. Run the transition with the directory as a single-quoted operand. The
+      child strips newlines, transitions, then removes the file and directory:
       ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (the script is an argument, so stdin stays free).
 bash -c "$(cat <<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-DEFER_REASON=$(tr -d '\n\r' < "$1")
+DEFER_REASON=$(tr -d '\n\r' < "$1/reason.txt")
 rc=0
 transition_todo_state "/absolute/path/to/file.md" deferred "$DEFER_REASON" || {
 printf '[debt:triage] Error: transition failed\n' >&2
 rc=1
 }
-rm -f -- "$1"
+rm -f -- "$1/reason.txt"
+rmdir -- "$1"
 exit "$rc"
 __YELLOW_DEBT_BASH__
-)" debt-triage '<reason-file>'
+)" debt-triage '<reason-dir>'
       ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
