@@ -1,0 +1,47 @@
+plugins/yellow-linear/commands/linear/delegate.md
+  s_c4c48e9a92a0cf::t_336802006eba9d 214-218
+plugins/yellow-jules/tests/config-resolution.test.ts
+  s_c4c48e9a92a0cf::t_fc5f85ab4b218f 245-274
+docs/security.md
+  s_c4c48e9a92a0cf::t_0356d69cb3ddf0 417-441
+  s_c4c48e9a92a0cf::t_bea8242e6e068d 72-82
+  s_c4c48e9a92a0cf::t_f77f6c08bffbca 579-582
+plugins/yellow-jules/src/config.ts
+  s_c4c48e9a92a0cf::t_dfe832c3c167db 173-181
+plugins/yellow-jules/dist/config.js
+  s_c4c48e9a92a0cf::t_54c57d98bd2eb6 178-183
+plugins/yellow-jules/dist/deadline.js
+  s_c4c48e9a92a0cf::t_2d82a17825a517 34-64,69
+plugins/yellow-jules/dist/runtime.js
+  s_c4c48e9a92a0cf::t_78a09879e47feb 751-753,756,760-763,783-786,793-794,797-813,820-838,842-847
+plugins/yellow-jules/dist/state.js
+  s_c4c48e9a92a0cf::t_595192695eaab1 174-176,579-583,586-588,594-596
+plugins/yellow-jules/src/deadline.ts
+  s_c4c48e9a92a0cf::t_2886fc7015bcdd 9,47-83,91
+plugins/yellow-jules/src/runtime.ts
+  s_c4c48e9a92a0cf::t_f6441406f8e37d 60,1114-1116,1120,1126-1129,1151-1154,1161-1162,1166-1192,1205-1225,1231-1236,1238-1243
+plugins/yellow-jules/src/state.ts
+  s_c4c48e9a92a0cf::t_e7f3c58a5aff9a 146-150,753-756,762-763,769-774,779-781
+plugins/yellow-jules/src/types.ts
+  s_c4c48e9a92a0cf::t_83807cbd28459c 246
+plugins/yellow-jules/tests/runtime-collect.test.ts
+  s_c4c48e9a92a0cf::t_eb7865265f01c2 262-315,352-390
+plugins/yellow-jules/tests/runtime-deadline.test.ts
+  s_c4c48e9a92a0cf::t_457d0f63db493a 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f8564e7ff9c1a5c17e9859aaa8cbd79b62c3a4fb",
+  "prompts": {},
+  "sessions": {
+    "s_c4c48e9a92a0cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4bc583f-a87e-464c-8e90-76629c1e94d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
