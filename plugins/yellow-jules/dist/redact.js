@@ -51,7 +51,9 @@ function looksSecretShaped(value) {
         return true;
     // Fully redacted text (e.g. "Bearer ***REDACTED***") is safe to persist; a
     // string that merely contains the marker next to a secret is not.
-    if (value.includes(REDACTED) && redact(value) === value)
+    if (redact(value) !== value)
+        return true;
+    if (value.includes(REDACTED))
         return false;
     if (/^Bearer\s+\S+$/i.test(value))
         return true;

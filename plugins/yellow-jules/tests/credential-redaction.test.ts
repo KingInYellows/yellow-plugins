@@ -119,6 +119,14 @@ describe('assertNoSecretShapedValues and the redaction marker', () => {
     ).toThrow(/refusing/);
   });
 
+  it('refuses the marker next to a secret that is not the live key', () => {
+    expect(() =>
+      assertNoSecretShapedValues({
+        t: '***REDACTED*** AIzaSyA1234567890abcdefgh',
+      })
+    ).toThrow(/refusing/);
+  });
+
   it('refuses any string that contains the live key', () => {
     expect(() =>
       assertNoSecretShapedValues({ t: `prefix-${LIVE_KEY}-suffix` })

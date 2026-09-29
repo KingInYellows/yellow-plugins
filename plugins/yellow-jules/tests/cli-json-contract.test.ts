@@ -92,7 +92,7 @@ describe('operational failures exit 1', () => {
     [['list', '--limit', '0'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--limit', '101'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--deadline-ms', 'soon'], 'list', 'JULES_INVALID_INPUT'],
-    [['list', '--deadline-ms', '240001'], 'list', 'JULES_INVALID_INPUT'],
+    [['list', '--deadline-ms', '200001'], 'list', 'JULES_INVALID_INPUT'],
     [['list', '--page-token', '../x'], 'list', 'JULES_INVALID_INPUT'],
     [['cancel'], 'cancel', 'JULES_UNSUPPORTED_CAPABILITY'],
     [['pause'], 'pause', 'JULES_UNSUPPORTED_CAPABILITY'],

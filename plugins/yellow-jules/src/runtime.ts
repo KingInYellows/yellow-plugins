@@ -916,15 +916,18 @@ function readManifestArtifacts(
     if (typeof a.path !== 'string' || !STAGED_PATH_RE.test(a.path)) continue;
     if (typeof a.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.sha256))
       continue;
-    let content: string;
+    let bytes: Buffer;
     try {
       const staged = path.join(dir, a.path);
       if (!fs.lstatSync(staged).isFile()) continue;
-      content = fs.readFileSync(staged, 'utf8');
+      bytes = fs.readFileSync(staged);
     } catch {
       continue;
     }
-    if (sha256(content) !== a.sha256) continue;
+    // Staged content was hashed as its UTF-8 bytes, so the raw file hashes the same.
+    if (crypto.createHash('sha256').update(bytes).digest('hex') !== a.sha256)
+      continue;
+    const content = bytes.toString('utf8');
     const baseCommit =
       typeof a.baseCommit === 'string'
         ? optionalBaseCommit(a.baseCommit)

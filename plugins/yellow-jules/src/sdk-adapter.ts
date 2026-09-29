@@ -235,20 +235,38 @@ function mapOutput(output: Sdk.SessionOutput): AdapterOutput {
   };
 }
 
-const STATE_RE = /^[A-Za-z_]{1,64}$/;
+/** The SDK's SessionState enum: the only values rendered bare or persisted. */
+const KNOWN_STATES = new Set([
+  'unspecified',
+  'queued',
+  'planning',
+  'awaitingPlanApproval',
+  'awaitingUserFeedback',
+  'inProgress',
+  'paused',
+  'failed',
+  'completed',
+]);
 const RFC3339_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
 
-/** Unknown or non-enum-shaped states become `unspecified` (condition `needs-inspection`). */
+/** Any state outside the known enum becomes `unspecified` (condition `needs-inspection`). */
 function allowlistedState(value: unknown): string {
-  return typeof value === 'string' && STATE_RE.test(value)
+  return typeof value === 'string' && KNOWN_STATES.has(value)
     ? value
     : 'unspecified';
 }
 
 /** Vendor timestamps are rendered and persisted, so anything not RFC 3339 is dropped. */
 function rfc3339OrEmpty(value: unknown): string {
-  return typeof value === 'string' && RFC3339_RE.test(value) ? value : '';
+  if (typeof value !== 'string') return '';
+  const m = RFC3339_RE.exec(value);
+  if (!m) return '';
+  // Date.parse rolls invalid calendar dates over (2026-02-31 -> March 3), so
+  // the day is checked against the month explicitly.
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return month >= 1 && month <= 12 && probe.getUTCDate() === day ? value : '';
 }
 
 function optionalSource(value: unknown): string | undefined {
@@ -260,6 +278,8 @@ function optionalSource(value: unknown): string | undefined {
 }
 
 export function mapSession(resource: Sdk.SessionResource): AdapterSession {
+  const createTime = rfc3339OrEmpty(resource.createTime);
+  const updateTime = rfc3339OrEmpty(resource.updateTime);
   const sessionResource = validateSessionResource(resource.name, 'response');
   const sourceResource = optionalSource(resource.sourceContext?.source);
   const startingBranch =
@@ -277,12 +297,8 @@ export function mapSession(resource: Sdk.SessionResource): AdapterSession {
     // Server-set enum text, but rendered bare and persisted: allowlisted.
     vendorState: allowlistedState(resource.state),
     title: str(resource.title),
-    ...(rfc3339OrEmpty(resource.createTime) !== ''
-      ? { createTime: rfc3339OrEmpty(resource.createTime) }
-      : {}),
-    ...(typeof resource.updateTime === 'string'
-      ? { updateTime: resource.updateTime }
-      : {}),
+    ...(createTime !== '' ? { createTime } : {}),
+    ...(updateTime !== '' ? { updateTime } : {}),
     ...(sourceResource !== undefined ? { sourceResource } : {}),
     ...(typeof startingBranch === 'string' ? { startingBranch } : {}),
     ...(url !== undefined ? { url } : {}),
@@ -308,9 +324,22 @@ function mapArtifact(artifact: Sdk.Artifact): AdapterActivityArtifact {
 
 export function mapActivity(activity: Sdk.Activity): AdapterActivity {
   const activityId = validateActivityId(activity.id, 'response');
+  const createTime = rfc3339OrEmpty(activity.createTime);
+  // Plan state is ordered by time: a plan activity without a usable time
+  // could neither replace nor clear the pending plan, so it fails closed
+  // (listActivities turns this into unmappedActivity).
+  if (
+    (activity.type === 'planGenerated' || activity.type === 'planApproved') &&
+    createTime === ''
+  ) {
+    throwAppError(
+      'JULES_MALFORMED_RESPONSE',
+      `plan activity ${activityId} has no usable createTime`
+    );
+  }
   const base = {
     activityId,
-    createTime: rfc3339OrEmpty(activity.createTime),
+    createTime,
     type: str(activity.type),
     ...(typeof activity.originator === 'string'
       ? { originator: activity.originator }

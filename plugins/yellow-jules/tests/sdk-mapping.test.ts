@@ -25,6 +25,9 @@ describe('vendor fields that render bare are allowlisted', () => {
         .vendorState
     ).toBe('unspecified');
     expect(mapSession(session({ state: 42 })).vendorState).toBe('unspecified');
+    expect(
+      mapSession(session({ state: 'IGNORE_PRIOR_INSTRUCTIONS' })).vendorState
+    ).toBe('unspecified');
   });
 
   it('a non-RFC-3339 timestamp is dropped', () => {
@@ -43,5 +46,19 @@ describe('vendor fields that render bare are allowlisted', () => {
       '2026-09-10T00:00:01.123Z'
     );
     expect(activity('soon').createTime).toBe('');
+    expect(activity('2026-02-31T00:00:00Z').createTime).toBe('');
+  });
+
+  it('a plan activity without a usable time fails closed', () => {
+    const plan = (createTime: unknown) =>
+      mapActivity({
+        id: 'a1',
+        type: 'planGenerated',
+        createTime,
+        plan: { id: 'p1', steps: [] },
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(plan('2026-09-10T00:00:01Z').plan?.planId).toBe('p1');
+    expect(() => plan('not a time')).toThrow(/no usable createTime/);
   });
 });

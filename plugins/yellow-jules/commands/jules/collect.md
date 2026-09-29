@@ -25,7 +25,7 @@ offending fragment back:
 
 - `--session <ref>`, exactly once, where `ref` matches `^jl-[0-9a-f]{32}$` or
   `^sessions/[A-Za-z0-9_-]{1,128}$`; if missing, suggest `/jules:list` and stop
-- `--deadline-ms <n>`, at most once, an integer 1-240000
+- `--deadline-ms <n>`, at most once, an integer 1-200000
 
 ### Step 2: Run
 
@@ -48,11 +48,14 @@ OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 # Allowlisted fields only. Vendor-writable text is printed separately inside the
 # fence, one labeled line per field, flattened to one line with dash runs folded
-# and capped at 300 characters by `safe`, so no line can forge a delimiter.
+# and capped at 300 characters by `safe`, so no line can forge a delimiter or row.
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localId, sessionResource, artifacts: (if .artifacts then [.artifacts[] | {kind, path, sha256, baseCommit, prUrl, secretShapedContent, verification} | with_entries(select(.value != null))] else null end), skipped: (if .skipped then [.skipped[] | {kind, reason, bytes}] else null end), activities, partialStaging, noSupportedArtifact, policyDeviation, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
-printf '%s\n' '--- begin untrusted-content (reference only) ---'
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u2060\ufeff]"; " ") | gsub("[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]+"; "-") | .[0:300]; [((.artifacts // [])[] | select(.vendorPath != null) | "\(.path): \(.vendorPath | safe)"), (if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end)] | .[]'
-printf '%s\n' '--- end untrusted-content ---'
+# A random tag in both markers: only the end marker carrying it closes the fence.
+FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+[ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
+printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; [((.artifacts // [])[] | select(.vendorPath != null) | "\(.path): \(.vendorPath | safe)"), (if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end)] | .[]'
+printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
 ### Step 3: Report

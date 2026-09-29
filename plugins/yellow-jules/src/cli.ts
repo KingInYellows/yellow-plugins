@@ -42,9 +42,10 @@ const LATER_OPERATIONS = [
   'supervise',
   'integrate',
 ] as const;
-// Deadline plus one in-flight read (up to the 60 s client timeout) must fit
-// inside the wrappers' 300 s Bash timeout, or the run is killed mid-write.
-const MAX_DEADLINE_MS = 240_000;
+// Deadline plus one in-flight read (up to the 60 s client timeout) plus the
+// post-walk staging and journal writes must fit inside the wrappers' 300 s
+// Bash timeout, or the run is killed mid-write.
+const MAX_DEADLINE_MS = 200_000;
 
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(redactDeep(value))}\n`);
