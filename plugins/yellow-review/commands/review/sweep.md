@@ -13,13 +13,13 @@ Run a full review-and-cleanup pass on a single PR: invoke `/review:pr
 --non-interactive` for adaptive multi-agent code review with autonomous fix
 application AND autonomous push, then `/review:resolve --non-interactive`
 for parallel resolution of all open reviewer comment threads with no
-spawn-cap, CONFLICT-surfacing, or push gates. Both skills run against the
+spawn-cap, CONFLICT-surfacing, issue-filing, verify-command, or push gates. Both skills run against the
 same PR with no human gates anywhere — sweep is fire-and-forget by design.
 
 Use when you want both an AI review pass and cleanup of any open bot or
 human comment threads in a single unattended invocation. Use `/review:pr`
 directly (without the flag) to keep its push-confirmation gate, or
-`/review:resolve` directly to keep its spawn-cap and push gates. For
+`/review:resolve` directly to keep all of its gates. For
 batch sweeping every open PR you authored, use `/review:sweep-all`. For
 multi-PR or stack-wide pipelines with compounding, use `/review:all`.
 
@@ -129,8 +129,10 @@ filename, not the slash-command name, and would silently fail to invoke
 the skill.
 
 The `--non-interactive` flag suppresses `/review:resolve`'s Step 4
-spawn-cap gate, Step 5 CONFLICT-surfacing gate, and Step 6
-push-confirmation gate. The Skill tool returns no machine-readable exit
+spawn-cap gate, Step 5 CONFLICT-surfacing and issue-filing gates, and
+Step 6 verify-command and push-confirmation gates; each falls back to its
+documented unattended rule (for issues: at most 3 per PR, and only with a
+one-line out-of-scope reason). The Skill tool returns no machine-readable exit
 status, so the wrapper cannot programmatically detect whether
 `/review:pr` errored or its fixes weren't pushed — sweep proceeds
 unconditionally; if `/review:pr` left no fixes to resolve against,
@@ -139,10 +141,12 @@ cleanup is the user's responsibility (this risk is documented in the
 plan that authored the gate removal).
 
 `/review:resolve` fetches all unresolved review threads on the PR via
-GraphQL (no author-type filter — both bot and human threads are
-addressed) and routes each thread through a `pr-comment-resolver` agent
-that either submits a fix or posts a false-positive response and marks
-the thread resolved.
+GraphQL, including outdated ones, and gives each a disposition from
+`references/resolve/dispositions.md`: `fixed` and `addressed` threads get
+a reply and are resolved, `oos` threads get a follow-up issue, and
+`disagree` / `unclear` threads get a reply and stay open as blocking.
+Human-reviewer threads are resolved only on hard evidence by default. Its
+last output line is the `Resolve:` contract line.
 
 ### Step 3b: Reconcile the review-findings ledger
 
@@ -186,17 +190,19 @@ Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
 ```text
 [review:sweep] PR #<PR#>
   Review:  completed (unattended; see /review:pr output above)
-  Resolve: <one-line summary from /review:resolve, e.g., "5 threads
-            resolved, 2 fixes applied" or "no open threads found">
+  Resolve: <the `Resolve:` line from /review:resolve, verbatim, e.g.
+            "5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped">
   Ledger:  <pending> pending, <attention> need attention — /review:triage <PR#>
 ```
 
 Print `Ledger:  none` when `summary` returned `{}`, and
 `Ledger:  unavailable` when it failed.
 
-If `/review:resolve`'s output cannot be reduced to a one-line summary,
-report `Resolve: completed (output unavailable — see above)` rather
-than synthesizing a plausible-looking summary.
+If `/review:resolve`'s output has no `Resolve:` line, report
+`Resolve: completed (output unavailable — see above)` rather than
+synthesizing a plausible-looking summary. Blocking threads do not change
+this command's exit code: they are reported, and `/review:sweep-all` (or a
+later `/review:sweep`) picks up anything a reviewer adds afterwards.
 
 ## Error Handling
 
@@ -219,7 +225,7 @@ than synthesizing a plausible-looking summary.
   proceeds to `/review:resolve` unconditionally. If `/review:pr`'s push
   failed or fixes weren't applied, `/review:resolve` may find unexpected
   state — inspect its output and re-run components manually if needed.
-- **`/review:resolve` returns no extractable summary**: report
+- **`/review:resolve` returns no `Resolve:` line**: report
   `Resolve: completed (output unavailable — see above)` rather than
   synthesizing one.
 - **Ledger step fails** (Step 3b): report `Ledger:  unavailable` and finish
