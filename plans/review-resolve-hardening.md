@@ -614,10 +614,10 @@ Decisions from the brainstorm and the planning round:
 <!-- /deepen-plan -->
 - [x] 4.2: `plugins/yellow-review/README.md`: the command table and the
   scripts table, plus a short "Dispositions" section for users.
-- [ ] 4.3: Changesets:
+- [x] 4.3: Changesets:
   - `.changeset/review-resolve-hardening.md`, `'yellow-review': minor`;
   - `.changeset/local-config-resolve-keys.md`, `'yellow-core': patch`.
-- [ ] 4.4: Validate:
+- [x] 4.4: Validate:
   - `pnpm validate:agents`
   - `pnpm lint:plugins`
   - `pnpm validate:shell-compat`
