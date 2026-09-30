@@ -1,0 +1,19 @@
+plans/yellow-council-v2-four-cli-03-synthesis-bias-mitigation.md
+  s_2ace69cfef87f2::t_e7e87f011191c4 1,3,6,13-15,24-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5b8ade661dc45c4e3520320c28f4277b40147b0a",
+  "prompts": {},
+  "sessions": {
+    "s_2ace69cfef87f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0d928312-9caa-4db9-a56e-4b18d6e4a125",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
