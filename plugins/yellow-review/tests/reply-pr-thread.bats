@@ -108,6 +108,14 @@ setup() {
   [ "$status" -eq 3 ]
 }
 
+@test "refuses a body that looks like a credential, before any API call" {
+  printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"credential"* ]]
+  [ ! -f "$CALLS" ]
+}
+
 # --- Rate limits ---
 
 @test "retries once after a 429 with Retry-After" {
@@ -121,6 +129,14 @@ setup() {
   run --separate-stderr "$SCRIPT" PRRT_reply_gqlrl fixed "$BODY"
   [ "$status" -eq 0 ]
   [ "$(cat "$CALLS")" = 2 ]
+}
+
+@test "the single retry is shared by the pre-check and the reply" {
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_precheck_rlboth"
+  run --separate-stderr "$SCRIPT" PRRT_reply_rlboth fixed "$BODY"
+  [ "$status" -eq 4 ]
+  # Pre-check limited then retried; the reply's first limit is not retried.
+  [ "$(cat "$CALLS")" = 1 ]
 }
 
 @test "a second rate limit exits 4 after exactly one retry" {

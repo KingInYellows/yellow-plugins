@@ -81,6 +81,13 @@ setup() {
   [ "$(tail -n 1 "$body")" = "<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->" ]
 }
 
+@test "refuses issue text that looks like a credential" {
+  printf 'Move DB_PASSWORD=hunter22 into the vault.\n' >| "$BODY"
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [ ! -f "$CREATES" ]
+}
+
 @test "a create failure exits 1" {
   export MOCK_GH_ISSUE_CREATE_FAIL=1
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"

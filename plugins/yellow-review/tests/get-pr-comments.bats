@@ -157,6 +157,15 @@ teardown() {
   [ "$c3" = "Bot" ]
 }
 
+@test "commentCount is the thread total, even past the 50 fetched" {
+  run "$SCRIPT" --include-outdated "test/repo" "123"
+  [ "$status" -eq 0 ]
+  counts=$(printf '%s' "$output" | jq -c '[.[] | {(.threadId): .commentCount}] | add')
+  # thread1 has totalCount 1; thread4 reports 55 with 2 fetched; thread3
+  # has no totalCount and falls back to the fetched length.
+  [ "$counts" = '{"PRRT_thread1":1,"PRRT_thread3":1,"PRRT_thread4":55}' ]
+}
+
 @test "missing author type is null, so callers treat the author as human" {
   run "$SCRIPT" "test/repo" "123"
   [ "$status" -eq 0 ]
