@@ -568,7 +568,7 @@ Decisions from the brainstorm and the planning round:
     143–145.
   - Step 4 prints the `Resolve:` line verbatim, with the existing fallback.
   - Blocking threads do not change the exit code.
-- [ ] 3.3: `commands/review/sweep-all.md`:
+- [x] 3.3: `commands/review/sweep-all.md`:
   - Add a `Blocking` column.
   - The confirmation shows the worst-case added wait: PR count × the
     `repass_wait_seconds` value.

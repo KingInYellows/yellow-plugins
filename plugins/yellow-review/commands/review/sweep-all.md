@@ -162,6 +162,11 @@ Use the `AskUserQuestion` tool with:
   fenced list: `Also deletes the review-findings ledgers of <K> closed or
   merged PRs: #<a> #<b> …`.
 
+  Always add the worst-case extra wait from `/review:resolve`'s bounded
+  re-pass: `Re-pass wait: up to <N> × <W>s = <N×W/60> min added` (`W` is
+  `resolve_pr.repass_wait_seconds` from `yellow-plugins.local.md`, default
+  120; `0` prints `Re-pass wait: disabled`).
+
 - **Options**:
   - **Proceed — sweep all <N> PRs** — run Step 3b's prune (when there is
     a prune list), then continue to Step 4
@@ -216,12 +221,19 @@ For each iteration:
      ran, not that every internal step succeeded.) Capture any stderr
      lines containing `Error:` or `fatal:` from the sweep output as the
      `Notes` value for this PR; leave `Notes` empty when the output is
-     clean.
+     clean. Take the `blocking` count `<b>` from the sweep's `Resolve:`
+     line (`?` when the line is missing).
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation, the working tree became dirty mid-loop): outcome is
      `skipped — <one-line reason>`.
-4. **Continue** to the next PR. Do not pause, do not prompt, do not
+4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
+   leaves the tree clean (fixes are committed and pushed; a failed verify
+   reverts its files). If it is dirty, add `working tree dirty after sweep`
+   to this PR's `Notes`, mark every remaining PR `skipped — working tree
+   dirty after PR #<PR#>`, and go to Step 5: sweeping on would carry these
+   edits onto the next branch.
+5. **Continue** to the next PR. Do not pause, do not prompt, do not
    abort the loop on per-PR failures.
 
 The PR number and title for each iteration must be substituted as
@@ -249,15 +261,20 @@ Print a pipe-delimited markdown summary table:
 ```text
 [review:sweep-all] Summary
 
-| PR# | Title                            | Outcome   | Residual | Skip Reason            | Notes                        |
-|-----|----------------------------------|-----------|----------|------------------------|------------------------------|
-| 123 | feat(yellow-debt): add scanner   | attempted | 2/1      |                        |                              |
-| 124 | fix(yellow-ci): lint regression  | attempted | —        |                        |                              |
-| 125 | refactor(yellow-core): split lib | skipped   | —        | PR closed before sweep |                              |
-| 126 | docs: update CLAUDE.md           | attempted | 0/0      |                        | Error: stack-provider adoption failed (…) |
+| PR# | Title                            | Outcome   | Blocking | Residual | Skip Reason            | Notes                        |
+|-----|----------------------------------|-----------|----------|----------|------------------------|------------------------------|
+| 123 | feat(yellow-debt): add scanner   | attempted | 1        | 2/1      |                        |                              |
+| 124 | fix(yellow-ci): lint regression  | attempted | 0        | —        |                        |                              |
+| 125 | refactor(yellow-core): split lib | skipped   | —        | —        | PR closed before sweep |                              |
+| 126 | docs: update CLAUDE.md           | attempted | ?        | 0/0      |                        | Error: stack-provider adoption failed (…) |
 
-Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention
+Totals: Attempted 3 | Skipped 1 | Total 4 | Blocking 1 | Residual 2 pending, 1 need attention
 ```
+
+`Blocking` is the review threads `/review:resolve` left open (disagree,
+unclear, held human threads, `CHANGES_REQUESTED`); `?` rows are excluded
+from the total. Blocking threads do not change the exit code — re-run
+`/review:sweep-all` later to pick up reviewer replies and late comments.
 
 `Residual` is `pending/attention`: pending findings are `open`, `reopened`
 or `applied` (fixed locally, not yet published); attention findings are
@@ -319,7 +336,8 @@ Otherwise, with `attempted_count >= 1`:
 - **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at
   Step 1 does NOT serialize concurrent sweeps — `/review:pr` and
   `/review:resolve` clean the working tree between PRs (via a commit +
-  push through the resolved stacked-PR provider), so a second `sweep-all` that starts
+  push through the resolved stacked-PR provider, or a verify revert; Step 4
+  item 4 stops the loop otherwise), so a second `sweep-all` that starts
   mid-loop will frequently see a clean tree and proceed, causing branch
   races (interleaved checkouts, conflicting commits, push races). Do
   not run two `sweep-all` instances simultaneously.
