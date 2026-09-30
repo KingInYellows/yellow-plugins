@@ -84,11 +84,13 @@ file at most 3 issues per PR. Replies and issues carry a hidden marker, so a
 re-run posts no duplicates. The last output line is a machine summary:
 
 ```text
-Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped
+Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
 ```
 
-Optional `resolve_pr.verify_command` runs before the commit; if it fails,
-the fixes are saved as a patch under the git common dir and reverted. The
+Optional `resolve_pr.verify_command` runs before the commit (interactive
+runs ask first; unattended runs need `resolve_pr.verify_unattended: true`);
+if it fails, the fixes are saved as a patch under the git common dir and
+reverted. The
 full contract is `references/resolve/dispositions.md`.
 
 ## Agents

@@ -222,7 +222,10 @@ For each iteration:
      lines containing `Error:` or `fatal:` from the sweep output as the
      `Notes` value for this PR; leave `Notes` empty when the output is
      clean. Take the `blocking` count `<b>` from the sweep's `Resolve:`
-     line (`?` when the line is missing).
+     line (`?` when the line is missing). If that line reports
+     `ratelimited=1`, mark every remaining PR `skipped — not attempted
+     (rate limit)` and go to Step 5: the next sweep would hit the same
+     GitHub limit.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation, the working tree became dirty mid-loop): outcome is

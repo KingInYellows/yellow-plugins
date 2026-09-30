@@ -191,7 +191,7 @@ Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
 [review:sweep] PR #<PR#>
   Review:  completed (unattended; see /review:pr output above)
   Resolve: <the `Resolve:` line from /review:resolve, verbatim, e.g.
-            "5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped">
+            "5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0">
   Ledger:  <pending> pending, <attention> need attention — /review:triage <PR#>
 ```
 
