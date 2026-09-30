@@ -36,3 +36,12 @@ Shared libraries: `lib/resolve-text.sh` (credential-shape check; refusals print
 a `resolve-text: refused rule=... line=...` line, never the text) and
 `lib/resolve-gh.sh` (`YELLOW_REVIEW_GH_TIMEOUT` for `file-followup-issue` and
 `get-pr-blockers`).
+
+Behaviour changes for callers: `/review:resolve` now always adds a new
+commit instead of amending the previous one, and its last output line is the
+`Resolve:` contract line. `/review:resolve-stack` exits 1 whenever anything
+blocks (open threads, `CHANGES_REQUESTED`, a rate limit or a dirty-tree
+abort), stops and reverts (patch saved) when a PR leaves the tree dirty, and
+its summary table now has `blocking` and `issues` columns instead of
+`comments found`. `/review:sweep-all` gains a `Blocking` column. The
+`pr-comment-resolver` agent no longer has a Bash tool.
