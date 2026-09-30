@@ -613,7 +613,7 @@ Decisions from the brainstorm and the planning round:
 > `commit-resolve-fixes` and `run-verify-command` land. `validate-doc-counts.js` checks only root docs, so no
 > validator will catch this.
 <!-- /deepen-plan -->
-- [ ] 4.2: `plugins/yellow-review/README.md`: the command table and the
+- [x] 4.2: `plugins/yellow-review/README.md`: the command table and the
   scripts table, plus a short "Dispositions" section for users.
 - [ ] 4.3: Changesets:
   - `.changeset/review-resolve-hardening.md`, `'yellow-review': minor`;
