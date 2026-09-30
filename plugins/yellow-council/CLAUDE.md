@@ -67,7 +67,21 @@ and never auto-commits. The user decides what to do with the verdicts.
   `tests/redaction.bats` fails the whole file if any copy drifts.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
-  `--- end council-output:<reviewer> ---` fences.
+  `--- end council-output:<reviewer> ---` fences. The synthesis input uses a
+  uniform `council-output:S<n>` label for every leg instead, so the fence
+  names no reviewer.
+- **Synthesis is blind, two-pass and rubric-scored.** Claude both reviews and
+  synthesizes, so `council.md` Step 5 normalizes each reviewer's text
+  (markdown and severity formats flattened; code spans, citations and
+  `Evidence:` quotes kept byte-for-byte), relabels reviewers with a random
+  `S1`–`S4` bijection per run, requires enumerate-then-compare reasoning with
+  a self-participant instruction, scores every finding on four rubric
+  dimensions combined without weighting, and re-runs the synthesis in reverse
+  label order to flag verdict flips as `low-confidence-synthesis` ties. Labels
+  map back to names only when the report is assembled. All of it is
+  prompt-level inside one orchestrator context — not isolated passes — and
+  correctness is self-assessed until citation verification (`verify_finding()`)
+  lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
@@ -90,9 +104,11 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 - `/council <mode> [args]` — main entry point with four modes:
   - `plan <path-or-text>` — council on a planning doc / design proposal
-  - `review [--base <ref>]` — council on the current diff
+  - `review [--base <ref>] [--single-pass]` — council on the current diff
   - `debug "<symptom>" [--paths <files>]` — council on a debug investigation
   - `question "<text>" [--paths <files>]` — open-ended consultation
+- `--single-pass` (accepted in every mode) skips the order-swapped second
+  synthesis pass, as does `COUNCIL_DOUBLE_PASS_SYNTHESIS=0`.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
@@ -159,6 +175,7 @@ Codex agent.)
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
+| `COUNCIL_DOUBLE_PASS_SYNTHESIS` | `0 \| 1` | `1` | `1` runs the order-swapped second synthesis pass and flags verdict flips as `low-confidence-synthesis` ties; `0` runs a single pass. Invalid values warn and keep `1`. `/council <mode> --single-pass` disables it for one invocation. |
 
 ## Testing
 

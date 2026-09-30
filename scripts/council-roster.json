@@ -64,6 +64,7 @@
     "plugins/yellow-council/skills/council-patterns/SKILL.md": "1efa59b3",
     "plugins/yellow-council/skills/council-patterns/references/cross-references.md": "1efa59b3",
     "plugins/yellow-council/tests/lib/extract-redaction-awk.bash": "1efa59b3",
+    "plugins/yellow-council/tests/synthesis.bats": "1efa59b3",
     "scripts/validate-agent-authoring.js": "1efa59b3"
   },
   "exceptions": [
