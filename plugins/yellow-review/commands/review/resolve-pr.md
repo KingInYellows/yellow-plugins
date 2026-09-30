@@ -360,11 +360,12 @@ not already. Then, for every thread sent to a resolver:
 ### Step 6: Verify, Commit and Push
 
 **Files.** The expected set is the union of every resolver's `Files
-modified`, minus clusters rolled back in Step 5. If `git status --porcelain`
-shows any change (tracked or untracked) outside that set, stop and report
-it; every `fixed` thread becomes `unclear`. Write the set,
-one path per line, to a `mktemp` file with the Write tool (`<files-file>`
-below); resolver text never goes on a command line.
+modified`, minus clusters rolled back in Step 5; write it, one path per
+line, to a `mktemp` file with the Write tool (`<files-file>`). **On any
+refusal below** — a `git status --porcelain` change outside the set, a
+script exit 2 or 3, verify `skipped` — run `run-verify-command --pr
+"<PR#>" --revert-dirty` (patch saved) and make every `fixed` thread
+`unclear`: a refused edit must not stay on disk.
 
 **Provider.** Invoke the `Skill` tool with `skill: "stack-provider-router"`
 and read `state`. `READY_GRAPHITE` → `--provider graphite`; `READY_GITHUB` →
@@ -383,8 +384,8 @@ Bash tool a `timeout` of `(<seconds> + 60) × 1000` ms:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --files-from "<files-file>"
 ```
 
-`pass` → `verify=pass`. `skipped` → `verify=skipped`, `fixed` threads held
-open as "verify skipped (<reason>)". `fail`/`timeout` → `verify=fail`: the files were
+`pass` → `verify=pass`. `skipped` → `verify=skipped` ("verify skipped
+(<reason>)", a refusal). `fail`/`timeout` → `verify=fail`: the files were
 reverted and a patch saved, every `fixed` thread becomes blocking "verify
 failed (<patch>)", and the commit is skipped (`push=skipped`). If
 `treeClean` is false, stop after Step 9 with the dirty file list.
@@ -401,7 +402,9 @@ Add `--unattended` in non-interactive mode; Bash `timeout` 600000 ms:
 
 `PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
 `push=failed` with its stderr (exit codes in the contract). Only `PUSHED`
-keeps `fixed` threads `fixed`; otherwise they become `unclear`.
+keeps `fixed` threads `fixed`; otherwise they become `unclear`. Stderr
+`credential-shaped` (interactive only): ask once more, naming the files;
+on yes re-run with `--allow-credential-shaped`, otherwise it is a refusal.
 
 ### Step 7: Write Phase
 
