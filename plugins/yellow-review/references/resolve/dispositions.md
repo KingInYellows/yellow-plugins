@@ -605,5 +605,8 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   of threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply;
   markers dedupe only per viewer.
+- Linear issues are not deduped by marker. If the reply fails after a
+  Linear issue is filed, a re-run can file a second one; the Step 9 report
+  lists the first so it can be closed by hand.
 - Where branch protection does not require conversation resolution, an open
   thread is a convention, not a merge block. The report says which applies.

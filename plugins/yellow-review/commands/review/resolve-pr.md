@@ -132,33 +132,17 @@ else
 fi
 ```
 
-The block handles four outcomes (`TARGET_PR` is the canonicalized
-explicitly-passed target from Step 1, and the temporary file is deleted before
-classification):
-
-1. **`BV_EC` = 0 and `CUR_PR` = `<PR#>`** — correct branch. Proceed to Step 3.
-2. **`BV_EC` = 0 and `CUR_PR` ≠ `<PR#>`** — wrong branch. Report the mismatch
-   and checkout guidance, then stop.
-3. **`BV_EC` ≠ 0 and `BV_ERR` contains** `no pull requests found`,
-   `no open pull requests`, or `no pull requests associated` (case-insensitive
-   substring — the same strings `/flow:compound` uses to classify this
-   state) — the current branch has no associated PR. Report checkout guidance
-   and stop.
-4. **`BV_EC` ≠ 0 with any other stderr** — the check could not run (auth, rate
-   limit, network). **Fail closed** with fenced stderr and retry guidance. Do
-   not assume the branch is correct or tell the user to switch branches.
+The block exits 0 only when the current branch maps to `<PR#>`. A different
+PR, no PR (the same stderr strings `/flow:compound` classifies), or a failed
+`gh` call all exit 1; the last fails closed with fenced stderr and retry
+guidance rather than telling the user to switch branches.
 
 If the block exits non-zero, stop the command and do not proceed to Step 3.
 
-This is a mode-independent precondition: it fires identically with and without
-`--non-interactive` (like the unknown-flag hard error in Step 1) and is **not**
-one of the `AskUserQuestion` gates `--non-interactive` suppresses — so it is not
-listed in that flag's gate set and `docs/plugin-scope-mode-protocol.md`
-Interface 1 is unchanged. A hard exit here cannot abort a
-`/review:resolve-stack` or `/review:sweep` invocation — the `Skill` tool returns
-no exit status, so neither caller can catch it programmatically. Under
-`/review:resolve-stack`, the walk's own Step 3 self-verify re-fetch then flags
-this PR's comments as still unresolved and continues to the next PR.
+This precondition fires identically with and without `--non-interactive`; it
+is not one of the suppressed gates. Callers cannot catch its exit (the `Skill`
+tool returns no status); `/review:resolve-stack`'s self-verify re-fetch flags
+the PR's threads as still open instead.
 
 ### Step 3: Fetch Unresolved Comments
 
@@ -352,123 +336,146 @@ notification). Do NOT proceed to commit, diff review, or thread resolution
 while any resolver task is still `in_progress` — doing so risks committing
 partial fixes and marking threads resolved prematurely.
 
-### Step 5: Review Changes
+### Step 5: Dispositions
 
-Collect resolver return summaries first. Scan each summary for a leading `CONFLICT:` line (the structured contradiction-conflict sentinel — see Step 4 contract).
+Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` now if you have
+not already. Then, for every thread sent to a resolver:
 
-- **Interactive mode (default).** If any cluster reported a `CONFLICT:`, surface the list (cluster id, threadIds, conflict description) via `AskUserQuestion` before continuing — options: "Keep the resolver's partial edits / Roll back the conflicted cluster's edits / Cancel and reconcile manually". Record the user's choice per cluster; conflicted clusters not kept must be reset (`git checkout -- <files>`) before Step 6.
-- **Non-interactive mode.** Do NOT prompt. Log each `CONFLICT:` cluster (cluster id, threadIds, conflict description) for the Step 9 report, keep the resolver's partial edits in place (no rollback), and leave the conflicted cluster's threads unresolved — Step 7 already skips marking threads resolved for any cluster whose resolver emitted `CONFLICT:`.
+1. **Conflicts.** For each cluster whose summary starts with `CONFLICT:`:
+   - **Interactive:** one `AskUserQuestion` listing them (cluster, threadIds,
+     description) with "Keep the resolver's partial edits / Roll back the
+     conflicted cluster's edits / Cancel and reconcile manually". Roll back
+     with `git checkout -- <files>`. Cancel stops before Step 6.
+   - **Non-interactive:** keep the edits, log the conflict for Step 9.
+   Either way, the conflicted cluster's threads become `unclear`.
+2. **Parse and validate** each `THREAD` line, applying the contract's
+   downgrade rules, skipped-reason mapping and `addressed` evidence rules.
+   Check evidence locally, for example:
+   ```bash
+   git cat-file -e "HEAD:<file>" && git show "HEAD:<file>" | wc -l
+   git merge-base --is-ancestor "<sha>" HEAD && git show --name-only --format= "<sha>"
+   ```
+3. **Lanes.** Classify each thread (bot vs human by the first comment's
+   `authorType`; `viewerCanResolve`; `viewerCanReply`) and apply the lane
+   table. Read `resolve_pr.resolve_human_threads` from
+   `yellow-plugins.local.md` (`evidence` default; any other value than
+   `evidence|never|all` warns and uses `evidence`).
+4. **Issue gate.** Candidates are the validated `oos` threads, sorted by
+   path, line, threadId.
+   - **Interactive:** one question per candidate (`path:line`, threadId,
+     `oos_reason`; options "File issue / Leave open"), four questions per
+     `AskUserQuestion` call. "Leave open" makes the thread `unclear`.
+   - **Non-interactive:** apply the contract's cap (3 created per PR per run,
+     shared with Step 8) and its over-cap reply.
 
-Then check for cross-agent edit conflicts:
+### Step 6: Verify, Commit and Push
 
-- If multiple agents proposed changes to the same file region, review and reconcile manually
-- Use `git diff` to inspect all changes before committing
+**Files.** The expected set is the union of every resolver's `Files
+modified`, minus clusters rolled back in Step 5. If `git status --porcelain`
+shows a tracked change outside that set, stop and report it.
 
-If neither conflict path triggered, proceed to Step 6.
+**Provider.** Invoke the `Skill` tool with `skill: "stack-provider-router"`
+and read `state`. `READY_GRAPHITE` → `--provider graphite`; `READY_GITHUB` →
+`--provider github`; any other state → report the router's `detail` inside a
+`--- begin untrusted-content (reference only) ---` / `--- end
+untrusted-content ---` fence, record `push=failed`, skip to Step 7.
 
-### Step 6: Commit and Push
-
-If changes were made:
-
-- **Interactive mode (default).**
-  1. Show `git diff --stat` summary to the user.
-  2. Use `AskUserQuestion` to confirm: "Push these changes to resolve PR #X
-     comments?"
-  3. On approval: run the commit + submit below.
-  4. If rejected: report changes remain uncommitted for manual review.
-- **Non-interactive mode.** Skip the `AskUserQuestion`. Print the `git diff
-  --stat` summary for the log, then run the commit + submit below directly.
-
-### Resolve the active stacked-PR provider
-
-Invoke the `Skill` tool with `skill: "stack-provider-router"`. Read `state`
-from its result.
-
-- **`READY_GRAPHITE`** — continue with the Graphite steps below.
-- **`READY_GITHUB`** — continue with the GitHub steps below.
-- **Any other state** — stop. Report the router's `detail` verbatim inside a
-  `--- begin untrusted-content (reference only) ---` /
-  `--- end untrusted-content ---` fence and do not attempt any
-  provider-specific mutation.
-
-#### Graphite
+**Verify** (only when `resolve_pr.verify_command` is set; else
+`verify=skipped`). Check whether the config file is tracked:
 
 ```bash
-gt modify -m "fix: resolve PR #<PR#> review comments"
-gt submit --no-interactive
+git ls-files --error-unmatch yellow-plugins.local.md >/dev/null 2>&1 && printf 'tracked\n' || printf 'untracked\n'
 ```
 
-If `gt submit` exits non-zero, report the error and skip Step 7 (see Step 7
-guard).
+- **Interactive:** show the command (fenced) via `AskUserQuestion`: "Run it
+  / Skip verification / Cancel". Skip → `verify=skipped`.
+- **Non-interactive:** tracked → print `verify skipped (tracked config)`,
+  `verify=skipped`. Untracked → run it.
+- When `verify=skipped` because the command was not run, every `fixed`
+  thread is held open as blocking ("verify skipped").
+- To run it, write the command with the Write tool to a `mktemp` path, then
+  (timeout from `resolve_pr.verify_timeout_seconds`, default 600):
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<file>" --trusted -- <expected files>
+  ```
+  `pass` → `verify=pass`. `fail`/`timeout` → `verify=fail`; the files were
+  reverted and a patch saved; every `fixed` thread becomes blocking "verify
+  failed (<patch>)"; skip the commit (`push=skipped`). If `treeClean` is false, stop the
+  command after Step 9 with the dirty file list.
 
-#### GitHub
+**Push.** Interactive: show `git diff --stat` and ask "Push these changes to
+resolve PR #X comments?"; rejection → `push=skipped`, edits stay
+uncommitted, `fixed` threads become `unclear`. Then run:
 
 ```bash
-git add -- <specific files, never -A/.>
-git commit -m "fix: resolve PR #<PR#> review comments"
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" -- <expected files>
 ```
 
-Read the JSON result's `status` field. `SUCCESS` continues to Step 7.
-Anything else, report the result's `recoveryAction` and skip Step 7 (see
-Step 7 guard).
+`PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
+`push=failed` with its stderr (exit codes in the contract). Only `PUSHED`
+keeps `fixed` threads `fixed`; otherwise they become `unclear`.
 
-### Step 7: Mark Threads Resolved
+### Step 7: Write Phase
 
-**Interactive mode:** only if the user approved the push in Step 6 AND the
-push succeeded (Graphite `gt submit` exited 0, or GitHub's adapter `submit`
-call returned `status: SUCCESS`). **Non-interactive mode:** only if the push
-succeeded. In both modes, if the push was rejected (interactive), the push
-failed, or **no changes were committed** (Step 6's "If changes were made"
-guard was false, so the push never ran), skip this step.
+Check the PR is still open (`gh pr view "<PR#>" --json state -q .state`); if
+not `OPEN`, print `PR #<N> is <STATE>; write phase stopped` and go to Step 9.
 
-For each successfully-resolved **cluster** from Step 4, iterate over the
-cluster's `threadIds` and run:
+Process threads serially, sorted by path, line, threadId — including the
+Step 3c dropped threads — following the contract's write order and lanes.
+For each action write the text with the Write tool to a `mktemp` path, never
+on a command line:
 
 ```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" "<owner/repo>" "<PR#>" "<threadId>" "<title-file>" "<body-file>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/reply-pr-thread" "<threadId>" "<disposition>" "<body-file>"
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/resolve-pr-thread" "<threadId>"
 ```
 
-A cluster is "successfully resolved" when its resolver agent returned without a
-`CONFLICT:` sentinel line in its summary AND its edits applied during Step 4
-without rollback during Step 5 reconciliation. If a cluster's resolver emitted
-`CONFLICT:` or its edits were rolled back in Step 5, do NOT mark its threads
-resolved — they remain open for human reconciliation.
+- `fixed` replies cite the short SHA from Step 6 (`git rev-parse --short`).
+- **Linear:** when ToolSearch finds
+  `mcp__plugin_yellow-linear_linear__save_issue` and the branch matches
+  `[A-Z]{2,5}-[0-9]{1,6}`, resolve the team from the prefix with
+  `list_teams` and call `save_issue` (title, team, description ending with
+  the marker). Any failure falls back to `file-followup-issue` once.
+- A failed stage stops that thread's later stages; record the per-stage
+  outcome. After any exit 4, stop mutating and mark the rest `not attempted
+  (rate limit)`.
 
-If a script exits non-zero for a single threadId, record that threadId as failed
-and continue to the next thread (within the same cluster and across clusters).
-Do not abort the loop. Include all failed threadIds with their stderr output in
-the Step 9 report.
+### Step 8: Bounded Re-pass
 
-### Step 8: Verification Loop
+Skip when the tree is dirty, `push=failed`, `verify=fail`, a rate limit was
+hit, or `resolve_pr.repass_wait_seconds` is 0 (default 120; outside 0–600
+warns and uses 120). Otherwise, write the round-1 thread IDs (one per line)
+to a `mktemp` file with the Write tool and poll every 20 seconds:
 
-1. Wait 2 seconds
-2. Re-fetch comments with `get-pr-comments`:
-   - If the re-fetch fails with a 429 (rate limit) error: wait 60 seconds and
-     retry once
-   - If the re-fetch fails with any other error: mark verification as
-     **inconclusive**, capture the stderr output, and skip to Step 9 (do not
-     attempt further `resolve-pr-thread` retries)
-3. If unresolved threads remain that we attempted to resolve, retry
-   `resolve-pr-thread` up to 3 times:
-   - Check the exit code on each attempt
-   - On a 429 (rate limit) error in stderr: wait 60 seconds before next retry
-4. Threads unresolved after 3 retries due to non-zero exit are reported as
-   **Errors** (include stderr from the last failed attempt). Other unresolved
-   threads are reported as warnings.
+```bash
+waited=0; found=0
+while [ "$waited" -lt "<wait>" ]; do
+  sleep 20; waited=$((waited + 20))
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-outdated "<owner/repo>" "<PR#>" >| "<refetch-file>" || continue
+  if jq -r '.[].threadId' "<refetch-file>" | grep -qvxF -f "<round1-file>"; then found=1; break; fi
+done
+printf 'waited=%s new=%s\n' "$waited" "$found"
+```
+
+From the last re-fetch:
+- threads this run attempted to resolve but still open → retry
+  `resolve-pr-thread` up to 3 times (wait 60 s after a rate limit); a thread
+  we resolved that is open again is reported `reopened by bot`, not retried;
+- if new threads appeared, re-check the PR state, then run Steps 3c–7 once
+  for the new threads only (same gates, shared issue cap). There is never a
+  third round. Threads left open by design are not errors.
 
 ### Step 9: Report
 
-Present summary:
-
-- **Total comments found** — raw count from Step 3
-- **Dropped (non-actionable)** — count and threadIds from Step 3c (LGTM / nit / etc.)
-- **Clusters formed** — count from Step 3d, plus the reduction ratio (e.g., `5 threads → 3 clusters`)
-- **Successfully resolved** — clusters whose edits applied and threads were marked resolved
-- **Failed/skipped** — clusters with resolver contradictions, edit conflicts, or `resolve-pr-thread` script failures (with stderr per failed threadId)
-- **Any remaining unresolved threads** — distinguishing dropped (intentional) from failed (needs human attention)
-- **Push status** — submitted, rejected, or skipped
-- **Verification status** — confirmed / inconclusive (with Step 8 error details if inconclusive)
+Report, per the contract: **Resolved** (by disposition, plus `resolved
+(non-actionable)`), **Blocking merge** (disagree/unclear, human-held, needs
+permission, verify failed with the patch path, not attempted (cluster cap /
+rate limit), per-stage failures such as `oos: issue #12 filed, reply
+failed`, and `CHANGES_REQUESTED` reviewers from `get-pr-blockers`),
+**Follow-up issues filed** (links, with `tracker=`), and **Conversation
+resolution** (`enforced` / `not enforced` / `unknown`). The final line is
+exactly the contract's `Resolve:` line.
 
 ## Error Handling
 
@@ -484,7 +491,10 @@ Present summary:
   restore access if needed, and retry; switching branches is not the remedy.
 - **Script not found**: "GraphQL scripts missing. Verify yellow-review plugin is
   installed."
-- **Resolver failures**: Report which comments could not be resolved and why.
-- **Push failure**: Report error, suggest `gt stack` to diagnose.
-
-See `pr-review-workflow` skill for full error handling patterns.
+- **Resolver failures**: every thread in the cluster becomes `unclear`
+  (blocking) and gets a reply saying what is missing.
+- **Push or verify failure**: `fixed` threads stay open; the report names the
+  failed stage (and the patch path for verify). Suggest `gt stack` or
+  `/stack:status` to diagnose a push failure.
+- **PR closed or merged mid-run**: the write phase stops with one line, not
+  per-thread errors.
