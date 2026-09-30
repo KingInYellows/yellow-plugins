@@ -1,0 +1,33 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_becc7011266565::t_5c4c34dffa4d86 81-82,116,123,125,153,161-172
+  s_becc7011266565::t_cbebf68860b941 173-174
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_becc7011266565::t_92a9e0774416d2 6-13,19-20,35,43-44,52-53,68-74,84,86,88,91-103,161-163,197,204-207,209-210,217-218,227
+plugins/yellow-review/lib/resolve-paths.sh
+  s_becc7011266565::t_e84fdf6dffb5db 4-6,9-13,37,41-42,48-49,51,53-54,58-62,66-69,73-77
+  s_becc7011266565::t_5240861383cc65 78
+plugins/yellow-review/tests/helpers/resolve-repo.bash
+  s_becc7011266565::t_62f42bfc9513d0 60-61,106-107
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_becc7011266565::t_62f42bfc9513d0 237-260
+plugins/yellow-review/tests/run-verify-command.bats
+  s_becc7011266565::t_62f42bfc9513d0 168-212
+plugins/yellow-review/tests/resolve-paths.bats
+  s_becc7011266565::t_62f42bfc9513d0 30-33,48-50,55-57,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "301bad48cb20604887d769d5a336be2d7b18935c",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
