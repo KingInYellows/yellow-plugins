@@ -725,3 +725,28 @@ EOF2
     done
   done
 }
+
+@test "5b surfaces a staged summary as detail for an excluded gemini slot with no fenced file" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5b="${BATS_TEST_TMPDIR}/5b.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  local profile
+  for profile in $PROFILES; do
+    setup_council_run
+    printf 'claude\tREVISE\tHIGH\t%s\ncodex\tREVISE\tLOW\t%s\ngemini\tUNAVAILABLE\tN/A\t\nopencode\tAPPROVE\tMEDIUM\t\n' \
+      "$CF" "$CX" >| "$REPO/.git/council-state.tsv"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    TOKEN=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_TOKEN=//p')
+    printf '%s\n' 'CLI not installed.' >| "$SD/gemini.summary.txt"
+    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" \
+        -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
+    grep -qxF '(excluded: UNAVAILABLE) Status detail: CLI not installed.' "$SD/forward.txt"
+    [ ! -e "$SD/gemini.summary.txt" ]
+    rm -rf "$SD" "$REPO"
+  done
+}

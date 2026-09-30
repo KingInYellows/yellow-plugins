@@ -1126,7 +1126,8 @@ Step 4 minted and redacted in place (claude-reviewer has no Bash and cannot
 sanitize its own return); the three CLI legs redact inside their own agents
 before writing theirs. The one exception is Codex's overall summary, which
 exists only in its (already redacted) Agent return — its fenced file carries
-only escaped findings — so 5a stages that single line through `Write`. The
+only escaped findings — so 5a stages that single line through `Write`, and likewise the `summary=` of a
+Gemini or OpenCode slot that exited before writing a fenced file. The
 Bash arrays Step 4 filled do not exist in this step's fresh subprocesses.
 
 Large text never comes back through one Bash result: the Bash tool truncates
@@ -1185,7 +1186,11 @@ does not match.
 If Codex's Agent return carried a `summary=` line, whatever its verdict
 (an excluded Codex slot's summary is its only status detail), use the `Write`
 tool to create `<literal COUNCIL_SYNTH_DIR value>/codex.summary.txt` (a new file)
-holding exactly that one `summary=` value, copied verbatim. Stage nothing
+holding exactly that one `summary=` value, copied verbatim. Do the same for an
+excluded (TIMEOUT, ERROR or UNAVAILABLE) Gemini or OpenCode slot whose Agent
+return had an empty `fenced_output_path=`: stage its `summary=` value as
+`gemini.summary.txt` or `opencode.summary.txt`, since that line is the only
+record of why it exited early. Never stage the claude leg's return. Stage nothing
 else — 5b reads every other leg from disk. Reviewer text must never be pasted
 into a Bash heredoc: a crafted line matching the delimiter would end the
 heredoc and run as shell input (the same reason Step 3 stages the pack
@@ -1531,7 +1536,7 @@ if [ "$SYNTH_TOKEN_OK" -ne 1 ] || [ ! -f "$SYNTH_DIR/.token" ] || [ -L "$SYNTH_D
   printf '[council] Error: staging directory %s is not the one Step 5a minted for this run — refusing to use or delete it\n' "$SYNTH_DIR" >&2
   exit 1
 fi
-# A freshly minted directory holds only .token and possibly codex.summary.txt;
+# A freshly minted directory holds only .token and possibly <reviewer>.summary.txt files;
 # never write through a pre-existing output name or symlink.
 for f in labels.txt forward.txt reverse.txt; do
   if [ -e "$SYNTH_DIR/$f" ] || [ -L "$SYNTH_DIR/$f" ]; then
@@ -1612,9 +1617,15 @@ while IFS=: read -r label r; do
     detail=$(printf '%s\n' "$text" | sed -n 's/^Summary: //p' | head -n 1)
     text=""
     why=""
-    if [ "$r" = "codex" ] && [ -f "$SYNTH_DIR/codex.summary.txt" ] && [ ! -L "$SYNTH_DIR/codex.summary.txt" ]; then
-      detail=$(head -n 1 "$SYNTH_DIR/codex.summary.txt")
-    fi
+    # A CLI leg that exits before writing its fenced file (CLI missing,
+    # timeout) leaves its cause only in its Agent return; 5a staged that
+    # line. claude never reads its Agent return.
+    case "$r" in
+      codex|gemini|opencode)
+        if [ -f "$SYNTH_DIR/${r}.summary.txt" ] && [ ! -L "$SYNTH_DIR/${r}.summary.txt" ]; then
+          detail=$(head -n 1 "$SYNTH_DIR/${r}.summary.txt")
+        fi ;;
+    esac
     if [ -n "$detail" ]; then
       detail=$(printf '%s\n' "$detail" | council_normalize_text "$r" | head -n 1) || {
         printf '[council] Error: normalization failed\n' >&2
@@ -1672,7 +1683,7 @@ __COUNCIL_LABELS__
 } >| "$SYNTH_DIR/reverse.txt" || council_synth_abort
 n=1
 while [ "$n" -le "$BLOCK_COUNT" ]; do rm -f -- "$SYNTH_DIR/block-S${n}.txt"; n=$((n + 1)); done
-rm -f -- "$SYNTH_DIR/codex.summary.txt"
+rm -f -- "$SYNTH_DIR/codex.summary.txt" "$SYNTH_DIR/gemini.summary.txt" "$SYNTH_DIR/opencode.summary.txt"
 
 printf 'COUNCIL_SYNTH_FORWARD=%s/forward.txt (%s lines)\n' "$SYNTH_DIR" "$(wc -l < "$SYNTH_DIR/forward.txt" | tr -d ' ')"
 printf 'COUNCIL_SYNTH_REVERSE=%s/reverse.txt\n' "$SYNTH_DIR"
