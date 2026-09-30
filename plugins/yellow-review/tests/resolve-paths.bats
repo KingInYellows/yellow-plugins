@@ -45,7 +45,7 @@ setup() {
 @test "rp_runner flags files hooks or verify commands execute" {
   for p in package.json web/package.json pnpm-lock.yaml Makefile conftest.py tests/conftest.py \
            vitest.config.ts .pre-commit-config.yaml lefthook.yml .lintstagedrc.json \
-           scripts/build.sh .husky/pre-commit packages/x/scripts/gen.sh .npmrc .yarnrc.yml \
+           scripts/build.sh .husky/pre-commit web/.husky/pre-push .npmrc .yarnrc.yml \
            justfile Rakefile Taskfile.yml pyproject.toml setup.py tox.ini build.rs \
            .cargo/config.toml .envrc .eslintrc.json .prettierrc; do
     rp_runner "$p" || { echo "not a runner: $p"; false; }
@@ -58,7 +58,8 @@ setup() {
 }
 
 @test "rp_runner leaves ordinary sources alone" {
-  for p in src/a.ts src/scripts.ts README.md src/transcripts/a.md; do
+  for p in src/a.ts src/scripts.ts README.md src/transcripts/a.md \
+           plugins/x/skills/y/scripts/tool packages/x/scripts/gen.sh; do
     run rp_runner "$p"
     [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
   done

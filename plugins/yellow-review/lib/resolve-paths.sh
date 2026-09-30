@@ -50,8 +50,11 @@ rp_denied() {
 rp_runner() {
     local l hooks top
     l=$(rp_lower "$1")
+    # Only the repository-root scripts/ directory: build and hook tooling
+    # lives there. Nested scripts/ directories (e.g. a plugin's own
+    # skills/*/scripts/) are ordinary sources that hooks do not run.
     case "/$l" in
-        /scripts/*|*/scripts/*|/.husky/*|*/.husky/*|/.cargo/*|*/.cargo/*) return 0 ;;
+        /scripts/*|/.husky/*|*/.husky/*|/.cargo/*|*/.cargo/*) return 0 ;;
     esac
     case "${l##*/}" in
         package.json|package-lock.json|npm-shrinkwrap.json|pnpm-lock.yaml|yarn.lock|bun.lock|bun.lockb) return 0 ;;
