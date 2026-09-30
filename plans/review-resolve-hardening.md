@@ -271,7 +271,7 @@ Decisions from the brainstorm and the planning round:
 > See https://docs.github.com/en/graphql/reference/pulls and
 > https://github.com/abhinav/git-spice/blob/main/internal/forge/github/review.go
 <!-- /deepen-plan -->
-- [ ] 1.4: New script `skills/pr-review-workflow/scripts/reply-pr-thread
+- [x] 1.4: New script `skills/pr-review-workflow/scripts/reply-pr-thread
   <PRRT_id> <disposition> <body-file>` (POSIX sh, modelled on
   `resolve-pr-thread`). It:
   - validates the `PRRT_` prefix and the disposition vocabulary;
