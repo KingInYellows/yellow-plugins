@@ -54,8 +54,9 @@ synthesis shell's mechanical combination rule.
 - Final cross-cutting validation pass over the assembled V2
 - A recorded decision on where the synthesis helper library lives (see
   "Carried follow-ups")
-- Normalizer fixes so evidence and identifiers survive byte-exact before
-  `verify_finding()` compares them; Step 7 report staging without a heredoc
+- Normalizer fixes for synthesis-side text (F3/F4) while `verify_finding()`
+  compares verbatim cited excerpts per R22; Step 7 report staging without a
+  heredoc and with guaranteed staging-dir cleanup
 
 ## Consumes
 
@@ -106,6 +107,10 @@ time.
   (paraphrased) line could still reproduce it and run the rest as shell.
   Stage `SYNTHESIS_MD` through `Write` into the token-bound staging dir (or a
   fresh `mktemp -d`) and `cat` it in Step 7, like 5a does for reviewer text.
+  If using a fresh `mktemp -d`, register a `trap` (or equivalent) so the
+  directory is removed on every exit — normal completion, Step 7 failure exits,
+  and early aborts — or reuse an existing staging dir whose lifecycle already
+  guarantees cleanup.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
   through unnormalized (identity and style signal survive). Buffer fenced
@@ -114,8 +119,11 @@ time.
 - **F4 — bare identifiers lose edge underscores.** `strip_emph` strips
   leading/trailing `*`/`_` runs from any non-path word, so bare `__init__`,
   `_private_fn` or `*ptr` in prose become `init`, `private_fn`, `ptr` — which
-  can break a finding's claim text that `verify_finding()` or a reader relies
-  on. Rule: `*` runs strip only when the same-length run wraps the word or
+  can break a finding's claim text that a reader relies on. F4 applies only to
+  the synthesis-side normalized copy; `verify_finding()` must compare the
+  verbatim cited excerpt against the source line (R22), so do not run F4 (or any
+  other normalizer pass) on the excerpt passed to verification. Rule: `*` runs
+  strip only when the same-length run wraps the word or
   phrase on both sides (`**important**`, `*x*`); an unpaired leading or
   trailing `*` (`*ptr`) is kept. `_`/`__` runs strip only when they wrap a
   multi-word phrase (`__two words__`); a single word wrapped in underscore
@@ -139,8 +147,11 @@ time.
 1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and the F4 emphasis
    rule (paired `*` runs and multi-word `_`/`__` phrases strip; lone
    underscore-wrapped identifiers and unpaired edge `*`/`_` are kept) in
-   `council_normalize_text`, with the F4 golden cases, so the
-   text `verify_finding()` compares is byte-exact.
+   `council_normalize_text`, with the F4 golden cases. Normalization feeds the
+   synthesis prompt only; `verify_finding()` receives the raw cited excerpt
+   unchanged so Tier 1 compares verbatim source bytes (e.g. `**important**` in a
+   README stays `**important**` for verification even when the synthesis copy is
+   stripped to `important`).
 2. **Verification helper** — Tier 1 mode-dependent exact match with the
    skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy
    ratio ≥85; three-state result.
@@ -157,6 +168,8 @@ time.
    synthesis prompt construction.
 7. **Step 7 report staging (F2)** — replace the `SYNTHESIS_MD` heredoc with
    `Write`-based staging; keep the Step 7 appendix loop untouched (Rule D1).
+   When using a fresh `mktemp -d`, trap cleanup on every exit path so
+   synthesized reviewer findings do not persist in private temp dirs.
 8. **Finalization sweep** — skill contract, both configuration tables,
    component counts and README/CHANGELOG, manual e2e scenarios (quota ETA,
    lineage warning, tie presentation, single-pass bypass, rubric output,
