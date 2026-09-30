@@ -113,13 +113,13 @@ if [ -n "$EXISTING" ]; then
 fi
 
 # --- Link back to the thread (first comment URL; PR URL as a fallback) ---
-LINK="https://github.com/$REPO/pull/$PR_NUMBER"
+LINK="https://${GH_HOST:-github.com}/$REPO/pull/$PR_NUMBER"
 # shellcheck disable=SC2016
 if THREAD_URL=$(gh api graphql -f threadId="$THREAD_ID" \
         -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { comments(first: 1) { nodes { url } } } } }' \
         --jq '.data.node.comments.nodes[0].url // empty' 2>"$ERR"); then
     case "$THREAD_URL" in
-        https://github.com/*) LINK="$THREAD_URL" ;;
+        https://*/"$REPO"/pull/*) LINK="$THREAD_URL" ;;
     esac
 fi
 
