@@ -458,19 +458,27 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
   credential (used before posting to Linear)
 
-All require `gh` and `jq` to be installed. Exit codes and markers are defined in
+All require `gh` and `jq`. Exit codes and markers are defined in
 `references/resolve/dispositions.md`.
 
-Local (non-GraphQL) scripts used by `/review:resolve` Step 6:
+Local (non-GraphQL) scripts used by `/review:resolve` Steps 5–7 and the
+callers that walk several PRs:
 
 - **commit-resolve-fixes** `--provider graphite|github --pr <N> --message
-  <msg> [--unattended] --files-from <f>` — Stage, new commit, submit,
-  verify remote head; never runs a push itself
-- **run-verify-command** `--pr <N> --timeout <s> --command-file <f>
-  --trusted [--unattended] --files-from <f>` — Run
-  `resolve_pr.verify_command`; on failure save a patch, revert the files
-  and report whether the tree is clean. `--revert-only` reverts without
-  running anything
+  <msg> [--unattended] [--allow-credential-shaped] [--files-from <f>]
+  [-- <files...>]` — Stage, new commit, submit, verify remote head; never
+  runs a push itself
+- **run-verify-command** — prints `{result, patch, log, treeClean}`:
+  - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended]
+    [--files-from <f>]` runs `resolve_pr.verify_command`; on failure it
+    saves a patch, reverts the files and reports whether the tree is clean
+  - `--pr <N> --revert-only [--files-from <f>]` saves a patch and reverts
+    the listed files without running anything
+  - `--pr <N> --revert-dirty` does the same for every change in the tree
+    (no file list); `/review:resolve-stack` and `/review:sweep-all` run it
+    after a dirty resolve
+- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
+  credential (used before posting to Linear)
 
 ## File Line Counts Script
 

@@ -67,8 +67,9 @@ Linear.
 
 ### Dispositions
 
-`/review:resolve` ends every unresolved thread in one of four states, and
-never resolves a thread before its reply has posted:
+`/review:resolve` ends every unresolved thread with one of four outcomes,
+and never resolves a thread before its reply has posted (bare LGTM / thanks
+/ nit threads are the one exception: they are resolved with no reply):
 
 | Disposition | What happens |
 | --- | --- |
@@ -77,9 +78,9 @@ never resolves a thread before its reply has posted:
 | `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
 | `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
 
-Human-reviewer threads resolve only on hard evidence by default
-(`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`). Bare
-LGTM / thanks / nit threads are resolved without a reply. Unattended runs
+Human-reviewer threads resolve only on hard evidence by default; others are
+held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
+Unattended runs
 file at most 3 issues per PR. Replies and issues carry a hidden marker, so a
 re-run posts no duplicates. The last output line is a machine summary:
 
@@ -87,11 +88,11 @@ re-run posts no duplicates. The last output line is a machine summary:
 Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
 ```
 
-Optional `resolve_pr.verify_command` runs before the commit (interactive
-runs ask first; unattended runs need `resolve_pr.verify_unattended: true`);
-if it fails, the fixes are saved as a patch under the git common dir and
-reverted. The
-full contract is `references/resolve/dispositions.md`.
+Optional `resolve_pr.verify_command` runs before the commit. Interactive
+runs ask first; unattended runs need `resolve_pr.verify_unattended: true`,
+an untracked `yellow-plugins.local.md`, and no runner files in the fix. If
+it fails, the fixes are saved as a patch under the git common dir and
+reverted. The full contract is `references/resolve/dispositions.md`.
 
 ## Agents
 
