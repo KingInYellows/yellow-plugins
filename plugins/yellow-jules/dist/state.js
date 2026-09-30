@@ -138,6 +138,60 @@ function isStringArray(value) {
 function isNonNegativeInt(value) {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
+const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
+const ARTIFACT_VERIFICATIONS = new Set([
+    'unverified',
+    'passed',
+    'failed',
+    'unavailable',
+    'errored',
+]);
+/** Absent is fine; present must be a string. */
+function hasOptionalStrings(value, fields) {
+    return fields.every((f) => value[f] === undefined || typeof value[f] === 'string');
+}
+function isValidArtifact(value) {
+    if (!isPlainObject(value))
+        return false;
+    return (ARTIFACT_KINDS.has(value['kind']) &&
+        typeof value['sessionResource'] === 'string' &&
+        hasOptionalStrings(value, [
+            'path',
+            'sha256',
+            'baseCommit',
+            'prUrl',
+            'vendorPath',
+        ]) &&
+        typeof value['secretShapedContent'] === 'boolean' &&
+        typeof value['collectedAt'] === 'string' &&
+        ARTIFACT_VERIFICATIONS.has(value['verification']));
+}
+function isValidDeviation(value) {
+    if (!isPlainObject(value))
+        return false;
+    return (value['kind'] === 'policy-deviation' &&
+        typeof value['reason'] === 'string' &&
+        hasOptionalStrings(value, ['prUrl']) &&
+        typeof value['observedAt'] === 'string' &&
+        typeof value['reconciled'] === 'boolean');
+}
+function isValidPlanStep(value) {
+    if (!isPlainObject(value))
+        return false;
+    return (typeof value['id'] === 'string' &&
+        typeof value['title'] === 'string' &&
+        hasOptionalStrings(value, ['description']) &&
+        isNonNegativeInt(value['index']));
+}
+function isValidPendingPlan(value) {
+    if (!isPlainObject(value))
+        return false;
+    return (typeof value['planId'] === 'string' &&
+        typeof value['activityCreateTime'] === 'string' &&
+        typeof value['activityId'] === 'string' &&
+        Array.isArray(value['steps']) &&
+        value['steps'].every(isValidPlanStep));
+}
 function isValidRecord(key, value) {
     if (!isPlainObject(value))
         return false;
@@ -176,22 +230,14 @@ function isValidRecord(key, value) {
         !isNonNegativeInt(value['artifactResumeRestartCount']))
         return false;
     if (!Array.isArray(value['artifacts']) ||
-        !value['artifacts'].every(isPlainObject))
+        !value['artifacts'].every(isValidArtifact))
         return false;
     if (!Array.isArray(value['deviations']) ||
-        !value['deviations'].every(isPlainObject))
+        !value['deviations'].every(isValidDeviation))
         return false;
-    if (value['pendingPlan'] !== undefined) {
-        const plan = value['pendingPlan'];
-        if (!isPlainObject(plan))
-            return false;
-        if (typeof plan['planId'] !== 'string' ||
-            typeof plan['activityCreateTime'] !== 'string') {
-            return false;
-        }
-        if (typeof plan['activityId'] !== 'string' || !Array.isArray(plan['steps']))
-            return false;
-    }
+    if (value['pendingPlan'] !== undefined &&
+        !isValidPendingPlan(value['pendingPlan']))
+        return false;
     return (typeof value['createdAt'] === 'string' &&
         typeof value['updatedAt'] === 'string');
 }

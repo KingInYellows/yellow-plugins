@@ -27,7 +27,10 @@
  *     source enables the Codex target (-007)
  *   - every catalog member of a group appears at each registered consumer
  *     site for that group — the marker-delimited slices of the commands that
- *     enumerate providers by hand (-008). A consumer that silently lacks a
+ *     enumerate providers by hand (-008). Each site carries separate
+ *     obligations (CONFLICT override list, READY_<ID> → provider mapping,
+ *     READY states, executable tooling probe); a token elsewhere in the slice
+ *     or in a comment does not satisfy them. A consumer that silently lacks a
  *     provider would either refuse it or route it nowhere; adding a
  *     provider must land with every consumer's handling (R25).
  *
@@ -112,9 +115,39 @@ const ROUTER_TABLES = [
 ];
 // Consumer sites that enumerate a group's providers by hand. Each entry is
 // a marker-delimited slice (`<!-- <marker>:start -->` in prose, or
-// `# <marker>:start` inside a shell block) in which every catalog member of
-// `group` must appear as each of `tokens(member)`. A missing file or marker
-// pair is itself drift.
+// `# <marker>:start` inside a shell block). Every catalog member of `group`
+// must satisfy each of the site's `obligations`; an obligation's `check`
+// returns the list of things missing for one member (empty = satisfied). A
+// token merely appearing somewhere in the slice does not satisfy an
+// obligation: each one inspects the specific structure that carries it. A
+// missing file or marker pair is itself drift.
+
+// Providers whose tooling has no CLI-resolution probe in the setup:all tooling
+// block (yellow-devin's tooling is its DEVIN_* credential rows elsewhere).
+const NO_CLI_PROBE_PROVIDERS = new Set(['devin']);
+
+/** Slice text with shell comment lines removed (executable code only). */
+function stripShellComments(text) {
+  return text
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .join('\n');
+}
+
+/** The `- ` bullet whose first line contains `needle`, up to the next top-level bullet. */
+function findBullet(slice, needle) {
+  const lines = slice.split('\n');
+  const startIndex = lines.findIndex(
+    (line) => line.startsWith('- ') && line.includes(needle)
+  );
+  if (startIndex === -1) return null;
+  let endIndex = startIndex + 1;
+  while (endIndex < lines.length && !lines[endIndex].startsWith('- ')) {
+    endIndex += 1;
+  }
+  return lines.slice(startIndex, endIndex).join('\n');
+}
+
 const CONSUMER_SITES = [
   {
     group: 'remote-agent',
@@ -126,25 +159,61 @@ const CONSUMER_SITES = [
       'delegate.md'
     ),
     marker: 'linear-delegate-providers',
-    describe: 'the --provider value and READY_<ID> mapping',
-    tokens: (member) => [
-      `\`${member.id}\``,
-      `READY_${member.id.toUpperCase()}`,
+    obligations: [
+      {
+        describe:
+          'the CONFLICT override accepted --provider values (first parenthetical of the CONFLICT bullet)',
+        check: (slice, member) => {
+          const bullet = findBullet(slice, '`CONFLICT`');
+          const list = bullet && bullet.match(/\(([^)]*)\)/);
+          return list && list[1].includes(`\`${member.id}\``)
+            ? []
+            : [`\`${member.id}\` in the CONFLICT override list`];
+        },
+      },
+      {
+        describe: 'the READY_<ID> → provider mapping',
+        check: (slice, member) => {
+          const ready = `READY_${member.id.toUpperCase()}`;
+          const bullet = findBullet(slice, `\`${ready}\``);
+          return bullet && bullet.includes(`provider = \`${member.id}\``)
+            ? []
+            : [`${ready} → provider = \`${member.id}\``];
+        },
+      },
     ],
   },
   {
     group: 'remote-agent',
     path: SETUP_ALL_RELATIVE,
     marker: 'setup-all-remote-agent-states',
-    describe: 'the acceptable READY_<ID> states',
-    tokens: (member) => [`READY_${member.id.toUpperCase()}`],
+    obligations: [
+      {
+        describe: 'the acceptable READY_<ID> states',
+        check: (slice, member) => {
+          const ready = `READY_${member.id.toUpperCase()}`;
+          return slice.includes(ready) ? [] : [ready];
+        },
+      },
+    ],
   },
   {
     group: 'remote-agent',
     path: SETUP_ALL_RELATIVE,
     marker: 'setup-all-remote-agent-tooling',
-    describe: 'the provider tooling probe',
-    tokens: (member) => [member.plugin],
+    obligations: [
+      {
+        describe:
+          'the executable provider tooling probe (comments do not count)',
+        check: (slice, member) => {
+          if (NO_CLI_PROBE_PROVIDERS.has(member.id)) return [];
+          const token = `${member.id}_cli_resolved`;
+          return stripShellComments(slice).includes(token)
+            ? []
+            : [`${token} (in executable code, not comments)`];
+        },
+      },
+    ],
   },
 ];
 
@@ -732,13 +801,13 @@ function validateConsumerSites(groups, errors) {
       continue;
     }
     for (const member of members) {
-      const missing = site
-        .tokens(member)
-        .filter((token) => !result.slice.includes(token));
-      if (missing.length > 0) {
-        errors.push(
-          `${PROVIDER_CONSUMER_SITE_DRIFT}: provider "${member.id}" (${member.plugin}) is missing from ${site.describe} in ${site.path} [${site.marker}]: ${missing.join(', ')}`
-        );
+      for (const obligation of site.obligations) {
+        const missing = obligation.check(result.slice, member);
+        if (missing.length > 0) {
+          errors.push(
+            `${PROVIDER_CONSUMER_SITE_DRIFT}: provider "${member.id}" (${member.plugin}) is missing from ${obligation.describe} in ${site.path} [${site.marker}]: ${missing.join(', ')}`
+          );
+        }
       }
     }
   }

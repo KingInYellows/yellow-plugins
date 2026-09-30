@@ -399,18 +399,23 @@ printf '\n=== Remote-Agent Provider Tooling ===\n'
 _cursor_root=""
 _jules_root=""
 _enabled_install_path() {
-  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" node -e '
+  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" PROJECT_PATH="$PWD" node -e '
     const fs = require("fs");
     let rows;
     try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
     if (!Array.isArray(rows)) rows = [];
+    // Same rule as summarizeProviders (remote-agent-provider-state.js): project
+    // and local rows count only when they belong to the current repository.
+    const projectPath = process.env.PROJECT_PATH || "";
     const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
     const candidates = rows
       .filter((row) =>
         row && typeof row === "object" &&
         row.id === process.env.PLUGIN_ID &&
         row.enabled === true &&
-        typeof row.installPath === "string" && row.installPath.length > 0
+        typeof row.installPath === "string" && row.installPath.length > 0 &&
+        (!((row.scope === "project" || row.scope === "local") && projectPath.length > 0) ||
+          row.projectPath === projectPath)
       )
       .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
     process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");

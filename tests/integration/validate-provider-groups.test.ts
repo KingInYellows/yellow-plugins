@@ -147,7 +147,8 @@ const CONSUMER_SITES: Record<
           (m) =>
             `- **\`READY_${m.id.toUpperCase()}\`** → provider = \`${m.id}\`.`
         ),
-        `- **\`CONFLICT\`** → \`--provider\` may be ${members.map((m) => `\`${m.id}\``).join(', ')}.`,
+        `- **\`CONFLICT\`** → if \`--provider\` was given (${members.map((m) => `\`${m.id}\``).join(', ')}),`,
+        '  use it only if that provider is enabled.',
       ].join('\n'),
   },
   'setup-all-remote-agent-states': {
@@ -161,7 +162,14 @@ const CONSUMER_SITES: Record<
     group: 'remote-agent',
     file: SETUP_ALL_PATH,
     shell: true,
-    render: (members) => members.map((m) => `# probe ${m.plugin}`).join('\n'),
+    render: (members) =>
+      [
+        ...members.map((m) => `# probe ${m.plugin}`),
+        // yellow-devin has no CLI-resolution probe (mirrors NO_CLI_PROBE_PROVIDERS).
+        ...members
+          .filter((m) => m.id !== 'devin')
+          .map((m) => `printf '${m.id}_cli_resolved: OK\\n'`),
+      ].join('\n'),
   },
 };
 
@@ -552,7 +560,7 @@ describe('validate-provider-groups — consumer sites (ERROR-PROVIDER-008, R25)'
   it.each([
     ['linear-delegate-providers', 'READY_JULES'],
     ['setup-all-remote-agent-states', 'READY_JULES'],
-    ['setup-all-remote-agent-tooling', 'yellow-jules'],
+    ['setup-all-remote-agent-tooling', 'jules_cli_resolved'],
   ])('fails when jules is missing from %s', (marker, token) => {
     const site = CONSUMER_SITES[marker]!;
     const run = runValidator(
@@ -568,7 +576,7 @@ describe('validate-provider-groups — consumer sites (ERROR-PROVIDER-008, R25)'
     expect(run.stderr).toContain(token);
   });
 
-  it('fails when the delegate --provider value list omits jules', () => {
+  it('fails when jules is dropped from the CONFLICT override list but READY_JULES and other jules tokens remain', () => {
     const run = runValidator(
       buildFixture({
         providers: PROVIDERS_WITH_JULES,
@@ -576,14 +584,57 @@ describe('validate-provider-groups — consumer sites (ERROR-PROVIDER-008, R25)'
           'linear-delegate-providers': [
             '- **`READY_CURSOR`** → provider = `cursor`.',
             '- **`READY_DEVIN`** → provider = `devin`.',
-            '- **`READY_JULES`** → stop.',
+            '- **`READY_JULES`** → provider = `jules`.',
+            '- **`CONFLICT`** → if `--provider` was given (`cursor` or `devin`),',
+            '  use it only if enabled. An accepted `jules` override follows `READY_JULES`.',
           ].join('\n'),
         },
       })
     );
     expect(run.status).toBe(1);
     expect(run.stderr).toContain('ERROR-PROVIDER-008');
-    expect(run.stderr).toContain('`jules`');
+    expect(run.stderr).toContain('provider "jules"');
+    expect(run.stderr).toContain('CONFLICT override');
+    expect(run.stderr).not.toContain('READY_<ID> → provider mapping');
+  });
+
+  it('fails when the READY_JULES mapping is dropped but jules stays in the override list and prose', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: {
+          'linear-delegate-providers': [
+            '- **`READY_CURSOR`** → provider = `cursor`.',
+            '- **`READY_DEVIN`** → provider = `devin`.',
+            '- **`CONFLICT`** → if `--provider` was given (`cursor`, `devin`, or `jules`),',
+            '  use it only if enabled. `READY_JULES` is handled elsewhere.',
+          ].join('\n'),
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('provider "jules"');
+    expect(run.stderr).toContain('READY_<ID> → provider mapping');
+    expect(run.stderr).not.toContain('CONFLICT override');
+  });
+
+  it('fails when the jules tooling probe survives only in comments', () => {
+    const run = runValidator(
+      buildFixture({
+        providers: PROVIDERS_WITH_JULES,
+        consumerSites: {
+          'setup-all-remote-agent-tooling': [
+            '# probe yellow-jules (jules_cli_resolved) lives in /jules:setup',
+            "printf 'cursor_cli_resolved: OK\\n'",
+          ].join('\n'),
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('provider "jules"');
+    expect(run.stderr).toContain('executable provider tooling probe');
   });
 
   it('a missing marker pair is itself an error', () => {

@@ -574,6 +574,62 @@ describe('pendingPlan', () => {
     });
     expect(second.pendingPlan?.planId).toBe('p1');
   });
+
+  describe('arrival order does not change the result', () => {
+    const approval = (offset: number, activityId: string): AdapterActivity => ({
+      activityId,
+      createTime: new Date(
+        Date.parse('2026-09-01T00:00:00Z') + offset * 1000
+      ).toISOString(),
+      type: 'planApproved',
+      approvedPlanId: 'p1',
+      artifacts: [],
+    });
+    const filler = (count: number): AdapterActivity[] =>
+      Array.from({ length: count }, (_, i) => ({
+        activityId: `f${String(i).padStart(3, '0')}`,
+        createTime: new Date(
+          Date.parse('2026-09-01T00:00:00Z') + (10 + i) * 1000
+        ).toISOString(),
+        type: 'progressUpdated',
+        artifacts: [],
+      }));
+
+    async function pendingFor(activities: AdapterActivity[]) {
+      fake.activities.set(S, activities);
+      const out = await status(makeDeps(dataDir, fake), {
+        session: S,
+        reconcile: false,
+      });
+      return out.pendingPlan?.planId;
+    }
+
+    it('an approved plan is cleared oldest-first and newest-first', async () => {
+      const oldestFirst = [plan('p1', 1, 'x1'), approval(2, 'x2')];
+      expect(await pendingFor(oldestFirst)).toBeUndefined();
+      await fs.promises.rm(dataDir, { recursive: true, force: true });
+      dataDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), 'yellow-jules-status-')
+      );
+      expect(await pendingFor([...oldestFirst].reverse())).toBeUndefined();
+    });
+
+    it('an approved plan is cleared when the plan and approval fall on different pages', async () => {
+      // 60 filler activities push the plan and approval onto opposite pages.
+      const oldestFirst = [
+        plan('p1', 1, 'x1'),
+        ...filler(60),
+        approval(2, 'x2'),
+      ];
+      const newestFirst = [...oldestFirst].reverse();
+      expect(await pendingFor(newestFirst)).toBeUndefined();
+    });
+
+    it('a plan newer than the approval stays pending in either order', async () => {
+      const oldestFirst = [approval(1, 'x1'), plan('p1', 2, 'x2')];
+      expect(await pendingFor([...oldestFirst].reverse())).toBe('p1');
+    });
+  });
 });
 
 describe('policy deviation (R13)', () => {
@@ -634,6 +690,28 @@ describe('policy deviation (R13)', () => {
     expect(result.outputs).toEqual([
       { type: 'pullRequest', title: 'PR', external: true },
     ]);
+    expect(result.policyDeviation).toBe(true);
+    expect(result.attention).toContain('policyDeviation');
+  });
+
+  it('a non-HTTPS PR URL is reported as a deviation without echoing the URL', async () => {
+    const bad = 'http://github.com/acme/widgets/pull/7?secret=vendor-text';
+    fake.sessions.set(S, makeSession({ outputs: [{ ...pr, url: bad }] }));
+    const result = await status(makeDeps(dataDir, fake), {
+      session: S,
+      reconcile: false,
+    });
+    expect(result.policyDeviation).toBe(true);
+    expect(result.attention).toContain('policyDeviation');
+    expect(JSON.stringify(result)).not.toContain('vendor-text');
+    const journal = await readJournal(dataDir);
+    const deviations = Object.values(journal.operations).flatMap(
+      (r) => r.deviations
+    );
+    expect(deviations).toHaveLength(1);
+    expect(deviations[0]?.prUrl).toBeUndefined();
+    expect(deviations[0]?.reason).toContain('not https');
+    expect(JSON.stringify(journal)).not.toContain('vendor-text');
   });
 });
 

@@ -57,7 +57,8 @@ async function walkActivities(params) {
     const seenIds = new Set();
     const seen = [];
     const newIds = [];
-    let pendingPlan = params.pendingPlan;
+    let latestPlan = params.pendingPlan;
+    let latestApproval;
     let newest;
     let pages = 0;
     let processed = 0;
@@ -135,17 +136,20 @@ async function walkActivities(params) {
                     activityId: activity.activityId,
                 };
             }
+            // Plan state is derived from the whole walk, not arrival order: the
+            // vendor's list order is unverified, so track the newest plan and the
+            // newest approval by stamp and combine them after the last page.
             if (activity.type === 'planGenerated' && activity.plan !== undefined) {
                 const stamp = {
                     createTime: activity.createTime,
                     activityId: activity.activityId,
                 };
-                if (pendingPlan == null ||
+                if (latestPlan == null ||
                     compareStamp(stamp, {
-                        createTime: pendingPlan.activityCreateTime,
-                        activityId: pendingPlan.activityId,
+                        createTime: latestPlan.activityCreateTime,
+                        activityId: latestPlan.activityId,
                     }) > 0) {
-                    pendingPlan = {
+                    latestPlan = {
                         planId: activity.plan.planId,
                         steps: activity.plan.steps,
                         activityCreateTime: activity.createTime,
@@ -153,13 +157,14 @@ async function walkActivities(params) {
                     };
                 }
             }
-            else if (activity.type === 'planApproved' && pendingPlan != null) {
-                const planStamp = {
-                    createTime: pendingPlan.activityCreateTime,
-                    activityId: pendingPlan.activityId,
-                };
-                if (compareStamp(activity, planStamp) > 0)
-                    pendingPlan = null;
+            else if (activity.type === 'planApproved') {
+                if (latestApproval === undefined ||
+                    compareStamp(activity, latestApproval) > 0) {
+                    latestApproval = {
+                        createTime: activity.createTime,
+                        activityId: activity.activityId,
+                    };
+                }
             }
             await params.onActivity?.(activity);
         }
@@ -181,6 +186,16 @@ async function walkActivities(params) {
         // before reading anything keeps its (still valid) stored token.
         resumePageToken = next.pageToken;
     }
+    // An approval newer than the newest plan clears it; an approval alone,
+    // with no plan known, leaves the result undefined.
+    const pendingPlan = latestPlan !== undefined &&
+        latestApproval !== undefined &&
+        compareStamp(latestApproval, {
+            createTime: latestPlan.activityCreateTime,
+            activityId: latestPlan.activityId,
+        }) > 0
+        ? null
+        : latestPlan;
     return {
         pages,
         processed,

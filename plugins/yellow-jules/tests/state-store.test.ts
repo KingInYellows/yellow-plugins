@@ -169,6 +169,83 @@ describe('stored resume tokens', () => {
   });
 });
 
+describe('nested journal records', () => {
+  const validArtifact = {
+    kind: 'patch',
+    sessionResource: 'sessions/s1',
+    path: 'a/patch.diff',
+    sha256: 'a'.repeat(64),
+    secretShapedContent: false,
+    collectedAt: '2026-01-01T00:00:00Z',
+    verification: 'unverified',
+  };
+  const validDeviation = {
+    kind: 'policy-deviation',
+    reason: 'r',
+    observedAt: '2026-01-01T00:00:00Z',
+    reconciled: false,
+  };
+  const validPlan = {
+    planId: 'p1',
+    steps: [{ id: 's1', title: 't', index: 0 }],
+    activityCreateTime: '2026-01-01T00:00:00Z',
+    activityId: 'a1',
+  };
+
+  async function loadWith(patch: Record<string, unknown>) {
+    const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
+    const raw = JSON.parse(
+      fs.readFileSync(resolveJournalPath(dataDir), 'utf8')
+    );
+    Object.assign(raw.operations[rec.localRequestId], patch);
+    fs.writeFileSync(resolveJournalPath(dataDir), JSON.stringify(raw), {
+      mode: 0o600,
+    });
+    return rec.localRequestId;
+  }
+
+  it('a journal with well-formed nested records still loads', async () => {
+    const id = await loadWith({
+      artifacts: [validArtifact],
+      deviations: [validDeviation, { ...validDeviation, prUrl: 'u' }],
+      pendingPlan: validPlan,
+      artifactResumeRestartCount: 1,
+    });
+    const journal = await readJournal(dataDir);
+    expect(journal.operations[id]?.deviations).toHaveLength(2);
+  });
+
+  it.each([
+    ['empty deviation', { deviations: [{}] }],
+    [
+      'deviation with wrong reconciled type',
+      { deviations: [{ ...validDeviation, reconciled: 'no' }] },
+    ],
+    [
+      'deviation with wrong prUrl type',
+      { deviations: [{ ...validDeviation, prUrl: 5 }] },
+    ],
+    ['empty artifact', { artifacts: [{}] }],
+    [
+      'artifact with unknown verification',
+      { artifacts: [{ ...validArtifact, verification: 'maybe' }] },
+    ],
+    [
+      'artifact missing collectedAt',
+      { artifacts: [{ ...validArtifact, collectedAt: undefined }] },
+    ],
+    [
+      'pending plan with a malformed step',
+      { pendingPlan: { ...validPlan, steps: [{}] } },
+    ],
+  ])('%s is JULES_JOURNAL_CORRUPT', async (_label, patch) => {
+    await loadWith(patch);
+    await expect(codeOfAsync(() => readJournal(dataDir))).resolves.toBe(
+      'JULES_JOURNAL_CORRUPT'
+    );
+  });
+});
+
 describe('withJournalLock', () => {
   it('serializes concurrent read-modify-write cycles (no lost updates)', async () => {
     const writers = Array.from({ length: 15 }, (_, i) =>

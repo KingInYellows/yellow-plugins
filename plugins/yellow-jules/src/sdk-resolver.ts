@@ -309,12 +309,26 @@ export type NpmRunner = (
 
 const STDERR_CAP = 64 * 1024;
 
+/**
+ * On win32 npm is a `.cmd` shim, which Node refuses to spawn without a shell
+ * (CVE-2024-27980). The shell is safe here only because every argument is a
+ * code-controlled constant and the directory is passed via `cwd`, never argv.
+ */
+export function npmSpawnConfig(platform: NodeJS.Platform): {
+  command: string;
+  shell: boolean;
+} {
+  const isWin = platform === 'win32';
+  return { command: isWin ? 'npm.cmd' : 'npm', shell: isWin };
+}
+
 export const defaultNpmRunner: NpmRunner = (args, options) =>
   new Promise((resolve) => {
-    const child = spawn('npm', [...args], {
+    const { command, shell } = npmSpawnConfig(process.platform);
+    const child = spawn(command, [...args], {
       cwd: options.cwd,
       env: options.env,
-      shell: false,
+      shell,
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     let stderr = '';

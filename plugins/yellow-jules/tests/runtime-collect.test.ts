@@ -571,6 +571,27 @@ describe('collect', () => {
     ]);
   });
 
+  it('reports an invalid PR URL as a deviation instead of silently skipping it', async () => {
+    fake.sessions.set(
+      S,
+      makeSession({
+        outputs: [
+          {
+            type: 'pullRequest',
+            url: 'https://github.com/evil/widgets/pull/9',
+            title: 'T',
+            description: 'D',
+          },
+        ],
+      })
+    );
+    const result = await collect(makeDeps(dataDir, fake), { session: S });
+    expect(result.policyDeviation).toBe(true);
+    expect(result.attention).toContain('policyDeviation');
+    expect(result.artifacts).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain('evil');
+  });
+
   it('refuses a symlinked artifacts directory', async () => {
     fake.sessions.set(S, makeSession());
     fs.symlinkSync(root, resolveArtifactsDir(dataDir));

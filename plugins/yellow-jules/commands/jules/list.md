@@ -10,8 +10,9 @@ allowed-tools:
 # List Jules Sessions
 
 One `GET sessions` page (no activity reads), with each session's vendor state,
-normalized `condition`, and the local id when the journal or the session's
-`[yellow:<local-id>]` title tag has one. `journalOnly` lists journal rows whose
+normalized `condition`, and the local id when the local journal binds one to the
+session (a vendor-writable `[yellow:<local-id>]` title tag is stripped for
+display and never trusted on its own). `journalOnly` lists journal rows whose
 session is not on this page — it never means the session is gone.
 
 ## Workflow

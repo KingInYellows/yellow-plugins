@@ -55,6 +55,7 @@ exports.defaultNpmRunner = exports.INSTALL_TIMEOUT_MS = exports.PINNED_SDK_VERSI
 exports.probeSdkResolution = probeSdkResolution;
 exports.resetSdkCache = resetSdkCache;
 exports.resolveSdk = resolveSdk;
+exports.npmSpawnConfig = npmSpawnConfig;
 exports.scrubInstallEnv = scrubInstallEnv;
 exports.installSdk = installSdk;
 const node_child_process_1 = require("node:child_process");
@@ -237,11 +238,21 @@ async function resolveSdk(dataDir, options = {}) {
     return cached;
 }
 const STDERR_CAP = 64 * 1024;
+/**
+ * On win32 npm is a `.cmd` shim, which Node refuses to spawn without a shell
+ * (CVE-2024-27980). The shell is safe here only because every argument is a
+ * code-controlled constant and the directory is passed via `cwd`, never argv.
+ */
+function npmSpawnConfig(platform) {
+    const isWin = platform === 'win32';
+    return { command: isWin ? 'npm.cmd' : 'npm', shell: isWin };
+}
 const defaultNpmRunner = (args, options) => new Promise((resolve) => {
-    const child = (0, node_child_process_1.spawn)('npm', [...args], {
+    const { command, shell } = npmSpawnConfig(process.platform);
+    const child = (0, node_child_process_1.spawn)(command, [...args], {
         cwd: options.cwd,
         env: options.env,
-        shell: false,
+        shell,
         stdio: ['ignore', 'ignore', 'pipe'],
     });
     let stderr = '';

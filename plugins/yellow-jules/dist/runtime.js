@@ -301,24 +301,33 @@ async function boundRecord(deps, journal, sessionResource) {
 }
 /**
  * R13: a vendor PR on a session whose create requested `autoPr: false` is a
- * policy deviation. External sessions (PR2: every observable session) have
- * no such request, so their PRs are collectable references only (R42).
+ * policy deviation. Independently of that request, a PR value that fails
+ * `validatePullRequestUrl` is always a deviation (contract: invalid values are
+ * reported as `policy-deviation`). The reason carries only the validator's
+ * fixed reason string; the vendor-writable URL is never echoed.
  */
 async function checkPolicyDeviation(deps, record, session) {
     let current = record;
-    if (record.autoPrRequested !== false)
-        return current;
     for (const output of session.outputs) {
         if (output.type !== 'pullRequest')
             continue;
         const source = record.sourceResource ?? session.sourceResource;
         const check = source !== undefined
             ? (0, validate_js_1.validatePullRequestUrl)(output.url, source)
-            : undefined;
+            : { valid: false, reason: 'session source unknown' };
+        if (!check.valid) {
+            current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
+                kind: 'policy-deviation',
+                reason: `vendor pull request reference failed validation: ${check.reason}`,
+            }, nowFn(deps));
+            continue;
+        }
+        if (record.autoPrRequested !== false)
+            continue;
         current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
             kind: 'policy-deviation',
             reason: 'vendor pull request observed on a session created with autoPr: false',
-            ...(check?.valid === true ? { prUrl: check.url } : {}),
+            prUrl: check.url,
         }, nowFn(deps));
     }
     return current;
