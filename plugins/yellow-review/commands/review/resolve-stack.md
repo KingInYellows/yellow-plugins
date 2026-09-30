@@ -199,9 +199,12 @@ failures and continue.
    submits without prompting. Its last output line is the contract line
    `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
    push=<...>, verify=<...>, ratelimited=<0|1>`
-   (`references/resolve/dispositions.md`). If it reports `ratelimited=1`,
-   remember that and finish **this** PR first — items 3, 3b and 5, skipping
-   only its restack — and list it under Needs manual attention as `rate
+   (`references/resolve/dispositions.md`). The command emits no contract line
+   when a rate limit stops it before its last step, so treat output with an
+   explicit rate-limit error (HTTP 403/429, `rate limit`), or a missing
+   contract line after a rate-limit message, as `ratelimited=1` too. If it
+   reports `ratelimited=1`, remember that and finish **this** PR first —
+   items 3, 3b and 5, skipping only its restack — and list it under Needs manual attention as `rate
    limited`. Then mark every remaining PR `not attempted (rate limit)` and
    go to `### Step 4: Final aggregate summary`: the next PR would hit the
    same limit.
@@ -245,8 +248,18 @@ failures and continue.
 
    Non-empty output: print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
-   followed by the file list. Save and revert the leftover edits (a refused
-   edit, such as one to `.claude/`, must not stay on disk) with
+   followed by the file list. The tree was clean at pre-flight, but an editor
+   or build may have touched it since, so revert only the resolve's own edits.
+   The resolve's own paths are the PR's changed files
+   (`gh pr diff "<PR#>" --name-only`) plus the trusted-config paths a refused
+   edit must never leave on disk: anything under `.claude/`,
+   `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
+   `.mcp.json`. If any dirty path is not the resolve's own, do NOT run
+   `--revert-dirty`: revert only the trusted-config paths among them with
+   `run-verify-command --pr "<PR#>" --revert-only -- <paths>` and list the
+   rest under Needs manual attention as `unrecognized changes left in place`.
+   When every dirty path is the resolve's own, save and revert the leftover
+   edits with
    `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
    and print its `patch` path when it is not null. If the script exits
    non-zero or reports `treeClean: false`, print `[review:resolve-stack]
