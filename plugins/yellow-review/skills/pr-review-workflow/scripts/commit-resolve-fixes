@@ -1,0 +1,152 @@
+#!/bin/bash
+# Stage the resolver-touched files, commit them as a NEW commit, submit via
+# the active stacked-PR provider, and verify the remote head.
+# Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> -- <files...>
+#   files:   repo-root-relative paths the resolvers modified. With no files
+#            and a clean tree the result is NOOP.
+#   message: one line starting with a conventional `fix` prefix; carries
+#            counts and paths only, never reviewer text.
+# Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
+# Exit codes: 2 usage, 3 staged mismatch, 4 commit failed, 5 submit failed,
+#             6 verify mismatch.
+# Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
+#        (default: the sibling github-workflow plugin).
+#      YELLOW_REVIEW_VERIFY_DELAY (default 5) — seconds between head checks.
+# Contract: references/resolve/dispositions.md. This script never pushes
+# directly; the provider's submit is the only publish path.
+
+set -euo pipefail
+
+VERIFY_ATTEMPTS=3
+MAX_MESSAGE_CHARS=200
+
+die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
+
+usage() {
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> -- <files...>\n' >&2
+    exit 2
+}
+
+PROVIDER=""
+PR=""
+MESSAGE=""
+FILES=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
+        --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
+        --) shift; FILES=("$@"); break ;;
+        *) usage ;;
+    esac
+done
+
+case "$PROVIDER" in
+    graphite|github) ;;
+    *) die 2 "--provider must be graphite or github" ;;
+esac
+[[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+[[ "$MESSAGE" =~ ^fix(\([a-z0-9._/-]+\))?!?:\ [^[:cntrl:]]+$ ]] \
+    || die 2 "--message must be one line starting with 'fix:' or 'fix(<scope>):'"
+[ "${#MESSAGE}" -le "$MAX_MESSAGE_CHARS" ] || die 2 "--message exceeds $MAX_MESSAGE_CHARS characters"
+
+for tool in git gh jq; do
+    command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
+done
+
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+cd -- "$TOP"
+BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
+
+# --- Validate the expected set ---
+# Arrays are expanded as ${a[@]+"${a[@]}"} so an empty one survives set -u
+# under bash 3.2.
+EXPECTED=()
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    f="${f#./}"
+    case "$f" in
+        ''|/*|../*|*/../*|*/..|..) die 2 "path must be repo-relative and inside the repository: $f" ;;
+    esac
+    [ -z "$(git status --porcelain --untracked-files=all -- "$f")" ] \
+        && die 3 "listed file has no changes: $f"
+    EXPECTED+=("$f")
+done
+
+# Tracked changes outside the expected set would ride along in the commit
+# (or be left behind): refuse before staging anything.
+while IFS= read -r -d '' d; do
+    found=0
+    for f in ${EXPECTED[@]+"${EXPECTED[@]}"}; do
+        [ "$d" = "$f" ] && { found=1; break; }
+    done
+    [ "$found" = 1 ] || die 3 "tracked change outside the expected set: $d"
+done < <(git diff --name-only -z HEAD --)
+
+emit() {
+    jq -nc --arg s "$1" --arg sha "$2" --arg b "$BRANCH" '{status: $s, sha: $sha, branch: $b}'
+}
+
+if [ "${#EXPECTED[@]}" -eq 0 ]; then
+    emit NOOP "$(git rev-parse HEAD)"
+    exit 0
+fi
+
+# --- Stage and compare ---
+git add -- "${EXPECTED[@]}" || die 3 "git add failed"
+STAGED=$(git diff --cached --name-only -z | tr '\0' '\n' | LC_ALL=C sort)
+WANT=$(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort -u)
+if [ "$STAGED" != "$WANT" ]; then
+    printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] staged:\n%s\n' "$WANT" "$STAGED" >&2
+    die 3 "staged set does not match the expected set"
+fi
+
+# --- Commit (always a new commit; never amend) ---
+BEFORE=$(git rev-parse HEAD)
+case "$PROVIDER" in
+    graphite) gt modify -c -m "$MESSAGE" --no-interactive >&2 || die 4 "gt modify -c failed" ;;
+    github) git commit -q -m "$MESSAGE" >&2 || die 4 "git commit failed" ;;
+esac
+SHA=$(git rev-parse HEAD)
+[ "$SHA" != "$BEFORE" ] || die 4 "no new commit was created"
+[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || die 4 "the new commit is not a child of the previous HEAD"
+git diff --cached --quiet || die 4 "changes remain staged after the commit"
+
+# --- Submit ---
+case "$PROVIDER" in
+    graphite)
+        # No --update-only: it has not been shown to leave the set of
+        # submitted stack branches unchanged, and the PR already exists.
+        gt submit --no-interactive --no-edit >&2 || die 5 "gt submit failed"
+        ;;
+    github)
+        RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(cd -- "$(dirname -- "$0")/../../../.." && pwd)/github-workflow/lib/github-stack-runtime.js}"
+        [ -f "$RUNTIME" ] || die 5 "github-stack-runtime.js not found at $RUNTIME"
+        # The runtime always exits 0 and reports through its JSON status.
+        OUT=$(node "$RUNTIME" submit) || die 5 "github-stack-runtime submit crashed"
+        ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
+        if [ "$ST" != SUCCESS ]; then
+            printf '%s\n' "$OUT" >&2
+            die 5 "github-stack-runtime submit returned status '${ST:-unparseable}'"
+        fi
+        ;;
+esac
+
+# --- Verify the published head ---
+DELAY="${YELLOW_REVIEW_VERIFY_DELAY:-5}"
+attempt=1
+while :; do
+    REMOTE=$(git ls-remote origin "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
+    PR_HEAD=$(gh pr view "$PR" --json headRefOid 2>/dev/null | jq -r '.headRefOid // empty' 2>/dev/null || true)
+    if [ "$REMOTE" = "$SHA" ] && [ "$PR_HEAD" = "$SHA" ]; then
+        break
+    fi
+    if [ "$attempt" -ge "$VERIFY_ATTEMPTS" ]; then
+        die 6 "head not verified: local=$SHA remote=${REMOTE:-none} pr=${PR_HEAD:-none}"
+    fi
+    attempt=$((attempt + 1))
+    sleep "$DELAY"
+done
+
+[ -z "$(git status --porcelain --untracked-files=no)" ] || die 6 "tracked tree is not clean after submit"
+
+emit PUSHED "$SHA"

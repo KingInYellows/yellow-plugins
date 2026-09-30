@@ -1,0 +1,102 @@
+# Shared fixtures for commit-resolve-fixes.bats and run-verify-command.bats:
+# a throwaway repository on a feature branch with a bare "origin", plus
+# stub gt / node / gh that publish by updating origin the way the real
+# providers would. The stubs live only in BATS_TEST_TMPDIR/bin.
+# shellcheck shell=bash
+
+RESOLVE_SCRIPTS="$(cd "$BATS_TEST_DIRNAME/.." && pwd)/skills/pr-review-workflow/scripts"
+
+resolve_repo_init() {
+  STUB_BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$STUB_BIN"
+  export PATH="$STUB_BIN:$PATH"
+  export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
+  : >| "$STUB_LOG"
+  unset STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD
+  export YELLOW_REVIEW_VERIFY_DELAY=0
+
+  ORIGIN="$BATS_TEST_TMPDIR/origin.git"
+  REPO="$BATS_TEST_TMPDIR/repo"
+  git init -q --bare -b main "$ORIGIN"
+  git init -q -b main "$REPO"
+  cd "$REPO" || return 1
+  git config user.email test@test.com
+  git config user.name Test
+  git config commit.gpgsign false
+  git remote add origin "$ORIGIN"
+  mkdir -p src
+  printf 'one\n' >| src/a.txt
+  printf 'two\n' >| src/b.txt
+  printf 'three\n' >| '-dash.txt'
+  git add -A && git commit -q -m "chore: initial"
+  git checkout -q -b feature
+  printf 'one\nfeature\n' >| src/a.txt
+  git commit -q -am "feat: first pass"
+  git push -q origin feature 2>/dev/null
+  FIRST_SHA=$(git rev-parse HEAD)
+
+  # Publish HEAD to origin, as a successful submit would.
+  cat >| "$STUB_BIN/publish" <<'STUB'
+#!/bin/sh
+b=$(git symbolic-ref --short HEAD)
+git --git-dir="$ORIGIN_DIR" fetch -q "$(git rev-parse --show-toplevel)" "+refs/heads/$b:refs/heads/$b"
+STUB
+  chmod +x "$STUB_BIN/publish"
+  export ORIGIN_DIR="$ORIGIN"
+
+  cat >| "$STUB_BIN/gt" <<'STUB'
+#!/bin/sh
+printf 'gt %s\n' "$*" >> "$STUB_LOG"
+case "$1" in
+  modify)
+    [ "${STUB_GT_MODIFY_FAIL:-0}" = 1 ] && exit 1
+    # Mirror gt modify -c: commit what is staged, never stage anything.
+    case " $* " in *" -c "*) ;; *) echo "stub gt: amend not expected" >&2; exit 1 ;; esac
+    msg=""; next=0
+    for a in "$@"; do
+      [ "$next" = 1 ] && { msg="$a"; next=0; }
+      [ "$a" = "-m" ] && next=1
+    done
+    exec git commit -q -m "$msg"
+    ;;
+  submit)
+    [ "${STUB_SUBMIT_FAIL:-0}" = 1 ] && exit 1
+    [ "${STUB_SUBMIT_SKIP_PUBLISH:-0}" = 1 ] && exit 0
+    exec publish
+    ;;
+esac
+echo "stub gt: unexpected: $*" >&2
+exit 1
+STUB
+  chmod +x "$STUB_BIN/gt"
+
+  cat >| "$STUB_BIN/node" <<'STUB'
+#!/bin/sh
+printf 'node %s\n' "$*" >> "$STUB_LOG"
+if [ "${STUB_SUBMIT_FAIL:-0}" = 1 ]; then
+  printf '{"status":"PUSH_REJECTED","recoveryAction":"sync first"}\n'
+  exit 0
+fi
+publish >/dev/null 2>&1
+printf '{"status":"SUCCESS"}\n'
+STUB
+  chmod +x "$STUB_BIN/node"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/github-stack-runtime.js"
+  : >| "$YELLOW_REVIEW_GITHUB_STACK_RUNTIME"
+
+  # gh pr view reports origin's branch head unless STUB_PR_HEAD overrides.
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+printf 'gh %s\n' "$*" >> "$STUB_LOG"
+case "$*" in
+  "pr view "*)
+    oid="${STUB_PR_HEAD:-$(git --git-dir="$ORIGIN_DIR" rev-parse -q --verify refs/heads/feature)}"
+    printf '{"headRefOid":"%s"}\n' "$oid"
+    exit 0
+    ;;
+esac
+echo "stub gh: unexpected: $*" >&2
+exit 1
+STUB
+  chmod +x "$STUB_BIN/gh"
+}
