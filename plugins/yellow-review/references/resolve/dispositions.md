@@ -226,8 +226,10 @@ manager or a git hook would execute: `package.json`, lockfiles, `.npmrc`,
 `.prettierrc*`, `.babelrc*`, `.mocharc*`, `conftest.py`, `pyproject.toml`,
 `setup.py`, `setup.cfg`, `tox.ini`, `pytest.ini`, `noxfile.py`, `build.rs`,
 `.pre-commit-config.yaml`, `lefthook*.yml`, `.lintstagedrc*`, and anything
-under a `scripts/`, `.husky/` or `.cargo/` directory or the
-`core.hooksPath` directory (matched case-insensitively).
+under the repository-root `scripts/` directory, any `.husky/` or `.cargo/`
+directory, or the `core.hooksPath` directory (matched case-insensitively).
+Nested `scripts/` directories, such as a plugin's `skills/*/scripts/`, are
+ordinary sources.
 
 ## File set
 
