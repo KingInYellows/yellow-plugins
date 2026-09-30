@@ -635,7 +635,7 @@ Decisions from the brainstorm and the planning round:
   - a re-run (no duplicate replies or issues);
   - `--non-interactive` with 4 `oos` candidates (3 filed, 1 blocking);
   - a failing `verify_command`, where a patch is saved and the tree is clean.
-- [ ] 4.6: File the follow-up issues:
+- [x] 4.6: File the follow-up issues (#957–#966):
   - `review-pr.md:1047` and `review-all.md:376` `gt modify -m` → stage + `-c`;
   - a sticky blocking-threads PR comment for repos without enforcement;
   - the CodeRabbit `@coderabbitai resolve` handoff;
