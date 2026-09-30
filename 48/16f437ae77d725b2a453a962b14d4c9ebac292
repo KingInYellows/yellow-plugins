@@ -1,0 +1,33 @@
+plugins/yellow-core/commands/setup/all.md
+  s_c4c48e9a92a0cf::t_a46738d0f0b4c1 402
+  s_c4c48e9a92a0cf::t_70b7b5dccf4fda 408-409
+  s_c4c48e9a92a0cf::t_177f2fcfde667f 418-419
+plugins/yellow-jules/dist/runtime.js
+  s_c4c48e9a92a0cf::t_08499e53ee88c1 178,180-181,647-650,684,741,799-814,839,878
+plugins/yellow-jules/dist/sdk-resolver.js
+  s_c4c48e9a92a0cf::t_9ac5f74ec86cd0 250-267,280,352-358,373-377,379-380,385
+plugins/yellow-jules/src/runtime.ts
+  s_c4c48e9a92a0cf::t_95c5f3745bf1ca 39,96-99,289,292,294,1009-1013,1048-1050,1112,1172-1186,1213,1264
+plugins/yellow-jules/src/sdk-resolver.ts
+  s_c4c48e9a92a0cf::t_2165f21758aad4 20,325-342,356,440-441,455-466,487-494,496,505
+plugins/yellow-jules/tests/runtime-collect.test.ts
+  s_c4c48e9a92a0cf::t_e96f7eecc162f7 521-562
+plugins/yellow-jules/tests/sdk-install-deadline.test.ts
+  s_c4c48e9a92a0cf::t_98f17932e15596 1-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4816f437ae77d725b2a453a962b14d4c9ebac292",
+  "prompts": {},
+  "sessions": {
+    "s_c4c48e9a92a0cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4bc583f-a87e-464c-8e90-76629c1e94d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
