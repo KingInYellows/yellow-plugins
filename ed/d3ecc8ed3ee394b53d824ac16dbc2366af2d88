@@ -1,0 +1,51 @@
+plugins/yellow-jules/commands/jules/list.md
+  s_c4c48e9a92a0cf::t_23870a4ee55282 13-15
+plugins/yellow-linear/commands/linear/delegate.md
+  s_c4c48e9a92a0cf::t_dd61358e317382 215-217
+plugins/yellow-jules/src/sdk-resolver.ts
+  s_c4c48e9a92a0cf::t_ae909186fa27b4 312-324,327-328,331
+plugins/yellow-core/commands/setup/all.md
+  s_c4c48e9a92a0cf::t_5a2966ce65ce80 402,407-409,416-418
+plugins/yellow-jules/dist/activity-walk.js
+  s_c4c48e9a92a0cf::t_938da13f300f25 60-61,139-141,147,149-150,152,160-167,189-198
+plugins/yellow-jules/dist/runtime.js
+  s_c4c48e9a92a0cf::t_2303a202557780 304-307,317-326,330
+plugins/yellow-jules/dist/sdk-resolver.js
+  s_c4c48e9a92a0cf::t_c8ce075234a174 58,241-249,251-252,255
+plugins/yellow-jules/dist/state.js
+  s_c4c48e9a92a0cf::t_f4e79178ef6406 141-194,233,236-239
+plugins/yellow-jules/src/activity-walk.ts
+  s_c4c48e9a92a0cf::t_af82216ff171a0 147-148,236-238,245,247-248,251,258-267,292-303
+plugins/yellow-jules/src/runtime.ts
+  s_c4c48e9a92a0cf::t_66409defb58b61 483-486,500-513,521
+plugins/yellow-jules/src/state.ts
+  s_c4c48e9a92a0cf::t_f300b6ffe852a0 117-185,223,228-233
+plugins/yellow-jules/tests/npm-spawn-config.test.ts
+  s_c4c48e9a92a0cf::t_d6b500eca9fd29 1-19
+plugins/yellow-jules/tests/runtime-collect.test.ts
+  s_c4c48e9a92a0cf::t_3e46d25751c575 574-594
+plugins/yellow-jules/tests/runtime-status.test.ts
+  s_c4c48e9a92a0cf::t_e089b369b08b46 577-632,693-714
+plugins/yellow-jules/tests/state-store.test.ts
+  s_c4c48e9a92a0cf::t_0c2cfa8a857586 172-248
+scripts/validate-provider-groups.js
+  s_c4c48e9a92a0cf::t_362d29d49e4f1e 30-33,118-150,162-183,190-198,204-216,804-810
+tests/integration/validate-provider-groups.test.ts
+  s_c4c48e9a92a0cf::t_b05c689625226a 150-151,165-172,563,579,587-589,596-637
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "edd3ecc8ed3ee394b53d824ac16dbc2366af2d88",
+  "prompts": {},
+  "sessions": {
+    "s_c4c48e9a92a0cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4bc583f-a87e-464c-8e90-76629c1e94d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
