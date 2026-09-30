@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for resolve-pr-thread GraphQL script
 
+bats_require_minimum_version 1.5.0
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/resolve-pr-thread"
 
@@ -8,6 +10,8 @@ setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
   export YELLOW_REVIEW_PACE_SECONDS=0
+  export YELLOW_REVIEW_RATE_LIMIT_WAIT=0
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl"
 }
 
 # --- Input validation ---
@@ -64,8 +68,15 @@ setup() {
   [ "$status" -eq 3 ]
 }
 
-@test "a rate limit exits 4" {
+@test "a rate limit is retried once, then exits 4" {
   run "$SCRIPT" "PRRT_ratelimited"
   [ "$status" -eq 4 ]
   [[ "$output" == *"rate limit"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl")" = 2 ]
+}
+
+@test "a single rate limit succeeds on the retry" {
+  run --separate-stderr "$SCRIPT" "PRRT_ratelimit_once"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .resolved)" = true ]
 }
