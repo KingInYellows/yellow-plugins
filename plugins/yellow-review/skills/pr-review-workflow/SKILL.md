@@ -455,6 +455,8 @@ Located at `skills/pr-review-workflow/scripts/`:
   round-1 file, and ends with `repass fetched=<0|1> found=<0|1>`. A failed
   fetch or parse is never read as "no new threads". Exit 4 on a rate limit
   (`poll rate-limited`), 2 on usage.
+- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
+  credential (used before posting to Linear)
 
 All require `gh` and `jq` to be installed. Exit codes and markers are defined in
 `references/resolve/dispositions.md`.
@@ -462,11 +464,13 @@ All require `gh` and `jq` to be installed. Exit codes and markers are defined in
 Local (non-GraphQL) scripts used by `/review:resolve` Step 6:
 
 - **commit-resolve-fixes** `--provider graphite|github --pr <N> --message
-  <msg> -- <files...>` — Stage, new commit, submit, verify remote head;
-  never runs a push itself
+  <msg> [--unattended] --files-from <f>` — Stage, new commit, submit,
+  verify remote head; never runs a push itself
 - **run-verify-command** `--pr <N> --timeout <s> --command-file <f>
-  --trusted -- <files...>` — Run `resolve_pr.verify_command`; on failure
-  save a patch, revert the files and report whether the tree is clean
+  --trusted [--unattended] --files-from <f>` — Run
+  `resolve_pr.verify_command`; on failure save a patch, revert the files
+  and report whether the tree is clean. `--revert-only` reverts without
+  running anything
 
 ## File Line Counts Script
 
