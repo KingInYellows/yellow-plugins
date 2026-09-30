@@ -198,7 +198,10 @@ failures and continue.
    verify-command, and push-confirmation gates so it resolves, commits, and
    submits without prompting. Its last output line is the contract line
    `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
-   push=<...>, verify=<...>` (`references/resolve/dispositions.md`).
+   push=<...>, verify=<...>, ratelimited=<0|1>`
+   (`references/resolve/dispositions.md`). After a PR reports
+   `ratelimited=1`, stop resolving: mark every remaining PR `not attempted
+   (rate limit)` and go to Step 4 — the next PR would hit the same limit.
 
 3. **Self-verify** — parse the `Resolve:` line from step 2's output for
    `b` (blocking), `i` (issues filed) and `push`. The `Skill` tool returns no
