@@ -56,6 +56,44 @@ bump() {
 # Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
 # below never capture them.
 case "$ALL_ARGS" in
+  *"FollowupViewer"*)
+    # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login.
+    MOCK_BODY="{\"data\":{\"viewer\":{\"login\":\"${MOCK_GH_VIEWER:-me}\"}}}"
+    emit "$@"
+    exit 0
+    ;;
+  *"FollowupThreadUrl"*)
+    MOCK_BODY='{"data":{"node":{"comments":{"nodes":[{"url":"https://github.com/test/repo/pull/7#discussion_r1"}]}}}}'
+    emit "$@"
+    exit 0
+    ;;
+  "issue list "*)
+    cat "$FIXTURE_DIR/issue-list-response.json"
+    exit 0
+    ;;
+  "issue create "*)
+    # Saves the title and body for assertions. MOCK_GH_ISSUE_CREATE_FAIL=1
+    # simulates a failure.
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = 1 ]; then
+      printf 'HTTP 422: Validation Failed\n' >&2
+      exit 1
+    fi
+    bump issue_create >/dev/null
+    _next=""
+    for a in "$@"; do
+      case "$_next" in
+        title) printf '%s' "$a" >| "${PAGE_STATE_DIR}/mock_gh_issue_title" ;;
+        body) cat "$a" >| "${PAGE_STATE_DIR}/mock_gh_issue_body" ;;
+      esac
+      case "$a" in
+        --title) _next=title ;;
+        --body-file) _next=body ;;
+        *) _next="" ;;
+      esac
+    done
+    printf 'Creating issue in test/repo\n\nhttps://github.com/test/repo/issues/77\n'
+    exit 0
+    ;;
   *"ReplyPrecheck"*)
     # reply-pr-thread pre-check: the thread's last comment.
     case "$ALL_ARGS" in
@@ -217,6 +255,7 @@ case "$ALL_ARGS" in
     printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
     printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2
     printf '  ReplyPrecheck / addPullRequestReviewThreadReply → PRRT_reply_* arms\n' >&2
+    printf '  FollowupViewer / FollowupThreadUrl / issue list / issue create\n' >&2
     exit 1
     ;;
 esac

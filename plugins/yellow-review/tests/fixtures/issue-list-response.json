@@ -1,0 +1,26 @@
+[
+  {
+    "number": 41,
+    "url": "https://github.com/test/repo/issues/41",
+    "author": { "id": "U_me", "is_bot": false, "login": "me", "name": "" },
+    "body": "Out of scope.\n\n<!-- yellow-review:resolve v1 thread=PRRT_issue_dup disposition=oos -->"
+  },
+  {
+    "number": 42,
+    "url": "https://github.com/test/repo/issues/42",
+    "author": { "id": "U_mallory", "is_bot": false, "login": "mallory", "name": "" },
+    "body": "Copied marker: <!-- yellow-review:resolve v1 thread=PRRT_issue_spoof disposition=oos -->"
+  },
+  {
+    "number": 43,
+    "url": "https://github.com/test/repo/issues/43",
+    "author": { "id": "U_me", "is_bot": false, "login": "me", "name": "" },
+    "body": "<!-- yellow-review:resolve v1 thread=PRRT_issue_dupX disposition=oos -->"
+  },
+  {
+    "number": 44,
+    "url": "https://github.com/test/repo/issues/44",
+    "author": { "id": "B_app", "is_bot": true, "login": "app/resolver-app", "name": "" },
+    "body": "<!-- yellow-review:resolve v1 thread=PRRT_issue_app disposition=oos -->"
+  }
+]
