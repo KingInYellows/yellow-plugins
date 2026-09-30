@@ -48,6 +48,10 @@ The orchestrator turns a proposed disposition into `unclear` when:
 
 - the thread has no `THREAD` line, the line is malformed, or the disposition
   is outside the vocabulary;
+- the thread has more than one `THREAD` line. Lines whose ID is not in the
+  cluster's own thread IDs (taken from `get-pr-comments`, never from
+  resolver text) are ignored;
+- `evidence` or `oos_reason` is longer than 200 characters;
 - the resolver returned nothing (every thread in the cluster);
 - `fixed` is proposed but the cluster `Status` is not `complete`, or
   `Files modified` names no file, or the named files have no diff;
@@ -73,9 +77,11 @@ outside what an automated resolver will change. Leaving open for a human.`
 
 Accept exactly one of:
 
-- `path:line` where the path matches `^[A-Za-z0-9._/-]+$` with no `..`
-  segment, exists at HEAD, and the line number is within the file's length
-  at HEAD;
+- `path:line`, split on the last `:`, where the line matches
+  `^[1-9][0-9]{0,6}$` and is within the file's length at HEAD, and the path
+  matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment, exists at
+  HEAD, and equals the thread's `path` (for outdated or review-level
+  threads: is one of the PR's changed files, `gh pr diff --name-only`);
 - a commit SHA matching `^[0-9a-f]{7,40}$` that passes
   `git merge-base --is-ancestor <sha> HEAD` and whose diff
   (`git show --name-only <sha>`) touches the thread's anchor path.
@@ -93,7 +99,8 @@ HEAD, not in the original diff position.
 ## Lanes
 
 A thread is **bot** only when every comment the viewer did not author has
-`authorType` `Bot`. One human reply makes it a human thread, so a human's
+`authorType` `Bot` and all of its comments were fetched (`commentCount`
+equals the number returned; longer threads count as human). One human reply makes it a human thread, so a human's
 objection inside a bot-opened thread is never auto-resolved. Unknown or
 missing types count as human. When comparing logins, strip a trailing
 `[bot]`.
@@ -165,10 +172,9 @@ addressed: reply posted, resolve failed
 
 ## Verify
 
-`resolve_pr.*` values, and a SHA-256 of `yellow-plugins.local.md`, are read
-once in Step 1, before any agent runs; later steps use only that snapshot.
-If the file's hash changed by Step 6, verify is skipped and the report says
-`config modified during run`.
+`resolve_pr.*` values, and whether `yellow-plugins.local.md` is tracked by
+git, are read once in Step 1, before any agent runs; later steps use only
+that snapshot, so an edit to the file during the run changes nothing.
 
 | Run | Condition | Verify | `fixed` threads |
 | --- | --- | --- | --- |
@@ -180,21 +186,42 @@ If the file's hash changed by Step 6, verify is skipped and the report says
 
 The tracked check runs from the repository root
 (`git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch --
-yellow-plugins.local.md`). Runner files are `package.json`, lockfiles,
-`Makefile`, `*.config.*`, `conftest.py`, and anything under `scripts/` or
-`.husky/`: a verify command would execute them. A failed or timed-out
-verify reverts the files, saves a patch and holds `fixed` threads open.
+yellow-plugins.local.md`). A failed or timed-out verify reverts the files,
+saves a patch and holds `fixed` threads open.
 
-Both scripts refuse the resolver deny-list paths (`.github/`, `.circleci/`,
-`.git/`, CI and container files, `.env*`, keys and secrets, `*.tfvars`,
-`*.tfstate`, `yellow-plugins.local.md`, `.claude/`), and `run-verify-command`
-refuses files that are unchanged or gitignored, so a revert can never delete
-a user file.
+**Runner files** are code that a verify command or a git hook would
+execute: `package.json`, lockfiles, `Makefile`, `*.config.*`,
+`conftest.py`, `.pre-commit-config.yaml`, `lefthook*.yml`, `.lintstagedrc*`,
+and anything under `scripts/`, `.husky/` or the `core.hooksPath` directory.
 
-Long calls must fit the Bash tool: pass it a `timeout` of
-`(verify_timeout_seconds + 60) × 1000` ms for verify and
-`(repass_wait_seconds + 120) × 1000` ms for the Step 8 poll. The settings
-are capped at 540 and 480 seconds so both fit the tool's 600 s maximum.
+## File set
+
+The expected file set comes from the resolvers' `Files modified`, but the
+scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
+
+- paths are canonical and repo-relative (no `.`, `..` or empty segment) and
+  git treats them literally (`GIT_LITERAL_PATHSPECS=1`);
+- the resolver deny list is refused, case-insensitively: `.github/`,
+  `.circleci/`, `.git/`, `.claude/`, CI and container files, `.env*`, keys
+  and secrets, `*.tfvars`, `*.tfstate`, `yellow-plugins.local.md`,
+  `CLAUDE.md`, `AGENTS.md`, `.mcp.json`;
+- `commit-resolve-fixes` refuses files outside the PR's changed files
+  (`gh pr diff --name-only`), any tracked or untracked change outside the
+  set, and — with `--unattended` — runner files, because the commit's git
+  hooks would execute them;
+- `run-verify-command` refuses files that are unchanged or gitignored, so a
+  revert can never delete a user file.
+
+A refused set is a staged mismatch (exit 3): nothing is committed and every
+`fixed` thread becomes `unclear`.
+
+## Bash timeouts
+
+Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
+`timeout` of `(verify_timeout_seconds + 60) × 1000` ms for verify,
+`(repass_wait_seconds + 120) × 1000` ms for the Step 8 poll, and 600000 ms
+for `commit-resolve-fixes` (hooks, submit and the head check). The settings
+are capped at 540 and 480 seconds.
 
 ## Recovery rule
 
@@ -230,6 +257,9 @@ Replies and issue bodies end with:
 - Never quote the reviewer.
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects
   longer bodies with exit 2).
+- Text that looks like a credential is refused, never posted (exit 2 from
+  `reply-pr-thread` and `file-followup-issue`). The orchestrator then posts
+  the plain outcome sentence for that disposition, with no resolver text.
 - The body is written to a file and passed by path, never on a command line.
 
 ## Pacing and rate limits
@@ -237,8 +267,8 @@ Replies and issue bodies end with:
 - Mutations run serially. `reply-pr-thread` sleeps 1 s after each post.
 - On a rate limit (HTTP 403/429 with "rate limit" in stderr, or a GraphQL
   error whose message mentions a rate limit), wait `Retry-After` seconds, or
-  60 s, then retry once. A second limit, or a required wait over 90 s,
-  exits 4.
+  60 s, then retry once per script run. A second limit, or a required wait
+  over 90 s, exits 4.
 - After any exit 4, stop mutating. Every remaining thread is reported as
   `not attempted (rate limit)` and counts as blocking.
 
@@ -248,10 +278,10 @@ Exit 1 is always "other failure" (network, unexpected response).
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reply-pr-thread` | replied or skipped | usage / body too long | not found or permission | rate limited | — | — |
+| `reply-pr-thread` | replied or skipped | usage / body too long / credential | not found or permission | rate limited | — | — |
 | `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage | — | — | — | — |
-| `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch | commit failed | submit failed | head not verified |
+| `file-followup-issue` | created or found | usage / credential | — | — | — | — |
+| `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` | ran (see `result`) | usage / not trusted | — | — | — | — |
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
