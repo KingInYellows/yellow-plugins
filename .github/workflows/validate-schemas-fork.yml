@@ -65,7 +65,7 @@ jobs:
     name: Validate Schemas (${{ matrix.target }})
     if: github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ (matrix.target == 'yellow-goal' || matrix.target == 'shell-compat') && 10 || 5 }}
+    timeout-minutes: ${{ (matrix.target == 'yellow-goal' || matrix.target == 'yellow-jules' || matrix.target == 'shell-compat') && 10 || 5 }}
 
     strategy:
       fail-fast: false
@@ -80,6 +80,7 @@ jobs:
           - codex
           - cursor
           - yellow-goal
+          - yellow-jules
           - generated
           - shell-compat
 
@@ -236,6 +237,14 @@ jobs:
               test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-goal/dist)"
               pnpm --filter yellow-goal test
               TMPDIR="$RUNNER_TEMP" bash scripts/verify-goal-release.sh
+              ;;
+            yellow-jules)
+              # Committed-dist drift (untracked-aware) plus the package suite,
+              # whose packed-SDK transport tests `npm ci` the pinned SDK from
+              # plugins/yellow-jules/runtime/package-lock.json into a temp dir.
+              pnpm --filter yellow-jules run build
+              test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-jules/dist)"
+              pnpm --filter yellow-jules test
               ;;
             generated)
               # Schema conformance gate (mirror of the main workflow's

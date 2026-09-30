@@ -1187,6 +1187,11 @@ jobs:
             echo "::group::Committed yellow-goal dist drift check"
             test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-goal/dist)"
             echo "::endgroup::"
+            echo "::group::Committed yellow-jules dist drift check"
+            # Untracked-aware form: a new src/ file whose compiled output was
+            # never committed must fail here too.
+            test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-jules/dist)"
+            echo "::endgroup::"
           } 2>&1 | tee -a "$LOG_PATH"
 
       - name: Capture build duration

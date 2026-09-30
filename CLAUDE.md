@@ -7,7 +7,7 @@ rationale lives in the linked docs.
 ## Repository Purpose
 
 `yellow-plugins` is a pnpm monorepo that ships a Claude Code plugin
-marketplace (19 plugins under `plugins/`) plus the TypeScript validation and
+marketplace (20 plugins under `plugins/`) plus the TypeScript validation and
 release tooling that gates it. There is no published runtime — the TypeScript
 packages exist solely to validate manifests, schemas, and authoring rules.
 Plugin install/uninstall/rollback is handled natively by Claude Code.
@@ -29,7 +29,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration (validator tests live here)
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + flow-namespace + provider-neutral-commands + council-roster + doc-counts + shell-compat
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + jules + flow-namespace + provider-neutral-commands + council-roster + doc-counts + shell-compat
 pnpm validate:agents          # agent-authoring rules only (fast; run after any plugin markdown edit)
 pnpm validate:shell-compat    # bash/zsh lint of fenced shell blocks + tier 4 libs (run after any shell edit)
 pnpm check:shell-parse        # blocks bash parses but zsh does not (skips locally without zsh; CI fails)

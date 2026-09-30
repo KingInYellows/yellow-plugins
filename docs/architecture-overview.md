@@ -1,6 +1,6 @@
 # yellow-plugins Technical Overview
 
-`yellow-plugins` is a git-native Claude Code plugin marketplace (19 plugins)
+`yellow-plugins` is a git-native Claude Code plugin marketplace (20 plugins)
 plus the validation and release tooling that gates it. There is no published
 application server. Claude Code (and, opt-in, Codex/Cursor) loads the plugins;
 this repository authors, validates, and versions them.
@@ -57,7 +57,7 @@ convention:
 
 Byte-identity drift is gated by `pnpm validate:generated`.
 
-### The 19 plugins
+### The 20 plugins
 
 Source of truth for membership and order: `pluginOrder` in
 `catalog/catalog.json`. The grouping below is editorial.
@@ -108,6 +108,9 @@ Source of truth for membership and order: `pluginOrder` in
   Cursor plugin).
 - **yellow-devin** — Legacy Devin.AI V3 API (same `remote-agent` group as
   cursor; not preferred).
+- **yellow-jules** — Google Jules via `@google/jules-sdk`, experimental and
+  read-only for now (same `remote-agent` group; not preferred). A typed CLI
+  with a committed `dist/`, like yellow-cursor.
 - **yellow-goal** — Process-spawn bridge to an external `goal-gen` engine (never
   imports it).
 
@@ -136,7 +139,8 @@ Catalog field `capabilityProvider` marks interchangeable implementations.
 
 1. **`stacked-pr`**: `gt-workflow` (graphite) vs `github-workflow` (github).
    Exactly one enabled at runtime.
-2. **`remote-agent`**: `yellow-cursor` preferred over `yellow-devin`.
+2. **`remote-agent`**: `yellow-cursor` preferred over `yellow-devin` and the
+   experimental `yellow-jules`.
 
 `/stack:status` and `/stack:select` read and switch provider state
 (`stack-provider-state.js`, `stack-tooling-probe.js`).

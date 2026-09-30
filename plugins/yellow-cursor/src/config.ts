@@ -43,6 +43,7 @@ function pathFor(platform: NodeJS.Platform): path.PlatformPath {
   return platform === 'win32' ? path.win32 : path.posix;
 }
 
+// replica:resolveDataDir:start
 export function resolveDataDir(overrides: Partial<DataDirEnv> = {}): string {
   const { env, platform, homedir } = { ...DEFAULT_DATA_DIR_ENV, ...overrides };
   const p = pathFor(platform);
@@ -71,6 +72,7 @@ export function resolveDataDir(overrides: Partial<DataDirEnv> = {}): string {
 
   return p.join(homedir(), '.local', 'share', 'yellow-cursor');
 }
+// replica:resolveDataDir:end
 
 export function resolveRuntimeDir(dataDir: string): string {
   return path.join(dataDir, 'runtime');

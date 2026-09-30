@@ -162,6 +162,22 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@22.19.15)
 
+  plugins/yellow-jules:
+    dependencies:
+      '@google/jules-sdk':
+        specifier: 0.2.0
+        version: 0.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.15
+        version: 22.19.15
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.2.0
+        version: 1.6.1(@types/node@22.19.15)
+
   plugins/yellow-linear: {}
 
   plugins/yellow-morph:
@@ -982,6 +998,13 @@ packages:
   /@google/generative-ai@0.21.0:
     resolution: {integrity: sha512-7XhUbtnlkSEZK15kN3t+tzIMxsbKm/dSkKBFalj+20NvPKe1kBY7mR2P7vuijEn+f06z5+A8bVGKO0v39cr6Wg==}
     engines: {node: '>=18.0.0'}
+    dev: false
+
+  /@google/jules-sdk@0.2.0:
+    resolution: {integrity: sha512-fKutNR8VvzsxqKA4uYkkJUZauXhiuIu9aVpjgeMuFADKt95y7oQbRJX/QmOS74fy2yAsY6SwKnIY6cJaaG6kpQ==}
+    dependencies:
+      yaml: 2.9.0
+      zod: 3.25.76
     dev: false
 
   /@hono/node-server@1.19.14(hono@4.12.16):
@@ -6483,7 +6506,6 @@ packages:
     resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
     engines: {node: '>= 14.6'}
     hasBin: true
-    dev: true
 
   /yauzl@2.10.0:
     resolution: {integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==}

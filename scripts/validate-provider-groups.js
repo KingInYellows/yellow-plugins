@@ -3,8 +3,9 @@
 /**
  * validate-provider-groups.js — gates the catalog-only `capabilityProvider`
  * field that marks a plugin as one interchangeable implementation of a
- * capability group (currently only `stacked-pr`: gt-workflow/graphite and
- * github-workflow/github). See plans/stacked-pr-provider-abstraction.md.
+ * capability group: `stacked-pr` (gt-workflow/graphite, github-workflow/
+ * github) and `remote-agent` (yellow-cursor/cursor, yellow-devin/devin,
+ * yellow-jules/jules). See plans/stacked-pr-provider-abstraction.md.
  *
  * Checks (each failure carries an ERROR-PROVIDER-* code; see
  * packages/domain/src/validation/errorCatalog.ts):
@@ -24,6 +25,14 @@
  *   - every provider-declaring plugin has its generated manifests present:
  *     the Claude manifest always, the Codex manifest only when the catalog
  *     source enables the Codex target (-007)
+ *   - every catalog member of a group appears at each registered consumer
+ *     site for that group — the marker-delimited slices of the commands that
+ *     enumerate providers by hand (-008). Each site carries separate
+ *     obligations (CONFLICT override list, READY_<ID> → provider mapping,
+ *     READY states, executable tooling probe); a token elsewhere in the slice
+ *     or in a comment does not satisfy them. A consumer that silently lacks a
+ *     provider would either refuse it or route it nowhere; adding a
+ *     provider must land with every consumer's handling (R25).
  *
  * SCOPE BOUNDARY — read this before assuming the gate covers more than it
  * does. Everything here is STATIC: declaration shape, uniqueness,
@@ -71,6 +80,7 @@ const PROVIDER_GROUP_UNDERPOPULATED = PROVIDER + '-004';
 const PROVIDER_SETUP_SECTION_DRIFT = PROVIDER + '-005';
 const PROVIDER_ROUTER_TABLE_DRIFT = PROVIDER + '-006';
 const PROVIDER_ARTIFACT_MISSING = PROVIDER + '-007';
+const PROVIDER_CONSUMER_SITE_DRIFT = PROVIDER + '-008';
 
 const SETUP_ALL_RELATIVE = path.join(
   'plugins',
@@ -103,6 +113,110 @@ const ROUTER_TABLES = [
     ),
   },
 ];
+// Consumer sites that enumerate a group's providers by hand. Each entry is
+// a marker-delimited slice (`<!-- <marker>:start -->` in prose, or
+// `# <marker>:start` inside a shell block). Every catalog member of `group`
+// must satisfy each of the site's `obligations`; an obligation's `check`
+// returns the list of things missing for one member (empty = satisfied). A
+// token merely appearing somewhere in the slice does not satisfy an
+// obligation: each one inspects the specific structure that carries it. A
+// missing file or marker pair is itself drift.
+
+// Providers whose tooling has no CLI-resolution probe in the setup:all tooling
+// block (yellow-devin's tooling is its DEVIN_* credential rows elsewhere).
+const NO_CLI_PROBE_PROVIDERS = new Set(['devin']);
+
+/** Slice text with shell comment lines removed (executable code only). */
+function stripShellComments(text) {
+  return text
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .join('\n');
+}
+
+/** The `- ` bullet whose first line contains `needle`, up to the next top-level bullet. */
+function findBullet(slice, needle) {
+  const lines = slice.split('\n');
+  const startIndex = lines.findIndex(
+    (line) => line.startsWith('- ') && line.includes(needle)
+  );
+  if (startIndex === -1) return null;
+  let endIndex = startIndex + 1;
+  while (endIndex < lines.length && !lines[endIndex].startsWith('- ')) {
+    endIndex += 1;
+  }
+  return lines.slice(startIndex, endIndex).join('\n');
+}
+
+const CONSUMER_SITES = [
+  {
+    group: 'remote-agent',
+    path: path.join(
+      'plugins',
+      'yellow-linear',
+      'commands',
+      'linear',
+      'delegate.md'
+    ),
+    marker: 'linear-delegate-providers',
+    obligations: [
+      {
+        describe:
+          'the CONFLICT override accepted --provider values (first parenthetical of the CONFLICT bullet)',
+        check: (slice, member) => {
+          const bullet = findBullet(slice, '`CONFLICT`');
+          const list = bullet && bullet.match(/\(([^)]*)\)/);
+          return list && list[1].includes(`\`${member.id}\``)
+            ? []
+            : [`\`${member.id}\` in the CONFLICT override list`];
+        },
+      },
+      {
+        describe: 'the READY_<ID> → provider mapping',
+        check: (slice, member) => {
+          const ready = `READY_${member.id.toUpperCase()}`;
+          const bullet = findBullet(slice, `\`${ready}\``);
+          return bullet && bullet.includes(`provider = \`${member.id}\``)
+            ? []
+            : [`${ready} → provider = \`${member.id}\``];
+        },
+      },
+    ],
+  },
+  {
+    group: 'remote-agent',
+    path: SETUP_ALL_RELATIVE,
+    marker: 'setup-all-remote-agent-states',
+    obligations: [
+      {
+        describe: 'the acceptable READY_<ID> states',
+        check: (slice, member) => {
+          const ready = `READY_${member.id.toUpperCase()}`;
+          return slice.includes(ready) ? [] : [ready];
+        },
+      },
+    ],
+  },
+  {
+    group: 'remote-agent',
+    path: SETUP_ALL_RELATIVE,
+    marker: 'setup-all-remote-agent-tooling',
+    obligations: [
+      {
+        describe:
+          'the executable provider tooling probe (comments do not count)',
+        check: (slice, member) => {
+          if (NO_CLI_PROBE_PROVIDERS.has(member.id)) return [];
+          const token = `${member.id}_cli_resolved`;
+          return stripShellComments(slice).includes(token)
+            ? []
+            : [`${token} (in executable code, not comments)`];
+        },
+      },
+    ],
+  },
+];
+
 const ROUTER_TABLE_START = '// provider-table:start';
 const ROUTER_TABLE_END = '// provider-table:end';
 const ROUTER_GROUP_RE = /^const PROVIDER_GROUP = '([a-z0-9-]+)';$/m;
@@ -631,6 +745,74 @@ function validateOneRouterTable(entry, groups, errors) {
   }
 }
 
+/** Text strictly between one `<marker>:start` / `<marker>:end` line pair, or an error string. */
+function markerSlice(text, marker) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const isMarker = (line, edge) => {
+    const trimmed = line.trim();
+    return (
+      trimmed === `<!-- ${marker}:${edge} -->` ||
+      trimmed === `# ${marker}:${edge}`
+    );
+  };
+  const starts = [];
+  const ends = [];
+  lines.forEach((line, index) => {
+    if (isMarker(line, 'start')) starts.push(index);
+    if (isMarker(line, 'end')) ends.push(index);
+  });
+  if (starts.length !== 1 || ends.length !== 1 || ends[0] <= starts[0]) {
+    return {
+      error: `expected exactly one ${marker}:start / ${marker}:end marker pair (found ${starts.length} start, ${ends.length} end)`,
+    };
+  }
+  return { slice: lines.slice(starts[0] + 1, ends[0]).join('\n') };
+}
+
+function validateConsumerSites(groups, errors) {
+  const cache = new Map();
+  for (const site of CONSUMER_SITES) {
+    const members = groups.get(site.group);
+    if (!members) {
+      continue;
+    }
+    if (!cache.has(site.path)) {
+      try {
+        cache.set(site.path, readText(path.join(ROOT, site.path)));
+      } catch (error) {
+        cache.set(site.path, null);
+        if (error.code !== 'ENOENT') {
+          fail(`Failed to read ${site.path}: ${error.message}`);
+        }
+      }
+    }
+    const text = cache.get(site.path);
+    if (text === null) {
+      errors.push(
+        `${PROVIDER_CONSUMER_SITE_DRIFT}: consumer site ${site.path} (group "${site.group}") is missing from disk`
+      );
+      continue;
+    }
+    const result = markerSlice(text, site.marker);
+    if (result.error !== undefined) {
+      errors.push(
+        `${PROVIDER_CONSUMER_SITE_DRIFT}: ${site.path}: ${result.error}`
+      );
+      continue;
+    }
+    for (const member of members) {
+      for (const obligation of site.obligations) {
+        const missing = obligation.check(result.slice, member);
+        if (missing.length > 0) {
+          errors.push(
+            `${PROVIDER_CONSUMER_SITE_DRIFT}: provider "${member.id}" (${member.plugin}) is missing from ${obligation.describe} in ${site.path} [${site.marker}]: ${missing.join(', ')}`
+          );
+        }
+      }
+    }
+  }
+}
+
 function validateRouterTable(groups, errors) {
   for (const entry of ROUTER_TABLES) {
     if (!groups.has(entry.group)) {
@@ -664,6 +846,7 @@ function main() {
   validateNonEmission(groups, declaringPlugins, errors);
   validateSetupAllSection(groups, errors);
   validateRouterTable(groups, errors);
+  validateConsumerSites(groups, errors);
 
   if (errors.length > 0) {
     exitWithErrors(errors);

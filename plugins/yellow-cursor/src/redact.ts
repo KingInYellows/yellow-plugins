@@ -58,6 +58,7 @@ const SECRET_FIELD_NAMES = new Set([
   'prompt',
 ]);
 
+// replica:assertNoSecretShapedValues:start
 /**
  * Recursively walks a plain JSON-like value and throws if any field name is
  * a known secret-shaped key, or any string value looks secret-shaped.
@@ -91,7 +92,9 @@ export function assertNoSecretShapedValues(value: unknown, path = '$'): void {
     }
   }
 }
+// replica:assertNoSecretShapedValues:end
 
+// replica:redactDeep:start
 /** Deep-redacts string leaves in a JSON-like value before it is printed. */
 export function redactDeep<T>(value: T): T {
   if (typeof value === 'string') {
@@ -111,3 +114,4 @@ export function redactDeep<T>(value: T): T {
   }
   return value;
 }
+// replica:redactDeep:end

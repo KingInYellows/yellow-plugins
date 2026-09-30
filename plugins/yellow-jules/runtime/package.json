@@ -1,0 +1,9 @@
+{
+  "name": "yellow-jules-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Data-dir install manifest for the pinned Jules SDK; installed only by `setup --install-sdk` with `npm ci --ignore-scripts`",
+  "dependencies": {
+    "@google/jules-sdk": "0.2.0"
+  }
+}

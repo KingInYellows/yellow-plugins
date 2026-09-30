@@ -66,6 +66,29 @@ bump as a breaking change requiring re-verification of
 the `instanceof` error-branching in `sdk-adapter.ts` before merging, since
 the SDK's error class shapes are not guaranteed stable across versions.
 
+## Jules SDK Pin
+
+**`@google/jules-sdk`** — pinned `0.2.0` **exact** in
+`plugins/yellow-jules/package.json` (workspace) and in
+`plugins/yellow-jules/runtime/package.json`, whose shipped
+`runtime/package-lock.json` pins the full tree that `/jules:setup
+--install-sdk` installs with `npm ci --ignore-scripts`:
+
+| Package             | Version   | Integrity (sha512, from the lockfile)                                                              |
+| ------------------- | --------- | -------------------------------------------------------------------------------------------------- |
+| `@google/jules-sdk` | `0.2.0`   | `fKutNR8VvzsxqKA4uYkkJUZauXhiuIu9aVpjgeMuFADKt95y7oQbRJX/QmOS74fy2yAsY6SwKnIY6cJaaG6kpQ==`         |
+| `yaml`              | `2.9.1`   | `3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==`         |
+| `zod`               | `3.25.76` | `gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==`         |
+
+The four R3 criteria (clean data-dir load, explicit create-flag
+serialization, count-proven retry disablement, isolatable in-memory storage)
+were verified on this artifact (`docs/yellow-jules/sdk-investigation.md` §10)
+and are re-exercised by `plugins/yellow-jules/tests/packed-sdk-transport.test.ts`.
+Treat any bump as a re-verification of all four criteria, and of the
+`@internal` `storageFactory` and `baseUrl` options the adapter relies on,
+before the pin moves; regenerate the runtime lockfile with
+`npm install --package-lock-only --ignore-scripts` inside `runtime/`.
+
 ## Yellow Goal Engine Release Pin
 
 Pinned engine artifact identity: `0.2.0`

@@ -71,6 +71,7 @@ const DEFAULT_DATA_DIR_ENV = {
 function pathFor(platform) {
     return platform === 'win32' ? path.win32 : path.posix;
 }
+// replica:resolveDataDir:start
 function resolveDataDir(overrides = {}) {
     const { env, platform, homedir } = { ...DEFAULT_DATA_DIR_ENV, ...overrides };
     const p = pathFor(platform);
@@ -94,6 +95,7 @@ function resolveDataDir(overrides = {}) {
     }
     return p.join(homedir(), '.local', 'share', 'yellow-cursor');
 }
+// replica:resolveDataDir:end
 function resolveRuntimeDir(dataDir) {
     return path.join(dataDir, 'runtime');
 }

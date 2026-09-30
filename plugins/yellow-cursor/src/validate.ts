@@ -62,6 +62,7 @@ export function validateRepoUrl(input: string): string {
 
 const REF_METACHAR_RE = /[\s~^:?*[\\`;|&$()<>'"\r\n]/;
 
+// replica:validateRef:start
 export function validateRef(input: string): string {
   if (input.length === 0 || input.length > 255) {
     return throwAppError(
@@ -102,6 +103,7 @@ export function validateRef(input: string): string {
   }
   return input;
 }
+// replica:validateRef:end
 
 export function validateModelId(input: string | undefined): string | undefined {
   if (input === undefined) return undefined;
@@ -153,6 +155,7 @@ export function validateRunId(input: string): string {
 
 const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._:-]{1,200}$/;
 
+// replica:validateIdempotencyKey:start
 export function validateIdempotencyKey(input: string): string {
   if (!IDEMPOTENCY_KEY_RE.test(input)) {
     return throwAppError(
@@ -162,6 +165,7 @@ export function validateIdempotencyKey(input: string): string {
   }
   return input;
 }
+// replica:validateIdempotencyKey:end
 
 const MAX_PROMPT_BYTES = 100 * 1024;
 

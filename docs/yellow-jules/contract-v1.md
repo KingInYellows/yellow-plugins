@@ -1,8 +1,9 @@
 # yellow-jules provider CLI contract, version 1
 
-**Version:** 1 **Status:** Draft until PR2 lands **Reconciled to:** `main`
-`8baa0bdd` (2026-09-10) **Spec:** `plans/specs/yellow-jules-integration.md`
-**Evidence:** [sdk-investigation.md](sdk-investigation.md),
+**Version:** 1 **Status:** Accepted (PR2 landed read-only surface, 2026-09-29)
+**Reconciled to:** `main` `8baa0bdd` (2026-09-10); PR2 revisions below **Spec:**
+`plans/specs/yellow-jules-integration.md` **Evidence:**
+[sdk-investigation.md](sdk-investigation.md),
 [capability-matrix.md](capability-matrix.md)
 
 This is the contract every later yellow-jules shell implements: subcommands,
@@ -30,6 +31,91 @@ documents in this directory are the standing evidence record after the plugin
 ships: none is folded into the plugin, none is archived, and a re-verification
 updates them in place; this file stays the canonical CLI contract, and
 `plugins/yellow-jules/CLAUDE.md` (PR3) links here rather than restating it.
+
+## PR2 revisions (2026-09-29)
+
+Recorded as the Provenance paragraph permits; each revises a PR1 default or
+mechanism, and none widens a guarantee.
+
+- **Approval carried across partial walks.** The operation record gains optional
+  `resumeApproval` `{ createTime, activityId }`: the newest `planApproved` a
+  partial `status` walk read, stored alongside `resumePageToken` and cleared
+  with it (complete walk, restart, or terminal retention), so newest-first
+  listings interrupted between an approval and its older plan do not leave the
+  plan pending.
+- **External sessions.** PR2 ships no `delegate`, so every session it can
+  observe was created outside yellow. `status` and `collect` on a
+  `sessions/{id}` absent from the journal mint a local id and write an operation
+  record with `origin: "external"`, `kind: "observe"`, and `status: "observed"`.
+  R13's `policy-deviation` applies only to records whose create requested
+  `autoPr: false`, which PR2 reaches only through test-planted create records;
+  an external session's vendor PR is an external reference (R42).
+- **Runtime lockfile location.** The data-dir install manifest and lockfile ship
+  as `plugins/yellow-jules/runtime/package.json` and `runtime/package-lock.json`
+  (outside the pnpm workspace glob); `setup --install-sdk` copies both into
+  `<dataDir>/runtime/` and runs `npm ci --ignore-scripts`. `runtime/pin.json`
+  records `sdkVersion`, `sdkIntegrity`, `sdkEntrySha256`, `treeSha256` (one
+  sha256 over the sorted relative path and sha256 of every regular file under
+  `runtime/node_modules/`), and the installed tree (`@google/jules-sdk` 0.2.0,
+  `yaml` 2.9.1, `zod` 3.25.76). Every load recomputes `treeSha256` and rejects
+  symlinks and nested `node_modules` (`JULES_SDK_INTEGRITY`); a pin without
+  `treeSha256` fails closed and asks for a `/jules:setup` rerun.
+- **Workspace resolution.** The workspace branch reads
+  `<pluginRoot>/node_modules/@google/jules-sdk` directly instead of walking
+  `createRequire` resolution, which would also accept an unverified install in
+  an ancestor directory. The resolved version must equal the pin.
+- **Raw REST state.** The pinned SDK's session mapper overwrites the REST
+  `state` with its own enum, so an unknown REST state is visible only as
+  `unspecified`. It still lands in `needs-inspection` (R10); the adapter does
+  not carry the raw string.
+- **Sources probe.** The SDK exposes sources only as an auto-paginating iterator
+  with no page token. `setup` reads up to `pageSize + 1` sources (at most two
+  `GET sources` pages) to report `truncated`.
+- **`collect` filter.** `collect` sends no `changeSet` filter, since its grammar
+  is unknown; the filter was an optimization only.
+- **No-progress restarts.** A stored resume token the vendor rejects
+  (`400`/`404`) restarts the walk from the watermark within the same invocation.
+  A resumed walk that finds nothing new discards the token so the next `status`
+  starts from the watermark. Either counts toward `JULES_NO_PROGRESS` on the
+  second consecutive occurrence.
+- **Lock timing.** A lock older than 60 s, or held by a dead pid on this host,
+  is stale (`JULES_STALE_LOCK`, never taken over). A live holder is waited on
+  for at most 15 s, then the call fails with `JULES_STALE_LOCK`,
+  `retryable: true`, and a recovery action that names the contention.
+- **`status --reconcile` in PR2.** With no reachable reservation it returns
+  `reconciled: []`. A hand-planted unresolved record is reported as
+  `not-reached` with `reason: "reconcile ships with delegate in PR3"` rather
+  than ignored.
+- **Title tags in `list`.** The `[yellow:<local-id>]` tag is vendor-writable, so
+  `list` strips it from the displayed title but surfaces a `localId` only when
+  the journal binds that id to the same session. Reconcile (PR3) still matches
+  on the tag.
+- **Accumulating staging.** A later `collect` continues the numbering recorded
+  in the previous `manifest.json` and on disk: `patch.diff` is never
+  overwritten, new patches go to `patches/<nn>-<sha256[0:12]>.diff`, and the
+  manifest accumulates. Journal artifacts are keyed by content digest.
+- **Retry window.** A read is retried only while the deadline leaves room for
+  the backoff plus a 5 s attempt, so a late retry does not overshoot it.
+- **Deadline ceiling.** `--deadline-ms` accepts 1-200 000. A run can outlast its
+  deadline by one in-flight read (the 60 s client timeout), and the command
+  wrappers run the CLI under a 300 s Bash timeout; a longer deadline would let
+  the host kill a run mid-write, leaving about 40 s for post-walk staging and
+  journal writes.
+- **Diagnostics and fencing.** On an operational failure stderr carries only the
+  error code; the message, which can embed vendor text, travels only in the JSON
+  envelope. The command wrappers print allowlisted fields, then every
+  vendor-writable string inside the untrusted-content fence as one labeled line,
+  with control, format, bidi, and tag characters flattened, dash runs (including
+  look-alikes) folded, and a 300-character cap, between markers that carry a
+  per-run random tag; no fenced line can forge a delimiter or a trusted row.
+- **Vendor enums and timestamps.** A session state outside the SDK's enum is
+  mapped to `unspecified`, and a timestamp that is not a valid RFC 3339 date is
+  dropped, since both are rendered bare and persisted. A plan activity without a
+  usable timestamp stops the walk as `unmappedActivity`.
+- **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
+  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
+  `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors
+  (exit 2) until they ship.
 
 ## Motivation
 
@@ -303,28 +389,30 @@ write any of those fields, and `collect` records its own
 and `lastActivityId` advance only after a **complete** `status` walk (no
 `nextPageToken` left) to the newest activity seen; a partial walk never advances
 them and records `resumePageToken` so the next `status` continues from it before
-starting a fresh watermarked read. A stored `resumePageToken` or
-`artifactResumePageToken` the vendor rejects (`400`/`404`) or that yields no
-progress is discarded and the walk restarts from the watermark (the session
-start for `collect`). For the restart guard, "no progress" is a walk that
-resumes from a stored `resumePageToken` or `artifactResumePageToken` and ends
-with the same `lastActivityId` it started from and no activity id outside the
-dedup ring; the journal counts consecutive such resume-token restarts per
-operation, and the second one fails the walk with `JULES_NO_PROGRESS` instead of
-restarting again (recovery: run `status` later; if it recurs, re-verify the SDK
-pin). A complete walk that finds no new activities is not a no-progress restart,
-and a walk that makes progress resets the count. Storing the token is a
-deliberate, recorded departure from R18's no-durable-page-tokens rule, and it
-never survives a terminal outcome. The dedup ring holds every id seen by
-`status` whose `createTime` falls within the 5-minute overlap window, capped at
-1000 entries; if the cap is reached the walk reports
-`dedupWindowExceeded: true`, counts may inflate, and — because ring membership
-is what suppresses re-acting — `supervise` treats that pass as check-failed
-(R33) and takes no act step on that session until a later `status` walk
-completes without the flag. Ring membership suppresses re-counting toward `new`
-and re-acting under `supervise`; it **never** suppresses an activity from being
-read, parsed, or used to extract plan or artifact state by `status`, `approve`,
-or `collect`.
+starting a fresh watermarked read. A partial walk also records `resumeApproval`
+(the newest `planApproved` stamp read) so a resumed walk does not resurrect the
+older plan that approval cleared; it is dropped with the token. A stored
+`resumePageToken` or `artifactResumePageToken` the vendor rejects (`400`/`404`)
+or that yields no progress is discarded and the walk restarts from the watermark
+(the session start for `collect`). For the restart guard, "no progress" is a
+walk that resumes from a stored `resumePageToken` or `artifactResumePageToken`
+and ends with the same `lastActivityId` it started from and no activity id
+outside the dedup ring; the journal counts consecutive such resume-token
+restarts per operation, and the second one fails the walk with
+`JULES_NO_PROGRESS` instead of restarting again (recovery: run `status` later;
+if it recurs, re-verify the SDK pin). A complete walk that finds no new
+activities is not a no-progress restart, and a walk that makes progress resets
+the count. Storing the token is a deliberate, recorded departure from R18's
+no-durable-page-tokens rule, and it never survives a terminal outcome. The dedup
+ring holds every id seen by `status` whose `createTime` falls within the
+5-minute overlap window, capped at 1000 entries; if the cap is reached the walk
+reports `dedupWindowExceeded: true`, counts may inflate, and — because ring
+membership is what suppresses re-acting — `supervise` treats that pass as
+check-failed (R33) and takes no act step on that session until a later `status`
+walk completes without the flag. Ring membership suppresses re-counting toward
+`new` and re-acting under `supervise`; it **never** suppresses an activity from
+being read, parsed, or used to extract plan or artifact state by `status`,
+`approve`, or `collect`.
 
 `pendingPlan` rule: every walk that observes a `planGenerated` activity with a
 later `(createTime, activityId)` than the journal's stored `pendingPlan`
@@ -474,8 +562,9 @@ runtime has observed, and `approve` compares against the same field.
   treated as absence. Patch and generated-file contents are written to
   `<dataDir>/artifacts/<local-id>/` rather than held in the result envelope
   (peak memory is the parsed vendor page, which is why `collect` uses `pageSize`
-  10; a response exceeding the runtime's string limits surfaces as
-  `JULES_MALFORMED_RESPONSE`); files are named locally (`patch.diff`,
+  10; a response body over 100 MiB is cut by the fetch guard before the SDK
+  parses it and surfaces as `JULES_MALFORMED_RESPONSE`; smaller per-field bodies
+  are bounded only by that response cap); files are named locally (`patch.diff`,
   `generated/<nn>-<sha256[0:12]>`), and a `manifest.json` records the vendor
   `GeneratedFile.path` as data only. Caps are degrade-and-report, never an error
   envelope, because they are exceeded by vendor data, not caller input: once 100
@@ -819,16 +908,20 @@ Each operation record carries the R35 fields plus the activity read-state that
 makes reads bounded across processes, written only by `status` (see "Activity
 walk"): `lastActivityCreateTime`, `lastActivityId` (tie-break for equal
 timestamps), `resumePageToken?`, `recentActivityIds` (the dedup ring: ids within
-the 5-minute overlap window, at most 1000), `activityCount`, and `pendingPlan?`;
-`collect` writes only `artifactResumePageToken?`. Retention: the ring and both
-resume tokens are dropped once an operation reaches a terminal, reconciled
-outcome, so a settled record is a few hundred bytes and a live one is bounded by
-the ring; `state/journal.json` is rewritten whole under the lock, and retention
-of terminal records is deferred until usage data justifies a policy (PR1
-default: none). Journal and grant maps are built with `Object.create(null)` (or
-`Map`), never by plain property assignment, so caller-supplied keys cannot reach
-the prototype. Writes are reservation-first and atomic (temp file plus rename)
-under the lock, and the R36 unresolved-operation lookup, authority evaluation,
+the 5-minute overlap window, at most 1000), `activityCount`, `pendingPlan?`, and
+`resumeApproval?` (the newest `planApproved` stamp a partial walk read; kept
+only while `resumePageToken` is stored, so a resumed walk can pair it with the
+older plan it approved; an unlocked walk's update is rebased so an older walk
+never clears or replaces a newer stored approval); `collect` writes only
+`artifactResumePageToken?`. Retention: the ring and both resume tokens are
+dropped once an operation reaches a terminal, reconciled outcome, so a settled
+record is a few hundred bytes and a live one is bounded by the ring;
+`state/journal.json` is rewritten whole under the lock, and retention of
+terminal records is deferred until usage data justifies a policy (PR1 default:
+none). Journal and grant maps are built with `Object.create(null)` (or `Map`),
+never by plain property assignment, so caller-supplied keys cannot reach the
+prototype. Writes are reservation-first and atomic (temp file plus rename) under
+the lock, and the R36 unresolved-operation lookup, authority evaluation,
 confirmation consumption, counter increment, and reservation write are one
 critical section under that lock (R31); the local request id is local
 deduplication only, never a vendor idempotency guarantee (R36).

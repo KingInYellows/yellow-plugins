@@ -1,7 +1,7 @@
 ---
 name: linear:delegate
-description: "Delegate a Linear issue to a remote coding agent — a Cursor cloud agent or a Devin AI session — via the remote-agent capability group. Resolves the enabled provider automatically (yellow-cursor is preferred; yellow-devin is the legacy path); use --provider to break a tie only when both are enabled."
-argument-hint: '[issue-id] [--provider cursor|devin]'
+description: "Delegate a Linear issue to a remote coding agent — a Cursor cloud agent or a Devin AI session — via the remote-agent capability group. Resolves the enabled provider automatically (yellow-cursor is preferred; yellow-devin is the legacy path; experimental yellow-jules is recognized but cannot launch yet); use --provider to break a tie only when more than one is enabled."
+argument-hint: '[issue-id] [--provider cursor|devin|jules]'
 allowed-tools:
   - Bash
   - Write
@@ -22,24 +22,26 @@ enabled — a Cursor cloud agent (preferred) or a Devin AI session (legacy) —
 with full context for autonomous implementation. This command never talks to
 a remote-agent provider's API directly: it resolves the provider, then
 launches through that provider's own surface (the `yellow-cursor` CLI, or
-the existing `/devin:delegate` command).
+the existing `/devin:delegate` command). The experimental `yellow-jules`
+provider is recognized, but its delegate command has not shipped: when it
+resolves, this command stops without contacting Jules.
 
 ## Arguments
 
 - `[issue-id]` — Linear issue identifier (e.g., `ENG-123`). If omitted,
   extracted from current branch name.
-- `[--provider cursor|devin]` — Overrides provider selection, but **only**
-  when both providers are enabled at once (the `CONFLICT` state below). It
-  never substitutes for a provider that isn't enabled at all — every other
-  non-ready state still stops the command.
+- `[--provider cursor|devin|jules]` — Overrides provider selection, but
+  **only** when more than one provider is enabled at once (the `CONFLICT`
+  state below). It never substitutes for a provider that isn't enabled at
+  all — every other non-ready state still stops the command.
 
 ## Workflow
 
 ### Step 1: Resolve Issue ID and Re-Fetch (C1 Validation)
 
-Parse `$ARGUMENTS` for `--provider cursor|devin` (validate the value is
-exactly `cursor` or `devin`; anything else is a usage error) and the issue
-id:
+Parse `$ARGUMENTS` for `--provider cursor|devin|jules` (validate the value is
+exactly `cursor`, `devin`, or `jules`; anything else is a usage error) and the
+issue id:
 
 ```bash
 ISSUE_ID=$(printf '%s' "${ARGUMENTS:-}" | sed 's/<[^>]*>//g' | \
@@ -157,13 +159,15 @@ fi
 
 # Coarse tooling probes — see the module docstring: this module never reads
 # env or runs commands itself, so the caller (this command) performs the
-# probes and passes results in. The cursor probe checks only that the CLI
-# resolved on disk; it is NOT equivalent to /cursor:setup's live SDK/auth
-# check, and PARTIAL_TOOLING is reported as such below, not upgraded to a
-# false READY.
+# probes and passes results in. The cursor and jules probes check only that
+# the plugin CLI resolved on disk; they are NOT equivalent to the plugins'
+# own live SDK/auth checks (/cursor:setup, /jules:setup), and
+# PARTIAL_TOOLING is reported as such below, not upgraded to a false READY.
 YELLOW_CURSOR_ROOT=$(resolve_plugin_root yellow-cursor dist/cli.js)
 TOOLING_CURSOR=$([ -n "$YELLOW_CURSOR_ROOT" ] && printf yes || printf no)
 TOOLING_DEVIN=$([ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -n "${DEVIN_ORG_ID:-}" ] && printf yes || printf no)
+YELLOW_JULES_ROOT=$(resolve_plugin_root yellow-jules dist/cli.js)
+TOOLING_JULES=$([ -n "$YELLOW_JULES_ROOT" ] && printf yes || printf no)
 
 CLASSIFICATION=$(printf '%s' "$_plugin_list_json" | node -e '
   const fs = require("fs");
@@ -175,9 +179,11 @@ CLASSIFICATION=$(printf '%s' "$_plugin_list_json" | node -e '
   if (process.argv[3] === "no") tooling.cursor = false;
   if (process.argv[4] === "yes") tooling.devin = true;
   if (process.argv[4] === "no") tooling.devin = false;
+  if (process.argv[5] === "yes") tooling.jules = true;
+  if (process.argv[5] === "no") tooling.jules = false;
   const result = classifyRemoteAgentState({ plugins, tooling, projectPath: process.argv[2] || null });
   process.stdout.write(JSON.stringify(result));
-' "$YELLOW_CORE_ROOT/lib/remote-agent-provider-state.js" "$repo_root" "$TOOLING_CURSOR" "$TOOLING_DEVIN")
+' "$YELLOW_CORE_ROOT/lib/remote-agent-provider-state.js" "$repo_root" "$TOOLING_CURSOR" "$TOOLING_DEVIN" "$TOOLING_JULES")
 
 printf 'yellow_cursor_root: %s\n' "${YELLOW_CURSOR_ROOT:-NONE}"
 printf 'classification:\n%s\n' "$CLASSIFICATION"
@@ -199,11 +205,20 @@ classifier output:
 
 Decide the provider:
 
+<!-- linear-delegate-providers:start -->
 - **`READY_CURSOR`** → provider = `cursor`.
 - **`READY_DEVIN`** → provider = `devin`.
-- **`CONFLICT`** → if `--provider` was given, use it (this is the ONLY
-  state `--provider` may override). Otherwise stop, print the fenced
-  `detail`, and tell the user to disable one provider or pass `--provider`.
+- **`READY_JULES`** → provider = `jules`. Jules delegation has not shipped:
+  skip Steps 4-6 and go straight to Step 7's **Jules** branch, which stops.
+- **`CONFLICT`** → if `--provider` was given (`cursor`, `devin`, or `jules`),
+  use it only if `classification.providers[<requested>].enabled` is `true`
+  (this is the ONLY state `--provider` may override). An accepted `jules`
+  override follows `READY_JULES`: skip Steps 4-6 and go straight to Step 7's
+  **Jules** branch. If the requested
+  provider is not enabled, or `--provider` was not given, stop, print the
+  fenced `detail`, and tell the user to disable the extra providers or pass
+  `--provider` naming an enabled one.
+<!-- linear-delegate-providers:end -->
 - **`UNSELECTED`**, **`PARTIAL_TOOLING`**, **`CONFIG_INVALID`** → stop, print
   the fenced `detail`, and do not proceed. `--provider` does **not** apply
   to any of these — it cannot substitute for a provider that isn't actually
@@ -563,6 +578,16 @@ Parse the single JSON object on stdout. On `{ok:true}`: capture `agentId`,
 `error.code`, `error.message`, and `error.recoveryAction` verbatim; stop —
 do not retry beyond what the CLI itself already does internally.
 
+**Jules.** Delegation to Jules is not available in this release — the
+`yellow-jules` delegate command ships later. Run this block, report its
+message, and stop: no packet is written, no confirmation is asked, no Linear
+comment is posted, and nothing contacts Jules.
+
+```bash
+printf 'ERROR: Jules delegation is not available yet; yellow-jules currently ships read-only commands. Enable yellow-cursor or yellow-devin, or pass --provider cursor|devin when more than one provider is enabled.\n' >&2
+exit 1
+```
+
 **Devin**: Invoke `Skill` with `skill: "devin:delegate"` and `args` set to
 the packet text from Step 4 followed by `--tags linear,<issue-id-lowercase>`
 — `/devin:delegate`'s argument-hint is a free-text task description, not an
@@ -628,6 +653,9 @@ Next steps:
 **Devin:** Report whatever `/devin:delegate` itself reported (session id,
 title, Devin URL, status) — do not re-derive or reformat those fields.
 
+**Jules:** Nothing was launched. Report the Step 7 message and that the
+Linear issue was left unchanged.
+
 ## Security Patterns
 
 - **C1**: `get_issue` validates issue exists before delegation
@@ -642,7 +670,8 @@ title, Devin URL, status) — do not re-derive or reformat those fields.
 - **No provider API client in this plugin**: no Devin API endpoint, no
   Devin credential format validation, no direct HTTP call to any
   remote-agent provider anywhere in this file — Cursor is reached only
-  through its own CLI binary; Devin is reached only through `/devin:delegate`
+  through its own CLI binary; Devin is reached only through `/devin:delegate`;
+  Jules is not reached at all until its delegate command ships
 - **Plugin-root resolution**: sibling plugin roots are resolved via
   `claude plugin list --json`'s `installPath` field, never via a
   `${CLAUDE_PLUGIN_ROOT}/../<plugin>` relative guess (the real plugin cache
@@ -660,7 +689,8 @@ title, Devin URL, status) — do not re-derive or reformat those fields.
 | `claude plugin list --json` fails | Report provider state as UNKNOWN, stop |
 | yellow-core not installed | Stop with install guidance |
 | Provider state is `UNSELECTED` / `PARTIAL_TOOLING` / `CONFIG_INVALID` | Stop, show the fenced `detail`, do not proceed |
-| Provider state is `CONFLICT` without `--provider` | Stop, show the fenced `detail`, ask the user to disable one provider or pass `--provider` |
+| Provider state is `CONFLICT` without `--provider` | Stop, show the fenced `detail`, ask the user to disable the extra providers or pass `--provider` |
+| Provider resolves to `jules` (`READY_JULES`, or `--provider jules` on `CONFLICT`) | Stop with the Step 7 Jules message ("Jules delegation is not available yet"); exit non-zero; no vendor call |
 | Cursor CLI returns `{ok:false}` | Report `error.code`/`error.message`/`error.recoveryAction`; stop |
 | Cursor `--repo` cannot be derived as https | Exit with the unsupported-host message above |
 | Devin path: `/devin:delegate` fails | Whatever `/devin:delegate` itself reports; this command does not intercept or reinterpret its errors |

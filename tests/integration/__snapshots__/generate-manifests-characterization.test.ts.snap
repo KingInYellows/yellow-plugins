@@ -75,6 +75,16 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
       "category": "development"
     },
     {
+      "name": "yellow-jules",
+      "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-jules",
+      "category": "development"
+    },
+    {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "3.5.2",
@@ -224,6 +234,7 @@ exports[`manifest byte-identity baseline > plugin inventory (explicit sorted nam
   "yellow-devin",
   "yellow-docs",
   "yellow-goal",
+  "yellow-jules",
   "yellow-linear",
   "yellow-morph",
   "yellow-research",
@@ -731,6 +742,31 @@ exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/pl
       "optional": false,
       "reason": "goal:run-stub sources validate_file_path() from yellow-core/lib/validate-fs.sh to contain the request path; the command fails closed without it"
     }
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-jules/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-jules",
+  "version": "0.1.0",
+  "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-jules",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "jules",
+    "google",
+    "remote-agent",
+    "delegation",
+    "ai-agent",
+    "automation"
   ]
 }
 "
