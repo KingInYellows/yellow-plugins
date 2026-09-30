@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [`dab83f3`](https://github.com/KingInYellows/yellow-plugins/commit/dab83f3d724ea89bde1e86117ffbcbe324487a58)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/linear:delegate` accepts `--provider cursor|devin|jules` and maps
+  `READY_JULES`, but Jules delegation is not available yet: when Jules resolves,
+  the command stops with an explanation before writing a packet, asking for
+  confirmation, posting a comment, or contacting Jules.
+
 ## 2.0.5
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # yellow-cursor
 
+## 0.2.4
+
+### Patch Changes
+
+- [`dab83f3`](https://github.com/KingInYellows/yellow-plugins/commit/dab83f3d724ea89bde1e86117ffbcbe324487a58)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Mark the units
+  yellow-jules copies (`validateRef`, `validateIdempotencyKey`,
+  `assertNoSecretShapedValues`, `redactDeep`, `resolveDataDir`, `AppError`,
+  `makeAppError`) with `// replica:` comments so a drift check keeps the copies
+  identical. Comment-only change; no behavior change.
+
 ## 0.2.3
 
 ### Patch Changes
