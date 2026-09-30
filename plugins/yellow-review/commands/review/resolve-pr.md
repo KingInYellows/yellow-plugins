@@ -62,11 +62,11 @@ Validate PR exists and is open. If not, report and stop.
 
 **Config snapshot.** Before any agent runs, read every `resolve_pr.*` key
 from `yellow-plugins.local.md` (validation and defaults in the `local-config`
-skill; invalid values warn and fall back) and record the file's hash. Later
-steps use only these values; Step 6 re-runs the hash to detect edits:
+skill; invalid values warn and fall back) and whether the file is tracked.
+Later steps use only this snapshot, so edits during the run change nothing:
 
 ```bash
-f="$(git rev-parse --show-toplevel)/yellow-plugins.local.md"; { sha256sum "$f" 2>/dev/null || shasum -a 256 "$f" 2>/dev/null || printf 'absent\n'; } | awk '{print $1}'
+git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1 && printf 'tracked\n' || printf 'untracked\n'
 ```
 
 **Non-interactive mode** suppresses every `AskUserQuestion` gate in this
@@ -347,8 +347,10 @@ not already. Then, for every thread sent to a resolver:
 1. **Conflicts.** For each cluster whose summary starts with `CONFLICT:`:
    - **Interactive:** one `AskUserQuestion` listing them (cluster, threadIds,
      description) with "Keep the resolver's partial edits / Roll back the
-     conflicted cluster's edits / Cancel and reconcile manually". Roll back
-     with `git checkout -- <files>`. Cancel stops before Step 6.
+     conflicted cluster's edits / Cancel and reconcile manually". To roll
+     back, write the cluster's files to a `mktemp` file with the Write tool
+     and run `GIT_LITERAL_PATHSPECS=1 git checkout HEAD --pathspec-from-file="<file>"`.
+     Cancel stops before Step 6.
    - **Non-interactive:** keep the edits, log the conflict for Step 9.
    Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
@@ -371,7 +373,8 @@ not already. Then, for every thread sent to a resolver:
 
 **Files.** The expected set is the union of every resolver's `Files
 modified`, minus clusters rolled back in Step 5. If `git status --porcelain`
-shows a tracked change outside that set, stop and report it. Write the set,
+shows any change (tracked or untracked) outside that set, stop and report
+it; every `fixed` thread becomes `unclear`. Write the set,
 one path per line, to a `mktemp` file with the Write tool (`<files-file>`
 below); resolver text never goes on a command line.
 
@@ -383,16 +386,9 @@ untrusted-content ---` fence, record `push=failed`, skip to Step 7.
 
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: ask with the command and `git diff --stat`; unattended: only
-with `verify_unattended: true`, an untracked config, and no runner files in
-the set). A hash that no longer matches Step 1 skips verify (`config
-modified during run`). The tracked check runs from the repository root:
-
-```bash
-git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1 && printf 'tracked\n' || printf 'untracked\n'
-```
-
-To run it, write the command with the Write tool to a `mktemp` path and call
-the script with a Bash tool `timeout` of `(<seconds> + 60) × 1000` ms:
+with `verify_unattended: true`, an untracked config and no runner files).
+Write the command with the Write tool to a `mktemp` path and pass the Bash
+tool a `timeout` of `(<seconds> + 60) × 1000` ms:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --files-from "<files-file>"
@@ -407,6 +403,8 @@ failed (<patch>)", and the commit is skipped (`push=skipped`). If
 resolve PR #X comments?"; rejection → `push=skipped`, edits stay
 uncommitted, `fixed` threads become `unclear`. Then run:
 
+Add `--unattended` in non-interactive mode; Bash `timeout` 600000 ms:
+
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --files-from "<files-file>"
 ```
@@ -420,10 +418,9 @@ keeps `fixed` threads `fixed`; otherwise they become `unclear`.
 Check the PR is still open (`gh pr view "<PR#>" --json state -q .state`); if
 not `OPEN`, print `PR #<N> is <STATE>; write phase stopped` and go to Step 9.
 
-Process threads serially, sorted by path, line, threadId — including the
-Step 3c dropped threads — following the contract's write order and lanes.
-For each action write the text with the Write tool to a `mktemp` path, never
-on a command line:
+Process threads serially, sorted by path, line, threadId — including Step
+3c's dropped threads — per the contract's write order and lanes. Write each
+text with the Write tool to a `mktemp` path, never on a command line:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" "<owner/repo>" "<PR#>" "<threadId>" "<title-file>" "<body-file>"
@@ -449,19 +446,22 @@ per line) to a `mktemp` file with the Write tool and poll every 20 seconds,
 with a Bash tool `timeout` of `(<wait> + 120) × 1000` ms:
 
 ```bash
-waited=0; found=0
-while [ "$waited" -lt "<wait>" ]; do
-  sleep 20; waited=$((waited + 20))
+end=$((SECONDS + <wait>)); found=0
+while [ $((SECONDS + 20)) -le "$end" ]; do
+  sleep 20
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-outdated "<owner/repo>" "<PR#>" >| "<refetch-file>" || continue
-  if jq -r '.[].threadId' "<refetch-file>" | grep -qvxF -f "<round1-file>"; then found=1; break; fi
+  if jq -r '.[].threadId' "<refetch-file>" | grep -qvxF -f "<round1-file>"; then found=1; fi
+  printf 'poll t=%s new=%s\n' "$SECONDS" "$found"
+  [ "$found" = 1 ] && break
 done
-printf 'waited=%s new=%s\n' "$waited" "$found"
 ```
 
 From the last re-fetch:
 - threads this run attempted to resolve but still open → retry
-  `resolve-pr-thread` up to 3 times (wait 60 s after a rate limit); a thread
-  we resolved that is open again is reported `reopened by bot`, not retried;
+  `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
+  permission`; exit 4 → stop, mark the rest `not attempted (rate limit)`,
+  `ratelimited=1`); a thread we resolved that is open again is reported
+  `reopened by bot`, not retried;
 - if new threads appeared, re-check the PR state, then run Steps 3c–7 once
   for the new threads only (same gates, shared issue cap). There is never a
   third round. Threads left open by design are not errors.
