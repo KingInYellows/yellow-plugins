@@ -6,7 +6,7 @@
 # Output: JSON to stdout: {"number":N,"url":"...","created":true|false}
 #   created=false means an issue the viewer authored already carries this
 #   thread's marker (dedupe hit); no new issue is filed.
-# Exit codes: 1 gh failure, 2 usage.
+# Exit codes: 1 gh failure, 2 usage or text that looks like a credential.
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -59,6 +59,13 @@ if [ "$(printf '%s' "$TITLE" | jq -Rs 'length')" -gt "$MAX_TITLE_CHARS" ]; then
 fi
 if [ "$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE")" -eq 0 ]; then
     printf 'Error: Body file is empty.\n' >&2
+    exit 2
+fi
+
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+if rt_looks_secret "$TITLE_FILE" || rt_looks_secret "$BODY_FILE"; then
+    printf 'Error: Issue text looks like it contains a credential; refusing to file it.\n' >&2
     exit 2
 fi
 

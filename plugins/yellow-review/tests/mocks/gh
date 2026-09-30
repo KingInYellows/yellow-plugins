@@ -98,6 +98,17 @@ case "$ALL_ARGS" in
   *"ReplyPrecheck"*)
     # reply-pr-thread pre-check: the thread's last comment.
     case "$ALL_ARGS" in
+      *"PRRT_reply_rlboth"*)
+        # Rate limited on the first pre-check only; the mutation then limits
+        # too (see below), so the script must not get a second retry.
+        if [ "$(bump precheck_rlboth)" -eq 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0"
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+          exit 1
+        fi
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_rlboth","comments":{"nodes":[{"viewerDidAuthor":false,"body":"x"}]}}}}'
+        ;;
       *"PRRT_reply_done"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
         ;;
@@ -121,9 +132,9 @@ case "$ALL_ARGS" in
       case "$a" in body=@*) cat "${a#body=@}" >| "${PAGE_STATE_DIR}/mock_gh_reply_body" ;; esac
     done
     case "$ALL_ARGS" in
-      *"PRRT_reply_rl2"*|*"PRRT_reply_rl"*)
-        # rl: limited on the first call only. rl2: always limited, no header.
-        case "$ALL_ARGS" in *"PRRT_reply_rl2"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+      *"PRRT_reply_rl2"*|*"PRRT_reply_rlboth"*|*"PRRT_reply_rl"*)
+        # rl: limited on the first call only. rl2 / rlboth: always limited.
+        case "$ALL_ARGS" in *"PRRT_reply_rl2"*|*"PRRT_reply_rlboth"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
         if [ "$limited" = 1 ]; then
           MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
           case "$ALL_ARGS" in

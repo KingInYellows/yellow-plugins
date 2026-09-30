@@ -6,8 +6,9 @@
 # Output: JSON to stdout:
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
 #   {"replied":false,"skipped":"already-replied","threadId":"PRRT_..."}
-# Exit codes: 1 other failure, 2 usage, 3 not found or permission,
-#             4 rate limited (after one retry).
+# Exit codes: 1 other failure, 2 usage or a body that looks like a
+#             credential, 3 not found or permission, 4 rate limited (after
+#             one retry for the whole script).
 # Contract: references/resolve/dispositions.md
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
@@ -53,6 +54,12 @@ if [ "$BODY_CHARS" -eq 0 ]; then
 fi
 if [ "$BODY_CHARS" -gt "$MAX_BODY_CHARS" ]; then
     printf 'Error: Reply body is %s characters; the limit is %s.\n' "$BODY_CHARS" "$MAX_BODY_CHARS" >&2
+    exit 2
+fi
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+if rt_looks_secret "$BODY_FILE"; then
+    printf 'Error: Reply body looks like it contains a credential; refusing to post it.\n' >&2
     exit 2
 fi
 
@@ -118,23 +125,24 @@ rate_limit_wait() {
     return 0
 }
 
-# Run a GraphQL call with one rate-limit retry. Exits 3/4/1 on failure.
+# Run a GraphQL call; one rate-limit retry is shared by the whole script so
+# the call fits the caller's Bash timeout. Exits 3/4/1 on failure.
+RETRIED=0
 call_with_retry() {
     _label="$1"; shift
-    _attempt=1
     while :; do
         if gh_graphql "$@" && ! jq -e '.errors | length > 0' "$RESP" >/dev/null 2>&1; then
             return 0
         fi
         if is_rate_limited; then
             _w=$(rate_limit_wait)
-            if [ "$_attempt" -ge 2 ] || [ -z "$_w" ]; then
+            if [ "$RETRIED" = 1 ] || [ -z "$_w" ]; then
                 printf 'Error: GitHub rate limit on %s for %s.\n' "$_label" "$THREAD_ID" >&2
                 exit 4
             fi
             printf '[reply-pr-thread] Rate limited on %s; retrying in %ss.\n' "$_label" "$_w" >&2
             sleep "$_w"
-            _attempt=$((_attempt + 1))
+            RETRIED=1
             continue
         fi
         if is_not_found_or_forbidden; then

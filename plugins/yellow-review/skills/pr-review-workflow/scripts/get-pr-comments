@@ -79,6 +79,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           line
           startLine
           comments(first: 50) {
+            totalCount
             nodes {
               id
               author { __typename login }
@@ -229,6 +230,7 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
               authorType: (.author.__typename // null)
             }
         ],
+        commentCount: (.comments.totalCount // ((.comments.nodes // []) | length)),
         isOutdated: (.isOutdated // false),
         viewerCanResolve: (.viewerCanResolve // false),
         viewerCanReply: (.viewerCanReply // false)
