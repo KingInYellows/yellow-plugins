@@ -1,0 +1,52 @@
+scripts/council-roster.json
+  s_2ace69cfef87f2::t_79a7ff885b3de9 67
+plugins/yellow-council/tests/lib/extract-synthesis-lib.bash
+  s_2ace69cfef87f2::t_376b436308ef22 1-36
+plugins/yellow-council/commands/council/council.md
+  s_2ace69cfef87f2::t_2211ce40cc74fe 167-168,377-378,1083-1156,1159-1367,1382-1467,1470-1592,1601,1609-1610,1618-1621,1626-1628,1630-1632,1637,1641,1653,1659-1660,1671-1680
+  s_2ace69cfef87f2::t_62182135bb1297 107-108,111,114-115,124-135,139,142-143,1371,1374
+  s_2ace69cfef87f2::t_5efe94bdf886cb 136-138,1378
+  s_2ace69cfef87f2::t_3489e84abd54da 1368-1370
+  s_2ace69cfef87f2::t_c12abeeaf5331f 1695-1696
+  s_2ace69cfef87f2::t_02009144ad4a83 2338
+  s_2ace69cfef87f2::t_db06a3dcfbb472 2612-2617,2630
+  s_2ace69cfef87f2::t_c5a8f25c252615 144
+  s_2ace69cfef87f2::t_1683367ccb3008 1375-1377
+  s_2ace69cfef87f2::t_0629eaa33d37c8 47-49
+  s_2ace69cfef87f2::t_c7672057d0ffd8 1372-1373
+  s_2ace69cfef87f2::t_f322edcc705afe 86-92
+  s_2ace69cfef87f2::t_965fb3f57e821c 1379-1381
+  s_2ace69cfef87f2::t_f253412ebfddb8 2339-2340
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_2ace69cfef87f2::t_8786ac34702e09 575-577,1026,1032-1112,1115-1118
+docs/testing/yellow-council-manual-tests.md
+  s_2ace69cfef87f2::t_a2333f8c1d67ff 119-161
+plugins/yellow-council/tests/synthesis.bats
+  s_2ace69cfef87f2::t_7384a23cbec3a4 1-283
+.github/workflows/validate-schemas.yml
+  s_2ace69cfef87f2::t_a341dea0247a69 1454,1463-1466
+plugins/yellow-council/CLAUDE.md
+  s_2ace69cfef87f2::t_152776b15bce14 70-84,107,110-111,178
+.changeset/council-synthesis-bias-mitigation.md
+  s_2ace69cfef87f2::t_7beb80ff4b50a5 1-12
+plans/yellow-council-v2-four-cli-03-synthesis-bias-mitigation.md
+  s_2ace69cfef87f2::t_e7e87f011191c4 1,3,6,13-15,24-303
+plugins/yellow-council/README.md
+  s_2ace69cfef87f2::t_8fe62080af538f 46,50-51,76-84,134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d3d5f92c1d64a8f6fc90bc8b02ac693a956e385",
+  "prompts": {},
+  "sessions": {
+    "s_2ace69cfef87f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0d928312-9caa-4db9-a56e-4b18d6e4a125",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
