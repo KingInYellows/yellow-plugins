@@ -1,0 +1,51 @@
+docs/yellow-jules/contract-v1.md
+  s_ca55a9df77f044::t_615ce40762c8a5 57-62,565-567,914-927
+plugins/yellow-jules/commands/jules/setup.md
+  s_ca55a9df77f044::t_6970381aa4d261 5,27-32,36-38,52,84-85
+plugins/yellow-jules/dist/fetch-guard.js
+  s_ca55a9df77f044::t_29b36a3c971b87 18,23-29,38-69,137
+plugins/yellow-jules/dist/runtime.js
+  s_ca55a9df77f044::t_5129dd2617cd9a 501-503,889-890,959-961,968,973
+plugins/yellow-jules/dist/sdk-adapter.js
+  s_ca55a9df77f044::t_6352af4cfa7bb8 137-142
+plugins/yellow-jules/dist/sdk-resolver.js
+  s_ca55a9df77f044::t_882089b05cf7bd 55,131-169,177,201-205,230-232,450
+plugins/yellow-jules/dist/state.js
+  s_ca55a9df77f044::t_62dcdeb25fd1a1 603,614-634
+plugins/yellow-jules/src/fetch-guard.ts
+  s_ca55a9df77f044::t_f6dbf9ea7c3b28 21-27,32-33,53-84,171
+plugins/yellow-jules/src/runtime.ts
+  s_ca55a9df77f044::t_3cb69831df0a1e 813-815,1276-1277,1364-1366,1374,1380
+plugins/yellow-jules/src/sdk-adapter.ts
+  s_ca55a9df77f044::t_ce52d9b961a5e9 37,187-191
+plugins/yellow-jules/src/sdk-resolver.ts
+  s_ca55a9df77f044::t_f830fccdf8b6e4 51-52,149-191,199,230-238,272-276,586
+plugins/yellow-jules/src/state.ts
+  s_ca55a9df77f044::t_0a30dfbfc6e375 790-793,823,837-857
+plugins/yellow-jules/tests/fetch-guard-response-cap.test.ts
+  s_ca55a9df77f044::t_b03dac8ca948ff 1-66
+plugins/yellow-jules/tests/offline-coverage.test.ts
+  s_ca55a9df77f044::t_fbf573f55a25c7 225-275
+plugins/yellow-jules/tests/packed-sdk-transport.test.ts
+  s_ca55a9df77f044::t_298b107111408c 232
+plugins/yellow-jules/tests/runtime-collect.test.ts
+  s_ca55a9df77f044::t_7d2e19026b4d9a 316-339
+plugins/yellow-jules/tests/state-store.test.ts
+  s_ca55a9df77f044::t_9b867ba87c14ef 480-523
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6a1b7e0696fc0572108c2023c7a571a8bb7c0be8",
+  "prompts": {},
+  "sessions": {
+    "s_ca55a9df77f044": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688a8aaf-ab6c-44c0-8bca-2360fe4a8483",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
