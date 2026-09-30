@@ -261,14 +261,14 @@ Print a pipe-delimited markdown summary table:
 ```text
 [review:sweep-all] Summary
 
-| PR# | Title                            | Outcome   | Blocking | Residual | Skip Reason            | Notes                        |
+| PR# | Title                            | Outcome   | Residual | Blocking | Skip Reason            | Notes                        |
 |-----|----------------------------------|-----------|----------|----------|------------------------|------------------------------|
-| 123 | feat(yellow-debt): add scanner   | attempted | 1        | 2/1      |                        |                              |
-| 124 | fix(yellow-ci): lint regression  | attempted | 0        | —        |                        |                              |
+| 123 | feat(yellow-debt): add scanner   | attempted | 2/1      | 1        |                        |                              |
+| 124 | fix(yellow-ci): lint regression  | attempted | —        | 0        |                        |                              |
 | 125 | refactor(yellow-core): split lib | skipped   | —        | —        | PR closed before sweep |                              |
-| 126 | docs: update CLAUDE.md           | attempted | ?        | 0/0      |                        | Error: stack-provider adoption failed (…) |
+| 126 | docs: update CLAUDE.md           | attempted | 0/0      | ?        |                        | Error: stack-provider adoption failed (…) |
 
-Totals: Attempted 3 | Skipped 1 | Total 4 | Blocking 1 | Residual 2 pending, 1 need attention
+Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention | Blocking 1
 ```
 
 `Blocking` is the review threads `/review:resolve` left open (disagree,
