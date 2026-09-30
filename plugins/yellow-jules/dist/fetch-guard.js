@@ -17,6 +17,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FetchGuardRefusal = exports.READ_TIMEOUT_MS = exports.VENDOR_ORIGIN = void 0;
 exports.installFetchGuard = installFetchGuard;
+const deadline_js_1 = require("./deadline.js");
 exports.VENDOR_ORIGIN = 'https://jules.googleapis.com';
 exports.READ_TIMEOUT_MS = 30_000;
 let installed = false;
@@ -70,6 +71,9 @@ function installFetchGuard(options) {
             signals.push(init.signal);
         if (input instanceof Request)
             signals.push(input.signal);
+        const attemptSignal = deadline_js_1.readAttemptSignal.getStore();
+        if (attemptSignal)
+            signals.push(attemptSignal);
         if (method !== 'POST') {
             const timeout = new AbortController();
             const timer = setTimeout(() => timeout.abort(new FetchGuardRefusal(`read timed out after ${options.readTimeoutMs} ms`)), options.readTimeoutMs);

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveArtifactsDir } from '../src/config.js';
 import { AdapterError } from '../src/errors.js';
-import { collect } from '../src/runtime.js';
+import { StagingBuffer, collect, toManifestPath } from '../src/runtime.js';
 import { markOperation, readJournal, reserveOperation } from '../src/state.js';
 import type { AdapterActivity } from '../src/types.js';
 
@@ -478,6 +478,46 @@ describe('collect', () => {
     expect(result.attention).toContain('partialStaging');
   });
 
+  it('does not retain bodies past the aggregate cap while walking', async () => {
+    const cap = 100;
+    const big = (n: number): string => `${String(n)}${'x'.repeat(59)}\n`;
+    const buffer = new StagingBuffer(cap);
+    for (let i = 0; i < 50; i += 1) {
+      buffer.patch(big(i), BASE);
+      expect(buffer.bufferedBytes).toBeLessThanOrEqual(cap);
+    }
+    buffer.generated('a.txt', 'y'.repeat(30));
+    expect(buffer.bufferedBytes).toBeLessThanOrEqual(cap);
+    // Exact duplicates are not counted twice.
+    const before = buffer.bufferedBytes;
+    buffer.patch(big(0), BASE);
+    expect(buffer.bufferedBytes).toBe(before);
+    expect(buffer.pending).toHaveLength(51);
+
+    fake.sessions.set(S, makeSession({ vendorState: 'completed' }));
+    fake.activities.set(
+      S,
+      Array.from({ length: 6 }, (_, i) =>
+        changeSetActivity(`${PATCH}+${String(i)}${'z'.repeat(80)}\n`)
+      )
+    );
+    const result = await collect(
+      makeDeps(dataDir, fake, { aggregateCapBytes: 200 }),
+      { session: S }
+    );
+    expect(result.artifacts.length).toBeGreaterThan(0);
+    expect(result.skipped.length).toBeGreaterThan(0);
+    expect(
+      result.skipped.every((k) => k.reason === 'aggregate-cap-reached')
+    ).toBe(true);
+    expect(result.partialStaging).toBe(true);
+    const dir = path.join(resolveArtifactsDir(dataDir), result.localId);
+    const staged = listFiles(dir)
+      .filter((f) => f !== 'manifest.json')
+      .reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
+    expect(staged).toBeLessThanOrEqual(200);
+  });
+
   it('flags secret-shaped content without altering the staged bytes', async () => {
     const leaky = `${PATCH}+const key = "AIzaSyA1234567890abcdefXYZ";\n`;
     fake.sessions.set(
@@ -537,5 +577,23 @@ describe('collect', () => {
     await expect(
       collect(makeDeps(dataDir, fake), { session: S })
     ).rejects.toThrow(/symlink/);
+  });
+});
+
+describe('toManifestPath', () => {
+  it('converts win32-style separators to POSIX', () => {
+    expect(toManifestPath('generated\\01-abcdef012345', path.win32)).toBe(
+      'generated/01-abcdef012345'
+    );
+    expect(toManifestPath('patches\\02-abcdef012345.diff', path.win32)).toBe(
+      'patches/02-abcdef012345.diff'
+    );
+  });
+
+  it('leaves POSIX paths unchanged', () => {
+    expect(toManifestPath('patches/02-abcdef012345.diff', path.posix)).toBe(
+      'patches/02-abcdef012345.diff'
+    );
+    expect(toManifestPath('patch.diff', path.win32)).toBe('patch.diff');
   });
 });

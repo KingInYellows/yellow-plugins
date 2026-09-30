@@ -6,6 +6,8 @@
  * exposes no Retry-After). Writes never go through this helper.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { AdapterError, throwAppError } from './errors.js';
 import type { Clock } from './types.js';
 
@@ -31,6 +33,14 @@ export function isExpired(clock: Clock, deadline: Deadline): boolean {
   return remainingMs(clock, deadline) <= 0;
 }
 
+/**
+ * The abort signal of the read attempt currently in flight. The SDK calls
+ * global `fetch` without a caller signal, so the fetch guard reads this store
+ * (async context follows the SDK's promise chain) and folds the signal into
+ * the request it dispatches.
+ */
+export const readAttemptSignal = new AsyncLocalStorage<AbortSignal>();
+
 function isRetryableRead(err: unknown): boolean {
   return (
     err instanceof AdapterError &&
@@ -45,8 +55,9 @@ export interface ReadRetryOptions {
 }
 
 /**
- * Race one read attempt against the remaining deadline. The underlying request
- * is not cancelled (deferred follow-up); the caller just stops waiting for it.
+ * Race one read attempt against the remaining deadline. When the timer wins,
+ * the attempt's abort signal fires so the fetch guard cancels the in-flight
+ * request (see `readAttemptSignal`).
  * The timer is a real one because the injected clock's sleep may be virtual.
  */
 async function boundByDeadline<T>(
@@ -62,17 +73,19 @@ async function boundByDeadline<T>(
     );
   if (remaining <= 0) return expire();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
   const expired = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       try {
+        controller.abort(new Error('operation deadline expired'));
         expire();
       } catch (err) {
         reject(err);
       }
     }, remaining);
   });
-  const attempt = fn();
-  // If the timer wins, the abandoned attempt may reject later; swallow it.
+  const attempt = readAttemptSignal.run(controller.signal, fn);
+  // If the timer wins, the aborted attempt rejects later; swallow it.
   attempt.catch(() => undefined);
   try {
     return await Promise.race([attempt, expired]);

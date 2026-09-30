@@ -894,6 +894,19 @@ const MANIFEST_MAX_BYTES = 10 * 1024 * 1024;
 const STAGED_PATH_RE =
   /^(?:patch\.diff|patches\/\d{2,}-[0-9a-f]{12}\.diff|generated\/\d{2,}-[0-9a-f]{12})$/;
 
+/** Manifest-relative paths are always POSIX-separated, whatever the platform. */
+export function toManifestPath(
+  rel: string,
+  pathImpl: Pick<typeof path, 'sep'> = path
+): string {
+  return rel.split(pathImpl.sep).join('/');
+}
+
+/** Native filesystem path for a POSIX manifest-relative path. */
+function stagedFsPath(dir: string, rel: string): string {
+  return path.join(dir, ...rel.split('/'));
+}
+
 /**
  * Artifacts a previous `collect` recorded here, rebuilt from validated fields
  * only: a staged file must still exist with the recorded digest (its secret
@@ -937,12 +950,15 @@ function readManifestArtifacts(
       continue;
     }
     if (a.kind !== 'patch' && a.kind !== 'generated-file') continue;
-    if (typeof a.path !== 'string' || !STAGED_PATH_RE.test(a.path)) continue;
+    if (typeof a.path !== 'string') continue;
+    // Tolerate manifests written with native (backslash) separators.
+    const relPath = toManifestPath(a.path, path.win32);
+    if (!STAGED_PATH_RE.test(relPath)) continue;
     if (typeof a.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(a.sha256))
       continue;
     let bytes: Buffer;
     try {
-      const staged = path.join(dir, a.path);
+      const staged = stagedFsPath(dir, relPath);
       if (!fs.lstatSync(staged).isFile()) continue;
       bytes = fs.readFileSync(staged);
     } catch {
@@ -958,7 +974,7 @@ function readManifestArtifacts(
         : undefined;
     out.push({
       kind: a.kind,
-      path: a.path,
+      path: relPath,
       sha256: a.sha256,
       ...(a.kind === 'patch' && baseCommit !== undefined ? { baseCommit } : {}),
       ...(a.kind === 'generated-file' && typeof a.vendorPath === 'string'
@@ -1044,12 +1060,12 @@ class Stager {
     const rel =
       this.patchSeq === 1
         ? 'patch.diff'
-        : path.join(
+        : path.posix.join(
             'patches',
             `${String(this.patchSeq).padStart(2, '0')}-${digest.slice(0, 12)}.diff`
           );
     if (this.patchSeq > 1) ensureOwnerOnlyDir(path.join(this.dir, 'patches'));
-    writeStaged(path.join(this.dir, rel), unidiffPatch);
+    writeStaged(stagedFsPath(this.dir, rel), unidiffPatch);
     const baseCommit = optionalBaseCommit(baseCommitId);
     this.artifacts.push({
       kind: 'patch',
@@ -1082,11 +1098,11 @@ class Stager {
     this.staged += bytes;
     this.generatedSeq += 1;
     ensureOwnerOnlyDir(path.join(this.dir, 'generated'));
-    const rel = path.join(
+    const rel = path.posix.join(
       'generated',
       `${String(this.generatedSeq).padStart(2, '0')}-${digest.slice(0, 12)}`
     );
-    writeStaged(path.join(this.dir, rel), content);
+    writeStaged(stagedFsPath(this.dir, rel), content);
     this.artifacts.push({
       kind: 'generated-file',
       path: rel,
@@ -1107,6 +1123,72 @@ class Stager {
       secretShapedContent: false,
       verification: 'unverified',
     });
+  }
+}
+
+/**
+ * Bounded buffer for staging operations recorded during the unlocked vendor
+ * walk and replayed under the journal lock. Bodies are retained only while the
+ * running total stays within the aggregate cap (the same test `Stager` applies,
+ * which also starts its total at zero for each collect); a body that would
+ * exceed it is dropped and replayed as a cap-skip, so memory is bounded by the
+ * cap and `skipped` / `partialStaging` stay correct. `Stager` remains the
+ * authoritative enforcement under the lock.
+ */
+export class StagingBuffer {
+  readonly pending: Array<(stager: Stager) => void> = [];
+  private buffered = 0;
+  private readonly seenPatches = new Set<string>();
+  private readonly seenGenerated = new Set<string>();
+
+  constructor(private readonly capBytes: number) {}
+
+  /** Bytes of artifact bodies currently retained. */
+  get bufferedBytes(): number {
+    return this.buffered;
+  }
+
+  patch(unidiffPatch: string, baseCommitId: string): void {
+    if (unidiffPatch === '') return;
+    const digest = sha256(unidiffPatch);
+    if (this.seenPatches.has(digest)) return;
+    this.seenPatches.add(digest);
+    const bytes = Buffer.byteLength(unidiffPatch, 'utf8');
+    if (this.buffered + bytes > this.capBytes) {
+      this.pending.push((s) =>
+        s.skipped.push({
+          kind: 'patch',
+          reason: 'aggregate-cap-reached',
+          bytes,
+        })
+      );
+      return;
+    }
+    this.buffered += bytes;
+    this.pending.push((s) => s.patch(unidiffPatch, baseCommitId));
+  }
+
+  generated(vendorPath: string, content: string): void {
+    const key = `${sha256(content)}:${redact(vendorPath)}`;
+    if (this.seenGenerated.has(key)) return;
+    this.seenGenerated.add(key);
+    const bytes = Buffer.byteLength(content, 'utf8');
+    if (this.buffered + bytes > this.capBytes) {
+      this.pending.push((s) =>
+        s.skipped.push({
+          kind: 'generated-file',
+          reason: 'aggregate-cap-reached',
+          bytes,
+        })
+      );
+      return;
+    }
+    this.buffered += bytes;
+    this.pending.push((s) => s.generated(vendorPath, content));
+  }
+
+  prRef(prUrl: string): void {
+    this.pending.push((s) => s.prRef(prUrl));
   }
 }
 
@@ -1136,11 +1218,12 @@ export async function collect(
     ensureOwnerOnlyDir(dir);
     // Vendor reads run unlocked; staging is buffered here and replayed inside
     // one critical section, so slot allocation never races another collect.
-    const pending: Array<(stager: Stager) => void> = [];
+    const capBytes = deps.aggregateCapBytes ?? AGGREGATE_ARTIFACT_CAP_BYTES;
+    const buffer = new StagingBuffer(capBytes);
 
     for (const output of session.outputs) {
       if (output.type === 'changeSet') {
-        pending.push((s) => s.patch(output.unidiffPatch, output.baseCommitId));
+        buffer.patch(output.unidiffPatch, output.baseCommitId);
       } else if (session.sourceResource !== undefined) {
         const check = validatePullRequestUrl(
           output.url,
@@ -1148,7 +1231,7 @@ export async function collect(
         );
         if (check.valid) {
           const url = check.url;
-          pending.push((s) => s.prRef(url));
+          buffer.prRef(url);
         }
       }
     }
@@ -1172,8 +1255,7 @@ export async function collect(
       onActivity: (activity: AdapterActivity) => {
         for (const artifact of activity.artifacts) {
           if (artifact.type === 'changeSet') {
-            const { unidiffPatch, baseCommitId } = artifact;
-            pending.push((s) => s.patch(unidiffPatch, baseCommitId));
+            buffer.patch(artifact.unidiffPatch, artifact.baseCommitId);
           }
         }
       },
@@ -1181,8 +1263,7 @@ export async function collect(
 
     for (const file of session.generatedFiles) {
       if (file.changeType === 'deleted' || file.content === '') continue;
-      const { path: vendorPath, content } = file;
-      pending.push((s) => s.generated(vendorPath, content));
+      buffer.generated(file.path, file.content);
     }
 
     const collectedAt = new Date(deps.clock.now()).toISOString();
@@ -1190,12 +1271,8 @@ export async function collect(
     // as one critical section. The journal lock is not reentrant, so the
     // journal write (recordArtifacts) follows after release.
     const stager = await withJournalLock(deps.dataDir, async () => {
-      const s = new Stager(
-        dir,
-        deps.aggregateCapBytes ?? AGGREGATE_ARTIFACT_CAP_BYTES,
-        session.sourceResource
-      );
-      for (const apply of pending) apply(s);
+      const s = new Stager(dir, capBytes, session.sourceResource);
+      for (const apply of buffer.pending) apply(s);
       writeStaged(
         path.join(dir, 'manifest.json'),
         `${JSON.stringify(

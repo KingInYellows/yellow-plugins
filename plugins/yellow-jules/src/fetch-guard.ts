@@ -14,6 +14,8 @@
  * env, or argv.
  */
 
+import { readAttemptSignal } from './deadline.js';
+
 export const VENDOR_ORIGIN = 'https://jules.googleapis.com';
 export const READ_TIMEOUT_MS = 30_000;
 
@@ -90,6 +92,8 @@ export function installFetchGuard(
     const signals: AbortSignal[] = [];
     if (init?.signal) signals.push(init.signal);
     if (input instanceof Request) signals.push(input.signal);
+    const attemptSignal = readAttemptSignal.getStore();
+    if (attemptSignal) signals.push(attemptSignal);
     if (method !== 'POST') {
       const timeout = new AbortController();
       const timer = setTimeout(

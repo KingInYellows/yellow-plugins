@@ -7,11 +7,12 @@
  * exposes no Retry-After). Writes never go through this helper.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MIN_ATTEMPT_MS = exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
+exports.readAttemptSignal = exports.MIN_ATTEMPT_MS = exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
 exports.deadlineIn = deadlineIn;
 exports.remainingMs = remainingMs;
 exports.isExpired = isExpired;
 exports.withReadRetry = withReadRetry;
+const node_async_hooks_1 = require("node:async_hooks");
 const errors_js_1 = require("./errors.js");
 exports.DEFAULT_READ_DEADLINE_MS = 120_000;
 exports.DEFAULT_COLLECT_DEADLINE_MS = 180_000;
@@ -27,13 +28,21 @@ function remainingMs(clock, deadline) {
 function isExpired(clock, deadline) {
     return remainingMs(clock, deadline) <= 0;
 }
+/**
+ * The abort signal of the read attempt currently in flight. The SDK calls
+ * global `fetch` without a caller signal, so the fetch guard reads this store
+ * (async context follows the SDK's promise chain) and folds the signal into
+ * the request it dispatches.
+ */
+exports.readAttemptSignal = new node_async_hooks_1.AsyncLocalStorage();
 function isRetryableRead(err) {
     return (err instanceof errors_js_1.AdapterError &&
         (err.kind === 'server-error' || err.kind === 'network'));
 }
 /**
- * Race one read attempt against the remaining deadline. The underlying request
- * is not cancelled (deferred follow-up); the caller just stops waiting for it.
+ * Race one read attempt against the remaining deadline. When the timer wins,
+ * the attempt's abort signal fires so the fetch guard cancels the in-flight
+ * request (see `readAttemptSignal`).
  * The timer is a real one because the injected clock's sleep may be virtual.
  */
 async function boundByDeadline(fn, options) {
@@ -42,9 +51,11 @@ async function boundByDeadline(fn, options) {
     if (remaining <= 0)
         return expire();
     let timer;
+    const controller = new AbortController();
     const expired = new Promise((_resolve, reject) => {
         timer = setTimeout(() => {
             try {
+                controller.abort(new Error('operation deadline expired'));
                 expire();
             }
             catch (err) {
@@ -52,8 +63,8 @@ async function boundByDeadline(fn, options) {
             }
         }, remaining);
     });
-    const attempt = fn();
-    // If the timer wins, the abandoned attempt may reject later; swallow it.
+    const attempt = exports.readAttemptSignal.run(controller.signal, fn);
+    // If the timer wins, the aborted attempt rejects later; swallow it.
     attempt.catch(() => undefined);
     try {
         return await Promise.race([attempt, expired]);
