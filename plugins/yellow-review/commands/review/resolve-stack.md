@@ -236,7 +236,7 @@ failures and continue.
    not proof of agreement); record that as `self-verify disagreement`. On non-zero exit: record the PR's
    verification as `inconclusive` with the stderr output and flag it.
 
-3b. **Clean-tree check** — continuing on a dirty tree would carry this PR's
+   **3b. Clean-tree check** — continuing on a dirty tree would carry this PR's
    edits onto the next branch:
 
    ```bash
