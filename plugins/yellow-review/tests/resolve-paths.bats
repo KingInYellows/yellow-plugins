@@ -11,8 +11,15 @@ setup() {
 
 @test "rp_canonical accepts plain repo-relative paths" {
   rp_canonical src/a.ts
-  rp_canonical -dash.txt
   rp_canonical 'src/$(x).txt'
+  rp_canonical a-dash.txt
+}
+
+@test "rp_canonical rejects root-level and nested names starting with a hyphen" {
+  for p in -dash.txt -rf src/-dash.txt a/b/-c -a/b; do
+    run rp_canonical "$p"
+    [ "$status" -ne 0 ] || { echo "accepted: $p"; false; }
+  done
 }
 
 @test "rp_canonical rejects dot, empty and escaping segments" {
@@ -55,6 +62,13 @@ setup() {
   rp_runner .GitHooks/pre-commit
   git config core.hooksPath "$(pwd)/hooks-abs"
   rp_runner hooks-abs/pre-commit
+}
+
+@test "rp_runner treats root-level files as hooks when core.hooksPath is the repository root" {
+  git config core.hooksPath "$(pwd)"
+  rp_runner pre-commit
+  run rp_runner src/pre-commit
+  [ "$status" -ne 0 ]
 }
 
 @test "rp_runner leaves ordinary sources alone" {

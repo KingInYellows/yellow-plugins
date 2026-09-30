@@ -13,8 +13,8 @@ lgit() { git --literal-pathspecs "$@"; }
 
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
-# rp_canonical <path>: repo-relative with no empty, `.` or `..` segment and
-# no control characters.
+# rp_canonical <path>: repo-relative with no empty, `.` or `..` segment, no
+# segment starting with `-` (option-shaped names) and no control characters.
 rp_canonical() {
     local rest="$1" seg
     [ -n "$rest" ] || return 1
@@ -22,7 +22,7 @@ rp_canonical() {
     case "$rest" in /*|*/) return 1 ;; esac
     while :; do
         seg="${rest%%/*}"
-        case "$seg" in ''|.|..) return 1 ;; esac
+        case "$seg" in ''|.|..|-*) return 1 ;; esac
         [ "$rest" = "$seg" ] && return 0
         rest="${rest#*/}"
     done
@@ -67,6 +67,12 @@ rp_runner() {
     hooks=$(git config --get core.hooksPath 2>/dev/null || true)
     if [ -n "$hooks" ]; then
         top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+        # A hooks path that is the repository root itself: Git runs every
+        # root-level file as a hook, so any path without a slash is a runner.
+        if [ -n "$top" ] && { [ "$hooks" = "$top" ] || [ "$hooks" = "$top/" ]; }; then
+            case "$l" in */*) ;; *) return 0 ;; esac
+            return 1
+        fi
         [ -n "$top" ] && hooks="${hooks#"$top"/}"
         hooks=$(rp_lower "${hooks#./}")
         case "$l" in "${hooks%/}"/*) return 0 ;; esac

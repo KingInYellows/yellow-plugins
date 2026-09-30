@@ -61,12 +61,19 @@ run_crf() {
   grep -q '^gt submit --no-interactive --no-edit$' "$STUB_LOG"
 }
 
-@test "handles a leading-dash filename and a deletion" {
+@test "refuses a leading-dash filename (exit 2) and commits nothing" {
   printf 'changed\n' >| ./-dash.txt
-  git rm -q --cached src/b.txt && rm src/b.txt && git reset -q -- src/b.txt
+  before=$(git rev-parse HEAD)
   run_crf --provider graphite --pr 7 --message "$MSG" -- -dash.txt src/b.txt
+  [ "$status" -eq 2 ]
+  [ "$(git rev-parse HEAD)" = "$before" ]
+}
+
+@test "handles a deletion" {
+  git rm -q --cached src/b.txt && rm src/b.txt && git reset -q -- src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/b.txt
   [ "$status" -eq 0 ]
-  [ "$(git show --name-status --format= HEAD | sort | tr '\t\n' ': ')" = "D:src/b.txt M:-dash.txt " ]
+  [ "$(git show --name-status --format= HEAD | sort | tr '\t\n' ': ')" = "D:src/b.txt " ]
 }
 
 @test "the github provider commits with git and submits via the runtime" {
@@ -295,6 +302,25 @@ run_crf() {
   [[ "$stderr" == *"credential-shaped"* ]]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a hook that leaves an untracked file makes the commit undo itself (exit 4)" {
+  printf '#!/bin/sh\nprintf "generated\\n" > src/generated.txt\n' >| .git/hooks/post-commit
+  chmod +x .git/hooks/post-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"not clean"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a sole remote not named origin is the one verified" {
+  git remote rename origin upstream
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
 }
 
 @test "a missing github runtime fails before committing (exit 2)" {

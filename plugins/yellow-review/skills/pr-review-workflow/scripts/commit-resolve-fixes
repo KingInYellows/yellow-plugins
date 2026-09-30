@@ -19,7 +19,8 @@
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
 # Exit codes: 2 usage, 3 staged mismatch or refused path, 4 commit failed
 #             (or the commit's files or added lines differ from the checked
-#             set, e.g. a hook changed them; the commit is then undone and
+#             set, or the tree is dirty after it, e.g. a hook changed or
+#             created files; the commit is then undone and
 #             its changes left unstaged for the caller's revert),
 #             5 submit failed, 6 verify mismatch. After 5 or 6 the commit
 #             exists locally: resubmit through the provider rather than
@@ -210,6 +211,11 @@ git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE
 if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
     undo_commit "credential-shaped: the commit looks like it contains a credential (a hook may have added it); nothing submitted"
 fi
+# A hook can also leave edits or new files unstaged or untracked. Check before
+# submitting, so a dirty tree is never reported after the push has happened.
+if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+    undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
+fi
 
 # --- Submit ---
 case "$PROVIDER" in
@@ -235,8 +241,19 @@ esac
 REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
     || git config --get remote.pushDefault 2>/dev/null \
     || git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-# "." means a local upstream (common for stacked branches): check origin.
-case "$REMOTE_NAME" in ''|.) REMOTE_NAME=origin ;; esac
+# "." means a local upstream (common for stacked branches). With nothing
+# configured, the providers accept a sole remote whatever its name (the github
+# runtime passes no --remote then), so check that one; otherwise origin.
+case "$REMOTE_NAME" in
+    ''|.)
+        REMOTES=$(git remote 2>/dev/null || true)
+        if [ -n "$REMOTES" ] && [ "$(printf '%s\n' "$REMOTES" | wc -l)" -eq 1 ]; then
+            REMOTE_NAME="$REMOTES"
+        else
+            REMOTE_NAME=origin
+        fi
+        ;;
+esac
 REMOTE=$(git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
 [ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
 PR_HEAD=""
@@ -246,7 +263,5 @@ for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do
     [ "$PR_HEAD" = "$SHA" ] && break
 done
 [ "$PR_HEAD" = "$SHA" ] || die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}"
-
-[ -z "$(git status --porcelain --untracked-files=no)" ] || die 6 "tracked tree is not clean after submit"
 
 emit PUSHED "$SHA"
