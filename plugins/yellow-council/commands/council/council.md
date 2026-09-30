@@ -1210,9 +1210,29 @@ from 5a and the literal `CLAUDE_FENCED_FILE` value from Step 4:
 # byte-for-byte: fenced code blocks, backtick code spans (any run length), the
 # path:line token of each citation, and everything from an Evidence: label to
 # the end of its line (shell 05's verify_finding() compares that quote to the
-# file). POSIX awk only (mawk has no interval expressions or gensub).
+# file). Optional first argument: the reviewer name (claude|codex|gemini|
+# opencode). When set, whole-word occurrences of that reviewer's own name and
+# model-family aliases in prose (not code spans, path-like words, fenced
+# blocks or Evidence tails) become [reviewer]; other reviewers' names stay.
+# POSIX awk only (mawk has no interval expressions or gensub).
 council_normalize_text() {
-  awk '
+  awk -v self="${1:-}" '
+    # True when lowercase word lc is the self reviewer name or an alias.
+    function self_alias(lc) {
+      if (self == "claude") return (lc == "claude" || lc == "anthropic")
+      if (self == "codex") return (lc == "codex" || lc == "openai" || lc == "gpt" || lc ~ /^gpt-/)
+      if (self == "gemini") return (lc == "gemini" || lc == "google" || lc == "agy")
+      if (self == "opencode") return (lc == "opencode")
+      return 0
+    }
+    # Replace a self-naming word core, keeping a possessive suffix.
+    function scrub_self(w,   sfx, lc) {
+      sfx = ""
+      if (length(w) > 2 && substr(w, length(w) - 1) == "\047s") { sfx = "\047s"; w = substr(w, 1, length(w) - 2) }
+      lc = tolower(w)
+      if (self_alias(lc)) return "[reviewer]" sfx
+      return w sfx
+    }
     function sev_level(h) {
       if (h ~ /P1|CRITICAL|[Cc]ritical|HIGH|[Hh]igh/) return "P1"
       if (h ~ /P2|MEDIUM|[Mm]edium/) return "P2"
@@ -1231,6 +1251,7 @@ council_normalize_text() {
       if (match(w, /[]})".,;:!?]+$/)) { post = substr(w, RSTART); w = substr(w, 1, RSTART - 1) }
       if (path) { if (match(w, /\*+$/)) w = substr(w, 1, RSTART - 1) }
       else if (match(w, /[*_]+$/)) w = substr(w, 1, RSTART - 1)
+      if (self != "" && !path) w = scrub_self(w)
       return pre w post
     }
     # strip_emph calls match() too, so copy RSTART/RLENGTH before calling it.
@@ -1337,7 +1358,7 @@ council_normalize_text() {
       if (match(s, /^(\[P[123]\]|\(P[123]\)|P[123]:|\[(CRITICAL|HIGH|MEDIUM|LOW)\]|\((CRITICAL|HIGH|MEDIUM|LOW)\)|(CRITICAL|HIGH|MEDIUM|LOW):|[Ss]everity:[ \t]*(P[123]|CRITICAL|HIGH|MEDIUM|LOW|[Cc]ritical|[Hh]igh|[Mm]edium|[Ll]ow))/)) {
         head = substr(s, 1, RLENGTH); rest = substr(s, RLENGTH + 1)
         sub(/^:/, "", rest)
-        sub(/^[ \t]+([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)[ \t]+(—|–|-)[ \t]*/, " ", rest)
+        sub(/^[ \t]+(\[reviewer\]|[Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)[ \t]+(—|–|-)[ \t]*/, " ", rest)
         # One separator shape after the citation, whichever the reviewer used.
         sub(/^[ \t]+/, "", rest)
         if (match(rest, /^[^ \t]+/) && substr(rest, 1, RLENGTH) ~ /:[0-9]/) {
@@ -1579,7 +1600,7 @@ while IFS=: read -r label r; do
       detail=$(head -n 1 "$SYNTH_DIR/codex.summary.txt")
     fi
     if [ -n "$detail" ]; then
-      detail=$(printf '%s\n' "$detail" | council_normalize_text | head -n 1) || {
+      detail=$(printf '%s\n' "$detail" | council_normalize_text "$r" | head -n 1) || {
         printf '[council] Error: normalization failed\n' >&2
         council_synth_abort
       }
@@ -1597,7 +1618,7 @@ ${text}"
   if [ "$excluded" -eq 1 ] && [ -n "$text" ]; then
     normalized="$text"
   elif [ -n "$text" ]; then
-    normalized=$(printf '%s\n' "$text" | council_normalize_text) || {
+    normalized=$(printf '%s\n' "$text" | council_normalize_text "$r") || {
       printf '[council] Error: normalization failed\n' >&2
       council_synth_abort
     }

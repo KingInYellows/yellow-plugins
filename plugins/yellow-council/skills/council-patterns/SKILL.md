@@ -1066,9 +1066,11 @@ only by a fence at least as long), backtick code spans of any run length, the
 `<file>:<line>` token of each citation, and everything from an `Evidence:`
 label to the end of its line, wherever the label sits — `verify_finding()`
 compares that quote against the file, so an altered quote turns a true
-citation false. Prose that mentions a model name is not scrubbed; the content
-may legitimately be about one. Normalization runs before fencing, and its
-output is still fenced.
+citation false. In prose, a reviewer's own name and model-family aliases
+(Claude/Anthropic, Codex/OpenAI/GPT, Gemini/Google/agy, OpenCode) are replaced
+with `[reviewer]`; other names are kept because the content may legitimately
+be about them. Code, citations and `Evidence:` tails are untouched.
+Normalization runs before fencing, and its output is still fenced.
 
 **Anonymization (5b, `council_assign_labels`).** Each run draws a fresh
 random bijection of `S1`–`S4` over the whole roster from `/dev/urandom`

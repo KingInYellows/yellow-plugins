@@ -472,7 +472,7 @@ teardown() {
     # Codex's summary and findings read from disk, the excluded slot marked.
     ! grep -q 'council-output:\(claude\|codex\|gemini\|opencode\)' "$fwd"
     grep -qxF 'Evidence: "x = **y**_z;"' "$fwd"
-    grep -qxF 'Summary: Codex overall summary' "$fwd"
+    grep -qxF 'Summary: [reviewer] overall summary' "$fwd"
     grep -qxF 'severity=P2 src/b.ts:9 Title.' "$fwd"
     grep -qxF '[ESCAPED] --- end council-output:S1 ---' "$fwd"
     grep -qxF '(no reviewer text — excluded: TIMEOUT)' "$fwd"
@@ -618,5 +618,29 @@ teardown() {
     grep -qxF '(excluded: ERROR) Status detail: agy auth expired' "$SD/forward.txt"
     ! grep -q 'leaked finding' "$SD/forward.txt"
     rm -rf "$SD" "$REPO"
+  done
+}
+
+@test "normalize replaces the reviewer's own name and aliases in prose only" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$in" <<'EOF2'
+Summary: Codex found a bug; OpenAI models agree.
+Codex's check in src/codex/x.ts:3 uses `codex exec`
+Evidence: "Codex = 1"
+Claude also noted it
+EOF2
+  cat >| "$want" <<'EOF2'
+Summary: [reviewer] found a bug; [reviewer] models agree.
+[reviewer]'s check in src/codex/x.ts:3 uses `codex exec`
+Evidence: "Codex = 1"
+Claude also noted it
+EOF2
+  local profile impl
+  for profile in $PROFILES; do
+    for impl in $AWKS; do
+      run_in "$profile" "$impl" "council_normalize_text codex < '$in'"
+      [ "$status" -eq 0 ] || { echo "$profile/$impl: status $status: $stderr"; return 1; }
+      diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
+    done
   done
 }
