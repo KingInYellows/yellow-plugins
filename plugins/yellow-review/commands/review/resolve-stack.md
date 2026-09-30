@@ -241,8 +241,11 @@ failures and continue.
 
    Non-empty output: print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
-   followed by the file list, skip the remaining PRs, and go to Step 4 (exit
-   `1`).
+   followed by the file list. Save and revert the leftover edits (a refused
+   edit, such as one to `.claude/`, must not stay on disk) with
+   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
+   and print its `patch` path. Then skip the remaining PRs and go to Step 4
+   (exit `1`).
 
 4. **Restack** — `gt upstack restack`. If it reports a conflict: do not pause —
    run `gt abort` to clear the conflicted restack (without this, the repo stays
