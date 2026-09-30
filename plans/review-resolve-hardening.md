@@ -451,7 +451,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 2: Resolver agent and `/review:resolve`
 
-- [ ] 2.1: Update `agents/workflow/pr-comment-resolver.md`.
+- [x] 2.1: Update `agents/workflow/pr-comment-resolver.md`.
   - Add the per-thread `THREAD` lines after the existing output block. Keep
     `Status`, `CONFLICT:` and `Files modified` unchanged.
   - Add these rules:
@@ -833,6 +833,6 @@ Decisions from the brainstorm and the planning round:
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
-- [ ] 2. agent/feat/resolve-commit-verify-scripts
+- [x] 2. agent/feat/resolve-commit-verify-scripts (completed 2026-09-30)
 - [ ] 3. agent/fix/resolve-dispositions
 - [ ] 4. agent/feat/resolve-stack-callers
