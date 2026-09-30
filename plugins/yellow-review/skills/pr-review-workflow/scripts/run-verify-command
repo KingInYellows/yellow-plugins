@@ -1,0 +1,181 @@
+#!/bin/bash
+# Run resolve_pr.verify_command before resolver fixes are committed. On
+# failure or timeout, save the resolver diff as a patch, revert the listed
+# files and report whether the tree is clean again.
+# Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted -- <files...>
+#   --trusted: required. The caller sets it only after confirming the command
+#              came from an untracked config file (unattended) or after the
+#              user approved it (interactive).
+#   files:     repo-root-relative paths the resolvers modified
+# Output: JSON to stdout:
+#   {"result":"pass|fail|timeout","patch":"<path>|null","log":"<path>","treeClean":true|false}
+# Exit codes: 0 ran (read "result"), 2 usage or not trusted.
+# Files: $(git rev-parse --git-common-dir)/yellow-review/resolve-patches/
+#        <pr>-<ts>.patch and .log, mode 0600; the newest 10 of each are kept.
+# Env: YELLOW_REVIEW_NO_TIMEOUT_BIN=1 forces the watchdog fallback (tests).
+# Contract: references/resolve/dispositions.md
+
+set -uo pipefail
+
+KILL_AFTER=10
+LOG_CAP_BYTES=1048576
+KEEP=10
+
+die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
+usage() {
+    printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted -- <files...>\n' >&2
+    exit 2
+}
+
+PR=""
+TIMEOUT=""
+COMMAND_FILE=""
+TRUSTED=0
+FILES=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
+        --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
+        --trusted) TRUSTED=1; shift ;;
+        --) shift; FILES=("$@"); break ;;
+        *) usage ;;
+    esac
+done
+
+[ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
+[[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+[[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "--timeout must be a positive integer (seconds)"
+[ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
+[ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
+COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
+
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+cd -- "$TOP" || die 2 "cannot enter $TOP"
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    case "$f" in
+        ''|/*|../*|*/../*|*/..|..) die 2 "path must be repo-relative and inside the repository: $f" ;;
+    esac
+done
+
+COMMON=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || COMMON=$(cd -- "$(git rev-parse --git-common-dir)" && pwd)
+OUT_DIR="$COMMON/yellow-review/resolve-patches"
+(umask 077 && mkdir -p -- "$OUT_DIR") || die 2 "cannot create $OUT_DIR"
+chmod 700 -- "$OUT_DIR" 2>/dev/null || true
+STAMP="$PR-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+LOG="$OUT_DIR/$STAMP.log"
+PATCH="$OUT_DIR/$STAMP.patch"
+(umask 077 && : >"$LOG")
+
+timeout_bin() {
+    [ "${YELLOW_REVIEW_NO_TIMEOUT_BIN:-0}" = 1 ] && return 1
+    local t
+    for t in timeout gtimeout; do
+        if command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=1 1 true >/dev/null 2>&1; then
+            printf '%s' "$t"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Watchdog fallback: the command and the watchdog each get their own process
+# group (set -m); a marker file separates a real timeout from a command that
+# happens to exit 124. Sets TIMED_OUT=1 on a real timeout.
+run_with_watchdog() {
+    local marker="$OUT_DIR/.$STAMP.timed-out" pid wd rc=0
+    rm -f -- "$marker"
+    set -m
+    bash -c "$(cat -- "$COMMAND_FILE")" >>"$LOG" 2>&1 </dev/null &
+    pid=$!
+    (
+        exec >/dev/null 2>&1 </dev/null
+        sleep "$TIMEOUT"
+        : >"$marker"
+        kill -s TERM -- "-$pid" 2>/dev/null
+        sleep "$KILL_AFTER"
+        kill -s KILL -- "-$pid" 2>/dev/null
+    ) &
+    wd=$!
+    set +m
+    # set -m moved the command out of our foreground group; forward Ctrl-C.
+    trap 'kill -s INT -- "-$pid" 2>/dev/null' INT
+    wait "$pid" || rc=$?
+    trap - INT
+    kill -s TERM -- "-$wd" 2>/dev/null
+    wait "$wd" 2>/dev/null
+    if [ -e "$marker" ]; then
+        rm -f -- "$marker"
+        TIMED_OUT=1
+    fi
+    return "$rc"
+}
+
+RC=0
+TIMED_OUT=0
+if T=$(timeout_bin); then
+    "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$(cat -- "$COMMAND_FILE")" >>"$LOG" 2>&1 </dev/null || RC=$?
+    # timeout(1) exits 124 on expiry, or 137 when it had to send KILL.
+    case "$RC" in 124|137) TIMED_OUT=1 ;; esac
+else
+    run_with_watchdog || RC=$?
+fi
+
+# Keep the tail of an oversized log: failures usually print last.
+if [ "$(wc -c <"$LOG")" -gt "$LOG_CAP_BYTES" ]; then
+    tail -c "$LOG_CAP_BYTES" <"$LOG" >"$LOG.tmp" && mv -f -- "$LOG.tmp" "$LOG"
+    chmod 600 -- "$LOG"
+fi
+
+prune() {
+    local ext="$1" f n=0
+    # Stamps sort by time within a PR; sort across PRs by mtime.
+    while IFS= read -r f; do
+        n=$((n + 1))
+        [ "$n" -gt "$KEEP" ] && rm -f -- "$f"
+    done < <(ls -1t -- "$OUT_DIR"/*."$ext" 2>/dev/null)
+}
+
+if [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ]; then
+    prune log
+    jq -nc --arg log "$LOG" '{result: "pass", patch: null, log: $log, treeClean: true}'
+    exit 0
+fi
+
+RESULT=fail
+[ "$TIMED_OUT" = 1 ] && RESULT=timeout
+
+# --- Save the resolver diff (tracked and untracked listed files) ---
+(
+    umask 077
+    : >"$PATCH"
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        if git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+            git diff HEAD -- "$f" >>"$PATCH"
+        elif [ -e "$f" ]; then
+            git diff --no-index -- /dev/null "$f" >>"$PATCH" || true
+        fi
+    done
+)
+
+# --- Revert the listed files ---
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    if git ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || git cat-file -e "HEAD:$f" 2>/dev/null; then
+        git checkout -q HEAD -- "$f" 2>/dev/null || true
+    else
+        rm -f -- "$f"
+    fi
+done
+
+CLEAN=true
+[ -z "$(git status --porcelain --untracked-files=no)" ] || CLEAN=false
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    git ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || { [ -e "$f" ] && CLEAN=false; }
+done
+
+prune log
+prune patch
+jq -nc --arg r "$RESULT" --arg p "$PATCH" --arg log "$LOG" --argjson clean "$CLEAN" \
+    '{result: $r, patch: $p, log: $log, treeClean: $clean}'
+exit 0
