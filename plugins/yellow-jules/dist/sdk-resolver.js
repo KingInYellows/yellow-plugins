@@ -247,6 +247,24 @@ function npmSpawnConfig(platform) {
     const isWin = platform === 'win32';
     return { command: isWin ? 'npm.cmd' : 'npm', shell: isWin };
 }
+/**
+ * SIGKILL reaches npm directly on POSIX. On win32 the child is the shell, and
+ * killing it can orphan npm, so take down the whole tree with taskkill first.
+ */
+function killInstallChild(child) {
+    if (process.platform === 'win32' && child.pid !== undefined) {
+        try {
+            (0, node_child_process_1.spawn)('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+                stdio: 'ignore',
+                windowsHide: true,
+            }).on('error', () => undefined);
+        }
+        catch {
+            // fall through to the direct kill
+        }
+    }
+    child.kill('SIGKILL');
+}
 const defaultNpmRunner = (args, options) => new Promise((resolve) => {
     const { command, shell } = npmSpawnConfig(process.platform);
     const child = (0, node_child_process_1.spawn)(command, [...args], {
@@ -259,7 +277,7 @@ const defaultNpmRunner = (args, options) => new Promise((resolve) => {
     let timedOut = false;
     const timer = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGKILL');
+        killInstallChild(child);
     }, options.timeoutMs);
     child.stderr?.on('data', (chunk) => {
         if (stderr.length < STDERR_CAP)
@@ -331,6 +349,13 @@ async function writePin(file, pin) {
  * under them can be loaded.
  */
 async function installSdk(dataDir, options = {}) {
+    const capMs = options.timeoutMs ?? exports.INSTALL_TIMEOUT_MS;
+    const deadlineMs = options.deadlineMs;
+    const deadlineExceeded = () => (0, errors_js_1.throwAppError)('JULES_DEADLINE_EXCEEDED', 'the operation deadline expired during the SDK install; the install was removed', { recoveryAction: 'Retry with a larger --deadline-ms.' });
+    if (deadlineMs !== undefined && deadlineMs <= 0)
+        return deadlineExceeded();
+    const deadlineBinds = deadlineMs !== undefined && deadlineMs < capMs;
+    const timeoutMs = deadlineBinds ? deadlineMs : capMs;
     const pluginRoot = options.pluginRoot ?? (0, config_js_1.resolvePluginRoot)();
     const shippedRuntime = path.join(pluginRoot, 'runtime');
     const runtimeDir = (0, config_js_1.resolveRuntimeDir)(dataDir);
@@ -344,18 +369,20 @@ async function installSdk(dataDir, options = {}) {
         await fs.promises.chmod(target, 0o600);
     }
     const runNpm = options.runNpm ?? exports.defaultNpmRunner;
-    const result = await runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], {
-        cwd: runtimeDir,
-        env: scrubInstallEnv(options.env ?? process.env),
-        timeoutMs: options.timeoutMs ?? exports.INSTALL_TIMEOUT_MS,
-    });
     try {
+        const result = await runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], {
+            cwd: runtimeDir,
+            env: scrubInstallEnv(options.env ?? process.env),
+            timeoutMs,
+        });
         if (result.exitCode !== 0) {
+            if (result.timedOut && deadlineBinds)
+                return deadlineExceeded();
             if (/EINTEGRITY/.test(result.stderr)) {
                 return integrityFailure('npm ci reported EINTEGRITY; the install was removed');
             }
             return (0, errors_js_1.throwAppError)('JULES_SDK_MISSING', result.timedOut
-                ? `npm ci timed out after ${options.timeoutMs ?? exports.INSTALL_TIMEOUT_MS} ms; the install was removed`
+                ? `npm ci timed out after ${timeoutMs} ms; the install was removed`
                 : `npm ci exited ${String(result.exitCode)}; the install was removed`, {
                 recoveryAction: 'Check network access to the npm registry, then rerun /jules:setup.',
             });

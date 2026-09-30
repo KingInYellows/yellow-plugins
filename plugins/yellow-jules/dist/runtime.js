@@ -175,9 +175,10 @@ async function setup(deps, args) {
         : 'none';
     const probe = args.installSdk
         ? await (deps.installSdk ??
-            ((d) => (0, sdk_resolver_js_1.installSdk)(d, {
+            ((d, o) => (0, sdk_resolver_js_1.installSdk)(d, {
                 pluginRoot: deps.pluginRoot ?? (0, config_js_1.resolvePluginRoot)(),
-            })))(deps.dataDir)
+                ...(o !== undefined ? { deadlineMs: o.deadlineMs } : {}),
+            })))(deps.dataDir, { deadlineMs: (0, deadline_js_1.remainingMs)(deps.clock, deadline) })
         : (deps.probeSdk ??
             ((d) => (0, sdk_resolver_js_1.probeSdkResolution)(d, {
                 pluginRoot: deps.pluginRoot ?? (0, config_js_1.resolvePluginRoot)(),
@@ -643,6 +644,10 @@ function readManifestArtifacts(dir, sourceResource) {
     }
     return out;
 }
+/** Dedupe key for a staged generated file; `safeVendorPath` is already redacted. */
+function generatedKey(digest, safeVendorPath) {
+    return `${digest}:${safeVendorPath}`;
+}
 function countFiles(dir) {
     try {
         return fs.readdirSync(dir).filter((name) => !name.includes('.tmp-')).length;
@@ -676,7 +681,7 @@ class Stager {
             if (prior.kind === 'patch' && prior.sha256 !== undefined)
                 this.seenDigests.add(prior.sha256);
             if (prior.kind === 'generated-file' && prior.sha256 !== undefined) {
-                this.seenGenerated.add(`${prior.sha256}:${prior.vendorPath ?? ''}`);
+                this.seenGenerated.add(generatedKey(prior.sha256, prior.vendorPath ?? ''));
             }
             if (prior.kind === 'pr-ref' && prior.prUrl !== undefined)
                 this.seenPrs.add(prior.prUrl);
@@ -733,7 +738,7 @@ class Stager {
         // reported as skipped (which would set partialStaging for nothing).
         const digest = sha256(content);
         const safeVendorPath = (0, redact_js_1.redact)(vendorPath);
-        const key = `${digest}:${safeVendorPath}`;
+        const key = generatedKey(digest, safeVendorPath);
         if (this.seenGenerated.has(key))
             return;
         this.seenGenerated.add(key);
@@ -791,6 +796,22 @@ class StagingBuffer {
     constructor(capBytes) {
         this.capBytes = capBytes;
     }
+    /**
+     * Marks artifacts an earlier collect already staged as seen, so they neither
+     * count toward the per-run cap nor queue a replay (`Stager` would discard
+     * them as duplicates). An optimisation hint from an unlocked read; `Stager`
+     * re-reads the manifest under the lock.
+     */
+    seedStaged(prior) {
+        for (const a of prior) {
+            if (a.sha256 === undefined)
+                continue;
+            if (a.kind === 'patch')
+                this.seenPatches.add(a.sha256);
+            else if (a.kind === 'generated-file')
+                this.seenGenerated.add(generatedKey(a.sha256, a.vendorPath ?? ''));
+        }
+    }
     /** Bytes of artifact bodies currently retained. */
     get bufferedBytes() {
         return this.buffered;
@@ -815,7 +836,7 @@ class StagingBuffer {
         this.pending.push((s) => s.patch(unidiffPatch, baseCommitId));
     }
     generated(vendorPath, content) {
-        const key = `${sha256(content)}:${(0, redact_js_1.redact)(vendorPath)}`;
+        const key = generatedKey(sha256(content), (0, redact_js_1.redact)(vendorPath));
         if (this.seenGenerated.has(key))
             return;
         this.seenGenerated.add(key);
@@ -854,6 +875,7 @@ async function collect(deps, args) {
         // one critical section, so slot allocation never races another collect.
         const capBytes = deps.aggregateCapBytes ?? exports.AGGREGATE_ARTIFACT_CAP_BYTES;
         const buffer = new StagingBuffer(capBytes);
+        buffer.seedStaged(readManifestArtifacts(dir, session.sourceResource));
         for (const output of session.outputs) {
             if (output.type === 'changeSet') {
                 buffer.patch(output.unidiffPatch, output.baseCommitId);

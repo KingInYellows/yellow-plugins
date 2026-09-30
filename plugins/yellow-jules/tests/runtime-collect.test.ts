@@ -518,6 +518,48 @@ describe('collect', () => {
     expect(staged).toBeLessThanOrEqual(200);
   });
 
+  it('does not let previously staged bodies crowd new artifacts out of the cap', async () => {
+    const big = `${PATCH}+${'q'.repeat(400)}\n`;
+    const cap = Buffer.byteLength(big) + 100;
+    const changeSet = {
+      type: 'changeSet' as const,
+      source: 's',
+      unidiffPatch: big,
+      baseCommitId: BASE,
+      suggestedCommitMessage: 'm',
+    };
+    fake.sessions.set(S, makeSession({ outputs: [changeSet] }));
+    fake.activities.set(S, []);
+    const first = await collect(
+      makeDeps(dataDir, fake, { aggregateCapBytes: cap }),
+      { session: S }
+    );
+    expect(first.artifacts).toHaveLength(1);
+    expect(first.partialStaging).toBe(false);
+
+    fake.sessions.set(
+      S,
+      makeSession({
+        outputs: [changeSet],
+        generatedFiles: [
+          { path: 'new.txt', content: 'fresh\n', changeType: 'created' },
+        ],
+      })
+    );
+    fake.activities.set(S, [changeSetActivity(PATCH2)]);
+    const second = await collect(
+      makeDeps(dataDir, fake, { aggregateCapBytes: cap }),
+      { session: S }
+    );
+    expect(second.skipped).toEqual([]);
+    expect(second.partialStaging).toBe(false);
+    expect(second.artifacts.map((a) => a.kind).sort()).toEqual([
+      'generated-file',
+      'patch',
+      'patch',
+    ]);
+  });
+
   it('flags secret-shaped content without altering the staged bytes', async () => {
     const leaky = `${PATCH}+const key = "AIzaSyA1234567890abcdefXYZ";\n`;
     fake.sessions.set(
