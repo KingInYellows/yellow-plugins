@@ -41,7 +41,8 @@ has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
   # readable here). Non-sensitive ones live under .pluginConfigs[].options in
-  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
   # Presence only: the value is never printed.
   local plugin="$1" option="$2" file jq_exit
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
@@ -55,7 +56,7 @@ has_userconfig() {
       jq -e --arg p "$plugin" --arg o "$option" '
         [ (.pluginSecrets // {} | to_entries[]),
           (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
-        | map(select((.key == $p or (.key | startswith($p + "@")))
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
                      and (.value | type) == "object")
               | .value[$o] // empty | select(. != ""))
         | length > 0' "$file" >/dev/null 2>&1
@@ -69,7 +70,7 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      grep -qF "\"$plugin" "$file" 2>/dev/null \
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
         && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
     fi
   done
@@ -157,7 +158,8 @@ has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
   # readable here). Non-sensitive ones live under .pluginConfigs[].options in
-  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
   # Presence only: the value is never printed.
   local plugin="$1" option="$2" file jq_exit
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
@@ -171,7 +173,7 @@ has_userconfig() {
       jq -e --arg p "$plugin" --arg o "$option" '
         [ (.pluginSecrets // {} | to_entries[]),
           (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
-        | map(select((.key == $p or (.key | startswith($p + "@")))
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
                      and (.value | type) == "object")
               | .value[$o] // empty | select(. != ""))
         | length > 0' "$file" >/dev/null 2>&1
@@ -185,7 +187,7 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      grep -qF "\"$plugin" "$file" 2>/dev/null \
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
         && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
     fi
   done
@@ -305,11 +307,12 @@ the error message above and do not proceed to Step 3.
 
 ### Step 3: Probe Org-Scoped Permissions
 
-**Skip guard:** If both `TOKEN_SRC` and `ORG_SRC` were `userconfig` in Step 1
-(no shell env vars set), skip Steps 3–4 entirely and proceed to Step 5.
-Print: "Skipping live API probes — credentials are in userConfig only (no shell
-env vars). MCP tool visibility is the credential validation signal. To enable
-curl-based permission probes, also export DEVIN_SERVICE_USER_TOKEN and
+**Skip guard:** If either `TOKEN_SRC` or `ORG_SRC` was `userconfig` in Step 1
+(that shell env var is unset), skip Steps 3–4 entirely and proceed to Step 5:
+the curl probes need both values in the shell. Print: "Skipping live API
+probes — a credential is in userConfig only (no shell env var). MCP tool
+visibility is the credential validation signal. To enable curl-based
+permission probes, also export DEVIN_SERVICE_USER_TOKEN and
 DEVIN_ORG_ID in your shell profile." Record all permissions as UNKNOWN in the
 Step 5 table.
 
@@ -319,13 +322,11 @@ Probe the org-scoped API to check `ViewOrgSessions` (list) and
 ```bash
 # Bash-level enforcement of the userConfig-only skip guard described above.
 # Without this, the prose instruction is the only thing keeping the curl
-# call from running with an empty Bearer token (→ misleading 401) when
-# Steps 1+2 ran in the same invocation and TOKEN_SRC/ORG_SRC are
-# "userconfig" with no shell exports.
-if [ "${TOKEN_SRC:-}" = "userconfig" ] && [ "${ORG_SRC:-}" = "userconfig" ] \
-    && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -z "${DEVIN_ORG_ID:-}" ]; then
+# call from running with an empty credential when either one is
+# userConfig-only (empty token → misleading 401, empty org ID → 404).
+if [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ] || [ -z "${DEVIN_ORG_ID:-}" ]; then
   printf '\n=== Permission Checks ===\n'
-  printf 'Skipping live API probes — credentials are in userConfig only (no shell env vars).\n'
+  printf 'Skipping live API probes — a credential is in userConfig only (no shell env var).\n'
   printf 'MCP tool visibility is the credential validation signal in this mode.\n'
   printf 'To enable curl-based permission probes, also add to ~/.zshrc or ~/.bashrc:\n'
   printf '  export DEVIN_SERVICE_USER_TOKEN="<your-cog-token>"\n'

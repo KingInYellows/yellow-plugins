@@ -152,7 +152,8 @@ has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
   # readable here). Non-sensitive ones live under .pluginConfigs[].options in
-  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
   # Presence only: the value is never printed.
   local plugin="$1" option="$2" file jq_exit
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
@@ -166,7 +167,7 @@ has_userconfig() {
       jq -e --arg p "$plugin" --arg o "$option" '
         [ (.pluginSecrets // {} | to_entries[]),
           (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
-        | map(select((.key == $p or (.key | startswith($p + "@")))
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
                      and (.value | type) == "object")
               | .value[$o] // empty | select(. != ""))
         | length > 0' "$file" >/dev/null 2>&1
@@ -180,7 +181,7 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      grep -qF "\"$plugin" "$file" 2>/dev/null \
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
         && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
     fi
   done
@@ -233,7 +234,8 @@ has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
   # readable here). Non-sensitive ones live under .pluginConfigs[].options in
-  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
   # Presence only: the value is never printed.
   local plugin="$1" option="$2" file jq_exit
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
@@ -247,7 +249,7 @@ has_userconfig() {
       jq -e --arg p "$plugin" --arg o "$option" '
         [ (.pluginSecrets // {} | to_entries[]),
           (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
-        | map(select((.key == $p or (.key | startswith($p + "@")))
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
                      and (.value | type) == "object")
               | .value[$o] // empty | select(. != ""))
         | length > 0' "$file" >/dev/null 2>&1
@@ -261,7 +263,7 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      grep -qF "\"$plugin" "$file" 2>/dev/null \
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
         && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
     fi
   done
@@ -311,7 +313,8 @@ has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
   # readable here). Non-sensitive ones live under .pluginConfigs[].options in
-  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
   # Presence only: the value is never printed.
   local plugin="$1" option="$2" file jq_exit
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
@@ -325,7 +328,7 @@ has_userconfig() {
       jq -e --arg p "$plugin" --arg o "$option" '
         [ (.pluginSecrets // {} | to_entries[]),
           (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
-        | map(select((.key == $p or (.key | startswith($p + "@")))
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
                      and (.value | type) == "object")
               | .value[$o] // empty | select(. != ""))
         | length > 0' "$file" >/dev/null 2>&1
@@ -339,7 +342,7 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      grep -qF "\"$plugin" "$file" 2>/dev/null \
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
         && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
     fi
   done

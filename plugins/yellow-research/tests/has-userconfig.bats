@@ -71,3 +71,10 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"could not parse"* ]]
 }
+
+@test "entries from another marketplace do not count" {
+  printf '{"pluginSecrets":{"yellow-research@other-marketplace":{"exa_api_key":"x"}}}' \
+    >| "$CLAUDE_CONFIG_DIR/.credentials.json"
+  run has_userconfig yellow-research exa_api_key
+  [ "$status" -eq 1 ]
+}
