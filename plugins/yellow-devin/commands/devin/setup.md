@@ -32,31 +32,48 @@ printf '\n=== Credentials ===\n'
 # The function is tiny and identical across copies; divergence cost is low.
 # Tracked for future centralization; do not extract to a shared lib in this PR.
 #
-# 2-arg has_userconfig: mirror the canonical definition in
-# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually —
-# if you change one, change all copies (search for "has_userconfig()" across
-# plugins/). `grep -qF` (fixed-string) fallback guards against regex
+# 2-arg has_userconfig: identical copies live in the research, devin and
+# semgrep setup commands (tests/has-userconfig.bats in yellow-research fails
+# on drift) — if you change one, change all copies (search for
+# "has_userconfig()" across plugins/). `grep -qF` (fixed-string) fallback guards against regex
 # metacharacters; jq path is preferred and path-scoped.
 has_userconfig() {
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    # exit 0 = key present; 1 = key absent; >=2 = parse error (warn).
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives across pluginConfigs)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or (.key | startswith($p + "@")))
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      grep -qF "\"$plugin" "$file" 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
@@ -137,24 +154,42 @@ source by repeating the Step 1 logic at the top of the Step 2 block.
 # definition from Step 1 does not survive across blocks. Mirror of the
 # canonical definition above; if you change one, change all copies.
 has_userconfig() {
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives across pluginConfigs)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@<marketplace>").
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or (.key | startswith($p + "@")))
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      grep -qF "\"$plugin" "$file" 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 # Re-detect TOKEN_SRC / ORG_SRC if they were not carried from Step 1.
