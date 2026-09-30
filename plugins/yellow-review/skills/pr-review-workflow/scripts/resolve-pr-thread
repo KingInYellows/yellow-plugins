@@ -49,34 +49,35 @@ mutation($threadId: ID!) {
 # --- Execute mutation (one retry after a rate limit) ---
 _STDERR_FILE=$(mktemp)
 trap 'rm -f "$_STDERR_FILE"' EXIT
-_ATTEMPT=1
-while :; do
+call() {
     RESPONSE=$(gh api graphql \
         -F threadId="$THREAD_ID" \
         -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     _GH_STDERR=$(cat "$_STDERR_FILE")
     sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
-    case "$_GH_EXIT:$_GH_STDERR" in
-        0:*) break ;;
-        *"rate limit"*|*"Rate limit"*|*"HTTP 429"*)
-            if [ "$_ATTEMPT" -lt 2 ]; then
-                _ATTEMPT=2
-                printf '[resolve-pr-thread] Rate limited; retrying once.\n' >&2
-                sleep "${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
-                continue
-            fi
-            ;;
-    esac
-    break
-done
+}
+is_rate_limited() {
+    case "$_GH_STDERR" in *"rate limit"*|*"Rate limit"*|*"HTTP 429"*) return 0 ;; esac
+    return 1
+}
+call
+if [ "$_GH_EXIT" -ne 0 ] && is_rate_limited; then
+    # Capped so the call fits the caller's Bash timeout.
+    _WAIT="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
+    case "$_WAIT" in ''|*[!0-9]*) _WAIT=60 ;; esac
+    [ "$_WAIT" -le 90 ] || _WAIT=90
+    printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_WAIT" >&2
+    sleep "$_WAIT"
+    call
+fi
 if [ "$_GH_EXIT" -ne 0 ]; then
+    if is_rate_limited; then
+        printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+        exit 4
+    fi
     case "$_GH_STDERR" in
         *"HTTP 401"*|*"Bad credentials"*|*"authentication"*)
             printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
-            ;;
-        *"rate limit"*|*"Rate limit"*|*"HTTP 429"*)
-            printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
-            exit 4
             ;;
         *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
             printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
