@@ -1,0 +1,19 @@
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_becc7011266565::t_4a9278fc083da2 212-214,340-341,377-380,386-387,425-428,444-445,452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "94d05a609c040ecd8d0256cda7b9fed25c7f27b8",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
