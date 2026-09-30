@@ -5,6 +5,8 @@
 # Exit codes: 1 other failure, 2 usage, 3 not found or permission,
 #             4 rate limited. Messages go to stderr.
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
+#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait before the single
+#      rate-limit retry.
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -44,20 +46,35 @@ mutation($threadId: ID!) {
   }
 }'
 
-# --- Execute mutation ---
+# --- Execute mutation (one retry after a rate limit) ---
 _STDERR_FILE=$(mktemp)
 trap 'rm -f "$_STDERR_FILE"' EXIT
-RESPONSE=$(gh api graphql \
-    -F threadId="$THREAD_ID" \
-    -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
-_GH_STDERR=$(cat "$_STDERR_FILE")
-sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+_ATTEMPT=1
+while :; do
+    RESPONSE=$(gh api graphql \
+        -F threadId="$THREAD_ID" \
+        -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+    _GH_STDERR=$(cat "$_STDERR_FILE")
+    sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+    case "$_GH_EXIT:$_GH_STDERR" in
+        0:*) break ;;
+        *"rate limit"*|*"Rate limit"*|*"HTTP 429"*)
+            if [ "$_ATTEMPT" -lt 2 ]; then
+                _ATTEMPT=2
+                printf '[resolve-pr-thread] Rate limited; retrying once.\n' >&2
+                sleep "${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
+                continue
+            fi
+            ;;
+    esac
+    break
+done
 if [ "$_GH_EXIT" -ne 0 ]; then
     case "$_GH_STDERR" in
-        *"401"*|*"Bad credentials"*|*"authentication"*)
+        *"HTTP 401"*|*"Bad credentials"*|*"authentication"*)
             printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
             ;;
-        *"rate limit"*|*"Rate limit"*|*"429"*)
+        *"rate limit"*|*"Rate limit"*|*"HTTP 429"*)
             printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
             exit 4
             ;;
@@ -65,7 +82,7 @@ if [ "$_GH_EXIT" -ne 0 ]; then
             printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
             exit 3
             ;;
-        *"403"*|*"FORBIDDEN"*|*"not accessible"*|*"permission"*)
+        *"HTTP 403"*|*"FORBIDDEN"*|*"not accessible"*|*"permission"*)
             printf 'Error: Not permitted to resolve thread: %s\n' "$THREAD_ID" >&2
             exit 3
             ;;
