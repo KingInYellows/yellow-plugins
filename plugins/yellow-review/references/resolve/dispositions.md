@@ -199,15 +199,18 @@ Replies and issue bodies end with:
 
 ## Script exit codes
 
+Exit 1 is always "other failure" (network, unexpected response).
+
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `reply-pr-thread` | replied or skipped | usage / body too long | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage | `gh` failure | — | — | — |
+| `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
+| `file-followup-issue` | created or found | usage | — | — | — | — |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch | commit failed | submit failed | head not verified |
 | `run-verify-command` | ran (see `result`) | usage / not trusted | — | — | — | — |
-| `resolve-pr-thread` | resolved | any other exit is a failure; match stderr for "rate limit" | | | | |
 
-`get-pr-blockers` always exits 0; unknown fields mean the lookup failed.
+`get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
+`unknown` fields mean the lookup failed.
 
 ## Report and contract line
 

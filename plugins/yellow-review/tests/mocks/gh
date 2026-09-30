@@ -31,9 +31,89 @@ emit() {
   fi
 }
 
+# Print an HTTP response the way `gh api` does: headers first only when -i
+# was passed. $1 = status line, $2 = extra header lines (may be empty),
+# MOCK_BODY = body.
+http() {
+  case " $* $ALL_ARGS " in
+    *" -i "*|*" --include "*)
+      printf '%s\r\nContent-Type: application/json\r\n' "$1"
+      [ -n "$2" ] && printf '%s\r\n' "$2"
+      printf '\r\n'
+      ;;
+  esac
+  printf '%s\n' "$MOCK_BODY"
+}
+
+# Count calls per key in BATS_TEST_TMPDIR; prints the new count.
+bump() {
+  _f="${PAGE_STATE_DIR}/mock_gh_count_$1"
+  _n=$(( $(cat "$_f" 2>/dev/null || printf 0) + 1 ))
+  printf '%s' "$_n" >| "$_f"
+  printf '%s' "$_n"
+}
+
 # Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
 # below never capture them.
 case "$ALL_ARGS" in
+  *"ReplyPrecheck"*)
+    # reply-pr-thread pre-check: the thread's last comment.
+    case "$ALL_ARGS" in
+      *"PRRT_reply_done"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_spoof"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
+        ;;
+      *"PRRT_reply_gone"*)
+        MOCK_BODY='{"data":{"node":null}}'
+        ;;
+      *)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_x","comments":{"nodes":[{"viewerDidAuthor":false,"body":"Please add a null check."}]}}}}'
+        ;;
+    esac
+    http "HTTP/2.0 200 OK" ""
+    exit 0
+    ;;
+  *"addPullRequestReviewThreadReply"*)
+    # reply-pr-thread mutation. Saves the posted body for assertions.
+    n=$(bump reply)
+    for a in "$@"; do
+      case "$a" in body=@*) cat "${a#body=@}" >| "${PAGE_STATE_DIR}/mock_gh_reply_body" ;; esac
+    done
+    case "$ALL_ARGS" in
+      *"PRRT_reply_rl2"*|*"PRRT_reply_rl"*)
+        # rl: limited on the first call only. rl2: always limited, no header.
+        case "$ALL_ARGS" in *"PRRT_reply_rl2"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+        if [ "$limited" = 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          case "$ALL_ARGS" in
+            *"PRRT_reply_rl2"*) http "HTTP/2.0 403 Forbidden" "" ;;
+            *) http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0" ;;
+          esac
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_gqlrl"*)
+        if [ "$n" -eq 1 ]; then
+          MOCK_BODY='{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}'
+          http "HTTP/2.0 200 OK" ""
+          printf 'gh: API rate limit exceeded for user.\n' >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_forbidden"*)
+        MOCK_BODY='{"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}'
+        http "HTTP/2.0 200 OK" ""
+        printf 'gh: Resource not accessible by integration\n' >&2
+        exit 1
+        ;;
+    esac
+    MOCK_BODY='{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_new"}}}}'
+    http "HTTP/2.0 200 OK" ""
+    exit 0
+    ;;
   *"latestOpinionatedReviews"*)
     # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL=1 simulates an
     # API failure.
@@ -136,6 +216,7 @@ case "$ALL_ARGS" in
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
     printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
     printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2
+    printf '  ReplyPrecheck / addPullRequestReviewThreadReply → PRRT_reply_* arms\n' >&2
     exit 1
     ;;
 esac

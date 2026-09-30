@@ -1,0 +1,192 @@
+#!/bin/sh
+# Reply to a PR review thread with an idempotency marker.
+# Usage: reply-pr-thread <PRRT_id> <disposition> <body-file>
+#   disposition: fixed | addressed | oos | disagree | unclear
+#   body-file:   reply text, at most 1000 characters; the marker is appended
+# Output: JSON to stdout:
+#   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
+#   {"replied":false,"skipped":"already-replied","threadId":"PRRT_..."}
+# Exit codes: 1 other failure, 2 usage, 3 not found or permission,
+#             4 rate limited (after one retry).
+# Contract: references/resolve/dispositions.md
+# Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
+#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
+
+set -eu
+
+MAX_BODY_CHARS=1000
+MAX_WAIT_SECONDS=300
+
+usage() {
+    printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2
+    exit 2
+}
+
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+[ $# -eq 3 ] || usage
+THREAD_ID="$1"
+DISPOSITION="$2"
+BODY_FILE="$3"
+
+case "$THREAD_ID" in
+    PRRT_*) ;;
+    *) printf 'Error: Invalid thread ID format. Expected PRRT_ prefix, got: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+case "${THREAD_ID#PRRT_}" in
+    ''|*[!A-Za-z0-9_-]*) printf 'Error: Invalid characters in thread ID: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+case "$DISPOSITION" in
+    fixed|addressed|oos|disagree|unclear) ;;
+    *) printf 'Error: Unknown disposition: %s\n' "$DISPOSITION" >&2; exit 2 ;;
+esac
+[ -f "$BODY_FILE" ] && [ -r "$BODY_FILE" ] || { printf 'Error: Body file not readable: %s\n' "$BODY_FILE" >&2; exit 2; }
+
+# Character count (not bytes), trailing whitespace ignored.
+BODY_CHARS=$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE")
+if [ "$BODY_CHARS" -eq 0 ]; then
+    printf 'Error: Body file is empty.\n' >&2
+    exit 2
+fi
+if [ "$BODY_CHARS" -gt "$MAX_BODY_CHARS" ]; then
+    printf 'Error: Reply body is %s characters; the limit is %s.\n' "$BODY_CHARS" "$MAX_BODY_CHARS" >&2
+    exit 2
+fi
+
+MARKER="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition=$DISPOSITION -->"
+
+WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+OUT="$WORK_DIR/out"
+ERR="$WORK_DIR/err"
+HEADERS="$WORK_DIR/headers"
+RESP="$WORK_DIR/body"
+POST_BODY="$WORK_DIR/post-body"
+
+jq -Rrs --arg marker "$MARKER" 'sub("\\s+$"; "") + "\n\n" + $marker' <"$BODY_FILE" >"$POST_BODY"
+
+# Run `gh api -i graphql ...`; split headers and body into $HEADERS/$RESP.
+# Returns gh's exit code.
+gh_graphql() {
+    _ec=0
+    : >"$HEADERS"
+    : >"$RESP"
+    gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
+    tr -d '\r' <"$OUT" | awk -v h="$HEADERS" -v b="$RESP" '
+        !done && /^$/ { done = 1; next }
+        !done { print > h; next }
+        { print > b }
+    '
+    return "$_ec"
+}
+
+header() {
+    awk -v name="$1" '
+        tolower(substr($0, 1, length(name) + 1)) == tolower(name) ":" {
+            sub(/^[^:]*:[ \t]*/, ""); print; exit
+        }' "$HEADERS"
+}
+
+is_rate_limited() {
+    grep -qiE 'rate limit|HTTP 429' "$ERR" && return 0
+    jq -e '[.errors[]?.message // empty] | any(test("rate limit"; "i"))' "$RESP" >/dev/null 2>&1
+}
+
+is_not_found_or_forbidden() {
+    grep -qiE 'Could not resolve|NOT_FOUND|not found|HTTP 403|HTTP 404|FORBIDDEN|not accessible|permission' "$ERR" && return 0
+    jq -e '[.errors[]?.type // empty] | any(. == "NOT_FOUND" or . == "FORBIDDEN")' "$RESP" >/dev/null 2>&1
+}
+
+# Seconds to wait before the single retry: Retry-After, then the reset time
+# when no requests remain, then the default. Prints nothing when the wait
+# would exceed MAX_WAIT_SECONDS.
+rate_limit_wait() {
+    _wait=$(header retry-after)
+    case "$_wait" in ''|*[!0-9]*) _wait="" ;; esac
+    if [ -z "$_wait" ] && [ "$(header x-ratelimit-remaining)" = 0 ]; then
+        _reset=$(header x-ratelimit-reset)
+        case "$_reset" in
+            ''|*[!0-9]*) ;;
+            *) _wait=$((_reset - $(date +%s))); [ "$_wait" -ge 0 ] || _wait=0 ;;
+        esac
+    fi
+    [ -n "$_wait" ] || _wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
+    [ "$_wait" -le "$MAX_WAIT_SECONDS" ] && printf '%s' "$_wait"
+    return 0
+}
+
+# Run a GraphQL call with one rate-limit retry. Exits 3/4/1 on failure.
+call_with_retry() {
+    _label="$1"; shift
+    _attempt=1
+    while :; do
+        if gh_graphql "$@" && ! jq -e '.errors | length > 0' "$RESP" >/dev/null 2>&1; then
+            return 0
+        fi
+        if is_rate_limited; then
+            _w=$(rate_limit_wait)
+            if [ "$_attempt" -ge 2 ] || [ -z "$_w" ]; then
+                printf 'Error: GitHub rate limit on %s for %s.\n' "$_label" "$THREAD_ID" >&2
+                exit 4
+            fi
+            printf '[reply-pr-thread] Rate limited on %s; retrying in %ss.\n' "$_label" "$_w" >&2
+            sleep "$_w"
+            _attempt=$((_attempt + 1))
+            continue
+        fi
+        if is_not_found_or_forbidden; then
+            printf 'Error: Thread not found or not permitted (%s): %s\n' "$_label" "$THREAD_ID" >&2
+            exit 3
+        fi
+        printf 'Error: GraphQL %s failed for %s: %s\n' "$_label" "$THREAD_ID" "$(head -c 300 "$ERR")" >&2
+        exit 1
+    done
+}
+
+# --- Pre-check: skip when our marker is already the last comment ---
+# shellcheck disable=SC2016
+PRECHECK='
+query ReplyPrecheck($threadId: ID!) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      id
+      comments(last: 1) { nodes { viewerDidAuthor body } }
+    }
+  }
+}'
+call_with_retry precheck -f threadId="$THREAD_ID" -f query="$PRECHECK"
+
+if ! jq -e '.data.node.id' "$RESP" >/dev/null 2>&1; then
+    printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
+    exit 3
+fi
+
+# A marker counts only on a comment the viewer authored; a reviewer quoting
+# our marker never causes a skip.
+if jq -e --arg marker "$MARKER" '
+    .data.node.comments.nodes[-1]
+    | select(. != null)
+    | .viewerDidAuthor == true and ((.body // "") | sub("\\s+$"; "") | endswith($marker))
+  ' "$RESP" >/dev/null 2>&1; then
+    jq -nc --arg id "$THREAD_ID" '{replied: false, skipped: "already-replied", threadId: $id}'
+    exit 0
+fi
+
+# --- Post the reply ---
+# shellcheck disable=SC2016
+MUTATION='
+mutation ReplyToThread($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+    comment { id }
+  }
+}'
+call_with_retry reply -f threadId="$THREAD_ID" -F "body=@$POST_BODY" -f query="$MUTATION"
+sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+
+COMMENT_ID=$(jq -r '.data.addPullRequestReviewThreadReply.comment.id // empty' "$RESP")
+if [ -z "$COMMENT_ID" ]; then
+    printf 'Error: Reply mutation returned no comment for %s.\n' "$THREAD_ID" >&2
+    exit 1
+fi
+jq -nc --arg id "$THREAD_ID" --arg cid "$COMMENT_ID" '{replied: true, commentId: $cid, threadId: $id}'
