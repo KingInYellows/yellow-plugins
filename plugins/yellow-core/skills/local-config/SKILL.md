@@ -69,8 +69,9 @@ resolve_pr:
   cluster_line_distance: 10               # default: 10 (positive integer)
   cluster_cap: 20                         # default: 20 (positive integer)
   verify_command: "pnpm test"             # default: unset (no verification)
-  verify_timeout_seconds: 600             # default: 600 (positive integer)
-  repass_wait_seconds: 120                # default: 120 (integer 0–600; 0 disables)
+  verify_unattended: false                # default: false (opt in for --non-interactive)
+  verify_timeout_seconds: 540             # default: 540 (integer 1–540)
+  repass_wait_seconds: 120                # default: 120 (integer 0–480; 0 disables)
   resolve_human_threads: evidence         # evidence | never | all
 ---
 ```
@@ -85,7 +86,7 @@ land in separate Wave 3 PRs:
 | `agent_native_focus`   | `review:pr` Step 4 dispatch (forces W3.5 reviewers) | Pending W3.5 (`agent-native-reviewers` branch). Until then: documented but ignored. |
 | `confidence_threshold` | `review:pr` aggregation gate, `audit-synthesizer` | Pending W3.13b (`yellow-debt-confidence-calibration` branch). Until then: documented but ignored. |
 | `resolve_pr.cluster_line_distance` | `review:resolve` Step 3d cluster threshold | Acted on by `review:resolve` (W3.3). Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default 10. |
-| `resolve_pr.cluster_cap`, `verify_command`, `verify_timeout_seconds`, `repass_wait_seconds`, `resolve_human_threads` | `review:resolve` Steps 4–8 | Acted on by `review:resolve`. See the field reference for defaults and fallbacks. |
+| `resolve_pr.cluster_cap`, `verify_command`, `verify_unattended`, `verify_timeout_seconds`, `repass_wait_seconds`, `resolve_human_threads` | `review:resolve` Steps 4–8 | Acted on by `review:resolve`. See the field reference for defaults and fallbacks. |
 
 Authors may set Wave 3 keys today without breaking Wave 2 consumers — the
 graceful-degradation rule (unknown keys emit a warning but do not abort)
@@ -104,9 +105,10 @@ means the file remains valid forward-and-backward.
 | `agent_native_focus` | boolean | `false` | When `true`, always invokes the W3.5 agent-native reviewer triplet (`cli-readiness-reviewer`, `agent-cli-readiness-reviewer`, `agent-native-reviewer`) regardless of whether the diff touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`. Useful for repos that author Claude Code plugins but house plugin code outside the standard `plugins/` layout. Acted on by W3.5 (pending). |
 | `confidence_threshold` | integer 0–100 | `75` | Override the Wave 2 confidence aggregation gate used by `review:pr` and `audit-synthesizer`. Values below `75` surface more findings (more false positives, fewer missed issues); values above `75` suppress more (fewer false positives, more missed issues). Set above `100` to suppress all findings (effectively a dry-run). Acted on by W3.13b (pending). |
 | `resolve_pr.cluster_cap` | positive integer | `20` | Maximum resolver clusters `review:resolve --non-interactive` dispatches (Step 4). Extra clusters are reported as blocking `not attempted (cluster cap)`. Invalid values warn and use `20`. |
-| `resolve_pr.verify_command` | string | unset | Shell command `review:resolve` runs from the repo root before committing resolver fixes (Step 6). On failure it saves a patch under the git common dir, reverts the resolver files and holds `fixed` threads open. Interactive runs show it and ask first. **Unattended runs execute it only when `yellow-plugins.local.md` is not tracked by git**; a tracked file (anyone with push access could edit it) prints `verify skipped (tracked config)` and holds `fixed` threads open. Unset means no verification. |
-| `resolve_pr.verify_timeout_seconds` | positive integer | `600` | Timeout for `verify_command`; the command is killed 10 s after it. Invalid values warn and use `600`. |
-| `resolve_pr.repass_wait_seconds` | integer 0–600 | `120` | How long `review:resolve` Step 8 polls (every 20 s) for new threads after a successful push before its single re-pass. `0` disables the re-pass. Out-of-range or non-integer values warn and use `120`. |
+| `resolve_pr.verify_command` | string | unset | Shell command `review:resolve` runs from the repo root before committing resolver fixes (Step 6). On failure it saves a patch under the git common dir, reverts the resolver files and holds `fixed` threads open. Interactive runs show it with `git diff --stat` and ask first. Unset means no verification. The command runs test and script files the resolvers may just have edited from untrusted review comments, with your credentials. |
+| `resolve_pr.verify_unattended` | boolean | `false` | Lets `--non-interactive` runs (`/review:sweep`, `/review:resolve-stack`) execute `verify_command`. When `false`, unattended runs behave as if `verify_command` were unset: nothing runs and threads resolve normally. When `true`, verify still does not run if `yellow-plugins.local.md` is tracked by git (`verify skipped (tracked config)`) or the fixes touch runner files such as `package.json`, lockfiles, `Makefile`, `conftest.py`, `scripts/` or `.husky/` (`verify skipped (runner files changed)`); in both cases `fixed` threads are held open. Keep this file untracked. |
+| `resolve_pr.verify_timeout_seconds` | integer 1–540 | `540` | Timeout for `verify_command`; the command is killed 10 s after it. Capped so the run fits Claude Code's 600 s Bash tool limit. Invalid or larger values warn and use the default or cap. |
+| `resolve_pr.repass_wait_seconds` | integer 0–480 | `120` | How long `review:resolve` Step 8 polls (every 20 s) for new threads after a successful push before its single re-pass. `0` disables the re-pass. Capped so the poll fits the Bash tool limit. Out-of-range or non-integer values warn and use `120`. |
 | `resolve_pr.resolve_human_threads` | `evidence` \| `never` \| `all` | `evidence` | Which human-reviewer threads `review:resolve` may resolve. `evidence`: only `fixed` (verified push) and `addressed` (verified pointer); `oos` and `disagree` reply and stay open. `never`: reply only. `all`: same as bot threads. A thread is human unless its opener's GraphQL `__typename` is `Bot`. Other values warn and use `evidence`. |
 | `resolve_pr.cluster_line_distance` | positive integer | `10` | Cluster threshold for `review:resolve` Step 3d. Adjacent threads on the same file with line distance ≤ this value merge into a single resolver task (transitive merge). Larger values cluster more aggressively (fewer resolvers, broader edits per agent); smaller values keep clusters tighter. Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default. |
 
@@ -205,7 +207,8 @@ use_persona_dispatch(reviewer_set)
   a warning. Non-integer values fall back to the default (`75`).
 - `resolve_pr.*` keys with an invalid type or range → emit a warning naming
   the key and fall back to its default (see the field reference). An empty
-  `verify_command` counts as unset.
+  `verify_command` counts as unset. `review:resolve` reads these keys once
+  before any agent runs and ignores later edits to the file.
 
 ### Example: TypeScript-focused plugin repo with strict gating
 
