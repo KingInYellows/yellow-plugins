@@ -23,8 +23,10 @@ Graphite before the walk moves up. Anything that needs human attention
 into a final summary instead of pausing the walk.
 
 This command is intentionally gateless. It delegates per-PR resolution to
-`/review:resolve` in `--non-interactive` mode, which suppresses that command's
-spawn-cap and push-confirmation gates. The per-PR `/review:resolve` keeps its
+`/review:resolve` in `--non-interactive` mode, which suppresses every one of
+that command's gates (spawn-cap, CONFLICT, issue-filing, verify-command,
+push-confirmation) in favour of their unattended rules — including filing at
+most 3 follow-up issues per PR. The per-PR `/review:resolve` keeps its
 gates by default for interactive use — only this stack walk runs them off. Run
 `/review:resolve <PR#>` directly for a single, gated, interactive pass.
 
@@ -192,11 +194,16 @@ failures and continue.
    `args: "<PR#> --non-interactive"`. The skill name is `review:resolve` (the
    `name:` frontmatter value of `resolve-pr.md`) — NOT the filename
    `resolve-pr`, which would silently fail to invoke. The `--non-interactive`
-   flag suppresses that command's spawn-cap, CONFLICT, and push-confirmation
-   gates so it resolves, commits, and `gt submit`s without prompting.
+   flag suppresses that command's spawn-cap, CONFLICT, issue-filing,
+   verify-command, and push-confirmation gates so it resolves, commits, and
+   submits without prompting. Its last output line is the contract line
+   `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
+   push=<...>, verify=<...>` (`references/resolve/dispositions.md`).
 
-3. **Self-verify** — the `Skill` tool returns no machine-readable exit status,
-   so re-fetch the PR's unresolved-comment count independently. Capture the
+3. **Self-verify** — parse the `Resolve:` line from step 2's output for
+   `b` (blocking), `i` (issues filed) and `push`. The `Skill` tool returns no
+   machine-readable exit status, so also re-fetch the PR's unresolved-thread
+   count independently as a mandatory cross-check. Capture the
    script output to a temp file and check its exit code *before* parsing —
    piping straight into `jq` would mask a non-zero exit from `get-pr-comments`
    (an auth / 429 / network failure that emits empty output would otherwise
@@ -204,7 +211,7 @@ failures and continue.
 
    ```bash
    PC_OUT=$(mktemp)
-   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" "<owner/repo>" "<PR#>" >|"$PC_OUT" 2>"$PC_OUT.err"
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-outdated "<owner/repo>" "<PR#>" >|"$PC_OUT" 2>"$PC_OUT.err"
    PC_EC=$?
    if [ "$PC_EC" -ne 0 ]; then
      printf '[review:resolve-stack] PR #<PR#>: self-verify inconclusive (get-pr-comments exit %s)\n' "$PC_EC" >&2
@@ -215,10 +222,24 @@ failures and continue.
    rm -f "$PC_OUT" "$PC_OUT.err"
    ```
 
-   On exit 0: `0` → the PR is fully resolved; `>0` → that many threads remain,
-   record the count and flag the PR for the "Needs manual attention" section.
-   On non-zero exit: record the PR's verification as `inconclusive` with the
-   stderr output and flag it for "Needs manual attention".
+   On exit 0 the count is the PR's open threads (outdated included). Flag the
+   PR for "Needs manual attention" when `b > 0`, when the count is `> 0`, or
+   when the two disagree — the `Resolve:` line is missing, or the count
+   exceeds `b` (open threads the command did not report as blocking); record
+   that as `self-verify disagreement`. On non-zero exit: record the PR's
+   verification as `inconclusive` with the stderr output and flag it.
+
+3b. **Clean-tree check** — continuing on a dirty tree would carry this PR's
+   edits onto the next branch:
+
+   ```bash
+   git status --porcelain
+   ```
+
+   Non-empty output: print this PR's row, then
+   `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
+   followed by the file list, skip the remaining PRs, and go to Step 4 (exit
+   `1`).
 
 4. **Restack** — `gt upstack restack`. If it reports a conflict: do not pause —
    run `gt abort` to clear the conflicted restack (without this, the repo stays
@@ -227,9 +248,8 @@ failures and continue.
    Downstream PRs may then rest on an unrestacked base; the summary surfaces
    this so the user can restack manually.
 
-5. **Record a summary row** for this PR: PR number, comments found (from the
-   `/review:resolve` output if available), remaining unresolved (from step 3),
-   push status, restack status.
+5. **Print and record a summary row** for this PR as soon as it completes
+   (columns as in Step 4), so an aborted walk still leaves a record.
 
 #### GitHub
 
@@ -243,38 +263,43 @@ failures and continue.
    `/review:resolve` resolves its own active provider internally, so this
    step is identical regardless of which provider this walk resolved.
 
-3. **Self-verify** — identical to the Graphite branch above; the
-   `get-pr-comments` script is provider-agnostic.
+3. **Self-verify and clean-tree check** — identical to Graphite steps 3 and
+   3b above; the scripts are provider-agnostic.
 
 4. **Rebase upstack** — `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack`. Read the JSON result's `status` field. `CONFLICT`: do not pause — run
    `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort` to clear the conflicted rebase (without this, the repo stays mid-rebase and the next iteration's checkout fails), record the conflict for the final summary, and continue to the next PR. `SUCCESS`: continue. Anything else: report the result's `recoveryAction`, record it for the final summary, and continue to the next PR.
    Downstream PRs may then rest on an unrestacked base; the summary surfaces
    this so the user can restack manually.
 
-5. **Record a summary row** for this PR: PR number, comments found (from the
-   `/review:resolve` output if available), remaining unresolved (from step 3),
-   push status, restack status.
+5. **Print and record a summary row** for this PR as soon as it completes.
 
 ### Step 4: Final aggregate summary
 
-Print a table with one row per PR walked:
+Print a table with one row per PR walked (the same rows step 5 streamed):
 
 ```text
-PR#  | comments found | remaining unresolved | push status | restack status
+PR#  | blocking | issues | remaining unresolved | push status | restack status
 ```
+
+`blocking`, `issues` and `push status` come from the PR's `Resolve:` line
+(`-` when it is missing); `remaining unresolved` is the step 3 count. If the
+walk aborted, the last line is `aborted at PR #<N>`.
 
 Then totals: PRs walked, PRs fully resolved (remaining == 0), PRs with
 residual comments, PRs skipped (no open PR / draft / checkout failure).
 
-Finally, a **Needs manual attention** section listing every PR with: residual
-unresolved comments (`>0` from step 3), a restack conflict, a push failure,
-an inconclusive self-verify, or a `not attempted (cluster cap)` or
-`not attempted (rate limit)` note surfaced by `/review:resolve`. If that section is empty, print
+Finally, a **Needs manual attention** section listing every PR with:
+blocking threads (`b > 0`), residual unresolved threads (`>0` from step 3),
+a self-verify disagreement or inconclusive self-verify, a restack conflict,
+a push failure, a dirty-tree abort, or a `not attempted (cluster cap)` or
+`not attempted (rate limit)` note surfaced by `/review:resolve`. If that
+section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
 **Exit code contract.** Exit `0` only when every walked PR is fully resolved —
-the "Needs manual attention" section is empty. Exit `1` when that section is
-non-empty, so a parent agent or CI step can distinguish a clean stack from one
+the "Needs manual attention" section is empty. Exit `1` when anything blocks
+(that section is non-empty, including any PR whose `Resolve:` line reports
+`b > 0`), so a parent agent or CI step can distinguish a clean stack from one
 that needs follow-up without parsing the prose table. Pre-flight failures
 (Step 1) exit non-zero; "no open PRs found" (Step 2) exits `0` — nothing to do
 is not a failure.
@@ -288,13 +313,10 @@ is not a failure.
 - **Not in a tracked stack / empty stack** — Step 2 reports "No open PRs
   found in current stack." and exits 0.
 - **`gt checkout` failure mid-walk** — log and skip that PR, continue.
-- **A mid-walk PR's resolve leaves the working tree dirty** — `/review:resolve`
-  hard-stops on a dirty tree at its Step 2. If a prior PR's resolve failed
-  partway (e.g. the commit step failed, or a resolver left an untracked
-  file), the next PR's `/review:resolve` invocation stops itself before
-  doing any work. Record that PR as skipped (its self-verify count still
-  reflects its pre-walk state, so flag it `inconclusive`) and continue.
-  Surface it in the "Needs manual attention" section.
+- **A PR's resolve leaves the working tree dirty** (a failed commit, a
+  verify revert that could not clean up, a rejected push) — step 3b stops
+  the walk with `aborted at PR #<N>` and the file list, and the command
+  exits `1`. Continuing would carry those edits onto the next branch.
 - **PR merged or closed between stack-build and the walk reaching it** —
   `/review:resolve` detects the non-open state and reports; record the PR as
   skipped and continue.
@@ -306,9 +328,9 @@ is not a failure.
   continue.
 - **ruvector MCP unavailable** — the Step 1 recall is best-effort and skipped
   silently.
-- **Re-run safety** — running `/review:resolve-stack` again is safe: PRs with
-  no unresolved comments are silent no-ops in `/review:resolve`, so a second
-  pass over a resolved stack just re-verifies and exits.
+- **Re-run safety** — running `/review:resolve-stack` again is safe: replies
+  and issues carry idempotency markers, so a second pass posts no duplicates;
+  threads left open by design are reported again as blocking.
 
 See the `pr-review-workflow` and `stack-traversal` skills for the shared
 conventions this command builds on.
