@@ -1,0 +1,22 @@
+docs/plugin-scope-mode-protocol.md
+  s_becc7011266565::t_6583b7a6fe76d5 34,40-48
+  s_becc7011266565::t_f520db0e41e907 49
+plans/review-resolve-hardening.md
+  s_becc7011266565::t_939bd4ebdaf351 554
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b4cca83826a97d81be07582910abda3f1452fc6b",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
