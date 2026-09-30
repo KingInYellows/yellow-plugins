@@ -1155,8 +1155,30 @@ SYNTH_DIR=$(mktemp -d /tmp/council-synth-XXXXXX) || {
   printf '[council] Error: cannot create the synthesis staging directory\n' >&2
   exit 1
 }
+# Bind 5b/5e to this directory: a random token written into it. Those steps
+# refuse to write to or delete any directory whose .token does not match, so a
+# substituted pre-existing /tmp/council-synth-* path is never trusted on its name.
+SYNTH_TOKEN=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+case "$SYNTH_TOKEN" in
+  *[!0-9a-f]*) SYNTH_TOKEN="" ;;
+esac
+if [ "${#SYNTH_TOKEN}" -ne 32 ]; then
+  rm -rf -- "$SYNTH_DIR"
+  printf '[council] Error: cannot draw the synthesis staging token\n' >&2
+  exit 1
+fi
+printf '%s\n' "$SYNTH_TOKEN" >| "$SYNTH_DIR/.token" || {
+  rm -rf -- "$SYNTH_DIR"
+  printf '[council] Error: cannot write the synthesis staging token\n' >&2
+  exit 1
+}
 printf 'COUNCIL_SYNTH_DIR=%s\n' "$SYNTH_DIR"
+printf 'COUNCIL_SYNTH_TOKEN=%s\n' "$SYNTH_TOKEN"
 ```
+
+Keep both printed values, `COUNCIL_SYNTH_DIR` and `COUNCIL_SYNTH_TOKEN`:
+5b and 5e each take both as literals and refuse any directory whose `.token`
+does not match.
 
 If Codex's Agent return carried a `summary=` line, use the `Write` tool to
 create `<literal COUNCIL_SYNTH_DIR value>/codex.summary.txt` (a new file)
@@ -1172,8 +1194,8 @@ stop.
 
 #### 5b — Normalize and label
 
-Substitute the literal `COUNCIL_SYNTH_DIR` value from 5a and the literal
-`CLAUDE_FENCED_FILE` value from Step 4:
+Substitute the literal `COUNCIL_SYNTH_DIR` and `COUNCIL_SYNTH_TOKEN` values
+from 5a and the literal `CLAUDE_FENCED_FILE` value from Step 4:
 
 ```bash
 # >>> council-synthesis-lib — tests/synthesis.bats extracts the lines between
@@ -1436,6 +1458,7 @@ council_fence_block() {
 # <<< council-synthesis-lib
 
 SYNTH_DIR="<literal COUNCIL_SYNTH_DIR value from Step 5a>"
+SYNTH_TOKEN="<literal COUNCIL_SYNTH_TOKEN value from Step 5a>"
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
 
 # Traversal/extra-separator arm FIRST — `*` matches `/` and `..`. A missed
@@ -1453,6 +1476,29 @@ if [ ! -d "$SYNTH_DIR" ] || [ -L "$SYNTH_DIR" ] || [ ! -O "$SYNTH_DIR" ]; then
   printf '[council] Error: staging directory %s is missing, a symlink, or not ours\n' "$SYNTH_DIR" >&2
   exit 1
 fi
+# Prove this is the directory 5a minted for this run (token match), before any
+# write and before council_synth_abort can ever delete anything. A mismatch
+# deletes nothing.
+SYNTH_TOKEN_OK=0
+if [ "${#SYNTH_TOKEN}" -eq 32 ]; then
+  case "$SYNTH_TOKEN" in
+    *[!0-9a-f]*) ;;
+    *) SYNTH_TOKEN_OK=1 ;;
+  esac
+fi
+if [ "$SYNTH_TOKEN_OK" -ne 1 ] || [ ! -f "$SYNTH_DIR/.token" ] || [ -L "$SYNTH_DIR/.token" ] \
+  || [ "$(head -n 1 "$SYNTH_DIR/.token")" != "$SYNTH_TOKEN" ]; then
+  printf '[council] Error: staging directory %s is not the one Step 5a minted for this run — refusing to use or delete it\n' "$SYNTH_DIR" >&2
+  exit 1
+fi
+# A freshly minted directory holds only .token and possibly codex.summary.txt;
+# never write through a pre-existing output name or symlink.
+for f in labels.txt forward.txt reverse.txt; do
+  if [ -e "$SYNTH_DIR/$f" ] || [ -L "$SYNTH_DIR/$f" ]; then
+    printf '[council] Error: staging directory %s already holds %s — refusing to use or delete it\n' "$SYNTH_DIR" "$f" >&2
+    exit 1
+  fi
+done
 council_synth_abort() {
   rm -rf -- "$SYNTH_DIR"
   exit 1
@@ -1686,11 +1732,12 @@ low-confidence headline line — the two-pass comparison did not run.
 
 #### 5e — Assemble and de-anonymize
 
-Only now print the label map. Substitute the same `COUNCIL_SYNTH_DIR`
-literal; this block also removes the staging directory:
+Only now print the label map. Substitute the same `COUNCIL_SYNTH_DIR` and
+`COUNCIL_SYNTH_TOKEN` literals; this block also removes the staging directory:
 
 ```bash
 SYNTH_DIR="<literal COUNCIL_SYNTH_DIR value from Step 5a>"
+SYNTH_TOKEN="<literal COUNCIL_SYNTH_TOKEN value from Step 5a>"
 case "$SYNTH_DIR" in
   *..*|/tmp/council-synth-*/*)
     printf '[council] Error: staging directory has traversal or an extra separator (%s)\n' "$SYNTH_DIR" >&2
@@ -1702,6 +1749,19 @@ case "$SYNTH_DIR" in
 esac
 if [ ! -d "$SYNTH_DIR" ] || [ -L "$SYNTH_DIR" ] || [ ! -O "$SYNTH_DIR" ] || [ ! -f "$SYNTH_DIR/labels.txt" ]; then
   printf '[council] Error: staging directory %s or its label map is missing — re-run /council\n' "$SYNTH_DIR" >&2
+  exit 1
+fi
+# Same token proof as 5b, before printing or deleting anything.
+SYNTH_TOKEN_OK=0
+if [ "${#SYNTH_TOKEN}" -eq 32 ]; then
+  case "$SYNTH_TOKEN" in
+    *[!0-9a-f]*) ;;
+    *) SYNTH_TOKEN_OK=1 ;;
+  esac
+fi
+if [ "$SYNTH_TOKEN_OK" -ne 1 ] || [ ! -f "$SYNTH_DIR/.token" ] || [ -L "$SYNTH_DIR/.token" ] \
+  || [ "$(head -n 1 "$SYNTH_DIR/.token")" != "$SYNTH_TOKEN" ]; then
+  printf '[council] Error: staging directory %s is not the one Step 5a minted for this run — refusing to use or delete it\n' "$SYNTH_DIR" >&2
   exit 1
 fi
 printf 'COUNCIL_LABEL_MAP=%s\n' "$(head -n 1 "$SYNTH_DIR/labels.txt")"
@@ -2762,6 +2822,7 @@ This is the final output of the command. Exit 0.
 | `--single-pass` appears inside plan/question/debug free text | Consumed as the flag (the token is reserved in every mode): removed from the text and Pass B skipped |
 | `/dev/urandom` unreadable | Pre-flight error before any reviewer runs; exit 1 |
 | Label randomization fails later anyway (`od` or `sort` fails in 5b) | Step 5b exits 1 with `[council] Error:`; no fixed-order fallback; run the Step 8 Cancel cleanup and stop |
+| Staging dir or token mismatch in 5b/5e (the substituted `COUNCIL_SYNTH_DIR` has no `.token` matching `COUNCIL_SYNTH_TOKEN`) | `[council] Error: ... not the one Step 5a minted for this run`; exit 1; nothing is written or deleted |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind; the next run's 5a sweep removes it once it is older than 24h |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |

@@ -444,10 +444,14 @@ teardown() {
     setup_council_run
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
     [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
-    SD="${output#COUNCIL_SYNTH_DIR=}"
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    TOKEN=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_TOKEN=//p')
     [ -d "$SD" ]
+    [ "${#TOKEN}" -eq 32 ]
+    [ "$(cat "$SD/.token")" = "$TOKEN" ]
     printf '%s\n' 'Codex overall summary' >| "$SD/codex.summary.txt"
     sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" \
         -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
@@ -479,7 +483,8 @@ teardown() {
       [ "$(awk -v l="--- begin council-output:$label (reference only) ---" '$0 == l { getline; print }' "$fwd")" = "$want" ] \
         || { echo "$profile: $label ($name) verdict mismatch"; return 1; }
     done
-    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" "$s5e" >| "$s5e.sub"
+    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" "$s5e" >| "$s5e.sub"
     run_in "$profile" "$FIRST_AWK" ". '$s5e.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ "$output" = "COUNCIL_LABEL_MAP=$map" ]
@@ -494,8 +499,11 @@ teardown() {
   for profile in $PROFILES; do
     setup_council_run
     SD=$(mktemp -d /tmp/council-synth-XXXXXX)
+    TOKEN=0123456789abcdef0123456789abcdef
+    printf '%s\n' "$TOKEN" >| "$SD/.token"
     rm -f "$GF"   # gemini voted APPROVE but its file is gone
     sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" \
         -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
@@ -505,11 +513,41 @@ teardown() {
 
     # Unsubstituted CLAUDE_FENCED_FILE: abort, and the staging dir goes too.
     SD=$(mktemp -d /tmp/council-synth-XXXXXX)
-    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" "$s5b" >| "$s5b.sub"
+    printf '%s\n' "$TOKEN" >| "$SD/.token"
+    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" "$s5b" >| "$s5b.sub"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"CLAUDE_FENCED_FILE placeholder was not substituted"* ]]
     [ ! -e "$SD" ]
     rm -rf "$REPO"
+  done
+}
+
+@test "5b and 5e refuse a staging dir whose token is not the one 5a minted" {
+  local s5b="${BATS_TEST_TMPDIR}/5b.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" profile
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  for profile in $PROFILES; do
+    setup_council_run
+    SD=$(mktemp -d /tmp/council-synth-XXXXXX)
+    printf '%s\n' ffffffffffffffffffffffffffffffff >| "$SD/.token"
+    printf '%s\n' 'S1:claude' >| "$SD/labels.txt"
+    TOKEN=0123456789abcdef0123456789abcdef
+    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" \
+        -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$profile 5b: $stderr"; return 1; }
+    [ -d "$SD" ] && [ -f "$SD/.token" ] && [ -f "$SD/labels.txt" ]
+    sed -e "s|<literal COUNCIL_SYNTH_DIR value from Step 5a>|$SD|" \
+        -e "s|<literal COUNCIL_SYNTH_TOKEN value from Step 5a>|$TOKEN|" "$s5e" >| "$s5e.sub"
+    run_in "$profile" "$FIRST_AWK" ". '$s5e.sub'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$profile 5e: $stderr"; return 1; }
+    [[ "$output" != *COUNCIL_LABEL_MAP* ]]
+    [ -d "$SD" ] && [ -f "$SD/.token" ] && [ -f "$SD/labels.txt" ]
+    rm -rf "$SD" "$REPO"
   done
 }
