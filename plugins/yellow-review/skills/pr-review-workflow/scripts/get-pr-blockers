@@ -5,7 +5,8 @@
 #   {"changesRequested":[{"login":"...","reviewId":"..."}],
 #    "reviewDecision":"CHANGES_REQUESTED|APPROVED|REVIEW_REQUIRED|null",
 #    "conversationResolution":"enforced|not_enforced|unknown"}
-# changesRequested and reviewDecision are null when the lookup failed.
+# changesRequested and reviewDecision are null when the lookup failed;
+# changesRequested is also null when there are more than 100 reviewers.
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
 # with unknown fields and a note on stderr.
 
@@ -61,6 +62,7 @@ query($owner: String!, $name: String!, $number: Int!) {
           author { __typename login }
           commit { oid }
         }
+        pageInfo { hasNextPage }
       }
     }
   }
@@ -72,10 +74,15 @@ BASE=""
 if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
         -f query="$QUERY" 2>"$ERR_FILE") \
     && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest | objects' 2>/dev/null); then
-    CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
-      [ (.latestOpinionatedReviews.nodes // [])[]
-        | select(.state == "CHANGES_REQUESTED")
-        | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]')
+    # A page past the first 100 reviewers would undercount; report unknown.
+    if [ "$(printf '%s' "$PR_JSON" | jq -r '.latestOpinionatedReviews.pageInfo.hasNextPage // false')" = true ]; then
+        note 'more than 100 opinionated reviewers; changesRequested unknown'
+    else
+        CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
+          [ (.latestOpinionatedReviews.nodes // [])[]
+            | select(.state == "CHANGES_REQUESTED")
+            | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]')
+    fi
     REVIEW_DECISION=$(printf '%s' "$PR_JSON" | jq -c '.reviewDecision')
     BASE=$(printf '%s' "$PR_JSON" | jq -r '.baseRefName // empty')
 else
