@@ -15,8 +15,6 @@ tags:
   - yellow-review
 ---
 
-# Early Exits Before Per-Item Cleanup, and Numbered Jump Targets, in Command Loops
-
 ## Problem
 
 PR #955 taught `/review:resolve-stack` and `/review:sweep-all` to read the
