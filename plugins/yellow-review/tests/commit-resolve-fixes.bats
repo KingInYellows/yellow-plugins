@@ -126,18 +126,63 @@ run_crf() {
   [[ "$stderr" == *"PUSH_REJECTED"* ]]
 }
 
-@test "a submit that never reaches origin exits 6 after three checks" {
+@test "a submit that never reaches origin exits 6 without polling the PR" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export STUB_SUBMIT_SKIP_PUBLISH=1
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 6 ]
-  [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+  ! grep -q '^gh pr view' "$STUB_LOG"
 }
 
-@test "a PR headRefOid that disagrees with origin exits 6" {
+@test "a PR headRefOid that disagrees with origin exits 6 after the backoff" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export STUB_PR_HEAD=0000000000000000000000000000000000000000
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 6 ]
   [[ "$stderr" == *"head not verified"* ]]
+  # One check plus one per backoff entry ("0 0").
+  [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+}
+
+# --- Untrusted file lists ---
+
+@test "--files-from reads one path per line" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'two\nfix\n' >| src/b.txt
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_crf --provider graphite --pr 7 --message "$MSG" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" = "src/a.txt src/b.txt " ]
+}
+
+@test "--files-from passes shell metacharacters through as plain file names" {
+  printf 'x\n' >| 'src/$(touch pwned).txt'
+  git add 'src/$(touch pwned).txt' && git commit -q -m "chore: odd name"
+  git push -q origin feature 2>/dev/null
+  printf 'y\n' >| 'src/$(touch pwned).txt'
+  printf '%s\n' 'src/$(touch pwned).txt' >| "$BATS_TEST_TMPDIR/files"
+  run_crf --provider graphite --pr 7 --message "$MSG" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ ! -e pwned ]
+}
+
+@test "a deny-listed path is refused before anything is staged (exit 3)" {
+  mkdir -p .github/workflows
+  printf 'on: push\n' >| .github/workflows/ci.yml
+  git add .github && git commit -q -m "ci: add" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  printf 'on: [push]\n' >| .github/workflows/ci.yml
+  run_crf --provider graphite --pr 7 --message "$MSG" -- .github/workflows/ci.yml
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"deny-listed"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "a missing github runtime fails before committing (exit 2)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/missing.js"
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }
