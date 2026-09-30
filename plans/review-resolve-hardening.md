@@ -524,7 +524,7 @@ Decisions from the brainstorm and the planning round:
 > exit (5). Add a `gh pr view --json state` check before the write phase and
 > again before the re-pass.
 <!-- /deepen-plan -->
-- [ ] 2.4: Update `plugins/yellow-core/skills/local-config/SKILL.md`. Document
+- [x] 2.4: Update `plugins/yellow-core/skills/local-config/SKILL.md`. Document
   these keys, each with a default, validation rule and warning fallback:
   - `resolve_pr.cluster_cap` (currently undocumented);
   - `resolve_pr.verify_command` (string);
