@@ -573,7 +573,7 @@ Decisions from the brainstorm and the planning round:
   - The confirmation shows the worst-case added wait: PR count × the
     `repass_wait_seconds` value.
   - Keep the clean-tree-between-PRs assumption at lines 319–325 true.
-- [ ] 3.4: `skills/pr-review-workflow/SKILL.md`:
+- [x] 3.4: `skills/pr-review-workflow/SKILL.md`:
   - Update the commit convention (lines 308–339): resolve uses
     `git add` + `gt modify -c`; `/review:pr` and `/review:all` still amend,
     and a follow-up issue tracks that.
