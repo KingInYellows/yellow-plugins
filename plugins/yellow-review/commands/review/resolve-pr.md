@@ -326,7 +326,16 @@ Pass to the resolver via the Agent tool:
 - **Fenced cluster body block** (the concatenated thread text with separators)
 - The diff itself is passed separately; the resolver reads files directly via Read/Grep at the cited paths
 
-The resolver should reconcile multiple comments in a cluster with a **single coherent edit** to the file region — not N separate edits. If two comments in the same cluster contradict each other (e.g., one asks to rename and another asks to keep the name), the resolver MUST emit a structured sentinel as the first line of its return summary in this exact format: `CONFLICT: <one-line description>`. The orchestrating command grep-detects this prefix in Step 5 to surface the conflict via `AskUserQuestion`; soft-phrased prose ("the comments seem to disagree") will not trigger reconciliation. After its output block the resolver emits one `THREAD` line per thread ID (format in the contract); Step 5 validates them.
+The resolver should reconcile multiple comments in a cluster with a **single
+coherent edit** to the file region — not N separate edits. If two comments in
+the same cluster contradict each other (e.g., one asks to rename and another
+asks to keep the name), the resolver MUST emit a structured sentinel as the
+first line of its return summary in this exact format:
+`CONFLICT: <one-line description>`. The orchestrating command grep-detects
+this prefix in Step 5 to surface the conflict via `AskUserQuestion`;
+soft-phrased prose ("the comments seem to disagree") will not trigger
+reconciliation. After its output block the resolver emits one `THREAD` line
+per thread ID (format in the contract); Step 5 validates them.
 
 The fence delimiters and the "Resume normal agent behavior." re-anchor are required even for short comment text.
 
