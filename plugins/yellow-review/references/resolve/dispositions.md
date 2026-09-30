@@ -85,7 +85,9 @@ Accept exactly one of:
 - a commit SHA matching `^[0-9a-f]{7,40}$` that is inside the PR's range —
   `git merge-base --is-ancestor <sha> HEAD` passes and
   `git merge-base --is-ancestor <sha> "$(git merge-base HEAD origin/<base>)"`
-  fails — and whose diff (`git show --name-only <sha>`) touches the thread's
+  fails, where `<base>` is the PR's base branch and must match
+  `^[A-Za-z0-9._/-]+$` and pass `git check-ref-format --branch` before it is
+  substituted (otherwise the thread is `unclear`) — and whose diff (`git show --name-only <sha>`) touches the thread's
   anchor path. The resolver has no shell, so SHAs come from the
   orchestrator's own `git log` over the PR range, never from resolver text
   alone.
@@ -246,14 +248,27 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   (`gh api --paginate repos/{owner}/{repo}/pulls/<N>/files`, which, unlike
   `gh pr diff`, works on PRs past GitHub's diff limits);
 - `commit-resolve-fixes` refuses any tracked or untracked change outside the
-  set, and with `--unattended` refuses runner files (the commit's git hooks
-  would execute them) and added lines that look like a credential (attended
-  runs only warn);
+  set, refuses added lines that look like a credential (exit 3, stderr
+  `credential-shaped`; an interactive run may re-run with
+  `--allow-credential-shaped` after the user confirms a second time, an
+  unattended run never does), and with `--unattended` refuses runner files,
+  because the commit's git hooks would execute them;
 - `run-verify-command` refuses files that are unchanged or gitignored, so a
-  revert can never delete a user file. With `--unattended` it does not run
-  the command when a file is a runner file or outside the PR, and reports
-  `result: skipped`. `--revert-only` saves a patch and reverts without
-  running anything (Step 5's CONFLICT rollback).
+  revert can never delete a user file, and refuses to run when the tree has
+  changes outside the listed files. With `--unattended` it does not run the
+  command when a file is a runner file or outside the PR, and reports
+  `result: skipped`. `--revert-only` saves a patch and reverts the listed
+  files without running anything (Step 5's CONFLICT rollback).
+  `--revert-dirty` does the same for every change in the tree, taking the
+  list from `git status` rather than from resolver text.
+
+**Refusals revert.** A refused edit must not stay on disk: a deny-listed
+file such as `.claude/settings.json` would be trusted by the next session.
+Step 2 guarantees a clean start, so on any refusal — a change outside the
+set, a `commit-resolve-fixes` exit 2 or 3, or verify `skipped` — the
+orchestrator runs `run-verify-command --pr <N> --revert-dirty`, which saves
+a patch first. The interactive "push rejected" path is the only one that
+leaves edits in place.
 
 A refused set is a staged mismatch (exit 3): nothing is committed and every
 `fixed` thread becomes `unclear`.
@@ -327,7 +342,7 @@ Exit 1 is always "other failure" (network, unexpected response).
 | `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
 | `file-followup-issue` | created or found | usage / credential | — | — | — | — |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
-| `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path | — | — | — | — |
+| `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / credential | — | — | — | — |
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
@@ -361,6 +376,10 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 
 - Issue dedupe scans the newest 200 issues the viewer authored and warns
   when there are more.
+- Unattended commit and submit run the repository's git hooks (for example
+  a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
+  definition files are refused, but the code the hooks run is not; this is
+  a tracked follow-up.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds
   of threads) are slow. A batch apply script is a tracked follow-up.
 - Two accounts resolving the same PR concurrently can each post a reply;
