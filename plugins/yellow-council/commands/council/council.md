@@ -144,7 +144,7 @@ case "$DOUBLE_PASS" in
     printf '[council] Warning: COUNCIL_DOUBLE_PASS_SYNTHESIS=%s is not 0 or 1; keeping 2-pass synthesis\n' "$DOUBLE_PASS" >&2
     ;;
 esac
-[ "$REST" = "$(printf '%s' "$RAW_REST" | awk '{ o = ""; for (i = 1; i <= NF; i++) o = o (o == "" ? "" : " ") $i; print o }')" ] || SYNTH_PASSES=1
+[ "$REST" = "$RAW_REST" ] || SYNTH_PASSES=1
 printf 'COUNCIL_SYNTHESIS_PASSES=%s\n' "$SYNTH_PASSES"
 ```
 
@@ -1272,6 +1272,10 @@ council_normalize_text() {
     # strip_emph calls match() too, so copy RSTART/RLENGTH before calling it.
     function strip_words(seg,   out, st, len) {
       out = ""
+      # codex-reviewer appends notes that name Codex; keep only their meaning.
+      # Only unprotected prose reaches here (not code spans or Evidence tails).
+      gsub(/ \(line approximate — not reported by Codex\)/, " (line approximate)", seg)
+      gsub(/ \(priority [^()]* out of range 0-3 — treated as P3\)/, " (priority out of range — treated as P3)", seg)
       while (match(seg, /[^ \t]+/)) {
         st = RSTART; len = RLENGTH
         out = out substr(seg, 1, st - 1) strip_emph(substr(seg, st, len))
@@ -1363,9 +1367,6 @@ council_normalize_text() {
       if (s ~ /^\[([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)\][ \t]+confidence:/) next
       sub(/^\[([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)\][ \t]*/, "", s)
       sub(/^Finding:[ \t]*/, "", s)
-      # codex-reviewer appends notes that name Codex; keep only their meaning.
-      gsub(/ \(line approximate — not reported by Codex\)/, " (line approximate)", s)
-      gsub(/ \(priority [^()]* out of range 0-3 — treated as P3\)/, " (priority out of range — treated as P3)", s)
       # An Evidence label later in the line starts a verbatim tail.
       tail = ""
       if ((p = index(s, "Evidence:")) > 1) { tail = substr(s, p); s = substr(s, 1, p - 1) }

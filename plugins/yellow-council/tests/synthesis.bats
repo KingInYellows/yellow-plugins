@@ -424,6 +424,25 @@ question "no flag here"||2'
   done
 }
 
+@test "Step 2 pass count ignores whitespace shape: flag-free stays 2, flagged is 1" {
+  local step2="${BATS_TEST_TMPDIR}/wsflag.sh" profile fmt want
+  extract_fence_after "$COUNCIL_MD" '### Step 2:' "$step2"
+  # printf formats for ARGUMENTS | expected pass count
+  local cases='question hello  world|2
+plan docs/my  plan.md|2
+question a\t\tb|2
+question hello  world --single-pass|1
+question a\t\tb --single-pass|1
+question a  --single-pass   b|1'
+  for profile in $PROFILES; do
+    while IFS='|' read -r fmt want; do
+      run_in "$profile" "$FIRST_AWK" "ARGUMENTS=\$(printf '$fmt'); export ARGUMENTS; unset COUNCIL_DOUBLE_PASS_SYNTHESIS; . '$step2'"
+      [ "$status" -eq 0 ] || { echo "$profile [$fmt]: status $status: $stderr"; return 1; }
+      [ "$output" = "COUNCIL_SYNTHESIS_PASSES=$want" ] || { echo "$profile [$fmt]: $output"; return 1; }
+    done <<<"$cases"
+  done
+}
+
 # --- Steps 5a, 5b, 5e end to end -------------------------------------------
 
 # setup_council_run — a throwaway git repo with a Step 4 state file and fenced
@@ -679,6 +698,28 @@ EOF2
   for profile in $PROFILES; do
     for impl in $AWKS; do
       run_in "$profile" "$impl" "council_normalize_text codex < '$in'"
+      [ "$status" -eq 0 ] || { echo "$profile/$impl: status $status: $stderr"; return 1; }
+      diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
+    done
+  done
+}
+
+@test "normalize keeps Codex note text in code spans and Evidence tails, rewrites it in prose" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$in" <<'EOF2'
+x (line approximate — not reported by Codex) y
+span `a (line approximate — not reported by Codex) b` then (line approximate — not reported by Codex) end
+see src/a.ts:3 — bad. Evidence: "q (line approximate — not reported by Codex) r"
+EOF2
+  cat >| "$want" <<'EOF2'
+x (line approximate) y
+span `a (line approximate — not reported by Codex) b` then (line approximate) end
+see src/a.ts:3 — bad. Evidence: "q (line approximate — not reported by Codex) r"
+EOF2
+  local profile impl
+  for profile in $PROFILES; do
+    for impl in $AWKS; do
+      run_in "$profile" "$impl" "council_normalize_text < '$in'"
       [ "$status" -eq 0 ] || { echo "$profile/$impl: status $status: $stderr"; return 1; }
       diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
     done
