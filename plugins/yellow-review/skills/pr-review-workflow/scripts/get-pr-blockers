@@ -1,0 +1,130 @@
+#!/bin/sh
+# Report what blocks a PR from merging beyond open review threads.
+# Usage: get-pr-blockers <owner/repo> <pr-number>
+# Output: JSON to stdout:
+#   {"changesRequested":[{"login":"...","reviewId":"..."}],
+#    "reviewDecision":"CHANGES_REQUESTED|APPROVED|REVIEW_REQUIRED|null",
+#    "conversationResolution":"enforced|not_enforced|unknown"}
+# changesRequested and reviewDecision are null when the lookup failed.
+# Never fails the caller: usage errors exit 2, every lookup error exits 0
+# with unknown fields and a note on stderr.
+
+set -eu
+
+note() { printf '[get-pr-blockers] %s\n' "$1" >&2; }
+
+unknown_json() {
+    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown"}\n'
+}
+
+if [ $# -ne 2 ]; then
+    printf 'Usage: get-pr-blockers <owner/repo> <pr-number>\n' >&2
+    exit 2
+fi
+
+REPO="$1"
+PR_NUMBER="$2"
+
+case "$REPO" in
+    */*/*|/*|*/) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) OWNER="${REPO%%/*}"; NAME="${REPO#*/}" ;;
+    *) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$PR_NUMBER" in
+    ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR_NUMBER" >&2; exit 2 ;;
+esac
+
+if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+    note 'gh or jq not found; blockers unknown'
+    unknown_json
+    exit 0
+fi
+
+ERR_FILE=$(mktemp) || { note 'mktemp failed; blockers unknown'; unknown_json; exit 0; }
+trap 'rm -f "$ERR_FILE"' EXIT
+
+# --- Reviews and base branch (GraphQL) ---
+# latestOpinionatedReviews may include DISMISSED reviews, so select on the
+# state client-side rather than trusting the connection to exclude them.
+# shellcheck disable=SC2016
+QUERY='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      baseRefName
+      reviewDecision
+      latestOpinionatedReviews(first: 100) {
+        nodes {
+          id
+          state
+          submittedAt
+          author { __typename login }
+          commit { oid }
+        }
+      }
+    }
+  }
+}'
+
+CHANGES_REQUESTED=null
+REVIEW_DECISION=null
+BASE=""
+if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
+        -f query="$QUERY" 2>"$ERR_FILE") \
+    && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest | objects' 2>/dev/null); then
+    CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
+      [ (.latestOpinionatedReviews.nodes // [])[]
+        | select(.state == "CHANGES_REQUESTED")
+        | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]')
+    REVIEW_DECISION=$(printf '%s' "$PR_JSON" | jq -c '.reviewDecision')
+    BASE=$(printf '%s' "$PR_JSON" | jq -r '.baseRefName // empty')
+else
+    note "review lookup failed; changesRequested unknown: $(head -c 300 "$ERR_FILE")"
+fi
+
+# --- Conversation resolution (REST) ---
+# enforced when either classic protection or a ruleset requires it;
+# not_enforced only when both sources answered and neither requires it.
+CLASSIC=unknown
+RULES=unknown
+if [ -n "$BASE" ]; then
+    BASE_ENC=$(printf '%s' "$BASE" | jq -sRr @uri)
+
+    if OUT=$(gh api "repos/$OWNER/$NAME/branches/$BASE_ENC/protection" \
+            --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE"); then
+        case "$OUT" in
+            true) CLASSIC=true ;;
+            *) CLASSIC=false ;;
+        esac
+    elif grep -q 'Branch not protected' "$ERR_FILE"; then
+        CLASSIC=false
+    else
+        # 403/404 for callers without admin rights: the setting is not visible.
+        note 'classic branch protection not readable; treating as unknown'
+    fi
+
+    if OUT=$(gh api "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" \
+            --jq '[.[] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
+            2>"$ERR_FILE"); then
+        case "$OUT" in
+            true) RULES=true ;;
+            *) RULES=false ;;
+        esac
+    else
+        note "branch rules lookup failed: $(head -c 300 "$ERR_FILE")"
+    fi
+fi
+
+if [ "$CLASSIC" = true ] || [ "$RULES" = true ]; then
+    RESOLUTION=enforced
+elif [ "$CLASSIC" = false ] && [ "$RULES" = false ]; then
+    RESOLUTION=not_enforced
+else
+    RESOLUTION=unknown
+fi
+
+jq -nc \
+    --argjson cr "$CHANGES_REQUESTED" \
+    --argjson rd "$REVIEW_DECISION" \
+    --arg res "$RESOLUTION" \
+    '{changesRequested: $cr, reviewDecision: $rd, conversationResolution: $res}'
