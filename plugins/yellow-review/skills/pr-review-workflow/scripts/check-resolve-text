@@ -1,0 +1,27 @@
+#!/bin/sh
+# Refuse resolver-written text that looks like a credential before it goes
+# anywhere public that the resolve scripts do not post themselves (for
+# example a Linear issue created through MCP).
+# Usage: check-resolve-text <file>...
+# Output: nothing on success.
+# Exit codes: 0 clean, 1 unreadable file, 2 usage or a file that looks like
+#             it contains a credential (the file is named on stderr).
+# Contract: references/resolve/dispositions.md ("Reply hygiene")
+
+set -eu
+
+if [ $# -lt 1 ]; then
+    printf 'Usage: check-resolve-text <file>...\n' >&2
+    exit 2
+fi
+
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+
+for f in "$@"; do
+    [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 1; }
+    if rt_looks_secret "$f"; then
+        printf 'Error: %s looks like it contains a credential.\n' "$f" >&2
+        exit 2
+    fi
+done
