@@ -1,0 +1,22 @@
+plugins/yellow-review/CLAUDE.md
+  s_becc7011266565::t_a4d4a134d71608 38-40,45-46,68-75,175,177-183,186-191,197-199,258-260,280-284,380-383
+  s_becc7011266565::t_030c5d3db93e78 384
+plans/review-resolve-hardening.md
+  s_becc7011266565::t_d759b526392cd7 568
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c9f45c45b3d8a16d2acaae847e13d81aa82fc403",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
