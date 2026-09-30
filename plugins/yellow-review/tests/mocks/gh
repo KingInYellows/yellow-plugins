@@ -435,6 +435,20 @@ case "$ALL_ARGS" in
     # Endless pagination: every page says there is another, with a cursor.
     printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
+  *"PRRT_gqlratelimit"*)
+    # HTTP 200 with a GraphQL rate-limit error; gh exits 0.
+    bump resolve_gqlrl >/dev/null
+    printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
+    exit 0
+    ;;
+  *"PRRT_gqlnotfound"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    exit 0
+    ;;
+  *"PRRT_gqlforbidden"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
+    exit 0
+    ;;
   *"PRRT_valid"*)
     cat "$FIXTURE_DIR/resolve-success-response.json"
     ;;
