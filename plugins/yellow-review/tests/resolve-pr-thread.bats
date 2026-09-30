@@ -11,7 +11,7 @@ setup() {
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
   export YELLOW_REVIEW_PACE_SECONDS=0
   export YELLOW_REVIEW_RATE_LIMIT_WAIT=0
-  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl"
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl" "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_gqlrl"
 }
 
 # --- Input validation ---
@@ -79,4 +79,20 @@ setup() {
   run --separate-stderr "$SCRIPT" "PRRT_ratelimit_once"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .resolved)" = true ]
+}
+
+@test "a GraphQL-level rate limit is retried once, then exits 4" {
+  run "$SCRIPT" "PRRT_gqlratelimit"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_gqlrl")" = 2 ]
+}
+
+@test "a GraphQL NOT_FOUND error exits 3" {
+  run "$SCRIPT" "PRRT_gqlnotfound"
+  [ "$status" -eq 3 ]
+}
+
+@test "a GraphQL FORBIDDEN error exits 3" {
+  run "$SCRIPT" "PRRT_gqlforbidden"
+  [ "$status" -eq 3 ]
 }
