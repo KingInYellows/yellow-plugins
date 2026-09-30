@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.0.5",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -54,7 +54,7 @@
     {
       "name": "yellow-cursor",
       "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
       },
