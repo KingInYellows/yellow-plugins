@@ -116,6 +116,54 @@ git commit -m "test: small change for council review"
 - No file references unless `--paths` provided
 - Most freeform of the modes
 
+### 2.5 — Synthesis bias mitigation
+
+Reuse the 2.2 branch (a diff where at least two reviewers raise findings).
+
+```text
+/council review
+/council review
+```
+
+**Expected behavior:**
+- Step 5b writes `forward.txt` / `reverse.txt` under
+  `/tmp/council-synth-*` (one `council-output:S<n>` block per reviewer, ending
+  in an `END OF SYNTHESIS INPUT` footer) and prints only their paths; Step 5e
+  prints `COUNCIL_LABEL_MAP=` and removes the directory. The label → reviewer
+  mapping differs between the two runs
+- The Pass A and Pass B working (enumeration `S<n>-F<k>`, rubric tables)
+  names reviewers only by label — no `Claude`, `Codex`, `Gemini`, `OpenCode`,
+  agent names or model families
+- The saved report uses real reviewer names in Agreement / Disagreement,
+  Reviewer Status and the raw-output appendix, and carries the "labels were
+  randomized" note under the header, ending with the two-pass note ("both
+  passes ran in one context …")
+- Every Agreement / Disagreement finding shows `correctness … (self-assessed)`,
+  `completeness`, `severity`, `constraints`, and `well-supported` or
+  `weakly-supported`
+- The Headline includes `Low-confidence synthesis: N of M findings (P%)`
+
+**Ruling flip presented as a tie:** when Pass B's ruling or ruling
+confidence for a finding differs from Pass A's (it may take a few runs on an
+ambiguous diff), that finding shows `low-confidence-synthesis` with both
+readings (`Pass A: …; Pass B: …`), is not resolved to either, and stays in the
+bucket its citations put it in.
+
+**Single-pass bypass:**
+
+```text
+/council review --single-pass
+COUNCIL_DOUBLE_PASS_SYNTHESIS=0 claude    # then: /council review
+COUNCIL_DOUBLE_PASS_SYNTHESIS=yes claude  # then: /council review
+```
+
+- The first two run Pass A only; the Headline has no low-confidence line and
+  no finding carries `low-confidence-synthesis`; the header note says
+  "synthesis ran a single pass (no order-swap check)" and does not claim both
+  passes ran
+- The third prints `[council] Warning: COUNCIL_DOUBLE_PASS_SYNTHESIS=yes is
+  not 0 or 1; keeping 2-pass synthesis` and runs both passes
+
 ## Phase 3: Failure Path Tests (Advisory)
 
 ### 3.1 — Per-reviewer timeout

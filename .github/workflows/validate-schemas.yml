@@ -1451,7 +1451,7 @@ jobs:
         # bats_require_minimum_version helper (>=1.5.0) used in this repo.
         run: sudo npm install -g bats@1.11.0
 
-      - name: Install gawk
+      - name: Install gawk and zsh
         # ubuntu-latest ships mawk only. The yellow-council suites run the
         # redaction program and the walker under every awk they find by
         # explicit binary name (mawk, gawk), so without this step the gawk
@@ -1460,7 +1460,10 @@ jobs:
         # calls that use plain `awk` (the identity gate's own extraction
         # and dedent) run under gawk here and under mawk on a stock image;
         # extract.bats shims both implementations explicitly.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gawk
+        # zsh: yellow-council's synthesis.bats runs council.md's Step 5b
+        # helpers under bash and zsh, and fails rather than skips in CI
+        # without it.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gawk zsh
 
       - name: Run yellow-core git-worktree bats suite (required)
         run: bats plugins/yellow-core/skills/git-worktree/tests/

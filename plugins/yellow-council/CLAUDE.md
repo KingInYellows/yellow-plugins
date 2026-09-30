@@ -20,8 +20,10 @@ and never auto-commits. The user decides what to do with the verdicts.
   shells accept: no `${!arr[@]}` key expansion or `${var^}` case conversion,
   and `>|` wherever a redirect overwrites an existing file (zsh `noclobber`)
 - **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
-  `grep`, and `find` (the last drives the stale-`/tmp` sweep; without it a
-  cancelled run leaves raw reviewer output behind until the OS reaps `/tmp`)
+  `grep`, `find`, `od`, and `sort` (`find` drives the stale-`/tmp` sweep;
+  without it a cancelled run leaves raw reviewer output behind until the OS
+  reaps `/tmp`. `od` and `sort` randomize the Step 5 reviewer labels from
+  `/dev/urandom`, which `/council` requires and fails closed without)
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
@@ -67,7 +69,22 @@ and never auto-commits. The user decides what to do with the verdicts.
   `tests/redaction.bats` fails the whole file if any copy drifts.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
-  `--- end council-output:<reviewer> ---` fences.
+  `--- end council-output:<reviewer> ---` fences. The synthesis input uses a
+  uniform `council-output:S<n>` label for every leg instead, so the fence
+  names no reviewer.
+- **Synthesis is blind, two-pass and rubric-scored.** Claude both reviews and
+  synthesizes, so `council.md` Step 5 normalizes each reviewer's text
+  (markdown and severity formats flattened; code spans, citations and
+  `Evidence:` quotes kept byte-for-byte), relabels reviewers with a random
+  `S1`–`S4` bijection per run, requires enumerate-then-compare reasoning with
+  a self-participant instruction, scores every finding on four rubric
+  dimensions combined without weighting, and re-runs the synthesis in reverse
+  label order to flag per-finding ruling flips as `low-confidence-synthesis`
+  ties. Labels
+  map back to names only when the report is assembled. All of it is
+  prompt-level inside one orchestrator context — not isolated passes — and
+  correctness is self-assessed until citation verification (`verify_finding()`)
+  lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
@@ -90,13 +107,15 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 - `/council <mode> [args]` — main entry point with four modes:
   - `plan <path-or-text>` — council on a planning doc / design proposal
-  - `review [--base <ref>]` — council on the current diff
+  - `review [--base <ref>] [--single-pass]` — council on the current diff
   - `debug "<symptom>" [--paths <files>]` — council on a debug investigation
   - `question "<text>" [--paths <files>]` — open-ended consultation
+- `--single-pass` (accepted in every mode) skips the order-swapped second
+  synthesis pass, as does `COUNCIL_DOUBLE_PASS_SYNTHESIS=0`.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
-- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`) plus a
+- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`, `od`, `sort`, readable `/dev/urandom`) plus a
   reviewer-availability summary. Does NOT verify CLI authentication.
 
 ### Agents (3)
@@ -159,10 +178,12 @@ Codex agent.)
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
+| `COUNCIL_DOUBLE_PASS_SYNTHESIS` | `0 \| 1` | `1` | `1` runs the order-swapped second synthesis pass and flags verdict flips as `low-confidence-synthesis` ties; `0` runs a single pass. Invalid values warn and keep `1`. `/council <mode> --single-pass` disables it for one invocation. |
 
 ## Testing
 
-`bats tests/` from the plugin directory (`redaction.bats` and `extract.bats` —
+`bats tests/` from the plugin directory (`redaction.bats`, `extract.bats` and
+`synthesis.bats` —
 the blocking CI gate runs the whole directory). The awk redaction program is
 shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
@@ -171,7 +192,11 @@ shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
 runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
 across every carrier — edit the patterns in all four files together, never
-just one. There is no fresh-machine install CI (see Known Limitations).
+just one. `synthesis.bats` extracts the Step 5b helper library (between the
+`council-synthesis-lib` markers) and the Step 2, 5a, 5b and 5e fences from
+`council.md` and runs them under bash, zsh and zsh with snapshot options, and
+under every awk it finds; it needs zsh, and fails rather than skips in CI
+without it. There is no fresh-machine install CI (see Known Limitations).
 
 ## Known Limitations
 

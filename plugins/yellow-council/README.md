@@ -43,10 +43,12 @@ The `/council` command takes a mode and arguments:
 ```text
 /council review
 /council review --base origin/develop
+/council review --single-pass
 ```
 
 Defaults to the upstream-tracking branch's merge-base when `--base` is omitted
-(matches yellow-codex's review default).
+(matches yellow-codex's review default). `--single-pass` skips the
+order-swapped second synthesis pass; it is accepted in every mode.
 
 ### `debug` — investigate a symptom
 
@@ -71,8 +73,15 @@ Defaults to the upstream-tracking branch's merge-base when `--base` is omitted
 
 Each invocation produces:
 
-- **Inline synthesis** — Headline (verdict count) + Agreement (findings cited
-  by ≥2 reviewers) + Disagreement (unique findings or verdict conflicts).
+- **Inline synthesis** — Headline (verdict count, plus the share of
+  low-confidence findings on a two-pass run) + Agreement (findings cited by
+  ≥2 reviewers) + Disagreement (unique findings or verdict conflicts). Every
+  finding carries rubric scores — correctness (self-assessed for now),
+  completeness, severity calibration, constraint adherence — and a
+  well-supported / weakly-supported result. The synthesizer works on
+  normalized text under randomized `S1`–`S4` labels and checks itself with a
+  second, reverse-order pass; a finding whose ruling flips is shown as a tie
+  with both readings, never silently resolved.
 - **Persisted report** at `docs/council/<date>-<mode>-<slug>.md` — synthesis
   plus four labeled raw reviewer outputs (each wrapped in injection fences and
   passed through credential redaction — **best-effort, not a guarantee**; see
@@ -122,6 +131,7 @@ The user is asked for confirmation before the report file is written.
 | `COUNCIL_OPENCODE_VARIANT` | `high` | OpenCode reasoning effort |
 | `COUNCIL_PATH_CHAR_CAP` | `8000` | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | `3` | Max `--paths` files per invocation |
+| `COUNCIL_DOUBLE_PASS_SYNTHESIS` | `1` | `0` skips the order-swapped second synthesis pass (same as `--single-pass`) |
 
 ## What yellow-council does NOT do
 
