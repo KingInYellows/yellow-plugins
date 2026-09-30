@@ -288,6 +288,26 @@ E2E ~L50, Phase 3 failure paths ~L119).
 - `ls .changeset/*.md | xargs rg -l '"?yellow-council"?: minor'` -> expected: one changeset
 - Manual (from Step 13): one `/council review` run shows randomized labels differ across two runs, a low-confidence headline line, and rubric dimensions per finding; `--single-pass` omits the headline line
 
+## Deviations (as shipped in PR #948)
+
+- Step 2/3: reviewer text is never pasted into a heredoc or retyped. 5b reads
+  every leg from its reviewer's script-redacted fenced file
+  (`council_extract_fenced`); only Codex's one-line summary is staged through
+  `Write`. Label keys use `od -An -N4 -tu4`, and Step 1 probes `/dev/urandom`
+  before the fan-out.
+- Step 5 is split 5a (staging dir) → 5b (normalize, label, write
+  `forward.txt` / `reverse.txt` / `labels.txt`) → 5c/5d (Read the files) →
+  5e (print the label map, remove the dir). The map is not printed before 5e,
+  and Step 7 does not consume it.
+- Per-finding outcomes are called *ruling* / *ruling confidence* (the spec's
+  per-finding verdict and confidence tier) to keep them apart from reviewer
+  votes.
+- R14: the orchestrator cannot observe its own usage limit, so Pass A's table
+  is saved to the staging dir and the fallback runs on the turn after an
+  interrupted Pass B.
+- `--single-pass` is stripped token-wise with one awk expression at three
+  sites (drift-tested); the token is reserved in every mode.
+
 ## Context Files
 
 - `plugins/yellow-council/commands/council/council.md` — Step 2 args (L78–113), Step 5 synthesis (L1051–1188), Step 7 appendix loop (~L1364), Failure Modes (~L2096), Configuration (~L2121)

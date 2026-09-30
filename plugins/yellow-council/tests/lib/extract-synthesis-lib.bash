@@ -34,3 +34,21 @@ extract_synthesis_lib() {
     }
   ' "$src" >| "$out"
 }
+
+# extract_fence_after <file> <heading-prefix> <outfile> — write the body of the
+# first ```bash fence that follows the first line starting with
+# <heading-prefix>. Fails loudly when the heading or its fence is missing, so
+# a renamed step cannot turn a test into a no-op.
+extract_fence_after() {
+  local src="$1" heading="$2" out="$3"
+  awk -v heading="$heading" '
+    !found && index($0, heading) == 1 { found = 1; next }
+    found && !inside && $0 == "```bash" { inside = 1; next }
+    inside && $0 == "```" { done = 1; exit }
+    inside { print }
+    END {
+      if (!found) { print "extract_fence_after: heading not found: " heading > "/dev/stderr"; exit 1 }
+      if (!done) { print "extract_fence_after: no complete bash fence after: " heading > "/dev/stderr"; exit 1 }
+    }
+  ' "$src" >| "$out"
+}

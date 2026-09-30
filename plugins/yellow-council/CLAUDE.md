@@ -77,7 +77,8 @@ and never auto-commits. The user decides what to do with the verdicts.
   `S1`–`S4` bijection per run, requires enumerate-then-compare reasoning with
   a self-participant instruction, scores every finding on four rubric
   dimensions combined without weighting, and re-runs the synthesis in reverse
-  label order to flag verdict flips as `low-confidence-synthesis` ties. Labels
+  label order to flag per-finding ruling flips as `low-confidence-synthesis`
+  ties. Labels
   map back to names only when the report is assembled. All of it is
   prompt-level inside one orchestrator context — not isolated passes — and
   correctness is self-assessed until citation verification (`verify_finding()`)
@@ -179,7 +180,8 @@ Codex agent.)
 
 ## Testing
 
-`bats tests/` from the plugin directory (`redaction.bats` and `extract.bats` —
+`bats tests/` from the plugin directory (`redaction.bats`, `extract.bats` and
+`synthesis.bats` —
 the blocking CI gate runs the whole directory). The awk redaction program is
 shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
@@ -188,7 +190,11 @@ shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
 runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
 across every carrier — edit the patterns in all four files together, never
-just one. There is no fresh-machine install CI (see Known Limitations).
+just one. `synthesis.bats` extracts the Step 5b helper library (between the
+`council-synthesis-lib` markers) and the Step 2, 5a, 5b and 5e fences from
+`council.md` and runs them under bash, zsh and zsh with snapshot options, and
+under every awk it finds; it needs zsh, and fails rather than skips in CI
+without it. There is no fresh-machine install CI (see Known Limitations).
 
 ## Known Limitations
 

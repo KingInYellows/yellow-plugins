@@ -80,7 +80,7 @@ Each invocation produces:
   completeness, severity calibration, constraint adherence — and a
   well-supported / weakly-supported result. The synthesizer works on
   normalized text under randomized `S1`–`S4` labels and checks itself with a
-  second, reverse-order pass; a finding whose verdict flips is shown as a tie
+  second, reverse-order pass; a finding whose ruling flips is shown as a tie
   with both readings, never silently resolved.
 - **Persisted report** at `docs/council/<date>-<mode>-<slug>.md` — synthesis
   plus four labeled raw reviewer outputs (each wrapped in injection fences and

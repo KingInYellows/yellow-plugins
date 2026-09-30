@@ -126,9 +126,11 @@ Reuse the 2.2 branch (a diff where at least two reviewers raise findings).
 ```
 
 **Expected behavior:**
-- Step 5b prints one `council-output:S<n>` block per reviewer and a
-  `COUNCIL_LABEL_MAP=` line; the label → reviewer mapping differs between the
-  two runs
+- Step 5b writes `forward.txt` / `reverse.txt` under
+  `/tmp/council-synth-*` (one `council-output:S<n>` block per reviewer, ending
+  in an `END OF SYNTHESIS INPUT` footer) and prints only their paths; Step 5e
+  prints `COUNCIL_LABEL_MAP=` and removes the directory. The label → reviewer
+  mapping differs between the two runs
 - The Pass A and Pass B working (enumeration `S<n>-F<k>`, rubric tables)
   names reviewers only by label — no `Claude`, `Codex`, `Gemini`, `OpenCode`,
   agent names or model families
@@ -140,8 +142,8 @@ Reuse the 2.2 branch (a diff where at least two reviewers raise findings).
   `weakly-supported`
 - The Headline includes `Low-confidence synthesis: N of M findings (P%)`
 
-**Verdict flip presented as a tie:** when Pass B's verdict or confidence
-tier for a finding differs from Pass A's (it may take a few runs on an
+**Ruling flip presented as a tie:** when Pass B's ruling or ruling
+confidence for a finding differs from Pass A's (it may take a few runs on an
 ambiguous diff), that finding shows `low-confidence-synthesis` with both
 readings (`Pass A: …; Pass B: …`), is not resolved to either, and stays in the
 bucket its citations put it in.
