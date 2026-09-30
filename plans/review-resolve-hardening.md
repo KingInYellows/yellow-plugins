@@ -581,7 +581,7 @@ Decisions from the brainstorm and the planning round:
   - Update the GraphQL Scripts section (lines 403–412) for the new scripts
     and flag.
   - Replace the duplicated Verification Loop with a pointer to the reference.
-- [ ] 3.5: `docs/plugin-scope-mode-protocol.md` Interface 1:
+- [x] 3.5: `docs/plugin-scope-mode-protocol.md` Interface 1:
   - Update line 34's gate list.
   - Note that unattended issue creation is deliberate and capped. It is the
     first non-interactive `gh issue create` in the repo; `test-reporter`
