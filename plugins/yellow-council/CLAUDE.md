@@ -20,8 +20,10 @@ and never auto-commits. The user decides what to do with the verdicts.
   shells accept: no `${!arr[@]}` key expansion or `${var^}` case conversion,
   and `>|` wherever a redirect overwrites an existing file (zsh `noclobber`)
 - **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
-  `grep`, and `find` (the last drives the stale-`/tmp` sweep; without it a
-  cancelled run leaves raw reviewer output behind until the OS reaps `/tmp`)
+  `grep`, `find`, `od`, and `sort` (`find` drives the stale-`/tmp` sweep;
+  without it a cancelled run leaves raw reviewer output behind until the OS
+  reaps `/tmp`. `od` and `sort` randomize the Step 5 reviewer labels from
+  `/dev/urandom`, which `/council` requires and fails closed without)
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
@@ -113,7 +115,7 @@ and never auto-commits. The user decides what to do with the verdicts.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
-- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`) plus a
+- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`, `od`, `sort`, readable `/dev/urandom`) plus a
   reviewer-availability summary. Does NOT verify CLI authentication.
 
 ### Agents (3)

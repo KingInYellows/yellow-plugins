@@ -21,13 +21,20 @@ present and at compatible versions.
 ### Step 1: Verify required system tools
 
 ```bash
-for tool in bash timeout jq mktemp awk sed grep find; do
+for tool in bash timeout jq mktemp awk sed grep find od sort; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[yellow-council] Error: required system tool "%s" not found\n' "$tool" >&2
     exit 1
   fi
 done
-printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find)\n'
+printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find, od, sort)\n'
+
+# /council randomizes reviewer labels from /dev/urandom and fails closed without it.
+case "$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' \n')" in
+  '' | *[!0-9]*)
+    printf '[yellow-council] Error: cannot read /dev/urandom — reviewer labels cannot be randomized\n' >&2
+    exit 1 ;;
+esac
 
 # Shell check. council.md's blocks run in the user's login shell and use
 # associative arrays: bash needs 4.3+, zsh supports them natively.
@@ -176,7 +183,7 @@ else
 fi
 
 printf '\n[yellow-council] Setup summary:\n'
-printf '  Required: bash 4.3+ or zsh, timeout, jq — verified\n'
+printf '  Required: bash 4.3+ or zsh, timeout, jq, od, sort, /dev/urandom — verified\n'
 printf '  Reviewers: %d of 4 available (Claude=in-process (always available), Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
   "$READY_COUNT" "$GEMINI_STATUS" "$OPENCODE_STATUS" "$CODEX_STATUS"
 if [ "$READY_COUNT" -eq 1 ]; then

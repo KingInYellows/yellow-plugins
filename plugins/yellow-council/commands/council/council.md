@@ -92,13 +92,15 @@ The user invokes `/council <mode> [args]`. Parse `$ARGUMENTS`:
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
 RAW_REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||')
 # `--single-pass` is a synthesis flag, accepted in every mode. Strip every
-# whitespace-separated token equal to it here, before any per-mode parsing,
+# whitespace-delimited token equal to it here (plus one adjacent separator;
+# every other byte, including runs of spaces and tabs, is preserved), before
+# any per-mode parsing,
 # so plan/question free text and the --base and --paths parsers never see it
 # (the token is reserved: inside free text it is consumed as the flag).
-# Steps 3 and 6 re-derive REST with this same awk — they run in fresh
+# Steps 3 and 6 re-derive REST with this same sed — they run in fresh
 # subprocesses; tests/synthesis.bats checks the three copies stay identical.
 REST=$(printf '%s' "$RAW_REST" \
-  | awk '{ o = ""; for (i = 1; i <= NF; i++) if ($i != "--single-pass") o = o (o == "" ? "" : " ") $i; print o }')
+  | sed -E -e ':a' -e 's/(^|[[:space:]])--single-pass$//' -e 's/(^|[[:space:]])--single-pass[[:space:]]/\1/' -e 'ta')
 
 case "$MODE" in
   plan|review|debug|question)
@@ -172,7 +174,7 @@ For each mode:
   # `--base <ref>` silently falls through to the origin/main default —
   # contradicting the loud-failure contract stated directly above.
   REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||' \
-    | awk '{ o = ""; for (i = 1; i <= NF; i++) if ($i != "--single-pass") o = o (o == "" ? "" : " ") $i; print o }')
+    | sed -E -e ':a' -e 's/(^|[[:space:]])--single-pass$//' -e 's/(^|[[:space:]])--single-pass[[:space:]]/\1/' -e 'ta')
 
   EXPLICIT_BASE=""
   # shellcheck disable=SC2086
@@ -1220,18 +1222,28 @@ council_normalize_text() {
     # True when lowercase word lc is the self reviewer name or an alias.
     function self_alias(lc) {
       if (self == "claude") return (lc == "claude" || lc == "anthropic")
-      if (self == "codex") return (lc == "codex" || lc == "openai" || lc == "gpt" || lc ~ /^gpt-/)
+      if (self == "codex") return (lc == "codex" || lc == "openai" || lc == "gpt")
       if (self == "gemini") return (lc == "gemini" || lc == "google" || lc == "agy")
       if (self == "opencode") return (lc == "opencode")
       return 0
     }
-    # Replace a self-naming word core, keeping a possessive suffix.
-    function scrub_self(w,   sfx, lc) {
-      sfx = ""
-      if (length(w) > 2 && substr(w, length(w) - 1) == "\047s") { sfx = "\047s"; w = substr(w, 1, length(w) - 2) }
-      lc = tolower(w)
-      if (self_alias(lc)) return "[reviewer]" sfx
-      return w sfx
+    # Replace self-naming words inside one token at word boundaries (runs of
+    # [A-Za-z0-9_]), so "Codex-generated", "OpenAI/GPT" and "Codex\047s" are
+    # scrubbed while "codex_helper" is not. "GPT-4" style suffixes go with "GPT".
+    function scrub_self(w,   out, pre, run, rest) {
+      out = ""
+      while (match(w, /[A-Za-z0-9_]+/)) {
+        pre = substr(w, 1, RSTART - 1)
+        run = substr(w, RSTART, RLENGTH)
+        rest = substr(w, RSTART + RLENGTH)
+        if (self_alias(tolower(run))) {
+          run = "[reviewer]"
+          if (tolower(substr(w, RSTART, RLENGTH)) == "gpt" && match(rest, /^-[0-9][A-Za-z0-9.]*/)) rest = substr(rest, RLENGTH + 1)
+        }
+        out = out pre run
+        w = rest
+      }
+      return out w
     }
     function sev_level(h) {
       if (h ~ /P1|CRITICAL|[Cc]ritical|HIGH|[Hh]igh/) return "P1"
@@ -1251,7 +1263,10 @@ council_normalize_text() {
       if (match(w, /[]})".,;:!?]+$/)) { post = substr(w, RSTART); w = substr(w, 1, RSTART - 1) }
       if (path) { if (match(w, /\*+$/)) w = substr(w, 1, RSTART - 1) }
       else if (match(w, /[*_]+$/)) w = substr(w, 1, RSTART - 1)
-      if (self != "" && !path) w = scrub_self(w)
+      # Scrub unless the word is a real path or citation: an extension, a :<n>
+      # line, 2+ slashes, or a leading ./ ../ / ~ or - (flag). A lone-slash
+      # word like OpenAI/GPT is prose.
+      if (self != "" && !(w ~ /:[0-9]/ || w ~ /[A-Za-z0-9_]\.[A-Za-z]/ || w ~ /\/.*\// || w ~ /^[.\/~-]/)) w = scrub_self(w)
       return pre w post
     }
     # strip_emph calls match() too, so copy RSTART/RLENGTH before calling it.
@@ -2008,7 +2023,7 @@ and paste them at the top of the block (before the first call site).
 # Re-derive state — each bash block runs in a fresh subprocess
 MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
 REST=$(printf '%s' "$ARGUMENTS" | sed -E 's|^[^[:space:]]+[[:space:]]*||' \
-  | awk '{ o = ""; for (i = 1; i <= NF; i++) if ($i != "--single-pass") o = o (o == "" ? "" : " ") $i; print o }')
+  | sed -E -e ':a' -e 's/(^|[[:space:]])--single-pass$//' -e 's/(^|[[:space:]])--single-pass[[:space:]]/\1/' -e 'ta')
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
 cd "$GIT_ROOT"
 

@@ -400,10 +400,28 @@ question "no flag here"||2'
 }
 
 @test "every REST derivation strips --single-pass with the identical expression" {
-  run grep -c -F 'if ($i != "--single-pass")' "$COUNCIL_MD"
+  run grep -c -F "-e 's/(^|[[:space:]])--single-pass\$//'" "$COUNCIL_MD"
   [ "$output" -eq 3 ]
-  run bash -c "grep -F 'if (\$i != \"--single-pass\")' '$COUNCIL_MD' | sed 's/^[[:space:]]*//' | sort -u | wc -l"
+  run bash -c "grep -F -e \"-e 's/(^|[[:space:]])--single-pass\\\$//'\" '$COUNCIL_MD' | sed 's/^[[:space:]]*//;s/^|[[:space:]]*//' | sort -u | wc -l"
   [ "$output" -eq 1 ]
+}
+
+@test "Step 2 flag strip preserves whitespace byte-for-byte" {
+  local step2="${BATS_TEST_TMPDIR}/ws.sh" profile
+  extract_fence_after "$COUNCIL_MD" '### Step 2:' "$step2"
+  local expr
+  expr=$(grep -F -e "-e 's/(^|[[:space:]])--single-pass\$//'" "$step2" | head -1 | sed 's/^[[:space:]]*| *//; s/)$//')
+  for profile in $PROFILES; do
+    run_in "$profile" "$FIRST_AWK" "strip() { printf '%s' \"\$1\" | $expr; }
+      [ \"\$(strip 'docs/my  plan.md')\" = 'docs/my  plan.md' ] || { echo nf1; exit 1; }
+      [ \"\$(strip 'a  b --single-pass   c')\" = 'a  b   c' ] || { echo f1; exit 1; }
+      [ \"\$(strip '--single-pass  x')\" = ' x' ] || { echo f2; exit 1; }
+      [ \"\$(strip 'x  --single-pass')\" = 'x ' ] || { echo f3; exit 1; }
+      t=\$(printf 'a\\t\\tb\\n  c --single-pass\\nd')
+      [ \"\$(strip \"\$t\")\" = \"\$(printf 'a\\t\\tb\\n  c\\nd')\" ] || { echo f4; exit 1; }
+      echo ok"
+    [ "$output" = ok ] || { echo "$profile: $output $stderr"; return 1; }
+  done
 }
 
 # --- Steps 5a, 5b, 5e end to end -------------------------------------------
@@ -634,6 +652,28 @@ Summary: [reviewer] found a bug; [reviewer] models agree.
 [reviewer]'s check in src/codex/x.ts:3 uses `codex exec`
 Evidence: "Codex = 1"
 Claude also noted it
+EOF2
+  local profile impl
+  for profile in $PROFILES; do
+    for impl in $AWKS; do
+      run_in "$profile" "$impl" "council_normalize_text codex < '$in'"
+      [ "$status" -eq 0 ] || { echo "$profile/$impl: status $status: $stderr"; return 1; }
+      diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
+    done
+  done
+}
+
+@test "normalize scrubs reviewer names at punctuation boundaries but keeps real paths" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$in" <<'EOF2'
+A Codex-generated patch (Codex) from OpenAI/GPT, GPT-4.1 and Codex, too
+See plugins/yellow-codex/agents/review/codex-reviewer.md and codex_helper --codex
+Evidence: "Codex-generated"
+EOF2
+  cat >| "$want" <<'EOF2'
+A [reviewer]-generated patch ([reviewer]) from [reviewer]/[reviewer], [reviewer] and [reviewer], too
+See plugins/yellow-codex/agents/review/codex-reviewer.md and codex_helper --codex
+Evidence: "Codex-generated"
 EOF2
   local profile impl
   for profile in $PROFILES; do
