@@ -11,6 +11,65 @@ ALL_ARGS="$*"
 # State file for multi-page pagination (tracks call count per PR)
 PAGE_STATE_DIR="${BATS_TEST_TMPDIR:-/tmp}"
 
+# Emulate `gh api --jq <expr>`: print the value after --jq, if any.
+jq_expr() {
+  _want=0
+  for _a in "$@"; do
+    if [ "$_want" = 1 ]; then printf '%s' "$_a"; return 0; fi
+    [ "$_a" = "--jq" ] && _want=1
+  done
+  return 0
+}
+
+# Print JSON, applying --jq when the caller passed one.
+emit() {
+  _expr=$(jq_expr "$@")
+  if [ -n "$_expr" ]; then
+    printf '%s' "$MOCK_BODY" | jq -r "$_expr"
+  else
+    printf '%s\n' "$MOCK_BODY"
+  fi
+}
+
+# Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
+# below never capture them.
+case "$ALL_ARGS" in
+  *"latestOpinionatedReviews"*)
+    # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL=1 simulates an
+    # API failure.
+    if [ "${MOCK_GH_BLOCKERS_FAIL:-0}" = 1 ]; then
+      printf 'gh: Something went wrong (HTTP 502)\n' >&2
+      exit 1
+    fi
+    cat "$FIXTURE_DIR/${MOCK_GH_BLOCKERS_FIXTURE:-blockers-response.json}"
+    exit 0
+    ;;
+  *"/protection"*)
+    # Classic branch protection. MOCK_GH_PROTECTION: enabled | disabled |
+    # notprotected | 403 | 404 (default).
+    case "${MOCK_GH_PROTECTION:-404}" in
+      enabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":true}}'; emit "$@" ;;
+      disabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":false}}'; emit "$@" ;;
+      notprotected)
+        printf '{"message":"Branch not protected"}gh: Branch not protected (HTTP 404)\n' >&2
+        exit 1
+        ;;
+      403) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;
+      *) printf '{"message":"Not Found"}gh: Not Found (HTTP 404)\n' >&2; exit 1 ;;
+    esac
+    exit 0
+    ;;
+  *"/rules/branches/"*)
+    # Branch rulesets. MOCK_GH_RULES: enforced | none (default) | fail.
+    case "${MOCK_GH_RULES:-none}" in
+      enforced) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]'; emit "$@" ;;
+      fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+      *) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]'; emit "$@" ;;
+    esac
+    exit 0
+    ;;
+esac
+
 case "$ALL_ARGS" in
   *"number=123"*)
     cat "$FIXTURE_DIR/single-page-response.json"
@@ -75,6 +134,8 @@ case "$ALL_ARGS" in
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
+    printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
+    printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2
     exit 1
     ;;
 esac

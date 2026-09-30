@@ -250,7 +250,7 @@ Decisions from the brainstorm and the planning round:
 > `PullRequestReviewThread` was not re-verified in this pass. Confirm it in the
 > introspection step.
 <!-- /deepen-plan -->
-- [ ] 1.3: New script `skills/pr-review-workflow/scripts/get-pr-blockers
+- [x] 1.3: New script `skills/pr-review-workflow/scripts/get-pr-blockers
   <owner/repo> <PR#>` (POSIX sh, `set -eu`). It emits JSON with:
   - `changesRequested: [{login, reviewId}]` from `latestOpinionatedReviews`;
   - `reviewDecision`;
