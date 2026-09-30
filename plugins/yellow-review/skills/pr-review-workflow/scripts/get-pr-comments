@@ -1,6 +1,7 @@
 #!/bin/bash
 # Fetch unresolved, non-outdated PR review threads via GitHub GraphQL API.
-# Usage: get-pr-comments <owner/repo> <pr-number>
+# Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>
+#   --include-outdated  also return unresolved threads whose anchor is outdated
 # Output: JSON array of thread objects to stdout.
 # Errors: Exit 1 with message to stderr.
 
@@ -11,13 +12,26 @@ command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from
 command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from https://jqlang.github.io/jq\n' >&2; exit 1; }
 
 # --- Input validation ---
-if [ $# -lt 2 ]; then
-    printf 'Usage: get-pr-comments <owner/repo> <pr-number>\n' >&2
+INCLUDE_OUTDATED=false
+POSITIONAL=()
+for arg in "$@"; do
+    case "$arg" in
+        --include-outdated) INCLUDE_OUTDATED=true ;;
+        --*)
+            printf 'Error: Unknown flag: %s\n' "$arg" >&2
+            exit 1
+            ;;
+        *) POSITIONAL+=("$arg") ;;
+    esac
+done
+
+if [ "${#POSITIONAL[@]}" -ne 2 ]; then
+    printf 'Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>\n' >&2
     exit 1
 fi
 
-REPO="$1"
-PR_NUMBER="$2"
+REPO="${POSITIONAL[0]}"
+PR_NUMBER="${POSITIONAL[1]}"
 
 # Validate owner/repo format
 case "$REPO" in
@@ -59,13 +73,18 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           id
           isResolved
           isOutdated
+          viewerCanResolve
+          viewerCanReply
           path
           line
           startLine
           comments(first: 50) {
             nodes {
-              author { login }
+              id
+              author { __typename login }
               body
+              createdAt
+              viewerDidAuthor
             }
           }
         }
@@ -189,10 +208,11 @@ ALL_THREADS=$(printf '%s\n' "${ALL_PAGES[@]}" | jq -s 'add // []') || {
 }
 
 # --- Filter and transform ---
-OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
+# Existing fields keep their order; new fields are appended after them.
+OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUTDATED" '
   [
     .[]
-    | select(.isResolved == false and .isOutdated == false)
+    | select(.isResolved == false and ($includeOutdated or .isOutdated == false))
     | {
         threadId: .id,
         path: .path,
@@ -200,8 +220,18 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
         startLine: .startLine,
         comments: [
           (.comments.nodes // [])[]
-          | { author: (.author.login // "ghost"), body: .body }
-        ]
+          | {
+              author: (.author.login // "ghost"),
+              body: .body,
+              id: .id,
+              createdAt: .createdAt,
+              viewerDidAuthor: (.viewerDidAuthor // false),
+              authorType: (.author.__typename // null)
+            }
+        ],
+        isOutdated: (.isOutdated // false),
+        viewerCanResolve: (.viewerCanResolve // false),
+        viewerCanReply: (.viewerCanReply // false)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2

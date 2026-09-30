@@ -103,6 +103,67 @@ teardown() {
   [ "$line" -eq 42 ]
 }
 
+# --- --include-outdated and additive fields ---
+
+@test "default output keeps the original fields first and in order" {
+  run "$SCRIPT" "test/repo" "123"
+  [ "$status" -eq 0 ]
+
+  keys=$(printf '%s' "$output" | jq -c '.[0] | keys_unsorted[0:5]')
+  [ "$keys" = '["threadId","path","line","startLine","comments"]' ]
+  ckeys=$(printf '%s' "$output" | jq -c '.[0].comments[0] | keys_unsorted[0:2]')
+  [ "$ckeys" = '["author","body"]' ]
+}
+
+@test "--include-outdated includes unresolved outdated threads" {
+  run "$SCRIPT" --include-outdated "test/repo" "123"
+  [ "$status" -eq 0 ]
+
+  ids=$(printf '%s' "$output" | jq -r '.[].threadId')
+  [[ "$ids" == *"PRRT_thread1"* ]]
+  [[ "$ids" == *"PRRT_thread3"* ]]
+  [[ "$ids" == *"PRRT_thread4"* ]]
+  # Resolved threads stay excluded
+  [[ "$ids" != *"PRRT_thread2"* ]]
+  outdated=$(printf '%s' "$output" | jq -r '.[] | select(.threadId == "PRRT_thread3") | .isOutdated')
+  [ "$outdated" = "true" ]
+}
+
+@test "--include-outdated is accepted after the positional arguments" {
+  run "$SCRIPT" "test/repo" "123" --include-outdated
+  [ "$status" -eq 0 ]
+  count=$(printf '%s' "$output" | jq 'length')
+  [ "$count" -eq 3 ]
+}
+
+@test "rejects an unknown flag" {
+  run "$SCRIPT" --bogus "test/repo" "123"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Unknown flag"* ]]
+}
+
+@test "emits thread permission fields and comment identity fields" {
+  run "$SCRIPT" --include-outdated "test/repo" "123"
+  [ "$status" -eq 0 ]
+
+  t1=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread1") | [.isOutdated, .viewerCanResolve, .viewerCanReply]')
+  [ "$t1" = '[false,true,true]' ]
+  t3=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread3") | .viewerCanResolve')
+  [ "$t3" = 'false' ]
+
+  c1=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread1") | .comments[0] | [.id, .createdAt, .viewerDidAuthor, .authorType]')
+  [ "$c1" = '["PRRC_c1","2026-09-30T10:00:00Z",false,"User"]' ]
+  c3=$(printf '%s' "$output" | jq -r '.[] | select(.threadId == "PRRT_thread3") | .comments[0].authorType')
+  [ "$c3" = "Bot" ]
+}
+
+@test "missing author type is null, so callers treat the author as human" {
+  run "$SCRIPT" "test/repo" "123"
+  [ "$status" -eq 0 ]
+  t=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread4") | [.comments[].authorType]')
+  [ "$t" = '[null,null]' ]
+}
+
 # --- Error handling ---
 
 @test "handles authentication failure" {
