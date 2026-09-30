@@ -58,7 +58,7 @@ async function walkActivities(params) {
     const seen = [];
     const newIds = [];
     let latestPlan = params.pendingPlan;
-    let latestApproval;
+    let latestApproval = params.approval;
     let newest;
     let pages = 0;
     let processed = 0;
@@ -208,6 +208,7 @@ async function walkActivities(params) {
         ...(newest !== undefined ? { newest } : {}),
         seen,
         pendingPlan,
+        ...(latestApproval !== undefined ? { latestApproval } : {}),
         startedFromResume: params.start.kind === 'resume',
         resumeRejected,
         filterRetried,

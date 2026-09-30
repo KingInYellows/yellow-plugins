@@ -64,6 +64,15 @@ export interface WalkParams {
     readonly activityId: string;
   };
   readonly pendingPlan?: PendingPlan;
+  /**
+   * The newest `planApproved` stamp an earlier partial walk of this session
+   * read but could not pair with its (older) plan. Newest-first listings
+   * reach the approval before the plan it approved.
+   */
+  readonly approval?: {
+    readonly createTime: string;
+    readonly activityId: string;
+  };
   /** Called for every activity read, in page order (collect stages artifacts here). */
   readonly onActivity?: (activity: AdapterActivity) => void | Promise<void>;
 }
@@ -91,6 +100,11 @@ export interface WalkResult {
   }>;
   /** The pending plan after this walk; `null` when a later planApproved cleared it. */
   readonly pendingPlan: PendingPlan | null | undefined;
+  /** Newest `planApproved` seen (including the carried `approval`); persist it across a partial walk. */
+  readonly latestApproval?: {
+    readonly createTime: string;
+    readonly activityId: string;
+  };
   readonly startedFromResume: boolean;
   /** The stored resume token was rejected (400/404) and the walk restarted from its fallback. */
   readonly resumeRejected: boolean;
@@ -145,7 +159,8 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   const seen: Array<{ activityId: string; createTime: string }> = [];
   const newIds: string[] = [];
   let latestPlan: PendingPlan | undefined = params.pendingPlan;
-  let latestApproval: { createTime: string; activityId: string } | undefined;
+  let latestApproval: { createTime: string; activityId: string } | undefined =
+    params.approval;
   let newest: { createTime: string; activityId: string } | undefined;
   let pages = 0;
   let processed = 0;
@@ -313,6 +328,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     ...(newest !== undefined ? { newest } : {}),
     seen,
     pendingPlan,
+    ...(latestApproval !== undefined ? { latestApproval } : {}),
     startedFromResume: params.start.kind === 'resume',
     resumeRejected,
     filterRetried,

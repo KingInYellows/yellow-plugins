@@ -233,6 +233,15 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
     !isValidPendingPlan(value['pendingPlan'])
   )
     return false;
+  if (
+    value['resumeApproval'] !== undefined &&
+    !(
+      isPlainObject(value['resumeApproval']) &&
+      typeof value['resumeApproval']['createTime'] === 'string' &&
+      typeof value['resumeApproval']['activityId'] === 'string'
+    )
+  )
+    return false;
   return (
     typeof value['createdAt'] === 'string' &&
     typeof value['updatedAt'] === 'string'
@@ -670,7 +679,12 @@ export async function reserveOperation(
 /** Retention: once terminal, the dedup ring and both resume tokens are dropped. */
 function applyRetention(record: OperationRecord): OperationRecord {
   if (!TERMINAL_STATUSES.has(record.status)) return record;
-  const { resumePageToken: _r, artifactResumePageToken: _a, ...rest } = record;
+  const {
+    resumePageToken: _r,
+    artifactResumePageToken: _a,
+    resumeApproval: _p,
+    ...rest
+  } = record;
   return { ...rest, recentActivityIds: [] };
 }
 
@@ -747,6 +761,11 @@ export interface ReadStateUpdate {
   };
   /** `null` clears a stored token; `undefined` leaves it unchanged. */
   readonly resumePageToken?: string | null;
+  /** `null` clears the carried approval; `undefined` leaves it unchanged. */
+  readonly resumeApproval?: {
+    readonly createTime: string;
+    readonly activityId: string;
+  } | null;
   readonly recentActivityIds?: readonly string[];
   readonly activityCountDelta?: number;
   /** `null` clears the pending plan (a `planApproved` was seen). */
@@ -790,12 +809,17 @@ export async function upsertReadState(
       const {
         resumePageToken: _drop,
         pendingPlan: _dropPlan,
+        resumeApproval: _dropApproval,
         ...base
       } = current;
       const resumePageToken =
         update.resumePageToken === undefined
           ? current.resumePageToken
           : (update.resumePageToken ?? undefined);
+      const resumeApproval =
+        update.resumeApproval === undefined
+          ? current.resumeApproval
+          : (update.resumeApproval ?? undefined);
       const rebase = update.rebase;
       let pendingPlan =
         update.pendingPlan === undefined
@@ -889,6 +913,7 @@ export async function upsertReadState(
             }
           : {}),
         ...(resumePageToken !== undefined ? { resumePageToken } : {}),
+        ...(resumeApproval !== undefined ? { resumeApproval } : {}),
         ...(pendingPlan !== undefined ? { pendingPlan } : {}),
         recentActivityIds,
         activityCount: current.activityCount + activityCountDelta,

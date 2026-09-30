@@ -354,7 +354,14 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
         ...(typeof step.description === 'string'
           ? { description: step.description }
           : {}),
-        index: typeof step.index === 'number' ? step.index : i,
+        // Journal validation requires a non-negative integer; fall back to
+        // the array position for negative, fractional, or non-finite values.
+        index:
+          typeof step.index === 'number' &&
+          Number.isInteger(step.index) &&
+          step.index >= 0
+            ? step.index
+            : i,
       })
     );
     return {

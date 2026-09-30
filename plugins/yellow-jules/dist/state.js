@@ -238,6 +238,11 @@ function isValidRecord(key, value) {
     if (value['pendingPlan'] !== undefined &&
         !isValidPendingPlan(value['pendingPlan']))
         return false;
+    if (value['resumeApproval'] !== undefined &&
+        !(isPlainObject(value['resumeApproval']) &&
+            typeof value['resumeApproval']['createTime'] === 'string' &&
+            typeof value['resumeApproval']['activityId'] === 'string'))
+        return false;
     return (typeof value['createdAt'] === 'string' &&
         typeof value['updatedAt'] === 'string');
 }
@@ -543,7 +548,7 @@ async function reserveOperation(dataDir, input, now = () => new Date(), config =
 function applyRetention(record) {
     if (!exports.TERMINAL_STATUSES.has(record.status))
         return record;
-    const { resumePageToken: _r, artifactResumePageToken: _a, ...rest } = record;
+    const { resumePageToken: _r, artifactResumePageToken: _a, resumeApproval: _p, ...rest } = record;
     return { ...rest, recentActivityIds: [] };
 }
 async function markOperation(dataDir, localRequestId, status, extra = {}, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
@@ -591,10 +596,13 @@ async function ensureObservedRecord(dataDir, sessionResource, now = () => new Da
 async function upsertReadState(dataDir, localRequestId, update, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);
-        const { resumePageToken: _drop, pendingPlan: _dropPlan, ...base } = current;
+        const { resumePageToken: _drop, pendingPlan: _dropPlan, resumeApproval: _dropApproval, ...base } = current;
         const resumePageToken = update.resumePageToken === undefined
             ? current.resumePageToken
             : (update.resumePageToken ?? undefined);
+        const resumeApproval = update.resumeApproval === undefined
+            ? current.resumeApproval
+            : (update.resumeApproval ?? undefined);
         const rebase = update.rebase;
         let pendingPlan = update.pendingPlan === undefined
             ? current.pendingPlan
@@ -674,6 +682,7 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                 }
                 : {}),
             ...(resumePageToken !== undefined ? { resumePageToken } : {}),
+            ...(resumeApproval !== undefined ? { resumeApproval } : {}),
             ...(pendingPlan !== undefined ? { pendingPlan } : {}),
             recentActivityIds,
             activityCount: current.activityCount + activityCountDelta,

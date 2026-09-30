@@ -37,6 +37,12 @@ updates them in place; this file stays the canonical CLI contract, and
 Recorded as the Provenance paragraph permits; each revises a PR1 default or
 mechanism, and none widens a guarantee.
 
+- **Approval carried across partial walks.** The operation record gains optional
+  `resumeApproval` `{ createTime, activityId }`: the newest `planApproved` a
+  partial `status` walk read, stored alongside `resumePageToken` and cleared
+  with it (complete walk, restart, or terminal retention), so newest-first
+  listings interrupted between an approval and its older plan do not leave the
+  plan pending.
 - **External sessions.** PR2 ships no `delegate`, so every session it can
   observe was created outside yellow. `status` and `collect` on a
   `sessions/{id}` absent from the journal mint a local id and write an operation
@@ -379,28 +385,30 @@ write any of those fields, and `collect` records its own
 and `lastActivityId` advance only after a **complete** `status` walk (no
 `nextPageToken` left) to the newest activity seen; a partial walk never advances
 them and records `resumePageToken` so the next `status` continues from it before
-starting a fresh watermarked read. A stored `resumePageToken` or
-`artifactResumePageToken` the vendor rejects (`400`/`404`) or that yields no
-progress is discarded and the walk restarts from the watermark (the session
-start for `collect`). For the restart guard, "no progress" is a walk that
-resumes from a stored `resumePageToken` or `artifactResumePageToken` and ends
-with the same `lastActivityId` it started from and no activity id outside the
-dedup ring; the journal counts consecutive such resume-token restarts per
-operation, and the second one fails the walk with `JULES_NO_PROGRESS` instead of
-restarting again (recovery: run `status` later; if it recurs, re-verify the SDK
-pin). A complete walk that finds no new activities is not a no-progress restart,
-and a walk that makes progress resets the count. Storing the token is a
-deliberate, recorded departure from R18's no-durable-page-tokens rule, and it
-never survives a terminal outcome. The dedup ring holds every id seen by
-`status` whose `createTime` falls within the 5-minute overlap window, capped at
-1000 entries; if the cap is reached the walk reports
-`dedupWindowExceeded: true`, counts may inflate, and — because ring membership
-is what suppresses re-acting — `supervise` treats that pass as check-failed
-(R33) and takes no act step on that session until a later `status` walk
-completes without the flag. Ring membership suppresses re-counting toward `new`
-and re-acting under `supervise`; it **never** suppresses an activity from being
-read, parsed, or used to extract plan or artifact state by `status`, `approve`,
-or `collect`.
+starting a fresh watermarked read. A partial walk also records `resumeApproval`
+(the newest `planApproved` stamp read) so a resumed walk does not resurrect the
+older plan that approval cleared; it is dropped with the token. A stored
+`resumePageToken` or `artifactResumePageToken` the vendor rejects (`400`/`404`)
+or that yields no progress is discarded and the walk restarts from the watermark
+(the session start for `collect`). For the restart guard, "no progress" is a
+walk that resumes from a stored `resumePageToken` or `artifactResumePageToken`
+and ends with the same `lastActivityId` it started from and no activity id
+outside the dedup ring; the journal counts consecutive such resume-token
+restarts per operation, and the second one fails the walk with
+`JULES_NO_PROGRESS` instead of restarting again (recovery: run `status` later;
+if it recurs, re-verify the SDK pin). A complete walk that finds no new
+activities is not a no-progress restart, and a walk that makes progress resets
+the count. Storing the token is a deliberate, recorded departure from R18's
+no-durable-page-tokens rule, and it never survives a terminal outcome. The dedup
+ring holds every id seen by `status` whose `createTime` falls within the
+5-minute overlap window, capped at 1000 entries; if the cap is reached the walk
+reports `dedupWindowExceeded: true`, counts may inflate, and — because ring
+membership is what suppresses re-acting — `supervise` treats that pass as
+check-failed (R33) and takes no act step on that session until a later `status`
+walk completes without the flag. Ring membership suppresses re-counting toward
+`new` and re-acting under `supervise`; it **never** suppresses an activity from
+being read, parsed, or used to extract plan or artifact state by `status`,
+`approve`, or `collect`.
 
 `pendingPlan` rule: every walk that observes a `planGenerated` activity with a
 later `(createTime, activityId)` than the journal's stored `pendingPlan`
@@ -895,19 +903,22 @@ Each operation record carries the R35 fields plus the activity read-state that
 makes reads bounded across processes, written only by `status` (see "Activity
 walk"): `lastActivityCreateTime`, `lastActivityId` (tie-break for equal
 timestamps), `resumePageToken?`, `recentActivityIds` (the dedup ring: ids within
-the 5-minute overlap window, at most 1000), `activityCount`, and `pendingPlan?`;
-`collect` writes only `artifactResumePageToken?`. Retention: the ring and both
-resume tokens are dropped once an operation reaches a terminal, reconciled
-outcome, so a settled record is a few hundred bytes and a live one is bounded by
-the ring; `state/journal.json` is rewritten whole under the lock, and retention
-of terminal records is deferred until usage data justifies a policy (PR1
-default: none). Journal and grant maps are built with `Object.create(null)` (or
-`Map`), never by plain property assignment, so caller-supplied keys cannot reach
-the prototype. Writes are reservation-first and atomic (temp file plus rename)
-under the lock, and the R36 unresolved-operation lookup, authority evaluation,
-confirmation consumption, counter increment, and reservation write are one
-critical section under that lock (R31); the local request id is local
-deduplication only, never a vendor idempotency guarantee (R36).
+the 5-minute overlap window, at most 1000), `activityCount`, `pendingPlan?`, and
+`resumeApproval?` (the newest `planApproved` stamp a partial walk read; kept
+only while `resumePageToken` is stored, so a resumed walk can pair it with the
+older plan it approved); `collect` writes only `artifactResumePageToken?`.
+Retention: the ring and both resume tokens are dropped once an operation reaches
+a terminal, reconciled outcome, so a settled record is a few hundred bytes and a
+live one is bounded by the ring; `state/journal.json` is rewritten whole under
+the lock, and retention of terminal records is deferred until usage data
+justifies a policy (PR1 default: none). Journal and grant maps are built with
+`Object.create(null)` (or `Map`), never by plain property assignment, so
+caller-supplied keys cannot reach the prototype. Writes are reservation-first
+and atomic (temp file plus rename) under the lock, and the R36
+unresolved-operation lookup, authority evaluation, confirmation consumption,
+counter increment, and reservation write are one critical section under that
+lock (R31); the local request id is local deduplication only, never a vendor
+idempotency guarantee (R36).
 
 R38 copy detection (shape fixed in shell 03): a controller-identity and epoch
 authority file lives **outside** `<dataDir>` on the host, records the canonical

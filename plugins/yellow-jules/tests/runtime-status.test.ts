@@ -575,6 +575,53 @@ describe('pendingPlan', () => {
     expect(second.pendingPlan?.planId).toBe('p1');
   });
 
+  it('an approval read before an interruption still clears the older plan on resume', async () => {
+    const filler: AdapterActivity[] = Array.from({ length: 60 }, (_, i) => ({
+      activityId: `f${String(i).padStart(3, '0')}`,
+      createTime: new Date(
+        Date.parse('2026-09-01T00:00:10Z') + i * 1000
+      ).toISOString(),
+      type: 'progressUpdated',
+      artifacts: [],
+    }));
+    // Newest-first listing: the approval is on page 1, the plan it approved
+    // on page 2, and the walk is interrupted between the two.
+    fake.activities.set(S, [
+      {
+        activityId: 'x2',
+        createTime: '2026-09-01T00:00:02.000Z',
+        type: 'planApproved',
+        approvedPlanId: 'p1',
+        artifacts: [],
+      },
+      ...filler,
+      plan('p1', 1, 'x1'),
+    ]);
+    const base = fake.listActivitiesImpl;
+    fake.listActivitiesImpl = async (s, o) => {
+      if (o.pageToken === 'p50') throw new AdapterError('network', 'reset');
+      return base(s, o);
+    };
+    const first = await status(makeDeps(dataDir, fake), {
+      session: S,
+      reconcile: false,
+    });
+    expect(first.activities?.partialPagination).toBe(true);
+    expect(first.pendingPlan).toBeUndefined();
+    expect((await recordFor())?.resumeApproval?.activityId).toBe('x2');
+
+    fake.listActivitiesImpl = base;
+    const resumed = await status(makeDeps(dataDir, fake), {
+      session: S,
+      reconcile: false,
+    });
+    expect(resumed.activities?.partialPagination).toBe(false);
+    expect(resumed.pendingPlan).toBeUndefined();
+    const record = await recordFor();
+    expect(record?.pendingPlan).toBeUndefined();
+    expect(record?.resumeApproval).toBeUndefined();
+  });
+
   describe('arrival order does not change the result', () => {
     const approval = (offset: number, activityId: string): AdapterActivity => ({
       activityId,

@@ -240,6 +240,11 @@ export interface OperationRecord {
   readonly recentActivityIds: readonly string[];
   readonly activityCount: number;
   readonly pendingPlan?: PendingPlan;
+  /** Newest `planApproved` read by a partial walk, kept while `resumePageToken` is stored. */
+  readonly resumeApproval?: {
+    readonly createTime: string;
+    readonly activityId: string;
+  };
   readonly resumeRestartCount: number;
   // Written only by `collect`.
   readonly artifactResumePageToken?: string;

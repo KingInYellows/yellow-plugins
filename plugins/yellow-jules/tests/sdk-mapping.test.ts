@@ -61,4 +61,23 @@ describe('vendor fields that render bare are allowlisted', () => {
     expect(plan('2026-09-10T00:00:01Z').plan?.planId).toBe('p1');
     expect(() => plan('not a time')).toThrow(/no usable createTime/);
   });
+
+  it('plan step indexes that are not non-negative integers fall back to position', () => {
+    const rec = mapActivity({
+      id: 'a1',
+      type: 'planGenerated',
+      createTime: '2026-09-10T00:00:01Z',
+      plan: {
+        id: 'p1',
+        steps: [
+          { id: 's0', title: 'a', index: -1 },
+          { id: 's1', title: 'b', index: 1.5 },
+          { id: 's2', title: 'c', index: 7 },
+          { id: 's3', title: 'd', index: Number.NaN },
+        ],
+      },
+      artifacts: [],
+    } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(rec.plan?.steps.map((s) => s.index)).toEqual([0, 1, 7, 3]);
+  });
 });

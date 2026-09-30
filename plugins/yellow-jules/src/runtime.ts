@@ -735,6 +735,9 @@ export async function status(
       ...(record.pendingPlan !== undefined
         ? { pendingPlan: record.pendingPlan }
         : {}),
+      ...(record.resumeApproval !== undefined
+        ? { approval: record.resumeApproval }
+        : {}),
     });
 
     // Restart guard: a stored token the vendor rejected, or one that yielded
@@ -791,6 +794,12 @@ export async function status(
           ? { watermark: walk.newest }
           : {}),
         resumePageToken,
+        // A partial walk keeps the newest approval it read so the resumed walk
+        // can pair it with the older plan; otherwise it is dropped.
+        resumeApproval:
+          resumePageToken !== null && walk.latestApproval !== undefined
+            ? walk.latestApproval
+            : null,
         recentActivityIds: ring,
         activityCountDelta: walk.newIds.length,
         // The walk ran unlocked: rebase against the journal record as it is
