@@ -273,6 +273,30 @@ run_crf() {
   [[ "$stderr" == *"credential-shaped"* ]]
 }
 
+@test "a hook that stages an extra file makes the commit undo itself (exit 4)" {
+  printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"a hook changed it"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  [ "$(git status --porcelain | sort | tr '\n' ' ')" = " M src/a.txt  M src/b.txt " ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a hook that adds a credential-shaped line makes the commit undo itself (exit 4)" {
+  printf '#!/bin/sh\nprintf "key = \\"AKIAABCDEFGHIJKLMNOP\\"\\n" >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
 @test "a missing github runtime fails before committing (exit 2)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/missing.js"

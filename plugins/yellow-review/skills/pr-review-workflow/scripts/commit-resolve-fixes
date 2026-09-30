@@ -19,7 +19,8 @@
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
 # Exit codes: 2 usage, 3 staged mismatch or refused path, 4 commit failed
 #             (or the commit's files or added lines differ from the checked
-#             set, e.g. a hook changed them; the commit stays local),
+#             set, e.g. a hook changed them; the commit is then undone and
+#             its changes left unstaged for the caller's revert),
 #             5 submit failed, 6 verify mismatch. After 5 or 6 the commit
 #             exists locally: resubmit through the provider rather than
 #             re-running this script (a re-run sees a clean tree: NOOP).
@@ -192,17 +193,22 @@ SHA=$(git rev-parse HEAD)
 git diff --cached --quiet || die 4 "changes remain staged after the commit"
 
 # A pre-commit hook can stage more files or edit listed ones after the checks
-# above, so compare what the commit actually holds. Nothing is submitted on a
-# mismatch; the commit stays local for a human to inspect.
+# above, so compare what the commit actually holds. On a mismatch nothing is
+# submitted and the commit is undone (changes left unstaged), so a later
+# submit — for example of an upstack branch — cannot publish it.
+undo_commit() {
+    git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "$SHA" >&2
+    die 4 "$1"
+}
 COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0' '\n' | LC_ALL=C sort)
 if [ "$COMMITTED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
-    die 4 "committed set does not match the expected set (a hook changed it); nothing submitted"
+    undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' >|"$ADDED"
 if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
-    die 4 "credential-shaped: the commit looks like it contains a credential (a hook may have added it); nothing submitted"
+    undo_commit "credential-shaped: the commit looks like it contains a credential (a hook may have added it); nothing submitted"
 fi
 
 # --- Submit ---
