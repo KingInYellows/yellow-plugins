@@ -213,10 +213,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   exits 2, 3 and 4 are refusals and 5 and 6 keep the local commit
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
-  (`--unattended` skips runner files; `--revert-only` and `--revert-dirty`
-  take no `--timeout`, `--command-file`, `--trusted` or `--unattended`). The
-  verify gate: interactive runs ask first, unattended runs need
-  `verify_unattended: true` and an untracked config
+  (`--unattended` skips runner files; `--revert-only` just reverts, and with
+  `--revert-dirty` takes no `--timeout`, `--command-file`, `--trusted` or
+  `--unattended`). The verify gate: interactive runs ask first, unattended
+  runs need `verify_unattended: true` and an untracked config
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
