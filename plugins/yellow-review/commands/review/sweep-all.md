@@ -232,8 +232,9 @@ For each iteration:
      `skipped — <one-line reason>`.
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
    leaves the tree clean (fixes are committed and pushed; a failed verify
-   reverts its files). If it is dirty, add `working tree dirty after sweep`
-   to this PR's `Notes`, mark every remaining PR `skipped — working tree
+   reverts its files). If it is dirty, save and revert the leftovers with
+   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`,
+   add `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes`, mark every remaining PR `skipped — working tree
    dirty after PR #<PR#>`, and go to Step 5: sweeping on would carry these
    edits onto the next branch.
 5. **Continue** to the next PR. Do not pause, do not prompt, do not
