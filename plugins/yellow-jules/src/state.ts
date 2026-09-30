@@ -787,6 +787,10 @@ export interface ReadStateUpdate {
   readonly rebase?: {
     readonly ring: readonly string[];
     readonly pendingPlan?: PendingPlan;
+    readonly approval?: {
+      readonly createTime: string;
+      readonly activityId: string;
+    };
   };
 }
 
@@ -816,7 +820,7 @@ export async function upsertReadState(
         update.resumePageToken === undefined
           ? current.resumePageToken
           : (update.resumePageToken ?? undefined);
-      const resumeApproval =
+      let resumeApproval =
         update.resumeApproval === undefined
           ? current.resumeApproval
           : (update.resumeApproval ?? undefined);
@@ -830,6 +834,27 @@ export async function upsertReadState(
         update.recentActivityIds ?? current.recentActivityIds;
       let activityCountDelta = update.activityCountDelta ?? 0;
       if (rebase !== undefined) {
+        // A stored approval has no reader without a resume token: it is
+        // dropped with the token. Otherwise keep the newest stamp, so an older
+        // walk cannot clear (or replace) a newer approval a concurrent status
+        // stored since the snapshot.
+        const freshApproval = current.resumeApproval;
+        if (resumePageToken === undefined) {
+          resumeApproval = undefined;
+        } else if (update.resumeApproval === null) {
+          resumeApproval =
+            freshApproval !== undefined &&
+            (rebase.approval === undefined ||
+              compareStamp(freshApproval, rebase.approval) > 0)
+              ? freshApproval
+              : undefined;
+        } else if (
+          update.resumeApproval !== undefined &&
+          freshApproval !== undefined &&
+          compareStamp(update.resumeApproval, freshApproval) <= 0
+        ) {
+          resumeApproval = freshApproval;
+        }
         const fresh = current.pendingPlan;
         if (update.pendingPlan === undefined) {
           pendingPlan = fresh;

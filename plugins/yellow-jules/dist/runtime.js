@@ -498,6 +498,9 @@ async function status(deps, args) {
                 ...(record.pendingPlan !== undefined
                     ? { pendingPlan: record.pendingPlan }
                     : {}),
+                ...(record.resumeApproval !== undefined
+                    ? { approval: record.resumeApproval }
+                    : {}),
             },
             ...(walk.pendingPlan !== record.pendingPlan
                 ? {
@@ -883,7 +886,8 @@ async function collect(deps, args) {
         // one critical section, so slot allocation never races another collect.
         const capBytes = deps.aggregateCapBytes ?? exports.AGGREGATE_ARTIFACT_CAP_BYTES;
         const buffer = new StagingBuffer(capBytes);
-        buffer.seedStaged(readManifestArtifacts(dir, session.sourceResource));
+        const priorArtifacts = readManifestArtifacts(dir, session.sourceResource);
+        buffer.seedStaged(priorArtifacts);
         for (const output of session.outputs) {
             if (output.type === 'changeSet') {
                 buffer.patch(output.unidiffPatch, output.baseCommitId);
@@ -952,18 +956,21 @@ async function collect(deps, args) {
         // whose walk read pages, found nothing new, and handed back the same token,
         // is discarded so the next collect restarts from the session beginning; the
         // second consecutive such restart fails. Unmapped pages never count.
+        // Progress is collect-owned: newly staged artifacts, not `status`'s activity
+        // ring, which collect never writes (a repeated page would look new forever).
+        const stagedNew = stager.artifacts.length > priorArtifacts.length;
         const noProgress = token !== undefined &&
             walk.startedFromResume &&
             !walk.resumeRejected &&
             walk.pages > 0 &&
             !walk.complete &&
             !walk.unmappedActivity &&
-            walk.newIds.length === 0 &&
+            !stagedNew &&
             walk.resumePageToken === token;
         const restarted = walk.startedFromResume && (walk.resumeRejected || noProgress);
         const restartCount = restarted
             ? (record.artifactResumeRestartCount ?? 0) + 1
-            : walk.newIds.length > 0
+            : stagedNew
                 ? 0
                 : (record.artifactResumeRestartCount ?? 0);
         const exhausted = restarted && restartCount >= 2;

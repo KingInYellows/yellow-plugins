@@ -313,6 +313,30 @@ describe('collect', () => {
     expect(record?.artifactResumeRestartCount).toBe(2);
   });
 
+  it('a repeated resumed page whose patch is already staged counts as no progress', async () => {
+    fake.sessions.set(S, makeSession());
+    fake.activities.set(S, makeActivities(25));
+    const base = fake.listActivitiesImpl;
+    fake.listActivitiesImpl = async (s, o) => {
+      if (o.pageToken === 'p10') throw new AdapterError('network', 'reset');
+      return base(s, o);
+    };
+    await collect(makeDeps(dataDir, fake), { session: S });
+    const recordFor = async () =>
+      Object.values((await readJournal(dataDir)).operations)[0];
+    expect((await recordFor())?.artifactResumePageToken).toBe('p10');
+
+    // Every request returns the same nonempty change-set activity and token.
+    fake.listActivitiesImpl = async () => ({
+      activities: [changeSetActivity(PATCH)],
+      nextPageToken: 'p10',
+    });
+    await collect(makeDeps(dataDir, fake), { session: S }); // stages the patch
+    await collect(makeDeps(dataDir, fake), { session: S }); // no progress: restart
+    const record = await recordFor();
+    expect(record?.artifactResumeRestartCount).toBeGreaterThanOrEqual(1);
+  });
+
   it('a resumed collect never overwrites patch.diff and merges the manifest', async () => {
     fake.sessions.set(S, makeSession());
     fake.activities.set(S, [

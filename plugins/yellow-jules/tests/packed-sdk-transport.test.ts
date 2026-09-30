@@ -229,6 +229,7 @@ describe('install and module loading (R3 a, R4)', () => {
       lock.packages['node_modules/@google/jules-sdk'].integrity
     );
     expect(pin.sdkEntrySha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(pin.treeSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(pin.tree.map((p) => p.name).sort()).toEqual([
       '@google/jules-sdk',
       'yaml',

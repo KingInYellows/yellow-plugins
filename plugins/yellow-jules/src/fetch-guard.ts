@@ -18,10 +18,19 @@ import { readAttemptSignal } from './deadline.js';
 
 export const VENDOR_ORIGIN = 'https://jules.googleapis.com';
 export const READ_TIMEOUT_MS = 30_000;
+/**
+ * Per-response body cap. It equals the 100 MiB aggregate artifact cap
+ * (AGGREGATE_ARTIFACT_CAP_BYTES in runtime.ts): no single vendor response may
+ * exceed what a whole invocation may stage, and the SDK never parses a larger
+ * body. Exceeding it surfaces as JULES_MALFORMED_RESPONSE.
+ */
+export const MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 
 export interface FetchGuardOptions {
   readonly allowedOrigins: readonly string[];
   readonly readTimeoutMs: number;
+  /** Defaults to MAX_RESPONSE_BYTES; lowered only by tests. */
+  readonly maxResponseBytes?: number;
   readonly onPostDispatch?: (url: string, at: number) => void;
 }
 
@@ -39,6 +48,38 @@ export class FetchGuardRefusal extends Error {
     super(`fetch guard: ${message}`);
     this.name = 'FetchGuardRefusal';
   }
+}
+
+/** A response body larger than the per-response cap; classified as malformed. */
+export class ResponseTooLarge extends FetchGuardRefusal {
+  constructor(limit: number) {
+    super(`response body exceeds ${limit} bytes`);
+    this.name = 'ResponseTooLarge';
+  }
+}
+
+function limitBody(response: Response, limit: number): Response {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > limit) {
+    void response.body?.cancel().catch(() => undefined);
+    throw new ResponseTooLarge(limit);
+  }
+  if (response.body === null) return response;
+  let seen = 0;
+  const counted = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        seen += chunk.byteLength;
+        if (seen > limit) controller.error(new ResponseTooLarge(limit));
+        else controller.enqueue(chunk);
+      },
+    })
+  );
+  return new Response(counted, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function isLoopbackHost(hostname: string): boolean {
@@ -127,7 +168,7 @@ export function installFetchGuard(
       await response.body?.cancel().catch(() => undefined);
       throw new FetchGuardRefusal(`refused a ${response.status} redirect`);
     }
-    return response;
+    return limitBody(response, options.maxResponseBytes ?? MAX_RESPONSE_BYTES);
   };
 
   globalThis.fetch = guarded;

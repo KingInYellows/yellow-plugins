@@ -134,6 +134,12 @@ function toAdapterError(sdk, err) {
         ...(status !== undefined ? { status } : {}),
         cause: err,
     });
+    // An oversized body is cut by the fetch guard; the SDK may wrap it.
+    for (let e = err, i = 0; e instanceof Error && i < 5; i++) {
+        if (e instanceof fetch_guard_js_1.ResponseTooLarge)
+            return make('malformed');
+        e = e.cause;
+    }
     if (err instanceof sdk.JulesRateLimitError)
         return make('rate-limited', err.status);
     if (err instanceof sdk.JulesAuthenticationError)

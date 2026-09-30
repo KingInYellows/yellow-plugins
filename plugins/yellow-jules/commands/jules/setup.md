@@ -2,7 +2,7 @@
 name: jules:setup
 # prettier-ignore
 description: 'Check Jules credential and SDK availability and, with consent, install the pinned Jules SDK into the plugin data directory. Use when first installing yellow-jules, after JULES_API_KEY changes, or when a jules command fails with JULES_SDK_MISSING or JULES_SDK_INTEGRITY.'
-argument-hint: '[--install-sdk]'
+argument-hint: '[--install-sdk] [--deadline-ms <ms>]'
 allowed-tools:
   - Bash
   - AskUserQuestion
@@ -24,14 +24,18 @@ installs only on this explicit flag — never per task.
 
 ### Step 1: Parse Arguments
 
-`$ARGUMENTS` is either empty or exactly `--install-sdk`. Anything else: report
-"unknown argument" with the fragment quoted back and stop.
+Read `$ARGUMENTS` yourself — never paste its raw text into the Bash source.
+Accepted grammar; refuse anything else before running any Bash, quoting the
+offending fragment back as "unknown argument":
+
+- `--install-sdk`, at most once
+- `--deadline-ms <n>`, at most once, an integer 1-200000
 
 ### Step 2: Run Setup
 
-Delete the `--install-sdk` line unless Step 1 found the flag. Run it with a Bash
-timeout of 600000 ms when installing (`npm ci` may take several minutes), 300000
-ms otherwise:
+Keep only the lines for flags that were given. Run it with a Bash timeout of
+600000 ms when installing (`npm ci` may take several minutes), 300000 ms
+otherwise — the CLI's own deadline defaults to 120 s and is capped at 200 s:
 
 ```bash
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
@@ -45,6 +49,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 args=(setup)
 args+=(--install-sdk)   # only if Step 1 found --install-sdk
+args+=(--deadline-ms 'VALIDATED_DEADLINE')   # only if --deadline-ms was given
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 # Allowlisted fields only. Vendor-writable text is printed separately inside the
@@ -76,7 +81,8 @@ If `sdkResolution` is `missing` and this pass did not install, ask with
 AskUserQuestion: "Install the pinned Jules SDK 0.2.0 into the yellow-jules data
 directory with `npm ci --ignore-scripts` from the plugin's lockfile?" Options:
 "Yes, install" / "No, skip". On "Yes, install", rerun Step 2 with the
-`--install-sdk` line kept and report the new result.
+`--install-sdk` line kept (and any `--deadline-ms` the user gave) and report the
+new result.
 
 On `ok:false`, report `error.code` and `error.retryable`, and the error message
 and recovery action from inside the fence. The block prints vendor-writable text

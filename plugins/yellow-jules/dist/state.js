@@ -600,7 +600,7 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
         const resumePageToken = update.resumePageToken === undefined
             ? current.resumePageToken
             : (update.resumePageToken ?? undefined);
-        const resumeApproval = update.resumeApproval === undefined
+        let resumeApproval = update.resumeApproval === undefined
             ? current.resumeApproval
             : (update.resumeApproval ?? undefined);
         const rebase = update.rebase;
@@ -611,6 +611,27 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
         let recentActivityIds = update.recentActivityIds ?? current.recentActivityIds;
         let activityCountDelta = update.activityCountDelta ?? 0;
         if (rebase !== undefined) {
+            // A stored approval has no reader without a resume token: it is
+            // dropped with the token. Otherwise keep the newest stamp, so an older
+            // walk cannot clear (or replace) a newer approval a concurrent status
+            // stored since the snapshot.
+            const freshApproval = current.resumeApproval;
+            if (resumePageToken === undefined) {
+                resumeApproval = undefined;
+            }
+            else if (update.resumeApproval === null) {
+                resumeApproval =
+                    freshApproval !== undefined &&
+                        (rebase.approval === undefined ||
+                            (0, activity_walk_js_1.compareStamp)(freshApproval, rebase.approval) > 0)
+                        ? freshApproval
+                        : undefined;
+            }
+            else if (update.resumeApproval !== undefined &&
+                freshApproval !== undefined &&
+                (0, activity_walk_js_1.compareStamp)(update.resumeApproval, freshApproval) <= 0) {
+                resumeApproval = freshApproval;
+            }
             const fresh = current.pendingPlan;
             if (update.pendingPlan === undefined) {
                 pendingPlan = fresh;

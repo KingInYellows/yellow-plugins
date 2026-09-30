@@ -477,6 +477,50 @@ describe('read-state, external records, deviations, retention', () => {
     expect(cleared.pendingPlan?.activityId).toBe('a3');
   });
 
+  it('rebases resumeApproval so a stale walk keeps a newer stored approval', async () => {
+    const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
+    const older = { createTime: '2026-01-01T00:01:00Z', activityId: 'a2' };
+    const newer = { createTime: '2026-01-01T00:02:00Z', activityId: 'a3' };
+    // A concurrent status stored the newer approval with a resume token.
+    await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'tok-new',
+      resumeApproval: newer,
+    });
+    // A stale walk (snapshot had no approval) clears it but keeps a token.
+    const kept = await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'tok-old',
+      resumeApproval: null,
+      rebase: { ring: [] },
+    });
+    expect(kept.resumeApproval).toEqual(newer);
+    // A stale walk carrying an older approval does not replace the newer one.
+    const stale = await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'tok-old',
+      resumeApproval: older,
+      rebase: { ring: [] },
+    });
+    expect(stale.resumeApproval).toEqual(newer);
+    // The snapshot's own approval, cleared by its walk, is not resurrected.
+    const cleared = await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'tok-x',
+      resumeApproval: null,
+      rebase: { ring: [], approval: newer },
+    });
+    expect(cleared.resumeApproval).toBeUndefined();
+    // A completed walk drops the approval with the token.
+    await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: 'tok-y',
+      resumeApproval: newer,
+    });
+    const done = await upsertReadState(dataDir, rec.localRequestId, {
+      resumePageToken: null,
+      resumeApproval: null,
+      rebase: { ring: [] },
+    });
+    expect(done.resumePageToken).toBeUndefined();
+    expect(done.resumeApproval).toBeUndefined();
+  });
+
   it('a stale status update does not resurrect an approved plan', async () => {
     const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
     const rebase = { ring: [] as string[] };

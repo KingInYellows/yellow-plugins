@@ -222,6 +222,57 @@ describe('SDK module loading in an installed plugin cache (R3 a, R4)', () => {
     }
   });
 
+  it('a modified non-entry file under runtime/node_modules is JULES_SDK_INTEGRITY', async () => {
+    const target = path.join(
+      resolveRuntimeDir(iso.dataDir),
+      'node_modules',
+      'zod',
+      'package.json'
+    );
+    const original = fs.readFileSync(target);
+    try {
+      fs.writeFileSync(target, `${original.toString('utf8')}\n`);
+      const r = await cli(cachePlugin, ['setup']);
+      expect(errorCode(r)).toBe('JULES_SDK_INTEGRITY');
+      expect(server.log).toEqual([]);
+    } finally {
+      fs.writeFileSync(target, original);
+    }
+    const ok = await cli(cachePlugin, ['setup']);
+    expect(ok.code).toBe(0);
+  });
+
+  it('a symlink under runtime/node_modules is JULES_SDK_INTEGRITY', async () => {
+    const link = path.join(
+      resolveRuntimeDir(iso.dataDir),
+      'node_modules',
+      'zod',
+      'planted-link'
+    );
+    fs.symlinkSync(path.join(isoRoot, 'nowhere'), link);
+    try {
+      const r = await cli(cachePlugin, ['setup']);
+      expect(errorCode(r)).toBe('JULES_SDK_INTEGRITY');
+    } finally {
+      fs.rmSync(link, { force: true });
+    }
+  });
+
+  it('a pin without treeSha256 fails closed and points at /jules:setup', async () => {
+    const pinFile = path.join(resolveRuntimeDir(iso.dataDir), 'pin.json');
+    const original = fs.readFileSync(pinFile, 'utf8');
+    try {
+      const pin = JSON.parse(original);
+      delete pin.treeSha256;
+      fs.writeFileSync(pinFile, JSON.stringify(pin), { mode: 0o600 });
+      const r = await cli(cachePlugin, ['setup']);
+      expect(errorCode(r)).toBe('JULES_SDK_INTEGRITY');
+      expect(JSON.stringify(r.json)).toContain('/jules:setup');
+    } finally {
+      fs.writeFileSync(pinFile, original, { mode: 0o600 });
+    }
+  });
+
   it('an SDK that ignores the injected storage factory fails the binding assertion', async () => {
     const real = (await import('@google/jules-sdk')) as unknown as SdkModule;
     const dataDir = fs.mkdtempSync(path.join(isoRoot, 'binding-'));

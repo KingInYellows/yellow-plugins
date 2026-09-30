@@ -34,7 +34,7 @@ import {
   mapAdapterError,
   throwAppError,
 } from './errors.js';
-import { FetchGuardRefusal } from './fetch-guard.js';
+import { FetchGuardRefusal, ResponseTooLarge } from './fetch-guard.js';
 import { truncateRedacted } from './redact.js';
 import type {
   ActivityPage,
@@ -184,6 +184,11 @@ export function toAdapterError(
       cause: err,
     });
 
+  // An oversized body is cut by the fetch guard; the SDK may wrap it.
+  for (let e: unknown = err, i = 0; e instanceof Error && i < 5; i++) {
+    if (e instanceof ResponseTooLarge) return make('malformed');
+    e = (e as { cause?: unknown }).cause;
+  }
   if (err instanceof sdk.JulesRateLimitError)
     return make('rate-limited', err.status);
   if (err instanceof sdk.JulesAuthenticationError)

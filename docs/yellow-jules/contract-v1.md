@@ -54,8 +54,12 @@ mechanism, and none widens a guarantee.
   as `plugins/yellow-jules/runtime/package.json` and `runtime/package-lock.json`
   (outside the pnpm workspace glob); `setup --install-sdk` copies both into
   `<dataDir>/runtime/` and runs `npm ci --ignore-scripts`. `runtime/pin.json`
-  records `sdkVersion`, `sdkIntegrity`, `sdkEntrySha256`, and the installed tree
-  (`@google/jules-sdk` 0.2.0, `yaml` 2.9.1, `zod` 3.25.76).
+  records `sdkVersion`, `sdkIntegrity`, `sdkEntrySha256`, `treeSha256` (one
+  sha256 over the sorted relative path and sha256 of every regular file under
+  `runtime/node_modules/`), and the installed tree (`@google/jules-sdk` 0.2.0,
+  `yaml` 2.9.1, `zod` 3.25.76). Every load recomputes `treeSha256` and rejects
+  symlinks and nested `node_modules` (`JULES_SDK_INTEGRITY`); a pin without
+  `treeSha256` fails closed and asks for a `/jules:setup` rerun.
 - **Workspace resolution.** The workspace branch reads
   `<pluginRoot>/node_modules/@google/jules-sdk` directly instead of walking
   `createRequire` resolution, which would also accept an unverified install in
@@ -558,8 +562,9 @@ runtime has observed, and `approve` compares against the same field.
   treated as absence. Patch and generated-file contents are written to
   `<dataDir>/artifacts/<local-id>/` rather than held in the result envelope
   (peak memory is the parsed vendor page, which is why `collect` uses `pageSize`
-  10; a response exceeding the runtime's string limits surfaces as
-  `JULES_MALFORMED_RESPONSE`); files are named locally (`patch.diff`,
+  10; a response body over 100 MiB is cut by the fetch guard before the SDK
+  parses it and surfaces as `JULES_MALFORMED_RESPONSE`; smaller per-field bodies
+  are bounded only by that response cap); files are named locally (`patch.diff`,
   `generated/<nn>-<sha256[0:12]>`), and a `manifest.json` records the vendor
   `GeneratedFile.path` as data only. Caps are degrade-and-report, never an error
   envelope, because they are exceeded by vendor data, not caller input: once 100
@@ -906,19 +911,20 @@ timestamps), `resumePageToken?`, `recentActivityIds` (the dedup ring: ids within
 the 5-minute overlap window, at most 1000), `activityCount`, `pendingPlan?`, and
 `resumeApproval?` (the newest `planApproved` stamp a partial walk read; kept
 only while `resumePageToken` is stored, so a resumed walk can pair it with the
-older plan it approved); `collect` writes only `artifactResumePageToken?`.
-Retention: the ring and both resume tokens are dropped once an operation reaches
-a terminal, reconciled outcome, so a settled record is a few hundred bytes and a
-live one is bounded by the ring; `state/journal.json` is rewritten whole under
-the lock, and retention of terminal records is deferred until usage data
-justifies a policy (PR1 default: none). Journal and grant maps are built with
-`Object.create(null)` (or `Map`), never by plain property assignment, so
-caller-supplied keys cannot reach the prototype. Writes are reservation-first
-and atomic (temp file plus rename) under the lock, and the R36
-unresolved-operation lookup, authority evaluation, confirmation consumption,
-counter increment, and reservation write are one critical section under that
-lock (R31); the local request id is local deduplication only, never a vendor
-idempotency guarantee (R36).
+older plan it approved; an unlocked walk's update is rebased so an older walk
+never clears or replaces a newer stored approval); `collect` writes only
+`artifactResumePageToken?`. Retention: the ring and both resume tokens are
+dropped once an operation reaches a terminal, reconciled outcome, so a settled
+record is a few hundred bytes and a live one is bounded by the ring;
+`state/journal.json` is rewritten whole under the lock, and retention of
+terminal records is deferred until usage data justifies a policy (PR1 default:
+none). Journal and grant maps are built with `Object.create(null)` (or `Map`),
+never by plain property assignment, so caller-supplied keys cannot reach the
+prototype. Writes are reservation-first and atomic (temp file plus rename) under
+the lock, and the R36 unresolved-operation lookup, authority evaluation,
+confirmation consumption, counter increment, and reservation write are one
+critical section under that lock (R31); the local request id is local
+deduplication only, never a vendor idempotency guarantee (R36).
 
 R38 copy detection (shape fixed in shell 03): a controller-identity and epoch
 authority file lives **outside** `<dataDir>` on the host, records the canonical

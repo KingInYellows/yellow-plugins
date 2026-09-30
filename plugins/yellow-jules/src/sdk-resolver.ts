@@ -48,6 +48,8 @@ export interface PinFile {
   readonly sdkVersion: string;
   readonly sdkIntegrity: string;
   readonly sdkEntrySha256: string;
+  /** sha256 over every regular file under runtime/node_modules (see computeTreeDigest). */
+  readonly treeSha256: string;
   readonly tree: readonly PinnedPackage[];
 }
 
@@ -144,6 +146,49 @@ function listInstalledPackages(nodeModules: string): string[] {
   return names.sort();
 }
 
+/**
+ * One digest over every regular file under `node_modules`: sha256 of sorted
+ * `<posix relative path>\0<file sha256>\n` lines. Symlinks, other non-regular
+ * entries, and any nested `node_modules` fail closed. Top-level dot-entries
+ * (npm's `.bin`, `.package-lock.json`) are not importable code and are skipped,
+ * matching listInstalledPackages. Synchronous; cost is one read of the whole
+ * tree (a few MB for the pinned SDK) on every data-dir verification.
+ */
+export function computeTreeDigest(nodeModules: string): string {
+  const lines: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    const entries = fs
+      .readdirSync(dir, { withFileTypes: true })
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entry of entries) {
+      if (rel === '' && entry.name.startsWith('.')) continue;
+      const relPath = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      const abs = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        return integrityFailure(
+          `runtime/node_modules contains a symlink at ${relPath}`
+        );
+      }
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules') {
+          return integrityFailure(
+            `runtime/node_modules contains a nested node_modules at ${relPath}`
+          );
+        }
+        walk(abs, relPath);
+      } else if (entry.isFile()) {
+        lines.push(`${relPath}\0${sha256File(abs)}\n`);
+      } else {
+        return integrityFailure(
+          `runtime/node_modules contains a non-regular file at ${relPath}`
+        );
+      }
+    }
+  };
+  walk(nodeModules, '');
+  return crypto.createHash('sha256').update(lines.join('')).digest('hex');
+}
+
 function isPinFile(value: unknown): value is PinFile {
   if (value === null || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
@@ -151,6 +196,7 @@ function isPinFile(value: unknown): value is PinFile {
     typeof v['sdkVersion'] === 'string' &&
     typeof v['sdkIntegrity'] === 'string' &&
     typeof v['sdkEntrySha256'] === 'string' &&
+    typeof v['treeSha256'] === 'string' &&
     Array.isArray(v['tree']) &&
     v['tree'].every(
       (p: unknown) =>
@@ -180,6 +226,15 @@ function verifyDataDirInstall(dataDir: string, entry: string): PinFile {
     pin = readJson(file);
   } catch {
     return integrityFailure('runtime/pin.json is unreadable');
+  }
+  if (
+    pin !== null &&
+    typeof pin === 'object' &&
+    typeof (pin as Record<string, unknown>)['treeSha256'] !== 'string'
+  ) {
+    return integrityFailure(
+      'runtime/pin.json has no treeSha256 (written by an older setup); rerun /jules:setup to reinstall and re-pin the SDK'
+    );
   }
   if (!isPinFile(pin) || pin.sdkVersion !== PINNED_SDK_VERSION) {
     return integrityFailure('runtime/pin.json does not record the pinned SDK');
@@ -213,6 +268,11 @@ function verifyDataDirInstall(dataDir: string, entry: string): PinFile {
         `${p.name} is ${String(version)}, runtime/pin.json records ${p.version}`
       );
     }
+  }
+  if (computeTreeDigest(nodeModules) !== pin.treeSha256) {
+    return integrityFailure(
+      'runtime/node_modules contents do not match the treeSha256 in runtime/pin.json'
+    );
   }
   return pin;
 }
@@ -523,6 +583,7 @@ export async function installSdk(
       sdkVersion: sdk.version,
       sdkIntegrity: sdk.integrity,
       sdkEntrySha256: sha256File(entry),
+      treeSha256: computeTreeDigest(nodeModules),
       tree,
     };
     await writePin(pinPath(dataDir), pin);
