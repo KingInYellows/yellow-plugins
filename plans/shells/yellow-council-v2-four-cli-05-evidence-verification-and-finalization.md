@@ -52,6 +52,10 @@ synthesis shell's mechanical combination rule.
   configuration tables, component counts, README/CHANGELOG
 - Expanded manual e2e checklist covering all V2 scenarios
 - Final cross-cutting validation pass over the assembled V2
+- A recorded decision on where the synthesis helper library lives (see
+  "Carried follow-ups")
+- Normalizer fixes so evidence and identifiers survive byte-exact before
+  `verify_finding()` compares them; Step 7 report staging without a heredoc
 
 ## Consumes
 
@@ -76,23 +80,63 @@ synthesis shell's mechanical combination rule.
 - R29
 - R30
 
+## Carried follow-ups (from PR #948 review, 2026-09-30)
+
+Deferred out of shell 03. Each is a step below; do not drop them at expand
+time.
+
+- **F1 — synthesis library location (decide first).** `council.md` is ~2,700
+  lines, far past the 500-line command ceiling, and carries the Step 5b helper
+  library (`council_normalize_text`, `council_extract_fenced`,
+  `council_assign_labels`, `council_fence_block`) inline between the
+  `# >>> council-synthesis-lib` markers. `verify_finding()` and the five-bucket
+  logic would add more. Decide — keep inline (extraction-tested by
+  `tests/synthesis.bats`) or move to a shipped plugin lib/references file the
+  fences source — and record the choice in `plugins/yellow-council/CLAUDE.md`.
+  Moving it changes how every Step 5 fence and `tests/lib/extract-synthesis-lib.bash`
+  load the helpers.
+- **F2 — Step 7 heredoc.** Step 7 still carries `SYNTHESIS_MD` in a quoted
+  heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03 only escapes that
+  delimiter in 5b input and in 5e's quoting rule; a synthesizer-authored
+  (paraphrased) line could still reproduce it and run the rest as shell.
+  Stage `SYNTHESIS_MD` through `Write` into the token-bound staging dir (or a
+  fresh `mktemp -d`) and `cat` it in Step 7, like 5a does for reviewer text.
+- **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
+  with no closing fence passes every remaining line of that reviewer's text
+  through unnormalized (identity and style signal survive). Buffer fenced
+  lines and, at end of input, re-process an unclosed fence as ordinary text,
+  or cap it; add a golden case.
+- **F4 — bare identifiers lose edge underscores.** `strip_emph` strips
+  leading/trailing `*`/`_` runs from any non-path word, so bare `__init__`,
+  `_private_fn` or `*ptr` in prose become `init`, `private_fn`, `ptr` — which
+  can break a finding's claim text that `verify_finding()` or a reader relies
+  on. Strip only paired emphasis runs; add golden cases.
+
 ## Implementation Steps (High-Level)
 
-1. **Verification helper** — Tier 1 mode-dependent exact match with the
+0. **Synthesis library location (F1)** — make and record the decision before
+   any Step 5 code is added; if moving, do the move as its own step with the
+   bats extraction updated and green.
+1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and paired-only
+   emphasis stripping in `council_normalize_text`, with golden cases, so the
+   text `verify_finding()` compares is byte-exact.
+2. **Verification helper** — Tier 1 mode-dependent exact match with the
    skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy
    ratio ≥85; three-state result.
-2. **Optional dependency handling** — import probe, soft-skip with warning,
+3. **Optional dependency handling** — import probe, soft-skip with warning,
    documented as optional.
-3. **Five-bucket synthesis reorganization** — apply the deterministic
+4. **Five-bucket synthesis reorganization** — apply the deterministic
    precedence rule (single-reviewer split by verification; verdict-split
    beats agreement; agreement split by verification); surface unverified
    claims visibly.
-4. **Rewire the rubric correctness dimension** — consume verification
+5. **Rewire the rubric correctness dimension** — consume verification
    results instead of self-assessment, completing the coupling that kept
    this phase in V2.
-5. **Bound the cost** — per-reviewer verification cap and concurrency with
+6. **Bound the cost** — per-reviewer verification cap and concurrency with
    synthesis prompt construction.
-6. **Finalization sweep** — skill contract, both configuration tables,
+7. **Step 7 report staging (F2)** — replace the `SYNTHESIS_MD` heredoc with
+   `Write`-based staging; keep the Step 7 appendix loop untouched (Rule D1).
+8. **Finalization sweep** — skill contract, both configuration tables,
    component counts and README/CHANGELOG, manual e2e scenarios (quota ETA,
    lineage warning, tie presentation, single-pass bypass, rubric output,
    verification hit/miss paths), verify every shipped PR carried its
