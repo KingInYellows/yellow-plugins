@@ -478,7 +478,7 @@ Decisions from the brainstorm and the planning round:
 > 3d/4/5/6/7/8"). A PR with only LGTM threads must still reach the write phase,
 > resolve them, and print the `Resolve:` line.
 <!-- /deepen-plan -->
-- [ ] 2.3: Replace Steps 5–9 of `resolve-pr.md` with:
+- [x] 2.3: Replace Steps 5–9 of `resolve-pr.md` with:
   - **Step 5, Dispositions:**
     - parse `THREAD` lines and apply the downgrade and evidence rules;
     - apply the human-thread and `viewerCanResolve` lanes;

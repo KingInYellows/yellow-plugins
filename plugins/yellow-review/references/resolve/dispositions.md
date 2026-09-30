@@ -698,9 +698,11 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reply, possibly with different dispositions. The marker makes re-runs
   idempotent; it does not make check-and-write atomic, and the script has no
   lock and no post-write reconciliation (unlike `file-followup-issue`'s
-  post-create rescan, which covers issues only). Run one resolve or sweep per PR
-  at a time. A duplicate reply is harmless noise; a conflicting pair is not
-  detected, and a later re-run acts on the viewer's newest marker comment in the
-  window only.
+  post-create rescan, which covers issues only). Run one resolve or sweep per
+  PR at a time. A duplicate reply is harmless noise; a conflicting pair is not
+  detected, and a later re-run acts on the last comment only.
+- Linear issues are not deduped by marker. If the reply fails after a
+  Linear issue is filed, a re-run can file a second one; the Step 9 report
+  lists the first so it can be closed by hand.
 - Where branch protection does not require conversation resolution, an open
   thread is a convention, not a merge block. The report says which applies.
