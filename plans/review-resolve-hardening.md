@@ -296,7 +296,7 @@ Decisions from the brainstorm and the planning round:
 > (and update `tests/resolve-pr-thread.bats`, which is not yet in the file
 > list) or to have Step 7 treat any non-zero exit as a failure and match stderr.
 <!-- /deepen-plan -->
-- [ ] 1.5: New script `skills/pr-review-workflow/scripts/file-followup-issue
+- [x] 1.5: New script `skills/pr-review-workflow/scripts/file-followup-issue
   <owner/repo> <PR#> <PRRT_id> <title-file> <body-file>`. It:
   - dedupes by scanning `gh issue list --state all --limit 200 --json
     number,url,body` for `thread=<id>`, where the author is the viewer;

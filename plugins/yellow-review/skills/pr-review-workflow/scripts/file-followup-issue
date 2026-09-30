@@ -1,0 +1,126 @@
+#!/bin/sh
+# File (or find) the GitHub follow-up issue for an out-of-scope review thread.
+# Usage: file-followup-issue <owner/repo> <pr-number> <PRRT_id> <title-file> <body-file>
+#   title-file: first line is the issue title (at most 256 characters)
+#   body-file:  issue text; a link to the thread and the marker are appended
+# Output: JSON to stdout: {"number":N,"url":"...","created":true|false}
+#   created=false means an issue the viewer authored already carries this
+#   thread's marker (dedupe hit); no new issue is filed.
+# Exit codes: 1 gh failure, 2 usage.
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+MAX_TITLE_CHARS=256
+LIST_LIMIT=200
+
+usage() {
+    printf 'Usage: file-followup-issue <owner/repo> <pr-number> <PRRT_id> <title-file> <body-file>\n' >&2
+    exit 2
+}
+
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+[ $# -eq 5 ] || usage
+REPO="$1"
+PR_NUMBER="$2"
+THREAD_ID="$3"
+TITLE_FILE="$4"
+BODY_FILE="$5"
+
+case "$REPO" in
+    */*/*|/*|*/) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) ;;
+    *) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$PR_NUMBER" in
+    ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR_NUMBER" >&2; exit 2 ;;
+esac
+case "$THREAD_ID" in
+    PRRT_*) ;;
+    *) printf 'Error: Invalid thread ID format. Expected PRRT_ prefix, got: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+case "${THREAD_ID#PRRT_}" in
+    ''|*[!A-Za-z0-9_-]*) printf 'Error: Invalid characters in thread ID: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+for f in "$TITLE_FILE" "$BODY_FILE"; do
+    [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 2; }
+done
+
+TITLE=$(head -n 1 "$TITLE_FILE" | tr -d '\r' | jq -Rr 'gsub("^\\s+|\\s+$"; "")')
+if [ -z "$TITLE" ]; then
+    printf 'Error: Title file is empty.\n' >&2
+    exit 2
+fi
+if [ "$(printf '%s' "$TITLE" | jq -Rs 'length')" -gt "$MAX_TITLE_CHARS" ]; then
+    printf 'Error: Title exceeds %s characters.\n' "$MAX_TITLE_CHARS" >&2
+    exit 2
+fi
+if [ "$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE")" -eq 0 ]; then
+    printf 'Error: Body file is empty.\n' >&2
+    exit 2
+fi
+
+WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+ERR="$WORK_DIR/err"
+
+gh_fail() {
+    printf 'Error: %s failed: %s\n' "$1" "$(head -c 300 "$ERR")" >&2
+    exit 1
+}
+
+# App logins appear as "app/<name>" in `gh issue list` and "<name>[bot]" in
+# GraphQL; compare on the bare name.
+# shellcheck disable=SC2016
+NORMALIZE='sub("^app/"; "") | sub("\\[bot\\]$"; "")'
+
+VIEWER=$(gh api graphql -f query='query FollowupViewer { viewer { login } }' \
+    --jq '.data.viewer.login' 2>"$ERR") || gh_fail 'viewer lookup'
+VIEWER=$(printf '%s' "$VIEWER" | jq -Rr "$NORMALIZE")
+[ -n "$VIEWER" ] || { printf 'Error: Could not determine the viewer login.\n' >&2; exit 1; }
+
+# The trailing " disposition=" keeps PRRT_ab from matching PRRT_abc.
+MARKER_PREFIX="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition="
+
+# --- Dedupe: scan issue bodies (search indexing lags, so no search API) ---
+gh issue list --repo "$REPO" --state all --limit "$LIST_LIMIT" \
+    --json number,url,body,author >"$WORK_DIR/issues.json" 2>"$ERR" || gh_fail 'issue list'
+
+EXISTING=$(jq -c --arg viewer "$VIEWER" --arg prefix "$MARKER_PREFIX" '
+    [ .[]
+      | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
+      | select((.body // "") | contains($prefix)) ]
+    | sort_by(.number) | first // empty
+    | {number, url, created: false}' "$WORK_DIR/issues.json")
+if [ -n "$EXISTING" ]; then
+    printf '%s\n' "$EXISTING"
+    exit 0
+fi
+
+# --- Link back to the thread (first comment URL; PR URL as a fallback) ---
+LINK="https://github.com/$REPO/pull/$PR_NUMBER"
+# shellcheck disable=SC2016
+if THREAD_URL=$(gh api graphql -f threadId="$THREAD_ID" \
+        -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { comments(first: 1) { nodes { url } } } } }' \
+        --jq '.data.node.comments.nodes[0].url // empty' 2>"$ERR"); then
+    case "$THREAD_URL" in
+        https://github.com/*) LINK="$THREAD_URL" ;;
+    esac
+fi
+
+ISSUE_BODY="$WORK_DIR/issue-body.md"
+jq -Rrs --arg link "$LINK" --arg pr "$PR_NUMBER" --arg marker "${MARKER_PREFIX}oos -->" \
+    'sub("\\s+$"; "") + "\n\nFollow-up from review thread on #" + $pr + ": " + $link + "\n\n" + $marker' \
+    <"$BODY_FILE" >"$ISSUE_BODY"
+
+URL=$(gh issue create --repo "$REPO" --title "$TITLE" --body-file "$ISSUE_BODY" 2>"$ERR") \
+    || gh_fail 'issue create'
+URL=$(printf '%s\n' "$URL" | grep -E '^https://[^ ]+/issues/[0-9]+$' | tail -n 1 || true)
+if [ -z "$URL" ]; then
+    printf 'Error: issue create returned no issue URL.\n' >&2
+    exit 1
+fi
+
+jq -nc --arg url "$URL" '{number: ($url | sub(".*/issues/"; "") | tonumber), url: $url, created: true}'
