@@ -5,12 +5,18 @@
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
 #                           [--unattended] [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
+#        run-verify-command --pr <N> --revert-dirty
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
 #                  (unattended) or after the user approved it (interactive).
 #   --unattended:  do not run the command when a file is a runner file or is
 #                  outside the PR's changed files; report result "skipped".
-#   --revert-only: run nothing; save the patch and revert (result "reverted").
+#   --revert-only: run nothing; save the patch and revert the listed files
+#                  (result "reverted"). Deny-listed paths may be reverted.
+#   --revert-dirty: like --revert-only for every change in the tree, listed
+#                  by git itself (for refusals: never trust resolver text).
+#   Running a command also requires the tree to have no changes outside the
+#   listed files.
 #   files:     repo-root-relative paths the resolvers modified, one per line
 #              in --files-from and/or after --. Each must have changes, must
 #              not be gitignored, and must not be on the resolver deny list,
@@ -32,7 +38,7 @@ KEEP=10
 
 die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] | --revert-only) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -42,6 +48,7 @@ COMMAND_FILE=""
 TRUSTED=0
 UNATTENDED=0
 REVERT_ONLY=0
+REVERT_DIRTY=0
 FILES=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,6 +58,7 @@ while [ $# -gt 0 ]; do
         --trusted) TRUSTED=1; shift ;;
         --unattended) UNATTENDED=1; shift ;;
         --revert-only) REVERT_ONLY=1; shift ;;
+        --revert-dirty) REVERT_ONLY=1; REVERT_DIRTY=1; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
@@ -78,15 +86,42 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
 
+# Every change in the tree, as git lists it (tracked, staged or untracked).
+tree_changes() {
+    { git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
+        | tr '\0' '\n' | LC_ALL=C sort -u
+}
+
+if [ "$REVERT_DIRTY" = 1 ]; then
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
+    while IFS= read -r f; do
+        [ -n "$f" ] && FILES+=("$f")
+    done < <(tree_changes)
+fi
+
 for f in ${FILES[@]+"${FILES[@]}"}; do
+    [ "$REVERT_DIRTY" = 1 ] && continue
     rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
-    rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
+    # Reverting is always safe; the deny list only stops running and committing.
+    [ "$REVERT_ONLY" = 0 ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
     # Fail closed unless check-ignore positively says "not ignored" (exit 1).
     IGN=0
     git check-ignore -q -- "$f" || IGN=$?
     [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
     [ -n "$(lgit status --porcelain --untracked-files=all -- "$f")" ] || die 2 "listed file has no changes: $f"
 done
+
+# Never run a command while the tree has changes the list does not name.
+if [ "$REVERT_ONLY" = 0 ]; then
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        found=0
+        for f in ${FILES[@]+"${FILES[@]}"}; do
+            [ "$d" = "$f" ] && { found=1; break; }
+        done
+        [ "$found" = 1 ] || die 2 "change outside the listed files: $d"
+    done < <(tree_changes)
+fi
 
 # Unattended: never execute runner files or files outside the PR.
 if [ "$UNATTENDED" = 1 ] && [ "$REVERT_ONLY" = 0 ]; then
@@ -206,7 +241,7 @@ RESULT=fail
             lgit diff --no-color --no-ext-diff --no-textconv --binary \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$PATCH"
         elif [ -e "$f" ]; then
-            git diff --no-index --no-color --no-ext-diff --binary \
+            git diff --no-index --no-color --no-ext-diff --no-textconv --binary \
                 --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$PATCH" || true
         fi
     done
@@ -214,9 +249,11 @@ RESULT=fail
 
 # --- Revert the listed files ---
 for f in ${FILES[@]+"${FILES[@]}"}; do
-    if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || git cat-file -e "HEAD:$f" 2>/dev/null; then
+    if git cat-file -e "HEAD:$f" 2>/dev/null; then
         lgit checkout -q HEAD -- "$f" 2>/dev/null || true
     else
+        # New file (untracked or only staged): drop it from the index too.
+        lgit rm -q --cached --ignore-unmatch -- "$f" >/dev/null 2>&1 || true
         rm -f -- "$f"
     fi
 done
