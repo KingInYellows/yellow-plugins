@@ -23,6 +23,8 @@ verify() {
   run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" "$@"
 }
 
+mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+
 has_kill_after() {
   command -v timeout >/dev/null 2>&1 && timeout --kill-after=1 1 true >/dev/null 2>&1
 }
@@ -63,8 +65,8 @@ has_kill_after() {
   [[ "$patch" == "$PATCH_DIR/7-"*.patch ]]
   grep -q '+resolver edit' "$patch"
   grep -q '+new' "$patch"
-  [ "$(stat -c %a "$patch")" = 600 ]
-  [ "$(stat -c %a "$PATCH_DIR")" = 700 ]
+  [ "$(mode "$patch")" = 600 ]
+  [ "$(mode "$PATCH_DIR")" = 700 ]
   [ -z "$(git status --porcelain)" ]
   grep -q boom "$(printf '%s' "$output" | jq -r .log)"
 }
@@ -111,6 +113,43 @@ has_kill_after() {
   export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
   verify 'exit 124' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+}
+
+@test "a command exiting 137 quickly under the timeout binary is fail, not timeout" {
+  has_kill_after || skip "timeout --kill-after not available"
+  verify 'exit 137' --timeout 30 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+}
+
+@test "--files-from lists the files to revert" {
+  printf 'src/a.txt\nsrc/new.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  verify 'exit 1' --timeout 5 --trusted --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  [ ! -e src/new.txt ]
+}
+
+@test "refuses a gitignored file so a revert can never delete it" {
+  printf 'secret.txt\n' >| .gitignore
+  git add .gitignore && git commit -q -m "chore: ignore"
+  printf 'user data\n' >| secret.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt secret.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored"* ]]
+  [ -f secret.txt ]
+}
+
+@test "refuses a listed file without changes" {
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/b.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"no changes: src/b.txt"* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "refuses a deny-listed path" {
+  printf 'X=1\n' >| .env
+  verify 'exit 1' --timeout 5 --trusted -- .env
+  [ "$status" -eq 2 ]
+  [ -f .env ]
 }
 
 @test "keeps only the newest 10 patches" {

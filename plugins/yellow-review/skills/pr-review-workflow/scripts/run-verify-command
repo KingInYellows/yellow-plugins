@@ -2,11 +2,15 @@
 # Run resolve_pr.verify_command before resolver fixes are committed. On
 # failure or timeout, save the resolver diff as a patch, revert the listed
 # files and report whether the tree is clean again.
-# Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted -- <files...>
+# Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
+#                           [--files-from <file>] [-- <files...>]
 #   --trusted: required. The caller sets it only after confirming the command
 #              came from an untracked config file (unattended) or after the
 #              user approved it (interactive).
-#   files:     repo-root-relative paths the resolvers modified
+#   files:     repo-root-relative paths the resolvers modified, one per line
+#              in --files-from and/or after --. Each must have changes, must
+#              not be gitignored, and must not be on the resolver deny list,
+#              so a revert can never delete a user file.
 # Output: JSON to stdout:
 #   {"result":"pass|fail|timeout","patch":"<path>|null","log":"<path>","treeClean":true|false}
 # Exit codes: 0 ran (read "result"), 2 usage or not trusted.
@@ -23,7 +27,7 @@ KEEP=10
 
 die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted -- <files...>\n' >&2
+    printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -38,7 +42,15 @@ while [ $# -gt 0 ]; do
         --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
         --trusted) TRUSTED=1; shift ;;
-        --) shift; FILES=("$@"); break ;;
+        --files-from)
+            [ $# -ge 2 ] || usage
+            [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
+            while IFS= read -r line || [ -n "$line" ]; do
+                [ -n "$line" ] && FILES+=("$line")
+            done <"$2"
+            shift 2
+            ;;
+        --) shift; FILES+=("$@"); break ;;
         *) usage ;;
     esac
 done
@@ -52,14 +64,31 @@ COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COM
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
+# Mirrors pr-comment-resolver's deny list.
+is_denied() {
+    case "$1" in
+        .github/*|.circleci/*|.git/*|.claude/*|yellow-plugins.local.md) return 0 ;;
+    esac
+    case "${1##*/}" in
+        .gitlab-ci.yml|Jenkinsfile|azure-pipelines.yml|Dockerfile|docker-compose.yml) return 0 ;;
+        .env|.env.*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
+    esac
+    return 1
+}
+
 for f in ${FILES[@]+"${FILES[@]}"}; do
     case "$f" in
         ''|/*|../*|*/../*|*/..|..) die 2 "path must be repo-relative and inside the repository: $f" ;;
     esac
+    [[ "$f" =~ [[:cntrl:]] ]] && die 2 "path contains control characters"
+    is_denied "$f" && die 2 "refusing a deny-listed path: $f"
+    git check-ignore -q -- "$f" && die 2 "refusing a gitignored path: $f"
+    [ -n "$(git status --porcelain --untracked-files=all -- "$f")" ] || die 2 "listed file has no changes: $f"
 done
 
-COMMON=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
-    || COMMON=$(cd -- "$(git rev-parse --git-common-dir)" && pwd)
+# cwd is the top level, so the relative common dir resolves correctly (and
+# works on git older than 2.31, which lacks --path-format).
+COMMON=$(cd -- "$(git rev-parse --git-common-dir)" && pwd) || die 2 "cannot resolve the git common dir"
 OUT_DIR="$COMMON/yellow-review/resolve-patches"
 (umask 077 && mkdir -p -- "$OUT_DIR") || die 2 "cannot create $OUT_DIR"
 chmod 700 -- "$OUT_DIR" 2>/dev/null || true
@@ -115,17 +144,20 @@ run_with_watchdog() {
 RC=0
 TIMED_OUT=0
 if T=$(timeout_bin); then
+    START=$SECONDS
     "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$(cat -- "$COMMAND_FILE")" >>"$LOG" 2>&1 </dev/null || RC=$?
-    # timeout(1) exits 124 on expiry, or 137 when it had to send KILL.
-    case "$RC" in 124|137) TIMED_OUT=1 ;; esac
+    # timeout(1) exits 124 on expiry, or 137 when it had to send KILL; the
+    # command can exit with either code itself, so also require the time.
+    case "$RC" in
+        124|137) [ $((SECONDS - START)) -ge "$TIMEOUT" ] && TIMED_OUT=1 ;;
+    esac
 else
     run_with_watchdog || RC=$?
 fi
 
 # Keep the tail of an oversized log: failures usually print last.
 if [ "$(wc -c <"$LOG")" -gt "$LOG_CAP_BYTES" ]; then
-    tail -c "$LOG_CAP_BYTES" <"$LOG" >"$LOG.tmp" && mv -f -- "$LOG.tmp" "$LOG"
-    chmod 600 -- "$LOG"
+    (umask 077 && tail -c "$LOG_CAP_BYTES" <"$LOG" >"$LOG.tmp") && mv -f -- "$LOG.tmp" "$LOG"
 fi
 
 prune() {

@@ -1,29 +1,36 @@
 #!/bin/bash
 # Stage the resolver-touched files, commit them as a NEW commit, submit via
 # the active stacked-PR provider, and verify the remote head.
-# Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> -- <files...>
-#   files:   repo-root-relative paths the resolvers modified. With no files
-#            and a clean tree the result is NOOP.
+# Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
+#                             [--files-from <file>] [-- <files...>]
+#   files:   repo-root-relative paths the resolvers modified, one per line in
+#            --files-from and/or after --. Resolver output is untrusted, so
+#            callers pass it through --files-from, never on a command line.
+#            Resolver deny-list paths (CI, secrets, yellow-plugins.local.md,
+#            .claude/) are refused. With no files and a clean tree the
+#            result is NOOP.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
-# Exit codes: 2 usage, 3 staged mismatch, 4 commit failed, 5 submit failed,
-#             6 verify mismatch.
+# Exit codes: 2 usage, 3 staged mismatch or refused path, 4 commit failed,
+#             5 submit failed, 6 verify mismatch. After 5 or 6 the commit
+#             exists locally: resubmit through the provider rather than
+#             re-running this script (a re-run sees a clean tree: NOOP).
 # Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
 #        (default: the sibling github-workflow plugin).
-#      YELLOW_REVIEW_VERIFY_DELAY (default 5) — seconds between head checks.
+#      YELLOW_REVIEW_VERIFY_BACKOFF (default "2 4 8 16") — seconds between
+#        PR head checks after the first.
 # Contract: references/resolve/dispositions.md. This script never pushes
 # directly; the provider's submit is the only publish path.
 
 set -euo pipefail
 
-VERIFY_ATTEMPTS=3
 MAX_MESSAGE_CHARS=200
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> -- <files...>\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -36,7 +43,15 @@ while [ $# -gt 0 ]; do
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
         --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
-        --) shift; FILES=("$@"); break ;;
+        --files-from)
+            [ $# -ge 2 ] || usage
+            [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
+            while IFS= read -r line || [ -n "$line" ]; do
+                [ -n "$line" ] && FILES+=("$line")
+            done <"$2"
+            shift 2
+            ;;
+        --) shift; FILES+=("$@"); break ;;
         *) usage ;;
     esac
 done
@@ -58,6 +73,25 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repo
 cd -- "$TOP"
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
+# Paths the resolver may never touch (mirrors pr-comment-resolver's deny
+# list); refused even when they have changes.
+is_denied() {
+    case "$1" in
+        .github/*|.circleci/*|.git/*|.claude/*|yellow-plugins.local.md) return 0 ;;
+    esac
+    case "${1##*/}" in
+        .gitlab-ci.yml|Jenkinsfile|azure-pipelines.yml|Dockerfile|docker-compose.yml) return 0 ;;
+        .env|.env.*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
+    esac
+    return 1
+}
+
+if [ "$PROVIDER" = github ]; then
+    RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(cd -- "$(dirname -- "$0")/../../../.." && pwd)/github-workflow/lib/github-stack-runtime.js}"
+    command -v node >/dev/null 2>&1 || die 2 "node not found"
+    [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found at $RUNTIME"
+fi
+
 # --- Validate the expected set ---
 # Arrays are expanded as ${a[@]+"${a[@]}"} so an empty one survives set -u
 # under bash 3.2.
@@ -67,6 +101,8 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
     case "$f" in
         ''|/*|../*|*/../*|*/..|..) die 2 "path must be repo-relative and inside the repository: $f" ;;
     esac
+    [[ "$f" =~ [[:cntrl:]] ]] && die 2 "path contains control characters"
+    is_denied "$f" && die 3 "refusing to commit a deny-listed path: $f"
     [ -z "$(git status --porcelain --untracked-files=all -- "$f")" ] \
         && die 3 "listed file has no changes: $f"
     EXPECTED+=("$f")
@@ -74,13 +110,16 @@ done
 
 # Tracked changes outside the expected set would ride along in the commit
 # (or be left behind): refuse before staging anything.
+DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE"' EXIT
+git diff --name-only -z HEAD -- >"$DIRTY_FILE" || die 3 "git diff failed"
 while IFS= read -r -d '' d; do
     found=0
     for f in ${EXPECTED[@]+"${EXPECTED[@]}"}; do
         [ "$d" = "$f" ] && { found=1; break; }
     done
     [ "$found" = 1 ] || die 3 "tracked change outside the expected set: $d"
-done < <(git diff --name-only -z HEAD --)
+done <"$DIRTY_FILE"
 
 emit() {
     jq -nc --arg s "$1" --arg sha "$2" --arg b "$BRANCH" '{status: $s, sha: $sha, branch: $b}'
@@ -107,8 +146,7 @@ case "$PROVIDER" in
     github) git commit -q -m "$MESSAGE" >&2 || die 4 "git commit failed" ;;
 esac
 SHA=$(git rev-parse HEAD)
-[ "$SHA" != "$BEFORE" ] || die 4 "no new commit was created"
-[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || die 4 "the new commit is not a child of the previous HEAD"
+[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || die 4 "no new commit was created on top of the previous HEAD"
 git diff --cached --quiet || die 4 "changes remain staged after the commit"
 
 # --- Submit ---
@@ -119,8 +157,6 @@ case "$PROVIDER" in
         gt submit --no-interactive --no-edit >&2 || die 5 "gt submit failed"
         ;;
     github)
-        RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(cd -- "$(dirname -- "$0")/../../../.." && pwd)/github-workflow/lib/github-stack-runtime.js}"
-        [ -f "$RUNTIME" ] || die 5 "github-stack-runtime.js not found at $RUNTIME"
         # The runtime always exits 0 and reports through its JSON status.
         OUT=$(node "$RUNTIME" submit) || die 5 "github-stack-runtime submit crashed"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
@@ -132,20 +168,19 @@ case "$PROVIDER" in
 esac
 
 # --- Verify the published head ---
-DELAY="${YELLOW_REVIEW_VERIFY_DELAY:-5}"
-attempt=1
-while :; do
-    REMOTE=$(git ls-remote origin "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
+# The branch ref is updated synchronously by the submit; the PR's
+# headRefOid can lag, so only that check backs off.
+REMOTE_NAME=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+REMOTE_NAME="${REMOTE_NAME:-origin}"
+REMOTE=$(git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
+[ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
+PR_HEAD=""
+for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do
+    [ "$delay" -gt 0 ] && sleep "$delay"
     PR_HEAD=$(gh pr view "$PR" --json headRefOid 2>/dev/null | jq -r '.headRefOid // empty' 2>/dev/null || true)
-    if [ "$REMOTE" = "$SHA" ] && [ "$PR_HEAD" = "$SHA" ]; then
-        break
-    fi
-    if [ "$attempt" -ge "$VERIFY_ATTEMPTS" ]; then
-        die 6 "head not verified: local=$SHA remote=${REMOTE:-none} pr=${PR_HEAD:-none}"
-    fi
-    attempt=$((attempt + 1))
-    sleep "$DELAY"
+    [ "$PR_HEAD" = "$SHA" ] && break
 done
+[ "$PR_HEAD" = "$SHA" ] || die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}"
 
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die 6 "tracked tree is not clean after submit"
 
