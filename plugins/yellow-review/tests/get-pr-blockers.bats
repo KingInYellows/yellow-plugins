@@ -46,6 +46,20 @@ setup() {
   [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "enforced" ]
 }
 
+@test "a ruleset requiring thread resolution on page two is enforced" {
+  export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=page2
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "enforced" ]
+}
+
+@test "a failing rules page leaves the ruleset source unknown" {
+  export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=page2fail
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "unknown" ]
+}
+
 @test "both sources readable and neither requires it is not_enforced" {
   export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=none
   run --separate-stderr "$SCRIPT" "test/repo" "610"

@@ -1,10 +1,12 @@
 # Resolve dispositions contract
 
-Loaded by `/review:resolve` (`commands/review/resolve-pr.md`) and
-`pr-comment-resolver` (`agents/workflow/pr-comment-resolver.md`). The
-scripts under `skills/pr-review-workflow/scripts/` implement the mechanical
-parts. This file is the single source for how every unresolved review thread
-ends; the command and the agent point here instead of restating it.
+To be loaded by `/review:resolve` (`commands/review/resolve-pr.md`) and
+`pr-comment-resolver` (`agents/workflow/pr-comment-resolver.md`). Wiring both
+consumers to this contract lands in a later PR of this stack; until then
+neither references it and their current behavior is unchanged. The scripts
+under `skills/pr-review-workflow/scripts/` implement the mechanical parts.
+This file is the single source for how every unresolved review thread ends;
+once wired, the command and the agent point here instead of restating it.
 
 GitHub thread state is the record. The review-findings ledger is not
 involved.
@@ -143,7 +145,7 @@ missing types count as human. When comparing logins, strip a trailing
 | Human thread, `all` | Same as a bot thread |
 | `viewerCanResolve=false` | Never attempt a resolve. Reply if `viewerCanReply` is true. Report under blocking "needs permission" |
 | `viewerCanReply=false` and `viewerCanResolve=false` | No mutation. Report under blocking "needs permission" |
-| Dropped non-actionable (Step 3c) | Resolve with no reply; report as `resolved (non-actionable)`. Applies to human threads too, except under `never`, which holds them open |
+| Dropped non-actionable (Step 3c) | If `viewerCanResolve=false`, do not resolve; report under blocking "needs permission". Otherwise resolve with no reply and report as `resolved (non-actionable)`. Applies to human threads too, except under `never`, which holds them open |
 | Outdated | Processed like any other thread; clustered by path only |
 | `CHANGES_REQUESTED` review | Never mutated. Report under "Blocking merge (reviewer action)" |
 
@@ -342,7 +344,7 @@ Exit 1 is always "other failure" (network, unexpected response).
 | --- | --- | --- | --- | --- | --- | --- |
 | `reply-pr-thread` | replied or skipped | usage / body too long / credential | not found or permission | rate limited | — | — |
 | `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage / credential | — | — | — | — |
+| `file-followup-issue` | created or found | usage / credential | — | rate limited (no retry) | — | — |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / credential | — | — | — | — |
@@ -380,8 +382,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   when there are more.
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
-  definition files are refused, but the code the hooks run is not; this is
-  a tracked follow-up.
+  definition files are refused, but the code the hooks run is not. How
+  unattended commits should treat hooks is an open decision tracked in
+  #964.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds
   of threads) are slow. A batch apply script is a tracked follow-up.
 - Two accounts resolving the same PR concurrently can each post a reply;

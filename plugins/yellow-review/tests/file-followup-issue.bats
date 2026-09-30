@@ -62,12 +62,13 @@ setup() {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_app "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[44,false]' ]
+  grep -q -- '--app resolver-app' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "dedupe lists only the viewer's issues" {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_dup "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
-  grep -q -- '--author @me' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  grep -q -- '--author me' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "creates an issue with the marker and a thread link" {
@@ -79,6 +80,15 @@ setup() {
   [ "$(head -n 1 "$body")" = "Retry policy belongs in the client module." ]
   grep -qF 'https://github.com/test/repo/pull/7#discussion_r1' "$body"
   [ "$(tail -n 1 "$body")" = "<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->" ]
+}
+
+@test "a thread URL on a host other than GH_HOST falls back to the PR URL" {
+  export GH_HOST=ghe.example.com
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  body="${BATS_TEST_TMPDIR}/mock_gh_issue_body"
+  grep -qF 'https://ghe.example.com/test/repo/pull/7' "$body"
+  ! grep -qF 'discussion_r1' "$body"
 }
 
 @test "refuses issue text that looks like a credential" {
@@ -93,4 +103,11 @@ setup() {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"issue create failed"* ]]
+}
+
+@test "a rate-limited create exits 4" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"rate limit"* ]]
 }

@@ -164,15 +164,28 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (3)
+### Scripts (7)
 
-- `get-pr-comments` — Fetch unresolved, non-outdated PR review threads via
-  GitHub GraphQL API
+- `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
+  PR review threads via GitHub GraphQL API; outdated threads are excluded
+  unless `--include-outdated` is passed
+- `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
+  `reviewDecision`, and whether conversation resolution is enforced
+- `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a review
+  thread with an idempotency marker; skips threads already replied to
 - `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
   mutation
+- `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
+  File (or find) the follow-up issue for an out-of-scope thread, deduped by a
+  viewer-authored marker
+- `check-resolve-text <file>...` — Refuse resolver-written text that looks
+  like a credential (for text posted outside the resolve scripts)
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
+
+`reply-pr-thread` and `file-followup-issue` source `lib/resolve-text.sh`
+(credential-shape check) before posting.
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
@@ -353,7 +366,8 @@ explicit-invocation wording live in the skill body and description.
 ## Testing
 
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
-`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
+`get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
+`check-resolve-text.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
 `tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
 invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by

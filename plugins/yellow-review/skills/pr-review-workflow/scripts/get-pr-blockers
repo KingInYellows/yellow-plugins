@@ -110,8 +110,12 @@ if [ -n "$BASE" ]; then
         note 'classic branch protection not readable; treating as unknown'
     fi
 
-    if OUT=$(gh api "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" \
-            --jq '[.[] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
+    # The endpoint returns 30 rules per page. --paginate prints one JSON array
+    # per page, so combine every page with jq -s before applying any; a failed
+    # page fails the whole lookup and RULES stays unknown.
+    if PAGES=$(gh api --paginate "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" 2>"$ERR_FILE") \
+        && OUT=$(printf '%s' "$PAGES" | jq -s \
+            '[.[][] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
             2>"$ERR_FILE"); then
         case "$OUT" in
             true) RULES=true ;;
