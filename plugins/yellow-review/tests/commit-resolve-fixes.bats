@@ -234,6 +234,30 @@ run_crf() {
   grep -q "^node .*github-workflow/2.10.0/lib/github-stack-runtime.js submit$" "$STUB_LOG"
 }
 
+@test "gt and hooks do not inherit literal-pathspec mode" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^gt-env literal=unset$' "$STUB_LOG"
+  grep -q '^gh api --paginate repos/{owner}/{repo}/pulls/7/files' "$STUB_LOG"
+}
+
+@test "--unattended refuses a credential in added lines and leaves nothing staged" {
+  printf 'one\nfeature\nkey = "AKIAABCDEFGHIJKLMNOP"\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"credential"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "an attended run only warns about a credential in added lines" {
+  printf 'one\nfeature\nkey = "AKIAABCDEFGHIJKLMNOP"\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"Warning"*"credential"* ]]
+}
+
 @test "a missing github runtime fails before committing (exit 2)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/missing.js"

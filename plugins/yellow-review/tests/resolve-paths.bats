@@ -27,7 +27,10 @@ setup() {
 @test "rp_denied matches the deny list case-insensitively" {
   for p in .github/workflows/ci.yml .GitHub/workflows/ci.yml .claude/settings.json .Claude/x \
            yellow-plugins.local.md CLAUDE.md AGENTS.md .mcp.json src/.env config/.env.prod \
-           deploy/Dockerfile keys/server.PEM infra/prod.tfvars secrets.yaml Jenkinsfile; do
+           deploy/Dockerfile keys/server.PEM infra/prod.tfvars secrets.yaml Jenkinsfile \
+           .vscode/tasks.json .devcontainer/devcontainer.json .idea/runConfigurations/x.xml \
+           Dockerfile.prod app.dockerfile docker-compose.override.yml compose.yaml \
+           .travis.yml .drone.yml bitbucket-pipelines.yml; do
     rp_denied "$p" || { echo "not denied: $p"; false; }
   done
 }
@@ -42,15 +45,20 @@ setup() {
 @test "rp_runner flags files hooks or verify commands execute" {
   for p in package.json web/package.json pnpm-lock.yaml Makefile conftest.py tests/conftest.py \
            vitest.config.ts .pre-commit-config.yaml lefthook.yml .lintstagedrc.json \
-           scripts/build.sh .husky/pre-commit; do
+           scripts/build.sh .husky/pre-commit packages/x/scripts/gen.sh .npmrc .yarnrc.yml \
+           justfile Rakefile Taskfile.yml pyproject.toml setup.py tox.ini build.rs \
+           .cargo/config.toml .envrc .eslintrc.json .prettierrc; do
     rp_runner "$p" || { echo "not a runner: $p"; false; }
   done
   git config core.hooksPath .githooks
   rp_runner .githooks/pre-commit
+  rp_runner .GitHooks/pre-commit
+  git config core.hooksPath "$(pwd)/hooks-abs"
+  rp_runner hooks-abs/pre-commit
 }
 
 @test "rp_runner leaves ordinary sources alone" {
-  for p in src/a.ts src/scripts.ts plugins/x/scripts/tool README.md; do
+  for p in src/a.ts src/scripts.ts README.md src/transcripts/a.md; do
     run rp_runner "$p"
     [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
   done

@@ -1,10 +1,15 @@
 # shell-compat: library
 # Path rules shared by commit-resolve-fixes and run-verify-command (bash;
 # sourced). Resolver file lists are untrusted: every path must be canonical,
-# off the deny list and, for unattended commits, not a file that a git hook
-# or verify command would execute. Contract: references/resolve/dispositions.md
-# ("File set"). Callers also export GIT_LITERAL_PATHSPECS=1.
+# on the PR's changed-file list, off the deny list and, for unattended runs,
+# not a file that a git hook, package manager or verify command would
+# execute. Contract: references/resolve/dispositions.md ("File set").
 # shellcheck shell=bash
+
+# Git with listed paths taken literally (no globs or pathspec magic). A
+# per-call flag, not GIT_LITERAL_PATHSPECS, so hooks, gt and the verify
+# command never inherit it.
+lgit() { git --literal-pathspecs "$@"; }
 
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
@@ -29,32 +34,45 @@ rp_denied() {
     local l
     l=$(rp_lower "$1")
     case "$l" in
-        .github/*|.circleci/*|.git/*|.claude/*) return 0 ;;
+        .github/*|.circleci/*|.git/*|.claude/*|.vscode/*|.devcontainer/*|.idea/*) return 0 ;;
         yellow-plugins.local.md|claude.md|agents.md|.mcp.json) return 0 ;;
     esac
     case "${l##*/}" in
-        .gitlab-ci.yml|jenkinsfile|azure-pipelines.yml|dockerfile|docker-compose.yml) return 0 ;;
+        .gitlab-ci.yml|.travis.yml|.drone.yml|jenkinsfile|azure-pipelines.yml|bitbucket-pipelines.yml) return 0 ;;
+        dockerfile|dockerfile.*|*.dockerfile|docker-compose*.yml|docker-compose*.yaml|compose.yml|compose.yaml) return 0 ;;
         .env|.env.*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
     esac
     return 1
 }
 
-# rp_runner <path>: files a verify command or a git hook would execute.
+# rp_runner <path>: files a verify command, package manager or git hook
+# would execute.
 rp_runner() {
-    local l hooks
+    local l hooks top
     l=$(rp_lower "$1")
-    case "$l" in
-        scripts/*|.husky/*) return 0 ;;
+    case "/$l" in
+        /scripts/*|*/scripts/*|/.husky/*|*/.husky/*|/.cargo/*|*/.cargo/*) return 0 ;;
     esac
     case "${l##*/}" in
         package.json|package-lock.json|npm-shrinkwrap.json|pnpm-lock.yaml|yarn.lock|bun.lock|bun.lockb) return 0 ;;
-        makefile|gnumakefile|conftest.py|.pre-commit-config.yaml|lefthook*.yml|lefthook*.yaml|.lintstagedrc*) return 0 ;;
-        *.config.*) return 0 ;;
+        .npmrc|.pnpmfile.cjs|.yarnrc|.yarnrc.*|.envrc|mise.toml|.mise.toml) return 0 ;;
+        makefile|gnumakefile|justfile|rakefile|taskfile.yml|taskfile.yaml) return 0 ;;
+        conftest.py|pyproject.toml|setup.py|setup.cfg|tox.ini|pytest.ini|noxfile.py|build.rs) return 0 ;;
+        .pre-commit-config.yaml|lefthook*.yml|lefthook*.yaml|.lintstagedrc*) return 0 ;;
+        *.config.*|.eslintrc*|.prettierrc*|.babelrc*|.mocharc*) return 0 ;;
     esac
     hooks=$(git config --get core.hooksPath 2>/dev/null || true)
-    hooks="${hooks#./}"
     if [ -n "$hooks" ]; then
-        case "$1" in "${hooks%/}"/*) return 0 ;; esac
+        top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+        [ -n "$top" ] && hooks="${hooks#"$top"/}"
+        hooks=$(rp_lower "${hooks#./}")
+        case "$l" in "${hooks%/}"/*) return 0 ;; esac
     fi
     return 1
+}
+
+# rp_pr_files <pr>: the PR's changed file names, one per line. Uses the
+# files API, which works past GitHub's diff-size limits (gh pr diff does not).
+rp_pr_files() {
+    gh api --paginate "repos/{owner}/{repo}/pulls/$1/files?per_page=100" --jq '.[].filename'
 }

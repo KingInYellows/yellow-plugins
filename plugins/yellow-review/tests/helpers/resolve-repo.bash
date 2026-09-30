@@ -57,6 +57,8 @@ printf 'gt %s\n' "$*" >> "$STUB_LOG"
 case "$1" in
   modify)
     [ "${STUB_GT_MODIFY_FAIL:-0}" = 1 ] && exit 1
+    # Hooks and gt must not inherit literal-pathspec mode.
+    printf 'gt-env literal=%s\n' "${GIT_LITERAL_PATHSPECS:-unset}" >> "$STUB_LOG"
     # Mirror gt modify -c: commit what is staged, never stage anything.
     case " $* " in *" -c "*) ;; *) echo "stub gt: amend not expected" >&2; exit 1 ;; esac
     msg=""; next=0
@@ -101,7 +103,8 @@ case "$*" in
     printf '{"headRefOid":"%s"}\n' "$oid"
     exit 0
     ;;
-  "pr diff "*)
+  "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*)
+    # The PR's changed files (the stub ignores --jq and prints names).
     [ "${STUB_PR_DIFF_FAIL:-0}" = 1 ] && exit 1
     exec git --git-dir="$ORIGIN_DIR" diff --name-only main...feature
     ;;
