@@ -1,0 +1,23 @@
+plugins/yellow-review/CLAUDE.md
+  s_becc7011266565::t_609f67f376ec26 175,188-189,194,390
+plugins/yellow-review/README.md
+  s_becc7011266565::t_6aa67227324f80 115
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_becc7011266565::t_ec80a38e9b8cbe 431-432,440-441,443-446
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b4f937b9743eea53eb8605dabb8a6f486ee36f1f",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
