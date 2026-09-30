@@ -1,0 +1,38 @@
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_fc95207836202a::t_d0de40a9ad22a3 84-92
+plugins/yellow-review/lib/resolve-text.sh
+  s_fc95207836202a::t_80d0f2498847ab 21-31
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_28e87b41759b07 383-385
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_fc95207836202a::t_6b4c9c622dfb26 55-70
+plugins/yellow-review/tests/mocks/gh
+  s_fc95207836202a::t_2ecc149acdd911 193-195,197-209
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_fc95207836202a::t_9130c17f22a424 49-62
+plans/review-resolve-hardening.md
+  s_fc95207836202a::t_d6f74eaf7c2135 510-512
+  s_fc95207836202a::t_4e61a2e5866392 62-66
+  s_fc95207836202a::t_66bc7ca53a39e2 675-678
+  s_fc95207836202a::t_7d2cea83bf9bb3 156-160
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_fc95207836202a::t_40cfdab98a69fe 122
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_fc95207836202a::t_ed0576edccb31a 113-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f1cafd9a4dc881a1ae125ccad520a9ebffe93381",
+  "prompts": {},
+  "sessions": {
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
