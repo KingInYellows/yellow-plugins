@@ -636,6 +636,17 @@ Decisions from the brainstorm and the planning round:
   - a re-run (no duplicate replies or issues);
   - `--non-interactive` with 4 `oos` candidates (3 filed, 1 blocking);
   - a failing `verify_command`, where a patch is saved and the tree is clean.
+  - **2026-09-30 run on this stack's own PRs #950 and #952** (Codex bot
+    threads; worktree scripts and resolver body, Graphite provider):
+    covered `fixed`, `addressed`, `disagree`, `unclear` (malformed THREAD
+    line and failed evidence), the outdated lane (4 outdated threads,
+    resolved via GraphQL), a re-run posting no duplicates, a runner-rule
+    refusal followed by `--revert-dirty` and patch restore, and new-commit
+    semantics. Not covered (no such threads): `oos` and issue filing, the
+    3-issue unattended cap, LGTM, human threads, a failing
+    `verify_command`. Found and fixed: the unattended `*/scripts/*` runner
+    rule was too broad (now root `scripts/` only), and a post-hook commit
+    mismatch now undoes the local commit.
 - [x] 4.6: File the follow-up issues (#957–#966):
   - `review-pr.md:1047` and `review-all.md:376` `gt modify -m` → stage + `-c`;
   - a sticky blocking-threads PR comment for repos without enforcement;
