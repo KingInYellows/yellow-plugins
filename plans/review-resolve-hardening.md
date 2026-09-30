@@ -562,7 +562,7 @@ Decisions from the brainstorm and the planning round:
 > The Skill tool returns no machine status (`:198`), so keep the `jq length`
 > cross-check mandatory, not optional.
 <!-- /deepen-plan -->
-- [ ] 3.2: `commands/review/sweep.md`:
+- [x] 3.2: `commands/review/sweep.md`:
   - Update the gate list at lines 131–135.
   - Replace the stale "posts a false-positive response" prose around lines
     143–145.
