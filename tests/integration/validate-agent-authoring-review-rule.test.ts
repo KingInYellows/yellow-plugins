@@ -216,8 +216,8 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
   });
 
   it('does NOT flag non-review agents (e.g., agents/workflow/)', () => {
-    // pr-comment-resolver legitimately needs Bash and Edit; it lives under
-    // agents/workflow/ not agents/review/ and Rule X does not apply.
+    // Workflow agents (e.g. pr-comment-resolver, which needs Edit) live under
+    // agents/workflow/ not agents/review/, and Rule X does not apply.
     writeAgent(
       tmpRoot,
       'yellow-test/agents/workflow/some-worker.md',
