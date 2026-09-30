@@ -75,6 +75,10 @@ case "$ALL_ARGS" in
   "issue create "*)
     # Saves the title and body for assertions. MOCK_GH_ISSUE_CREATE_FAIL=1
     # simulates a failure.
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = ratelimit ]; then
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+      exit 1
+    fi
     if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = 1 ]; then
       printf 'HTTP 422: Validation Failed\n' >&2
       exit 1
@@ -190,8 +194,23 @@ case "$ALL_ARGS" in
     exit 0
     ;;
   *"/rules/branches/"*)
-    # Branch rulesets. MOCK_GH_RULES: enforced | none (default) | fail.
+    # Branch rulesets. MOCK_GH_RULES: enforced | none (default) | fail |
+    # page2 (the enforcing rule only on page two; needs --paginate, which
+    # prints one array per page) | page2fail (page two errors).
     case "${MOCK_GH_RULES:-none}" in
+      page2|page2fail)
+        printf '[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]\n'
+        case " $ALL_ARGS " in
+          *" --paginate "*)
+            if [ "$MOCK_GH_RULES" = page2fail ]; then
+              printf 'gh: Server Error (HTTP 500)\n' >&2
+              exit 1
+            fi
+            printf '[{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]\n'
+            ;;
+        esac
+        exit 0
+        ;;
       enforced) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]'; emit "$@" ;;
       fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
       *) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]'; emit "$@" ;;

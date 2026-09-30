@@ -52,3 +52,25 @@ setup() {
   [ "$status" -eq 0 ]
   [ $((SECONDS - start)) -lt 5 ]
 }
+
+@test "an unquoted lowercase credential assignment exits 2" {
+  printf '%s\n' 'password: hunter22' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf '%s\n' 'the api_key=abc12345xyz was committed' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "type annotations and prose about credentials are not flagged" {
+  printf '%s\n' 'password: string' 'token: str' 'secret: Optional[str]' \
+    'token: $TOKEN' 'The password: required field is validated.' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "an unquoted credential value containing a slash exits 2" {
+  printf '%s\n' 'password: fake123/password' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}

@@ -59,9 +59,11 @@ Decisions from the brainstorm and the planning round:
     - `addressed`: reply with a mechanically verified pointer, then resolve.
     - `oos`: file an issue, reply with the link, then resolve.
     - `disagree` or `unclear`: reply and leave open (blocking).
-- **Resolve last.** A thread is resolved only after its reply posts. For
-  `fixed`, the verified push must also have landed. Anything malformed,
-  missing, skipped or partial becomes `unclear`.
+- **Resolve last.** A thread is resolved only after its reply posts, except
+  dropped non-actionable threads, which resolve with no reply unless
+  `resolve_human_threads: never` holds them open. For `fixed`, the verified
+  push must also have landed. Anything malformed, missing, skipped or
+  partial becomes `unclear`.
 - **Human-reviewer threads** resolve only on hard evidence (`fixed` with a
   verified push, or `addressed` with a verified pointer).
   - `oos` and `disagree` on human threads reply and stay open.
@@ -151,7 +153,11 @@ Decisions from the brainstorm and the planning round:
 <!-- /deepen-plan -->
 - **Machine summary line.** The command prints exactly one line of the form
   `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
-  push=<ok|skipped|failed|noop>, verify=<pass|fail|skipped>`.
+  push=<ok|skipped|failed|noop>, verify=<pass|fail|skipped>,
+  ratelimited=<0|1>`.
+  - `ratelimited=1` means a script exited 4 and mutations stopped;
+    `/review:resolve-stack` and `/review:sweep-all` stop mutating and report
+    remaining PRs as `not attempted (rate limit)`.
   - `/review:sweep` and `/review:sweep-all` print it and do not change their
     exit code for blocking threads.
   - `/review:resolve-stack` exits 1 when anything blocks.
@@ -501,6 +507,9 @@ Decisions from the brainstorm and the planning round:
   these keys, each with a default, validation rule and warning fallback:
   - `resolve_pr.cluster_cap` (currently undocumented);
   - `resolve_pr.verify_command` (string);
+  - `resolve_pr.verify_unattended` (default `false`, boolean; any value other
+    than `true` warns and is treated as `false`, so unattended runs skip
+    verify);
   - `resolve_pr.verify_timeout_seconds` (default 600);
   - `resolve_pr.repass_wait_seconds` (default 120, range 0–600);
   - `resolve_pr.resolve_human_threads` (`evidence|never|all`).
@@ -663,9 +672,10 @@ Decisions from the brainstorm and the planning round:
 
 ## Acceptance Criteria
 
-1. No thread is resolved unless its reply posted. A `fixed` thread also needs
-   a push verified by `ls-remote` and `headRefOid`. Verify with bats (script
-   exits) and the 4.5 run.
+1. No thread is resolved unless its reply posted, except dropped
+   non-actionable threads (held open under `resolve_human_threads: never`).
+   A `fixed` thread also needs a push verified by `ls-remote` and
+   `headRefOid`. Verify with bats (script exits) and the 4.5 run.
 2. Resolver edits are always staged before the commit, and a staged-set
    mismatch aborts before the push (`commit-resolve-fixes` exit 3).
 3. Each resolve pass adds a new commit. The previous commit's message and

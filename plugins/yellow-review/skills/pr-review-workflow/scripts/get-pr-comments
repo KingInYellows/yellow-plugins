@@ -1,5 +1,6 @@
 #!/bin/bash
-# Fetch unresolved, non-outdated PR review threads via GitHub GraphQL API.
+# Fetch unresolved PR review threads via GitHub GraphQL API. Outdated threads
+# are excluded unless --include-outdated is passed.
 # Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>
 #   --include-outdated  also return unresolved threads whose anchor is outdated
 # Output: JSON array of thread objects to stdout.
