@@ -1,0 +1,57 @@
+docs/solutions/code-quality/context-observer-py-observer-crash-behavior-docstr.md
+  s_c445864c5f07c1::t_30648c21c26bdb 1-23
+docs/solutions/code-quality/scripts-validate-provider-groups-js-checks-each-co.md
+  s_c445864c5f07c1::t_f500c9ddaa854c 1-22
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_cc54a24c474bc0::t_457b2f833ba46d 1-83
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_f38f44144d87fc::t_94d69d720a81f5 1-22
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_e2e3c391667504::t_67795b2707670b 1-76
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_f38f44144d87fc::t_1303f3e7007bd4 1-23
+docs/solutions/workflow/release-pr-token-only-bypasses-approval-for-versio.md
+  s_f38f44144d87fc::t_1b6d70de027cbc 1-22
+docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md
+  s_f38f44144d87fc::t_bba745bb8dcde4 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9a3d3db245396064cbaecb9ee1bcbc854f3f18a2",
+  "prompts": {},
+  "sessions": {
+    "s_c445864c5f07c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "31c30920-d821-4769-b184-b0bff9fec192",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_cc54a24c474bc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04386d49-9238-4791-b95b-e4134636bb2c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e2e3c391667504": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b4687c1e-d024-4e17-a663-9723ae8f9f7e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f38f44144d87fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d200bece-f0a6-4a4f-8863-507fe7d173a4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
