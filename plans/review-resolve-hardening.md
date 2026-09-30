@@ -576,7 +576,8 @@ Decisions from the brainstorm and the planning round:
   - Keep the clean-tree-between-PRs assumption at lines 319–325 true.
 - [x] 3.4: `skills/pr-review-workflow/SKILL.md`:
   - Update the commit convention (lines 308–339): resolve uses
-    `git add` + `gt modify -c`; `/review:pr` and `/review:all` still amend,
+    `commit-resolve-fixes` (explicit `git add`, then a new commit through
+    the provider); `/review:pr` and `/review:all` still amend,
     and a follow-up issue tracks that.
   - Update the GraphQL Scripts section (lines 403–412) for the new scripts
     and flag.
