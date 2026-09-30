@@ -461,7 +461,7 @@ Decisions from the brainstorm and the planning round:
     - never reply, resolve or file.
   - Point to `references/resolve/dispositions.md` rather than restating it.
     Stay under 300 lines.
-- [ ] 2.2: Update `commands/review/resolve-pr.md` Steps 1–4.
+- [x] 2.2: Update `commands/review/resolve-pr.md` Steps 1–4.
   - Step 1: add the issue-filing prompt to the gates that `--non-interactive`
     suppresses.
   - Step 3: call `get-pr-comments --include-outdated`. Run `get-pr-blockers`
