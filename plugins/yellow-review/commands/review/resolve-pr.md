@@ -209,21 +209,9 @@ If `.ruvector/` exists:
 
 ### Step 3c: Actionability filter
 
-Drop comment threads whose entire content is non-actionable approval / acknowledgement / style noise. **Trim leading and trailing whitespace, then test the concatenated thread body** (case-insensitive, single-line / non-MULTILINE mode so `^` and `$` anchor to the full string rather than individual lines, stripping a trailing `!` or `.` for word patterns) against this regex set:
-
-| Pattern (case-insensitive)                                 | Matches                                            |
-| ---------------------------------------------------------- | -------------------------------------------------- |
-| `^lgtm[!.]?$`                                              | `LGTM`, `lgtm.`, `LGTM!`                           |
-| `^thanks[!.]?$` / `^thank\s+you[!.]?$`                     | `thanks`, `thank you`, `Thanks!`                   |
-| `^(?:👍\|✅\|🎉)\s*[!.]?$`                                  | bare emoji approvals                               |
-| `^\+1\s*[!.]?$`                                            | `+1`                                               |
-| `^looks?\s+good[!.]?$`                                     | `looks good`, `Looks Good!`                        |
-| `^nice(?:\s+catch)?[!.]?$`                                 | `nice`, `nice catch`                               |
-| `^nit:?[!.]?$`                                             | bare `nit` or `nit:` with no content               |
-
-A thread matches **only when its entire concatenated body** matches one of the patterns above. Threads with one of these patterns followed by a substantive paragraph (e.g., `LGTM, but consider X for the retry path`) are NOT dropped — the substantive body is what matters. The `nit:` prefix rule deliberately does NOT drop `nit: <substantive suggestion>` because nit-prefixed comments are often actionable cosmetic feedback — only bare `nit` / `nit:` with no body is dropped.
-
-Adapted from upstream `EveryInc/compound-engineering-plugin` PR #461 actionability filter at locked SHA `e5b397c9`. The yellow-plugins variant is intentionally conservative — when in doubt, keep the thread.
+Drop threads whose entire body is non-actionable approval, acknowledgement
+or bare-nit noise, using the pattern table and matching rules in the
+contract's "Non-actionable threads" section. When in doubt, keep the thread.
 
 Track:
 - `dropped_count` — number of threads filtered out
@@ -349,8 +337,8 @@ not already. Then, for every thread sent to a resolver:
      description) with "Keep the resolver's partial edits / Roll back the
      conflicted cluster's edits / Cancel and reconcile manually". To roll
      back, write the cluster's files to a `mktemp` file with the Write tool
-     and run `GIT_LITERAL_PATHSPECS=1 git checkout HEAD --pathspec-from-file="<file>"`.
-     Cancel stops before Step 6.
+     and run `run-verify-command --pr "<PR#>" --revert-only --files-from
+     "<file>"` (it saves a patch). Cancel stops before Step 6.
    - **Non-interactive:** keep the edits, log the conflict for Step 9.
    Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
@@ -386,15 +374,17 @@ untrusted-content ---` fence, record `push=failed`, skip to Step 7.
 
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: ask with the command and `git diff --stat`; unattended: only
-with `verify_unattended: true`, an untracked config and no runner files).
-Write the command with the Write tool to a `mktemp` path and pass the Bash
-tool a `timeout` of `(<seconds> + 60) × 1000` ms:
+with `verify_unattended: true` and an untracked config; add `--unattended`,
+which reports `skipped` with a reason for runner files or files outside the
+PR). Write the command with the Write tool to a `mktemp` path and pass the
+Bash tool a `timeout` of `(<seconds> + 60) × 1000` ms:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --files-from "<files-file>"
 ```
 
-`pass` → `verify=pass`. `fail`/`timeout` → `verify=fail`: the files were
+`pass` → `verify=pass`. `skipped` → `verify=skipped`, `fixed` threads held
+open as "verify skipped (<reason>)". `fail`/`timeout` → `verify=fail`: the files were
 reverted and a patch saved, every `fixed` thread becomes blocking "verify
 failed (<patch>)", and the commit is skipped (`push=skipped`). If
 `treeClean` is false, stop after Step 9 with the dirty file list.
@@ -432,8 +422,10 @@ text with the Write tool to a `mktemp` path, never on a command line:
 - **Linear:** when ToolSearch finds
   `mcp__plugin_yellow-linear_linear__save_issue` and the branch matches
   `[A-Z]{2,5}-[0-9]{1,6}`, resolve the team from the prefix with
-  `list_teams` and call `save_issue` (title, team, description ending with
-  the marker). Any failure falls back to `file-followup-issue` once.
+  `list_teams`, write the title and description (ending with the marker) to
+  files, run `check-resolve-text` on them (exit 2 → the plain title and
+  body, no resolver text), then call `save_issue`. Any failure falls back
+  to `file-followup-issue` once.
 - A failed stage stops that thread's later stages; record the per-stage
   outcome. After any exit 4, stop mutating and mark the rest `not attempted
   (rate limit)`.
@@ -449,13 +441,15 @@ with a Bash tool `timeout` of `(<wait> + 120) × 1000` ms:
 end=$((SECONDS + <wait>)); found=0
 while [ $((SECONDS + 20)) -le "$end" ]; do
   sleep 20
-  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-outdated "<owner/repo>" "<PR#>" >| "<refetch-file>" || continue
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-outdated "<owner/repo>" "<PR#>" >| "<refetch-file>" 2>| "<refetch-err>" \
+    || { grep -qi 'rate limit' "<refetch-err>" && { printf 'poll rate-limited\n'; break; }; continue; }
   if jq -r '.[].threadId' "<refetch-file>" | grep -qvxF -f "<round1-file>"; then found=1; fi
   printf 'poll t=%s new=%s\n' "$SECONDS" "$found"
   [ "$found" = 1 ] && break
 done
 ```
 
+`poll rate-limited` means `ratelimited=1`: skip the rest of this step.
 From the last re-fetch:
 - threads this run attempted to resolve but still open → retry
   `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
