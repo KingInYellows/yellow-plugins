@@ -84,9 +84,15 @@ VIEWER=$(printf '%s' "$VIEWER" | jq -Rr "$NORMALIZE")
 # The trailing " disposition=" keeps PRRT_ab from matching PRRT_abc.
 MARKER_PREFIX="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition="
 
-# --- Dedupe: scan issue bodies (search indexing lags, so no search API) ---
-gh issue list --repo "$REPO" --state all --limit "$LIST_LIMIT" \
+# --- Dedupe: scan the viewer's issue bodies ---
+# --author filters server-side (not the lagging search index), so other
+# users' issues cannot push ours out of the window.
+gh issue list --repo "$REPO" --author @me --state all --limit "$LIST_LIMIT" \
     --json number,url,body,author >"$WORK_DIR/issues.json" 2>"$ERR" || gh_fail 'issue list'
+if [ "$(jq 'length' "$WORK_DIR/issues.json")" -ge "$LIST_LIMIT" ]; then
+    printf '[file-followup-issue] Warning: %s or more of your issues exist; dedupe only scanned the newest %s.\n' \
+        "$LIST_LIMIT" "$LIST_LIMIT" >&2
+fi
 
 EXISTING=$(jq -c --arg viewer "$VIEWER" --arg prefix "$MARKER_PREFIX" '
     [ .[]
