@@ -63,7 +63,7 @@ setup() {
 
 @test "counts characters, not bytes, for the size cap" {
   # 1000 two-byte characters are within the cap.
-  python3 -c 'print("é" * 1000, end="")' >| "$BODY"
+  printf 'é%.0s' $(seq 1 1000) >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 0 ]
 }

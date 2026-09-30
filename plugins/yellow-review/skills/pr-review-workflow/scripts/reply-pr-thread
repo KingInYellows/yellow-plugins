@@ -15,7 +15,9 @@
 set -eu
 
 MAX_BODY_CHARS=1000
-MAX_WAIT_SECONDS=300
+# Longer waits exit 4 instead: the whole call must fit the caller's Bash
+# tool timeout (120 s by default).
+MAX_WAIT_SECONDS=90
 
 usage() {
     printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2

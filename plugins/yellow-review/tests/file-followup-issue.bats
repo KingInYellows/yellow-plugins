@@ -64,6 +64,12 @@ setup() {
   [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[44,false]' ]
 }
 
+@test "dedupe lists only the viewer's issues" {
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_dup "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  grep -q -- '--author @me' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+}
+
 @test "creates an issue with the marker and a thread link" {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]

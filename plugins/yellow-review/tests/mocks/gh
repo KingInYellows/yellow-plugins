@@ -68,6 +68,7 @@ case "$ALL_ARGS" in
     exit 0
     ;;
   "issue list "*)
+    printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
     cat "$FIXTURE_DIR/issue-list-response.json"
     exit 0
     ;;
