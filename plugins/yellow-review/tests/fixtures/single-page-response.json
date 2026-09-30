@@ -3,18 +3,32 @@
     "repository": {
       "pullRequest": {
         "reviewThreads": {
-          "pageInfo": { "hasNextPage": false, "endCursor": null },
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
           "nodes": [
             {
               "id": "PRRT_thread1",
               "isResolved": false,
               "isOutdated": false,
+              "viewerCanResolve": true,
+              "viewerCanReply": true,
               "path": "src/main.ts",
               "line": 42,
               "startLine": 40,
               "comments": {
                 "nodes": [
-                  { "author": { "login": "reviewer1" }, "body": "Consider using a const here" }
+                  {
+                    "author": {
+                      "login": "reviewer1",
+                      "__typename": "User"
+                    },
+                    "body": "Consider using a const here",
+                    "id": "PRRC_c1",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  }
                 ]
               }
             },
@@ -22,35 +36,67 @@
               "id": "PRRT_thread2",
               "isResolved": true,
               "isOutdated": false,
+              "viewerCanResolve": true,
+              "viewerCanReply": true,
               "path": "src/utils.ts",
               "line": 10,
               "startLine": null,
               "comments": {
-                "nodes": [{ "author": { "login": "reviewer1" }, "body": "LGTM" }]
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "reviewer1"
+                    },
+                    "body": "LGTM"
+                  }
+                ]
               }
             },
             {
               "id": "PRRT_thread3",
               "isResolved": false,
               "isOutdated": true,
+              "viewerCanResolve": false,
+              "viewerCanReply": true,
               "path": "src/old.ts",
               "line": 5,
               "startLine": null,
               "comments": {
-                "nodes": [{ "author": { "login": "reviewer2" }, "body": "Outdated comment" }]
+                "nodes": [
+                  {
+                    "author": {
+                      "__typename": "Bot",
+                      "login": "coderabbitai"
+                    },
+                    "body": "Outdated comment",
+                    "id": "PRRC_c3",
+                    "createdAt": "2026-09-30T11:00:00Z",
+                    "viewerDidAuthor": false
+                  }
+                ]
               }
             },
             {
               "id": "PRRT_thread4",
               "isResolved": false,
               "isOutdated": false,
+              "viewerCanResolve": true,
+              "viewerCanReply": true,
               "path": "src/handler.ts",
               "line": 88,
               "startLine": 85,
               "comments": {
                 "nodes": [
-                  { "author": { "login": "reviewer2" }, "body": "Add error handling" },
-                  { "author": null, "body": "Follow-up note" }
+                  {
+                    "author": {
+                      "login": "reviewer2"
+                    },
+                    "body": "Add error handling"
+                  },
+                  {
+                    "author": null,
+                    "body": "Follow-up note"
+                  }
                 ]
               }
             }

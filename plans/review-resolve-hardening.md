@@ -220,7 +220,7 @@ Decisions from the brainstorm and the planning round:
   - the `Resolve:` contract line;
   - known limit: two accounts running concurrently may post duplicate
     replies.
-- [ ] 1.2: Extend `skills/pr-review-workflow/scripts/get-pr-comments`.
+- [x] 1.2: Extend `skills/pr-review-workflow/scripts/get-pr-comments`.
   - Add an `--include-outdated` flag, which drops only the `isOutdated ==
     false` clause at line 195. The default filter is unchanged.
   - Add these fields to each thread: `isOutdated`, `viewerCanResolve`,
