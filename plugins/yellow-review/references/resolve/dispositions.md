@@ -81,10 +81,14 @@ Accept exactly one of:
   `^[1-9][0-9]{0,6}$` and is within the file's length at HEAD, and the path
   matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment, exists at
   HEAD, and equals the thread's `path` (for outdated or review-level
-  threads: is one of the PR's changed files, `gh pr diff --name-only`);
-- a commit SHA matching `^[0-9a-f]{7,40}$` that passes
-  `git merge-base --is-ancestor <sha> HEAD` and whose diff
-  (`git show --name-only <sha>`) touches the thread's anchor path.
+  threads: is one of the PR's changed files);
+- a commit SHA matching `^[0-9a-f]{7,40}$` that is inside the PR's range —
+  `git merge-base --is-ancestor <sha> HEAD` passes and
+  `git merge-base --is-ancestor <sha> "$(git merge-base HEAD origin/<base>)"`
+  fails — and whose diff (`git show --name-only <sha>`) touches the thread's
+  anchor path. The resolver has no shell, so SHAs come from the
+  orchestrator's own `git log` over the PR range, never from resolver text
+  alone.
 
 A value that fails its pattern is never used in a command; the thread
 becomes `unclear`.
@@ -95,6 +99,30 @@ deleting commit is cited and passes the SHA rule.
 
 For outdated threads, the resolver looks for the concern in the file at
 HEAD, not in the original diff position.
+
+## Non-actionable threads
+
+Step 3c drops a thread only when its **entire** concatenated body — trimmed,
+tested case-insensitively in single-line mode so `^` and `$` anchor to the
+whole string, with a trailing `!` or `.` stripped for word patterns —
+matches one of:
+
+| Pattern (case-insensitive) | Matches |
+| --- | --- |
+| `^lgtm[!.]?$` | `LGTM`, `lgtm.`, `LGTM!` |
+| `^thanks[!.]?$` / `^thank\s+you[!.]?$` | `thanks`, `thank you`, `Thanks!` |
+| `^(?:👍\|✅\|🎉)\s*[!.]?$` | bare emoji approvals |
+| `^\+1\s*[!.]?$` | `+1` |
+| `^looks?\s+good[!.]?$` | `looks good`, `Looks Good!` |
+| `^nice(?:\s+catch)?[!.]?$` | `nice`, `nice catch` |
+| `^nit:?[!.]?$` | bare `nit` or `nit:` with no content |
+
+`LGTM, but consider X` is not dropped, and neither is `nit: <suggestion>`:
+the substantive body is what matters. Adapted from upstream
+`EveryInc/compound-engineering-plugin` PR #461 at locked SHA `e5b397c9`; the
+yellow-plugins variant is intentionally conservative — when in doubt, keep
+the thread. Dropped threads skip the resolvers and are resolved with no
+reply in the write phase (the lane below).
 
 ## Lanes
 
@@ -189,28 +217,43 @@ The tracked check runs from the repository root
 yellow-plugins.local.md`). A failed or timed-out verify reverts the files,
 saves a patch and holds `fixed` threads open.
 
-**Runner files** are code that a verify command or a git hook would
-execute: `package.json`, lockfiles, `Makefile`, `*.config.*`,
-`conftest.py`, `.pre-commit-config.yaml`, `lefthook*.yml`, `.lintstagedrc*`,
-and anything under `scripts/`, `.husky/` or the `core.hooksPath` directory.
+**Runner files** are code or config that a verify command, a package
+manager or a git hook would execute: `package.json`, lockfiles, `.npmrc`,
+`.pnpmfile.cjs`, `.yarnrc*`, `Makefile`, `justfile`, `Rakefile`,
+`Taskfile.y*ml`, `mise.toml`, `.envrc`, `*.config.*`, `.eslintrc*`,
+`.prettierrc*`, `.babelrc*`, `.mocharc*`, `conftest.py`, `pyproject.toml`,
+`setup.py`, `setup.cfg`, `tox.ini`, `pytest.ini`, `noxfile.py`, `build.rs`,
+`.pre-commit-config.yaml`, `lefthook*.yml`, `.lintstagedrc*`, and anything
+under a `scripts/`, `.husky/` or `.cargo/` directory or the
+`core.hooksPath` directory (matched case-insensitively).
 
 ## File set
 
 The expected file set comes from the resolvers' `Files modified`, but the
 scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
 
-- paths are canonical and repo-relative (no `.`, `..` or empty segment) and
-  git treats them literally (`GIT_LITERAL_PATHSPECS=1`);
+- paths are canonical and repo-relative (no `.`, `..` or empty segment),
+  and the scripts' own git calls use `git --literal-pathspecs` (never the
+  exported variable, which would leak into hooks and the verify command);
 - the resolver deny list is refused, case-insensitively: `.github/`,
-  `.circleci/`, `.git/`, `.claude/`, CI and container files, `.env*`, keys
-  and secrets, `*.tfvars`, `*.tfstate`, `yellow-plugins.local.md`,
+  `.circleci/`, `.git/`, `.claude/`, `.vscode/`, `.devcontainer/`, `.idea/`,
+  CI and container files (`Dockerfile*`, `docker-compose*`, `compose.y*ml`,
+  `.gitlab-ci.yml`, `.travis.yml`, `.drone.yml`, `Jenkinsfile`,
+  `azure-pipelines.yml`, `bitbucket-pipelines.yml`), `.env*`, keys and
+  secrets, `*.tfvars`, `*.tfstate`, and the root `yellow-plugins.local.md`,
   `CLAUDE.md`, `AGENTS.md`, `.mcp.json`;
-- `commit-resolve-fixes` refuses files outside the PR's changed files
-  (`gh pr diff --name-only`), any tracked or untracked change outside the
-  set, and — with `--unattended` — runner files, because the commit's git
-  hooks would execute them;
+- both scripts refuse files outside the PR's changed files
+  (`gh api --paginate repos/{owner}/{repo}/pulls/<N>/files`, which, unlike
+  `gh pr diff`, works on PRs past GitHub's diff limits);
+- `commit-resolve-fixes` refuses any tracked or untracked change outside the
+  set, and with `--unattended` refuses runner files (the commit's git hooks
+  would execute them) and added lines that look like a credential (attended
+  runs only warn);
 - `run-verify-command` refuses files that are unchanged or gitignored, so a
-  revert can never delete a user file.
+  revert can never delete a user file. With `--unattended` it does not run
+  the command when a file is a runner file or outside the PR, and reports
+  `result: skipped`. `--revert-only` saves a patch and reverts without
+  running anything (Step 5's CONFLICT rollback).
 
 A refused set is a staged mismatch (exit 3): nothing is committed and every
 `fixed` thread becomes `unclear`.
@@ -258,8 +301,10 @@ Replies and issue bodies end with:
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects
   longer bodies with exit 2).
 - Text that looks like a credential is refused, never posted (exit 2 from
-  `reply-pr-thread` and `file-followup-issue`). The orchestrator then posts
-  the plain outcome sentence for that disposition, with no resolver text.
+  `reply-pr-thread`, `file-followup-issue`, and `check-resolve-text`, which
+  the orchestrator runs on a Linear issue's title and description before
+  `save_issue`). The orchestrator then posts the plain outcome sentence for
+  that disposition, with no resolver text.
 - The body is written to a file and passed by path, never on a command line.
 
 ## Pacing and rate limits
@@ -282,7 +327,8 @@ Exit 1 is always "other failure" (network, unexpected response).
 | `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
 | `file-followup-issue` | created or found | usage / credential | — | — | — | — |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
-| `run-verify-command` | ran (see `result`) | usage / not trusted | — | — | — | — |
+| `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path | — | — | — | — |
+| `check-resolve-text` | clean | usage / credential | — | — | — | — |
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
 `unknown` fields mean the lookup failed.
