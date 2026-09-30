@@ -1,0 +1,21 @@
+plugins/yellow-council/commands/council/council.md
+  s_cc54a24c474bc0::t_0c7c15d720c610 147,1275-1278
+plugins/yellow-council/tests/synthesis.bats
+  s_cc54a24c474bc0::t_0795a19cd631b1 427-445,706-727
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7cdacbdd888f1ee6562ec178b82b1f1a7a0f761e",
+  "prompts": {},
+  "sessions": {
+    "s_cc54a24c474bc0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04386d49-9238-4791-b95b-e4134636bb2c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
