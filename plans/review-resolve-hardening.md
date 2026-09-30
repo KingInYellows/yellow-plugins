@@ -331,7 +331,7 @@ Decisions from the brainstorm and the planning round:
   description). Both refuse and never redact; a refusal prints
   `resolve-text: refused rule=<rule> line=<n>` (or `scan failed`) on stderr,
   never the text. Covered by `tests/check-resolve-text.bats`.
-- [ ] 1.6: New script `skills/pr-review-workflow/scripts/commit-resolve-fixes
+- [x] 1.6: New script `skills/pr-review-workflow/scripts/commit-resolve-fixes
   --provider graphite|github --pr <N> --message <msg> -- <files...>`. It:
   - checks that each path is inside the repo and has a diff;
   - runs `git add --`, then checks `git diff --cached --name-only` equals the
@@ -830,3 +830,10 @@ Decisions from the brainstorm and the planning round:
 - **Scope:** plugins/yellow-review/commands/review/resolve-stack.md, plugins/yellow-review/commands/review/sweep.md, plugins/yellow-review/commands/review/sweep-all.md, plugins/yellow-review/skills/pr-review-workflow/SKILL.md, docs/plugin-scope-mode-protocol.md, plugins/yellow-review/CLAUDE.md, plugins/yellow-review/README.md, .changeset/
 - **Tasks:** 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
 - **Depends on:** #3
+
+## Stack Progress
+<!-- Updated by flow:work. Do not edit manually. -->
+- [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
+- [ ] 2. agent/feat/resolve-commit-verify-scripts
+- [ ] 3. agent/fix/resolve-dispositions
+- [ ] 4. agent/feat/resolve-stack-callers
