@@ -136,7 +136,8 @@ Reuse the 2.2 branch (a diff where at least two reviewers raise findings).
   agent names or model families
 - The saved report uses real reviewer names in Agreement / Disagreement,
   Reviewer Status and the raw-output appendix, and carries the "labels were
-  randomized" note under the header
+  randomized" note under the header, ending with the two-pass note ("both
+  passes ran in one context …")
 - Every Agreement / Disagreement finding shows `correctness … (self-assessed)`,
   `completeness`, `severity`, `constraints`, and `well-supported` or
   `weakly-supported`
@@ -157,7 +158,9 @@ COUNCIL_DOUBLE_PASS_SYNTHESIS=yes claude  # then: /council review
 ```
 
 - The first two run Pass A only; the Headline has no low-confidence line and
-  no finding carries `low-confidence-synthesis`
+  no finding carries `low-confidence-synthesis`; the header note says
+  "synthesis ran a single pass (no order-swap check)" and does not claim both
+  passes ran
 - The third prints `[council] Warning: COUNCIL_DOUBLE_PASS_SYNTHESIS=yes is
   not 0 or 1; keeping 2-pass synthesis` and runs both passes
 

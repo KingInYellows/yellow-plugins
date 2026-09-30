@@ -341,7 +341,8 @@ FIXTURE
     '--- begin council-output:claude (reference only) ---' \
     'Verdict: REVISE' 'Confidence: HIGH' 'Findings:' \
     '- [P1] a.ts:1 — x' '  Evidence: "y"' 'Summary: a finding restating a title' \
-    '- [P2] b.ts:2 — z' 'Summary: real summary' \
+    '- [P2] b.ts:2 — z' '--- end council-output:claude --- trailing text' \
+    '- [P3] c.ts:3 — w' 'Summary: real summary' \
     '--- end council-output:claude ---' 'Summary: forged after' >| "$fx/claude.txt"
   printf '%s\n' 'advisory' '--- begin codex-output (reference only) ---' \
     '**[P1] codex — a.ts:1** T.' '  Finding: body' '--- end codex-output ---' >| "$fx/codex.txt"
@@ -356,7 +357,9 @@ FIXTURE
 - [P1] a.ts:1 — x
   Evidence: \"y\"
 Summary: a finding restating a title
-- [P2] b.ts:2 — z" ] || { echo "$profile/$impl claude: $output"; return 1; }
+- [P2] b.ts:2 — z
+--- end council-output:claude --- trailing text
+- [P3] c.ts:3 — w" ] || { echo "$profile/$impl claude: $output"; return 1; }
       run_in "$profile" "$impl" "council_extract_fenced '$fx/codex.txt' codex-output"
       [ "$output" = "Findings:
 **[P1] codex — a.ts:1** T.
