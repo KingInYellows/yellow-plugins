@@ -1,0 +1,34 @@
+plugins/yellow-jules/src/runtime.ts
+  s_c4c48e9a92a0cf::t_4a17dbda18b795 955
+  s_c4c48e9a92a0cf::t_cb9e6371f6fbdd 897-909,953-954,956,961,977,1063,1068,1101,1105,1129-1194,1221-1222,1226,1234,1258,1266,1274-1275
+plugins/yellow-jules/dist/deadline.js
+  s_c4c48e9a92a0cf::t_8970f3e1af48dd 10,15,31-37,43-45,54,58,66-67
+plugins/yellow-jules/dist/fetch-guard.js
+  s_c4c48e9a92a0cf::t_fc37bb79adf958 20,74-76
+plugins/yellow-jules/dist/runtime.js
+  s_c4c48e9a92a0cf::t_1eb4704753a982 47,53,549-556,598-602,608,625,707,710,743-744,767-829,846-847,850,856,878,886,893-894
+plugins/yellow-jules/src/deadline.ts
+  s_c4c48e9a92a0cf::t_cea60f90718014 9-10,36-43,58-60,76,80,87-88
+plugins/yellow-jules/src/fetch-guard.ts
+  s_c4c48e9a92a0cf::t_1c351d8c5acffd 17-18,95-96
+plugins/yellow-jules/tests/runtime-collect.test.ts
+  s_c4c48e9a92a0cf::t_15090ed7cb6d73 9,481-520,582-599
+plugins/yellow-jules/tests/runtime-deadline.test.ts
+  s_c4c48e9a92a0cf::t_dbcc5d6cbc069d 1-4,8-11,39-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5149d734c04ef80e741e0a91b9dbc922becb2fa",
+  "prompts": {},
+  "sessions": {
+    "s_c4c48e9a92a0cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4bc583f-a87e-464c-8e90-76629c1e94d9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
