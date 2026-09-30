@@ -393,6 +393,11 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
 }
 
+@test "sweep-all: the summary table carries a Blocking column from the Resolve line" {
+  grep -q '^| PR# | Title .*| Residual | Blocking |' "$SWEEP_ALL"
+  grep -q "from the sweep's \`Resolve:\`" "$SWEEP_ALL"
+}
+
 @test "sweep-all: the prune loop uses find (zsh-safe) and a bounded PR-number check" {
   grep -q "find \"\$DIR\" -maxdepth 1 -type f -name '\*.jsonl'" "$SWEEP_ALL"
   grep -q "grep -Exq '\[1-9\]\[0-9\]{0,9}'" "$SWEEP_ALL"
