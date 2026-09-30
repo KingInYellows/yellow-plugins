@@ -395,7 +395,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
 
 @test "sweep-all: the summary table carries a Blocking column from the Resolve line" {
   grep -q '^| PR# | Title .*| Residual | Blocking |' "$SWEEP_ALL"
-  grep -q "from the sweep's \`Resolve:\`" "$SWEEP_ALL"
+  grep -q "sweep's \`Resolve:\` line" "$SWEEP_ALL"
 }
 
 @test "sweep-all: the prune loop uses find (zsh-safe) and a bounded PR-number check" {
@@ -511,6 +511,39 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   printf '%s\n' "$step5" | grep -q 'list every file the conflicted cluster modified, shared or not'
   printf '%s\n' "$step5" | grep -q 'Every other cluster that modified a listed file loses its edits with the revert'
   ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
+}
+
+# The dirty-tree and rate-limit stops must finish the current PR (clean-tree
+# check, revert, row) before ending the walk, and name the summary heading.
+@test "resolve-stack: dirty-tree stop reverts, checks the result, and names the summary heading" {
+  grep -q -- '--pr "<PR#>" --revert-dirty' "$RESOLVE_STACK"
+  grep -q 'aborted at PR #<PR#>: working tree dirty after resolve' "$RESOLVE_STACK"
+  grep -q 'treeClean: false' "$RESOLVE_STACK"
+  grep -q 'go to `### Step 4: Final aggregate summary`' "$RESOLVE_STACK"
+  ! grep -q 'go to Step 4' "$RESOLVE_STACK"
+}
+
+@test "resolve-stack: a rate-limited PR is finished before the walk stops" {
+  grep -q 'ratelimited=<0|1>' "$RESOLVE_STACK"
+  grep -q 'finish \*\*this\*\* PR first' "$RESOLVE_STACK"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
+  grep -q -- '--include-outdated' "$RESOLVE_STACK"
+}
+
+@test "sweep-all: the rate-limit stop runs after the clean-tree check" {
+  clean=$(grep -n 'Clean-tree check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  rate=$(grep -n 'Rate-limit stop' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  [ -n "$clean" ] && [ -n "$rate" ] && [ "$clean" -lt "$rate" ]
+  grep -q -- '--pr "<PR#>" --revert-dirty' "$SWEEP_ALL"
+  grep -q 'go to `### Step 5: End-of-loop' "$SWEEP_ALL"
+  ! grep -q 'go to Step 5' "$SWEEP_ALL"
+  grep -q 'Re-pass wait: up to' "$SWEEP_ALL"
+}
+
+@test "resolve-stack, sweep and sweep-all read the same Resolve: contract fields" {
+  for f in "$RESOLVE_STACK" "$SWEEP" "$SWEEP_ALL"; do
+    grep -q 'ratelimited=' "$f" || { echo "no ratelimited= in $f"; false; }
+  done
 }
 
 # Collapse line wraps so a phrase can be matched across them.
