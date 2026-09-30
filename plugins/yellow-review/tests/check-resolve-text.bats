@@ -37,3 +37,18 @@ setup() {
   run "$SCRIPT" "$BATS_TEST_TMPDIR/nope"
   [ "$status" -eq 1 ]
 }
+
+@test "ordinary code that names credentials is not flagged" {
+  printf '%s\n' 'token: string' 'password: z.string()' \
+    'const API_KEY = process.env.API_KEY' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a very long single line is scanned quickly" {
+  head -c 3000000 /dev/zero | tr '\0' 'a' >| "$A"
+  start=$SECONDS
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  [ $((SECONDS - start)) -lt 5 ]
+}
