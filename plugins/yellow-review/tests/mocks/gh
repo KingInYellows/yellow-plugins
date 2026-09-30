@@ -442,6 +442,14 @@ case "$ALL_ARGS" in
     printf 'Could not resolve to a node' >&2
     exit 1
     ;;
+  *"PRRT_ratelimited"*)
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_forbidden"*)
+    printf 'gh: Resource not accessible by integration\n' >&2
+    exit 1
+    ;;
   *"PRRT_resolved"*)
     printf 'already resolved' >&2
     exit 1
@@ -468,6 +476,7 @@ case "$ALL_ARGS" in
     printf '  PRRT_valid  → resolve-success-response.json\n' >&2
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
+    printf '  PRRT_ratelimited / PRRT_forbidden → rate limit / permission error\n' >&2
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
     printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
     printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2
