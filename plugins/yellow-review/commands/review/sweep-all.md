@@ -225,19 +225,38 @@ For each iteration:
      clean. Take the `blocking` count `<b>` and `ratelimited` from the
      sweep's `Resolve:` line (`?` when no line has the contract form,
      including the `Resolve: completed (output unavailable …)` fallback).
+     `/review:resolve` emits no contract line when a rate limit stops it
+     before its last step. Treat sweep output containing an explicit
+     rate-limit error (HTTP 403/429, `rate limit`, `secondary rate limit`),
+     or a missing contract line after a rate-limit message, as
+     `ratelimited=1` even though `<b>` stays `?`.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation, the working tree became dirty mid-loop): outcome is
      `skipped — <one-line reason>`.
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
    leaves the tree clean (fixes are committed and pushed; a failed verify
-   reverts its files). If it is dirty, save and revert the leftovers with
+   reverts its files). If it is dirty, the tree was clean at pre-flight, but
+   an editor or build may have touched it during the sweep, so revert only
+   the sweep's own edits. Its own paths are the PR's changed files
+   (`gh pr diff "<PR#>" --name-only`) plus the trusted-config paths a refused
+   resolver edit must never leave on disk: anything under `.claude/`,
+   `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
+   `.mcp.json`. When every dirty path is the sweep's own, save and revert the
+   leftovers with
    `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
    and add `working tree dirty after sweep (patch: <patch>)` to this PR's
    `Notes` — or `revert incomplete: <files>` when the script exits non-zero
-   or reports `treeClean: false`. Then mark every remaining PR `skipped —
-   working tree dirty after PR #<PR#>` and go to `### Step 5: End-of-loop
-   summary table`: sweeping on would carry these edits onto the next branch.
+   or reports `treeClean: false`. When any dirty path is not the sweep's
+   own, do NOT run `--revert-dirty`: revert only the trusted-config paths
+   among them with `run-verify-command --pr "<PR#>" --revert-only -- <paths>`
+   and add `unrecognized changes left in place: <files>` to `Notes`.
+   Either way mark every remaining PR `skipped — working tree dirty after PR
+   #<PR#>` and go to `### Step 5: End-of-loop summary table`: sweeping on
+   would carry these edits onto the next branch. Also skip Step 6 (print
+   `[review:sweep-all] Skipping /flow:compound — working tree not clean.`)
+   whenever the tree is still dirty at this point, so compounding never
+   runs over unresolved edits.
 5. **Rate-limit stop** — only after item 4: if this PR's `Resolve:` line
    reported `ratelimited=1`, add `rate limited` to its `Notes`, mark every
    remaining PR `skipped — not attempted (rate limit)`, and go to
@@ -306,6 +325,10 @@ Print:
 ```
 
 Then stop.
+
+**Dirty-tree guard:** if Step 4 item 4 left the tree dirty (an incomplete
+revert or unrecognized changes), skip this step and print the message
+given there. Do NOT invoke `/flow:compound`.
 
 Otherwise, with `attempted_count >= 1`:
 
