@@ -78,8 +78,8 @@ BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is de
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
-# Listed paths are file names, never globs or pathspec magic.
-export GIT_LITERAL_PATHSPECS=1
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 
 # The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.
@@ -113,18 +113,16 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ "$UNATTENDED" = 1 ] && rp_runner "$f"; then
         die 3 "refusing to commit a runner file unattended (git hooks would execute it): $f"
     fi
-    [ -z "$(git status --porcelain --untracked-files=all -- "$f")" ] \
+    [ -z "$(lgit status --porcelain --untracked-files=all -- "$f")" ] \
         && die 3 "listed file has no changes: $f"
     EXPECTED+=("$f")
 done
 
-# Tracked changes outside the expected set would ride along in the commit
-# (or be left behind): refuse before staging anything.
 # Only files the PR already changes may be committed.
 if [ "${#EXPECTED[@]}" -gt 0 ]; then
-    PR_FILES=$(gh pr diff "$PR" --name-only 2>/dev/null) || die 3 "could not list PR #$PR's changed files"
+    PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || die 3 "could not list PR #$PR's changed files"
     for f in "${EXPECTED[@]}"; do
-        printf '%s\n' "$PR_FILES" | grep -qxF -- "$f" || die 3 "not one of PR #$PR's changed files: $f"
+        grep -qxF -- "$f" <<<"$PR_FILES" || die 3 "not one of PR #$PR's changed files: $f"
     done
 fi
 
@@ -152,12 +150,26 @@ if [ "${#EXPECTED[@]}" -eq 0 ]; then
 fi
 
 # --- Stage and compare ---
-git add -- "${EXPECTED[@]}" || die 3 "git add failed"
+lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
 STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort)
 WANT=$(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort -u)
 if [ "$STAGED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] staged:\n%s\n' "$WANT" "$STAGED" >&2
     die 3 "staged set does not match the expected set"
+fi
+
+# A review comment can steer a resolver into pasting a secret it read into a
+# file the PR already changes. Unattended runs refuse; attended runs warn.
+ADDED=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE" "$ADDED"' EXIT
+git diff --cached --no-renames --no-color --no-ext-diff -U0 \
+    | awk '/^\+/ && !/^\+\+\+ / { print substr($0, 2) }' >"$ADDED"
+if rt_looks_secret "$ADDED"; then
+    if [ "$UNATTENDED" = 1 ]; then
+        lgit reset -q -- "${EXPECTED[@]}"
+        die 3 "staged changes look like they contain a credential; nothing committed"
+    fi
+    printf '[commit-resolve-fixes] Warning: staged changes look like they contain a credential.\n' >&2
 fi
 
 # --- Commit (always a new commit; never amend) ---

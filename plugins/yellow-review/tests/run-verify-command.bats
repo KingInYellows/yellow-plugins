@@ -165,6 +165,51 @@ has_kill_after() {
   [ -f .env ]
 }
 
+@test "the verify command does not inherit literal-pathspec mode" {
+  verify 'printf "%s\n" "${GIT_LITERAL_PATHSPECS:-unset}"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(cat "$(printf '%s' "$output" | jq -r .log)")" = unset ]
+}
+
+@test "--unattended skips a runner file without running the command" {
+  printf '{"name":"y"}\n' >| package.json
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt package.json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == "runner files changed: package.json" ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--unattended skips a file outside the PR" {
+  printf 'edited\n' >| src/c.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/c.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--unattended runs when every file is in the PR and not a runner" {
+  verify 'true' --timeout 5 --trusted --unattended -- src/a.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "--revert-only saves a patch and reverts without --trusted or a command" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  grep -q '+resolver edit' "$(printf '%s' "$output" | jq -r .patch)"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "the saved patch ignores colour and prefix settings" {
+  git config color.ui always
+  git config diff.noprefix true
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  ! grep -q $'\033' "$patch"
+  git apply "$patch"
+  grep -q 'resolver edit' src/a.txt
+}
+
 @test "keeps only the newest 10 patches" {
   for i in $(seq 1 12); do
     printf 'one\nfeature\nedit %s\n' "$i" >| src/a.txt
