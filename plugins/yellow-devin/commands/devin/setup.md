@@ -32,31 +32,49 @@ printf '\n=== Credentials ===\n'
 # The function is tiny and identical across copies; divergence cost is low.
 # Tracked for future centralization; do not extract to a shared lib in this PR.
 #
-# 2-arg has_userconfig: mirror the canonical definition in
-# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually —
-# if you change one, change all copies (search for "has_userconfig()" across
-# plugins/). `grep -qF` (fixed-string) fallback guards against regex
+# 2-arg has_userconfig: identical copies live in the research, devin and
+# semgrep setup commands (tests/has-userconfig.bats in yellow-research fails
+# on drift) — if you change one, change all copies (search for
+# "has_userconfig()" across plugins/). `grep -qF` (fixed-string) fallback guards against regex
 # metacharacters; jq path is preferred and path-scoped.
 has_userconfig() {
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    # exit 0 = key present; 1 = key absent; >=2 = parse error (warn).
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives across pluginConfigs)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
@@ -137,24 +155,43 @@ source by repeating the Step 1 logic at the top of the Step 2 block.
 # definition from Step 1 does not survive across blocks. Mirror of the
 # canonical definition above; if you change one, change all copies.
 has_userconfig() {
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives across pluginConfigs)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 # Re-detect TOKEN_SRC / ORG_SRC if they were not carried from Step 1.
@@ -270,11 +307,12 @@ the error message above and do not proceed to Step 3.
 
 ### Step 3: Probe Org-Scoped Permissions
 
-**Skip guard:** If both `TOKEN_SRC` and `ORG_SRC` were `userconfig` in Step 1
-(no shell env vars set), skip Steps 3–4 entirely and proceed to Step 5.
-Print: "Skipping live API probes — credentials are in userConfig only (no shell
-env vars). MCP tool visibility is the credential validation signal. To enable
-curl-based permission probes, also export DEVIN_SERVICE_USER_TOKEN and
+**Skip guard:** If either `TOKEN_SRC` or `ORG_SRC` was `userconfig` in Step 1
+(that shell env var is unset), skip Steps 3–4 entirely and proceed to Step 5:
+the curl probes need both values in the shell. Print: "Skipping live API
+probes — a credential is in userConfig only (no shell env var). MCP tool
+visibility is the credential validation signal. To enable curl-based
+permission probes, also export DEVIN_SERVICE_USER_TOKEN and
 DEVIN_ORG_ID in your shell profile." Record all permissions as UNKNOWN in the
 Step 5 table.
 
@@ -284,13 +322,11 @@ Probe the org-scoped API to check `ViewOrgSessions` (list) and
 ```bash
 # Bash-level enforcement of the userConfig-only skip guard described above.
 # Without this, the prose instruction is the only thing keeping the curl
-# call from running with an empty Bearer token (→ misleading 401) when
-# Steps 1+2 ran in the same invocation and TOKEN_SRC/ORG_SRC are
-# "userconfig" with no shell exports.
-if [ "${TOKEN_SRC:-}" = "userconfig" ] && [ "${ORG_SRC:-}" = "userconfig" ] \
-    && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -z "${DEVIN_ORG_ID:-}" ]; then
+# call from running with an empty credential when either one is
+# userConfig-only (empty token → misleading 401, empty org ID → 404).
+if [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ] || [ -z "${DEVIN_ORG_ID:-}" ]; then
   printf '\n=== Permission Checks ===\n'
-  printf 'Skipping live API probes — credentials are in userConfig only (no shell env vars).\n'
+  printf 'Skipping live API probes — a credential is in userConfig only (no shell env var).\n'
   printf 'MCP tool visibility is the credential validation signal in this mode.\n'
   printf 'To enable curl-based permission probes, also add to ~/.zshrc or ~/.bashrc:\n'
   printf '  export DEVIN_SERVICE_USER_TOKEN="<your-cog-token>"\n'

@@ -97,30 +97,49 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
-# 2-arg has_userconfig: mirror the canonical definition in
-# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
-# — if you change one, change all copies (search for "has_userconfig()"
-# across plugins/). `grep -qF` (fixed-string) guards against regex
-# metacharacters sneaking into the search pattern.
+# 2-arg has_userconfig: identical copies live in the research, devin and
+# semgrep setup commands (tests/has-userconfig.bats in yellow-research fails
+# on drift) — if you change one, change all copies (search for
+# "has_userconfig()" across plugins/). `grep -qF` (fixed-string) in the no-jq fallback guards
+# against regex metacharacters sneaking into the search pattern.
 has_userconfig() {
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
     printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 check_key() {
   # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
@@ -223,28 +242,43 @@ If user skips, proceed to Step 4 with all format-valid keys marked
 # in a command file runs in a fresh subprocess — the function is undefined here.
 # Re-define inline so the SKIP_CURL_PROBE check below is reliable.
 has_userconfig() {
-  # Mirror the canonical Step-1 definition. Surface jq parse errors
-  # (exit >= 2) instead of silently treating a corrupted settings.json
-  # as "credential absent" — otherwise users see "NOT SET" for keys
-  # that are actually configured and get instructed to re-enter them.
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
     printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 # Skip curl probe when key is userConfig-only — shell env is empty so the
@@ -303,28 +337,43 @@ fi
 ```bash
 # Re-define has_userconfig inline (separate Bash block = fresh subprocess).
 has_userconfig() {
-  # Mirror the canonical Step-1 definition. Surface jq parse errors
-  # (exit >= 2) instead of silently treating a corrupted settings.json
-  # as "credential absent" — otherwise users see "NOT SET" for keys
-  # that are actually configured and get instructed to re-enter them.
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
     printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
@@ -379,28 +428,43 @@ fi
 ```bash
 # Re-define has_userconfig inline (separate Bash block = fresh subprocess).
 has_userconfig() {
-  # Mirror the canonical Step-1 definition. Surface jq parse errors
-  # (exit >= 2) instead of silently treating a corrupted settings.json
-  # as "credential absent" — otherwise users see "NOT SET" for keys
-  # that are actually configured and get instructed to re-enter them.
-  local plugin="$1" option="$2" jq_exit
-  local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -e --arg p "$plugin" --arg o "$option" \
-      '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>/dev/null
-    jq_exit=$?
-    if [ "$jq_exit" -ge 2 ]; then
-      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
-        "$settings" "$jq_exit" >&2
-    fi
-    return "$jq_exit"
-  else
+  # Sensitive userConfig values live under .pluginSecrets in the credentials
+  # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
+  # readable here). Non-sensitive ones live under .pluginConfigs[].options in
+  # settings.json. Both are keyed by plugin id ("<name>@yellow-plugins");
+  # other marketplaces' entries for the same name are ignored.
+  # Presence only: the value is never printed.
+  local plugin="$1" option="$2" file jq_exit
+  local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
+  if ! command -v jq >/dev/null 2>&1; then
+    have_jq=0
     printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
-    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
+  for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
+    [ -r "$file" ] || continue
+    if [ "$have_jq" -eq 1 ]; then
+      jq -e --arg p "$plugin" --arg o "$option" '
+        [ (.pluginSecrets // {} | to_entries[]),
+          (.pluginConfigs // {} | to_entries[] | .value |= (.options // {})) ]
+        | map(select((.key == $p or .key == $p + "@yellow-plugins")
+                     and (.value | type) == "object")
+              | .value[$o] // empty | select(. != ""))
+        | length > 0' "$file" >/dev/null 2>&1
+      jq_exit=$?
+      # 1 = key absent; 4 = no output (empty file). 2, 3 and 5 are real
+      # errors: say so instead of reporting a configured key as NOT SET.
+      case "$jq_exit" in
+        0) return 0 ;;
+        1|4) ;;
+        *) printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+             "$file" "$jq_exit" >&2 ;;
+      esac
+    else
+      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
+        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+    fi
+  done
+  return 1
 }
 
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.

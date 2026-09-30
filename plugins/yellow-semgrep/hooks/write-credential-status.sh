@@ -6,7 +6,19 @@
 # {"continue": true} on all paths, including jq/write failures.
 set -uo pipefail
 
-HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/credential-status.sh"
+# Locate yellow-core's credential-status.sh: the repository layout
+# (plugins/<name>/ siblings) first, then the installed cache layout
+# (cache/<marketplace>/<plugin>/<version>/), newest version first —
+# ${CLAUDE_PLUGIN_ROOT}/../yellow-core alone never resolves in the cache.
+ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+HELPER="$ROOT/../yellow-core/lib/credential-status.sh"
+if [ -n "$ROOT" ] && [ ! -f "$HELPER" ] && [ -d "$ROOT/../../yellow-core" ]; then
+  CORE_VER=$(for d in "$ROOT/../../yellow-core"/*/; do
+    d=$(basename -- "$d")
+    [[ "$d" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$d"
+  done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+  [ -n "$CORE_VER" ] && HELPER="$ROOT/../../yellow-core/$CORE_VER/lib/credential-status.sh"
+fi
 # yellow-core not installed alongside yellow-semgrep — skip silently.
 [ -f "$HELPER" ] || { printf '{"continue": true}\n'; exit 0; }
 # shellcheck source=/dev/null
