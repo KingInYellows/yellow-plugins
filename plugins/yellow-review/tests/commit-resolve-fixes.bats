@@ -251,11 +251,26 @@ run_crf() {
   [ -z "$(git diff --cached --name-only)" ]
 }
 
-@test "an attended run only warns about a credential in added lines" {
+@test "an attended run refuses a credential too, unless the user confirmed an override" {
   printf 'one\nfeature\nkey = "AKIAABCDEFGHIJKLMNOP"\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
   [ "$status" -eq 0 ]
-  [[ "$stderr" == *"Warning"*"credential"* ]]
+}
+
+@test "--allow-credential-shaped is refused with --unattended" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --allow-credential-shaped -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "an added line that starts with ++ is still scanned" {
+  printf 'one\nfeature\n++ key = "AKIAABCDEFGHIJKLMNOP"\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
 }
 
 @test "a missing github runtime fails before committing (exit 2)" {

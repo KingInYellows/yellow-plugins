@@ -2,7 +2,8 @@
 # Stage the resolver-touched files, commit them as a NEW commit, submit via
 # the active stacked-PR provider, and verify the remote head.
 # Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
-#                             [--unattended] [--files-from <file>] [-- <files...>]
+#                             [--unattended] [--allow-credential-shaped]
+#                             [--files-from <file>] [-- <files...>]
 #   files:   repo-root-relative paths the resolvers modified, one per line in
 #            --files-from and/or after --. Resolver output is untrusted, so
 #            callers pass it through --files-from, never on a command line.
@@ -10,6 +11,9 @@
 #            the deny list; --unattended also refuses runner files, which the
 #            commit's git hooks would execute (lib/resolve-paths.sh). With
 #            no files and a clean tree the result is NOOP.
+#   Added lines that look like a credential are refused (exit 3, stderr
+#   "credential-shaped") unless --allow-credential-shaped is passed, which an
+#   interactive caller does only after the user confirms a second time.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
@@ -31,7 +35,7 @@ MAX_MESSAGE_CHARS=200
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -39,6 +43,7 @@ PROVIDER=""
 PR=""
 MESSAGE=""
 UNATTENDED=0
+ALLOW_CREDENTIAL=0
 FILES=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -46,6 +51,7 @@ while [ $# -gt 0 ]; do
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
         --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
         --unattended) UNATTENDED=1; shift ;;
+        --allow-credential-shaped) ALLOW_CREDENTIAL=1; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
@@ -67,6 +73,8 @@ esac
 [[ "$MESSAGE" =~ ^fix(\([a-z0-9._/-]+\))?!?:\ [^[:cntrl:]]+$ ]] \
     || die 2 "--message must be one line starting with 'fix:' or 'fix(<scope>):'"
 [ "${#MESSAGE}" -le "$MAX_MESSAGE_CHARS" ] || die 2 "--message exceeds $MAX_MESSAGE_CHARS characters"
+[ "$UNATTENDED" = 1 ] && [ "$ALLOW_CREDENTIAL" = 1 ] \
+    && die 2 "--allow-credential-shaped needs a human confirmation; never pass it with --unattended"
 
 for tool in git gh jq; do
     command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
@@ -159,17 +167,16 @@ if [ "$STAGED" != "$WANT" ]; then
 fi
 
 # A review comment can steer a resolver into pasting a secret it read into a
-# file the PR already changes. Unattended runs refuse; attended runs warn.
+# file the PR already changes. Scan only added lines inside hunks (a header
+# is skipped by position, so an added "++ x" line is still scanned), with
+# --text so binary-attributed files are not hidden.
 ADDED=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE" "$ADDED"' EXIT
-git diff --cached --no-renames --no-color --no-ext-diff -U0 \
-    | awk '/^\+/ && !/^\+\+\+ / { print substr($0, 2) }' >"$ADDED"
-if rt_looks_secret "$ADDED"; then
-    if [ "$UNATTENDED" = 1 ]; then
-        lgit reset -q -- "${EXPECTED[@]}"
-        die 3 "staged changes look like they contain a credential; nothing committed"
-    fi
-    printf '[commit-resolve-fixes] Warning: staged changes look like they contain a credential.\n' >&2
+git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
+    | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' >"$ADDED"
+if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
+    lgit reset -q -- "${EXPECTED[@]}"
+    die 3 "credential-shaped: staged changes look like they contain a credential; nothing committed"
 fi
 
 # --- Commit (always a new commit; never amend) ---

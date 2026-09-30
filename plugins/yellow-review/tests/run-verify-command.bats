@@ -52,7 +52,7 @@ has_kill_after() {
 
 @test "runs from the repository root" {
   cd src
-  verify 'pwd' --timeout 5 --trusted -- src/a.txt
+  verify 'pwd' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(cat "$(printf '%s' "$output" | jq -r .log)")" = "$(cd "$REPO" && pwd -P)" ]
 }
@@ -79,9 +79,17 @@ has_kill_after() {
   [ -f src/new.txt ]
 }
 
-@test "an unlisted dirty file makes treeClean false" {
+@test "refuses to run while the tree has changes the list does not name" {
   printf 'two\nstray\n' >| src/b.txt
-  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"change outside the listed files: src/b.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an unlisted dirty file left after --revert-only makes treeClean false" {
+  printf 'two\nstray\n' >| src/b.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
 }
 
@@ -152,10 +160,40 @@ has_kill_after() {
   [ -f src/new.txt ]
 }
 
-@test "an untracked stray left after the revert makes treeClean false" {
+@test "an untracked stray left after --revert-only makes treeClean false" {
   printf 'stray\n' >| src/stray.txt
-  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+}
+
+@test "--revert-dirty reverts every change git sees, deny-listed and staged files included" {
+  mkdir -p .claude
+  printf '{}\n' >| .claude/settings.json
+  git add .claude && git commit -q -m "chore: settings"
+  printf '{"hooks":{}}\n' >| .claude/settings.json
+  printf 'staged new\n' >| src/staged.txt
+  git add src/staged.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat .claude/settings.json)" = '{}' ]
+  [ ! -e src/staged.txt ] && [ ! -e src/new.txt ]
+  grep -q 'hooks' "$(printf '%s' "$output" | jq -r .patch)"
+}
+
+@test "--revert-dirty takes no file list" {
+  run "$SCRIPT" --pr 7 --revert-dirty -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "--revert-only may revert a deny-listed path" {
+  mkdir -p .claude
+  printf '{}\n' >| .claude/settings.json
+  git add .claude && git commit -q -m "chore: settings"
+  printf '{"hooks":{}}\n' >| .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- .claude/settings.json src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat .claude/settings.json)" = '{}' ]
 }
 
 @test "refuses a deny-listed path" {
@@ -172,7 +210,7 @@ has_kill_after() {
 
 @test "--unattended skips a runner file without running the command" {
   printf '{"name":"y"}\n' >| package.json
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt package.json
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt package.json src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
   [[ "$(printf '%s' "$output" | jq -r .reason)" == "runner files changed: package.json" ]]
@@ -181,6 +219,7 @@ has_kill_after() {
 }
 
 @test "--unattended skips a file outside the PR" {
+  git checkout -q -- src/a.txt && rm src/new.txt
   printf 'edited\n' >| src/c.txt
   verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/c.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
@@ -188,6 +227,7 @@ has_kill_after() {
 }
 
 @test "--unattended runs when every file is in the PR and not a runner" {
+  rm src/new.txt
   verify 'true' --timeout 5 --trusted --unattended -- src/a.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
 }
@@ -211,6 +251,7 @@ has_kill_after() {
 }
 
 @test "keeps only the newest 10 patches" {
+  rm src/new.txt
   for i in $(seq 1 12); do
     printf 'one\nfeature\nedit %s\n' "$i" >| src/a.txt
     verify 'exit 1' --timeout 5 --trusted -- src/a.txt
