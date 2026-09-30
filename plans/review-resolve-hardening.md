@@ -538,7 +538,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 3: Callers and shared docs
 
-- [ ] 3.1: `commands/review/resolve-stack.md`:
+- [x] 3.1: `commands/review/resolve-stack.md`:
   - Self-verify uses `get-pr-comments --include-outdated` and parses the
     `Resolve:` line. `jq length` stays only as a cross-check and flags
     disagreement.
@@ -832,5 +832,5 @@ Decisions from the brainstorm and the planning round:
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
 - [x] 2. agent/feat/resolve-commit-verify-scripts (completed 2026-09-30)
-- [ ] 3. agent/fix/resolve-dispositions
+- [x] 3. agent/fix/resolve-dispositions (completed 2026-09-30)
 - [ ] 4. agent/feat/resolve-stack-callers
