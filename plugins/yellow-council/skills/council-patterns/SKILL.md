@@ -1085,7 +1085,12 @@ is the one definition of that set. Escaping only prefixes `[ESCAPED] `, so an
 escaped quote keeps its bytes. A voting reviewer whose file cannot be read is
 never shown as an empty review: 5b warns and marks the block `reviewer text
 unavailable`. The label map is kept in the staging directory and printed only
-at assembly.
+at assembly. The staging directory and its random token are recorded by 5a in
+a shell-owned state file, `.git/council-synth.state` (0600, never a symlink);
+every block that overwrites or deletes inside the directory reloads both from
+that file and checks them against the directory's `.token`. They are never
+substituted from model-relayed text, so an injected orchestrator cannot
+point a destructive step at another `/tmp/council-synth-*` directory.
 
 **Pass A.** Enumerate every finding per label (`S<n>-F<k>`, citation, claim)
 before comparing anything; then compare across labels; then score; only then

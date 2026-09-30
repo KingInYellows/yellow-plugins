@@ -505,6 +505,47 @@ either pattern above:
   tool permission request, including writes (same class as the retired Gemini
   `--yolo`)
 
+#### Synthesis staging directory (yellow-council)
+
+`council.md` Steps 5a-5e stage reviewer text for the blind two-pass synthesis
+in a `/tmp/council-synth-XXXXXX` directory. That directory is a separate
+trust boundary from the pack and fenced-output files above:
+
+- **Contents**: `.token`, `labels.txt` (the S1-S4 label map),
+  `forward.txt`/`reverse.txt` (normalized, already-redacted reviewer text,
+  fenced as `council-output:S<n>` and relabeled so no reviewer is named),
+  `<reviewer>.summary.txt` (Codex, plus excluded Gemini/OpenCode early-exit
+  summaries, written by the model with `Write`), and `pass-a.md`
+  (model-generated, untrusted; the 5d resume block validates it instead of
+  trusting it). `mktemp -d` creates the directory 0700.
+- **Ownership and authentication handoff**: the capability (directory plus a
+  32-hex token) lives in a shell-owned state file,
+  `$GIT_ROOT/.git/council-synth.state` (line 1 directory, line 2 token; written
+  only by 5a under `umask 077`, then `chmod 600`). 5a refuses a symlink or a
+  non-regular/foreign file at that path and removes the directory and state
+  file if the write fails. Steps 5b, 5d resume, and 5e reload both values from
+  the state file (regular, non-symlink, owned by the current user) and require
+  a `/tmp/council-synth-*` shape with no `..` or extra `/`, a directory that
+  exists, is not a symlink and is owned by the user, a 32-hex token, and a
+  `$SYNTH_DIR/.token` equal to the state token. Anything missing, foreign, or
+  garbled fails closed with nothing deleted. The model sees only the printed
+  `COUNCIL_SYNTH_DIR`, for non-destructive `Read`/`Write`; no destructive step
+  trusts model-relayed text. Worktrees where `.git` is a file are unsupported,
+  as with `.git/council-state.tsv`.
+- **Cleanup and retention**: 5e removes the directory and state file;
+  `council_synth_abort` removes both. Step 7 early exit, Step 8 Cancel, and
+  Step 9 cleanup remove the state file only. The next run's 5a sweep deletes
+  `/tmp/council-synth-*` directories older than 24 hours, so an interrupted run
+  leaves redacted, normalized reviewer text in `/tmp` for up to about 24 hours.
+- **Prompt-injection boundary**: all staged reviewer text is untrusted. It is
+  redacted in Step 4, normalized, fenced with `[ESCAPED]` delimiter handling,
+  and read from files rather than large Bash results. Labels hide reviewer
+  identity until 5e de-anonymizes.
+- **Known residual**: the older `CLAUDE_FENCED_FILE` handoff (Steps
+  5b/7/8/9) still relays its path through the model. It is guarded by a shape
+  check on `/tmp/council-claude-fenced-*.txt` plus identity with the minted
+  literal; converting it to a state file is a follow-up.
+
 ### In-Process Reviewer (yellow-council `claude-reviewer`)
 
 `/council`'s fourth slot does not shell out at all. It runs inside Claude Code
