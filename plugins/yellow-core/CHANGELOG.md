@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.6.0
+
+### Minor Changes
+
+- [`dab83f3`](https://github.com/KingInYellows/yellow-plugins/commit/dab83f3d724ea89bde1e86117ffbcbe324487a58)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Recognize
+  yellow-jules as a third `remote-agent` provider: the classifier adds
+  `READY_JULES` and `--tooling-jules` (precedence and the yellow-cursor
+  preference are unchanged), and `/setup:all` probes `JULES_API_KEY` presence
+  and the yellow-jules CLI, classifies the plugin, and offers `/jules:setup` for
+  it.
+
 ## 2.5.0
 
 ### Minor Changes

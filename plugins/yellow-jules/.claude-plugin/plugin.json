@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-jules",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
   "author": {
     "name": "KingInYellows",
