@@ -595,7 +595,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 4: Docs, release, follow-ups
 
-- [ ] 4.1: `plugins/yellow-review/CLAUDE.md`:
+- [x] 4.1: `plugins/yellow-review/CLAUDE.md`:
   - Scripts heading: 3 → 9, with one line per script (see the note below).
   - `get-pr-comments` wording.
   - The Testing section lists the new bats files.
