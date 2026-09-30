@@ -15,6 +15,17 @@ setup() {
   # Resolver edits: one tracked file changed, one new untracked file.
   printf 'one\nfeature\nresolver edit\n' >| src/a.txt
   printf 'new\n' >| src/new.txt
+  # The runner refuses files outside the PR, so the PR's file list also names
+  # src/new.txt (the stub otherwise lists only the fixture's committed changes).
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh-base"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+gh-base "$@" || exit $?
+case "$*" in
+  "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*) echo src/new.txt ;;
+esac
+STUB
+  chmod +x "$STUB_BIN/gh"
 }
 
 verify() {
@@ -48,6 +59,16 @@ has_kill_after() {
   grep -q 'resolver edit' src/a.txt
   [ -f src/new.txt ]
   grep -q checked "$(printf '%s' "$output" | jq -r .log)"
+}
+
+@test "credentials the command prints are redacted from the log, with the exit status kept" {
+  verify 'echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; echo visible; exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  ! grep -q 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$log"
+  grep -q visible "$log"
+  [ "$(mode "$log")" = 600 ]
 }
 
 @test "runs from the repository root" {
@@ -117,6 +138,16 @@ has_kill_after() {
   ! pgrep -f 'sleep 31\.7' >/dev/null
 }
 
+@test "watchdog timeout still escalates to KILL for a descendant that ignores TERM" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  # The command shell dies on TERM; its child ignores TERM and needs KILL.
+  verify '(trap "" TERM; exec sleep 31.3) & wait' --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  # The script waits out the KILL escalation, so nothing may survive.
+  ! pgrep -f 'sleep 31\.3' >/dev/null
+}
+
 @test "a command exiting 124 on its own under the watchdog is fail, not timeout" {
   export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
   verify 'exit 124' --timeout 5 --trusted -- src/a.txt src/new.txt
@@ -181,6 +212,20 @@ has_kill_after() {
   grep -q 'hooks' "$(printf '%s' "$output" | jq -r .patch)"
 }
 
+@test "--revert-dirty keeps a newline in a filename from forging a second path" {
+  victim="$(dirname -- "$REPO")/victim-$$"
+  : >| "$victim"
+  # One untracked file "x\n../victim-N"; split on newlines it would forge "../victim-N".
+  bad=$(printf 'x\n../victim-%s' "$$")
+  mkdir -p -- "$(dirname -- "$bad")"
+  printf 'y\n' >| "$bad"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -e "$victim" ]
+  [ ! -e "$bad" ]
+  rm -f -- "$victim"
+}
+
 @test "--revert-dirty takes no file list" {
   run "$SCRIPT" --pr 7 --revert-dirty -- src/a.txt
   [ "$status" -eq 2 ]
@@ -232,6 +277,28 @@ has_kill_after() {
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
 }
 
+@test "an interactive run also skips a file outside the PR" {
+  git checkout -q -- src/a.txt && rm src/new.txt
+  printf 'edited\n' >| src/c.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/c.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an interactive run skips when the PR's files cannot be listed" {
+  export STUB_PR_DIFF_FAIL=1
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an interactive run does not skip a runner file in the PR" {
+  rm src/new.txt
+  printf '{"name":"y"}\n' >| package.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt package.json
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
 @test "--revert-only saves a patch and reverts without --trusted or a command" {
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
@@ -248,6 +315,47 @@ has_kill_after() {
   ! grep -q $'\033' "$patch"
   git apply "$patch"
   grep -q 'resolver edit' src/a.txt
+}
+
+@test "a credential-shaped edit is reverted but never archived in a patch" {
+  printf 'one\nfeature\nAPI_KEY=abcd1234efgh5678\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"credential"* ]]
+  [ -z "$(git status --porcelain)" ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  ! grep -rq 'abcd1234efgh5678' "$PATCH_DIR"
+}
+
+@test "an untracked dangling symlink is kept in the patch before it is removed" {
+  ln -s missing-target src/dangling
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/dangling
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  grep -q 'src/dangling' "$patch"
+  grep -q 'missing-target' "$patch"
+  [ ! -L src/dangling ]
+}
+
+@test "a patch that cannot be saved reverts nothing" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
 }
 
 @test "keeps only the newest 10 patches" {

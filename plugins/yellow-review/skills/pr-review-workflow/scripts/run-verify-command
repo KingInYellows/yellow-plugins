@@ -89,12 +89,12 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # Every change in the tree, as git lists it (tracked, staged or untracked).
 tree_changes() {
     { git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
-        | tr '\0' '\n' | LC_ALL=C sort -u
+        | LC_ALL=C sort -zu
 }
 
 if [ "$REVERT_DIRTY" = 1 ]; then
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
-    while IFS= read -r f; do
+    while IFS= read -r -d '' f; do
         [ -n "$f" ] && FILES+=("$f")
     done < <(tree_changes)
 fi
@@ -113,7 +113,7 @@ done
 
 # Never run a command while the tree has changes the list does not name.
 if [ "$REVERT_ONLY" = 0 ]; then
-    while IFS= read -r d; do
+    while IFS= read -r -d '' d; do
         [ -n "$d" ] || continue
         found=0
         for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -123,15 +123,16 @@ if [ "$REVERT_ONLY" = 0 ]; then
     done < <(tree_changes)
 fi
 
-# Unattended: never execute runner files or files outside the PR.
-if [ "$UNATTENDED" = 1 ] && [ "$REVERT_ONLY" = 0 ]; then
+# Whenever a command will run, never execute files outside the PR (the
+# resolver's list is untrusted). Unattended also never runs runner files.
+if [ "$REVERT_ONLY" = 0 ]; then
     skip() {
         jq -nc --arg why "$1" '{result: "skipped", patch: null, log: null, treeClean: true, reason: $why}'
         exit 0
     }
     PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || skip "could not list the PR's changed files"
     for f in ${FILES[@]+"${FILES[@]}"}; do
-        rp_runner "$f" && skip "runner files changed: $f"
+        [ "$UNATTENDED" = 1 ] && rp_runner "$f" && skip "runner files changed: $f"
         grep -qxF -- "$f" <<<"$PR_FILES" || skip "not one of the PR's changed files: $f"
     done
 fi
@@ -173,7 +174,13 @@ run_with_watchdog() {
         sleep "$TIMEOUT"
         : >"$marker"
         kill -s TERM -- "-$pid" 2>/dev/null
-        sleep "$KILL_AFTER"
+        # Poll the group so a timeout returns as soon as it has exited;
+        # anything still alive after KILL_AFTER gets KILL.
+        i=$((KILL_AFTER * 5))
+        while [ "$i" -gt 0 ] && kill -0 -- "-$pid" 2>/dev/null; do
+            sleep 0.2
+            i=$((i - 1))
+        done
         kill -s KILL -- "-$pid" 2>/dev/null
     ) &
     wd=$!
@@ -182,11 +189,15 @@ run_with_watchdog() {
     trap 'kill -s INT -- "-$pid" 2>/dev/null' INT
     wait "$pid" || rc=$?
     trap - INT
-    kill -s TERM -- "-$wd" 2>/dev/null
-    wait "$wd" 2>/dev/null
     if [ -e "$marker" ]; then
+        # Timed out: let the watchdog finish its KILL_AFTER escalation so a
+        # descendant that ignored TERM is killed before cleanup continues.
+        wait "$wd" 2>/dev/null
         rm -f -- "$marker"
         TIMED_OUT=1
+    else
+        kill -s TERM -- "-$wd" 2>/dev/null
+        wait "$wd" 2>/dev/null
     fi
     return "$rc"
 }
@@ -206,6 +217,51 @@ elif T=$(timeout_bin); then
 else
     run_with_watchdog || RC=$?
 fi
+
+# Redact the finished log before it is capped, reported or retained: a
+# verifier can echo its environment. Runs after the command exits, so the exit
+# status and process-group handling are untouched. Without yellow-core's
+# cs_redact_secrets, or when it fails, the log is withheld rather than kept raw.
+core_lib() {
+    local here root cand ver
+    here=$(cd -- "$(dirname -- "$0")" && pwd) || return 1
+    root="$here/../../.."
+    cand="$root/../yellow-core/lib/compound-staging.sh"
+    if [ -f "$cand" ]; then
+        printf '%s' "$cand"
+        return 0
+    fi
+    # Installed cache layout: cache/<marketplace>/<plugin>/<version>/
+    if [ -d "$root/../../yellow-core" ]; then
+        ver=$(for cand in "$root/../../yellow-core"/*/; do
+            cand=$(basename -- "$cand")
+            [[ "$cand" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$cand"
+        done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+        cand="$root/../../yellow-core/$ver/lib/compound-staging.sh"
+        if [ -n "$ver" ] && [ -f "$cand" ]; then
+            printf '%s' "$cand"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+redact_log() {
+    local lib
+    if ! command -v cs_redact_secrets >/dev/null 2>&1; then
+        lib=$(core_lib) || lib=""
+        # shellcheck disable=SC1090
+        [ -n "$lib" ] && . "$lib" 2>/dev/null
+    fi
+    if command -v cs_redact_secrets >/dev/null 2>&1 \
+        && (umask 077 && cs_redact_secrets <"$LOG" >"$LOG.tmp" 2>/dev/null); then
+        mv -f -- "$LOG.tmp" "$LOG"
+    else
+        rm -f -- "$LOG.tmp"
+        (umask 077 && printf '[withheld: log redaction unavailable]\n' >|"$LOG")
+    fi
+}
+redact_log
 
 # Keep the tail of an oversized log: failures usually print last.
 if [ "$(wc -c <"$LOG")" -gt "$LOG_CAP_BYTES" ]; then
@@ -232,20 +288,49 @@ RESULT=fail
 [ "$REVERT_ONLY" = 1 ] && RESULT=reverted
 
 # --- Save the resolver diff (tracked and untracked listed files) ---
-(
+# Every git call must succeed, or the revert below would destroy edits the
+# patch does not hold. `git diff --no-index` exits 1 when files differ.
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+save_patch() {
+    local f rc
     umask 077
-    : >"$PATCH"
+    : >"$PATCH" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
             lgit diff --no-color --no-ext-diff --no-textconv --binary \
-                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$PATCH"
-        elif [ -e "$f" ]; then
+                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$PATCH" || return 1
+        elif [ -e "$f" ] || [ -L "$f" ]; then
+            # -L: a dangling symlink has no -e but is still an edit to keep.
+            rc=0
             git diff --no-index --no-color --no-ext-diff --no-textconv --binary \
-                --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$PATCH" || true
+                --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$PATCH" || rc=$?
+            [ "$rc" -le 1 ] || return 1
         fi
     done
-)
+}
+PATCH_OUT="$PATCH"
+REASON=""
+if ! (save_patch); then
+    rm -f -- "$PATCH"
+    jq -nc --arg r "$RESULT" --arg log "$LOG" \
+        '{result: $r, patch: null, log: $log, treeClean: false, reason: "could not save the recovery patch; nothing was reverted"}'
+    exit 0
+fi
+
+# A resolver can paste a credential into a listed file. Do not archive it: drop
+# the patch and still revert, so the secret leaves the disk. The resolver's
+# edit is regenerable; the credential must not persist under .git.
+ADDED_PATCH=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f -- "$ADDED_PATCH"' EXIT
+awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' "$PATCH" >"$ADDED_PATCH" \
+    || { rm -f -- "$PATCH"; die 2 "cannot screen the recovery patch"; }
+if rt_looks_secret "$ADDED_PATCH"; then
+    rm -f -- "$PATCH"
+    PATCH_OUT=""
+    REASON="recovery patch withheld: added lines look like a credential"
+fi
 
 # --- Revert the listed files ---
 for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -265,6 +350,7 @@ CLEAN=true
 
 prune log
 prune patch
-jq -nc --arg r "$RESULT" --arg p "$PATCH" --arg log "$LOG" --argjson clean "$CLEAN" \
-    '{result: $r, patch: $p, log: $log, treeClean: $clean}'
+jq -nc --arg r "$RESULT" --arg p "$PATCH_OUT" --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
+    '{result: $r, patch: (if $p == "" then null else $p end), log: $log, treeClean: $clean}
+     + (if $why == "" then {} else {reason: $why} end)'
 exit 0

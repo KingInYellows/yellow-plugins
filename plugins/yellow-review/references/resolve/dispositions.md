@@ -11,17 +11,13 @@ once wired, the command and the agent point here instead of restating it.
 GitHub thread state is the record. The review-findings ledger is not
 involved.
 
-**Implementation status.** Implemented in this PR: `get-pr-comments`
+**Implementation status.** Implemented by this stack so far: `get-pr-comments`
 (`--include-outdated`), `get-pr-blockers`, `reply-pr-thread`,
-`file-followup-issue`, `check-resolve-text`, `lib/resolve-text.sh` and
-`lib/resolve-gh.sh`, plus the
-existing `resolve-pr-thread`. **Planned**, landing in a later PR of this stack
-and not present yet: `commit-resolve-fixes`, `run-verify-command` and
-`lib/resolve-paths.sh`. The sections that depend on them (Write order phases A
-and B, Verify, File set, the Bash timeout for `commit-resolve-fixes`, and the
-matching Script exit codes rows) are marked **(planned)** and are the intended
-contract, not current behavior. `resolve-pr-thread` currently exits only 0 or 1;
-the 2/3/4 codes in the table are planned for it too.
+`file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes`,
+`run-verify-command`, `lib/resolve-text.sh`, `lib/resolve-gh.sh`, `lib/resolve-paths.sh` and the
+existing `resolve-pr-thread`. Still planned: the 2/3/4 exit codes for
+`resolve-pr-thread`, which currently exits only 0 or 1 (its table row is
+marked), and the `/review:resolve` and `pr-comment-resolver` wiring.
 
 ## Dispositions
 
@@ -215,12 +211,9 @@ record); only the resolve is withheld.
 Three phases, in order. A later phase never runs for a thread whose earlier
 phase failed.
 
-1. **Phase A, local (planned: needs `run-verify-command` and
-   `commit-resolve-fixes`).** Optional `verify_command`
-   (`run-verify-command`), then stage and commit (`commit-resolve-fixes`).
-   See Verify below.
-2. **Phase B, remote (planned: needs `commit-resolve-fixes`).** Submit and
-   verify the head (`commit-resolve-fixes` does both). `fixed` threads need `status: PUSHED` and a verified SHA.
+1. **Phase A, local.** Optional `verify_command` (`run-verify-command`),
+   then stage and commit (`commit-resolve-fixes`). See Verify below.
+2. **Phase B, remote.** Submit and verify the head (`commit-resolve-fixes` does both). `fixed` threads need `status: PUSHED` and a verified SHA.
    `NOOP` or a failure downgrades every `fixed` thread to `unclear`; the
    other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
@@ -240,9 +233,7 @@ disagree: reply posted (open)
 addressed: reply posted, resolve failed
 ```
 
-## Verify (planned)
-
-Depends on `run-verify-command`, which is not in this PR.
+## Verify
 
 `resolve_pr.*` values, and whether `yellow-plugins.local.md` is tracked by
 git, are read once in Step 1, before any agent runs; later steps use only
@@ -273,10 +264,7 @@ directory, or the `core.hooksPath` directory (matched case-insensitively).
 Nested `scripts/` directories, such as a plugin's `skills/*/scripts/`, are
 ordinary sources.
 
-## File set (planned)
-
-Depends on `commit-resolve-fixes`, `run-verify-command` and
-`lib/resolve-paths.sh`, none of which are in this PR.
+## File set
 
 The expected file set comes from the resolvers' `Files modified`, but the
 scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
@@ -302,12 +290,20 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   because the commit's git hooks would execute them;
 - `run-verify-command` refuses files that are unchanged or gitignored, so a
   revert can never delete a user file, and refuses to run when the tree has
-  changes outside the listed files. With `--unattended` it does not run the
-  command when a file is a runner file or outside the PR, and reports
+  changes outside the listed files. It does not run the command when a
+  file is outside the PR (or the PR's file list cannot be fetched), and with
+  `--unattended` also when a file is a runner file; it reports
   `result: skipped`. `--revert-only` saves a patch and reverts the listed
   files without running anything (Step 5's CONFLICT rollback).
   `--revert-dirty` does the same for every change in the tree, taking the
   list from `git status` rather than from resolver text.
+  The patch is written and checked before anything is reverted. If any
+  patch command fails (full disk, unsupported entry), nothing is reverted
+  and the result carries `patch: null`, `treeClean: false` and a `reason`.
+  Untracked symlinks, including dangling ones, are saved. A patch whose
+  added lines look like a credential (`rt_looks_secret`) is deleted rather
+  than archived under `.git`; the files are still reverted so the secret
+  leaves the disk, and the result carries `patch: null` and a `reason`.
 
 **Refusals revert.** A refused edit must not stay on disk: a deny-listed
 file such as `.claude/settings.json` would be trusted by the next session.
@@ -425,8 +421,8 @@ and `get-pr-comments` exit 1 for every failure, usage included.
 | `reply-pr-thread` | replied or skipped | usage / unreadable or over-long body / credential or scan failure | not found or permission | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
 | `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
 | `file-followup-issue` | created or found | usage / unreadable title or body file / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry), or a `gh` call timed out (a create may have filed) | dedupe window full with no marker (not transient) | — |
-| `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
-| `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
+| `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed, or undone (a hook changed or left files) | submit failed | head not verified |
+| `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / unreadable file / credential or scan failure | — | — | — | — |
 
 `get-pr-comments` exits 1 on any failure (usage included) and 3 when the
