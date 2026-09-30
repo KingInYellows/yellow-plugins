@@ -44,8 +44,9 @@ rest stay open as blocking), deduped by a marker in the issue body. It is
 the first non-interactive `gh issue create` in the repo; every other issue
 path (for example `yellow-browser-test`'s `test-reporter`) stays gated.
 Likewise `resolve_pr.verify_command` runs unattended only when
-`yellow-plugins.local.md` is untracked, so a committed config value is
-never executed without a human.
+`resolve_pr.verify_unattended: true` is set, `yellow-plugins.local.md` is
+untracked (so a committed config value is never executed without a human),
+and the fix touches no runner files.
 
 Known gap (current behavior, recorded not resolved — see the non-goal
 above): `--non-interactive` does NOT suppress `/review:pr` Step 9a's

@@ -213,10 +213,13 @@ resolution, and sequential stack review. Graphite-native workflow.
   exits 2, 3 and 4 are refusals and 5 and 6 keep the local commit
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
-  (`--unattended` skips runner files; `--revert-only` just reverts, and with
-  `--revert-dirty` takes no `--timeout`, `--command-file`, `--trusted` or
-  `--unattended`). The verify gate: interactive runs ask first, unattended
-  runs need `verify_unattended: true` and an untracked config
+  (`--unattended` skips runner files; `--revert-only` reverts the listed
+  files; `--revert-dirty` reverts every change in the tree, takes no file
+  list, and is what `/review:resolve-stack` and `/review:sweep-all` run
+  after a dirty resolve; both reject `--timeout`, `--command-file`,
+  `--trusted` and `--unattended`). The verify gate: interactive runs ask
+  first, unattended runs need `verify_unattended: true` and an untracked
+  config
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
@@ -244,8 +247,7 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
   fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text` and `commit-resolve-fixes`) —
-  the credential-shape check for resolver-written text; a match means the
-  text is never posted. On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and
+  refuses credential-shaped text before it is posted or committed. On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and
   `rt_report_refusal` prints a `resolve-text:` stderr line (never the text)
   that tells a refusal from a usage error: `refused rule=<rule> line=<n>` for
   a credential hit, `scan failed` when the scan did not run. Callers look for
@@ -438,20 +440,25 @@ explicit-invocation wording live in the skill body and description.
 
 ## Testing
 
-`bats tests/` from the plugin directory — `get-pr-comments.bats`,
-`get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
-`check-resolve-text.bats`, `resolve-paths.bats`, `commit-resolve-fixes.bats`,
-`run-verify-command.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,
-`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
-`tests/mocks/gh`), `commit-resolve-fixes.bats` and `run-verify-command.bats`
-(a throwaway repository with a bare origin and stub `gt`/`node`/`gh`, built by
-`tests/helpers/resolve-repo.bash`), `resolve-paths.bats` (unit tests for
-`lib/resolve-paths.sh`), `file-line-counts.bats` (pins the thermonuclear line-count
-invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
-`review-ledger.bats` (throwaway repositories with a bare origin, built by
-`tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
-absent), `session-start.bats` (the hook's counts, orphan and stale-state
-handling, fold fallback, held-lock and 5 MB budget), and `skill-content.bats`.
+`bats tests/` from the plugin directory:
+
+- `get-pr-comments.bats`, `get-pr-blockers.bats`, `reply-pr-thread.bats`,
+  `resolve-pr-thread.bats`, `file-followup-issue.bats`,
+  `check-resolve-text.bats`, `pr-changed-ranges.bats`,
+  `poll-new-threads.bats` — GraphQL fixtures in `tests/fixtures/`, fake
+  `gh` in `tests/mocks/gh`
+- `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway
+  repository with a bare origin and stub `gt`/`node`/`gh`, built by
+  `tests/helpers/resolve-repo.bash`
+- `resolve-paths.bats` — unit tests for `lib/resolve-paths.sh`
+- `file-line-counts.bats` — pins the thermonuclear line-count invariant
+  alongside `skills/pr-review-workflow/scripts/file-line-counts`
+- `review-ledger.bats` — throwaway repositories with a bare origin, built by
+  `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when
+  ctags is absent
+- `session-start.bats` — the hook's counts, orphan and stale-state handling,
+  fold fallback, held-lock and 5 MB budget
+- `skill-content.bats` — pins load-bearing command and skill text
 
 ## Known Limitations
 
