@@ -94,7 +94,12 @@ time.
   `tests/synthesis.bats`) or move to a shipped plugin lib/references file the
   fences source — and record the choice in `plugins/yellow-council/CLAUDE.md`.
   Moving it changes how every Step 5 fence and `tests/lib/extract-synthesis-lib.bash`
-  load the helpers.
+  load the helpers. If moved, the library is sourced directly from markdown
+  fences under the user's login shell (often zsh), so it must also be classified
+  under the CONTRIBUTING.md "Bash and zsh" tier contract (Tier 4 if sourced
+  directly), registered in `scripts/shell-compat-config.json`, given a
+  `tests/shell-compat/drivers/<plugin>--<lib>.sh` driver if Tier 4, and pass
+  `pnpm test:shell-compat` and `pnpm validate:shell-compat`.
 - **F2 — Step 7 heredoc.** Step 7 still carries `SYNTHESIS_MD` in a quoted
   heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03 only escapes that
   delimiter in 5b input and in 5e's quoting rule; a synthesizer-authored
@@ -110,15 +115,31 @@ time.
   leading/trailing `*`/`_` runs from any non-path word, so bare `__init__`,
   `_private_fn` or `*ptr` in prose become `init`, `private_fn`, `ptr` — which
   can break a finding's claim text that `verify_finding()` or a reader relies
-  on. Strip only paired emphasis runs; add golden cases.
+  on. Rule: `*` runs strip only when the same-length run wraps the word or
+  phrase on both sides (`**important**`, `*x*`); an unpaired leading or
+  trailing `*` (`*ptr`) is kept. `_`/`__` runs strip only when they wrap a
+  multi-word phrase (`__two words__`); a single word wrapped in underscore
+  runs (`__init__`, `_x_`, `__important__`) is treated as an identifier and
+  kept, as is any unpaired edge underscore (`_private_fn`). Underscores inside
+  a word (`snake_case`) are never touched. `__init__` and `__important__` are
+  syntactically identical, so no rule can keep one and strip the other; keeping
+  both is the safe side (a lost identifier breaks evidence, a kept emphasis
+  marker only leaves style). Golden cases: `__init__` kept,
+  `_private_fn` kept, `*ptr` kept, `**important**` stripped, `__two words__`
+  stripped, `snake_case` untouched.
 
 ## Implementation Steps (High-Level)
 
 0. **Synthesis library location (F1)** — make and record the decision before
    any Step 5 code is added; if moving, do the move as its own step with the
-   bats extraction updated and green.
-1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and paired-only
-   emphasis stripping in `council_normalize_text`, with golden cases, so the
+   bats extraction updated and green, the new library tier-classified and
+   registered in `scripts/shell-compat-config.json`, a `tests/shell-compat`
+   driver added if Tier 4, and `pnpm test:shell-compat` plus
+   `pnpm validate:shell-compat` passing.
+1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and the F4 emphasis
+   rule (paired `*` runs and multi-word `_`/`__` phrases strip; lone
+   underscore-wrapped identifiers and unpaired edge `*`/`_` are kept) in
+   `council_normalize_text`, with the F4 golden cases, so the
    text `verify_finding()` compares is byte-exact.
 2. **Verification helper** — Tier 1 mode-dependent exact match with the
    skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy
