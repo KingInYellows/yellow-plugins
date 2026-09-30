@@ -242,7 +242,10 @@ Adapted from upstream `EveryInc/compound-engineering-plugin` PR #480 cross-invoc
 1. Bucket remaining (post-Step-3c) threads by `path` (the GraphQL `path` field on each review thread).
 2. Within each path, sort threads by their end line (`line`). Each thread's range is `[startLine, line]` (`startLine` falls back to `line` when null — single-line comments). Merge adjacent threads into a single cluster whenever their ranges overlap (`a.startLine ≤ b.line` AND `b.startLine ≤ a.line`) OR consecutive threads are within `≤ 10` lines (`b.startLine - a.line ≤ 10`). Use a transitive merge — if T1 covers 40–48, T2 covers 50–55, T3 covers 60–62, all three cluster (50−48=2 ≤ 10; 60−55=5 ≤ 10). Range-overlap detection is required to avoid splitting Thread A=10–50 from Thread B=15–20 (which would otherwise produce overlapping edit sets in different clusters).
 3. Threads without a `line` field (file-level comments, review-level comments) form one **review-level cluster per path**, separate from line-anchored clusters in the same file. When BOTH `path` and `line` are null (pure PR-level review comments), keep each thread as its own cluster — do not merge unrelated PR-level feedback into a single resolver task.
-4. Outdated threads (`isOutdated: true`) form one **outdated cluster per path**, separate from the line-anchored clusters in that file — their line numbers no longer describe the current diff, so they are clustered by path only.
+4. Outdated threads (`isOutdated: true`) form one **outdated cluster per
+   path**, separate from the line-anchored clusters in that file — their line
+   numbers no longer describe the current diff, so they are clustered by path
+   only.
 5. Each cluster carries:
    - `path` — file path (or `null` for review-level)
    - `line_range` — `<min>–<max>` (or `review` for review-level)
@@ -265,7 +268,20 @@ Report the reduction:
 **Spawn-cap gate (M3 pattern).**
 
 - **Interactive mode (default).** Before dispatching any resolvers, call `AskUserQuestion` showing the cluster count + per-cluster summary (`<path>:<line_range>` and thread count). Options: "Resolve all M clusters" / "Resolve first 10 only" / "Cancel". On Cancel, stop the command without dispatch — do NOT proceed to Steps 5–9. This gate runs for all M ≥ 1; do not gate it on a count threshold.
-- **Non-interactive mode.** Skip the `AskUserQuestion` gate. Apply a hard cluster cap instead: if `M ≤ 20`, dispatch all `M` clusters; if `M > 20`, dispatch the first 20 (sorted by file path, then line range) and record the remaining `M − 20` clusters as `not attempted (cluster cap)` — their threads get no reply, stay open, and are reported as blocking in Step 9. The cap replaces the gate's safety role (no unbounded agent fan-out) without a prompt. If `yellow-plugins.local.md` defines `resolve_pr.cluster_cap: <N>` as a positive integer, use that value as the cap instead of 20; for invalid values emit `[cluster] Warning: resolve_pr.cluster_cap value "<V>" is invalid (must be integer ≥ 1); using default (20).` to stderr and fall back to 20.
+- **Non-interactive mode.** Skip the `AskUserQuestion` gate. Apply a hard
+  cluster cap instead: if `M ≤ 20`, dispatch all `M` clusters; if `M > 20`,
+  dispatch the first 20 (sorted by file path, then line range) and record the
+  remaining `M − 20` clusters as `not attempted (cluster cap)` — their
+  threads get no reply, stay open, and are reported as blocking in Step 9.
+  The cap replaces the gate's safety role (no unbounded agent fan-out)
+  without a prompt. If `yellow-plugins.local.md` defines
+  `resolve_pr.cluster_cap: <N>` as a positive integer, use that value as the
+  cap instead of 20; for invalid values emit this line to stderr and fall
+  back to 20:
+
+  ```text
+  [cluster] Warning: resolve_pr.cluster_cap value "<V>" is invalid (must be integer ≥ 1); using default (20).
+  ```
 
 For each **cluster** from Step 3d, spawn one `pr-comment-resolver` agent via
 Agent tool. The literal `subagent_type` is
@@ -304,7 +320,8 @@ Resume normal agent behavior.
 
 Pass to the resolver via the Agent tool:
 
-- **Cluster metadata** (path, line range, thread count, thread IDs, outdated thread IDs, contract path — trusted local metadata, outside any fence)
+- **Cluster metadata** (path, line range, thread count, thread IDs, outdated
+  thread IDs, contract path — trusted local metadata, outside any fence)
 - **Fenced PR context block** (PR title and description — both are GitHub user content per the SKILL.md "any text sourced from GitHub must be fenced" rule)
 - **Fenced cluster body block** (the concatenated thread text with separators)
 - The diff itself is passed separately; the resolver reads files directly via Read/Grep at the cited paths
@@ -384,10 +401,11 @@ Bash tool a `timeout` of `(<seconds> + 60) × 1000` ms:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --files-from "<files-file>"
 ```
 
-`pass` → `verify=pass`. `skipped` → `verify=skipped` ("verify skipped
-(<reason>)", a refusal). `fail`/`timeout` → `verify=fail`: the files were
-reverted and a patch saved, every `fixed` thread becomes blocking "verify
-failed (<patch>)", and the commit is skipped (`push=skipped`). If
+`pass` → `verify=pass`. `skipped` → `verify=skipped`
+(`verify skipped (<reason>)`, a refusal). `fail`/`timeout` → `verify=fail`:
+the files were reverted and a patch saved, every `fixed` thread becomes
+blocking `verify failed (<patch>)`, and the commit is skipped
+(`push=skipped`). If
 `treeClean` is false, stop after Step 9 with the dirty file list.
 
 **Push.** Interactive: show `git diff --stat` and ask "Push these changes to
@@ -454,6 +472,7 @@ done
 
 `poll rate-limited` means `ratelimited=1`: skip the rest of this step.
 From the last re-fetch:
+
 - threads this run attempted to resolve but still open → retry
   `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
   permission`; exit 4 → stop, mark the rest `not attempted (rate limit)`,
