@@ -164,8 +164,9 @@ Use the `AskUserQuestion` tool with:
 
   Always add the worst-case extra wait from `/review:resolve`'s bounded
   re-pass: `Re-pass wait: up to <N> × <W>s = <N×W/60> min added` (`W` is
-  `resolve_pr.repass_wait_seconds` from `yellow-plugins.local.md`, default
-  120; `0` prints `Re-pass wait: disabled`).
+  `resolve_pr.repass_wait_seconds` from `yellow-plugins.local.md`, read and
+  validated as the `local-config` skill describes: an integer 0–480, anything
+  else means the default 120; `0` prints `Re-pass wait: disabled`).
 
 - **Options**:
   - **Proceed — sweep all <N> PRs** — run Step 3b's prune (when there is
@@ -221,11 +222,9 @@ For each iteration:
      ran, not that every internal step succeeded.) Capture any stderr
      lines containing `Error:` or `fatal:` from the sweep output as the
      `Notes` value for this PR; leave `Notes` empty when the output is
-     clean. Take the `blocking` count `<b>` from the sweep's `Resolve:`
-     line (`?` when the line is missing). If that line reports
-     `ratelimited=1`, mark every remaining PR `skipped — not attempted
-     (rate limit)` and go to Step 5: the next sweep would hit the same
-     GitHub limit.
+     clean. Take the `blocking` count `<b>` and `ratelimited` from the
+     sweep's `Resolve:` line (`?` when no line has the contract form,
+     including the `Resolve: completed (output unavailable …)` fallback).
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation, the working tree became dirty mid-loop): outcome is
@@ -233,12 +232,19 @@ For each iteration:
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
    leaves the tree clean (fixes are committed and pushed; a failed verify
    reverts its files). If it is dirty, save and revert the leftovers with
-   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`,
-   add `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes`, mark every remaining PR `skipped — working tree
-   dirty after PR #<PR#>`, and go to Step 5: sweeping on would carry these
-   edits onto the next branch.
-5. **Continue** to the next PR. Do not pause, do not prompt, do not
-   abort the loop on per-PR failures.
+   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
+   and add `working tree dirty after sweep (patch: <patch>)` to this PR's
+   `Notes` — or `revert incomplete: <files>` when the script exits non-zero
+   or reports `treeClean: false`. Then mark every remaining PR `skipped —
+   working tree dirty after PR #<PR#>` and go to `### Step 5: End-of-loop
+   summary table`: sweeping on would carry these edits onto the next branch.
+5. **Rate-limit stop** — only after item 4: if this PR's `Resolve:` line
+   reported `ratelimited=1`, add `rate limited` to its `Notes`, mark every
+   remaining PR `skipped — not attempted (rate limit)`, and go to
+   `### Step 5: End-of-loop summary table`: the next sweep would hit the same
+   GitHub limit.
+6. **Continue** to the next PR otherwise. Unless item 4 or 5 stopped the
+   loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
 The PR number and title for each iteration must be substituted as
 literal values in the announce print and the Skill invocation. Bash
@@ -275,8 +281,9 @@ Print a pipe-delimited markdown summary table:
 Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention | Blocking 1
 ```
 
-`Blocking` is the review threads `/review:resolve` left open (disagree,
-unclear, held human threads, `CHANGES_REQUESTED`); `?` rows are excluded
+`Blocking` is the `b` count from the `Resolve:` line: review threads
+`/review:resolve` left open (disagree, unclear, held human threads) plus
+`CHANGES_REQUESTED` reviewers; `?` rows are excluded
 from the total. Blocking threads do not change the exit code — re-run
 `/review:sweep-all` later to pick up reviewer replies and late comments.
 

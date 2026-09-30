@@ -199,9 +199,12 @@ failures and continue.
    submits without prompting. Its last output line is the contract line
    `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
    push=<...>, verify=<...>, ratelimited=<0|1>`
-   (`references/resolve/dispositions.md`). After a PR reports
-   `ratelimited=1`, stop resolving: mark every remaining PR `not attempted
-   (rate limit)` and go to Step 4 — the next PR would hit the same limit.
+   (`references/resolve/dispositions.md`). If it reports `ratelimited=1`,
+   remember that and finish **this** PR first — items 3, 3b and 5, skipping
+   only its restack — and list it under Needs manual attention as `rate
+   limited`. Then mark every remaining PR `not attempted (rate limit)` and
+   go to `### Step 4: Final aggregate summary`: the next PR would hit the
+   same limit.
 
 3. **Self-verify** — parse the `Resolve:` line from step 2's output for
    `b` (blocking), `i` (issues filed) and `push`. The `Skill` tool returns no
@@ -228,8 +231,9 @@ failures and continue.
    On exit 0 the count is the PR's open threads (outdated included). Flag the
    PR for "Needs manual attention" when `b > 0`, when the count is `> 0`, or
    when the two disagree — the `Resolve:` line is missing, or the count
-   exceeds `b` (open threads the command did not report as blocking); record
-   that as `self-verify disagreement`. On non-zero exit: record the PR's
+   exceeds `b` (open threads the command did not report as blocking; `b`
+   also counts `CHANGES_REQUESTED` reviewers, so a count at or below `b` is
+   not proof of agreement); record that as `self-verify disagreement`. On non-zero exit: record the PR's
    verification as `inconclusive` with the stderr output and flag it.
 
 3b. **Clean-tree check** — continuing on a dirty tree would carry this PR's
@@ -244,8 +248,11 @@ failures and continue.
    followed by the file list. Save and revert the leftover edits (a refused
    edit, such as one to `.claude/`, must not stay on disk) with
    `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
-   and print its `patch` path. Then skip the remaining PRs and go to Step 4
-   (exit `1`).
+   and print its `patch` path when it is not null. If the script exits
+   non-zero or reports `treeClean: false`, print `[review:resolve-stack]
+   revert incomplete:` with `git status --porcelain` and list it under Needs
+   manual attention. Then mark the remaining PRs `not attempted (dirty
+   tree)` and go to `### Step 4: Final aggregate summary` (exit `1`).
 
 4. **Restack** — `gt upstack restack`. If it reports a conflict: do not pause —
    run `gt abort` to clear the conflicted restack (without this, the repo stays
@@ -265,7 +272,8 @@ failures and continue.
    to the next PR.
 
 2. **Resolve** — invoke the `Skill` tool with `skill: "review:resolve"` and
-   `args: "<PR#> --non-interactive"`, exactly as in the Graphite branch above.
+   `args: "<PR#> --non-interactive"`, exactly as in the Graphite branch above,
+   including its `ratelimited=1` rule.
    `/review:resolve` resolves its own active provider internally, so this
    step is identical regardless of which provider this walk resolved.
 
@@ -288,18 +296,20 @@ PR#  | blocking | issues | remaining unresolved | push status | restack status
 ```
 
 `blocking`, `issues` and `push status` come from the PR's `Resolve:` line
-(`-` when it is missing); `remaining unresolved` is the step 3 count. If the
-walk aborted, the last line is `aborted at PR #<N>`.
+(`-` when it is missing); `remaining unresolved` is the step 3 count;
+`restack status` is `-` for a PR whose walk stopped before its restack. If
+the walk aborted, the last line is `aborted at PR #<N>`.
 
-Then totals: PRs walked, PRs fully resolved (remaining == 0), PRs with
-residual comments, PRs skipped (no open PR / draft / checkout failure).
+Then totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
+PRs with residual comments, PRs skipped (no open PR / draft / checkout
+failure), and PRs not attempted (rate limit / dirty tree).
 
 Finally, a **Needs manual attention** section listing every PR with:
 blocking threads (`b > 0`), residual unresolved threads (`>0` from step 3),
 a self-verify disagreement or inconclusive self-verify, a restack conflict,
-a push failure, a dirty-tree abort, or a `not attempted (cluster cap)` or
-`not attempted (rate limit)` note surfaced by `/review:resolve`. If that
-section is empty, print
+a push failure, a dirty-tree abort or incomplete revert, a `not attempted
+(cluster cap)` note surfaced by `/review:resolve`, a rate-limited PR, or
+`not attempted (rate limit)`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
 **Exit code contract.** Exit `0` only when every walked PR is fully resolved —
