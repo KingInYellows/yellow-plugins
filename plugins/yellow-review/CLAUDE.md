@@ -221,12 +221,6 @@ resolution, and sequential stack review. Graphite-native workflow.
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
 
-`reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
-`lib/resolve-text.sh` (credential-shape check) before posting; `reply-pr-thread`
-and `resolve-pr-thread` also source `lib/gh-graphql.sh`.
-`commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
-and `lib/verify-run.sh`.
-
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes
 and markers for the resolve scripts are in
@@ -242,27 +236,29 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
 
 ### Library
 
+- `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
+  `run-verify-command`) — canonical-path check, the case-insensitive
+  resolver deny list (agent-tool config dirs and instruction files
+  included), the runner-file list (files a git hook or verify command would
+  execute) and `rp_tree_changes`; a `git config` failure other than exit 1
+  fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
-  `file-followup-issue` and `check-resolve-text`) — the credential-shape
-  check for resolver-written text; a match means the text is never posted.
-  On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal`
-  prints a `resolve-text:` stderr line (never the text) that tells a refusal
-  from a usage error: `refused rule=<rule> line=<n>` for a credential hit,
-  `scan failed` when the scan did not run. Callers look for that line anywhere
-  on stderr rather than assume it is first.
+  `file-followup-issue`, `check-resolve-text` and `commit-resolve-fixes`) —
+  the credential-shape check for resolver-written text; a match means the
+  text is never posted. On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and
+  `rt_report_refusal` prints a `resolve-text:` stderr line (never the text)
+  that tells a refusal from a usage error: `refused rule=<rule> line=<n>` for
+  a credential hit, `scan failed` when the scan did not run. Callers look for
+  that line anywhere on stderr rather than assume it is first.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
   `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
   30 s, clamped to 60 s) and returns 124 on a timeout, but only when
   `timeout(1)` is installed;
   without it `gh` runs unbounded.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
-  `resolve-pr-thread`) — one GraphQL call helper with rate-limit and
-  not-found/permission classification, so both scripts agree on exit codes.
-- `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
-  `run-verify-command`) — canonical-path check, the case-insensitive resolver
-  deny list (agent-tool config dirs and instruction files included), the
-  runner-file list (files a git hook or verify command would execute) and
-  `rp_tree_changes`; a `git config` failure other than exit 1 fails closed
+  `resolve-pr-thread`) — the shared GraphQL call (bounded by
+  `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and not-found/permission
+  classification behind their exit codes 3 and 4
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
   process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
   accepts only a `timeout`/`gtimeout` that supports `--kill-after`
@@ -449,7 +445,8 @@ explicit-invocation wording live in the skill body and description.
 `resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
 `tests/mocks/gh`), `commit-resolve-fixes.bats` and `run-verify-command.bats`
 (a throwaway repository with a bare origin and stub `gt`/`node`/`gh`, built by
-`tests/helpers/resolve-repo.bash`), `file-line-counts.bats` (pins the thermonuclear line-count
+`tests/helpers/resolve-repo.bash`), `resolve-paths.bats` (unit tests for
+`lib/resolve-paths.sh`), `file-line-counts.bats` (pins the thermonuclear line-count
 invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
