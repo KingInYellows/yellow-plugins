@@ -12,7 +12,7 @@ resolve_repo_init() {
   export PATH="$STUB_BIN:$PATH"
   export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
   : >| "$STUB_LOG"
-  unset STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD
+  unset STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_DIFF_FAIL
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
 
   ORIGIN="$BATS_TEST_TMPDIR/origin.git"
@@ -28,11 +28,18 @@ resolve_repo_init() {
   printf 'one\n' >| src/a.txt
   printf 'two\n' >| src/b.txt
   printf 'three\n' >| '-dash.txt'
+  printf 'untouched\n' >| src/c.txt
+  printf '{}\n' >| package.json
   git add -A && git commit -q -m "chore: initial"
   git checkout -q -b feature
+  # The PR changes every fixture file except src/c.txt.
   printf 'one\nfeature\n' >| src/a.txt
+  printf 'two\nfeature\n' >| src/b.txt
+  printf 'three\nfeature\n' >| '-dash.txt'
+  printf '{"name":"x"}\n' >| package.json
   git commit -q -am "feat: first pass"
-  git push -q origin feature 2>/dev/null
+  # origin needs main too: the stub `gh pr diff` compares main...feature.
+  git push -q origin main feature 2>/dev/null
   FIRST_SHA=$(git rev-parse HEAD)
 
   # Publish HEAD to origin, as a successful submit would.
@@ -93,6 +100,10 @@ case "$*" in
     oid="${STUB_PR_HEAD:-$(git --git-dir="$ORIGIN_DIR" rev-parse -q --verify refs/heads/feature)}"
     printf '{"headRefOid":"%s"}\n' "$oid"
     exit 0
+    ;;
+  "pr diff "*)
+    [ "${STUB_PR_DIFF_FAIL:-0}" = 1 ] && exit 1
+    exec git --git-dir="$ORIGIN_DIR" diff --name-only main...feature
     ;;
 esac
 echo "stub gh: unexpected: $*" >&2

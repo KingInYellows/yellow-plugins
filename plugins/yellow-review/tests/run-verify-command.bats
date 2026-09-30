@@ -145,6 +145,19 @@ has_kill_after() {
   grep -q 'resolver edit' src/a.txt
 }
 
+@test "list entries are literal paths, never globs" {
+  verify 'exit 1' --timeout 5 --trusted -- 'src/*'
+  [ "$status" -eq 2 ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "an untracked stray left after the revert makes treeClean false" {
+  printf 'stray\n' >| src/stray.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+}
+
 @test "refuses a deny-listed path" {
   printf 'X=1\n' >| .env
   verify 'exit 1' --timeout 5 --trusted -- .env

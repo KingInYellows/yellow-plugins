@@ -47,7 +47,7 @@ run_crf() {
 
 @test "stages unstaged resolver edits and makes a new commit (graphite)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
-  printf 'two\nfix\n' >| src/b.txt
+  printf 'two\nfeature\nfix\n' >| src/b.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/b.txt
   [ "$status" -eq 0 ]
   sha=$(git rev-parse HEAD)
@@ -148,7 +148,7 @@ run_crf() {
 
 @test "--files-from reads one path per line" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
-  printf 'two\nfix\n' >| src/b.txt
+  printf 'two\nfeature\nfix\n' >| src/b.txt
   printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
   run_crf --provider graphite --pr 7 --message "$MSG" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
@@ -177,6 +177,61 @@ run_crf() {
   [[ "$stderr" == *"deny-listed"* ]]
   [ "$(git rev-parse HEAD)" = "$base" ]
   [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "a file the PR does not change is refused (exit 3)" {
+  printf 'edited\n' >| src/c.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/c.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"not one of PR #7's changed files: src/c.txt"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "an unreadable PR file list refuses the commit (exit 3)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export STUB_PR_DIFF_FAIL=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "an untracked file outside the set aborts before committing (exit 3)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'import os\n' >| conftest.py
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the expected set: conftest.py"* ]]
+}
+
+@test "--unattended refuses runner files; attended commits them" {
+  printf '{"name":"y"}\n' >| package.json
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- package.json
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"runner file"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" -- package.json
+  [ "$status" -eq 0 ]
+}
+
+@test "a non-canonical path is rejected, not normalized (exit 2)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- ./src/a.txt
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src//a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "the github runtime is found in the installed cache layout" {
+  unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
+  cache="$BATS_TEST_TMPDIR/cache/yellow-plugins"
+  mkdir -p "$cache/yellow-review/1.0.0/skills/pr-review-workflow" "$cache/github-workflow/2.3.0/lib" "$cache/github-workflow/2.10.0/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts"
+  cp -R "$(dirname "$RESOLVE_SCRIPTS")/../../lib" "$cache/yellow-review/1.0.0/lib"
+  : >| "$cache/github-workflow/2.3.0/lib/github-stack-runtime.js"
+  : >| "$cache/github-workflow/2.10.0/lib/github-stack-runtime.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run --separate-stderr "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts/commit-resolve-fixes" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q "^node .*github-workflow/2.10.0/lib/github-stack-runtime.js submit$" "$STUB_LOG"
 }
 
 @test "a missing github runtime fails before committing (exit 2)" {

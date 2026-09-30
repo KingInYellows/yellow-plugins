@@ -2,13 +2,14 @@
 # Stage the resolver-touched files, commit them as a NEW commit, submit via
 # the active stacked-PR provider, and verify the remote head.
 # Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
-#                             [--files-from <file>] [-- <files...>]
+#                             [--unattended] [--files-from <file>] [-- <files...>]
 #   files:   repo-root-relative paths the resolvers modified, one per line in
 #            --files-from and/or after --. Resolver output is untrusted, so
 #            callers pass it through --files-from, never on a command line.
-#            Resolver deny-list paths (CI, secrets, yellow-plugins.local.md,
-#            .claude/) are refused. With no files and a clean tree the
-#            result is NOOP.
+#            Paths must be canonical, on the PR's changed-file list and off
+#            the deny list; --unattended also refuses runner files, which the
+#            commit's git hooks would execute (lib/resolve-paths.sh). With
+#            no files and a clean tree the result is NOOP.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
@@ -30,19 +31,21 @@ MAX_MESSAGE_CHARS=200
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
 PROVIDER=""
 PR=""
 MESSAGE=""
+UNATTENDED=0
 FILES=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
         --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
+        --unattended) UNATTENDED=1; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
@@ -73,23 +76,31 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repo
 cd -- "$TOP"
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
-# Paths the resolver may never touch (mirrors pr-comment-resolver's deny
-# list); refused even when they have changes.
-is_denied() {
-    case "$1" in
-        .github/*|.circleci/*|.git/*|.claude/*|yellow-plugins.local.md) return 0 ;;
-    esac
-    case "${1##*/}" in
-        .gitlab-ci.yml|Jenkinsfile|azure-pipelines.yml|Dockerfile|docker-compose.yml) return 0 ;;
-        .env|.env.*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
-    esac
+# shellcheck source=../../../lib/resolve-paths.sh
+. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+# Listed paths are file names, never globs or pathspec magic.
+export GIT_LITERAL_PATHSPECS=1
+
+# The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
+# source tree, <marketplace>/<name>/<version>/ in the installed cache.
+find_runtime() {
+    local root cand ver
+    root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
+    cand="$root/../github-workflow/lib/github-stack-runtime.js"
+    [ -f "$cand" ] && { printf '%s' "$cand"; return 0; }
+    ver=$(for d in "$root"/../../github-workflow/*/; do
+        d="${d%/}"; d="${d##*/}"
+        [[ "$d" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$d"
+    done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+    cand="$root/../../github-workflow/$ver/lib/github-stack-runtime.js"
+    [ -n "$ver" ] && [ -f "$cand" ] && { printf '%s' "$cand"; return 0; }
     return 1
 }
 
 if [ "$PROVIDER" = github ]; then
-    RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(cd -- "$(dirname -- "$0")/../../../.." && pwd)/github-workflow/lib/github-stack-runtime.js}"
+    RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(find_runtime || true)}"
     command -v node >/dev/null 2>&1 || die 2 "node not found"
-    [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found at $RUNTIME"
+    [ -n "$RUNTIME" ] && [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found (is github-workflow installed?)"
 fi
 
 # --- Validate the expected set ---
@@ -97,12 +108,11 @@ fi
 # under bash 3.2.
 EXPECTED=()
 for f in ${FILES[@]+"${FILES[@]}"}; do
-    f="${f#./}"
-    case "$f" in
-        ''|/*|../*|*/../*|*/..|..) die 2 "path must be repo-relative and inside the repository: $f" ;;
-    esac
-    [[ "$f" =~ [[:cntrl:]] ]] && die 2 "path contains control characters"
-    is_denied "$f" && die 3 "refusing to commit a deny-listed path: $f"
+    rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
+    rp_denied "$f" && die 3 "refusing to commit a deny-listed path: $f"
+    if [ "$UNATTENDED" = 1 ] && rp_runner "$f"; then
+        die 3 "refusing to commit a runner file unattended (git hooks would execute it): $f"
+    fi
     [ -z "$(git status --porcelain --untracked-files=all -- "$f")" ] \
         && die 3 "listed file has no changes: $f"
     EXPECTED+=("$f")
@@ -110,15 +120,26 @@ done
 
 # Tracked changes outside the expected set would ride along in the commit
 # (or be left behind): refuse before staging anything.
+# Only files the PR already changes may be committed.
+if [ "${#EXPECTED[@]}" -gt 0 ]; then
+    PR_FILES=$(gh pr diff "$PR" --name-only 2>/dev/null) || die 3 "could not list PR #$PR's changed files"
+    for f in "${EXPECTED[@]}"; do
+        printf '%s\n' "$PR_FILES" | grep -qxF -- "$f" || die 3 "not one of PR #$PR's changed files: $f"
+    done
+fi
+
+# Tracked or untracked changes outside the expected set would ride along in
+# the commit (or be left behind): refuse before staging anything.
 DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE"' EXIT
-git diff --name-only -z HEAD -- >"$DIRTY_FILE" || die 3 "git diff failed"
+{ git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
+    >"$DIRTY_FILE" || die 3 "git diff failed"
 while IFS= read -r -d '' d; do
     found=0
     for f in ${EXPECTED[@]+"${EXPECTED[@]}"}; do
         [ "$d" = "$f" ] && { found=1; break; }
     done
-    [ "$found" = 1 ] || die 3 "tracked change outside the expected set: $d"
+    [ "$found" = 1 ] || die 3 "change outside the expected set: $d"
 done <"$DIRTY_FILE"
 
 emit() {
@@ -132,7 +153,7 @@ fi
 
 # --- Stage and compare ---
 git add -- "${EXPECTED[@]}" || die 3 "git add failed"
-STAGED=$(git diff --cached --name-only -z | tr '\0' '\n' | LC_ALL=C sort)
+STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort)
 WANT=$(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort -u)
 if [ "$STAGED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] staged:\n%s\n' "$WANT" "$STAGED" >&2
@@ -170,8 +191,11 @@ esac
 # --- Verify the published head ---
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
-REMOTE_NAME=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-REMOTE_NAME="${REMOTE_NAME:-origin}"
+REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
+    || git config --get remote.pushDefault 2>/dev/null \
+    || git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+# "." means a local upstream (common for stacked branches): check origin.
+case "$REMOTE_NAME" in ''|.) REMOTE_NAME=origin ;; esac
 REMOTE=$(git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
 [ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
 PR_HEAD=""
