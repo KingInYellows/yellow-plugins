@@ -14,7 +14,8 @@ Enumerate every open non-draft PR you authored, then run `/review:sweep` on
 each one sequentially with no per-PR prompts. A single upfront
 `AskUserQuestion` confirms the PR list before any work begins; the loop
 runs unattended after that. Failures on individual PRs are logged and
-skipped — the loop never pauses, never aborts. After all PRs are
+skipped — the loop never pauses and never aborts on a per-PR failure; only
+the dirty-tree and rate-limit stops in Step 4 end it early. After all PRs are
 processed, one `/flow:compound` pass captures learnings from the
 batch (skipped if zero PRs were swept).
 
@@ -201,7 +202,8 @@ ledger.
 
 For each PR in the sorted list, in order from lowest PR number to
 highest, do the following. **No pauses anywhere in this loop** — log
-failures and continue.
+per-PR failures and continue, except where item 4 (dirty tree) or item 5
+(rate limit) ends the loop.
 
 For each iteration:
 
@@ -225,11 +227,13 @@ For each iteration:
      clean. Take the `blocking` count `<b>` and `ratelimited` from the
      sweep's `Resolve:` line (`?` when no line has the contract form,
      including the `Resolve: completed (output unavailable …)` fallback).
-     `/review:resolve` emits no contract line when a rate limit stops it
-     before its last step. Treat sweep output containing an explicit
-     rate-limit error (HTTP 403/429, `rate limit`, `secondary rate limit`),
-     or a missing contract line after a rate-limit message, as
-     `ratelimited=1` even though `<b>` stays `?`.
+     When a line has the contract form, its `ratelimited` value is the only
+     rate-limit state: reviewer comments and nested findings that merely
+     mention a "rate limit" never change it. `/review:resolve` emits no
+     contract line when a rate limit stops it before its last step, so only
+     when no line has the contract form, treat a tool error line (`gh:` or
+     `Error:`) reporting a rate limit (HTTP 403/429, `secondary rate limit`)
+     as `ratelimited=1` even though `<b>` stays `?`.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation, the working tree became dirty mid-loop): outcome is
