@@ -12,10 +12,15 @@ resolve_repo_init() {
   export PATH="$STUB_BIN:$PATH"
   export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
   : >| "$STUB_LOG"
-  unset STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_DIFF_FAIL
+  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_DIFF_FAIL
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
   # Fixture repos must not inherit the developer's or CI's git config.
-  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  # GIT_CONFIG_GLOBAL needs git 2.32; sandboxing HOME works on every
+  # supported version (2.31+).
+  export GIT_CONFIG_NOSYSTEM=1
+  export HOME="$BATS_TEST_TMPDIR/home"
+  export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/xdg"
+  mkdir -p "$HOME" "$XDG_CONFIG_HOME"
 
   ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   REPO="$BATS_TEST_TMPDIR/repo"
@@ -68,7 +73,31 @@ case "$1" in
       [ "$next" = 1 ] && { msg="$a"; next=0; }
       [ "$a" = "-m" ] && next=1
     done
-    exec git commit -q -m "$msg"
+    git commit -q -m "$msg" || exit 1
+    # Like gt, restack the child branch onto the new commit and record the
+    # parent revision it was restacked onto.
+    if [ -n "${STUB_GT_CHILD:-}" ]; then
+      cur=$(git symbolic-ref --short HEAD)
+      git rebase -q --autostash --onto "$cur" "$(cat "$STUB_GT_CHILD_BASE")" "$STUB_GT_CHILD" >/dev/null 2>&1 || exit 1
+      git checkout -q "$cur"
+      git rev-parse HEAD > "$STUB_GT_CHILD_BASE"
+    fi
+    exit 0
+    ;;
+  restack)
+    [ "${STUB_GT_RESTACK_FAIL:-0}" = 1 ] && exit 1
+    # Only the stub's single child branch is tracked; --upstack from the
+    # current branch rebases it when its recorded parent revision is stale.
+    if [ -n "${STUB_GT_CHILD:-}" ]; then
+      cur=$(git symbolic-ref --short HEAD)
+      if [ "$(cat "$STUB_GT_CHILD_BASE")" != "$(git rev-parse "$cur")" ]; then
+        # gt restacks with unstaged changes present; autostash mirrors that.
+        git rebase -q --autostash --onto "$cur" "$(cat "$STUB_GT_CHILD_BASE")" "$STUB_GT_CHILD" >/dev/null 2>&1 || exit 1
+        git checkout -q "$cur"
+        git rev-parse "$cur" > "$STUB_GT_CHILD_BASE"
+      fi
+    fi
+    exit 0
     ;;
   submit)
     [ "${STUB_SUBMIT_FAIL:-0}" = 1 ] && exit 1
@@ -94,7 +123,10 @@ for a in "$@"; do
   [ "$prev" = "--remote" ] && ORIGIN_DIR=$(git remote get-url "$a") && export ORIGIN_DIR
   prev="$a"
 done
-publish >/dev/null 2>&1
+if ! publish >/dev/null 2>&1; then
+  printf '{"status":"PUSH_REJECTED","recoveryAction":"sync first"}\n'
+  exit 0
+fi
 printf '{"status":"SUCCESS"}\n'
 STUB
   chmod +x "$STUB_BIN/node"
@@ -108,7 +140,7 @@ printf 'gh %s\n' "$*" >> "$STUB_LOG"
 case "$*" in
   "pr view "*)
     oid="${STUB_PR_HEAD:-$(git --git-dir="$ORIGIN_DIR" rev-parse -q --verify refs/heads/feature)}"
-    printf '{"headRefOid":"%s"}\n' "$oid"
+    printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false}\n' "$oid"
     exit 0
     ;;
   "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*)
@@ -121,4 +153,16 @@ echo "stub gh: unexpected: $*" >&2
 exit 1
 STUB
   chmod +x "$STUB_BIN/gh"
+}
+
+# stub_gt_child_branch: add a branch "child" on top of the feature branch and
+# make the gt stub restack it, as gt does for an upstack branch. Leaves the
+# repository on "feature".
+stub_gt_child_branch() {
+  git checkout -q -b child
+  printf 'child\n' >| src/child.txt
+  git add src/child.txt && git commit -q -m "feat: child"
+  git checkout -q feature
+  export STUB_GT_CHILD=child STUB_GT_CHILD_BASE="$BATS_TEST_TMPDIR/child.base"
+  git rev-parse feature >| "$STUB_GT_CHILD_BASE"
 }

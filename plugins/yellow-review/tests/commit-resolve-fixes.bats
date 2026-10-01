@@ -107,8 +107,10 @@ STUB
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- 'src/*'
   [ "$status" -eq 3 ]
+  [[ "$stderr" == *"listed file has no changes: src/*"* ]]
   run_crf --provider graphite --pr 7 --message "$MSG" -- 'src/[ab].txt'
   [ "$status" -eq 3 ]
+  [[ "$stderr" == *"listed file has no changes: src/[ab].txt"* ]]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   [ -z "$(git diff --cached --name-only)" ]
 }
@@ -165,7 +167,7 @@ STUB
   ! grep -q '^gt ' "$STUB_LOG"
 }
 
-@test "a listed file without changes is a staged mismatch (exit 3)" {
+@test "a listed file without changes refuses the commit (exit 3)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/b.txt
   [ "$status" -eq 3 ]
@@ -238,7 +240,9 @@ STUB
   export STUB_SUBMIT_SKIP_PUBLISH=1
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 6 ]
-  ! grep -q '^gh pr view' "$STUB_LOG"
+  # The pre-commit branch binding calls gh pr view; only the head polling
+  # asks for headRefOid.
+  ! grep -q '^gh pr view.*headRefOid' "$STUB_LOG"
 }
 
 @test "a PR headRefOid that disagrees with origin exits 6 after the backoff" {
@@ -248,7 +252,7 @@ STUB
   [ "$status" -eq 6 ]
   [[ "$stderr" == *"head not verified"* ]]
   # One check plus one per backoff entry ("0 0").
-  [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+  [ "$(grep -c '^gh pr view.*headRefOid' "$STUB_LOG")" -eq 3 ]
 }
 
 @test "a PR headRefOid that lags then matches is verified after the backoff" {
@@ -257,6 +261,7 @@ STUB
   cat >| "$STUB_BIN/gh" <<'STUB'
 #!/bin/sh
 case "$*" in
+  "pr view "*isCrossRepository*) ;;
   "pr view "*)
     n=$(cat "$LAG_COUNT" 2>/dev/null || echo 0)
     if [ "$n" -lt 2 ]; then
@@ -275,7 +280,7 @@ STUB
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
-  [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+  [ "$(grep -c '^gh pr view.*headRefOid' "$STUB_LOG")" -eq 3 ]
 }
 
 @test "a submit that exceeds the timeout exits 5" {
@@ -386,6 +391,9 @@ STUB
 }
 
 @test "gt and hooks do not inherit literal-pathspec mode" {
+  # The script never sets the flag (it uses a per-call --literal-pathspecs), so
+  # clear any ambient value to keep the check independent of the runner's env.
+  unset GIT_LITERAL_PATHSPECS
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
@@ -398,6 +406,19 @@ STUB
   run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
   [ "$status" -eq 3 ]
   [[ "$stderr" == *"credential"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "a scanner failure refuses the commit like a credential and leaves nothing staged" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  # Fail only the scanner's awk call (-v strict=...); everything else runs for real.
+  printf '#!/bin/sh\ncase "$1" in -v) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v awk)" >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  printf 'one\nfeature changed\n' >| src/a.txt
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not be scanned"* ]]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   [ -z "$(git diff --cached --name-only)" ]
 }
@@ -435,6 +456,42 @@ STUB
   [ -z "$(git diff --cached --name-only)" ]
   [ "$(git status --porcelain | sort | tr '\n' ' ')" = " M src/a.txt  M src/b.txt " ]
   ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a rejected graphite commit restacks the upstack back onto the reset branch" {
+  stub_gt_child_branch
+  printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  grep -q '^gt restack --upstack' "$STUB_LOG"
+  # The child sits directly on the reset parent again, without the rejected commit.
+  [ "$(git rev-parse child~1)" = "$FIRST_SHA" ]
+  [ "$(git rev-list --count "$FIRST_SHA"..child)" = 1 ]
+  [ "$(git symbolic-ref --short HEAD)" = feature ]
+}
+
+@test "a failed restack after an undo is reported with the gt restack hint (still exit 4)" {
+  stub_gt_child_branch
+  export STUB_GT_RESTACK_FAIL=1
+  printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"retry \`gt restack\`"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "the github provider never runs gt restack when it undoes a commit" {
+  printf '#!/bin/sh\nprintf "late\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/post-commit
+  chmod +x .git/hooks/post-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  ! grep -q '^gt ' "$STUB_LOG"
 }
 
 @test "a hook that adds a credential-shaped line makes the commit undo itself (exit 4)" {

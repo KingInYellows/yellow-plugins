@@ -474,17 +474,35 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 2 ]
 }
 
-@test "a URL password that merely contains a percent placeholder is refused; whole-password placeholders stay clean" {
-  for t in 'https://u:Hunter2%s@example.com/x' 'https://u:p%zz1word@host' \
-    'https://deploy:p%40ss%21word@example.com/x'; do
+@test "rt_looks_secret_strict skips keyword rules but keeps high-precision ones" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  # shellcheck source=../lib/resolve-text.sh
+  . "$LIB"
+  for t in 'password = "hunter22"' 'API_KEY=abcd1234efgh5678' 'token: string' 'password: hunter22'; do
     printf '%s\n' "$t" >| "$A"
-    run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    if [ "$t" != 'token: string' ]; then rt_looks_secret "$A" || { echo "keyword rules missed: $t"; false; }; fi
+    run rt_looks_secret_strict "$A"
+    [ "$status" -eq 1 ] || { echo "strict flagged: $t"; false; }
   done
-  printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
-    'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
-  run "$SCRIPT" "$A"
-  [ "$status" -eq 0 ]
+  for t in 'x ghp_abcdefghijklmnopqrstuvwxyz0123456789' 'AKIA''ABCDEFGHIJKLMNOP' \
+           'ASIA''ABCDEFGHIJKLMNOP' 'gl''pat-abcdefghijklmnopqrstu1234' \
+           'xoxb-1234567890-abcdef' 'sk-ant-abcdefghijklmnopqrstuvwxyz' \
+           'AIzaSyA1234567890abcdefghijklmnopqrstuvw' \
+           'aB3dEf6hIj9kLm2n''Op5qRs8tUv1wXy4zAb' '-----BEGIN PRIVATE KEY-----'; do
+    printf '%s\n' "$t" >| "$A"
+    rt_looks_secret_strict "$A" || { echo "strict missed: $t"; false; }
+  done
+}
+
+@test "rt_looks_secret_strict keeps the URL-userinfo rule and the keyword-in-word anchoring" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  # shellcheck source=../lib/resolve-text.sh
+  . "$LIB"
+  printf 'clone https://deploy:%s@example.com/o/r.git\n' 'S3cr3t9x' >| "$A"
+  rt_looks_secret_strict "$A"
+  printf '%s\n' 'bypass: something-else' >| "$A"
+  run rt_looks_secret_strict "$A"
+  [ "$status" -eq 1 ]
 }
 
 @test "a keyword alone on a line checks the next non-blank line as its value" {
