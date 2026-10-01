@@ -267,7 +267,7 @@ PR already stages at Step 9a.
 
 ### Phase 2: yellow-review wrapper
 
-- [ ] 2.1: Create `plugins/yellow-review/lib/stage-learning.sh`. It is
+- [x] 2.1: Create `plugins/yellow-review/lib/stage-learning.sh`. It is
       executable, invoked as
       `bash "${CLAUDE_PLUGIN_ROOT}/lib/stage-learning.sh" ...`, and like
       `review-ledger.sh` it is not a tiered library. Subcommands:
@@ -482,7 +482,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 4.2: `plugins/yellow-review/tests/stage-learning.bats`. Cases:
+- [x] 4.2: `plugins/yellow-review/tests/stage-learning.bats`. Cases:
   - Library resolution via `YR_CORE_LIB`, the sibling path, and the cache's
     newest version (a fake `2.4.0` and `2.10.1` tree, as in
     `review-ledger.bats`).
