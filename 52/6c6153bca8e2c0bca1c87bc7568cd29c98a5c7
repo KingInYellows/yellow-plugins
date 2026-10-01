@@ -1,0 +1,22 @@
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_3a67c5309460ff::t_787f393015d196 43
+  s_3a67c5309460ff::t_0dd33962df2f3d 15-42
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_3a67c5309460ff::t_fb4c27482564d4 6,16-26,33-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "526c6153bca8e2c0bca1c87bc7568cd29c98a5c7",
+  "prompts": {},
+  "sessions": {
+    "s_3a67c5309460ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf180525-44ba-4076-9ae7-0a9ec39ef387",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
