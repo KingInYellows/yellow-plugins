@@ -38,9 +38,12 @@ rp_denied() {
         .github/*|*/.github/*|.circleci/*|*/.circleci/*|.git/*|*/.git/*) return 0 ;;
         .claude/*|*/.claude/*|.vscode/*|*/.vscode/*) return 0 ;;
         .devcontainer/*|*/.devcontainer/*|.idea/*|*/.idea/*) return 0 ;;
+        .cursor/*|*/.cursor/*|.codex/*|*/.codex/*|.agents/*|*/.agents/*) return 0 ;;
+        .gemini/*|*/.gemini/*|.windsurf/*|*/.windsurf/*|.cline/*|*/.cline/*) return 0 ;;
     esac
     case "${l##*/}" in
-        yellow-plugins.local.md|claude.md|agents.md|.mcp.json) return 0 ;;
+        yellow-plugins.local.md|claude.md|agents.md|gemini.md|.mcp.json) return 0 ;;
+        .cursorrules|.windsurfrules|.clinerules|copilot-instructions.md) return 0 ;;
         .gitlab-ci.yml|.travis.yml|.drone.yml|jenkinsfile|azure-pipelines.yml|bitbucket-pipelines.yml) return 0 ;;
         dockerfile*|*.dockerfile|docker-compose*.yml|docker-compose*.yaml|compose.yml|compose.yaml) return 0 ;;
         .env*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
@@ -55,11 +58,13 @@ rp_denied() {
 # build and package manifests that a build tool evaluates (build.gradle,
 # Gemfile, *.gemspec, Cargo.toml, composer.json, pom.xml, CMakeLists.txt) and
 # test bootstrap files a runner loads before any test (jest.setup.*,
-# setupTests.*, spec_helper.rb, test_helper.*, phpunit.xml). Left out:
+# setupTests.*, spec_helper.rb, test_helper.*, phpunit.xml) and other
+# ecosystems' manifests (mix.exs, Package.swift, build.zig, *.csproj,
+# deno.json[c], bunfig.toml). Left out:
 # go.mod and requirements.txt (declarative, never executed) and __init__.py
 # (any package has them; too broad).
 rp_runner() {
-    local l hooks top
+    local l hooks top rc
     l=$(rp_lower "$1")
     # Only the repository-root scripts/ directory: build and hook tooling
     # lives there. Nested scripts/ directories (e.g. a plugin's own
@@ -74,6 +79,8 @@ rp_runner() {
         conftest.py|pyproject.toml|setup.py|setup.cfg|tox.ini|pytest.ini|noxfile.py|build.rs) return 0 ;;
         build.gradle|build.gradle.kts|settings.gradle|settings.gradle.kts|gradlew|gradlew.bat|build.sbt|pom.xml) return 0 ;;
         gemfile|gemfile.lock|*.gemspec|cargo.toml|cargo.lock|composer.json|composer.lock) return 0 ;;
+        mix.exs|package.swift|build.zig|build.zig.zon|*.csproj|*.fsproj|*.vbproj) return 0 ;;
+        directory.build.props|directory.build.targets|deno.json|deno.jsonc|bunfig.toml) return 0 ;;
         cmakelists.txt|meson.build|.rspec|spec_helper.rb|rails_helper.rb|test_helper.rb|test_helper.exs|test_helper.py) return 0 ;;
         jest.setup.[cm]js|jest.setup.[cm]ts|jest.setup.js|jest.setup.ts|jest.setup.jsx|jest.setup.tsx) return 0 ;;
         vitest.setup.[cm]js|vitest.setup.[cm]ts|vitest.setup.js|vitest.setup.ts|vitest.setup.jsx|vitest.setup.tsx) return 0 ;;
@@ -82,7 +89,11 @@ rp_runner() {
         .pre-commit-config.yaml|lefthook*.yml|lefthook*.yaml|.lintstagedrc*) return 0 ;;
         *.config.*|.eslintrc*|.prettierrc*|.babelrc*|.mocharc*) return 0 ;;
     esac
-    hooks=$(git config --get core.hooksPath 2>/dev/null || true)
+    # Exit 1 is "unset". Any other failure (unreadable or invalid config)
+    # means the hooks directory is unknown, so treat every path as a runner.
+    rc=0
+    hooks=$(git config --get core.hooksPath 2>/dev/null) || rc=$?
+    [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ] || return 0
     if [ -n "$hooks" ]; then
         top=$(git rev-parse --show-toplevel 2>/dev/null || true)
         # Normalise to a path relative to the toplevel: strip an absolute
@@ -129,10 +140,17 @@ rp_pr_files() {
 # (tracked or staged, then untracked; the two sets are disjoint),
 # NUL-delimited so a newline in a filename cannot forge a second path. A
 # listing failure returns non-zero and must stop the caller, never read as
-# "clean". The caller owns <outfile> (a mktemp file it removes on exit).
+# "clean", and git's first stderr line goes to stderr so the caller's own
+# message can sit beside the cause. The caller owns <outfile> (a mktemp file
+# it removes on exit).
 rp_tree_changes() {
-    { git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
-        >"$1" 2>/dev/null
+    local err rc=0
+    err=$({ git diff --no-renames --name-only -z HEAD -- \
+        && git ls-files --others --exclude-standard -z; } 2>&1 >"$1") || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf 'rp_tree_changes: %s\n' "${err%%$'\n'*}" >&2
+        return "$rc"
+    fi
 }
 
 # rp_assert_only_listed <changes-file> [path...]: succeeds when every path in

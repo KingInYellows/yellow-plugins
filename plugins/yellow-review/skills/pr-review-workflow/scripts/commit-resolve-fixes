@@ -42,8 +42,25 @@
 #      YELLOW_REVIEW_SUBMIT_TIMEOUT (default 300) and
 #      YELLOW_REVIEW_NET_TIMEOUT (default 30) — seconds allowed for the
 #        provider submit and for each gh / git ls-remote call, enforced with
-#        timeout(1) or gtimeout when installed (no limit otherwise). Worst
-#        case with the defaults is under 600 s, the caller's Bash budget.
+#        the timeout binary lib/verify-run.sh's vr_timeout_bin finds (timeout
+#        or gtimeout, one that supports --kill-after; the same detector
+#        run-verify-command uses). Without one the calls run unbounded and
+#        one warning is printed before the first network call. Worst case
+#        with the defaults is under 600 s, the caller's Bash budget.
+#      YELLOW_REVIEW_NO_TIMEOUT_BIN=1 — treat no timeout binary as found
+#        (tests).
+# Provider calls, pinned to plugins/yellow-core/lib/stack-operation-registry.js
+# (no validator scans scripts, so change both together):
+#   commitOrAmend  graphite `gt modify -c -m` (registry: `gt modify -m`, plus
+#                  -c for a new commit); github `git commit -m`
+#   submitStack    graphite `gt submit --no-interactive` (+ --no-edit);
+#                  github runtime `submit` (the runtime adds --auto itself)
+#   rebaseUpstack  graphite `gt restack --upstack`
+#   abortConflict  graphite `gt abort`
+# Remote: the github runtime is given --remote only for an explicit choice
+# (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
+# refuses an ambiguous setup itself (status INVALID_ARGS, exit 5). Graphite
+# pushes to `gt repo remote` (default origin), not git's pushRemote.
 # Contract: references/resolve/dispositions.md. This script never pushes
 # directly; the provider's submit is the only publish path.
 
@@ -55,6 +72,8 @@ MAX_MESSAGE_CHARS=200
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+# shellcheck source=../../../lib/verify-run.sh
+. "$(dirname -- "$0")/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
@@ -101,14 +120,15 @@ for tool in git gh jq; do
     command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
 done
 
-# Bound every network call. Without timeout(1) or gtimeout (macOS without
-# coreutils) calls run unbounded. A timeout exits 124, which every caller
-# below already treats as a failure of that step.
+# Bound every network call. Without a usable timeout binary (macOS without
+# coreutils) calls run unbounded, with one warning before the first of them.
+# A timeout exits 124 (137 after KILL), which every caller below already
+# treats as a failure of that step.
 SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
 NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
 [[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
 [[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
-TIMEOUT_BIN=$(command -v timeout || command -v gtimeout || true)
+TIMEOUT_BIN=$(vr_timeout_bin || true)
 # TERM first, then KILL after a short grace so a process that traps TERM
 # cannot outlive the bound.
 KILL_GRACE=5
@@ -177,7 +197,14 @@ fi
 # Tracked or untracked changes outside the expected set would ride along in
 # the commit (or be left behind): refuse before staging anything.
 DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f "$DIRTY_FILE"' EXIT
+NET_ERR=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE" "$NET_ERR"' EXIT
+# last_err: the first line of the last network call's stderr, for a message.
+# One line, control characters dropped, credentials in URLs masked, capped.
+last_err() {
+    [ -s "$NET_ERR" ] || return 0
+    head -n 1 "$NET_ERR" | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g' | cut -c1-200
+}
 rp_tree_changes "$DIRTY_FILE" || die 3 "cannot list tree changes"
 d=$(rp_assert_only_listed "$DIRTY_FILE" ${EXPECTED[@]+"${EXPECTED[@]}"}) \
     || die 3 "change outside the expected set: $d"
@@ -191,9 +218,16 @@ if [ "${#EXPECTED[@]}" -eq 0 ]; then
     exit 0
 fi
 
+if [ -z "$TIMEOUT_BIN" ]; then
+    printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
+fi
+
 # --- Stage and compare ---
 lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
-STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort)
+STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort) || {
+    lgit reset -q -- "${EXPECTED[@]}" || true
+    die 3 "could not list the staged files; nothing committed"
+}
 WANT=$(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort -u)
 if [ "$STAGED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] staged:\n%s\n' "$WANT" "$STAGED" >&2
@@ -205,7 +239,7 @@ fi
 # is skipped by position, so an added "++ x" line is still scanned), with
 # --text so binary-attributed files are not hidden.
 ADDED=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f "$DIRTY_FILE" "$ADDED"' EXIT
+trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED"' EXIT
 git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
     | rt_added_lines >"$ADDED"
 if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
@@ -245,7 +279,8 @@ git diff --cached --quiet || undo_commit "changes remain staged after the commit
 # NUL separates records; an embedded newline is mapped to \001 so one path
 # containing newlines cannot masquerade as several expected paths (expected
 # paths are canonical and never hold control characters).
-COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0\n' '\n\001' | LC_ALL=C sort)
+COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0\n' '\n\001' | LC_ALL=C sort) \
+    || undo_commit "could not list the committed files; nothing submitted"
 if [ "$COMMITTED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
     undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
@@ -258,31 +293,44 @@ if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
 fi
 # A hook can also leave edits or new files unstaged or untracked. Check before
 # submitting, so a dirty tree is never reported after the push has happened.
-if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+rp_tree_changes "$DIRTY_FILE" || undo_commit "could not list tree changes after the commit; nothing submitted"
+if [ -s "$DIRTY_FILE" ]; then
     undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
 fi
 
 # --- Resolve the remote once ---
-# Submit and verification must agree on one remote. The github runtime is given
-# it explicitly (its own default would pick remote.pushDefault over a
-# branch-specific pushRemote); gt submit pushes to the branch's configured
-# remote, which this precedence mirrors.
+# Submit and verification must agree on one remote.
+# github: the runtime's own default would pick remote.pushDefault over a
+#   branch-specific pushRemote, and it refuses an ambiguous setup. So pass
+#   --remote only for an explicit choice (pushRemote, pushDefault or the sole
+#   remote, whatever its name) and let the runtime refuse the rest.
+# graphite: gt pushes to `gt repo remote` (default origin), not git's
+#   pushRemote; the name is used only when it is a configured remote.
+# The remote is read after the commit on purpose: nothing above depends on it.
 REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
-    || git config --get remote.pushDefault 2>/dev/null \
-    || git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-# "." means a local upstream (common for stacked branches). With nothing
-# configured, the providers accept a sole remote whatever its name, so use that
-# one; otherwise origin.
-case "$REMOTE_NAME" in
-    ''|.)
-        REMOTES=$(git remote 2>/dev/null || true)
-        if [ -n "$REMOTES" ] && [ "$(printf '%s\n' "$REMOTES" | wc -l)" -eq 1 ]; then
-            REMOTE_NAME="$REMOTES"
-        else
-            REMOTE_NAME=origin
-        fi
-        ;;
-esac
+    || git config --get remote.pushDefault 2>/dev/null || true)
+REMOTE_EXPLICIT=0
+REMOTES=$(git remote 2>/dev/null || true)
+REMOTE_COUNT=$(printf '%s' "$REMOTES" | grep -c . || true)
+UPSTREAM_REMOTE=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+if [ -n "$REMOTE_NAME" ] && [ "$REMOTE_NAME" != . ]; then
+    REMOTE_EXPLICIT=1
+elif [ "$REMOTE_COUNT" -eq 1 ]; then
+    REMOTE_NAME="$REMOTES"
+    REMOTE_EXPLICIT=1
+elif [ -n "$UPSTREAM_REMOTE" ] && [ "$UPSTREAM_REMOTE" != . ]; then
+    # "." is a local upstream (common for stacked branches). A configured
+    # upstream remote is good enough to verify against, not to submit to.
+    REMOTE_NAME="$UPSTREAM_REMOTE"
+else
+    REMOTE_NAME=origin
+fi
+if [ "$PROVIDER" = graphite ]; then
+    GT_REMOTE=$(gt repo remote 2>/dev/null | awk 'END { print $1 }' || true)
+    if [ -n "$GT_REMOTE" ] && git remote get-url -- "$GT_REMOTE" >/dev/null 2>&1; then
+        REMOTE_NAME="$GT_REMOTE"
+    fi
+fi
 
 # --- Submit ---
 case "$PROVIDER" in
@@ -294,7 +342,9 @@ case "$PROVIDER" in
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
-        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit --remote "$REMOTE_NAME") \
+        REMOTE_ARGS=()
+        [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
+        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
             || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then
@@ -307,14 +357,27 @@ esac
 # --- Verify the published head ---
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
-REMOTE=$(bounded "$NET_TIMEOUT" git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
-[ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
+LS_RC=0
+LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
+REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
+if [ "$REMOTE" != "$SHA" ]; then
+    why=$(last_err)
+    [ "$LS_RC" -eq 124 ] || [ "$LS_RC" -eq 137 ] && why="ls-remote timed out after ${NET_TIMEOUT}s"
+    die 6 "head not verified: local=$SHA remote=${REMOTE:-none}${why:+ ($why)}"
+fi
 PR_HEAD=""
+PR_RC=0
 for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do
     [ "$delay" -gt 0 ] && sleep "$delay"
-    PR_HEAD=$(gh pr view "$PR" --json headRefOid 2>/dev/null | jq -r '.headRefOid // empty' 2>/dev/null || true)
+    PR_RC=0
+    PR_JSON=$(gh pr view "$PR" --json headRefOid 2>"$NET_ERR") || PR_RC=$?
+    PR_HEAD=$(printf '%s' "$PR_JSON" | jq -r '.headRefOid // empty' 2>/dev/null || true)
     [ "$PR_HEAD" = "$SHA" ] && break
 done
-[ "$PR_HEAD" = "$SHA" ] || die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}"
+if [ "$PR_HEAD" != "$SHA" ]; then
+    why=$(last_err)
+    [ "$PR_RC" -eq 124 ] || [ "$PR_RC" -eq 137 ] && why="gh pr view timed out after ${NET_TIMEOUT}s"
+    die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}${why:+ ($why)}"
+fi
 
 emit PUSHED "$SHA"

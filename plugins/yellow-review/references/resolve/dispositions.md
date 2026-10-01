@@ -222,10 +222,12 @@ phase failed.
 1. **Phase A, local.** Optional `verify_command` (`run-verify-command`),
    then stage and commit (`commit-resolve-fixes`). See Verify below.
 2. **Phase B, remote.** Submit and verify the head (`commit-resolve-fixes`
-   does both, against one remote chosen in this order:
-   `branch.<name>.pushRemote`, `remote.pushDefault`, `branch.<name>.remote`;
-   when that is unset or `.`, the sole remote, else `origin`). `fixed`
-   threads need `status: PUSHED` and a verified SHA.
+   does both). Graphite pushes to `gt repo remote` (default `origin`), so the
+   head is verified there when it names a configured remote, else through the
+   git chain below. The GitHub runtime gets `--remote` only for
+   `branch.<name>.pushRemote`, `remote.pushDefault` or a sole remote; with
+   several remotes and neither setting it refuses and the script exits 5.
+   `fixed` threads need `status: PUSHED` and a verified SHA.
    `NOOP` or a failure downgrades every `fixed` thread to `unclear`; the
    other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
@@ -276,7 +278,9 @@ manager or a git hook would execute: `package.json`, lockfiles
 package manifests (`build.gradle[.kts]`, `settings.gradle[.kts]`, `gradlew`,
 `build.sbt`, `pom.xml`, `Gemfile[.lock]`, `*.gemspec`, `Cargo.toml`,
 `Cargo.lock`, `composer.json`, `composer.lock`, `CMakeLists.txt`,
-`meson.build`), test bootstrap files (`.rspec`, `spec_helper.rb`,
+`meson.build`, `mix.exs`, `Package.swift`, `build.zig[.zon]`, `*.csproj`,
+`*.fsproj`, `*.vbproj`, `Directory.Build.props|targets`, `deno.json[c]`,
+`bunfig.toml`), test bootstrap files (`.rspec`, `spec_helper.rb`,
 `rails_helper.rb`, `test_helper.*`, `jest.setup.*`, `vitest.setup.*`,
 `setupTests.*`, `karma.conf.*`, `phpunit.xml[.dist]`), and anything under the
 repository-root `scripts/` directory, any `.husky/` or `.cargo/` directory at
@@ -298,7 +302,9 @@ trust.
 `core.hooksPath` is normalised before matching: an absolute path under the
 toplevel loses that prefix, and leading `./` and trailing `/` are stripped.
 A hooks path of `.`, `./` or the toplevel itself means the repository root,
-where every root-level file is a runner (nested files are not).
+where every root-level file is a runner (nested files are not). When
+`git config` fails for any reason other than the key being unset, the hooks
+directory is unknown and every path counts as a runner.
 
 ## File set
 
@@ -312,8 +318,10 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   into hooks and the verify command);
 - the resolver deny list is refused, case-insensitively: the directories
   `.github/`, `.circleci/`, `.git/`, `.claude/`, `.vscode/`, `.devcontainer/`
-  and `.idea/` at any depth; CLAUDE.md, AGENTS.md, `.mcp.json` and
-  `yellow-plugins.local.md` by basename at any depth; CI and container files
+  and `.idea/`, `.cursor/`, `.codex/`, `.agents/`, `.gemini/`, `.windsurf/` and
+  `.cline/` at any depth; CLAUDE.md, AGENTS.md, GEMINI.md, `.mcp.json`,
+  `.cursorrules`, `.windsurfrules`, `.clinerules`, `copilot-instructions.md`
+  and `yellow-plugins.local.md` by basename at any depth; CI and container files
   (`Dockerfile*`, `docker-compose*`, `compose.y*ml`, `.gitlab-ci.yml`,
   `.travis.yml`, `.drone.yml`, `Jenkinsfile`, `azure-pipelines.yml`,
   `bitbucket-pipelines.yml`), `.env*`, keys and secrets, `*.tfvars` and
@@ -327,16 +335,25 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
   because the commit's git hooks would execute them;
-- `run-verify-command` refuses files that are unchanged or gitignored, so a
-  revert can never delete a user file, and refuses to run when the tree has
-  changes outside the listed files. It does not run the command when a
+- `run-verify-command` refuses gitignored files, and when running a command
+  also unchanged files, and refuses to run when the tree has changes outside
+  the listed files. It does not run the command when a
   file is outside the PR (or the PR's file list cannot be fetched), and with
   `--unattended` also when a file is a runner file; it reports
-  `result: skipped`. `--revert-only` saves a patch and reverts the listed
-  files without running anything (Step 5's CONFLICT rollback).
+  `result: skipped`; a PR file listing that times out
+  (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. `--revert-only`
+  saves a patch and reverts the listed files without running anything
+  (Step 5's CONFLICT rollback). It waives only the deny-list check; an
+  unchanged listed file is skipped and named in `reason`
+  (`skipped, no changes: <f>`), while a gitignored or unverifiable entry
+  exits 2 with nothing reverted. It deletes a listed untracked, non-ignored
+  file whoever created it; the saved patch holds the content unless the
+  credential screen withheld it (a pre-resolve baseline is tracked in #973).
   `--revert-dirty` does the same for every change in the tree. It rejects a
   file list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text.
+  `git ls-files --others --exclude-standard`), never resolver text. Either
+  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  `--unattended` exits 2.
   The patch is written and checked before anything is reverted. If any
   patch command fails (full disk, unsupported entry), nothing is reverted
   and the result carries `patch: null`, `treeClean: false` and a `reason`.
@@ -364,11 +381,15 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   that keeps its last 1 MiB, so a chatty command never blocks; the log is
   written when the stream ends. A process that holds the pipe open after the
   command exits is killed with the group; if the pipe stays open (another
-  session), the log is replaced by a withheld notice. The log is redacted
-  with yellow-core's `cs_redact_secrets`, or withheld when that is
-  unavailable. A pass whose command left changes outside the listed files
-  reports `result: pass`, `treeClean: false` and a `reason`, and reverts
-  nothing; the caller then refuses to commit. Files live under
+  session), the log is replaced by a withheld notice and `reason` says
+  `log withheld: a process kept the output open after the command exited`; a
+  failed stream adds `log may be incomplete: the output stream failed`, so a
+  pass can carry a `reason` with `treeClean: true`. A log file that cannot be
+  created exits 2. The log is redacted with yellow-core's `cs_redact_secrets`
+  (and capped again afterwards, since redaction can grow it), or withheld when
+  that is unavailable. A pass whose command left changes outside the listed
+  files reports `result: pass`, `treeClean: false` and a `reason`, and
+  reverts nothing; the caller then refuses to commit. Files live under
   `<git-common-dir>/yellow-review/resolve-patches/` (mode 0600); the newest
   10 patches and 10 logs per PR are kept, and other PRs' files are never
   pruned.
@@ -408,8 +429,10 @@ rate-limit wait cap in `reply-pr-thread`:
 | `reply-pr-thread`     | pre-check, wait, retried pre-check, reply: `3 × GH + MAX_WAIT_SECONDS` = 180 s                              | `(3 × GH + MAX_WAIT_SECONDS + 60) × 1000` = 240000 ms |
 | `file-followup-issue` | viewer, issue scan, thread lookup, create, rescan and duplicate close, each one `gh` call: `6 × GH` = 180 s | `(6 × GH + 60) × 1000` = 240000 ms                    |
 
-`commit-resolve-fixes` bounds its own network calls with `timeout(1)` or
-`gtimeout` when installed (no limit otherwise): the provider submit gets 300
+`commit-resolve-fixes` and `run-verify-command` bound their network calls
+with a `timeout`/`gtimeout` binary that supports `--kill-after`; without one
+the calls run unbounded and `commit-resolve-fixes` warns once on stderr. The
+provider submit gets 300
 s (`YELLOW_REVIEW_SUBMIT_TIMEOUT`) and every other `gh` or `git ls-remote`
 call 30 s (`YELLOW_REVIEW_NET_TIMEOUT`). A submit timeout exits 5; a timeout
 in the PR file list exits 3 and one in a verify call exits 6. With the
@@ -568,14 +591,15 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - `f` counts resolved `fixed` threads. `i` counts issues created (not dedupe
   hits). `b` counts open threads left blocking plus `CHANGES_REQUESTED`
   reviewers.
-- `ratelimited=1` means a script exited 4 (or `get-pr-blockers` reported
-  `lookupReason: rate_limited` or `resolutionLookupReason: rate_limited`) and
-  mutations stopped. `/review:resolve-stack`
-  and `/review:sweep-all` then stop mutating: every remaining PR is reported
-  `not attempted (rate limit)` instead of hitting the limit again.
-- `/review:sweep` and `/review:sweep-all` print the line and do not change their
-  exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
-  `b` is non-zero.
+- `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
+  `file-followup-issue` exited 4 (a rate limit) and mutations stopped.
+  `commit-resolve-fixes` exit 4 is a commit undo and never sets it.
+  `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
+  remaining PR is reported `not attempted (rate limit)` instead of hitting
+  the limit again.
+- `/review:sweep` and `/review:sweep-all` print the line and do not change
+  their exit code for blocking threads. `/review:resolve-stack` exits 1 when
+  any PR's `b` is non-zero.
 
 ## Known limits
 

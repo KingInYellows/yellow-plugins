@@ -12,12 +12,13 @@ resolve_repo_init() {
   export PATH="$STUB_BIN:$PATH"
   export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
   : >| "$STUB_LOG"
-  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_DIFF_FAIL
+  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_FILES_FAIL STUB_PR_DIFF_FAIL STUB_GT_REMOTE
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
   # Fixture repos must not inherit the developer's or CI's git config.
   # GIT_CONFIG_GLOBAL needs git 2.32; sandboxing HOME works on every
-  # supported version (2.31+).
+  # supported version (2.31+); newer git also skips the global file.
   export GIT_CONFIG_NOSYSTEM=1
+  export GIT_CONFIG_GLOBAL=/dev/null
   export HOME="$BATS_TEST_TMPDIR/home"
   export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/xdg"
   mkdir -p "$HOME" "$XDG_CONFIG_HOME"
@@ -91,13 +92,19 @@ case "$1" in
     if [ -n "${STUB_GT_CHILD:-}" ]; then
       cur=$(git symbolic-ref --short HEAD)
       if [ "$(cat "$STUB_GT_CHILD_BASE")" != "$(git rev-parse "$cur")" ]; then
-        # gt restacks with unstaged changes present; autostash mirrors that.
+        # Real gt (1.7.20, checked in a scratch repo) restacks an upstack
+        # branch with unstaged and untracked changes present and leaves them
+        # in place, i.e. it autostashes; --autostash mirrors that.
         git rebase -q --autostash --onto "$cur" "$(cat "$STUB_GT_CHILD_BASE")" "$STUB_GT_CHILD" >/dev/null 2>&1 || exit 1
         git checkout -q "$cur"
         git rev-parse "$cur" > "$STUB_GT_CHILD_BASE"
       fi
     fi
     exit 0
+    ;;
+  repo)
+    # gt pushes to the remote `gt repo remote` names (default origin).
+    [ "$2" = remote ] && { printf '%s\n' "${STUB_GT_REMOTE:-origin}"; exit 0; }
     ;;
   submit)
     [ "${STUB_SUBMIT_FAIL:-0}" = 1 ] && exit 1
@@ -117,6 +124,21 @@ if [ "${STUB_SUBMIT_FAIL:-0}" = 1 ]; then
   printf '{"status":"PUSH_REJECTED","recoveryAction":"sync first"}\n'
   exit 0
 fi
+# The real runtime refuses several remotes without --remote unless
+# remote.pushDefault names one of them.
+case " $* " in
+  *" --remote "*) ;;
+  *)
+    if [ "$(git remote | wc -l)" -gt 1 ]; then
+      pd=$(git config remote.pushDefault || true)
+      if [ -z "$pd" ] || ! git remote | grep -qxF "$pd"; then
+        printf '{"status":"INVALID_ARGS","recoveryAction":"pass a remote"}\n'
+        exit 0
+      fi
+      ORIGIN_DIR=$(git remote get-url "$pd") && export ORIGIN_DIR
+    fi
+    ;;
+esac
 # Publish to the remote named by --remote, as the real runtime would.
 prev=""
 for a in "$@"; do
@@ -145,7 +167,8 @@ case "$*" in
     ;;
   "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*)
     # The PR's changed files (the stub ignores --jq and prints names).
-    [ "${STUB_PR_DIFF_FAIL:-0}" = 1 ] && exit 1
+    # STUB_PR_DIFF_FAIL is the old name, still honoured.
+    [ "${STUB_PR_FILES_FAIL:-${STUB_PR_DIFF_FAIL:-0}}" = 1 ] && exit 1
     exec git --git-dir="$ORIGIN_DIR" diff --name-only main...feature
     ;;
 esac

@@ -459,42 +459,54 @@ has_kill_after() {
   grep -q 'resolver edit' src/a.txt
 }
 
-# Starts the script in the background, waits for the verify command to be
-# running, sends TERM and leaves the JSON in $BATS_TEST_TMPDIR/out.
+# Starts the script in the background (job control on, so a non-interactive
+# shell does not leave SIGINT ignored for it), waits for the verify command
+# to be running, sends signal $1 and leaves the JSON in $BATS_TEST_TMPDIR/out.
 terminate_while_running() {
   printf '%s\n' 'touch "$BATS_TEST_TMPDIR/started"; sleep 31.1 & sleep 31.1; wait' >| "$CMD"
+  set -m
   "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted -- src/a.txt src/new.txt \
     >| "$BATS_TEST_TMPDIR/out" 2>/dev/null 3>&- &
   local pid=$!
+  set +m
   for _ in $(seq 1 100); do
     [ -e "$BATS_TEST_TMPDIR/started" ] && break
     sleep 0.1
   done
   [ -e "$BATS_TEST_TMPDIR/started" ]
-  kill -TERM "$pid"
+  kill -s "$1" "$pid"
   wait "$pid"
 }
 
 assert_interrupted_and_reverted() {
   [ "$(jq -c '[.result, .treeClean]' "$BATS_TEST_TMPDIR/out")" = '["fail",true]' ]
-  [[ "$(jq -r .reason "$BATS_TEST_TMPDIR/out")" == *"interrupted by SIGTERM"* ]]
+  [[ "$(jq -r .reason "$BATS_TEST_TMPDIR/out")" == *"interrupted by SIG$1"* ]]
   grep -q '+resolver edit' "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
   [ -z "$(git status --porcelain)" ]
   run ! pgrep -f 'sleep 31\.1'
 }
 
-@test "TERM stops the command and its group, then saves the edits and reverts them" {
+@test "TERM, HUP and INT stop the command and its group, then save the edits and revert them" {
   has_kill_after || skip "timeout --kill-after not available"
-  terminate_while_running
-  assert_interrupted_and_reverted
+  for sig in TERM HUP INT; do
+    terminate_while_running "$sig"
+    assert_interrupted_and_reverted "$sig"
+    # Put the resolver edits back for the next signal.
+    git apply "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
+    rm -f "$BATS_TEST_TMPDIR/started"
+  done
 }
 
-@test "TERM under the watchdog fallback stops the group and the watchdog, then reverts" {
+@test "TERM, HUP and INT under the watchdog fallback stop the group and the watchdog, then revert" {
   export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
-  terminate_while_running
-  assert_interrupted_and_reverted
-  # The watchdog's sleep for the 60 s timeout must not outlive the script.
-  run ! pgrep -f 'sleep 60'
+  for sig in TERM HUP INT; do
+    terminate_while_running "$sig"
+    assert_interrupted_and_reverted "$sig"
+    # The watchdog's sleep for the 60 s timeout must not outlive the script.
+    run ! pgrep -f 'sleep 60'
+    git apply "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
+    rm -f "$BATS_TEST_TMPDIR/started"
+  done
 }
 
 @test "a binary-marked file cannot smuggle a credential into the patch" {
@@ -631,4 +643,100 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   grep -q visible "$log"
   run ! grep -q 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$log"
   grep -q 'REDACTED' "$log"
+}
+
+@test "an output directory that is a regular file exits 2 before anything runs" {
+  mkdir -p "$REPO/.git/yellow-review"
+  : >| "$PATCH_DIR"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create"*"resolve-patches"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "a failed output pipe exits 2 before the command runs" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nexit 1\n' >| "$shim/mkfifo"
+  chmod +x "$shim/mkfifo"
+  PATH="$shim:$PATH" verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create the output pipe"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a process in another session that keeps the output open withholds the log" {
+  command -v setsid >/dev/null 2>&1 || skip "setsid not available"
+  # The pause lets setsid leave the command's group before the command exits.
+  verify "echo hello; setsid sleep 31.8 & echo \$! >| '$BATS_TEST_TMPDIR/holder.pid'; sleep 0.5" --timeout 60 --trusted -- src/a.txt src/new.txt
+  kill "$(cat "$BATS_TEST_TMPDIR/holder.pid")" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld"* ]]
+  [[ "$(cat "$(printf '%s' "$output" | jq -r .log)")" == *"[withheld: a process kept the output open"* ]]
+}
+
+@test "a failed log stream is named in the reason" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nexit 1\n' >| "$shim/tail"
+  chmod +x "$shim/tail"
+  PATH="$shim:$PATH" verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log may be incomplete"* ]]
+}
+
+@test "a stalled gh call is bounded and skips the run" {
+  has_kill_after || skip "timeout --kill-after not available"
+  printf '#!/bin/sh\nexec sleep 31.6\n' >| "$STUB_BIN/gh"
+  start=$SECONDS
+  YELLOW_REVIEW_NET_TIMEOUT=1 verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ $((SECONDS - start)) -lt 20 ]
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"could not list the PR's changed files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a non-numeric YELLOW_REVIEW_NET_TIMEOUT exits 2" {
+  YELLOW_REVIEW_NET_TIMEOUT=soon verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"YELLOW_REVIEW_NET_TIMEOUT"* ]]
+}
+
+@test "--revert-only skips an unchanged listed file, names it, and reverts the rest" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/c.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"skipped, no changes: src/c.txt"* ]]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only still refuses a gitignored file and reverts nothing" {
+  printf 'secret.txt\n' >| .gitignore
+  git add .gitignore && git commit -q -m "chore: ignore"
+  printf 'user data\n' >| secret.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt secret.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored"* ]]
+  [ -f secret.txt ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "the revert modes reject flags that only apply when running a command" {
+  printf 'true\n' >| "$CMD"
+  for flag in "--timeout 5" "--command-file $CMD" "--trusted" "--unattended"; do
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-only $flag -- src/a.txt
+    [ "$status" -eq 2 ]
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty $flag
+    [ "$status" -eq 2 ]
+  done
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
 }

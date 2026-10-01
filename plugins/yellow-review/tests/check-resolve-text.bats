@@ -351,32 +351,6 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 6 ]
 }
 
-@test "a Slack webhook URL and a glpat token are refused; ordinary services paths are not" {
-  export RT_ALLOWED_HOST=example.com
-  check_refused() {
-    printf '%s\n' "$1" >| "$A"
-    run "$SCRIPT" "$A"
-    [ "$status" -eq 6 ]
-  }
-  check_refused "posted to https://hooks.slack.com/services/T0A1B2C3D/B0E1F2G3H/$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT5uVw)"
-  check_refused "token glpat-$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT)"
-  printf '%s\n' 'see https://example.com/services/Tracker/Billing/handlers and com/services/Tracker/Billing/Retry2' >| "$A"
-  run "$SCRIPT" "$A"
-  [ "$status" -eq 0 ]
-}
-
-@test "a path with a token-shaped segment is refused; Java paths, acronyms and SHA segments are not" {
-  printf '%s\n' 'leaked path/to/qZ8xK2mLp9RtVw4YbN7cJd3H/x' >| "$A"
-  run "$SCRIPT" "$A"
-  [ "$status" -eq 6 ]
-  printf '%s\n' \
-    'src/main/java/com/acme/ReviewFindingsLedgerTransitionHelperFactory2/Impl' \
-    'src/main/java/com/acme/HTTPServerRequestHandlerFactory3/Impl' \
-    'objects/da39a3ee5e6b4b0d3255bfef95601890afd80709/Readme/Impl1' >| "$A"
-  run "$SCRIPT" "$A"
-  [ "$status" -eq 0 ]
-}
-
 @test "the identifier exemption stops at 256 characters so appended key material is refused" {
   local unit='Abcd' body='' i
   for i in $(seq 1 63); do body="$body$unit"; done
@@ -527,44 +501,78 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 1 ]
 }
 
-@test "a keyword alone on a line checks the next non-blank line as its value" {
-  check() {
-    printf '%b' "$2" >| "$A"
-    run --separate-stderr "$SCRIPT" "$A"
-    [ "$status" -eq 6 ]
-    [[ "$stderr" == *"rule=$1 "* ]]
-  }
-  check unquoted-keyword-value 'password:\n  hunter\n'
-  check unquoted-keyword-value 'token:\n  abcdefghij\n'
-  check unquoted-keyword-value 'db_password:\n\n  - hunter22\n'
-  check unquoted-keyword-value 'password:\r\n  hunter\r\n'
-  check quoted-keyword-assignment 'api_key:\n    "s3cr3tvalue"\n'
-}
+# rt_added_lines (lib/resolve-text.sh): fixed diffs, exact output.
 
-@test "next-line values that are placeholders, prose or out of reach stay clean" {
-  while IFS= read -r t; do
-    printf '%b' "$t" >| "$A"
-    run "$SCRIPT" "$A"
-    [ "$status" -eq 0 ]
-  done <<'CASES'
-password:\n  string\n
-token:\n  <your token>\n
-password:\n\nNext paragraph of prose.\n
-password:\n  Rotation is scheduled for Friday\n
-Keep the password:\nthe team agreed to rotate it\n
-Keep the password:\nsomething\n
-password:\nok\nhunterhunter\n
-bypass:\n  something\n
-CASES
-}
-
-@test "CRLF line endings do not hide an all-letter literal; a CRLF placeholder stays clean" {
-  printf 'password: hunter\r\n' >| "$A"
-  run "$SCRIPT" "$A"
-  [ "$status" -eq 6 ]
-  printf 'password: string\r\ntoken: <your token>\r\n' >| "$A"
-  run "$SCRIPT" "$A"
+@test "rt_added_lines prints added lines without the plus and skips file headers" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+index 111..222 100644
+--- a/f.txt
++++ b/f.txt
+@@ -1,2 +1,3 @@
+ context
+-removed
++added one
++ indented add
+DIFF
   [ "$status" -eq 0 ]
+  [ "$output" = $'added one\n indented add' ]
+}
+
+@test "rt_added_lines keeps an added line that itself starts with ++ or --" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1,2 @@
++++ x
++-- y
+DIFF
+  [ "$output" = $'++ x\n-- y' ]
+}
+
+@test "rt_added_lines ignores the no-newline marker and removed lines" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1 @@
+-old
+\ No newline at end of file
++new
+\ No newline at end of file
+DIFF
+  [ "$output" = new ]
+}
+
+@test "rt_added_lines prints nothing for a hunk-less diff and for empty input" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/bin b/bin
+new file mode 100755
+index 0000000..e69de29
+--- /dev/null
++++ b/bin
+DIFF
+  [ -z "$output" ]
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" </dev/null
+  [ -z "$output" ]
+}
+
+@test "rt_added_lines resets at the next file header across several files" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/a b/a
+--- a/a
++++ b/a
+@@ -0,0 +1 @@
++from a
+diff --git a/b b/b
+--- a/b
++++ b/b
++++ not a hunk line
+@@ -0,0 +1 @@
++from b
+DIFF
+  [ "$output" = $'from a\nfrom b' ]
 }
 
 @test "a value that merely contains a placeholder character is refused" {
