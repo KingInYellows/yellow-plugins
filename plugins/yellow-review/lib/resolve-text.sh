@@ -1,5 +1,6 @@
 # shell-compat: library
-# Shared by reply-pr-thread and file-followup-issue (POSIX sh; sourced).
+# Shared by reply-pr-thread, file-followup-issue and check-resolve-text
+# (POSIX sh; sourced).
 # Resolver-written text is posted publicly under the user's account, and a
 # review comment can steer the resolver into quoting a file it read. Refuse
 # (never redact-and-post) anything that looks like a credential.
@@ -52,7 +53,12 @@ rt_looks_secret() {
                 if (w ~ /^AKIA[0-9A-Z]/ && m >= 20) hit = 1
                 if (w ~ /^xox[abprs]-/ && m >= 14) hit = 1
                 if (w ~ /^sk-/ && m >= 23) hit = 1
-                if (m >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) hit = 1
+                # A long mixed-case token with a digit looks like a key, but
+                # URLs and file paths are too and are routine in replies.
+                # Exempt slash-bearing tokens without base64 `+` or `=`.
+                if (m >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) {
+                    if (!(w ~ /\// && w !~ /[+=]/)) hit = 1
+                }
             }
         }
         END { exit hit ? 0 : 1 }

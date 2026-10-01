@@ -74,3 +74,29 @@ setup() {
   run "$SCRIPT" "$A"
   [ "$status" -eq 2 ]
 }
+
+@test "issue and PR URLs and long file paths are not flagged" {
+  printf '%s\n' \
+    'Filed https://github.com/KingInYellows/yellow-plugins/issues/123 for this.' \
+    'See https://github.com/KingInYellows/yellow-plugins/pull/950#discussion_r12345' \
+    'Edited src/components/UserProfile2/index.tsx and docs/brainstorms/2026-09-30-Review-resolve-hardening.md' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a bare mixed-case token with a digit and no slash still exits 2" {
+  tok=$(printf 'aB3%.0s' {1..12})
+  printf 'leaked %s here\n' "$tok" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a slash-bearing token with base64 plus or equals still exits 2" {
+  tok=$(printf 'aB3%.0s' {1..12})
+  printf 'leaked %s+%s/%s here\n' "$tok" "$tok" "$tok" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'leaked %s/%s== here\n' "$tok" "$tok" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
