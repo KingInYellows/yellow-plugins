@@ -54,22 +54,23 @@ Linear.
 
 ## Commands
 
-| Command                 | Description                                                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/review:setup`         | Validate review prerequisites and optional yellow-core integration                                                                           |
-| `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application                                                                    |
-| `/review:resolve`       | Resolve every unresolved review thread (outdated included): fix, reply, resolve, file follow-up issues, and report what still blocks merge   |
+| Command                 | Description                                                               |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `/review:setup`         | Validate review prerequisites and optional yellow-core integration        |
+| `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application |
+| `/review:resolve`       | Resolve every unresolved review thread (outdated included): fix, reply, resolve, file follow-up issues, and report what still blocks merge |
 | `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks |
-| `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)                                                                      |
-| `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass                            |
-| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation                                     |
-| `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`)     |
+| `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
+| `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
+| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation |
+| `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
 
 ### Dispositions
 
-`/review:resolve` ends every unresolved thread with one of four outcomes,
-and never resolves a thread before its reply has posted (bare LGTM / thanks
-/ nit threads are the one exception: they are resolved with no reply):
+`/review:resolve` ends every unresolved thread with one of five
+dispositions, and never resolves a thread before its reply has posted (bare
+LGTM / thanks / nit threads are the one exception: they are resolved with no
+reply):
 
 | Disposition | What happens |
 | --- | --- |
@@ -80,9 +81,9 @@ and never resolves a thread before its reply has posted (bare LGTM / thanks
 
 Human-reviewer threads resolve only on hard evidence by default; others are
 held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
-Unattended runs
-file at most 3 issues per PR. Replies and issues carry a hidden marker, so a
-re-run posts no duplicates. The last output line is a machine summary:
+Unattended runs file at most 3 issues per PR. Replies and issues carry a
+hidden marker, so a re-run posts no duplicates. The last output line is a
+machine summary:
 
 ```text
 Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
@@ -140,7 +141,8 @@ mechanical parts of the resolve contract in
 `references/resolve/dispositions.md`. `/review:resolve` invokes
 `get-pr-blockers`, `reply-pr-thread`, `resolve-pr-thread` and
 `file-followup-issue` per that contract; the other helpers below serve the
-fetch, verify, commit and re-pass steps. They need `gh` and `jq`.
+fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
+`file-line-counts` need `gh` and `jq`; those two read only local files.
 
 | Script | Purpose |
 | --- | --- |
@@ -152,13 +154,13 @@ fetch, verify, commit and re-pass steps. They need `gh` and `jq`.
 | `resolve-pr-thread` | Resolve one thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
-| `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example a Linear issue) |
+| `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example to Linear) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
 | `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
-Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-paths.sh`,
-`gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
+Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
+`resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
 
 ## Opt-in: thermonuclear structural review
 

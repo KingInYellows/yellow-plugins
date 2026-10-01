@@ -731,6 +731,15 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
   remaining PR is reported `not attempted (rate limit)` instead of hitting
   the limit again.
+- **Reading `ratelimited` (callers).** When the output has a `Resolve:` line
+  of the contract form, its `ratelimited` value is the only rate-limit state:
+  reviewer comments, nested findings, retry notices and a bare `HTTP 403`
+  never change it. Only when no such line exists (the command stopped before
+  its last step), match the output for the markers the scripts print on a
+  rate limit and nothing broader: `GitHub API rate limit exceeded`
+  (`get-pr-comments`, `resolve-pr-thread`), `GitHub rate limit on`
+  (`reply-pr-thread`, `file-followup-issue`) and `poll rate-limited`
+  (`poll-new-threads`). A match counts as `ratelimited=1`; `b` stays unknown.
 - `/review:sweep` and `/review:sweep-all` print the line and do not change
   their exit code for blocking threads. `/review:resolve-stack` exits 1 when
   any PR's `b` is non-zero.

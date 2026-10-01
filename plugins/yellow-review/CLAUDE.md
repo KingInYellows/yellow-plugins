@@ -235,7 +235,9 @@ and markers for the resolve scripts are in
 `dispositions.md` (the contract: vocabulary, downgrade and evidence rules,
 lanes, write order, issue cap, `Resolve:` line), `clusters.md` (clustering and
 the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
-`branch-check.md` and `memory-recall.md`.
+`branch-check.md`, `memory-recall.md` and `dirty-tree-cleanup.md` (the
+ownership check and revert that `/review:resolve-stack` and
+`/review:sweep-all` run after a dirty tree).
 
 ### Library
 
@@ -246,7 +248,8 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
   execute) and `rp_tree_changes`; a `git config` failure other than exit 1
   fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
-  `file-followup-issue`, `check-resolve-text` and `commit-resolve-fixes`) —
+  `file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes` and
+  `run-verify-command`) —
   refuses credential-shaped text before it is posted or committed. On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and
   `rt_report_refusal` prints a `resolve-text:` stderr line (never the text)
   that tells a refusal from a usage error: `refused rule=<rule> line=<n>` for
@@ -261,7 +264,8 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
   `resolve-pr-thread`) — the shared GraphQL call (bounded by
   `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and not-found/permission
   classification behind their exit codes 3 and 4
-- `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
+- `lib/verify-run.sh` (bash, sourced by `run-verify-command` and
+  `commit-resolve-fixes`) — timeout,
   process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
   accepts only a `timeout`/`gtimeout` that supports `--kill-after`
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
