@@ -86,7 +86,7 @@ synthesis shell's mechanical combination rule.
 Deferred out of shell 03. Each is a step below; do not drop them at expand
 time.
 
-- **F1 — synthesis library location (decide first).** `council.md` is ~2,700
+- **F1 — synthesis library location (decide first).** `council.md` is ~3,000
   lines, far past the 500-line command ceiling, and carries the Step 5b helper
   library (`council_normalize_text`, `council_extract_fenced`,
   `council_assign_labels`, `council_fence_block`) inline between the
@@ -105,12 +105,21 @@ time.
   heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03 only escapes that
   delimiter in 5b input and in 5e's quoting rule; a synthesizer-authored
   (paraphrased) line could still reproduce it and run the rest as shell.
-  Stage `SYNTHESIS_MD` through `Write` into the token-bound staging dir (or a
-  fresh `mktemp -d`) and `cat` it in Step 7, like 5a does for reviewer text.
-  If using a fresh `mktemp -d`, register a `trap` (or equivalent) so the
-  directory is removed on every exit — normal completion, Step 7 failure exits,
-  and early aborts — or reuse an existing staging dir whose lifecycle already
-  guarantees cleanup.
+  Stage `SYNTHESIS_MD` through `Write` into a fresh `mktemp -d` created and
+  owned by Step 7, and `cat` it from there, like 5a does for reviewer text.
+  Do not reuse the 5e staging dir: 5e runs `rm -rf -- "$SYNTH_DIR"` right
+  after printing the label map, before Step 7, so nothing is left to reuse
+  (unless 5e is deliberately changed to stop deleting it, which would move
+  cleanup ownership and is out of scope here). Each Bash block is a fresh
+  subprocess, so a `trap` set right after `mktemp -d` would fire when that
+  block exits, before the separate `Write` call can stage the file. Use a
+  cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap
+  and prints the path; (2) `Write` stages `SYNTHESIS_MD` there; (3) a later
+  block installs the `trap` (removing the dir on every exit of that block),
+  then `cat`s the file and runs the rest of Step 7. If `Write` fails, or the
+  run is cancelled or aborts between (1) and (3), the orchestrator runs an
+  explicit `rm -rf -- "<dir>"` block before stopping. The synthesized
+  findings never persist in a temp dir.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
   through unnormalized (identity and style signal survive). Buffer fenced
@@ -142,8 +151,9 @@ time.
    any Step 5 code is added; if moving, do the move as its own step with the
    bats extraction updated and green, the new library tier-classified and
    registered in `scripts/shell-compat-config.json`, a `tests/shell-compat`
-   driver added if Tier 4, and `pnpm test:shell-compat` plus
-   `pnpm validate:shell-compat` passing.
+   driver added if Tier 4, and `pnpm test:shell-compat`,
+   `pnpm validate:shell-compat`, plus `pnpm check:shell-parse` (parses the
+   edited Step 5 fenced wrappers under bash and zsh) passing.
 1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and the F4 emphasis
    rule (paired `*` runs and multi-word `_`/`__` phrases strip; lone
    underscore-wrapped identifiers and unpaired edge `*`/`_` are kept) in
