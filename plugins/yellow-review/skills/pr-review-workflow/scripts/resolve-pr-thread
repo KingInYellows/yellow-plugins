@@ -5,8 +5,8 @@
 # Exit codes: 1 other failure, 2 usage, 3 not found or permission,
 #             4 rate limited. Messages go to stderr.
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
-#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait before the single
-#      rate-limit retry.
+#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no Retry-After
+#      or x-ratelimit-reset header says; waits over 90 s exit 4, no retry.
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -47,14 +47,37 @@ mutation($threadId: ID!) {
 }'
 
 # --- Execute mutation (one retry after a rate limit) ---
-_STDERR_FILE=$(mktemp)
-trap 'rm -f "$_STDERR_FILE"' EXIT
+# Longer waits exit 4 instead: the whole call must fit the caller's Bash
+# tool timeout (120 s by default). Same bounded wait as reply-pr-thread.
+MAX_WAIT_SECONDS=90
+_WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$_WORK_DIR"' EXIT
+_STDERR_FILE="$_WORK_DIR/err"
+_OUT_FILE="$_WORK_DIR/out"
+_HEADERS_FILE="$_WORK_DIR/headers"
+_BODY_FILE="$_WORK_DIR/body"
 call() {
-    RESPONSE=$(gh api graphql \
+    : >"$_HEADERS_FILE"
+    : >"$_BODY_FILE"
+    gh api -i graphql \
         -F threadId="$THREAD_ID" \
-        -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+        -f query="$MUTATION" >"$_OUT_FILE" 2>"$_STDERR_FILE" && _GH_EXIT=0 || _GH_EXIT=$?
+    # Split headers from body; output without a status line is all body.
+    tr -d '\r' <"$_OUT_FILE" | awk -v h="$_HEADERS_FILE" -v b="$_BODY_FILE" '
+        NR == 1 { inh = ($0 ~ /^HTTP\//) }
+        inh && /^$/ { inh = 0; next }
+        inh { print > h; next }
+        { print > b }
+    '
+    RESPONSE=$(cat "$_BODY_FILE")
     _GH_STDERR=$(cat "$_STDERR_FILE")
     sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+}
+header() {
+    awk -v name="$1" '
+        tolower(substr($0, 1, length(name) + 1)) == tolower(name) ":" {
+            sub(/^[^:]*:[ \t]*/, ""); print; exit
+        }' "$_HEADERS_FILE"
 }
 is_rate_limited() {
     case "$_GH_STDERR" in *"rate limit"*|*"Rate limit"*|*"HTTP 429"*) return 0 ;; esac
@@ -64,14 +87,35 @@ is_rate_limited() {
 is_gql_not_found_or_forbidden() {
     printf '%s' "$RESPONSE" | jq -e '[.errors[]? | .type // empty] | any(. == "NOT_FOUND" or . == "FORBIDDEN")' >/dev/null 2>&1
 }
+# Seconds to wait before the single retry: Retry-After, then the reset time
+# when no requests remain, then the default. Prints nothing when the wait
+# would exceed MAX_WAIT_SECONDS.
+rate_limit_wait() {
+    _wait=$(header retry-after)
+    case "$_wait" in ''|*[!0-9]*) _wait="" ;; esac
+    if [ -z "$_wait" ] && [ "$(header x-ratelimit-remaining)" = 0 ]; then
+        _reset=$(header x-ratelimit-reset)
+        case "$_reset" in
+            ''|*[!0-9]*) ;;
+            *) _wait=$((_reset - $(date +%s))); [ "$_wait" -ge 0 ] || _wait=0 ;;
+        esac
+    fi
+    if [ -z "$_wait" ]; then
+        _wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
+        case "$_wait" in ''|*[!0-9]*) _wait=60 ;; esac
+    fi
+    [ "$_wait" -le "$MAX_WAIT_SECONDS" ] && printf '%s' "$_wait"
+    return 0
+}
 call
 if is_rate_limited; then
-    # Capped so the call fits the caller's Bash timeout.
-    _WAIT="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
-    case "$_WAIT" in ''|*[!0-9]*) _WAIT=60 ;; esac
-    [ "$_WAIT" -le 90 ] || _WAIT=90
-    printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_WAIT" >&2
-    sleep "$_WAIT"
+    _W=$(rate_limit_wait)
+    if [ -z "$_W" ]; then
+        printf 'Error: GitHub API rate limit exceeded; the required wait exceeds %ss.\n' "$MAX_WAIT_SECONDS" >&2
+        exit 4
+    fi
+    printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_W" >&2
+    sleep "$_W"
     call
 fi
 if is_rate_limited; then

@@ -534,6 +534,25 @@ case "$ALL_ARGS" in
     printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
     exit 0
     ;;
+  *"PRRT_rl_header"*)
+    # 429 with Retry-After: 1 on the first call, then success.
+    if [ "$(bump resolve_rl_header)" -eq 1 ]; then
+      MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+      http "HTTP/2.0 429 Too Many Requests" "Retry-After: 1"
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+      exit 1
+    fi
+    MOCK_BODY=$(cat "$FIXTURE_DIR/resolve-success-response.json")
+    http "HTTP/2.0 200 OK" ""
+    ;;
+  *"PRRT_rl_long"*)
+    # 429 with Retry-After beyond the 90 s ceiling.
+    bump resolve_rl_long >/dev/null
+    MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+    http "HTTP/2.0 429 Too Many Requests" "Retry-After: 120"
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+    exit 1
+    ;;
   *"PRRT_gqlnotfound"*)
     printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
     exit 0

@@ -11,7 +11,7 @@ setup() {
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
   export YELLOW_REVIEW_PACE_SECONDS=0
   export YELLOW_REVIEW_RATE_LIMIT_WAIT=0
-  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl" "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_gqlrl"
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl" "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_gqlrl" "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_header" "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_long"
 }
 
 # --- Input validation ---
@@ -85,6 +85,20 @@ setup() {
   run "$SCRIPT" "PRRT_gqlratelimit"
   [ "$status" -eq 4 ]
   [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_gqlrl")" = 2 ]
+}
+
+@test "a Retry-After within 90 s is honoured over the default wait" {
+  run --separate-stderr "$SCRIPT" "PRRT_rl_header"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"retrying once in 1s"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_header")" = 2 ]
+}
+
+@test "a Retry-After over 90 s exits 4 without retrying" {
+  run --separate-stderr "$SCRIPT" "PRRT_rl_long"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"exceeds 90s"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_long")" = 1 ]
 }
 
 @test "a GraphQL NOT_FOUND error exits 3" {
