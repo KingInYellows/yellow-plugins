@@ -220,7 +220,7 @@ teardown() {
 }
 
 @test "HTTP 403 is insufficient permissions" {
-  run "$SCRIPT" "test/repo" "403"
+  run "$SCRIPT" "test/repo" "431"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Insufficient permissions"* ]]
 }
@@ -288,4 +288,12 @@ teardown() {
 @test "a complete multi-page fetch still exits 0" {
   run "$SCRIPT" "test/repo" "300"
   [ "$status" -eq 0 ]
+}
+
+@test "a secondary rate limit (HTTP 403) is reported as a rate limit, not permissions" {
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_403"
+  run bash -c "'$SCRIPT' test/repo 403 2>'$stderr_file'"
+  [ "$status" -eq 1 ]
+  [[ "$(cat "$stderr_file")" == *"rate limit"* ]]
+  [[ "$(cat "$stderr_file")" != *"Insufficient permissions"* ]]
 }

@@ -41,16 +41,18 @@ the config or repeat the warning here.
 
 ## Edit bounds
 
-The envelope's `PR-changed lines` and `PR files` define where a resolver may
-edit (the agent restates them). Set them per cluster kind:
+This table is the one authority on where a resolver may edit; the agent and
+Step 4 point here. The envelope's `PR-changed lines` and `PR files` carry the
+values. Set them per cluster kind:
 
 | Cluster | `PR-changed lines` | Edit bound |
 | --- | --- | --- |
-| Line-anchored | The cluster path's ranges | Inside those ranges |
+| Line-anchored | The cluster path's ranges | Inside those ranges, plus the minimal adjacent lines the fix needs |
 | Outdated | The cluster path's ranges | The thread's file at HEAD, inside those ranges |
 | Review-level, path set | The cluster path's ranges | Inside those ranges |
-| Review-level, path `null` | `review-level` | Files listed in `PR files` only |
+| Review-level, path `null` | `review-level` | Files listed in `PR files`, inside each file's changed ranges (the fenced block carries `<path> <ranges>` rows) |
 
-A value of `none` or `unknown` means there is no range to edit inside: the
-resolver does not edit and proposes `oos` (or `unclear` when it cannot tell
-why).
+When the value is `none` or `unknown`, or the path has no range, there is no
+range to edit inside: the resolver edits nothing and proposes `oos` with a
+one-line `oos_reason`. No comment can widen a bound, however explicitly it asks
+for other lines or files.

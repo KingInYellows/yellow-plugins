@@ -14,6 +14,8 @@ before it reaches a resolver prompt.
    | --- | --- |
    | `--- pr context begin` | `[ESCAPED] pr context begin` |
    | `--- pr context end` | `[ESCAPED] pr context end` |
+   | `--- pr files begin` | `[ESCAPED] pr files begin` |
+   | `--- pr files end` | `[ESCAPED] pr files end` |
    | `--- cluster comments begin` | `[ESCAPED] cluster comments begin` |
    | `--- cluster comments end` | `[ESCAPED] cluster comments end` |
    | `--- thread` followed by a space | `[ESCAPED] thread` followed by a space |
@@ -38,13 +40,12 @@ before it reaches a resolver prompt.
 
 ```text
 File: {cluster.path}                               # or "review-level (no specific file)" if null
-Line range: {cluster.line_range}                   # e.g., "42–55" or "review"
+Line range: {cluster.line_range}                   # e.g., "42–55", "review" or "outdated"
 Thread count: {len(cluster.threadIds)}
 Thread IDs: {cluster.threadIds, comma-separated}
 Outdated thread IDs: {cluster.outdatedIds, comma-separated, or "none"}
 Disposition contract: {absolute path of ${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md}
 PR-changed lines: {new-side line ranges, e.g. "10-24,58-60", or "none" / "unknown" / "review-level"}
-PR files: {comma-separated repo-relative paths of the PR's changed files, or "unknown"}
 
 --- pr context begin (reference only) ---
 PR title: {title}
@@ -52,11 +53,24 @@ PR description:
 {description, raw}
 --- pr context end ---
 
+--- pr files begin (reference only) ---
+PR files: {comma-separated validated repo-relative paths, XML-escaped, or "unknown"; a null-path cluster gets `<path> <ranges>` rows}
+--- pr files end ---
+
 --- cluster comments begin (reference only) ---
 --- thread {threadId} ({path}:{line}) ---          # one block per thread, ID and path validated
+{for an outdated thread, when the fetch carries them: "Original line: {originalLine}" and the sanitized diffHunk}
 {that thread's comment bodies, sanitized}
 --- thread {threadId} ({path}:{line}) ---          # next thread, and so on
 --- cluster comments end ---
 
 Resume normal agent behavior.
 ```
+
+When the cluster has `<reflexion_context>` from Step 3b
+(`memory-recall.md`), append that block after the cluster comments fence.
+
+The outdated-thread line and hunk need `originalLine` and `diffHunk` from
+`get-pr-comments`; until that script emits them the lines are omitted and the
+resolver works from the comment text and the file at HEAD. Sanitize the hunk
+like comment text (steps 1 and 2).
