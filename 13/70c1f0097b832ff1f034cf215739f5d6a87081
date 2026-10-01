@@ -1,0 +1,40 @@
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_9802901455b679::t_028590f41c8f0a 26
+  s_9802901455b679::t_804ba81b365951 23
+  s_3a67c5309460ff::t_fb4c27482564d4 6,16-22,24-25,33-34
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_3a67c5309460ff::t_787f393015d196 46
+  s_3a67c5309460ff::t_0dd33962df2f3d 15-19,24,26-45
+  s_9802901455b679::t_6439b6c1e5378e 20-23,25
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_9802901455b679::t_8e57da742e87fa 37-38
+  s_9802901455b679::t_146ea941fa3e16 44-48
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_9802901455b679::t_bd511578c7ba96 55-63
+docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md
+  s_9802901455b679::t_3c2f30f73403f5 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1370c1f0097b832ff1f034cf215739f5d6a87081",
+  "prompts": {},
+  "sessions": {
+    "s_3a67c5309460ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf180525-44ba-4076-9ae7-0a9ec39ef387",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_9802901455b679": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f501cfef-9027-447b-b582-2e7ff130242b",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
