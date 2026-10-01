@@ -85,13 +85,12 @@ and never auto-commits. The user decides what to do with the verdicts.
   prompt-level inside one orchestrator context — not isolated passes — and
   correctness is self-assessed until citation verification (`verify_finding()`)
   lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
-  The staging directory's capability (path + random token) is shell-owned:
-  5a writes it to `.git/council-synth.state` (mode 0600, symlink refused) and
-  5b, 5d-resume and 5e reload it from there, never from model-relayed
-  literals, before any overwrite or `rm -rf`. The model only sees the
-  directory path to `Read`/`Write` non-destructive files. (The older
-  `CLAUDE_FENCED_FILE` literal handoff is not yet converted.) See
-  `docs/security.md` "Synthesis staging directory (yellow-council)".
+  The staging directory's capability (path + random token) lives in
+  `.git/council-synth.state`, written only by 5a and never relayed through the
+  model; it does not stop a deliberate `Write` forgery, and one synthesis runs
+  per worktree. Validation, cleanup and that residual are in
+  `docs/security.md` "Synthesis staging directory (yellow-council)". The
+  `CLAUDE_FENCED_FILE` literal handoff still relays its path through the model.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
@@ -200,8 +199,9 @@ redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
 runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
 across every carrier — edit the patterns in all four files together, never
 just one. `synthesis.bats` extracts the Step 5b helper library (between the
-`council-synthesis-lib` markers) and the Step 2, 5a, 5b and 5e fences from
-`council.md` and runs them under bash, zsh and zsh with snapshot options, and
+`council-synthesis-lib` markers) and the Step 2, 5a, 5b, 5d-resume, 5e, 7, 8
+(Cancel) and 9 fences from `council.md` and runs them under bash, zsh and zsh
+with snapshot options, and
 under every awk it finds; it needs zsh, and fails rather than skips in CI
 without it. There is no fresh-machine install CI (see Known Limitations).
 

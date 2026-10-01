@@ -1153,17 +1153,19 @@ while IFS= read -r -d '' stale; do
   rm -rf -- "$stale" 2>/dev/null || true
 done < <(find /tmp -maxdepth 1 -type d -name 'council-synth-*' -mmin "+${STALE_MINUTES}" -print0 2>/dev/null)
 
-# The staging capability (directory + token) lives in a shell-owned state file
-# inside the git dir, beside council-state.tsv — NOT in anything the model
-# relays. Later fences reload it from there; nothing destructive trusts text
-# the model copied. Refuse a pre-placed symlink or foreign file at that path.
+# The staging capability (directory + token) lives in a state file only 5a
+# writes, inside the git dir beside council-state.tsv — NOT in anything the
+# model relays. Later fences reload it from there; nothing destructive trusts a
+# path or token the model copied. This closes the relayed-literal vector, not a
+# deliberate Write of the state file (docs/security.md "Known residual").
+# Refuse a pre-placed symlink or foreign file at that path.
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
   printf '[council] Error: not in a git repository\n' >&2
   exit 1
 }
 SYNTH_STATE="$GIT_ROOT/.git/council-synth.state"
 if [ -L "$SYNTH_STATE" ] || { [ -e "$SYNTH_STATE" ] && { [ ! -f "$SYNTH_STATE" ] || [ ! -O "$SYNTH_STATE" ]; }; }; then
-  printf '[council] Error: %s is a symlink or not our regular file — refusing to use it\n' "$SYNTH_STATE" >&2
+  printf '[council] Error: %s is a symlink or not our regular file — refusing to use it; remove it manually and re-run /council\n' "$SYNTH_STATE" >&2
   exit 1
 fi
 
@@ -1189,12 +1191,13 @@ printf '%s\n' "$SYNTH_TOKEN" >| "$SYNTH_DIR/.token" || {
   printf '[council] Error: cannot write the synthesis staging token\n' >&2
   exit 1
 }
-# Line 1 = directory, line 2 = token. Mode 0600 from creation (umask 077),
-# then chmod as a belt-and-braces; >| overwrites under zsh noclobber.
-# One synthesis per worktree: claim the state file atomically (ln fails if it
-# exists) so a concurrent /council cannot overwrite another run's capability.
-# A state file whose directory is gone or over an hour old is a dead run's
-# leftover and is reclaimed.
+# Line 1 = directory, line 2 = token. The content is written to a temp file
+# beside the state file (mode 0600 from umask 077; chmod covers a temp file
+# that already existed), then hard-linked into place, so an interrupted write
+# never leaves a half-written state file. ln fails if the state file exists:
+# one synthesis per worktree, so a concurrent /council cannot replace another
+# run's capability. A state file whose directory is gone or over an hour old
+# is a dead run's leftover and is removed before the claim.
 if [ -f "$SYNTH_STATE" ]; then
   OLD_DIR=$(sed -n '1p' "$SYNTH_STATE" 2>/dev/null)
   case "$OLD_DIR" in
@@ -1231,8 +1234,8 @@ and ignores anything you relay; there is no token to carry.
 
 If Codex's Agent return carried a `summary=` line, whatever its verdict
 (an excluded Codex slot's summary is its only status detail), use the `Write`
-tool to create `<literal COUNCIL_SYNTH_DIR value>/codex.summary.txt` (a new file)
-holding exactly that one `summary=` value, copied verbatim. Do the same for an
+tool to create `codex.summary.txt` (a new file) in the `COUNCIL_SYNTH_DIR` path
+printed by 5a, holding exactly that one `summary=` value, copied verbatim. Do the same for an
 excluded (TIMEOUT, ERROR or UNAVAILABLE) Gemini or OpenCode slot whose Agent
 return had an empty `fenced_output_path=`: stage its `summary=` value as
 `gemini.summary.txt` or `opencode.summary.txt`, since that line is the only
@@ -1577,7 +1580,7 @@ case "$SYNTH_DIR" in
     exit 1 ;;
   /tmp/council-synth-*) ;;
   *)
-    printf '[council] Error: synthesis state file does not name a staging directory\n' >&2
+    printf '[council] Error: synthesis state file does not name a staging directory — re-run /council\n' >&2
     exit 1 ;;
 esac
 if [ ! -d "$SYNTH_DIR" ] || [ -L "$SYNTH_DIR" ] || [ ! -O "$SYNTH_DIR" ]; then
@@ -1891,11 +1894,11 @@ case "$SYNTH_DIR" in
     exit 1 ;;
   /tmp/council-synth-*) ;;
   *)
-    printf '[council] Error: synthesis state file does not name a staging directory\n' >&2
+    printf '[council] Error: synthesis state file does not name a staging directory — re-run /council\n' >&2
     exit 1 ;;
 esac
 if [ ! -d "$SYNTH_DIR" ] || [ -L "$SYNTH_DIR" ] || [ ! -O "$SYNTH_DIR" ]; then
-  printf '[council] Error: staging directory %s is missing — re-run /council\n' "$SYNTH_DIR" >&2
+  printf '[council] Error: staging directory %s is missing, a symlink, or not ours — re-run /council\n' "$SYNTH_DIR" >&2
   exit 1
 fi
 SYNTH_TOKEN_OK=0
@@ -1961,7 +1964,7 @@ case "$SYNTH_DIR" in
     exit 1 ;;
   /tmp/council-synth-*) ;;
   *)
-    printf '[council] Error: synthesis state file does not name a staging directory\n' >&2
+    printf '[council] Error: synthesis state file does not name a staging directory — re-run /council\n' >&2
     exit 1 ;;
 esac
 if [ ! -d "$SYNTH_DIR" ] || [ -L "$SYNTH_DIR" ] || [ ! -O "$SYNTH_DIR" ] || [ ! -f "$SYNTH_DIR/labels.txt" ]; then
@@ -1982,8 +1985,14 @@ if [ "$SYNTH_TOKEN_OK" -ne 1 ] || [ ! -f "$SYNTH_DIR/.token" ] || [ -L "$SYNTH_D
   exit 1
 fi
 printf 'COUNCIL_LABEL_MAP=%s\n' "$(head -n 1 "$SYNTH_DIR/labels.txt")"
-rm -rf -- "$SYNTH_DIR" || printf '[council] Warning: could not remove %s; the next run sweeps it after 24h\n' "$SYNTH_DIR" >&2
-rm -f -- "$SYNTH_STATE"
+# Keep the state file when the directory could not be removed: it is the only
+# pointer to that directory.
+if rm -rf -- "$SYNTH_DIR"; then
+  rm -f -- "$SYNTH_STATE" \
+    || printf '[council] Warning: could not remove %s; remove it by hand\n' "$SYNTH_STATE" >&2
+else
+  printf '[council] Warning: could not remove %s; kept %s so the directory stays findable — remove both by hand\n' "$SYNTH_DIR" "$SYNTH_STATE" >&2
+fi
 ```
 
 Replace each `S<n>` with that reviewer's display name (`Claude`, `Codex`,
@@ -2234,9 +2243,10 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
 # Both guards below exit AFTER the fan-out, so both must clean up first.
 # Cleanup is INLINED here rather than calling Step 6's `council_cleanup_temps`:
 # that function was defined in a different bash fence, i.e. a different
-# subprocess, so it does not exist here. In both of these cases the state file
-# is missing or unusable, so the only reclaimable artifact is the path this
-# run minted — the same shape guard as everywhere else applies.
+# subprocess, so it does not exist here. In both of these cases the Step 4
+# state is missing or unusable, so the reclaimable artifacts are the path this
+# run minted (the same shape guard as everywhere else applies) and the Step 5a
+# synthesis state file.
 # Defined BEFORE the git-root guard below: the minted claude path does not
 # depend on GIT_ROOT, and a guard that exits before this function exists
 # would strand that file in /tmp with no cleanup at all.
@@ -2251,7 +2261,10 @@ council_cleanup_claude_only() {
   esac
   [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
   # Synthesis handoff state file (Step 5a); removing it never touches the dir.
-  [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+  if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ]; then
+    rm -f -- "$GIT_ROOT/.git/council-synth.state" \
+      || printf '[council] Warning: could not remove %s\n' "$GIT_ROOT/.git/council-synth.state" >&2
+  fi
 }
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; council_cleanup_claude_only; exit 1; }
 STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
@@ -2897,7 +2910,10 @@ case "$CLAUDE_FENCED" in
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
-[ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ]; then
+  rm -f -- "$GIT_ROOT/.git/council-synth.state" \
+    || printf '[council] Warning: could not remove %s\n' "$GIT_ROOT/.git/council-synth.state" >&2
+fi
 exit 0
 ```
 
@@ -3002,7 +3018,10 @@ case "$CLAUDE_FENCED" in
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
-[ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ]; then
+  rm -f -- "$GIT_ROOT/.git/council-synth.state" \
+    || printf '[council] Warning: could not remove %s\n' "$GIT_ROOT/.git/council-synth.state" >&2
+fi
 
 # Apply the verification result now that cleanup has run.
 [ "$WRITE_OK" -eq 1 ] || exit 1
@@ -3053,6 +3072,7 @@ This is the final output of the command. Exit 0.
 | Staging state file missing, symlinked, foreign or garbled in 5b/5d/5e, or its directory has no `.token` matching the state file's token | `[council] Error: ... synthesis state file ... ` or `... not the one Step 5a minted for this run`; exit 1; nothing is written or deleted. Directory and token come only from `.git/council-synth.state`, never from model-relayed text |
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; stop and re-run `/council` |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind; the next run's 5a sweep removes it once it is older than 24h |
+| Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 60 minutes old; before that, 5a exits 1 with `another council synthesis is in progress in this worktree` — wait, or remove the file by hand |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |
 | Git not in repo | Pre-flight error; exit 1 |

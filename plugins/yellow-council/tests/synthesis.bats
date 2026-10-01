@@ -475,6 +475,16 @@ write_synth_state() {
   printf '%s\n%s\n' "$1" "$2" >| "$REPO/.git/council-synth.state"
 }
 
+# is_mode_600 <path> — portable (no GNU stat): the permission string is -rw-------.
+is_mode_600() {
+  [ "$(ls -ld "$1" | cut -c1-10)" = "-rw-------" ]
+}
+
+# synth_dirs — sorted list of staging dirs currently in /tmp.
+synth_dirs() {
+  find /tmp -maxdepth 1 -type d -name 'council-synth-*' | sort
+}
+
 teardown() {
   rm -f "${CF:-}" "${GF:-}" "${CX:-}"
   [ -z "${SD:-}" ] || rm -rf "$SD"
@@ -497,7 +507,7 @@ teardown() {
     [ -d "$SD" ]
     local st="$REPO/.git/council-synth.state"
     [ -f "$st" ] && [ ! -L "$st" ]
-    [ "$(stat -c %a "$st")" = 600 ]
+    is_mode_600 "$st"
     [ "$(sed -n 1p "$st")" = "$SD" ]
     TOKEN=$(sed -n 2p "$st")
     [ "${#TOKEN}" -eq 32 ]
@@ -518,7 +528,8 @@ teardown() {
       "--- begin council-output:S4--- begin council-output:S3--- begin council-output:S2--- begin council-output:S1" ]
     # Blinded: no reviewer name in any fence label, evidence byte-exact,
     # Codex's summary and findings read from disk, the excluded slot marked.
-    ! grep -q 'council-output:\(claude\|codex\|gemini\|opencode\)' "$fwd"
+    run grep -q 'council-output:\(claude\|codex\|gemini\|opencode\)' "$fwd"
+    [ "$status" -eq 1 ]
     grep -qxF 'Evidence: "x = **y**_z;"' "$fwd"
     grep -qxF 'Summary: [reviewer] overall summary' "$fwd"
     grep -qxF 'severity=P2 src/b.ts:9 Title.' "$fwd"
@@ -606,7 +617,8 @@ teardown() {
   extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "$s5d"
   extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
   # No relayed literal placeholder for the dir or token survives in any fence.
-  ! grep -q 'literal COUNCIL_SYNTH' "$s5b" "$s5d" "$s5e"
+  run grep -q 'literal COUNCIL_SYNTH' "$s5b" "$s5d" "$s5e"
+  [ "$status" -eq 1 ]
   for profile in $PROFILES; do
     setup_council_run
     SD=$(mktemp -d /tmp/council-synth-XXXXXX)
@@ -658,55 +670,76 @@ teardown() {
   cmp "${BATS_TEST_TMPDIR}/5b.reload" "${BATS_TEST_TMPDIR}/5e.reload"
 }
 
-@test "5b, 5d and 5e fail closed on a missing, garbled, symlinked or foreign-dir state file" {
+@test "5b, 5d and 5e fail closed on a bad state file, each with its own message" {
   local s5b="${BATS_TEST_TMPDIR}/5b.sh" s5d="${BATS_TEST_TMPDIR}/5d.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" profile
   extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
   extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "$s5d"
   extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|placeholder|" "$s5b" >| "$s5b.sub"
-  local GOOD=0123456789abcdef0123456789abcdef f sh
+  local GOOD=0123456789abcdef0123456789abcdef f
+  # A foreign-owned state file or directory is not covered: creating one needs
+  # root (chown), and the -O ownership test it exercises is the same one the
+  # symlink and shape cases reach.
   for profile in $PROFILES; do
     setup_council_run
     SD=$(mktemp -d /tmp/council-synth-XXXXXX)
     printf '%s\n' "$GOOD" >| "$SD/.token"
     printf '%s\n' 'S1:claude' >| "$SD/labels.txt"
-    local st="$REPO/.git/council-synth.state" case_name
-    for case_name in missing garbled symlink traversal notours-dir; do
-      rm -f "$st"
+    local st="$REPO/.git/council-synth.state" case_name want want_e LINK="" GONE="/tmp/council-synth-gone-$$"
+    for case_name in missing garbled symlink directory-as-state traversal bad-shape-dir symlinked-dir nonexistent-dir bad-token; do
+      rm -rf "$st"
+      [ -z "$LINK" ] || rm -f "$LINK"
+      want="is missing, a symlink, or not ours"
+      want_e="$want"
       case "$case_name" in
         missing) ;;
-        garbled) printf '%s\n' "$SD" >| "$st" ;;
+        garbled) printf '%s\n' "$SD" >| "$st"; want="unreadable or garbled"; want_e="$want" ;;
         symlink) printf '%s\n%s\n' "$SD" "$GOOD" >| "$BATS_TEST_TMPDIR/real.state"
                  ln -s "$BATS_TEST_TMPDIR/real.state" "$st" ;;
-        traversal) printf '%s\n%s\n' "$SD/../council-synth-x" "$GOOD" >| "$st" ;;
-        notours-dir) printf '%s\n%s\n' "/tmp" "$GOOD" >| "$st" ;;
+        directory-as-state) mkdir "$st" ;;
+        traversal) printf '%s\n%s\n' "$SD/../council-synth-x" "$GOOD" >| "$st"
+                   want="traversal or an extra separator"; want_e="$want" ;;
+        bad-shape-dir) printf '%s\n%s\n' "/tmp" "$GOOD" >| "$st"
+                       want="does not name a staging directory"; want_e="$want" ;;
+        symlinked-dir) LINK="/tmp/council-synth-link-$$"
+                       ln -s "$SD" "$LINK"
+                       printf '%s\n%s\n' "$LINK" "$GOOD" >| "$st"
+                       want_e="or its label map is missing" ;;
+        nonexistent-dir) printf '%s\n%s\n' "$GONE" "$GOOD" >| "$st"
+                         want_e="or its label map is missing" ;;
+        bad-token) printf '%s\n%s\n' "$SD" "nothex" >| "$st"
+                   want="not the one Step 5a minted"; want_e="$want" ;;
       esac
       for f in "$s5b.sub" "$s5d" "$s5e"; do
         run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$f'"
         [ "$status" -ne 0 ] || { echo "$profile $case_name $f: expected failure"; return 1; }
+        local w="$want"
+        [ "$f" != "$s5e" ] || w="$want_e"
+        [[ "$stderr" == *"$w"* ]] || { echo "$profile $case_name $f: want [$w], got: $stderr"; return 1; }
       done
       # Nothing was deleted or written.
       [ -d "$SD" ] && [ -f "$SD/.token" ] && [ -f "$SD/labels.txt" ]
       [ ! -e "$SD/forward.txt" ]
     done
-    rm -f "$st"
+    [ -z "$LINK" ] || rm -f "$LINK"
+    rm -rf "$st"
     rm -rf "$SD" "$REPO"
   done
 }
 
-@test "5a writes a 0600 state file, refuses a symlinked one, and 5a overwrites a stale one" {
+@test "5a writes a 0600 state file, refuses a symlinked one, and reclaims a stale one" {
   local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   for profile in $PROFILES; do
     setup_council_run
     local st="$REPO/.git/council-synth.state"
-    # Stale state file from an interrupted run is overwritten (zsh noclobber safe).
+    # A stale state file (its directory is gone) is reclaimed (zsh noclobber safe).
     printf '%s\n%s\n' /tmp/council-synth-stale 00000000000000000000000000000000 >| "$st"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
     [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     [ "$(sed -n 1p "$st")" = "$SD" ]
-    [ "$(stat -c %a "$st")" = 600 ]
+    is_mode_600 "$st"
     rm -rf "$SD"
     # A symlink at the state path is refused and its target is not written.
     rm -f "$st"
@@ -716,6 +749,65 @@ teardown() {
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"symlink or not our regular file"* ]] || { echo "$profile: $stderr"; return 1; }
     [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "5a refuses while another synthesis is live or the state path is a directory, and reclaims an aged one" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  for profile in $PROFILES; do
+    setup_council_run
+    local st="$REPO/.git/council-synth.state" LIVE
+    LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
+    write_synth_state "$LIVE" 0123456789abcdef0123456789abcdef
+    # A recent directory named by the state file: another run holds it.
+    before=$(synth_dirs)
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"another council synthesis is in progress"* ]] || { echo "$profile live: $stderr"; return 1; }
+    [ "$(sed -n 1p "$st")" = "$LIVE" ]
+    after=$(synth_dirs)
+    [ "$before" = "$after" ]
+    # The same directory aged past 60 minutes is a dead run's leftover.
+    touch -t 200001010000 "$LIVE"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile aged: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    [ "$(sed -n 1p "$st")" = "$SD" ]
+    rm -rf "$SD" "$LIVE"
+    # A directory at the state path is refused.
+    rm -f "$st"
+    mkdir "$st"
+    before=$(synth_dirs)
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"symlink or not our regular file"* ]] || { echo "$profile dir: $stderr"; return 1; }
+    after=$(synth_dirs)
+    [ "$before" = "$after" ]
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "5a rolls back the staging directory when the state file cannot be written" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  for profile in $PROFILES; do
+    setup_council_run
+    # A read-only git dir: the state temp file cannot be created.
+    chmod 555 "$REPO/.git"
+    before=$(synth_dirs)
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    chmod 755 "$REPO/.git"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"cannot claim the synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
+    after=$(synth_dirs)
+    [ "$before" = "$after" ]
+    [ ! -e "$REPO/.git/council-synth.state" ]
     SD=""
     rm -rf "$REPO"
   done
@@ -736,6 +828,47 @@ teardown() {
   write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
   [ ! -e "$st" ]
+  rm -rf "$REPO"
+}
+
+# check_state_cleanup <script> — a cleanup fence leaves a symlink at the synth
+# state path alone (its target untouched) and removes a regular user-owned one.
+# Expects setup_council_run to have run.
+check_state_cleanup() {
+  local script="$1" st="$REPO/.git/council-synth.state"
+  printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
+  ln -s "$BATS_TEST_TMPDIR/target" "$st"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
+  [ -L "$st" ] && [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
+  rm -f "$st"
+  write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
+  [ ! -e "$st" ]
+}
+
+@test "Step 7 early-exit cleanup unlinks a regular state file but leaves a symlinked one" {
+  local s7="${BATS_TEST_TMPDIR}/7.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s7.raw" >| "$s7"
+  # No Step 4 state file: the guard exits through council_cleanup_claude_only.
+  rm -f "$REPO/.git/council-state.tsv"
+  check_state_cleanup "$s7"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"state file missing"* ]]
+  rm -rf "$REPO"
+}
+
+@test "Step 9 cleanup unlinks a regular state file but leaves a symlinked one" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s9.raw" >| "$s9"
+  # REPORT_PATH_ABS is unset, so verification fails, but cleanup still runs first.
+  check_state_cleanup "$s9"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"file write reported success but file not found"* ]]
+  [ ! -e "$REPO/.git/council-state.tsv" ]
   rm -rf "$REPO"
 }
 
@@ -770,7 +903,7 @@ teardown() {
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$profile token: $stderr"; return 1; }
     [[ "$output" != *"begin council-pass-a"* ]]
-    rm -rf "$SD"
+    rm -rf "$SD" "$REPO"
   done
 }
 
@@ -796,7 +929,8 @@ teardown() {
     rm -f "$AF"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     grep -qxF '(excluded: ERROR) Status detail: agy auth expired' "$SD/forward.txt"
-    ! grep -q 'leaked finding' "$SD/forward.txt"
+    run grep -q 'leaked finding' "$SD/forward.txt"
+    [ "$status" -eq 1 ]
     rm -rf "$SD" "$REPO"
   done
 }
