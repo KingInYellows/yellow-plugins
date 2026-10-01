@@ -1,0 +1,23 @@
+plans/setup-command-bugs.md
+  s_46afba3fd1243f::t_c147331e4abfd4 24,30,79
+plugins/yellow-research/commands/research/setup.md
+  s_46afba3fd1243f::t_c147331e4abfd4 223-224,321,418,518,532-533,737-748,765-768,856
+.changeset/research-setup-shell-env-wording.md
+  s_46afba3fd1243f::t_c147331e4abfd4 10-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "842eb0af8769d0d1f0b0c319ec41892fe00071b2",
+  "prompts": {},
+  "sessions": {
+    "s_46afba3fd1243f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "551287bb-653b-4f77-987f-3999e3653fd2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
