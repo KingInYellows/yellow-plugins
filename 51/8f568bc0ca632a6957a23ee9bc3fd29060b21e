@@ -1,0 +1,36 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread
+  s_fc95207836202a::t_f1190f986e9a1a 61-65,68,77-80,120-123
+plugins/yellow-review/tests/mocks/gh
+  s_fc95207836202a::t_f1190f986e9a1a 260-273
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_fc95207836202a::t_308a7b52a4e7f0 405-406
+  s_fc95207836202a::t_650311c27acf27 466-467,471-477,484-489,492-496,498,503,507-509,516-518
+  s_fc95207836202a::t_124b0c423a1f0e 376-379
+  s_fc95207836202a::t_8db9862b407c63 307
+  s_fc95207836202a::t_91c199e70fc11e 329-336
+  s_fc95207836202a::t_3bcb32698d70cb 395-397
+  s_fc95207836202a::t_bd4e0db4b1242f 445-446
+  s_fc95207836202a::t_35314af2ec5d90 325-326
+plugins/yellow-review/agents/workflow/pr-comment-resolver.md
+  s_fc95207836202a::t_1ded7018bdd092 43-45
+  s_fc95207836202a::t_462bd11a6e62e9 48
+  s_fc95207836202a::t_bdc5e7e2e1c42e 78-81
+plugins/yellow-review/tests/resolve-pr-thread.bats
+  s_fc95207836202a::t_f1190f986e9a1a 14,83-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "518f568bc0ca632a6957a23ee9bc3fd29060b21e",
+  "prompts": {},
+  "sessions": {
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
