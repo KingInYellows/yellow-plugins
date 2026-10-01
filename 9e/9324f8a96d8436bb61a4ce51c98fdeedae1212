@@ -1,0 +1,21 @@
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_fc95207836202a::t_7e83c7962175a8 239
+plugins/yellow-review/README.md
+  s_fc95207836202a::t_5f7c43669b0cdc 28-32,34-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9e9324f8a96d8436bb61a4ce51c98fdeedae1212",
+  "prompts": {},
+  "sessions": {
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
