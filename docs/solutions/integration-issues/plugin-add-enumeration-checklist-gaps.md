@@ -34,15 +34,18 @@ validators are the authority on what actually fails.
    `test -z "$(git status --porcelain --untracked-files=all -- <dist>)"` catches
    them. A new plugin's dist check must use the yellow-goal form.
 5. **Ship a lockfile for a data-dir `npm ci`.** Precedent:
-   `plugins/yellow-morph/package-lock.json` plus `lib/install-morphmcp.sh`.
+   `plugins/yellow-morph/package-lock.json` plus
+   `plugins/yellow-morph/lib/install-morphmcp.sh`.
    `.gitignore:47` ignores `package-lock.json` globally with per-plugin
    negations. Placing it at `plugins/<name>/runtime/` keeps it out of the pnpm
    workspace, because the `plugins/*` glob matches direct children only.
    yellow-cursor's `installSdk` runs an unlocked `npm install` without
    `--ignore-scripts`, a supply-chain gap not to copy.
-6. **Do not trust stale comments in provider validators.** The
-   `scripts/validate-provider-groups.js` header says "currently only
-   stacked-pr", but `remote-agent` is already routed. Its `ERROR-PROVIDER-*`
+6. **Verify provider routing in code, not header comments.** Comments in
+   `scripts/validate-provider-groups.js` can lag the groups it actually
+   enforces (`stacked-pr` and `remote-agent`); read the group tables and
+   consumer-site checks before deciding which groups a new provider needs.
+   Its `ERROR-PROVIDER-*`
    codes are built by string concatenation so `scripts/lint-error-codes.js`
    does not flag literal catalog codes in `scripts/`; keep that style.
 

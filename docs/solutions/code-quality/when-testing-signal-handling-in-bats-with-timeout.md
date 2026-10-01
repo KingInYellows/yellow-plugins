@@ -12,7 +12,38 @@ source: compound-staging
 
 ## Context
 
-When testing signal handling in bats with timeout, the timeout tool exits 124 after successfully sending a signal (e.g., -s TERM). Use `cmd || true` after piped timeout invocations to avoid test failures in bats, since the signal delivery is the intended outcome, not an error.
+When testing signal handling in bats with timeout, the timeout tool exits 124 after its deadline passes and it sends the signal (e.g., `-s TERM`). That nonzero status fails a bare piped command under bats, but `cmd || true` is the wrong fix: it also swallows a child that exits early or a broken invocation, so the following output assertion can pass on a regression.
+
+Capture the status and assert the expected value instead:
+
+```bash
+# macOS/BSD has no `timeout` unless coreutils provides `gtimeout`.
+killer=$(command -v timeout || command -v gtimeout || true)
+[ -n "$killer" ] || skip "timeout/gtimeout not available"
+# Without pipefail, the pipeline status is the killer's own status.
+if { printf 'first-part'; sleep 3; printf 'second-part'; } \
+    | "$killer" -s TERM 1 python3 "$OBS" > "$TEST_HOME/out"; then
+  rc=0
+else
+  rc=$?
+fi
+[ "$rc" -eq 124 ]                            # deadline reached, signal sent
+[ "$(cat "$TEST_HOME/out")" = "first-part" ]     # the handler's observable effect
+```
+
+Treat the other statuses as distinct failures, not as success:
+
+| Status | Meaning |
+|--------|---------|
+| 124 | Deadline reached; the expected result for a signal test |
+| 125 | `timeout` itself failed |
+| 126 / 127 | The command could not be invoked or was not found |
+| 137 | SIGKILL was sent (`-s KILL`, or `-k` after a TERM-ignoring child) |
+| other | The child exited on its own before the deadline, with its own status |
+
+Keep an assertion on what the handler did (forwarded output, restored file, removed temp file). The status alone only proves the signal was sent.
+
+For a case that expects SIGKILL (`-s KILL`, or a TERM-ignoring child hit by `-k`), `timeout` reports 137 rather than 124; assert 137 there and check the filesystem state afterwards. `plugins/yellow-core/tests/context-observer.bats` ("T10" tests) uses `run "$killer" -s KILL 1 ...` and then checks the record is intact. The "R19" test in the same file shows the `|| true` form this doc replaces; prefer the status assertion above for new tests.
 
 ## Source
 

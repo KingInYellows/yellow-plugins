@@ -52,12 +52,15 @@ Run `pnpm validate:schemas` (includes council-roster) after edits.
 
 Additional constraints found while grounding the same shell.
 
-5. **Step 5 synthesis has no bash.** Any mechanical stage (normalization,
-   label permutation, rubric AND-combination, flip detection,
-   de-anonymization) needs new bash fences. Hand off between fences with a
-   printed `mktemp -d /tmp/council-synth-*` literal, substituted later and
-   guarded by shape and identity. Do not add `$STATE_FILE` rows: Steps
-   6/7/8/9 parse every row as a reviewer.
+5. **Step 5 had no bash when this was written; it now does (resolved).**
+   Step 5 now holds a 5a staging fence, a 5b `council-synthesis-lib` fence
+   (`council_normalize_text` and the `council-output:S<n>` label permutation)
+   and the 5e literal-substitution fences. Add any new mechanical stage to
+   those existing fences rather than creating parallel ones. The pattern is
+   unchanged: hand off between fences with a printed
+   `mktemp -d /tmp/council-synth-*` literal (plus a `.token` check),
+   substituted later and guarded by shape and identity. Do not add
+   `$STATE_FILE` rows: Steps 6/7/8/9 parse every row as a reviewer.
 6. **Stage untrusted reviewer text with the Write tool, not a heredoc.** Write
    into a not-yet-existing child of the mktemp dir (see
    `docs/solutions/security-issues/heredoc-delimiter-collision.md`). Codex's
