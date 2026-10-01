@@ -47,6 +47,7 @@ plugins/yellow-review/lib/resolve-text.sh
   s_c22a55971bf452::t_d67172a980bc81 2-3,103-104,107-113
   s_c22a55971bf452::t_8bee237817cbe1 99-100
   s_fc95207836202a::t_b62fa7200041b4 119
+  s_9802901455b679::t_63c33d7d66b592 98,114-115
 plugins/yellow-review/tests/commit-resolve-fixes.bats
   s_9802901455b679::t_b34ce89562ed0e 394-396
   s_9802901455b679::t_99dea8dda76bc4 110,113
