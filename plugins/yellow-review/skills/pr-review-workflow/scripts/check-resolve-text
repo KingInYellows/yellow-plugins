@@ -4,8 +4,9 @@
 # example a Linear issue created through MCP).
 # Usage: check-resolve-text <file>...
 # Output: nothing on success.
-# Exit codes: 0 clean, 1 unreadable file, 2 usage or a file that looks like
-#             it contains a credential (the file is named on stderr).
+# Exit codes: 0 clean, 2 usage, an unreadable file, or a file that looks like
+#             it contains a credential or could not be scanned (the file is
+#             named on stderr).
 # Contract: references/resolve/dispositions.md ("Reply hygiene")
 
 set -eu
@@ -19,7 +20,7 @@ fi
 . "$(dirname "$0")/../../../lib/resolve-text.sh"
 
 for f in "$@"; do
-    [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 1; }
+    [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 2; }
     if ! rt_text_clean "$f"; then
         printf 'Error: %s looks like it contains a credential, or could not be scanned.\n' "$f" >&2
         exit 2

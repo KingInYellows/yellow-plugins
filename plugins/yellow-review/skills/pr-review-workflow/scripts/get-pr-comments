@@ -3,8 +3,16 @@
 # are excluded unless --include-outdated is passed.
 # Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>
 #   --include-outdated  also return unresolved threads whose anchor is outdated
-# Output: JSON array of thread objects to stdout.
-# Errors: Exit 1 with message to stderr.
+# Output: JSON array of thread objects to stdout. Each thread has threadId,
+#   path, line, startLine, comments[] (author, body, id, createdAt,
+#   viewerDidAuthor, authorType), commentCount, commentsTruncated (true when
+#   the thread has more comments than the 50 fetched), isOutdated,
+#   viewerCanResolve and viewerCanReply.
+# Errors: Exit 1 with a message to stderr for every failure, usage errors
+#   included; callers key on zero vs non-zero and the rate-limit wording.
+# Truncation: when the thread list hits the page cap or GitHub returns no
+#   cursor, a warning goes to stderr and the script still exits 0 with the
+#   threads fetched so far, so stdout stays a plain array.
 
 set -euo pipefail
 
@@ -232,6 +240,7 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
             }
         ],
         commentCount: (.comments.totalCount // ((.comments.nodes // []) | length)),
+        commentsTruncated: ((.comments.totalCount // 0) > ((.comments.nodes // []) | length)),
         isOutdated: (.isOutdated // false),
         viewerCanResolve: (.viewerCanResolve // false),
         viewerCanReply: (.viewerCanReply // false)

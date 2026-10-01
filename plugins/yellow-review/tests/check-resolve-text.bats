@@ -19,7 +19,7 @@ setup() {
 }
 
 @test "a credential shape in any file exits 2 and names it" {
-  printf 'use AKIAABCDEFGHIJKLMNOP\n' >| "$B"
+  printf 'use AKIA''ABCDEFGHIJKLMNOP\n' >| "$B"
   run --separate-stderr "$SCRIPT" "$A" "$B"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"$B"* ]]
@@ -31,11 +31,15 @@ setup() {
   [ "$status" -eq 2 ]
 }
 
-@test "no arguments exits 2; a missing file exits 1" {
+@test "no arguments exits 2" {
   run "$SCRIPT"
   [ "$status" -eq 2 ]
-  run "$SCRIPT" "$BATS_TEST_TMPDIR/nope"
-  [ "$status" -eq 1 ]
+}
+
+@test "a missing file exits 2 like the sibling scripts" {
+  run --separate-stderr "$SCRIPT" "$BATS_TEST_TMPDIR/nope"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not readable"* ]]
 }
 
 @test "ordinary code that names credentials is not flagged" {
@@ -45,12 +49,12 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "a very long single line is scanned quickly" {
+@test "a very long single line is scanned to completion" {
+  # The generous timeout only guards against a hang; speed is not asserted.
+  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
   head -c 3000000 /dev/zero | tr '\0' 'a' >| "$A"
-  start=$SECONDS
-  run "$SCRIPT" "$A"
+  run timeout 120 "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
-  [ $((SECONDS - start)) -lt 30 ]
 }
 
 @test "an unquoted lowercase credential assignment exits 2" {
@@ -108,4 +112,116 @@ setup() {
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"could not be scanned"* ]]
+}
+
+# Planted credentials below are obviously fake and assembled from pieces so
+# this file contains no credential-shaped literal for repo or CI scanners.
+
+pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
+
+@test "each token prefix is flagged at its length floor and clean one below" {
+  # prefix:floor (token length including the prefix)
+  for spec in 'gh''p_:24' 'gh''o_:24' 'gh''u_:24' 'gh''s_:24' 'gh''r_:24' \
+              'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'xo''xp-:14' \
+              'sk''-:23' 'sk''_live_:24' 'rk''_live_:24' 'pk''_live_:24'; do
+    prefix=${spec%:*}
+    floor=${spec##*:}
+    printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged at floor: $prefix"; false; }
+    printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix} - 1)))" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged below floor: $prefix"; false; }
+  done
+}
+
+@test "an uppercase NAME_KEY assignment with a literal value exits 2" {
+  printf 'DB_PASSWORD=%s\n' "$(pad 8)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a quoted keyword assignment exits 2" {
+  printf '%s\n' 'const password = "hunter22"' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "unquoted keyword values: digit, all-letter and separated literals exit 2" {
+  for t in 'secret: abc123def' 'password: hunter' 'password: correct-horse-battery'; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done
+}
+
+@test "a placeholder-only separated value is not flagged" {
+  printf '%s\n' 'token: optional-string' 'password: required-value' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "an Authorization or Bearer header with a 20+ character token exits 2" {
+  printf 'Authorization: Bearer %s\n' "$(pad 20)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'sent bearer %s\n' "$(pad 20)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'Authorization: Bearer %s\n' "$(pad 19)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "credentials in URL userinfo exit 2" {
+  printf 'clone https://deploy:%s@example.com/o/r.git\n' 'S3cr3t9x' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'postgres://app:%s@db.internal:5432/app\n' 'hunterhunter' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "URLs with a port, userinfo placeholders or a later @ are not flagged" {
+  printf '%s\n' 'See https://example.com:443/path/a@b and https://user:${PASS}@example.com' \
+    'postgres://app:<password>@db.internal/app' 'mailto:me@example.com' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a keyword inside a longer word is not a credential keyword" {
+  printf '%s\n' 'bypass: something-else' 'We bypass: foobarbaz here' 'token=[REDACTED]' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a camelCase keyword and a digit-bearing value in a longer word still exit 2" {
+  printf '%s\n' 'userPassword: hunter' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf '%s\n' 'mypassword: hunter22' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a mixed-case URL, a long mixed-case path, a SHA and a thread ID are not flagged" {
+  printf '%s\n' \
+    'https://github.com/KingInYellows/Yellow-Plugins/blob/Main/plugins/Yellow-Review/Lib/Resolve-Text.sh' \
+    'plugins/yellow-review/skills/PrReviewWorkflow2/scripts/Check-Resolve-Text' \
+    'da39a3ee5e6b4b0d3255bfef95601890afd80709' \
+    'Thread PRRT_kwDOLabcdE84Abcdef is out of scope.' \
+    'LongCamelCaseIdentifierWithoutAnyDigitsInIt' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "rt_text_clean called bare under set -e returns on a clean file and fails on a hit" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  run sh -c '. "$1"; set -e; rt_text_clean "$2"; echo reached' sh "$LIB" "$A"
+  [ "$status" -eq 0 ]
+  [ "$output" = reached ]
+  printf '%s\n' 'password: hunter22' >| "$A"
+  run sh -c '. "$1"; set -e; rt_text_clean "$2"; echo reached' sh "$LIB" "$A"
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
 }

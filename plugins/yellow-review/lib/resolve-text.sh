@@ -11,9 +11,12 @@
 # shape. A credential hit, a scanner failure (awk missing or erroring) and an
 # unreadable file all return non-zero, so a caller that refuses on non-zero
 # fails closed instead of posting unscanned text.
+# The status is captured explicitly, so a bare call under `set -e` returns it
+# instead of aborting on the clean (awk 1) status; call it in a condition.
 rt_text_clean() {
-    rt_looks_secret "$1"
-    [ "$?" -eq 1 ]
+    _rt_rc=0
+    rt_looks_secret "$1" || _rt_rc=$?
+    [ "$_rt_rc" -eq 1 ]
 }
 
 # rt_looks_secret <file>: awk exit status. 0 means the file contains a
@@ -41,16 +44,26 @@ rt_looks_secret() {
             # characters, a digit or all letters (minus placeholder words),
             # and no call/reference punctuation, so `password: string`,
             # `password: z.string()` and `token: $TOKEN` stay clean.
+            # For the letter-only branches below the keyword must start a
+            # word: `bypass: something` is not a `pass` keyword. A letter
+            # before it disqualifies it unless the keyword itself starts with
+            # a capital (camelCase `userPassword`). A value with a digit is
+            # flagged either way.
             r = l
+            base = 0
             while (match(r, /(pass(word|wd)?|secret|token|api[_-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
+                start = base + RSTART
+                base += RSTART + RLENGTH - 1
                 r = substr(r, RSTART + RLENGTH)
+                inword = (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
                 sub(/[.!?]+$/, "", seg)
                 if (length(seg) < 6 || seg ~ /[(<${\[]/) continue
                 if (seg ~ /[0-9]/) hit = 1
                 # All-letter literal (`password: hunter`): flag unless it is a
                 # known type or prose placeholder.
+                else if (inword) continue
                 else if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) hit = 1
                 # Separated lowercase literal (`password: correct-horse-battery`):
                 # flag unless every part is a placeholder word.
@@ -60,6 +73,18 @@ rt_looks_secret() {
                     for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
                     if (!allph) hit = 1
                 }
+            }
+            # Credentials in URL userinfo (scheme://user:pass@host); a
+            # placeholder or variable password stays clean.
+            # Guarded: the scheme pattern is quadratic on one huge line.
+            r = index(l, "://") ? l : ""
+            while (match(r, /[a-z][a-z0-9+.-]*:\/\/[^\/@ \t:]+:[^\/@ \t]+@/)) {
+                seg = substr(r, RSTART, RLENGTH)
+                r = substr(r, RSTART + RLENGTH)
+                sub(/^[^:]*:\/\/[^:]*:/, "", seg)
+                sub(/@$/, "", seg)
+                if (seg ~ /[<${\[%]/ || index(ph, " " seg " ") > 0) continue
+                hit = 1
             }
             # Authorization header or Bearer/Basic scheme with an opaque
             # token of 20+ characters; `Authorization: none` stays clean.

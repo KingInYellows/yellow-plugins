@@ -4,9 +4,14 @@
 # Output: JSON to stdout:
 #   {"changesRequested":[{"login":"...","reviewId":"..."}],
 #    "reviewDecision":"CHANGES_REQUESTED|APPROVED|REVIEW_REQUIRED|null",
-#    "conversationResolution":"enforced|not_enforced|unknown"}
-# changesRequested and reviewDecision are null when the lookup failed;
-# changesRequested is also null when there are more than 100 reviewers.
+#    "conversationResolution":"enforced|not_enforced|unknown",
+#    "lookupFailed":true|false}
+# Only reviews from users with write access are counted (writersOnly).
+# A failed lookup is signalled by changesRequested null together with
+# lookupFailed true (also when there are more than 100 reviewers) and by
+# conversationResolution "unknown". reviewDecision null alone is not a
+# failure: GitHub returns it when no review is required. Callers must treat
+# lookupFailed true as blocking-unknown, never as "no blockers".
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
 # with unknown fields and a note on stderr.
 
@@ -15,7 +20,7 @@ set -eu
 note() { printf '[get-pr-blockers] %s\n' "$1" >&2; }
 
 unknown_json() {
-    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown"}\n'
+    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","lookupFailed":true}\n'
 }
 
 if [ $# -ne 2 ]; then
@@ -47,6 +52,7 @@ trap 'rm -f "$ERR_FILE"' EXIT
 # --- Reviews and base branch (GraphQL) ---
 # latestOpinionatedReviews may include DISMISSED reviews, so select on the
 # state client-side rather than trusting the connection to exclude them.
+# writersOnly drops drive-by reviews from users who cannot block the merge.
 # shellcheck disable=SC2016
 QUERY='
 query($owner: String!, $name: String!, $number: Int!) {
@@ -54,7 +60,7 @@ query($owner: String!, $name: String!, $number: Int!) {
     pullRequest(number: $number) {
       baseRefName
       reviewDecision
-      latestOpinionatedReviews(first: 100) {
+      latestOpinionatedReviews(first: 100, writersOnly: true) {
         nodes {
           id
           state
@@ -70,7 +76,9 @@ query($owner: String!, $name: String!, $number: Int!) {
 
 CHANGES_REQUESTED=null
 REVIEW_DECISION=null
+LOOKUP_FAILED=true
 BASE=""
+RESPONSE=""
 if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
         -f query="$QUERY" 2>"$ERR_FILE") \
     && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest | objects' 2>/dev/null); then
@@ -78,15 +86,24 @@ if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NU
     if [ "$(printf '%s' "$PR_JSON" | jq -r '.latestOpinionatedReviews.pageInfo.hasNextPage // false')" = true ]; then
         note 'more than 100 opinionated reviewers; changesRequested unknown'
     else
-        CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
+        # A jq failure on a malformed payload leaves the fields unknown
+        # instead of aborting under set -e.
+        if CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
           [ (.latestOpinionatedReviews.nodes // [])[]
             | select(.state == "CHANGES_REQUESTED")
-            | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]')
+            | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]' 2>/dev/null); then
+            LOOKUP_FAILED=false
+        else
+            CHANGES_REQUESTED=null
+            note 'review nodes unreadable; changesRequested unknown'
+        fi
     fi
-    REVIEW_DECISION=$(printf '%s' "$PR_JSON" | jq -c '.reviewDecision')
-    BASE=$(printf '%s' "$PR_JSON" | jq -r '.baseRefName // empty')
+    REVIEW_DECISION=$(printf '%s' "$PR_JSON" | jq -c '.reviewDecision' 2>/dev/null) || REVIEW_DECISION=null
+    BASE=$(printf '%s' "$PR_JSON" | jq -r '.baseRefName // empty' 2>/dev/null) || BASE=""
 else
-    note "review lookup failed; changesRequested unknown: $(head -c 300 "$ERR_FILE")"
+    # gh can exit 0 with a null pullRequest and the reason in .errors.
+    GQL_MSG=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null) || GQL_MSG=""
+    note "review lookup failed; changesRequested unknown: $(head -c 300 "$ERR_FILE")${GQL_MSG:+ $GQL_MSG}"
 fi
 
 # --- Conversation resolution (REST) ---
@@ -95,8 +112,11 @@ fi
 CLASSIC=unknown
 RULES=unknown
 if [ -n "$BASE" ]; then
-    BASE_ENC=$(printf '%s' "$BASE" | jq -sRr @uri)
-
+    BASE_ENC=$(printf '%s' "$BASE" | jq -sRr @uri 2>/dev/null) || BASE_ENC=""
+fi
+if [ -n "$BASE" ] && [ -z "$BASE_ENC" ]; then
+    note 'base branch name could not be encoded; conversationResolution unknown'
+elif [ -n "$BASE" ]; then
     if OUT=$(gh api "repos/$OWNER/$NAME/branches/$BASE_ENC/protection" \
             --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE"); then
         case "$OUT" in
@@ -116,7 +136,7 @@ if [ -n "$BASE" ]; then
     if PAGES=$(gh api --paginate "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" 2>"$ERR_FILE") \
         && OUT=$(printf '%s' "$PAGES" | jq -s \
             '[.[][] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
-            2>"$ERR_FILE"); then
+            2>>"$ERR_FILE"); then
         case "$OUT" in
             true) RULES=true ;;
             *) RULES=false ;;
@@ -138,4 +158,6 @@ jq -nc \
     --argjson cr "$CHANGES_REQUESTED" \
     --argjson rd "$REVIEW_DECISION" \
     --arg res "$RESOLUTION" \
-    '{changesRequested: $cr, reviewDecision: $rd, conversationResolution: $res}'
+    --argjson lf "$LOOKUP_FAILED" \
+    '{changesRequested: $cr, reviewDecision: $rd, conversationResolution: $res, lookupFailed: $lf}' \
+    || unknown_json

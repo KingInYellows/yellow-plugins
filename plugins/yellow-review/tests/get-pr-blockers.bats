@@ -9,13 +9,21 @@ SCRIPT="${SCRIPT_DIR}/get-pr-blockers"
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
-  unset MOCK_GH_PROTECTION MOCK_GH_RULES MOCK_GH_BLOCKERS_FAIL
+  unset MOCK_GH_PROTECTION MOCK_GH_RULES MOCK_GH_BLOCKERS_FAIL MOCK_GH_BLOCKERS_FIXTURE
 }
 
 @test "rejects missing arguments with exit 2" {
   run "$SCRIPT"
   [ "$status" -eq 2 ]
   [[ "$output" == *"Usage:"* ]]
+}
+
+@test "rejects malformed repo values with exit 2" {
+  for bad in noslash a/b/c /repo owner/; do
+    run "$SCRIPT" "$bad" "610"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Invalid repo format"* ]]
+  done
 }
 
 @test "rejects a non-numeric PR number with exit 2" {
@@ -58,6 +66,7 @@ setup() {
   run --separate-stderr "$SCRIPT" "test/repo" "610"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "unknown" ]
+  [[ "$stderr" == *"Server Error (HTTP 500)"* ]]
 }
 
 @test "both sources readable and neither requires it is not_enforced" {
@@ -86,6 +95,80 @@ setup() {
   export MOCK_GH_BLOCKERS_FAIL=1
   run --separate-stderr "$SCRIPT" "test/repo" "610"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .conversationResolution]')" = '[null,null,"unknown"]' ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .conversationResolution, .lookupFailed]')" = '[null,null,"unknown",true]' ]
   [[ "$stderr" == *"review lookup failed"* ]]
+}
+
+@test "a successful review lookup reports lookupFailed false" {
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = "false" ]
+}
+
+@test "the review query asks for writers only" {
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  grep -q 'writersOnly: true' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+@test "missing gh or jq exits 0 with unknown fields" {
+  run --separate-stderr env PATH=/nonexistent "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .conversationResolution, .lookupFailed]')" = '[null,null,"unknown",true]' ]
+  [[ "$stderr" == *"not found"* ]]
+}
+
+@test "a null pullRequest reports the GraphQL error message" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-null-pr.json
+  run --separate-stderr "$SCRIPT" "test/repo" "999"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .lookupFailed]')" = '[null,true]' ]
+  [[ "$stderr" == *"Could not resolve to a PullRequest"* ]]
+}
+
+@test "a malformed review payload leaves changesRequested unknown and exits 0" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-malformed.json
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .lookupFailed]')" = '[null,true]' ]
+  [[ "$stderr" == *"unreadable"* ]]
+}
+
+@test "more than 100 reviewers leaves changesRequested unknown but keeps reviewDecision" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-next-page.json
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .lookupFailed]')" = '[null,"CHANGES_REQUESTED",true]' ]
+  [[ "$stderr" == *"more than 100"* ]]
+}
+
+@test "a ghost reviewer is reported as ghost" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-ghost.json
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '.changesRequested')" = '[{"login":"ghost","reviewId":"PRR_ghost"}]' ]
+}
+
+@test "no CHANGES_REQUESTED reviews gives an empty list that is not a failure" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-approved.json
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .lookupFailed]')" = '[[],"APPROVED",false]' ]
+}
+
+@test "a null reviewDecision with a good lookup is not a failure" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-no-policy.json
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.changesRequested, .reviewDecision, .lookupFailed]')" = '[[],null,false]' ]
+}
+
+@test "a base branch with a slash and a space is URL-encoded in both endpoints" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-slash-branch.json
+  export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=none
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "not_enforced" ]
+  grep -q 'repos/test/repo/branches/feature%2Fa%20b/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+  grep -q 'repos/test/repo/rules/branches/feature%2Fa%20b' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
 }
