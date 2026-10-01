@@ -124,7 +124,7 @@ cs_redact_secrets() {
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]{22,255}/[REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]{16}/[REDACTED:aws-access-key]/g' \
+    -e 's/(AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}/[REDACTED:aws-access-key]/g' \
     -e 's/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]{40}/\1=[REDACTED:aws-secret]/g' \
     -e 's/sk-ant-api[A-Za-z0-9_-]{20,}/[REDACTED:anthropic-key]/g' \
     -e 's/sk-(admin|proj|svcacct)-[A-Za-z0-9_-]{20,}/[REDACTED:openai-key]/g' \
@@ -149,6 +149,93 @@ cs_redact_secrets() {
     printf '[REDACTED: sanitization failed]\n'
     return 1
   }
+}
+
+# Stage one entry that is not a session transcript (an unattended review's
+# outcome narrative, say) in the pending ledger. The entry has the Stop
+# hook's shape, so the drain treats both producers alike.
+#
+# The narrative is untrusted text that the drain later embeds in a fenced
+# scorer prompt, so it is sanitised in a fixed order:
+#   1. cap at 8 KiB, cut at a line boundary (a mid-line cut could split a
+#      secret past the redaction patterns);
+#   2. strip control, zero-width, bidi and Unicode-tag characters — before
+#      redaction, because an invisible character inside a token defeats the
+#      patterns and stripping it afterwards would reassemble the secret;
+#   3. redact;
+#   4. neutralise lines that could forge a fence or a role turn (`---`,
+#      backtick/tilde fences, `system:`-style prefixes) by prefixing `> `.
+#      This runs after redaction because PEM markers begin with `-----` and
+#      the redaction range needs them intact.
+#
+# Args:
+#   $1 — cwd whose project slug selects the staging dir
+#   $2 — session id; sanitised to [A-Za-z0-9._-], and a repeat overwrites
+#   $3 — file holding the narrative (read, never echoed)
+# Returns: 0 staged, 1 bad args, 2 jq missing, 3 sanitisation failed,
+#          4 write failed.
+cs_stage_entry() {
+  local cwd="${1:-}" sid="${2:-}" src="${3:-}"
+  local size capped redacted text invisible hash ts slug staging entry
+  if [ -z "$cwd" ] || [ -z "$src" ] || [ ! -f "$src" ] || [ ! -r "$src" ]; then
+    return 1
+  fi
+  sid=$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_')
+  case "$sid" in
+    '' | . | ..) return 1 ;;
+  esac
+  command -v jq >/dev/null 2>&1 || return 2
+
+  size=$(wc -c <"$src" | tr -d ' ')
+  if [ "${size:-0}" -gt 8192 ] 2>/dev/null; then
+    capped=$(head -c 8192 "$src" | sed '$d')
+  else
+    capped=$(cat -- "$src")
+  fi
+
+  # UTF-8 byte sequences, matched under LC_ALL=C: U+200B-200F, U+202A-202E,
+  # U+2060-2064, U+2066-2069, U+FEFF and the tag block U+E0000-E007F.
+  invisible=$(printf '\342\200[\213-\217\252-\256]|\342\201[\240-\244\246-\251]|\357\273\277|\363\240[\200\201][\200-\277]')
+  redacted=$(printf '%s\n' "$capped" \
+    | tr -d '\000-\010\013\014\016-\037\177' \
+    | LC_ALL=C sed -E -e "s/${invisible}//g" \
+    | cs_redact_secrets 2>/dev/null) || return 3
+  text=$(printf '%s\n' "$redacted" | sed -E \
+    -e '/^[[:space:]]*(---|```|~~~)/s/^/> /' \
+    -e '/^[[:space:]]*([Ss][Yy][Ss][Tt][Ee][Mm]|[Aa][Ss][Ss][Ii][Ss][Tt][Aa][Nn][Tt]|[Hh][Uu][Mm][Aa][Nn]|[Uu][Ss][Ee][Rr])[[:space:]]*:/s/^/> /') \
+    || return 3
+  [ -n "$text" ] || return 1
+
+  hash=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$text" | sha256sum 2>/dev/null | cut -d' ' -f1)
+  elif command -v shasum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$text" | shasum -a 256 2>/dev/null | cut -d' ' -f1)
+  fi
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # cs_staging_dir_for_slug does not check HOME; an unset HOME would stage
+  # under /.claude.
+  [ -n "${HOME:-}" ] || return 4
+  slug=$(cs_derive_project_slug "$cwd")
+  staging=$(cs_staging_dir_for_slug "$slug") || return 4
+  entry=$(jq -nc \
+    --arg ts "$ts" \
+    --arg sid "$sid" \
+    --arg hash "$hash" \
+    --arg cwd "$cwd" \
+    --arg tail "$text" \
+    '{
+       schema: "1",
+       schema_min_reader: "1",
+       timestamp: $ts,
+       session_id: $sid,
+       content_hash: $hash,
+       cwd: $cwd,
+       transcript_tail: $tail
+     }') || return 4
+  cs_atomic_jsonl_write "${staging}/pending/${sid}.jsonl" "${entry}
+" || return 4
 }
 
 # Read the drain-budget JSON file. Emits a single-line JSON object on stdout.
