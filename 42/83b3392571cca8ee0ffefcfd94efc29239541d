@@ -410,6 +410,7 @@ docs/security.md
 plugins/yellow-review/commands/review/resolve-stack.md
   s_becc7011266565::t_aed4a7c16ddcb4 197-206,214,225-242,251-252,266-267,274,278,281,284-287,291-293,300-302,316-319,331-333
   s_becc7011266565::t_2bcf13711fabfb 26-29
+  s_5667e810256031::t_eac904f0744e10 294-296
 ---
 {
   "schema_version": "authorship/3.0.0",
