@@ -239,15 +239,12 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   secondary rate limit is also an HTTP 403.
 - `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
   `run-verify-command`) — canonical-path check, the case-insensitive resolver
-  deny list, and the runner-file list (files a git hook or verify command
-  would execute)
+  deny list (agent-tool config dirs and instruction files included), the
+  runner-file list (files a git hook or verify command would execute) and
+  `rp_tree_changes`; a `git config` failure other than exit 1 fails closed
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
-  process-group and redacted-log helpers for the verify run
-- `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
-  `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
-  sibling plugin: the source tree first, then the newest numeric version in
-  the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
-  it; the helper itself has no override.
+  process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
+  accepts only a `timeout`/`gtimeout` that supports `--kill-after`
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
