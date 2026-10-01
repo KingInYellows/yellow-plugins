@@ -190,9 +190,13 @@ record); only the resolve is withheld.
 - Tracker: GitHub by default, via `file-followup-issue`. Linear when
   `mcp__plugin_yellow-linear_linear__save_issue` is discoverable via
   ToolSearch and the branch matches `[A-Z]{2,5}-[0-9]{1,6}`; the team comes
-  from the ID prefix. The Linear description ends with the same marker. A
-  Linear failure, or an unresolvable team, falls back to GitHub once and
-  records `tracker=github (linear unavailable)`.
+  from the ID prefix. The Linear description ends with the same marker. The
+  `save_issue` response is untrusted data: accept only an identifier
+  matching `^<PREFIX>-[0-9]{1,6}$` and a URL matching
+  `^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`. A
+  Linear failure (including a response that fails either check), or an
+  unresolvable team, falls back to GitHub once and records
+  `tracker=github (linear unavailable)`.
 - Dedupe check: run `file-followup-issue --find <owner/repo> <PRRT_id>` for
   every candidate before either tracker is used, so a GitHub issue filed by
   an earlier run's fallback is found even when Linear works this time. It
@@ -253,8 +257,10 @@ that snapshot, so an edit to the file during the run changes nothing.
 
 The tracked check runs from the repository root
 (`git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch --
-yellow-plugins.local.md`). A failed or timed-out verify reverts the files,
-saves a patch and holds `fixed` threads open.
+yellow-plugins.local.md`). Keep the file untracked and ignored (add it to
+`.git/info/exclude` or a `.gitignore`): an untracked file that is not ignored
+fails Step 2's clean-tree check. A failed or timed-out verify reverts the
+files, saves a patch and holds `fixed` threads open.
 
 **Runner files** are code or config that a verify command, a package
 manager or a git hook would execute: `package.json`, lockfiles
