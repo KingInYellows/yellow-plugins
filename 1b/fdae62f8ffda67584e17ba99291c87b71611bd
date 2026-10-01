@@ -27,6 +27,7 @@ plugins/yellow-review/tests/helpers/resolve-repo.bash
 plugins/yellow-review/references/resolve/dispositions.md
   s_fc95207836202a::t_68fd9277864ed4 404-407
   s_fc95207836202a::t_e3c4bc55458109 193-196,236-243,245-253,260-272,289-291,295-297,301-321,326,328-333,346-355,418-419
+  s_c22a55971bf452::t_0a3984c00134d9 192
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -34,6 +35,14 @@ plugins/yellow-review/references/resolve/dispositions.md
   "base_commit_sha": "1bfdae62f8ffda67584e17ba99291c87b71611bd",
   "prompts": {},
   "sessions": {
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
     "s_fc95207836202a": {
       "agent_id": {
         "tool": "claude",
