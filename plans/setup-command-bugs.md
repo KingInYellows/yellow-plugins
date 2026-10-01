@@ -21,13 +21,13 @@ Three defects in plugin setup commands:
 ## Proposed Solution
 
 - Bug 1: verify only; no edit.
-- Bug 2: make the shell-env-only status neutral, drop the false "cause (b)" from the three probe messages, and correct SKILL.md.
+- Bug 2: make the shell-env-only status neutral, drop the false "cause (b)" from the three probe messages, and correct SKILL.md. When a userConfig key is also set, report the shell-key probe as `PRESENT (userConfig takes precedence …)` (Perplexity pending MCP visibility) because the MCP uses the userConfig key.
 - Bug 3: copy the `web_signal_*` block from `setup:all` into Step 2.5, with `is_web` true when any signal matches. Use a strict copy so the two stay comparable.
 
 Decisions (from SpecFlow review):
 
 - **`repo_top` outside git:** keep Step 2.5's existing `|| echo "."` fallback and drop the `[ -n "$repo_top" ]` guards from the copy, so a non-git web project still detects.
-- **Drift check:** keep-in-sync comment only. A validator is a follow-up, not in scope. `all.md` is not touched, so no yellow-core changeset.
+- **Drift check:** keep-in-sync comment only. A validator is a follow-up, not in scope. `all.md` gets only a one-line reciprocal sync comment (with a yellow-core patch changeset).
 - **Known false positives/negatives** (substring match on `pyproject.toml`, root-only files, compose filename variants) are inherited from `setup:all` and left as-is.
 
 ## Implementation Plan
@@ -76,7 +76,7 @@ Decisions (from SpecFlow review):
 ## Technical Details
 
 - Modify: `plugins/yellow-research/commands/research/setup.md`, `plugins/yellow-research/skills/research-patterns/SKILL.md`, `plugins/yellow-browser-test/commands/browser-test/setup.md`.
-- Create: two changesets.
+- Create: three changesets (yellow-research, yellow-browser-test, yellow-core).
 - Shell rules: no variable named `path` or `status`; use `>|` for overwrites; quote all expansions; no bash-only constructs.
 - No catalog, manifest or count changes.
 
