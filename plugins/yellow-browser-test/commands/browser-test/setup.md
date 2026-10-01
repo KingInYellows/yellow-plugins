@@ -78,10 +78,13 @@ for f in fly.toml render.yaml vercel.json netlify.toml; do
     break
   fi
 done
-if [ -f "$repo_top/docker-compose.yml" ] && \
-   grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/docker-compose.yml" 2>/dev/null; then
-  web_signals="$web_signals docker_http"
-fi
+for f in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+  if [ -f "$repo_top/$f" ] && \
+     grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/$f" 2>/dev/null; then
+    web_signals="$web_signals docker_http"
+    break
+  fi
+done
 if [ -n "$web_signals" ]; then
   printf 'is_web: true (signals:%s; checked: %s)\n' "$web_signals" "$repo_top"
 else
@@ -93,9 +96,9 @@ If `is_web` is `false`, use AskUserQuestion:
 
 > "No web-app signals found in {the `checked:` path from the output above}
 > (checked: package.json, Gemfile, Python deps, go.mod, Cargo.toml, PaaS
-> config, docker-compose ports). That path is the git root, which may differ
-> from your current directory. Browser testing requires a web app with a dev
-> server."
+> config, docker-compose ports). That path is the git root, or your current
+> directory if you are not in a git repository. Browser testing requires a web
+> app with a dev server."
 >
 > Options:
 > - "Continue anyway" — proceed to app discovery

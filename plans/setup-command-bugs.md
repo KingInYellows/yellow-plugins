@@ -4,7 +4,7 @@
 
 Three defects in plugin setup commands:
 
-1. `/research:setup` treats `jq -e` exit 4 (key absent) as a settings.json parse error.
+1. `/research:setup` treats `jq -e` exit 4 (no output, e.g. `// empty` with an absent key, or an empty settings file) and exit 1 (null/false result) as a settings.json parse error.
 2. `/research:setup` still says shell-env keys make the MCPs fail. Since 4.1.0 the `bin/start-*.sh` wrappers (via `bin/lib/resolve-mcp-key.sh`) fall back to shell env; `tests/resolve-mcp-key.bats:39` proves it.
 3. `/browser-test:setup` Step 2.5 only greps `package.json`, so FastAPI, Rails, Go and Rust apps hit the "no web framework" prompt. `/setup:all` already detects them.
 
@@ -66,7 +66,7 @@ Decisions (from SpecFlow review):
 ### Phase 4: Quality
 
 - [x] 4.1: `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:shell-compat`, `pnpm check:shell-parse`, `pnpm validate:schemas`.
-- [x] 4.2: Add `.changeset/` files: `yellow-research` patch and `yellow-browser-test` patch. The browser-test text must say Django/FastAPI/Rails/Go/Rust projects no longer see the "no framework" prompt.
+- [x] 4.2: Add `.changeset/` files: `yellow-research` patch, `yellow-browser-test` patch and `yellow-core` patch (for the `all.md` reciprocal sync comment). The browser-test text must say Django/FastAPI/Rails/Go/Rust projects no longer see the "no framework" prompt.
 <!-- deepen-plan: codebase -->
 > **Codebase:** README.md and CLAUDE.md of yellow-browser-test make no detection claims, so 4.3 is likely a no-op. The `:155` error row is the only other stale framing, and no code path triggers it anymore.
 <!-- /deepen-plan -->
@@ -85,7 +85,7 @@ Decisions (from SpecFlow review):
 - All 9 `has_userconfig` copies keep `1|4) ;;` and `has-userconfig.bats` passes.
 - The Phase 2.4 grep (which excludes `CHANGELOG.md` history) returns nothing, and `/research:setup` prints no "WILL FAIL" for a shell-env-only key.
 - `/browser-test:setup` Step 2.5 reports `is_web: true` for FastAPI, Rails, Go, Rust and PaaS-config repos, including outside a git repo.
-- Validators in 4.1 pass; both changesets are present.
+- Validators in 4.1 pass; all three changesets are present.
 
 ## Edge Cases
 

@@ -315,8 +315,15 @@ if [ -n "$paas_match" ]; then
 else
   printf 'web_signal_paas:               absent\n'
 fi
-if [ -n "$repo_top" ] && [ -f "$repo_top/docker-compose.yml" ] && \
-   grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/docker-compose.yml" 2>/dev/null; then
+docker_http_present=0
+for f in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+  if [ -n "$repo_top" ] && [ -f "$repo_top/$f" ] && \
+     grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/$f" 2>/dev/null; then
+    docker_http_present=1
+    break
+  fi
+done
+if [ "$docker_http_present" -eq 1 ]; then
   printf 'web_signal_docker_http:        present\n'
   web_signal_count=$((web_signal_count + 1))
 else
@@ -699,7 +706,8 @@ from Step 1's "Web App Signals" section (the bash dashboard probes
 `pyproject.toml` for Django/Flask/FastAPI, `go.mod` for Gin/Echo/Fiber/Chi/
 Gorilla, `Cargo.toml` for Axum/Actix/Rocket/Warp, PaaS configs
 `fly.toml`/`render.yaml`/`vercel.json`/`netlify.toml`, and
-`docker-compose.yml` for HTTP port mappings).
+Compose files (`compose.y*ml`, `docker-compose.y*ml`) for HTTP port
+mappings).
 
 If `web_signal_count` is `0` AND `.claude/yellow-browser-test.local.md` is
 absent, OMIT this plugin from the dashboard entirely — a non-web-app repo

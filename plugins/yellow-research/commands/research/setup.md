@@ -217,6 +217,12 @@ fi
 
 Per-key status after this step: `ABSENT` / `FORMAT VALID` / `FORMAT INVALID`
 
+Exception: when Step 1 showed `set (both shell & userConfig)` and the shell key
+is `FORMAT INVALID`, no probe runs and the final status is
+`PRESENT (userConfig takes precedence — shell key format invalid)`, because the
+MCP uses the userConfig key. Perplexity's label ends with `; pending
+MCP-visibility confirmation`.
+
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
 `UNREACHABLE` / `PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
@@ -741,6 +747,10 @@ its Step 3 status is any of:
   problem. Perplexity's label ends with `; pending MCP-visibility
   confirmation` and follows the pending rule below. Step 5 never shows setup
   instructions for these statuses.
+- `PRESENT (userConfig takes precedence — shell key format invalid)` — both
+  keys are set and the shell key failed Step 2's format check, so no probe ran.
+  Treated like the precedence status above: active for EXA and Tavily, pending
+  rule for Perplexity, never triggers Step 5.
 
 `PRESENT (userConfig only — pending MCP-visibility confirmation)` and the
 Perplexity form of `PRESENT (userConfig takes precedence — …; pending
@@ -765,8 +775,9 @@ seven — Context7, Grep, WarpGrep, DeepWiki, ast-grep, Parallel Task, Ceramic):
 
 If any key's status is exactly `ABSENT`, `FORMAT INVALID`, or `INVALID`, show
 this block. Match the whole status, not a substring: every
-`PRESENT (userConfig takes precedence — shell key probe: …)` status contains
-the word INVALID or ACTIVE but never triggers it.
+`PRESENT (userConfig takes precedence — shell key probe: …)` or
+`PRESENT (userConfig takes precedence — shell key format invalid)` status
+contains the word INVALID or ACTIVE but never triggers it.
 
 ```text
 To enable missing providers (recommended path, no restart required):
@@ -855,6 +866,7 @@ research), `Done`.
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
 | HTTP 401/403                             | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
 | HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale.               | Record per-provider |
+| Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |
 | HTTP 5xx                                 | "UNREACHABLE — API server error."                                                | Record per-provider |
 | ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured."             | Record, continue    |
