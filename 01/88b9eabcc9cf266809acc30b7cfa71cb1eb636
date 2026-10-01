@@ -29,7 +29,7 @@ plugins/yellow-review/tests/check-resolve-text.bats
   s_9802901455b679::t_2a8cc309842a86 124
   s_c22a55971bf452::t_d8ab67274d0936 112
   s_fc95207836202a::t_cbdd9147009bde 22,123,127
-  s_fc95207836202a::t_70fc0d71009b16 113-118,120-122,125-126,128-131
+  s_fc95207836202a::t_70fc0d71009b16 77,113-118,120-122,125-126,128-131
   s_9802901455b679::t_4122f706d67b73 119
 plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
   s_9802901455b679::t_8970bb3931ff1f 245-248
