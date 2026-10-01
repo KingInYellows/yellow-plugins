@@ -3,23 +3,21 @@
 ---
 
 Harden `/review:resolve` so every unresolved review thread ends in an honest,
-durable state. `pr-comment-resolver` now proposes a per-thread disposition
-(`fixed`, `addressed`, `oos`, `disagree`, `unclear`) and the command validates
-it against the contract in `references/resolve/dispositions.md` before writing
-anything. `/review:resolve` is wired to that contract and the resolve scripts:
-it replies to and resolves threads through `reply-pr-thread` and
-`resolve-pr-thread`, files follow-up issues for `oos` threads (GitHub by
-default, Linear when available), and leaves `disagree` and `unclear` threads
-open as blocking. Replies and follow-up issues carry an idempotency marker, so
-re-runs dedupe by marker on GitHub; Linear dedupe is best-effort and a rerun can
-still file a second issue if the first was not indexed before its reply failed.
-The command commits and pushes fixes as a new commit through the active
-stacked-PR provider.
+durable state. Each thread gets a disposition (`fixed`, `addressed`, `oos`,
+`disagree`, `unclear`) that the command validates against the contract in
+`references/resolve/dispositions.md` before writing anything; a thread is
+resolved only after its reply posts, and a `fixed` thread only after a
+verified push. Out-of-scope threads can file a follow-up issue (capped at 3
+per PR when unattended). Replies and issues carry an idempotency marker, so
+re-runs dedupe by marker on GitHub (Linear dedupe is best-effort, so a rerun can
+still file a second issue if the first was not indexed before its reply failed). The command commits and pushes fixes as a new
+commit through the active stacked-PR provider.
 
 The resolver no longer has a Bash tool; it reads and edits only inside the
-PR's changed lines. The command checks that local HEAD matches the PR head
-before it starts, and prints a final `Resolve:` contract line on every stop
-from the fetch onward.
+PR's changed lines (the single edit-bounds table is in
+`references/resolve/clusters.md`). The command checks that local HEAD matches
+the PR head before it starts, and every stop from the fetch onward prints a
+final `Resolve:` line.
 
 `resolve-pr-thread` now exits 3 for not-found or permission failures and 4 for
 rate limits; `commit-resolve-fixes` uses exits 2 to 6 for refusals and failed
@@ -43,5 +41,4 @@ commit instead of amending the previous one, and its last output line is the
 blocks (open threads, `CHANGES_REQUESTED`, a rate limit or a dirty-tree
 abort), stops and reverts (patch saved) when a PR leaves the tree dirty, and
 its summary table now has `blocking` and `issues` columns instead of
-`comments found`. `/review:sweep-all` gains a `Blocking` column. The
-`pr-comment-resolver` agent no longer has a Bash tool.
+`comments found`. `/review:sweep-all` gains a `Blocking` column.
