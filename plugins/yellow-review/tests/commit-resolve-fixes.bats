@@ -345,7 +345,7 @@ STUB
 
 @test "an unreadable PR file list refuses the commit (exit 3)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
-  export STUB_PR_DIFF_FAIL=1
+  export STUB_PR_FILES_FAIL=1
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 3 ]
 }
@@ -563,22 +563,53 @@ STUB
   grep -q '^node .* submit --remote other$' "$STUB_LOG"
 }
 
-@test "branch.<name>.remote is used when no push remote is configured" {
+@test "branch.<name>.remote alone is not passed on: the runtime refuses several remotes (exit 5)" {
   git remote rename origin upstream
   git remote add other "$BATS_TEST_TMPDIR/other.git"
   git config branch.feature.remote upstream
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
-  [ "$status" -eq 0 ]
-  grep -q '^node .* submit --remote upstream$' "$STUB_LOG"
+  [ "$status" -eq 5 ]
+  [[ "$stderr" == *"INVALID_ARGS"* ]]
+  grep -q '^node .* submit$' "$STUB_LOG"
 }
 
-@test "several remotes and no configuration fall back to origin" {
+@test "several remotes and no configuration leave the refusal to the runtime (exit 5)" {
   git remote add other "$BATS_TEST_TMPDIR/other.git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  grep -q '^node .* submit$' "$STUB_LOG"
+  ! grep -q -- '--remote' "$STUB_LOG"
+}
+
+@test "branch pushRemote with several remotes is passed explicitly" {
+  git remote add other "$BATS_TEST_TMPDIR/other.git"
+  git config branch.feature.pushRemote origin
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   grep -q '^node .* submit --remote origin$' "$STUB_LOG"
+}
+
+@test "graphite verifies against the remote gt repo remote names, not git's pushRemote" {
+  OTHER="$BATS_TEST_TMPDIR/other.git"
+  git init -q --bare -b main "$OTHER"
+  git remote add other "$OTHER"
+  git push -q other main feature 2>/dev/null
+  git config branch.feature.pushRemote origin
+  export STUB_GT_REMOTE=other ORIGIN_DIR="$OTHER"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+}
+
+@test "a gt repo remote that is not a configured remote falls back to git's choice" {
+  export STUB_GT_REMOTE=ghost
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
 }
 
 @test "a local upstream (.) with a sole remote uses that remote" {
@@ -596,4 +627,155 @@ STUB
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 2 ]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+# --- Listing failures after the commit undo it ---
+
+# A git shim in front of the real git that exits 128 for one diff invocation.
+git_shim_failing() {
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+$1
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+}
+
+@test "a failed staged-file listing exits 3 and unstages" {
+  git_shim_failing 'if [ "$1" = diff ] && [ "$2" = --cached ] && [ "$3" = --no-renames ] && [ "$4" = --name-only ]; then exit 128; fi'
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not list the staged files"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "a failed committed-file listing undoes the commit (exit 4)" {
+  # The two-revision diff of the new commit is the only 6-argument call.
+  git_shim_failing 'if [ "$1" = diff ] && [ "$2" = --no-renames ] && [ "$3" = --name-only ] && [ $# -eq 6 ] && [ "$6" != -- ]; then exit 128; fi'
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"could not list the committed files"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a failed tree listing after the commit is not read as clean (exit 4, undone)" {
+  # The post-commit hook arms the shim, so only the listing after the commit fails.
+  printf '#!/bin/sh\n: >| "%s/armed"\n' "$BATS_TEST_TMPDIR" >| .git/hooks/post-commit
+  chmod +x .git/hooks/post-commit
+  git_shim_failing "if [ -e \"$BATS_TEST_TMPDIR/armed\" ] && [ \"\$1\" = ls-files ]; then exit 128; fi"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"could not list tree changes"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+# --- Rename handling ---
+
+@test "a rename of listed files is committed as both paths under diff.renames" {
+  git config diff.renames true
+  # The PR deletes src/c.txt, so c.txt is a PR file; the resolver then moves
+  # src/a.txt onto it, which `git add` plus diff.renames reports as one rename.
+  git rm -q src/c.txt && git commit -q -m "feat: drop c"
+  git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  mv src/a.txt src/c.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/c.txt
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD^)" = "$base" ]
+  [ "$(git diff --no-renames --name-only "$base" HEAD | tr '\n' ' ')" = "src/a.txt src/c.txt " ]
+}
+
+# --- Network timeouts and diagnostics ---
+
+need_timeout_bin() {
+  command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || skip "no timeout command"
+}
+
+@test "a git ls-remote that exceeds the net timeout exits 6" {
+  need_timeout_bin
+  git_shim_failing 'if [ "$1" = ls-remote ]; then exec sleep 30; fi'
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export YELLOW_REVIEW_NET_TIMEOUT=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"ls-remote timed out after 1s"* ]]
+}
+
+@test "a gh pr view head poll that exceeds the net timeout exits 6" {
+  need_timeout_bin
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+case "$*" in
+  "pr view "*headRefOid*) exec sleep 30 ;;
+esac
+exec "$(dirname "$0")/gh.real" "$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export YELLOW_REVIEW_NET_TIMEOUT=1 YELLOW_REVIEW_VERIFY_BACKOFF="0"
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"gh pr view timed out after 1s"* ]]
+}
+
+@test "a PR file listing that exceeds the net timeout refuses the commit (exit 3)" {
+  need_timeout_bin
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+case "$1" in
+  api) exec sleep 30 ;;
+esac
+exec "$(dirname "$0")/gh.real" "$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export YELLOW_REVIEW_NET_TIMEOUT=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not list PR #7's changed files"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "the last gh error reaches the verify message with URL credentials masked" {
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+case "$*" in
+  "pr view "*headRefOid*)
+    echo "fatal: unable to access https://user:tok3n@example.com/o/r: connection reset" >&2
+    exit 1
+    ;;
+esac
+exec "$(dirname "$0")/gh.real" "$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"connection reset"* ]]
+  [[ "$stderr" != *"tok3n"* ]]
+}
+
+@test "without a timeout binary the run is unbounded and warns once" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'no timeout binary')" -eq 1 ]
+}
+
+@test "a NOOP run makes no network call and does not warn about timeouts" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  run_crf --provider graphite --pr 7 --message "$MSG" --
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"no timeout binary"* ]]
 }
