@@ -1,0 +1,19 @@
+plans/review-resolve-hardening.md
+  s_fc95207836202a::t_7c43f920a76f01 611,630-646,846
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "de97d028c67c90519694bbf222fc7d21afd42a45",
+  "prompts": {},
+  "sessions": {
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
