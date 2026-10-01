@@ -1,12 +1,10 @@
 # Resolve dispositions contract
 
-To be loaded by `/review:resolve` (`commands/review/resolve-pr.md`) and
-`pr-comment-resolver` (`agents/workflow/pr-comment-resolver.md`). Wiring both
-consumers to this contract lands in a later PR of this stack; until then neither
-references it and their current behavior is unchanged. The scripts under
-`skills/pr-review-workflow/scripts/` implement the mechanical parts. This file
-is the single source for how every unresolved review thread ends; once wired,
-the command and the agent point here instead of restating it.
+Loaded by `/review:resolve` (`commands/review/resolve-pr.md`) and
+`pr-comment-resolver` (`agents/workflow/pr-comment-resolver.md`). The
+scripts under `skills/pr-review-workflow/scripts/` implement the mechanical
+parts. This file is the single source for how every unresolved review thread
+ends; the command and the agent point here instead of restating it.
 
 GitHub thread state is the record. The review-findings ledger is not involved.
 
