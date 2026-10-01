@@ -350,11 +350,12 @@ Step 2 guarantees a clean start, so on any refusal — a change outside the
 set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify `skipped` — the
 orchestrator runs `run-verify-command --pr <N> --revert-dirty`, which saves
 a patch first. Exit 4 has already undone the commit and left its changes
-unstaged, so the revert only has to clear the tree. After exit 4 the
-orchestrator stops mutating (see Pacing). The interactive "push rejected"
+unstaged, so the revert only has to clear the tree; `fixed` threads become
+`unclear` and the write phase still runs for the other threads (exit 4 here
+is a refusal, not a rate limit). The interactive "push rejected"
 path is the only one that leaves edits in place. After exit 5 or 6 the
-commit exists locally: nothing is reverted, and the orchestrator resubmits
-through the provider instead of re-running the script.
+commit exists locally: nothing is reverted, `push=failed` is reported, and
+`fixed` threads become `unclear` until a later run publishes it.
 
 A refused set is a staged mismatch (exit 3): nothing is committed and every
 `fixed` thread becomes `unclear`.
@@ -457,12 +458,14 @@ Replies and issue bodies end with:
   `file-followup-issue` applies the same limit to every `gh` call through
   `lib/resolve-gh.sh` and exits 4 the same way; a timed-out create may have
   filed, and a re-run finds the issue by its marker.
-- After any exit 4, stop mutating. This includes `commit-resolve-fixes`
-  exit 4 (commit failed or undone), where the reason is not a rate limit.
-  Every remaining thread is reported as `not attempted (rate limit)` for a
-  rate limit, or as blocking with the script's reason otherwise. For a
-  timeout, the current thread's reply may have posted: re-run
-  `reply-pr-thread` for it once, and treat a `skipped` result as posted.
+- After an exit 4 from `reply-pr-thread`, `resolve-pr-thread` or
+  `file-followup-issue` (a rate limit or a timed-out `gh` call), stop
+  mutating. Every remaining thread is reported as `not attempted (rate
+  limit)` and counts as blocking. For a timeout, the current thread's reply
+  may have posted: re-run `reply-pr-thread` for it once, and treat a
+  `skipped` result as posted. `commit-resolve-fixes` exit 4 is not a rate
+  limit: it is handled as a refusal (see "Refusals revert") and does not
+  stop the write phase.
 
 ## Script exit codes
 
