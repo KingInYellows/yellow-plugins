@@ -125,3 +125,40 @@ a lesson.
   branch that is not yet merged.
 - Any solution doc that references the work that produced it, in a repository
   using Graphite, stacked PRs, squash merges, or any rebase-based workflow.
+
+---
+
+## Update — 2026-10-01
+
+### Finding 3: Claims About Code State Rot When the Code Ships
+
+PR #972 added seven auto-promoted solution docs. One review pass found four
+defects in them, all one kind: a claim about the state of code or tooling that
+was false when written or became false when the work shipped.
+
+- **Self-contradiction.** A runbook's closing sentence forbade running
+  `hooks reembed` while the MCP server was live. Step 3 of the same runbook did
+  exactly that, with writes quiesced and a restart afterwards.
+- **Plan-time doc read as current.** A constraints doc written while planning an
+  unshipped change said "Step 5 has no bash" and "`--single-pass` is a silent
+  no-op until an arm is added". By merge, Step 5 held bash fences, the flag had
+  an arm, and the fences were labelled `council-output:S<n>`.
+- **Stale claim inside a warning about stale claims.** A checklist item said a
+  validator's header comment listed only one provider group, but the file
+  already listed two.
+- **Phantom tool.** A doc told readers to run a check "that Gate C enforces",
+  naming a tool absent from the repo, with no pointer to where it lives and no
+  command to run in its place.
+
+**Rules:**
+
+- Mark a doc written before the implementation ships as plan-time in its Context
+  and reconcile it before the implementing PR merges. Otherwise phrase the
+  lesson as an invariant the code enforces, not as "currently X" or "has no Y".
+- Before saving, check every "currently / only / no X / the header says" claim
+  against the file with `rg`, and re-read the closing sentence against the
+  numbered steps above it.
+- Name a tool by where it lives, or substitute the underlying command. Here that
+  command is `git merge-base --is-ancestor "$SQUASH_SHA" origin/main`.
+- Treat state claims in compound-staging entries as unverified. They are written
+  from one moment of a session transcript, with no check against the tree.
