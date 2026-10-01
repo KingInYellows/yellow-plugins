@@ -1,0 +1,19 @@
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_3a67c5309460ff::t_582457a7b264f9 108-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "736b56fb6b678e5344ef6e3e681134eb502c53f9",
+  "prompts": {},
+  "sessions": {
+    "s_3a67c5309460ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf180525-44ba-4076-9ae7-0a9ec39ef387",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
