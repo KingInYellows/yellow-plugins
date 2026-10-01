@@ -1,0 +1,27 @@
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_5667e810256031::t_ef55a2c2c28db0 6-7,15-17,29-46,56-76,78-87
+docs/solutions/code-quality/scripts-validate-provider-groups-js-checks-each-co.md
+  s_5667e810256031::t_58f38da95731f1 2,8,12,16-34
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_5667e810256031::t_59be977e000cac 46-47
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_5667e810256031::t_5208f1910f29a1 44-45
+docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md
+  s_5667e810256031::t_cd4e4ad6de85f5 15-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7559b101ba0f08f83bf950aeff0f65fbe9b3ceca",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
