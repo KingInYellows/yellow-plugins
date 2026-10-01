@@ -81,7 +81,7 @@ run_crf() {
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
-  grep -q '^node .*github-stack-runtime.js submit$' "$STUB_LOG"
+  grep -q '^node .*github-stack-runtime.js submit --remote origin$' "$STUB_LOG"
   ! grep -q '^gt ' "$STUB_LOG"
 }
 
@@ -238,7 +238,7 @@ run_crf() {
   run --separate-stderr "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts/commit-resolve-fixes" \
     --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
-  grep -q "^node .*github-workflow/2.10.0/lib/github-stack-runtime.js submit$" "$STUB_LOG"
+  grep -q "^node .*github-workflow/2.10.0/lib/github-stack-runtime.js submit --remote origin$" "$STUB_LOG"
 }
 
 @test "gt and hooks do not inherit literal-pathspec mode" {
@@ -321,6 +321,20 @@ run_crf() {
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+}
+
+@test "submit and verification use the same remote when pushDefault and pushRemote differ" {
+  OTHER="$BATS_TEST_TMPDIR/other.git"
+  git init -q --bare -b main "$OTHER"
+  git remote add other "$OTHER"
+  git config remote.pushDefault other
+  git config branch.feature.pushRemote origin
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+  grep -q '^node .* submit --remote origin$' "$STUB_LOG"
+  [ "$(git --git-dir="$OTHER" rev-parse -q --verify refs/heads/feature || true)" = "" ]
 }
 
 @test "a missing github runtime fails before committing (exit 2)" {

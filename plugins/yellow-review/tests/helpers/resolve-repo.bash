@@ -86,6 +86,12 @@ if [ "${STUB_SUBMIT_FAIL:-0}" = 1 ]; then
   printf '{"status":"PUSH_REJECTED","recoveryAction":"sync first"}\n'
   exit 0
 fi
+# Publish to the remote named by --remote, as the real runtime would.
+prev=""
+for a in "$@"; do
+  [ "$prev" = "--remote" ] && ORIGIN_DIR=$(git remote get-url "$a") && export ORIGIN_DIR
+  prev="$a"
+done
 publish >/dev/null 2>&1
 printf '{"status":"SUCCESS"}\n'
 STUB
