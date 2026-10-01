@@ -228,7 +228,7 @@ Decisions from the brainstorm and the planning round:
     replies.
 - [x] 1.2: Extend `skills/pr-review-workflow/scripts/get-pr-comments`.
   - Add an `--include-outdated` flag, which drops only the `isOutdated ==
-    false` clause at line 195. The default filter is unchanged.
+    false` clause in the thread filter. The default filter is unchanged.
   - Add these fields to each thread: `isOutdated`, `viewerCanResolve`,
     `viewerCanReply`.
   - Add these fields to each comment: `id`, `createdAt`, `viewerDidAuthor`,
@@ -238,8 +238,9 @@ Decisions from the brainstorm and the planning round:
     introspection.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Confirmed. The filter is at `get-pr-comments:195`. The query
-> already selects `isOutdated` (`:61`) but does not output it. The existing bats
+> **Codebase:** Confirmed. The filter is at `get-pr-comments:217` (line numbers
+> refreshed against this PR's HEAD, after the new fields shifted them). The query
+> already selects `isOutdated` (`:76`) but does not output it. The existing bats
 > tests assert thread IDs and values, not exact key sets, so the new fields are
 > safe.
 >
@@ -568,14 +569,14 @@ Decisions from the brainstorm and the planning round:
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Confirmed. Every other `gh issue create` in the repo is gated
-> (`test-reporter.md:106`, "NEVER create GitHub issues without user
+> (`test-reporter.md:122`, "NEVER create GitHub issues without user
 > confirmation") or appears only in prose (`flow/plan.md:575-594`).
 <!-- /deepen-plan -->
 
 ### Phase 4: Docs, release, follow-ups
 
 - [ ] 4.1: `plugins/yellow-review/CLAUDE.md`:
-  - Scripts heading: 3 → 7, with one line per script.
+  - Scripts heading: 3 → 9, with one line per script (see the note below).
   - `get-pr-comments` wording.
   - The Testing section lists the new bats files.
   - The `/review:resolve` and "Exceptions" gate lists.
@@ -583,10 +584,13 @@ Decisions from the brainstorm and the planning round:
     for late comments.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Correction: the scripts count goes from 3 to **8**, not 7 (3
-> existing plus `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue`,
-> `commit-resolve-fixes`, `run-verify-command`). `plugins/yellow-review/CLAUDE.md:167`
-> has `### Scripts (3)`. `validate-doc-counts.js` checks only root docs, so no
+> **Codebase:** Correction: the scripts count goes from 3 to **9**, not 7 or 8
+> (3 existing: `get-pr-comments`, `resolve-pr-thread`, `file-line-counts`; plus
+> `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue`,
+> `check-resolve-text`, `commit-resolve-fixes`, `run-verify-command`).
+> `check-resolve-text` already ships, so `plugins/yellow-review/CLAUDE.md:167`
+> reads `### Scripts (7)` today; the heading reaches 9 only once
+> `commit-resolve-fixes` and `run-verify-command` land. `validate-doc-counts.js` checks only root docs, so no
 > validator will catch this.
 <!-- /deepen-plan -->
 - [ ] 4.2: `plugins/yellow-review/README.md`: the command table and the

@@ -37,7 +37,7 @@
               "id": "PRRT_thread2",
               "isResolved": true,
               "isOutdated": false,
-              "viewerCanResolve": true,
+              "viewerCanResolve": false,
               "viewerCanReply": true,
               "path": "src/utils.ts",
               "line": 10,
