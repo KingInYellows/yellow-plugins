@@ -58,7 +58,8 @@ setup() {
   run "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 2 ]
   [[ "$output" == *"limit is 1000"* ]]
-  [ ! -f "$CALLS" ]
+  # The mock logs every gh invocation, so this proves gh never ran at all.
+  [ ! -f "${BATS_TEST_TMPDIR}/mock_gh_any_call" ]
 }
 
 @test "counts characters, not bytes, for the size cap" {
@@ -113,6 +114,16 @@ setup() {
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"credential"* ]]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a scanner failure refuses to post, before any API call" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"could not be scanned"* ]]
   [ ! -f "$CALLS" ]
 }
 

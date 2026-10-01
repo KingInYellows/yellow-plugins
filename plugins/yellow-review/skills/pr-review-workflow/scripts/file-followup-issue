@@ -6,8 +6,9 @@
 # Output: JSON to stdout: {"number":N,"url":"...","created":true|false}
 #   created=false means an issue the viewer authored already carries this
 #   thread's marker (dedupe hit); no new issue is filed.
-# Exit codes: 1 gh failure, 2 usage or text that looks like a credential,
-#             4 rate limited (no retry here; the caller stops mutating).
+# Exit codes: 1 gh failure or a full dedupe window with no match, 2 usage or
+#             text that looks like a credential (or cannot be scanned), 4 rate
+#             limited (no retry here; the caller stops mutating).
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -65,8 +66,8 @@ fi
 
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
-if rt_looks_secret "$TITLE_FILE" || rt_looks_secret "$BODY_FILE"; then
-    printf 'Error: Issue text looks like it contains a credential; refusing to file it.\n' >&2
+if ! rt_text_clean "$TITLE_FILE" || ! rt_text_clean "$BODY_FILE"; then
+    printf 'Error: Issue text looks like it contains a credential, or could not be scanned; refusing to file it.\n' >&2
     exit 2
 fi
 
@@ -107,20 +108,22 @@ MARKER_PREFIX="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition="
 # users' issues cannot push ours out of the window.
 gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
     --json number,url,body,author >"$WORK_DIR/issues.json" 2>"$ERR" || gh_fail 'issue list'
-if [ "$(jq 'length' "$WORK_DIR/issues.json")" -ge "$LIST_LIMIT" ]; then
-    printf '[file-followup-issue] Warning: %s or more of your issues exist; dedupe only scanned the newest %s.\n' \
-        "$LIST_LIMIT" "$LIST_LIMIT" >&2
-fi
-
-EXISTING=$(jq -c --arg viewer "$VIEWER" --arg prefix "$MARKER_PREFIX" '
+EXISTING=$(jq -c --arg viewer "$VIEWER" --arg marker "${MARKER_PREFIX}oos -->" '
     [ .[]
       | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
-      | select((.body // "") | contains($prefix)) ]
+      | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
     | sort_by(.number) | first // empty
     | {number, url, created: false}' "$WORK_DIR/issues.json")
 if [ -n "$EXISTING" ]; then
     printf '%s\n' "$EXISTING"
     exit 0
+fi
+# No match in a full window: an older issue may carry the marker, so filing
+# now could duplicate it. Fail closed and let the caller leave the thread open.
+if [ "$(jq 'length' "$WORK_DIR/issues.json")" -ge "$LIST_LIMIT" ]; then
+    printf 'Error: %s or more of your issues exist and none carries this thread marker; refusing to file a possible duplicate.\n' \
+        "$LIST_LIMIT" >&2
+    exit 1
 fi
 
 # --- Link back to the thread (first comment URL; PR URL as a fallback) ---
@@ -148,6 +151,27 @@ URL=$(printf '%s\n' "$URL" | grep -E '^https://[^ ]+/issues/[0-9]+$' | tail -n 1
 if [ -z "$URL" ]; then
     printf 'Error: issue create returned no issue URL.\n' >&2
     exit 1
+fi
+
+# The dedupe scan and the create are not atomic. Re-scan after creating: if a
+# concurrent run filed first, the lowest-numbered marker issue wins; close ours
+# as a duplicate (best effort) and report the winner.
+MY_NUMBER=${URL##*/}
+if gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
+        --json number,url,body,author >"$WORK_DIR/issues-after.json" 2>"$ERR"; then
+    WINNER=$(jq -c --arg viewer "$VIEWER" --arg prefix "$MARKER_PREFIX" '
+        [ .[]
+          | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
+          | select((.body // "") | contains($prefix)) ]
+        | sort_by(.number) | first // empty
+        | {number, url, created: false}' "$WORK_DIR/issues-after.json" 2>/dev/null || true)
+    if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
+        gh issue close "$URL" --reason 'not planned' \
+            --comment "Duplicate of #$(printf '%s\n' "$WINNER" | jq -r '.number'), filed concurrently for the same review thread." \
+            >/dev/null 2>&1 || true
+        printf '%s\n' "$WINNER"
+        exit 0
+    fi
 fi
 
 jq -nc --arg url "$URL" '{number: ($url | sub(".*/issues/"; "") | tonumber), url: $url, created: true}'

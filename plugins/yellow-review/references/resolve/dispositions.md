@@ -360,12 +360,12 @@ Exit 1 is always "other failure" (network, unexpected response).
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reply-pr-thread` | replied or skipped | usage / body too long / credential | not found or permission | rate limited | — | — |
+| `reply-pr-thread` | replied or skipped | usage / body too long / credential or scan failure | not found or permission | rate limited | — | — |
 | `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage / credential | — | rate limited (no retry) | — | — |
+| `file-followup-issue` | created or found | usage / credential or scan failure | — | rate limited (no retry) | — | — |
 | `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
-| `check-resolve-text` | clean | usage / credential | — | — | — | — |
+| `check-resolve-text` | clean | usage / credential or scan failure | — | — | — | — |
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
 `unknown` fields mean the lookup failed.
@@ -396,8 +396,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 
 ## Known limits
 
-- Issue dedupe scans the newest 200 issues the viewer authored and warns
-  when there are more.
+- Issue dedupe scans the newest 200 issues the viewer authored. When that
+  window is full and holds no marker for the thread, `file-followup-issue`
+  exits 1 rather than risk a duplicate, and the thread stays open.
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
   definition files are refused, but the code the hooks run is not. How

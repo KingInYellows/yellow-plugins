@@ -11,6 +11,9 @@ ALL_ARGS="$*"
 # State file for multi-page pagination (tracks call count per PR)
 PAGE_STATE_DIR="${BATS_TEST_TMPDIR:-/tmp}"
 
+# Record that gh was invoked at all, so tests can prove "no API call".
+printf '%s\n' "$ALL_ARGS" >> "${PAGE_STATE_DIR}/mock_gh_any_call"
+
 # Emulate `gh api --jq <expr>`: print the value after --jq, if any.
 jq_expr() {
   _want=0
@@ -69,6 +72,11 @@ case "$ALL_ARGS" in
     ;;
   "issue list "*)
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
+    if [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ]; then
+      # A full 200-issue window with no marker for the requested thread.
+      jq -n '[range(0; 200) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]'
+      exit 0
+    fi
     cat "$FIXTURE_DIR/issue-list-response.json"
     exit 0
     ;;
@@ -142,10 +150,10 @@ case "$ALL_ARGS" in
         if [ "$limited" = 1 ]; then
           MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
           case "$ALL_ARGS" in
-            *"PRRT_reply_rl2"*) http "HTTP/2.0 403 Forbidden" "" ;;
-            *) http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0" ;;
+            *"PRRT_reply_rl2"*) _status=403; http "HTTP/2.0 403 Forbidden" "" ;;
+            *) _status=429; http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0" ;;
           esac
-          printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP %s)\n' "$_status" >&2
           exit 1
         fi
         ;;
@@ -185,7 +193,7 @@ case "$ALL_ARGS" in
       enabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":true}}'; emit "$@" ;;
       disabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":false}}'; emit "$@" ;;
       notprotected)
-        printf '{"message":"Branch not protected"}gh: Branch not protected (HTTP 404)\n' >&2
+        printf 'gh: Branch not protected (HTTP 404)\n' >&2
         exit 1
         ;;
       403) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;

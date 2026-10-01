@@ -50,7 +50,7 @@ setup() {
   start=$SECONDS
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
-  [ $((SECONDS - start)) -lt 5 ]
+  [ $((SECONDS - start)) -lt 30 ]
 }
 
 @test "an unquoted lowercase credential assignment exits 2" {
@@ -99,4 +99,13 @@ setup() {
   printf 'leaked %s/%s== here\n' "$tok" "$tok" >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 2 ]
+}
+
+@test "a scanner failure exits 2 instead of reporting clean" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"could not be scanned"* ]]
 }

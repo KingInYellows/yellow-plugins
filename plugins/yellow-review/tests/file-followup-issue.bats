@@ -9,7 +9,7 @@ SCRIPT="${SCRIPT_DIR}/file-followup-issue"
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
-  unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL
+  unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL MOCK_GH_ISSUE_LIST_FULL
   TITLE="${BATS_TEST_TMPDIR}/title.txt"
   BODY="${BATS_TEST_TMPDIR}/body.txt"
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
@@ -110,4 +110,22 @@ setup() {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 4 ]
   [[ "$stderr" == *"rate limit"* ]]
+}
+
+@test "a full dedupe window with no marker fails closed and creates nothing" {
+  export MOCK_GH_ISSUE_LIST_FULL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"refusing to file a possible duplicate"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a scanner failure refuses to file instead of passing the text through" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"could not be scanned"* ]]
+  [ ! -e "$CREATES" ]
 }

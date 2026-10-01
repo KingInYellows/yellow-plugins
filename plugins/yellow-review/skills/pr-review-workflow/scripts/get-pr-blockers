@@ -41,7 +41,7 @@ if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
-ERR_FILE=$(mktemp) || { note 'mktemp failed; blockers unknown'; unknown_json; exit 0; }
+ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/get-pr-blockers.XXXXXX") || { note 'mktemp failed; blockers unknown'; unknown_json; exit 0; }
 trap 'rm -f "$ERR_FILE"' EXIT
 
 # --- Reviews and base branch (GraphQL) ---

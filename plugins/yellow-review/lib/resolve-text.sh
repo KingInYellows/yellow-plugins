@@ -7,7 +7,18 @@
 # The awk avoids {n,} intervals, which mawk does not support.
 # shellcheck shell=sh
 
-# rt_looks_secret <file>: exit 0 when the file contains a credential shape.
+# rt_text_clean <file>: exit 0 only when the scan ran and found no credential
+# shape. A credential hit, a scanner failure (awk missing or erroring) and an
+# unreadable file all return non-zero, so a caller that refuses on non-zero
+# fails closed instead of posting unscanned text.
+rt_text_clean() {
+    rt_looks_secret "$1"
+    [ "$?" -eq 1 ]
+}
+
+# rt_looks_secret <file>: awk exit status. 0 means the file contains a
+# credential shape, 1 means clean, anything else means the scan itself failed;
+# use rt_text_clean unless the distinction matters.
 rt_looks_secret() {
     awk '
         BEGIN {
@@ -17,7 +28,7 @@ rt_looks_secret() {
             ph = ph " masked hidden default missing invalid expired empty bearer"
             ph = ph " options config value values bytes buffer promise function "
         }
-        /-----BEGIN [A-Z ]*PRIVATE KEY-----/ { hit = 1 }
+        toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { hit = 1 }
         # NAME_KEY=value with a literal-looking value (8+ token characters,
         # so `API_KEY = process.env.API_KEY` in code does not match).
         /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { hit = 1 }
@@ -41,6 +52,23 @@ rt_looks_secret() {
                 # All-letter literal (`password: hunter`): flag unless it is a
                 # known type or prose placeholder.
                 else if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) hit = 1
+                # Separated lowercase literal (`password: correct-horse-battery`):
+                # flag unless every part is a placeholder word.
+                else if (seg ~ /^[a-z]+([-_\/][a-z]+)+$/) {
+                    np = split(seg, parts, /[-_\/]/)
+                    allph = 1
+                    for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
+                    if (!allph) hit = 1
+                }
+            }
+            # Authorization header or Bearer/Basic scheme with an opaque
+            # token of 20+ characters; `Authorization: none` stays clean.
+            r = l
+            while (match(r, /(authorization[ \t]*[=:][ \t]*([a-z]+[ \t]+)?|(bearer|basic)[ \t]+)[a-z0-9._~+\/=-]+/)) {
+                seg = substr(r, RSTART, RLENGTH)
+                r = substr(r, RSTART + RLENGTH)
+                sub(/^.*[ \t=:]/, "", seg)
+                if (length(seg) >= 20) hit = 1
             }
             # split() keeps this linear on very long (minified) lines.
             n = split($0, ws, /[^A-Za-z0-9+\/_=-]+/)
@@ -53,14 +81,25 @@ rt_looks_secret() {
                 if (w ~ /^AKIA[0-9A-Z]/ && m >= 20) hit = 1
                 if (w ~ /^xox[abprs]-/ && m >= 14) hit = 1
                 if (w ~ /^sk-/ && m >= 23) hit = 1
+                if (w ~ /^(sk|rk|pk)_live_/ && m >= 24) hit = 1
                 # A long mixed-case token with a digit looks like a key, but
                 # URLs and file paths are too and are routine in replies.
-                # Exempt slash-bearing tokens without base64 `+` or `=`.
+                # Exempt only a path-shaped token: 2+ slashes, no base64 `+`
+                # or `=`, and every segment short or hyphen-separated words.
                 if (m >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) {
-                    if (!(w ~ /\// && w !~ /[+=]/)) hit = 1
+                    pathlike = 0
+                    if (w !~ /[+=]/) {
+                        ns = split(w, segs, "/")
+                        if (ns >= 3) {
+                            pathlike = 1
+                            for (j = 1; j <= ns; j++)
+                                if (length(segs[j]) > 24 && segs[j] !~ /-/) pathlike = 0
+                        }
+                    }
+                    if (!pathlike) hit = 1
                 }
             }
         }
         END { exit hit ? 0 : 1 }
-    ' "$1"
+    ' < "$1"
 }

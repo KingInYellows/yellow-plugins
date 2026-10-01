@@ -58,8 +58,8 @@ if [ "$BODY_CHARS" -gt "$MAX_BODY_CHARS" ]; then
 fi
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
-if rt_looks_secret "$BODY_FILE"; then
-    printf 'Error: Reply body looks like it contains a credential; refusing to post it.\n' >&2
+if ! rt_text_clean "$BODY_FILE"; then
+    printf 'Error: Reply body looks like it contains a credential, or could not be scanned; refusing to post it.\n' >&2
     exit 2
 fi
 
@@ -131,7 +131,7 @@ RETRIED=0
 call_with_retry() {
     _label="$1"; shift
     while :; do
-        if gh_graphql "$@" && ! jq -e '.errors | length > 0' "$RESP" >/dev/null 2>&1; then
+        if gh_graphql "$@" && jq -e '(.errors // []) | length == 0' "$RESP" >/dev/null 2>&1; then
             return 0
         fi
         if is_rate_limited; then
@@ -192,7 +192,9 @@ mutation ReplyToThread($threadId: ID!, $body: String!) {
   }
 }'
 call_with_retry reply -f threadId="$THREAD_ID" -F "body=@$POST_BODY" -f query="$MUTATION"
-sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+# The reply is already posted: a bad pacing value must not fail the script,
+# or a retry would post a duplicate.
+sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}" 2>/dev/null || true
 
 COMMENT_ID=$(jq -r '.data.addPullRequestReviewThreadReply.comment.id // empty' "$RESP")
 if [ -z "$COMMENT_ID" ]; then

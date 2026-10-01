@@ -16,12 +16,12 @@ if [ $# -lt 1 ]; then
 fi
 
 # shellcheck source=../../../lib/resolve-text.sh
-. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+. "$(dirname "$0")/../../../lib/resolve-text.sh"
 
 for f in "$@"; do
     [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 1; }
-    if rt_looks_secret "$f"; then
-        printf 'Error: %s looks like it contains a credential.\n' "$f" >&2
+    if ! rt_text_clean "$f"; then
+        printf 'Error: %s looks like it contains a credential, or could not be scanned.\n' "$f" >&2
         exit 2
     fi
 done
