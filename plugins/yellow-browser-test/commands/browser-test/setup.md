@@ -49,41 +49,41 @@ back to `.` here) — keep the two in sync when either changes:
 
 ```bash
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-signals=""
+web_signals=""
 if [ -f "$repo_top/package.json" ] && \
    grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
-  signals="$signals node"
+  web_signals="$web_signals node"
 fi
 if [ -f "$repo_top/Gemfile" ] && \
    grep -qE "^[[:space:]]*gem[[:space:]]+['\"]rails['\"]" "$repo_top/Gemfile" 2>/dev/null; then
-  signals="$signals rails"
+  web_signals="$web_signals rails"
 fi
 for f in "$repo_top/requirements.txt" "$repo_top/pyproject.toml"; do
   if [ -f "$f" ] && grep -qiE "(django|flask|fastapi|starlette|sanic)" "$f" 2>/dev/null; then
-    signals="$signals python"
+    web_signals="$web_signals python"
     break
   fi
 done
 if [ -f "$repo_top/go.mod" ] && \
    grep -qE "(gin-gonic|labstack/echo|gofiber/fiber|go-chi/chi|gorilla/mux)" "$repo_top/go.mod" 2>/dev/null; then
-  signals="$signals go"
+  web_signals="$web_signals go"
 fi
 if [ -f "$repo_top/Cargo.toml" ] && \
-   grep -qE "^(axum|actix-web|rocket|warp)[[:space:]]*=" "$repo_top/Cargo.toml" 2>/dev/null; then
-  signals="$signals rust"
+   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*$|[[:space:]]*=)|package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
+  web_signals="$web_signals rust"
 fi
 for f in fly.toml render.yaml vercel.json netlify.toml; do
   if [ -f "$repo_top/$f" ]; then
-    signals="$signals paas($f)"
+    web_signals="$web_signals paas($f)"
     break
   fi
 done
 if [ -f "$repo_top/docker-compose.yml" ] && \
    grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/docker-compose.yml" 2>/dev/null; then
-  signals="$signals docker_http"
+  web_signals="$web_signals docker_http"
 fi
-if [ -n "$signals" ]; then
-  printf 'is_web: true (signals:%s; checked: %s)\n' "$signals" "$repo_top"
+if [ -n "$web_signals" ]; then
+  printf 'is_web: true (signals:%s; checked: %s)\n' "$web_signals" "$repo_top"
 else
   printf 'is_web: false (checked: %s)\n' "$repo_top"
 fi

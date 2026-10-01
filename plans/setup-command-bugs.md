@@ -50,7 +50,7 @@ Decisions (from SpecFlow review):
 <!-- /deepen-plan -->
 
 - [x] 2.3: `skills/research-patterns/SKILL.md` — rewrite "API Key Setup" (:117-120) and the power-user paragraph (:145-147) to match README/CLAUDE.md: userConfig first, shell env fallback.
-- [x] 2.4: Run `rg -n 'MCP WILL FAIL|reads userConfig, not shell env|NOT shell env|no longer wired into|no longer reads' plugins docs --glob '!docs/solutions/**'` and expect no stale hits.
+- [x] 2.4: Run `rg -n 'MCP WILL FAIL|reads userConfig, not shell env|NOT shell env|no longer wired into|no longer reads' plugins docs --glob '!docs/solutions/**' --glob '!**/CHANGELOG.md'` and expect no stale hits. CHANGELOG history is excluded: its "no longer reads `composio_mcp_url`" entries are unrelated to the research shell-env claims.
 
 ### Phase 3: browser-test web detection
 
@@ -83,7 +83,7 @@ Decisions (from SpecFlow review):
 ## Acceptance Criteria
 
 - All 9 `has_userconfig` copies keep `1|4) ;;` and `has-userconfig.bats` passes.
-- The Phase 2.4 grep returns nothing, and `/research:setup` prints no "WILL FAIL" for a shell-env-only key.
+- The Phase 2.4 grep (which excludes `CHANGELOG.md` history) returns nothing, and `/research:setup` prints no "WILL FAIL" for a shell-env-only key.
 - `/browser-test:setup` Step 2.5 reports `is_web: true` for FastAPI, Rails, Go, Rust and PaaS-config repos, including outside a git repo.
 - Validators in 4.1 pass; both changesets are present.
 
