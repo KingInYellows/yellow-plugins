@@ -226,6 +226,27 @@ has_kill_after() {
   rm -f -- "$victim"
 }
 
+@test "a failed tree listing exits 2 and neither runs nor reverts anything" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --others ] && exit 1; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot list tree changes"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  PATH="$shim:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot list tree changes"* ]]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
 @test "--revert-dirty takes no file list" {
   run "$SCRIPT" --pr 7 --revert-dirty -- src/a.txt
   [ "$status" -eq 2 ]

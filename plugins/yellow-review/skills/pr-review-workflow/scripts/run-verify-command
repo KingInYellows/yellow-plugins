@@ -86,17 +86,28 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
 
-# Every change in the tree, as git lists it (tracked, staged or untracked).
-tree_changes() {
+CHANGES_FILE=""
+trap '[ -z "$CHANGES_FILE" ] || rm -f -- "$CHANGES_FILE"' EXIT
+
+# Every change in the tree, as git lists it (tracked or staged, then
+# untracked; the two sets are disjoint), NUL-delimited so a newline in a
+# filename cannot forge a second path. Written to a 0600 temp file with every
+# status checked: a listing failure must stop the run, never read as "clean".
+list_tree_changes() {
+    CHANGES_FILE=$(mktemp) || return 1
     { git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
-        | LC_ALL=C sort -zu
+        >"$CHANGES_FILE" 2>/dev/null
 }
+
+if [ "$REVERT_DIRTY" = 1 ] || [ "$REVERT_ONLY" = 0 ]; then
+    list_tree_changes || die 2 "cannot list tree changes"
+fi
 
 if [ "$REVERT_DIRTY" = 1 ]; then
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
     while IFS= read -r -d '' f; do
         [ -n "$f" ] && FILES+=("$f")
-    done < <(tree_changes)
+    done <"$CHANGES_FILE"
 fi
 
 for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -120,7 +131,7 @@ if [ "$REVERT_ONLY" = 0 ]; then
             [ "$d" = "$f" ] && { found=1; break; }
         done
         [ "$found" = 1 ] || die 2 "change outside the listed files: $d"
-    done < <(tree_changes)
+    done <"$CHANGES_FILE"
 fi
 
 # Whenever a command will run, never execute files outside the PR (the
@@ -323,7 +334,7 @@ fi
 # the patch and still revert, so the secret leaves the disk. The resolver's
 # edit is regenerable; the credential must not persist under .git.
 ADDED_PATCH=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f -- "$ADDED_PATCH"' EXIT
+trap 'rm -f -- "$ADDED_PATCH"; [ -z "$CHANGES_FILE" ] || rm -f -- "$CHANGES_FILE"' EXIT
 awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' "$PATCH" >"$ADDED_PATCH" \
     || { rm -f -- "$PATCH"; die 2 "cannot screen the recovery patch"; }
 if rt_looks_secret "$ADDED_PATCH"; then

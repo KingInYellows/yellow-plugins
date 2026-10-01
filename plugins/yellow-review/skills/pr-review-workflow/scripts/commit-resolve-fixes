@@ -217,6 +217,28 @@ if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
     undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
 fi
 
+# --- Resolve the remote once ---
+# Submit and verification must agree on one remote. The github runtime is given
+# it explicitly (its own default would pick remote.pushDefault over a
+# branch-specific pushRemote); gt submit pushes to the branch's configured
+# remote, which this precedence mirrors.
+REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
+    || git config --get remote.pushDefault 2>/dev/null \
+    || git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+# "." means a local upstream (common for stacked branches). With nothing
+# configured, the providers accept a sole remote whatever its name, so use that
+# one; otherwise origin.
+case "$REMOTE_NAME" in
+    ''|.)
+        REMOTES=$(git remote 2>/dev/null || true)
+        if [ -n "$REMOTES" ] && [ "$(printf '%s\n' "$REMOTES" | wc -l)" -eq 1 ]; then
+            REMOTE_NAME="$REMOTES"
+        else
+            REMOTE_NAME=origin
+        fi
+        ;;
+esac
+
 # --- Submit ---
 case "$PROVIDER" in
     graphite)
@@ -226,7 +248,7 @@ case "$PROVIDER" in
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
-        OUT=$(node "$RUNTIME" submit) || die 5 "github-stack-runtime submit crashed"
+        OUT=$(node "$RUNTIME" submit --remote "$REMOTE_NAME") || die 5 "github-stack-runtime submit crashed"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then
             printf '%s\n' "$OUT" >&2
@@ -238,22 +260,6 @@ esac
 # --- Verify the published head ---
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
-REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
-    || git config --get remote.pushDefault 2>/dev/null \
-    || git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-# "." means a local upstream (common for stacked branches). With nothing
-# configured, the providers accept a sole remote whatever its name (the github
-# runtime passes no --remote then), so check that one; otherwise origin.
-case "$REMOTE_NAME" in
-    ''|.)
-        REMOTES=$(git remote 2>/dev/null || true)
-        if [ -n "$REMOTES" ] && [ "$(printf '%s\n' "$REMOTES" | wc -l)" -eq 1 ]; then
-            REMOTE_NAME="$REMOTES"
-        else
-            REMOTE_NAME=origin
-        fi
-        ;;
-esac
 REMOTE=$(git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
 [ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
 PR_HEAD=""
