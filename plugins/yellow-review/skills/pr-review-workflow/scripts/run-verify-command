@@ -207,7 +207,7 @@ on_signal() {
 # and SIGNALED.
 run_verify() {
     local cmd T start
-    cmd=$(cat -- "$COMMAND_FILE")
+    cmd=$(cat -- "$COMMAND_FILE") || die 2 "cannot read --command-file: $COMMAND_FILE"
     FIFO="$OUT_DIR/.$STAMP.fifo"
     MARKER="$OUT_DIR/.$STAMP.timed-out"
     rm -f -- "$MARKER"
@@ -252,12 +252,49 @@ run_verify() {
         [ "$TIMED_OUT" = 1 ] || kill -s TERM -- "-$WD_PID" 2>/dev/null
         wait "$WD_PID" 2>/dev/null
     fi
-    # Anything the command left running in its group holds the log open.
+    # Stop anything the command left running in its group, even a process that
+    # redirected its output away from the FIFO: it must not outlive the
+    # cleanliness check and race the commit that follows.
+    vr_stop_group "$CMD_PID" "$KILL_AFTER"
+    # Anything in another session can still hold the log open.
     vr_drain_log "$TAIL_PID" "$CMD_PID" "$LOG"
+    # The command is done: a later signal must not turn a pass into a fail.
+    trap '' TERM HUP INT
     return 0
 }
 
+# Save the resolver diff before the command runs: a verifier that rewrites or
+# deletes a listed file and then fails must not change what the recovery patch
+# holds, because the revert below discards the tree. Every git call must
+# succeed, or the revert would destroy edits the patch does not hold.
+# `git diff --no-index` exits 1 when files differ. A file is a tracked edit
+# when it is in the index or in HEAD (a staged deletion is in HEAD only).
+# <fmt> is --binary for the kept patch and --text for the credential screen:
+# a binary-marked file still hides text a --binary patch would keep.
+save_patch() {
+    local out="$1" fmt="$2" f rc
+    umask 077
+    : >"$out" || return 1
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        # Fixed flags so the patch re-applies whatever the user's diff config.
+        if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+            || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            lgit diff --no-color --no-ext-diff --no-textconv "$fmt" \
+                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+        elif [ -e "$f" ] || [ -L "$f" ]; then
+            # -L: a dangling symlink has no -e but is still an edit to keep.
+            rc=0
+            git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
+            [ "$rc" -le 1 ] || return 1
+        fi
+    done
+}
+TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
+SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 if [ "$MODE" = run ]; then
+    (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
+    (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
     run_verify
 fi
 
@@ -282,6 +319,7 @@ if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNAL
     jq -nc --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
         '{result: "pass", patch: null, log: $log, treeClean: $clean}
          + (if $why == "" then {} else {reason: $why} end)'
+    rm -f -- "$PATCH" "$TEXT_FILE"
     exit 0
 fi
 
@@ -294,33 +332,16 @@ RESULT=fail
 trap '' TERM HUP INT
 
 # --- Save the resolver diff (tracked and untracked listed files) ---
-# Every git call must succeed, or the revert below would destroy edits the
-# patch does not hold. `git diff --no-index` exits 1 when files differ. A file
-# is a tracked edit when it is in the index or in HEAD (a staged deletion is
-# in HEAD only). <fmt> is --binary for the kept patch and --text for the
-# credential screen: a binary-marked file still hides text a --binary patch
-# would keep.
-save_patch() {
-    local out="$1" fmt="$2" f rc
-    umask 077
-    : >"$out" || return 1
-    for f in ${FILES[@]+"${FILES[@]}"}; do
-        # Fixed flags so the patch re-applies whatever the user's diff config.
-        if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
-            || git cat-file -e "HEAD:$f" 2>/dev/null; then
-            lgit diff --no-color --no-ext-diff --no-textconv "$fmt" \
-                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
-        elif [ -e "$f" ] || [ -L "$f" ]; then
-            # -L: a dangling symlink has no -e but is still an edit to keep.
-            rc=0
-            git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
-                --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
-            [ "$rc" -le 1 ] || return 1
-        fi
-    done
-}
+# In run mode the diff was saved before the command ran (see above), so a
+# verifier that rewrites or deletes a listed file cannot change what the
+# recovery patch holds. The other modes save it now.
+if [ "$MODE" != run ]; then
+    SAVE_BIN_OK=0 SAVE_TEXT_OK=0
+    (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
+    (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+fi
 PATCH_OUT="$PATCH"
-if ! (save_patch "$PATCH" --binary); then
+if [ "$SAVE_BIN_OK" != 1 ]; then
     rm -f -- "$PATCH"
     jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
         '{result: $r, patch: null, log: $log, treeClean: false,
@@ -330,15 +351,20 @@ fi
 
 # A resolver can paste a credential into a listed file. Do not archive it: drop
 # the patch and still revert, so the secret leaves the disk. The resolver's
-# edit is regenerable; the credential must not persist under .git. Screen a
-# forced-text diff, and treat a screen that cannot answer as a hit.
+# edit is regenerable; a credential must not persist under .git. Screen a
+# forced-text diff, and treat a screen that cannot answer as a hit. The strict
+# screen (private keys, known token prefixes, long tokens) skips the keyword
+# rules, so code that assigns to `password` or declares `token: string` keeps
+# its patch; commit-resolve-fixes still runs the full screen before any commit.
+# Known gap: a keyword-shaped value (`password = "hunter22"`) passes this screen
+# and stays in the archived patch (newest 10 per PR) even if the full screen
+# later refuses the commit; that refusal does not delete the patch.
 ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
-TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
-if ! (save_patch "$TEXT_FILE" --text) || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
+if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
     rm -f -- "$PATCH"
     die 2 "cannot screen the recovery patch"
 fi
-rt_looks_secret "$ADDED_FILE"
+rt_looks_secret_strict "$ADDED_FILE"
 case $? in
     1) ;;
     0)

@@ -66,15 +66,18 @@ vr_log_stream() {
 # stream is still open after that (a process in another session), the log is
 # withheld rather than left half-written. Returns 1 when withheld.
 vr_drain_log() {
-    local pid="$1" pgid="$2" log="$3" i
-    for i in $(seq 1 50); do
+    local pid="$1" pgid="$2" log="$3" i=0
+    while [ "$i" -lt 50 ]; do
         kill -0 "$pid" 2>/dev/null || { wait "$pid" 2>/dev/null; return 0; }
         sleep 0.1
+        i=$((i + 1))
     done
     kill -s KILL -- "-$pgid" 2>/dev/null
-    for i in $(seq 1 20); do
+    i=0
+    while [ "$i" -lt 20 ]; do
         kill -0 "$pid" 2>/dev/null || { wait "$pid" 2>/dev/null; return 0; }
         sleep 0.1
+        i=$((i + 1))
     done
     kill -s KILL "$pid" 2>/dev/null
     wait "$pid" 2>/dev/null
@@ -93,18 +96,27 @@ vr_core_lib() {
 # or when it fails, the log is replaced by a notice rather than kept raw.
 vr_redact_log() {
     local log="$1" lib
-    if ! command -v cs_redact_secrets >/dev/null 2>&1; then
-        lib=$(vr_core_lib "$2") || lib=""
-        # shellcheck disable=SC1090
-        [ -n "$lib" ] && . "$lib" 2>/dev/null
+    # Always source the canonical definition: a PATH executable of the same
+    # name must never stand in for it.
+    lib=$(vr_core_lib "$2") || lib=""
+    # A source checkout's copy may carry uncommitted resolver edits (it is not
+    # an rp_runner path). Sourcing it would run that code after verification,
+    # so refuse a copy that is modified, untracked or unverifiable in git.
+    if [ -n "$lib" ] && git -C "${lib%/*}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local dirty
+        dirty=$(git -C "${lib%/*}" status --porcelain --ignored=no -- "${lib##*/}" 2>/dev/null) \
+            && [ -z "$dirty" ] && git -C "${lib%/*}" ls-files --error-unmatch -- "${lib##*/}" >/dev/null 2>&1 \
+            || lib=""
     fi
-    if command -v cs_redact_secrets >/dev/null 2>&1 \
-        && (umask 077 && cs_redact_secrets <"$log" >"$log.tmp" 2>/dev/null); then
-        mv -f -- "$log.tmp" "$log"
-    else
-        rm -f -- "$log.tmp"
-        (umask 077 && printf '[withheld: log redaction unavailable]\n' >|"$log")
+    # shellcheck disable=SC1090
+    [ -n "$lib" ] && . "$lib" 2>/dev/null
+    if declare -F cs_redact_secrets >/dev/null 2>&1 \
+        && (umask 077 && cs_redact_secrets <"$log" >"$log.tmp" 2>/dev/null) \
+        && mv -f -- "$log.tmp" "$log"; then
+        return 0
     fi
+    rm -f -- "$log.tmp"
+    (umask 077 && printf '[withheld: log redaction unavailable]\n' >|"$log") || rm -f -- "$log"
 }
 
 # vr_cap_log <log> <cap-bytes>: keep the tail of an oversized log.

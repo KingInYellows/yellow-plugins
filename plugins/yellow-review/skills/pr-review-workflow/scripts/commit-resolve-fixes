@@ -29,7 +29,9 @@
 #             (including a credential a hook added), or the tree is dirty
 #             after it, e.g. a hook changed or created files; the commit is
 #             then undone and its changes left unstaged for the caller's
-#             revert), 5 submit failed or timed out, 6 verify mismatch or a
+#             revert; on Graphite the upstack is restacked back onto the
+#             reset branch, or stderr tells the user to run `gt restack`),
+#             5 submit failed or timed out, 6 verify mismatch or a
 #             verify call timed out. After 5 or 6 the commit exists locally:
 #             resubmit through the provider rather than re-running this
 #             script (a re-run sees a clean tree: NOOP).
@@ -104,11 +106,20 @@ done
 # below already treats as a failure of that step.
 SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
 NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
+[[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
+[[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
 TIMEOUT_BIN=$(command -v timeout || command -v gtimeout || true)
+# TERM first, then KILL after a short grace so a process that traps TERM
+# cannot outlive the bound.
+KILL_GRACE=5
 bounded() {
     local secs="$1"
     shift
-    if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "$secs" "$@"; else "$@"; fi
+    if [ -n "$TIMEOUT_BIN" ]; then
+        "$TIMEOUT_BIN" --kill-after="$KILL_GRACE" "$secs" "$@"
+    else
+        "$@"
+    fi
 }
 GH_BIN=$(command -v gh)
 # Shadows gh for this script and the sourced rp_pr_files.
@@ -153,6 +164,14 @@ if [ "${#EXPECTED[@]}" -gt 0 ]; then
     for f in "${EXPECTED[@]}"; do
         grep -qxF -- "$f" <<<"$PR_FILES" || die 3 "not one of PR #$PR's changed files: $f"
     done
+    # The checked-out branch must be PR <N>'s own head branch (in this
+    # repository, not a fork), or the submit below would publish an unrelated
+    # branch before the head check can fail.
+    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository 2>/dev/null \
+        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring)] | join(" ")' 2>/dev/null) \
+        || die 3 "could not read PR #$PR's head branch"
+    [ "$PR_META" = "$BRANCH false" ] \
+        || die 3 "checked-out branch '$BRANCH' is not the head branch of PR #$PR (or the PR is from a fork); nothing committed"
 fi
 
 # Tracked or untracked changes outside the expected set would ride along in
@@ -189,9 +208,9 @@ ADDED=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE" "$ADDED"' EXIT
 git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
     | rt_added_lines >"$ADDED"
-if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
+if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}"
-    die 3 "credential-shaped: staged changes look like they contain a credential; nothing committed"
+    die 3 "credential-shaped: staged changes look like they contain a credential, or could not be scanned; nothing committed"
 fi
 
 # --- Commit (always a new commit; never amend) ---
@@ -199,9 +218,18 @@ BEFORE=$(git rev-parse HEAD)
 SHA=""
 # Undo the new commit (changes left unstaged) and exit 4, so nothing is
 # submitted and a later submit — for example of an upstack branch — cannot
-# publish it.
+# publish it. gt modify -c already restacked the upstack branches onto the
+# rejected commit, so on the Graphite path restack them back onto the reset
+# branch; a failure is aborted with `gt abort` and reported, and the user
+# retries `gt restack` themselves.
 undo_commit() {
     git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "${SHA:-HEAD}" >&2
+    if [ "$PROVIDER" = graphite ] && ! gt restack --upstack --no-interactive >&2; then
+        # A conflicting restack leaves the repository mid-rebase; abort it so
+        # the tree is not left in a state a plain rerun cannot recover.
+        gt abort >&2 || printf '[commit-resolve-fixes] Warning: gt abort failed; the repository may be mid-rebase, run `gt abort` or `git rebase --abort`\n' >&2
+        printf '[commit-resolve-fixes] Warning: could not restack the upstack branches after undoing the commit; the failed restack was aborted. Resolve any conflicts and retry `gt restack` before submitting\n' >&2
+    fi
     die 4 "$1"
 }
 case "$PROVIDER" in
@@ -214,15 +242,19 @@ git diff --cached --quiet || undo_commit "changes remain staged after the commit
 
 # A pre-commit hook can stage more files or edit listed ones after the checks
 # above, so compare what the commit actually holds.
-COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0' '\n' | LC_ALL=C sort)
+# NUL separates records; an embedded newline is mapped to \001 so one path
+# containing newlines cannot masquerade as several expected paths (expected
+# paths are canonical and never hold control characters).
+COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0\n' '\n\001' | LC_ALL=C sort)
 if [ "$COMMITTED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
     undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
-    | rt_added_lines >|"$ADDED"
-if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
-    undo_commit "credential-shaped: the commit looks like it contains a credential (a hook may have added it); nothing submitted"
+    | rt_added_lines >|"$ADDED" \
+    || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
+if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
+    undo_commit "credential-shaped: the commit looks like it contains a credential, or could not be scanned (a hook may have added it); nothing submitted"
 fi
 # A hook can also leave edits or new files unstaged or untracked. Check before
 # submitting, so a dirty tree is never reported after the push has happened.

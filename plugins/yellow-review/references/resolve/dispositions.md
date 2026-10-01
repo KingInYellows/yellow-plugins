@@ -272,12 +272,28 @@ manager or a git hook would execute: `package.json`, lockfiles
 `.mise.toml`, `.envrc`, `*.config.*`, `.eslintrc*`, `.prettierrc*`,
 `.babelrc*`, `.mocharc*`, `conftest.py`, `pyproject.toml`, `setup.py`,
 `setup.cfg`, `tox.ini`, `pytest.ini`, `noxfile.py`, `build.rs`,
-`.pre-commit-config.yaml`, `lefthook*.y*ml`, `.lintstagedrc*`, and anything
-under the repository-root `scripts/` directory, any `.husky/` or `.cargo/`
-directory at any depth, or the `core.hooksPath` directory (all matched
+`.pre-commit-config.yaml`, `lefthook*.y*ml`, `.lintstagedrc*`, build and
+package manifests (`build.gradle[.kts]`, `settings.gradle[.kts]`, `gradlew`,
+`build.sbt`, `pom.xml`, `Gemfile[.lock]`, `*.gemspec`, `Cargo.toml`,
+`Cargo.lock`, `composer.json`, `composer.lock`, `CMakeLists.txt`,
+`meson.build`), test bootstrap files (`.rspec`, `spec_helper.rb`,
+`rails_helper.rb`, `test_helper.*`, `jest.setup.*`, `vitest.setup.*`,
+`setupTests.*`, `karma.conf.*`, `phpunit.xml[.dist]`), and anything under the
+repository-root `scripts/` directory, any `.husky/` or `.cargo/` directory at
+any depth, or the `core.hooksPath` directory (all matched
 case-insensitively). `rp_runner` in `lib/resolve-paths.sh` is authoritative
 when this list and the code differ. Nested `scripts/` directories, such as a
-plugin's `skills/*/scripts/`, are ordinary sources.
+plugin's `skills/*/scripts/`, are ordinary sources on purpose: hooks and build
+tools run the root `scripts/` directory by convention, and treating every
+nested one as a runner would block ordinary plugin and package code. Also not
+runners: `go.mod` and `requirements.txt` (declarative, never executed) and
+`__init__.py` (too broad).
+
+The runner gate is a deny list of known entry points, not a sandbox. An
+unattended verify command can still execute any source file the test suite
+imports, including a file a resolver just edited. Opt in with
+`resolve_pr.verify_unattended` only for repositories whose review comments you
+trust.
 
 `core.hooksPath` is normalised before matching: an absolute path under the
 toplevel loses that prefix, and leading `./` and trailing `/` are stripped.
@@ -326,11 +342,16 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   and the result carries `patch: null`, `treeClean: false` and a `reason`.
   Untracked symlinks, including dangling ones, and staged deletions are
   saved. The credential screen runs on a separate `--text` diff of the same
-  files, so a binary-attributed file cannot hide a secret. A patch whose
-  added lines look like a credential (`rt_looks_secret`) is deleted rather
-  than archived under `.git`; the files are still reverted so the secret
-  leaves the disk, and the result carries `patch: null` and a `reason`.
-  The patch is also withheld, with a `reason`, when `rt_looks_secret`
+  files, so a binary-attributed file cannot hide a secret. It uses
+  `rt_looks_secret_strict`: private-key blocks, known token prefixes (`ghp_`,
+  `github_pat_`, `xox*-`, `AKIA`/`ASIA`, `sk-`, `glpat-`, `AIza`) and long
+  mixed-case tokens, without the `password = "..."` keyword rules, so a
+  resolver's code edit is not lost to a false positive. (Posted text and
+  `commit-resolve-fixes` keep the full `rt_looks_secret`.) A patch whose
+  added lines match is deleted rather than archived under `.git`; the files
+  are still reverted so the secret leaves the disk, and the result carries
+  `patch: null` and a `reason`.
+  The patch is also withheld, with a `reason`, when the screen
   returns any status other than 0 or 1 (the screen could not answer). When
   the `--text` diff cannot be produced or read, the script exits 2 and
   reverts nothing.
@@ -357,8 +378,8 @@ file such as `.claude/settings.json` would be trusted by the next session.
 Step 2 guarantees a clean start, so on any refusal — a change outside the
 set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify `skipped` — the
 orchestrator runs `run-verify-command --pr <N> --revert-dirty`, which saves
-a patch first. Exit 4 has already undone the commit and left its changes
-unstaged, so the revert only has to clear the tree; `fixed` threads become
+a patch first. Exit 4 leaves no new commit behind, so the revert only has
+to clear the tree; `fixed` threads become
 `unclear` and the write phase still runs for the other threads (exit 4 here
 is a refusal, not a rate limit). The interactive "push rejected"
 path is the only one that leaves edits in place. After exit 5 or 6 the

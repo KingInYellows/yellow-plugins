@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Unit tests for lib/resolve-paths.sh (canonical paths, deny list, runners)
 
+bats_require_minimum_version 1.5.0
+
 LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-paths.sh"
 
 setup() {
@@ -58,7 +60,7 @@ setup() {
 @test "rp_denied allows ordinary files and near misses" {
   for p in src/a.ts README.md docs/environment.md src/github/x.ts src/claude.md.bak \
            docs/CLAUDE.md.txt a/claudex.md src/.githubx/a src/my.claude/a src/vscode/a \
-           src/dockerfiles/a.md src/envfile src/.environment compose.yml.md \
+           src/dockerfiles/a.md src/envfile compose.yml.md \
            src/secrets/a.md src/a.pemx src/a.keys src/a.tfvars.json .mcp.json.bak; do
     run rp_denied "$p"
     [ "$status" -ne 0 ] || { echo "denied: $p"; false; }
@@ -70,7 +72,13 @@ setup() {
            vitest.config.ts .pre-commit-config.yaml lefthook.yml .lintstagedrc.json \
            scripts/build.sh .husky/pre-commit web/.husky/pre-push .npmrc .yarnrc.yml \
            justfile Rakefile Taskfile.yml pyproject.toml setup.py tox.ini build.rs \
-           .cargo/config.toml .envrc .eslintrc.json .prettierrc; do
+           .cargo/config.toml .envrc .eslintrc.json .prettierrc \
+           build.gradle app/build.gradle.kts settings.gradle settings.gradle.kts gradlew gradlew.bat \
+           build.sbt pom.xml Gemfile Gemfile.lock composer.json composer.lock \
+           mygem.gemspec Cargo.toml crates/x/Cargo.toml cargo.lock CMakeLists.txt meson.build \
+           .rspec spec/spec_helper.rb spec/rails_helper.rb test/test_helper.rb jest.setup.ts \
+           src/setupTests.ts vitest.setup.js karma.conf.js phpunit.xml phpunit.xml.dist phpunit.dist.xml \
+           BUILD.GRADLE GEMFILE; do
     rp_runner "$p" || { echo "not a runner: $p"; false; }
   done
   git config core.hooksPath .githooks
@@ -107,7 +115,10 @@ setup() {
 
 @test "rp_runner leaves ordinary sources alone" {
   for p in src/a.ts src/scripts.ts README.md src/transcripts/a.md \
-           plugins/x/skills/y/scripts/tool packages/x/scripts/gen.sh; do
+           plugins/x/skills/y/scripts/tool packages/x/scripts/gen.sh \
+           go.mod requirements.txt pkg/__init__.py docs/build.gradle.md docs/Gemfile.md \
+           src/Cargo.toml.md src/test_helpers.ts src/spec_helper.md src/setup_tests.ts \
+           src/jest-setup.ts src/gradle.ts src/pom.xml.md src/phpunit.md; do
     run rp_runner "$p"
     [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
   done

@@ -340,14 +340,31 @@ has_kill_after() {
 }
 
 @test "a credential-shaped edit is reverted but never archived in a patch" {
-  printf 'one\nfeature\nAPI_KEY=abcd1234efgh5678\n' >| src/a.txt
+  printf 'one\nfeature\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\n' >| src/a.txt
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *"credential"* ]]
   [ -z "$(git status --porcelain)" ]
   [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
-  run ! grep -rq 'abcd1234efgh5678' "$PATCH_DIR"
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
+}
+
+@test "a PEM private key edit is reverted and its patch withheld" {
+  printf 'one\nfeature\n-----BEGIN RSA PRIVATE KEY-----\nMIIEabc\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+}
+
+@test "code that assigns a password or declares a token keeps its recovery patch" {
+  printf 'one\nfeature\npassword = "hunter22"\nconst API_KEY = "abcd1234efgh5678"\ntoken: string\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$patch" != null ]
+  grep -q 'token: string' "$patch"
+  [ -z "$(git status --porcelain)" ]
 }
 
 @test "an untracked dangling symlink is kept in the patch before it is removed" {
@@ -481,13 +498,13 @@ assert_interrupted_and_reverted() {
 }
 
 @test "a binary-marked file cannot smuggle a credential into the patch" {
-  printf 'API_KEY=abcd1234efgh5678\n\0' >| src/bin.dat
+  printf 'GH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\n\0' >| src/bin.dat
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/bin.dat
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,true]' ]
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *"credential"* ]]
   [ ! -e src/bin.dat ]
-  run ! grep -rq 'abcd1234efgh5678' "$PATCH_DIR"
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
 }
 
 @test "a clean binary file is kept in the patch as a binary patch" {
@@ -503,7 +520,8 @@ assert_interrupted_and_reverted() {
   real=$(command -v awk)
   {
     printf '#!/bin/bash\n'
-    printf 'for a in "$@"; do [ -f "$a" ] && exit 2; done\n'
+    printf '# The scanner feeds the file on stdin, so detect its awk program instead.\n'
+    printf 'for a in "$@"; do case "$a" in *"PRIVATE KEY"*) exit 2 ;; esac; done\n'
     printf 'exec "%s" "$@"\n' "$real"
   } >| "$shim/awk"
   chmod +x "$shim/awk"
