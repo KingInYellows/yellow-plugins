@@ -70,7 +70,7 @@ plugins/yellow-review/references/resolve/envelope.md
   s_fc95207836202a::t_e0568ce5bf0acf 1-38,40-62
   s_fc95207836202a::t_e3a10fe588d8e4 39
 plugins/yellow-review/skills/pr-review-workflow/scripts/pr-changed-ranges
-  s_fc95207836202a::t_9097404fe64e70 1-62
+  s_fc95207836202a::t_9097404fe64e70 1-62,1-5,7-30,35-40,56-62
 tests/integration/validate-agent-authoring-review-rule.test.ts
   s_fc95207836202a::t_f84b7a7fdd1419 268
   s_fc95207836202a::t_1d1ced93f9427b 20,233-267
