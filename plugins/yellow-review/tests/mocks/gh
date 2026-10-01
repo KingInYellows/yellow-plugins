@@ -143,9 +143,16 @@ case "$ALL_ARGS" in
     emit "$@"
     exit 0
     ;;
-  *"FollowupIssues"*)
-    # file-followup-issue's issue lookup (GraphQL repository.issues,
-    # filterBy.createdBy). The args are saved for assertions.
+  *"/pulls/"*"/files"*)
+    # PR file list. MOCK_GH_FILES_FAIL=1 simulates an API failure.
+    if [ "${MOCK_GH_FILES_FAIL:-0}" = 1 ]; then
+      printf 'gh: Server Error (HTTP 500)\n' >&2
+      exit 1
+    fi
+    cat "$FIXTURE_DIR/${MOCK_GH_FILES_FIXTURE:-pr-files-response.json}"
+    exit 0
+    ;;
+  "issue list "*)
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
     _call=$(bump issue_list)
     # MOCK_GH_RESCAN shapes the second lookup only (the post-create rescan):
@@ -498,6 +505,10 @@ case "$ALL_ARGS" in
     cat "$FIXTURE_DIR/graphql-error-response.json" >&2
     exit 1
     ;;
+  *"number=429"*)
+    printf 'gh: API rate limit exceeded for user.\n' >&2
+    exit 1
+    ;;
   *"number=401"*)
     printf 'Bad credentials' >&2
     exit 1
@@ -509,10 +520,6 @@ case "$ALL_ARGS" in
   *"number=420"*)
     # GitHub reports a secondary rate limit as HTTP 403.
     printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
-    exit 1
-    ;;
-  *"number=429"*)
-    printf 'gh: Too Many Requests (HTTP 429)\n' >&2
     exit 1
     ;;
   *"number=502"*)
@@ -528,11 +535,41 @@ case "$ALL_ARGS" in
     # Endless pagination: every page says there is another, with a cursor.
     printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
-  *"PRRT_gqlratelimit"*)
-    # HTTP 200 with a GraphQL rate-limit error; gh exits 0.
-    bump resolve_gqlrl >/dev/null
+  *"PRRT_gqlrl_exit0"*)
+    # HTTP 200 with a GraphQL rate-limit error and gh exiting 0.
+    bump resolve_gqlrl_exit0 >/dev/null
     printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
     exit 0
+    ;;
+  *"PRRT_gqlratelimit"*)
+    # Real gh prints the body and exits 1 on a GraphQL .errors payload.
+    bump resolve_gqlrl >/dev/null
+    printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
+    printf 'gh: API rate limit exceeded for user.\n' >&2
+    exit 1
+    ;;
+  *"PRRT_bare429"*)
+    # 429 with no rate-limit wording and no headers.
+    bump resolve_429 >/dev/null
+    printf 'gh: HTTP 429\n' >&2
+    exit 1
+    ;;
+  *"PRRT_auth401"*)
+    printf 'gh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_plain403"*)
+    printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_403notfoundtext"*)
+    # A 403 whose text also says "not found": permission wins.
+    printf 'gh: HTTP 403: thread not found in token scope\n' >&2
+    exit 1
+    ;;
+  *"PRRT_generic500"*)
+    printf 'gh: HTTP 500: Server Error\n' >&2
+    exit 1
     ;;
   *"PRRT_rl_header"*)
     # 429 with Retry-After: 1 on the first call, then success.
@@ -553,13 +590,24 @@ case "$ALL_ARGS" in
     printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
     exit 1
     ;;
-  *"PRRT_gqlnotfound"*)
+  *"PRRT_gqlnf_exit0"*)
     printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
     exit 0
     ;;
-  *"PRRT_gqlforbidden"*)
+  *"PRRT_gqlfb_exit0"*)
     printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
     exit 0
+    ;;
+  *"PRRT_gqlnotfound"*)
+    # Real gh: body on stdout, message on stderr, exit 1.
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    printf 'gh: Could not resolve to a node with the global id.\n' >&2
+    exit 1
+    ;;
+  *"PRRT_gqlforbidden"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
+    printf 'gh: Resource not accessible by integration\n' >&2
+    exit 1
     ;;
   *"PRRT_valid"*)
     cat "$FIXTURE_DIR/resolve-success-response.json"
@@ -611,6 +659,7 @@ case "$ALL_ARGS" in
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
     printf '  PRRT_ratelimited / PRRT_ratelimit_once / PRRT_forbidden → rate limit / permission error\n' >&2
+    printf '  PRRT_gql* / PRRT_bare429 / PRRT_auth401 / PRRT_plain403 / PRRT_generic500 → typed and bare gh failures (exit 1)\n' >&2
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
     printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
     printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2

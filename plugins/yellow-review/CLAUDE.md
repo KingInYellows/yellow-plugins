@@ -195,6 +195,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   failure save a patch and revert the files (`--unattended` skips runner
   files; `--revert-only`, `--revert-dirty`). Not yet invoked by
   `/review:resolve`; see `references/resolve/dispositions.md`
+- `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
+  from the files API (`/review:resolve` resolver envelope)
+- `poll-new-threads --wait <s> ...` — Step 8 re-pass poll for threads that
+  appeared after round 1; always fetches at least once
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
@@ -420,10 +424,10 @@ explicit-invocation wording live in the skill body and description.
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
 `check-resolve-text.bats`, `resolve-paths.bats`, `commit-resolve-fixes.bats`,
-`run-verify-command.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
-`tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
-(pins the thermonuclear line-count invariant alongside
-`skills/pr-review-workflow/scripts/file-line-counts`),
+`run-verify-command.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,
+`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
+`tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
+invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
 absent), `session-start.bats` (the hook's counts, orphan and stale-state

@@ -1,15 +1,50 @@
 #!/bin/sh
 # Resolve a single PR review thread via GitHub GraphQL API.
-# Usage: resolve-pr-thread <thread-node-id>
+# Usage: resolve-pr-thread [-h|--help] <thread-node-id>
 # Output: JSON to stdout: {"resolved": true, "threadId": "PRRT_..."}
-# Exit codes: 1 other failure, 2 usage, 3 not found or permission,
-#             4 rate limited. Messages go to stderr.
-# Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
+# Exit codes: 1 other failure, 2 usage, 3 not found or permission (stderr
+#             carries a reason=not-found|permission line), 4 rate limited
+#             or a gh call timed out (not retried). Messages go to stderr.
+# Env: YELLOW_REVIEW_PACE_SECONDS (default 1, max 10) — sleep after the call.
+#      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
+#      timeout(1), skipped when it is not installed.
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no Retry-After
 #      or x-ratelimit-reset header says; waits over 90 s exit 4, no retry.
 # Contract: references/resolve/dispositions.md
 
 set -eu
+
+usage_text() {
+    cat <<'HELP'
+Usage: resolve-pr-thread [-h|--help] <thread-node-id>
+
+Resolve one PR review thread (PRRT_ node id). Prints
+{"resolved": true, "threadId": "..."} on success; an already-resolved
+thread counts as success.
+
+Exit codes:
+  0  resolved (or already resolved)
+  1  other failure (including authentication)
+  2  usage error or invalid thread id
+  3  not found or not permitted; stderr has a reason=not-found or
+     reason=permission line
+  4  rate limited (one retry first; a required wait over 90 s skips it),
+     or a gh call timed out (not retried)
+
+Environment:
+  YELLOW_REVIEW_PACE_SECONDS     sleep after the call; default 1, invalid
+                                 values fall back to 1, capped at 10
+  YELLOW_REVIEW_RATE_LIMIT_WAIT  retry wait when no Retry-After or
+                                 x-ratelimit-reset header says; default 60,
+                                 over 90 exits 4
+  YELLOW_REVIEW_GH_TIMEOUT       seconds per gh call; default 30, needs
+                                 timeout(1)
+HELP
+}
+
+case "${1:-}" in
+    -h|--help) usage_text; exit 0 ;;
+esac
 
 # --- Dependency checks ---
 command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from https://cli.github.com\n' >&2; exit 1; }
@@ -17,7 +52,7 @@ command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from htt
 
 # --- Input validation ---
 if [ $# -lt 1 ]; then
-    printf 'Usage: resolve-pr-thread <thread-node-id>\n' >&2
+    usage_text >&2
     exit 2
 fi
 
@@ -47,103 +82,69 @@ mutation($threadId: ID!) {
 }'
 
 # --- Execute mutation (one retry after a rate limit) ---
-# Longer waits exit 4 instead: the whole call must fit the caller's Bash
-# tool timeout (120 s by default). Same bounded wait as reply-pr-thread.
-MAX_WAIT_SECONDS=90
+# shellcheck source=../../../lib/gh-graphql.sh
+. "$(dirname -- "$0")/../../../lib/gh-graphql.sh"
 _WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
 trap 'rm -rf "$_WORK_DIR"' EXIT
-_STDERR_FILE="$_WORK_DIR/err"
-_OUT_FILE="$_WORK_DIR/out"
-_HEADERS_FILE="$_WORK_DIR/headers"
-_BODY_FILE="$_WORK_DIR/body"
-call() {
-    : >"$_HEADERS_FILE"
-    : >"$_BODY_FILE"
-    gh api -i graphql \
-        -F threadId="$THREAD_ID" \
-        -f query="$MUTATION" >"$_OUT_FILE" 2>"$_STDERR_FILE" && _GH_EXIT=0 || _GH_EXIT=$?
-    # Split headers from body; output without a status line is all body.
-    tr -d '\r' <"$_OUT_FILE" | awk -v h="$_HEADERS_FILE" -v b="$_BODY_FILE" '
-        NR == 1 { inh = ($0 ~ /^HTTP\//) }
-        inh && /^$/ { inh = 0; next }
-        inh { print > h; next }
-        { print > b }
-    '
-    RESPONSE=$(cat "$_BODY_FILE")
-    _GH_STDERR=$(cat "$_STDERR_FILE")
-    sleep "${YELLOW_REVIEW_PACE_SECONDS:-1}"
+gg_init "$_WORK_DIR"
+run_mutation() {
+    gg_call -F threadId="$THREAD_ID" -f query="$MUTATION" || true
+    RESPONSE=$(cat "$GG_RESP")
+    _GH_STDERR=$(cat "$GG_ERR")
+    _GH_EXIT=$GG_EXIT
 }
-header() {
-    awk -v name="$1" '
-        tolower(substr($0, 1, length(name) + 1)) == tolower(name) ":" {
-            sub(/^[^:]*:[ \t]*/, ""); print; exit
-        }' "$_HEADERS_FILE"
+# fail_reason <token>: exit 3 with the reason token on its own stderr line.
+fail_reason() {
+    case "$1" in
+        not-found) printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2 ;;
+        *) printf 'Error: Not permitted to resolve thread: %s\n' "$THREAD_ID" >&2 ;;
+    esac
+    printf 'reason=%s\n' "$1" >&2
+    exit 3
 }
-is_rate_limited() {
-    case "$_GH_STDERR" in *"rate limit"*|*"Rate limit"*|*"HTTP 429"*) return 0 ;; esac
-    # GraphQL-level rate limits arrive as HTTP 200 with an .errors payload.
-    printf '%s' "$RESPONSE" | jq -e '[.errors[]? | (.type // ""), (.message // "")] | any(test("rate limit|RATE_LIMITED"; "i"))' >/dev/null 2>&1
-}
-is_gql_not_found_or_forbidden() {
-    printf '%s' "$RESPONSE" | jq -e '[.errors[]? | .type // empty] | any(. == "NOT_FOUND" or . == "FORBIDDEN")' >/dev/null 2>&1
-}
-# Seconds to wait before the single retry: Retry-After, then the reset time
-# when no requests remain, then the default. Prints nothing when the wait
-# would exceed MAX_WAIT_SECONDS.
-rate_limit_wait() {
-    _wait=$(header retry-after)
-    case "$_wait" in ''|*[!0-9]*) _wait="" ;; esac
-    if [ -z "$_wait" ] && [ "$(header x-ratelimit-remaining)" = 0 ]; then
-        _reset=$(header x-ratelimit-reset)
-        case "$_reset" in
-            ''|*[!0-9]*) ;;
-            *) _wait=$((_reset - $(date +%s))); [ "$_wait" -ge 0 ] || _wait=0 ;;
-        esac
+# A timed-out call may have applied the mutation: report it, never retry.
+fail_if_timed_out() {
+    if [ "$_GH_EXIT" -eq 124 ]; then
+        printf 'Error: gh timed out after %ss resolving %s; not retried.\n' "$GG_TIMEOUT" "$THREAD_ID" >&2
+        exit 4
     fi
-    if [ -z "$_wait" ]; then
-        _wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
-        case "$_wait" in ''|*[!0-9]*) _wait=60 ;; esac
-    fi
-    [ "$_wait" -le "$MAX_WAIT_SECONDS" ] && printf '%s' "$_wait"
-    return 0
 }
-call
-if is_rate_limited; then
-    _W=$(rate_limit_wait)
-    if [ -z "$_W" ]; then
-        printf 'Error: GitHub API rate limit exceeded; the required wait exceeds %ss.\n' "$MAX_WAIT_SECONDS" >&2
+run_mutation
+fail_if_timed_out
+if gg_is_rate_limited; then
+    _W=$(gg_rate_limit_wait)
+    if [ "$_W" -gt "$GG_MAX_WAIT_SECONDS" ]; then
+        printf 'Error: GitHub API rate limit exceeded; the required wait (%ss) exceeds %ss, not retried.\n' "$_W" "$GG_MAX_WAIT_SECONDS" >&2
         exit 4
     fi
     printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_W" >&2
     sleep "$_W"
-    call
+    run_mutation
+    fail_if_timed_out
 fi
-if is_rate_limited; then
-    printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+if gg_is_rate_limited; then
+    printf 'Error: GitHub API rate limit exceeded; the one retry is already spent.\n' >&2
     exit 4
 fi
+gg_pace
 if [ "$_GH_EXIT" -ne 0 ]; then
     case "$_GH_STDERR" in
-        *"HTTP 401"*|*"Bad credentials"*|*"authentication"*)
-            printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
-            ;;
-        *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
-            printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
-            exit 3
-            ;;
-        *"HTTP 403"*|*"FORBIDDEN"*|*"not accessible"*|*"permission"*)
-            printf 'Error: Not permitted to resolve thread: %s\n' "$THREAD_ID" >&2
-            exit 3
-            ;;
         *"already resolved"*|*"ALREADY_RESOLVED"*)
             # Idempotent — treat as success
             jq -n --arg id "$THREAD_ID" '{"resolved": true, "threadId": $id}'
             exit 0
             ;;
-        *)
-            printf 'Error: GraphQL mutation failed: %s\n' "$_GH_STDERR" >&2
+        *"HTTP 401"*|*"Bad credentials"*|*"authentication"*)
+            printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+            exit 1
             ;;
     esac
+    # Real gh exits 1 on a GraphQL .errors payload, so typed
+    # NOT_FOUND/FORBIDDEN errors are classified here too.
+    if _REASON=$(gg_reason); then
+        fail_reason "$_REASON"
+    fi
+    printf 'Error: GraphQL mutation failed: %s\n' "$_GH_STDERR" >&2
     exit 1
 fi
 
@@ -161,9 +162,8 @@ else
         printf '[resolve-pr-thread] Error: Failed to parse GraphQL error response.\n' >&2
         exit 1
     }
-    if is_gql_not_found_or_forbidden; then
-        printf 'Error: Thread not found or not permitted: %s\n' "$THREAD_ID" >&2
-        exit 3
+    if _REASON=$(gg_reason); then
+        fail_reason "$_REASON"
     fi
     if [ -n "$ERRORS" ]; then
         # Check for already-resolved in error message (idempotent)

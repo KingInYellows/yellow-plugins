@@ -1,0 +1,62 @@
+#!/bin/sh
+# List the PR's changed files with their new-side line ranges, from the files
+# API (works past GitHub's diff-size limits, unlike `gh pr diff`).
+# Usage: pr-changed-ranges <pr-number>
+# Output: one row per file on stdout: "<path> <ranges>" where <ranges> is
+#   "10-24,58-60" (new-side lines the PR added; context lines excluded), "none" (no new-side lines) or
+#   "unknown" (the API returned no patch: binary, rename or oversized file).
+#   Only paths matching ^[A-Za-z0-9._/-]+$ are listed.
+# Exit codes: 0 ok (possibly no rows), 1 fetch or parse failure (the caller
+#             treats every range as unknown), 2 usage.
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+[ $# -eq 1 ] || { printf 'Usage: pr-changed-ranges <pr-number>\n' >&2; exit 2; }
+PR="$1"
+case "$PR" in
+    ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR" >&2; exit 2 ;;
+esac
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+
+gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/files" 2>"$WORK/err" || {
+    printf 'Error: could not list files of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
+    exit 1
+}
+
+# Walk each patch: a hunk header "@@ -a,b +<start>,c @@" sets the new-side line
+# counter, "+" lines are PR-added (recorded, counter advances), context lines
+# advance the counter, "-" and "\ No newline" lines do not. Consecutive added
+# lines collapse into one range; context lines are never reported.
+jq -r '
+  .[]
+  | select(.filename | test("^[A-Za-z0-9._/-]+$"))
+  | [ .filename,
+      ( if (.patch // "") == "" then "unknown"
+        else
+          [ .patch | split("\n")[]
+            | if startswith("@@") then {h: ((capture("\\+(?<s>[0-9]+)") | .s | tonumber))}
+              elif startswith("+") then {a: 1}
+              elif startswith("-") or startswith("\\") then {}
+              else {c: 1} end ]
+          | reduce .[] as $e ({n: 0, add: []};
+              if $e.h != null then .n = $e.h
+              elif $e.a != null then .add += [.n] | .n += 1
+              elif $e.c != null then .n += 1
+              else . end)
+          | .add
+          | reduce .[] as $x ([];
+              if length > 0 and .[-1][1] == $x - 1 then .[-1][1] = $x
+              else . + [[$x, $x]] end)
+          | map("\(.[0])-\(.[1])")
+          | if length == 0 then "none" else join(",") end
+        end ) ]
+  | join(" ")' "$WORK/files" >"$WORK/rows" 2>"$WORK/err" || {
+    printf 'Error: could not parse the PR file list: %s\n' "$(cat "$WORK/err")" >&2
+    exit 1
+}
+cat "$WORK/rows"
