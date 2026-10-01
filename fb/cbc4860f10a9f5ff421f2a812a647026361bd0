@@ -1,0 +1,32 @@
+plugins/yellow-core/commands/setup/all.md
+  s_46afba3fd1243f::t_9a9f92583f2419 318-326
+  s_46afba3fd1243f::t_ca0131f4a18b11 709-710
+plugins/yellow-research/commands/research/setup.md
+  s_46afba3fd1243f::t_58573529828bcc 220-225
+  s_46afba3fd1243f::t_2ab6bd2fb34122 778-780
+  s_46afba3fd1243f::t_e40e0c8f0e9c82 750-753
+  s_46afba3fd1243f::t_5dd7d21b9f2507 869
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_46afba3fd1243f::t_7b918dc19d701c 99-101
+  s_46afba3fd1243f::t_33262c666fc266 81-87
+plans/setup-command-bugs.md
+  s_46afba3fd1243f::t_07257d6f49b801 7
+  s_46afba3fd1243f::t_b89af45c01ea21 88
+  s_46afba3fd1243f::t_b96c28aed7b4f0 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fbcbc4860f10a9f5ff421f2a812a647026361bd0",
+  "prompts": {},
+  "sessions": {
+    "s_46afba3fd1243f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "551287bb-653b-4f77-987f-3999e3653fd2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
