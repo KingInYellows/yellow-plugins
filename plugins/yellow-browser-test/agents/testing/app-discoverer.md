@@ -67,7 +67,8 @@ backend; running these checks unconditionally lets the agent surface the
 backend dev command alongside any frontend script:
 
 - `Makefile` — targets like `dev`, `serve`, `run`
-- `docker-compose.yml` — service definitions
+- `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml`
+  — service definitions; check all four
 - `Procfile` — web process
 - `Gemfile` — `rails` gem implies `rails server` (default :3000)
 - `requirements.txt` / `pyproject.toml` — `django`/`flask`/`fastapi`/`starlette`/`sanic`
