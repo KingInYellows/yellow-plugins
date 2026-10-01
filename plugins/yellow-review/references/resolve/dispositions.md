@@ -11,6 +11,17 @@ once wired, the command and the agent point here instead of restating it.
 GitHub thread state is the record. The review-findings ledger is not
 involved.
 
+**Implementation status.** Implemented in this PR: `get-pr-comments`
+(`--include-outdated`), `get-pr-blockers`, `reply-pr-thread`,
+`file-followup-issue`, `check-resolve-text` and `lib/resolve-text.sh`, plus the
+existing `resolve-pr-thread`. **Planned**, landing in a later PR of this stack
+and not present yet: `commit-resolve-fixes`, `run-verify-command` and
+`lib/resolve-paths.sh`. The sections that depend on them (Write order phases A
+and B, Verify, File set, the Bash timeout for `commit-resolve-fixes`, and the
+matching Script exit codes rows) are marked **(planned)** and are the intended
+contract, not current behavior. `resolve-pr-thread` currently exits only 0 or 1;
+the 2/3/4 codes in the table are planned for it too.
+
 ## Dispositions
 
 | Disposition | Meaning | Write action |
@@ -179,10 +190,12 @@ record); only the resolve is withheld.
 Three phases, in order. A later phase never runs for a thread whose earlier
 phase failed.
 
-1. **Phase A, local.** Optional `verify_command` (`run-verify-command`),
-   then stage and commit (`commit-resolve-fixes`). See Verify below.
-2. **Phase B, remote.** Submit and verify the head (`commit-resolve-fixes`
-   does both). `fixed` threads need `status: PUSHED` and a verified SHA.
+1. **Phase A, local (planned: needs `run-verify-command` and
+   `commit-resolve-fixes`).** Optional `verify_command`
+   (`run-verify-command`), then stage and commit (`commit-resolve-fixes`).
+   See Verify below.
+2. **Phase B, remote (planned: needs `commit-resolve-fixes`).** Submit and
+   verify the head (`commit-resolve-fixes` does both). `fixed` threads need `status: PUSHED` and a verified SHA.
    `NOOP` or a failure downgrades every `fixed` thread to `unclear`; the
    other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
@@ -202,7 +215,9 @@ disagree: reply posted (open)
 addressed: reply posted, resolve failed
 ```
 
-## Verify
+## Verify (planned)
+
+Depends on `run-verify-command`, which is not in this PR.
 
 `resolve_pr.*` values, and whether `yellow-plugins.local.md` is tracked by
 git, are read once in Step 1, before any agent runs; later steps use only
@@ -233,7 +248,10 @@ directory, or the `core.hooksPath` directory (matched case-insensitively).
 Nested `scripts/` directories, such as a plugin's `skills/*/scripts/`, are
 ordinary sources.
 
-## File set
+## File set (planned)
+
+Depends on `commit-resolve-fixes`, `run-verify-command` and
+`lib/resolve-paths.sh`, none of which are in this PR.
 
 The expected file set comes from the resolvers' `Files modified`, but the
 scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
@@ -343,10 +361,10 @@ Exit 1 is always "other failure" (network, unexpected response).
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `reply-pr-thread` | replied or skipped | usage / body too long / credential | not found or permission | rate limited | — | — |
-| `resolve-pr-thread` | resolved | usage | not found or permission | rate limited | — | — |
+| `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
 | `file-followup-issue` | created or found | usage / credential | — | rate limited (no retry) | — | — |
-| `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
-| `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
+| `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
+| `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / credential | — | — | — | — |
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
