@@ -18,6 +18,16 @@ setup() {
   rm -f "$POSTED" "$CALLS"
 }
 
+# Put a sleep stub first on PATH that logs its argument instead of waiting.
+stub_sleep() {
+  mkdir -p "${BATS_TEST_TMPDIR}/sleepbin"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >> "%s/sleep_log"\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/sleepbin/sleep"
+  chmod +x "${BATS_TEST_TMPDIR}/sleepbin/sleep"
+  export PATH="${BATS_TEST_TMPDIR}/sleepbin:${PATH}"
+  SLEEP_LOG="${BATS_TEST_TMPDIR}/sleep_log"
+  rm -f "$SLEEP_LOG"
+}
+
 # --- Usage ---
 
 @test "rejects missing arguments with exit 2" {
@@ -69,6 +79,20 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "a body of exactly 1000 ASCII characters is accepted" {
+  head -c 1000 /dev/zero | tr '\0' 'a' >| "$BODY"
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+}
+
+@test "1001 multibyte characters are rejected with exit 2" {
+  printf 'é%.0s' $(seq 1 1001) >| "$BODY"
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"limit is 1000"* ]]
+  [ ! -f "${BATS_TEST_TMPDIR}/mock_gh_any_call" ]
+}
+
 # --- Posting ---
 
 @test "appends the marker to the posted body" {
@@ -86,10 +110,11 @@ setup() {
   [ ! -f "$CALLS" ]
 }
 
-@test "posts again when our last marker has a different disposition" {
+@test "skips when our last marker has a different disposition and reports it" {
   run --separate-stderr "$SCRIPT" PRRT_reply_done unclear "$BODY"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
 }
 
 @test "a marker quoted in a reviewer comment does not cause a skip" {
@@ -107,6 +132,34 @@ setup() {
 @test "a permission error on the reply exits 3" {
   run --separate-stderr "$SCRIPT" PRRT_reply_forbidden fixed "$BODY"
   [ "$status" -eq 3 ]
+}
+
+@test "a 502 with a non-JSON body exits 1 and shows the response" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_502 fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"HTTP 502"* ]]
+}
+
+@test "a GraphQL internal error with no stderr exits 1 and shows the response" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_500 fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"Something went wrong"* ]]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "a mutation that returns no comment exits 1" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_nocomment fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"returned no comment"* ]]
+}
+
+@test "a gh call that times out exits 4 without retrying" {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nexit 124\n' >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"timed out"* ]]
 }
 
 @test "refuses a body that looks like a credential, before any API call" {
@@ -129,11 +182,63 @@ setup() {
 
 # --- Rate limits ---
 
-@test "retries once after a 429 with Retry-After" {
-  run --separate-stderr "$SCRIPT" PRRT_reply_rl fixed "$BODY"
+@test "retries once after a 429 and honours Retry-After over the env default" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=45 run --separate-stderr "$SCRIPT" PRRT_reply_rl fixed "$BODY"
   [ "$status" -eq 0 ]
   [ "$(cat "$CALLS")" = 2 ]
+  [[ "$stderr" == *"retrying in 7s"* ]]
+  grep -qx 7 "$SLEEP_LOG"
+}
+
+@test "waits exactly Retry-After: 90, the cap" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_ra90 fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"retrying in 90s"* ]]
+  grep -qx 90 "$SLEEP_LOG"
+}
+
+@test "Retry-After: 120 is over the cap: exit 4, no retry, message names the wait" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_ra120 fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "$CALLS")" = 1 ]
+  [[ "$stderr" == *"120s wait is over the 90s cap"* ]]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "uses x-ratelimit-reset when no requests remain and no Retry-After" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=45 run --separate-stderr "$SCRIPT" PRRT_reply_reset fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$CALLS")" = 2 ]
+  _w=$(sed -n 's/.*retrying in \([0-9]*\)s.*/\1/p' <<<"$stderr")
+  [ "$_w" -ge 25 ] && [ "$_w" -le 30 ]
+}
+
+@test "a reset time in the past waits 0 s, not the env default" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=45 run --separate-stderr "$SCRIPT" PRRT_reply_resetpast fixed "$BODY"
+  [ "$status" -eq 0 ]
   [[ "$stderr" == *"retrying in 0s"* ]]
+  grep -qx 0 "$SLEEP_LOG"
+}
+
+@test "a reset time over the cap exits 4" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_resetfar fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"over the 90s cap"* ]]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "falls back to YELLOW_REVIEW_RATE_LIMIT_WAIT when no header says" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=5 run --separate-stderr "$SCRIPT" PRRT_reply_dflt fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"retrying in 5s"* ]]
+  grep -qx 5 "$SLEEP_LOG"
 }
 
 @test "retries once after a GraphQL rate-limit error returned with HTTP 200" {
@@ -154,4 +259,5 @@ setup() {
   run --separate-stderr "$SCRIPT" PRRT_reply_rl2 fixed "$BODY"
   [ "$status" -eq 4 ]
   [ "$(cat "$CALLS")" = 2 ]
+  [[ "$stderr" == *"retry is already spent"* ]]
 }

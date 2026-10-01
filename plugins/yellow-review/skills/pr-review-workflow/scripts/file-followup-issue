@@ -6,8 +6,9 @@
 # Output: JSON to stdout: {"number":N,"url":"...","created":true|false}
 #   created=false means an issue the viewer authored already carries this
 #   thread's marker (dedupe hit); no new issue is filed.
-# Exit codes: 1 gh failure or a full dedupe window with no match, 2 usage or
-#             text that looks like a credential (or cannot be scanned), 4 rate
+# Exit codes: 1 gh failure or a full dedupe window with no match, 2 usage,
+#             text that looks like a credential (or cannot be scanned), or a
+#             thread that belongs to a different pull request, 4 rate
 #             limited (no retry here; the caller stops mutating).
 # Contract: references/resolve/dispositions.md
 
@@ -128,16 +129,25 @@ fi
 
 # --- Link back to the thread (first comment URL; PR URL as a fallback) ---
 LINK="https://${GH_HOST:-github.com}/$REPO/pull/$PR_NUMBER"
+PR_URL="$LINK"
 # shellcheck disable=SC2016
 if THREAD_URL=$(gh api graphql -f threadId="$THREAD_ID" \
         -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { comments(first: 1) { nodes { url } } } } }' \
         --jq '.data.node.comments.nodes[0].url // empty' 2>"$ERR"); then
     case "$THREAD_URL" in
-        "https://${GH_HOST:-github.com}/$REPO/pull/$PR_NUMBER"[/#?]*|"https://${GH_HOST:-github.com}/$REPO/pull/$PR_NUMBER") LINK="$THREAD_URL" ;;
+        "$PR_URL"[/#?]*|"$PR_URL") LINK="$THREAD_URL" ;;
+        '') printf 'Note: no thread URL returned; linking the PR instead.\n' >&2 ;;
+        *)
+            printf 'Error: Thread %s does not belong to %s#%s (its first comment is at %s).\n' \
+                "$THREAD_ID" "$REPO" "$PR_NUMBER" "$THREAD_URL" >&2
+            exit 2
+            ;;
     esac
 elif grep -qiE 'rate limit|HTTP 429' "$ERR"; then
     # Ordinary lookup failures keep the PR-URL fallback; a rate limit stops the caller.
     gh_fail 'thread link lookup'
+else
+    printf 'Note: thread link lookup failed (%s); linking the PR instead.\n' "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
 fi
 
 ISSUE_BODY="$WORK_DIR/issue-body.md"
@@ -149,7 +159,7 @@ URL=$(gh issue create --repo "$REPO" --title "$TITLE" --body-file "$ISSUE_BODY" 
     || gh_fail 'issue create'
 URL=$(printf '%s\n' "$URL" | grep -E '^https://[^ ]+/issues/[0-9]+$' | tail -n 1 || true)
 if [ -z "$URL" ]; then
-    printf 'Error: issue create returned no issue URL.\n' >&2
+    printf 'Error: issue create returned no issue URL; an issue may already exist. Re-running finds it by its thread marker.\n' >&2
     exit 1
 fi
 

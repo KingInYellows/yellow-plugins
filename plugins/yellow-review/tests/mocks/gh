@@ -60,21 +60,41 @@ bump() {
 # below never capture them.
 case "$ALL_ARGS" in
   *"FollowupViewer"*)
-    # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login.
+    # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login;
+    # MOCK_GH_VIEWER_FAIL=1|ratelimit simulates a failure.
+    case "${MOCK_GH_VIEWER_FAIL:-0}" in
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 403)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
     MOCK_BODY="{\"data\":{\"viewer\":{\"login\":\"${MOCK_GH_VIEWER:-me}\"}}}"
     emit "$@"
     exit 0
     ;;
   *"FollowupThreadUrl"*)
-    MOCK_BODY='{"data":{"node":{"comments":{"nodes":[{"url":"https://github.com/test/repo/pull/7#discussion_r1"}]}}}}'
+    # MOCK_GH_THREAD_FAIL=1|ratelimit simulates a failed lookup;
+    # MOCK_GH_THREAD_URL overrides the first comment URL (empty = none).
+    case "${MOCK_GH_THREAD_FAIL:-0}" in
+      ratelimit) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    _turl="${MOCK_GH_THREAD_URL-https://github.com/test/repo/pull/7#discussion_r1}"
+    MOCK_BODY=$(jq -nc --arg u "$_turl" '{data:{node:{comments:{nodes:(if $u == "" then [] else [{url:$u}] end)}}}}')
     emit "$@"
     exit 0
     ;;
   "issue list "*)
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
-    if [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ]; then
-      # A full 200-issue window with no marker for the requested thread.
-      jq -n '[range(0; 200) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]'
+    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit simulates a failed list.
+    case "${MOCK_GH_ISSUE_LIST_FAIL:-0}" in
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    # MOCK_GH_ISSUE_LIST_COUNT=N (or MOCK_GH_ISSUE_LIST_FULL=1, N=200): a
+    # window of N unrelated issues with no marker for the requested thread.
+    _n="${MOCK_GH_ISSUE_LIST_COUNT:-}"
+    [ -z "$_n" ] && [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ] && _n=200
+    if [ -n "$_n" ]; then
+      jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]'
       exit 0
     fi
     cat "$FIXTURE_DIR/issue-list-response.json"
@@ -90,6 +110,12 @@ case "$ALL_ARGS" in
     if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = 1 ]; then
       printf 'HTTP 422: Validation Failed\n' >&2
       exit 1
+    fi
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = nourl ]; then
+      # Created, but gh printed no issue URL.
+      bump issue_create >/dev/null
+      printf 'Creating issue in test/repo\n'
+      exit 0
     fi
     bump issue_create >/dev/null
     _next=""
@@ -151,11 +177,47 @@ case "$ALL_ARGS" in
           MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
           case "$ALL_ARGS" in
             *"PRRT_reply_rl2"*) _status=403; http "HTTP/2.0 403 Forbidden" "" ;;
-            *) _status=429; http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0" ;;
+            *) _status=429; http "HTTP/2.0 429 Too Many Requests" "Retry-After: 7" ;;
           esac
           printf 'gh: You have exceeded a secondary rate limit. (HTTP %s)\n' "$_status" >&2
           exit 1
         fi
+        ;;
+      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
+        # Wait-source arms. ra120 / resetfar are always limited (over the
+        # cap); the rest are limited on the first call only.
+        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_resetfar"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+        if [ "$limited" = 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          _now=$(date +%s)
+          case "$ALL_ARGS" in
+            *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
+            *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
+            *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
+            *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
+            *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
+            *) _hdr="" ;;
+          esac
+          http "HTTP/2.0 429 Too Many Requests" "$_hdr"
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_502"*)
+        MOCK_BODY='<html><body>502 Bad Gateway</body></html>'
+        http "HTTP/2.0 502 Bad Gateway" ""
+        printf 'gh: HTTP 502\n' >&2
+        exit 1
+        ;;
+      *"PRRT_reply_500"*)
+        MOCK_BODY='{"errors":[{"type":"INTERNAL","message":"Something went wrong while executing your query."}]}'
+        http "HTTP/2.0 200 OK" ""
+        exit 1
+        ;;
+      *"PRRT_reply_nocomment"*)
+        MOCK_BODY='{"data":{"addPullRequestReviewThreadReply":{"comment":null}}}'
+        http "HTTP/2.0 200 OK" ""
+        exit 0
         ;;
       *"PRRT_reply_gqlrl"*)
         if [ "$n" -eq 1 ]; then
@@ -243,6 +305,10 @@ case "$ALL_ARGS" in
       printf '1' > "$PAGE_FILE"
       cat "$FIXTURE_DIR/multi-page-response-page1.json"
     fi
+    ;;
+  *"number=500"*)
+    # Reviewer-thread fixture chosen per test via MOCK_GH_COMMENTS_FIXTURE.
+    cat "$FIXTURE_DIR/${MOCK_GH_COMMENTS_FIXTURE:-viewer-fields-response.json}"
     ;;
   *"number=350"*)
     # Null cursor: hasNextPage=true but endCursor=null

@@ -307,10 +307,12 @@ are capped at 540 and 480 seconds.
 
 `reply-pr-thread` reads the thread's last comment before posting. When that
 comment was authored by the viewer (`viewerDidAuthor`) and ends with a
-marker for the same thread and disposition, it skips the reply
-(`already-replied`) and the orchestrator retries only the resolve (when the
-lane allows it). A reviewer comment after ours makes the marker no longer
-last, so the thread is processed again.
+marker for the same thread, whatever its disposition, it skips the reply
+(`already-replied`), reports the posted marker's disposition in the skip
+JSON, and the orchestrator retries only the resolve (when the lane allows
+it). A re-run therefore never posts a second, contradicting reply. A
+reviewer comment after ours makes the marker no longer last, so the thread
+is processed again.
 
 `get-pr-comments` fetches `comments(first: 50)`; do not use that list to
 decide whether our marker is last. The reply script's own `comments(last:1)`
@@ -347,16 +349,21 @@ Replies and issue bodies end with:
 ## Pacing and rate limits
 
 - Mutations run serially. `reply-pr-thread` sleeps 1 s after each post.
-- On a rate limit (HTTP 403/429 with "rate limit" in stderr, or a GraphQL
-  error whose message mentions a rate limit), wait `Retry-After` seconds, or
-  60 s, then retry once per script run. A second limit, or a required wait
-  over 90 s, exits 4.
+- On a rate limit (stderr matching "rate limit" or "HTTP 429", or a GraphQL
+  error whose message mentions a rate limit), `reply-pr-thread` waits the
+  `Retry-After` header, else the time to `x-ratelimit-reset` when
+  `x-ratelimit-remaining` is 0, else `YELLOW_REVIEW_RATE_LIMIT_WAIT`
+  (default 60 s), then retries once per script run. A second limit, or a
+  required wait over 90 s, exits 4. A bare 403 is not a rate limit: it exits
+  3. `file-followup-issue` never waits or retries; a rate limit exits 4 at
+  once.
 - After any exit 4, stop mutating. Every remaining thread is reported as
   `not attempted (rate limit)` and counts as blocking.
 
 ## Script exit codes
 
-Exit 1 is always "other failure" (network, unexpected response).
+Exit 1 is always a non-usage failure (missing tool, unreadable file,
+network, unexpected response).
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -402,8 +409,7 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
   definition files are refused, but the code the hooks run is not. How
-  unattended commits should treat hooks is an open decision tracked in
-  #964.
+  unattended commits should treat hooks is an open decision.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds
   of threads) are slow. A batch apply script is a tracked follow-up.
 - Two accounts resolving the same PR concurrently can each post a reply;

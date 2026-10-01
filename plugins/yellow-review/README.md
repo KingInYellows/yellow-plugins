@@ -73,6 +73,22 @@ yellow-core integration before reviewing real PRs.
 | `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
 
+## Resolve scripts
+
+Helpers under `skills/pr-review-workflow/scripts/` that implement the
+mechanical parts of the resolve contract in
+`references/resolve/dispositions.md`. `/review:resolve` does not invoke the
+new ones yet; wiring lands in a later PR of this stack.
+
+| Script | Description |
+| ------ | ----------- |
+| `get-pr-comments` | Unresolved review threads (`--include-outdated` adds outdated ones) |
+| `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
+| `reply-pr-thread` | Reply to a thread with an idempotency marker |
+| `resolve-pr-thread` | Resolve a single thread |
+| `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
+| `check-resolve-text` | Refuse credential-shaped text before it is posted to Linear |
+
 ## Opt-in: thermonuclear structural review
 
 `thermonuclear-reviewer` is the one persona `/review:pr` never selects on

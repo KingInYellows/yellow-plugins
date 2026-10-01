@@ -9,7 +9,8 @@ SCRIPT="${SCRIPT_DIR}/file-followup-issue"
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
-  unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL MOCK_GH_ISSUE_LIST_FULL
+  unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL MOCK_GH_ISSUE_LIST_FULL MOCK_GH_ISSUE_LIST_COUNT \
+    MOCK_GH_ISSUE_LIST_FAIL MOCK_GH_VIEWER_FAIL MOCK_GH_THREAD_FAIL MOCK_GH_THREAD_URL GH_HOST
   TITLE="${BATS_TEST_TMPDIR}/title.txt"
   BODY="${BATS_TEST_TMPDIR}/body.txt"
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
@@ -82,13 +83,83 @@ setup() {
   [ "$(tail -n 1 "$body")" = "<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->" ]
 }
 
-@test "a thread URL on a host other than GH_HOST falls back to the PR URL" {
+@test "a thread URL on a host other than GH_HOST is a mismatch and exits 2" {
   export GH_HOST=ghe.example.com
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"does not belong to"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a thread whose first comment is on another pull request exits 2 and files nothing" {
+  export MOCK_GH_THREAD_URL=https://github.com/test/repo/pull/8#discussion_r9
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"does not belong to test/repo#7"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a failed thread lookup links the PR and says so on stderr" {
+  export MOCK_GH_THREAD_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
+  [[ "$stderr" == *"thread link lookup failed"* ]]
   body="${BATS_TEST_TMPDIR}/mock_gh_issue_body"
-  grep -qF 'https://ghe.example.com/test/repo/pull/7' "$body"
+  grep -qF 'pull/7' "$body"
   ! grep -qF 'discussion_r1' "$body"
+}
+
+@test "a thread lookup with no URL links the PR and says so on stderr" {
+  export MOCK_GH_THREAD_URL=
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"no thread URL returned"* ]]
+  ! grep -qF 'discussion_r1' "${BATS_TEST_TMPDIR}/mock_gh_issue_body"
+}
+
+@test "a rate-limited thread lookup exits 4 and files nothing" {
+  export MOCK_GH_THREAD_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"thread link lookup"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a rate-limited viewer lookup exits 4" {
+  export MOCK_GH_VIEWER_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"viewer lookup"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a failed viewer lookup exits 1" {
+  export MOCK_GH_VIEWER_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"viewer lookup failed"* ]]
+}
+
+@test "a rate-limited issue list exits 4" {
+  export MOCK_GH_ISSUE_LIST_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"issue list"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a failed issue list exits 1 and creates nothing" {
+  export MOCK_GH_ISSUE_LIST_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"issue list failed"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "the dedupe list covers closed issues too" {
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_dup "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  grep -q -- '--state all' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "refuses issue text that looks like a credential" {
@@ -96,6 +167,15 @@ setup() {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 2 ]
   [ ! -f "$CREATES" ]
+}
+
+@test "a create that prints no issue URL warns that an issue may exist" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=nourl
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"no issue URL"* ]]
+  [[ "$stderr" == *"may already exist"* ]]
+  [[ "$stderr" == *"thread marker"* ]]
 }
 
 @test "a create failure exits 1" {
@@ -128,4 +208,71 @@ setup() {
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"could not be scanned"* ]]
   [ ! -e "$CREATES" ]
+}
+
+@test "a window one short of full with no marker still creates" {
+  export MOCK_GH_ISSUE_LIST_COUNT=199
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.created')" = "true" ]
+}
+
+@test "a window of exactly 200 with no marker refuses" {
+  export MOCK_GH_ISSUE_LIST_COUNT=200
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"refusing to file a possible duplicate"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "rejects a malformed repo" {
+  for repo in noslash a/b/c /repo owner/; do
+    run "$SCRIPT" "$repo" 7 PRRT_issue_new "$TITLE" "$BODY"
+    [ "$status" -eq 2 ] || { echo "accepted repo: $repo"; false; }
+  done
+}
+
+@test "rejects a non-numeric or empty PR number" {
+  for pr in abc 7a -1 ''; do
+    run "$SCRIPT" test/repo "$pr" PRRT_issue_new "$TITLE" "$BODY"
+    [ "$status" -eq 2 ] || { echo "accepted PR: $pr"; false; }
+  done
+}
+
+@test "rejects a thread ID without the PRRT_ prefix or with nothing after it" {
+  for id in issue_new PRRT_ 'PRRT_a/b'; do
+    run "$SCRIPT" test/repo 7 "$id" "$TITLE" "$BODY"
+    [ "$status" -eq 2 ] || { echo "accepted thread: $id"; false; }
+  done
+}
+
+@test "rejects an unreadable title or body file" {
+  run "$SCRIPT" test/repo 7 PRRT_issue_new "${BATS_TEST_TMPDIR}/nope" "$BODY"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "${BATS_TEST_TMPDIR}/nope"
+  [ "$status" -eq 2 ]
+}
+
+@test "rejects an empty body" {
+  printf '  \n\n' >| "$BODY"
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"Body file is empty"* ]]
+}
+
+@test "a title of exactly 256 characters is accepted and 257 is rejected" {
+  head -c 256 /dev/zero | tr '\0' 'a' >| "$TITLE"
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  head -c 257 /dev/zero | tr '\0' 'a' >| "$TITLE"
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"exceeds 256"* ]]
+}
+
+@test "only the first line of the title file is used" {
+  printf 'First line\nsecond line\n' >| "$TITLE"
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_issue_title")" = "First line" ]
 }

@@ -14,6 +14,7 @@ setup() {
 teardown() {
   # Clean up pagination state files
   rm -f "${BATS_TEST_TMPDIR}/mock_gh_pr300_page" 2>/dev/null || true
+  unset MOCK_GH_COMMENTS_FIXTURE
 }
 
 # --- Input validation ---
@@ -173,6 +174,24 @@ teardown() {
   [ "$t" = '[null,null]' ]
 }
 
+@test "viewer fields keep true values and default to false when absent" {
+  run "$SCRIPT" "test/repo" "500"
+  [ "$status" -eq 0 ]
+  v1=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_v1") | [.viewerCanResolve, .viewerCanReply, .comments[0].viewerDidAuthor]')
+  [ "$v1" = '[true,false,true]' ]
+  v2=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_v2") | [.isOutdated, .viewerCanResolve, .viewerCanReply, .comments[0].viewerDidAuthor]')
+  [ "$v2" = '[false,false,false,false]' ]
+}
+
+@test "commentsTruncated is true only when the thread has more comments than fetched" {
+  run "$SCRIPT" "test/repo" "500"
+  [ "$status" -eq 0 ]
+  t=$(printf '%s' "$output" | jq -c '[.[] | {(.threadId): .commentsTruncated}] | add')
+  [ "$t" = '{"PRRT_v1":false,"PRRT_v2":false,"PRRT_v3":true}' ]
+  fetched=$(printf '%s' "$output" | jq '.[] | select(.threadId == "PRRT_v3") | [(.comments | length), .commentCount] | @csv' -r)
+  [ "$fetched" = "50,51" ]
+}
+
 # --- Error handling ---
 
 @test "handles authentication failure" {
@@ -184,6 +203,7 @@ teardown() {
 @test "handles not-found error" {
   run "$SCRIPT" "test/repo" "999"
   [ "$status" -eq 1 ]
+  [[ "$output" == *"Repository or PR not found"* ]]
 }
 
 # --- Pagination ---
@@ -202,6 +222,14 @@ teardown() {
   ids=$(printf '%s' "$output" | jq -r '.[].threadId')
   [[ "$ids" == *"PRRT_mp_thread1"* ]]
   [[ "$ids" == *"PRRT_mp_thread3"* ]]
+}
+
+@test "--include-outdated accumulates threads across pages" {
+  run "$SCRIPT" --include-outdated "test/repo" "300"
+  [ "$status" -eq 0 ]
+  ids=$(printf '%s' "$output" | jq -r '.[].threadId' | sort | tr '\n' ' ')
+  # Resolved PRRT_mp_thread2 stays out; the outdated page-2 thread comes in.
+  [ "$ids" = "PRRT_mp_thread1 PRRT_mp_thread3 PRRT_mp_thread4 " ]
 }
 
 @test "warns on null cursor with hasNextPage true" {

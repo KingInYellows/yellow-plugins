@@ -5,13 +5,26 @@
 #   body-file:   reply text, at most 1000 characters; the marker is appended
 # Output: JSON to stdout:
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
-#   {"replied":false,"skipped":"already-replied","threadId":"PRRT_..."}
-# Exit codes: 1 other failure, 2 usage or a body that looks like a
-#             credential, 3 not found or permission, 4 rate limited (after
-#             one retry for the whole script).
+#   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
+#     (skipped when the thread's last comment is ours and carries a marker
+#     for this thread with ANY disposition; "disposition" is the one found)
+# Exit codes: 1 other failure (including a non-JSON response),
+#             2 usage: wrong argument count, invalid thread ID or
+#               disposition, unreadable, empty or over-long body file, or a
+#               body that looks like a credential (or could not be scanned),
+#             3 not found or permission,
+#             4 rate limited or timed out: a second rate limit after the one
+#               retry the whole script gets, a wait over 90 s (the wait is
+#               Retry-After, else x-ratelimit-reset when
+#               x-ratelimit-remaining is 0, else
+#               YELLOW_REVIEW_RATE_LIMIT_WAIT), or a gh call that exceeded
+#               YELLOW_REVIEW_GH_TIMEOUT (not retried: the reply may have
+#               posted; a re-run skips via the pre-check).
 # Contract: references/resolve/dispositions.md
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
+#      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
+#        timeout(1), skipped when it is not installed.
 
 set -eu
 
@@ -19,6 +32,8 @@ MAX_BODY_CHARS=1000
 # Longer waits exit 4 instead: the whole call must fit the caller's Bash
 # tool timeout (120 s by default).
 MAX_WAIT_SECONDS=90
+GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
+case "$GH_TIMEOUT" in ''|*[!0-9]*) GH_TIMEOUT=30 ;; esac
 
 usage() {
     printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2
@@ -76,12 +91,18 @@ POST_BODY="$WORK_DIR/post-body"
 jq -Rrs --arg marker "$MARKER" 'sub("\\s+$"; "") + "\n\n" + $marker' <"$BODY_FILE" >"$POST_BODY"
 
 # Run `gh api -i graphql ...`; split headers and body into $HEADERS/$RESP.
-# Returns gh's exit code.
+# Returns gh's exit code (124 when timeout(1) killed it); also in GH_EC.
+GH_EC=0
 gh_graphql() {
     _ec=0
     : >"$HEADERS"
     : >"$RESP"
-    gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$GH_TIMEOUT" gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
+    else
+        gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
+    fi
+    GH_EC=$_ec
     tr -d '\r' <"$OUT" | awk -v h="$HEADERS" -v b="$RESP" '
         !done && /^$/ { done = 1; next }
         !done { print > h; next }
@@ -98,18 +119,18 @@ header() {
 }
 
 is_rate_limited() {
-    grep -qiE 'rate limit|HTTP 429' "$ERR" && return 0
-    jq -e '[.errors[]?.message // empty] | any(test("rate limit"; "i"))' "$RESP" >/dev/null 2>&1
+    grep -qiE 'rate limit|abuse|HTTP 429' "$ERR" && return 0
+    jq -e '[.errors[]?.message // empty] | any(test("rate limit|abuse"; "i"))' "$RESP" >/dev/null 2>&1
 }
 
 is_not_found_or_forbidden() {
-    grep -qiE 'Could not resolve|NOT_FOUND|not found|HTTP 403|HTTP 404|FORBIDDEN|not accessible|permission' "$ERR" && return 0
+    grep -qiE 'Could not resolve to|NOT_FOUND|HTTP 403|HTTP 404|FORBIDDEN|Resource not accessible' "$ERR" && return 0
     jq -e '[.errors[]?.type // empty] | any(. == "NOT_FOUND" or . == "FORBIDDEN")' "$RESP" >/dev/null 2>&1
 }
 
 # Seconds to wait before the single retry: Retry-After, then the reset time
-# when no requests remain, then the default. Prints nothing when the wait
-# would exceed MAX_WAIT_SECONDS.
+# when no requests remain, then the default. The caller compares the result
+# with MAX_WAIT_SECONDS.
 rate_limit_wait() {
     _wait=$(header retry-after)
     case "$_wait" in ''|*[!0-9]*) _wait="" ;; esac
@@ -120,9 +141,11 @@ rate_limit_wait() {
             *) _wait=$((_reset - $(date +%s))); [ "$_wait" -ge 0 ] || _wait=0 ;;
         esac
     fi
-    [ -n "$_wait" ] || _wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
-    [ "$_wait" -le "$MAX_WAIT_SECONDS" ] && printf '%s' "$_wait"
-    return 0
+    if [ -z "$_wait" ]; then
+        _wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
+        case "$_wait" in ''|*[!0-9]*) _wait=60 ;; esac
+    fi
+    printf '%s' "$_wait"
 }
 
 # Run a GraphQL call; one rate-limit retry is shared by the whole script so
@@ -134,10 +157,18 @@ call_with_retry() {
         if gh_graphql "$@" && jq -e '(.errors // []) | length == 0' "$RESP" >/dev/null 2>&1; then
             return 0
         fi
+        if [ "$GH_EC" -eq 124 ]; then
+            printf 'Error: gh timed out after %ss on %s for %s; not retried.\n' "$GH_TIMEOUT" "$_label" "$THREAD_ID" >&2
+            exit 4
+        fi
         if is_rate_limited; then
             _w=$(rate_limit_wait)
-            if [ "$RETRIED" = 1 ] || [ -z "$_w" ]; then
-                printf 'Error: GitHub rate limit on %s for %s.\n' "$_label" "$THREAD_ID" >&2
+            if [ "$_w" -gt "$MAX_WAIT_SECONDS" ]; then
+                printf 'Error: GitHub rate limit on %s for %s; the %ss wait is over the %ss cap, not retried.\n' "$_label" "$THREAD_ID" "$_w" "$MAX_WAIT_SECONDS" >&2
+                exit 4
+            fi
+            if [ "$RETRIED" = 1 ]; then
+                printf 'Error: GitHub rate limit on %s for %s; the one retry is already spent (would wait %ss).\n' "$_label" "$THREAD_ID" "$_w" >&2
                 exit 4
             fi
             printf '[reply-pr-thread] Rate limited on %s; retrying in %ss.\n' "$_label" "$_w" >&2
@@ -149,12 +180,15 @@ call_with_retry() {
             printf 'Error: Thread not found or not permitted (%s): %s\n' "$_label" "$THREAD_ID" >&2
             exit 3
         fi
-        printf 'Error: GraphQL %s failed for %s: %s\n' "$_label" "$THREAD_ID" "$(head -c 300 "$ERR")" >&2
+        # Non-JSON output (an HTML 502 page, say) has no .errors; show it.
+        _detail=$(head -c 300 "$ERR")
+        [ -n "$_detail" ] || _detail=$(head -c 300 "$RESP")
+        printf 'Error: GraphQL %s failed for %s: %s\n' "$_label" "$THREAD_ID" "$_detail" >&2
         exit 1
     done
 }
 
-# --- Pre-check: skip when our marker is already the last comment ---
+# --- Pre-check: skip when our last comment already carries a marker ---
 # shellcheck disable=SC2016
 PRECHECK='
 query ReplyPrecheck($threadId: ID!) {
@@ -173,13 +207,17 @@ if ! jq -e '.data.node.id' "$RESP" >/dev/null 2>&1; then
 fi
 
 # A marker counts only on a comment the viewer authored; a reviewer quoting
-# our marker never causes a skip.
-if jq -e --arg marker "$MARKER" '
+# our marker never causes a skip. Any disposition counts: a re-run after a
+# crash (reply posted, resolve failed) must not post a contradictory reply.
+PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     .data.node.comments.nodes[-1]
-    | select(. != null)
-    | .viewerDidAuthor == true and ((.body // "") | sub("\\s+$"; "") | endswith($marker))
-  ' "$RESP" >/dev/null 2>&1; then
-    jq -nc --arg id "$THREAD_ID" '{replied: false, skipped: "already-replied", threadId: $id}'
+    | select(. != null and .viewerDidAuthor == true)
+    | (.body // "") | sub("\\s+$"; "")
+    | capture("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$")
+    | .d
+  ' "$RESP" 2>/dev/null || true)
+if [ -n "$PRIOR_DISPOSITION" ]; then
+    jq -nc --arg id "$THREAD_ID" --arg d "$PRIOR_DISPOSITION" '{replied: false, skipped: "already-replied", disposition: $d, threadId: $id}'
     exit 0
 fi
 
