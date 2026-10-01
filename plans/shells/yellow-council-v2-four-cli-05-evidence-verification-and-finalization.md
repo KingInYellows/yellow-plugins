@@ -52,11 +52,7 @@ synthesis shell's mechanical combination rule.
   configuration tables, component counts, README/CHANGELOG
 - Expanded manual e2e checklist covering all V2 scenarios
 - Final cross-cutting validation pass over the assembled V2
-- A recorded decision on where the synthesis helper library lives (see
-  "Carried follow-ups")
-- Normalizer fixes for synthesis-side text (F3/F4) while `verify_finding()`
-  compares verbatim cited excerpts per R22; Step 7 report staging without a
-  heredoc and with guaranteed staging-dir cleanup
+- Carried follow-ups F1-F4 (see "Carried follow-ups")
 
 ## Consumes
 
@@ -87,9 +83,10 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand
 time.
 
 - **F1 — synthesis library location (decide first).** `council.md` is ~3,000
-  lines, far past the 500-line command ceiling, and carries the Step 5b helper
-  library (`council_normalize_text`, `council_extract_fenced`,
-  `council_assign_labels`, `council_fence_block`) inline between the
+  lines, far past the 500-line command ceiling (RULE 21 only warns), and
+  carries the Step 5b helper library (`council_normalize_text`,
+  `council_extract_fenced`, `council_assign_labels`, `council_fence_block`)
+  inline between the
   `# >>> council-synthesis-lib` markers. `verify_finding()` and the five-bucket
   logic would add more. Decide — keep inline (extraction-tested by
   `tests/synthesis.bats`) or move to a shipped plugin lib/references file the
@@ -143,25 +140,18 @@ time.
   both is the safe side (a lost identifier breaks evidence, a kept emphasis
   marker only leaves style). Golden cases: `__init__` kept,
   `_private_fn` kept, `*ptr` kept, `**important**` stripped, `__two words__`
-  stripped, `snake_case` untouched.
+  stripped, `snake_case` untouched. `strip_emph` works per whitespace token, so
+  multi-word pairing needs phrase-level state: `strip_words` must track an open
+  run across tokens and strip it only when a matching closing run arrives.
 
 ## Implementation Steps (High-Level)
 
 0. **Synthesis library location (F1)** — make and record the decision before
-   any Step 5 code is added; if moving, do the move as its own step with the
-   bats extraction updated and green, the new library tier-classified and
-   registered in `scripts/shell-compat-config.json`, a `tests/shell-compat`
-   driver added if Tier 4, and `pnpm test:shell-compat`,
-   `pnpm validate:shell-compat`, plus `pnpm check:shell-parse` (parses the
+   any Step 5 code is added; if moving, do the move as its own step and satisfy
+   F1's shell-compat requirements, plus `pnpm check:shell-parse` (parses the
    edited Step 5 fenced wrappers under bash and zsh) passing.
-1. **Normalizer fixes (F3, F4)** — unclosed-fence handling and the F4 emphasis
-   rule (paired `*` runs and multi-word `_`/`__` phrases strip; lone
-   underscore-wrapped identifiers and unpaired edge `*`/`_` are kept) in
-   `council_normalize_text`, with the F4 golden cases. Normalization feeds the
-   synthesis prompt only; `verify_finding()` receives the raw cited excerpt
-   unchanged so Tier 1 compares verbatim source bytes (e.g. `**important**` in a
-   README stays `**important**` for verification even when the synthesis copy is
-   stripped to `important`).
+1. **Normalizer fixes (F3, F4)** — implement F3 and F4 in
+   `council_normalize_text` per "Carried follow-ups", with their golden cases.
 2. **Verification helper** — Tier 1 mode-dependent exact match with the
    skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy
    ratio ≥85; three-state result.
@@ -176,10 +166,9 @@ time.
    this phase in V2.
 6. **Bound the cost** — per-reviewer verification cap and concurrency with
    synthesis prompt construction.
-7. **Step 7 report staging (F2)** — replace the `SYNTHESIS_MD` heredoc with
-   `Write`-based staging; keep the Step 7 appendix loop untouched (Rule D1).
-   When using a fresh `mktemp -d`, trap cleanup on every exit path so
-   synthesized reviewer findings do not persist in private temp dirs.
+7. **Step 7 report staging (F2)** — implement F2's cross-call staging
+   lifecycle per "Carried follow-ups"; keep the Step 7 appendix loop untouched
+   (`scripts/validate-council-roster.js` Rule D1).
 8. **Finalization sweep** — skill contract, both configuration tables,
    component counts and README/CHANGELOG, manual e2e scenarios (quota ETA,
    lineage warning, tie presentation, single-pass bypass, rubric output,
@@ -188,4 +177,5 @@ time.
 
 ## Open Questions
 
-- None
+- F1: keep the synthesis helper library inline in `council.md` or move it to a
+  shipped plugin lib/references file. Decide in Step 0, before any Step 5 code.
