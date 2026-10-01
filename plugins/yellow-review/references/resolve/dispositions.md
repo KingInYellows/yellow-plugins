@@ -829,17 +829,25 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   hits). `b` counts open threads left blocking plus `CHANGES_REQUESTED`
   reviewers.
 - `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
-  `file-followup-issue` exited 4 with `reason=rate-limit` (or no recognizable
-  reason), or `get-pr-blockers` reported `lookupReason: rate_limited` or
-  `resolutionLookupReason: rate_limited`, and mutations stopped. An exit 4 with
+  `file-followup-issue` exited 4 with `reason=rate-limit` (or no
+  recognizable reason) and mutations stopped. An exit 4 with
   `reason=timeout` stops mutations too but leaves `ratelimited=0`.
   `commit-resolve-fixes` exit 4 is a commit undo and never sets it.
   `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
-  remaining PR is reported `not attempted (rate limit)` instead of hitting the
-  limit again.
-- `/review:sweep` and `/review:sweep-all` print the line and do not change their
-  exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
-  `b` is non-zero.
+  remaining PR is reported `not attempted (rate limit)` instead of hitting
+  the limit again.
+- **Reading `ratelimited` (callers).** When the output has a `Resolve:` line
+  of the contract form, its `ratelimited` value is the only rate-limit state:
+  reviewer comments, nested findings, retry notices and a bare `HTTP 403`
+  never change it. Only when no such line exists (the command stopped before
+  its last step), match the output for the markers the scripts print on a
+  rate limit and nothing broader: `GitHub API rate limit exceeded`
+  (`get-pr-comments`, `resolve-pr-thread`), `GitHub rate limit on`
+  (`reply-pr-thread`, `file-followup-issue`) and `poll rate-limited`
+  (`poll-new-threads`). A match counts as `ratelimited=1`; `b` stays unknown.
+- `/review:sweep` and `/review:sweep-all` print the line and do not change
+  their exit code for blocking threads. `/review:resolve-stack` exits 1 when
+  any PR's `b` is non-zero.
 
 ## Known limits
 

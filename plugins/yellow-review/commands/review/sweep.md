@@ -13,8 +13,9 @@ Run a full review-and-cleanup pass on a single PR: invoke `/review:pr
 --non-interactive` for adaptive multi-agent code review with autonomous fix
 application AND autonomous push, then `/review:resolve --non-interactive`
 for parallel resolution of all open reviewer comment threads with no
-spawn-cap, CONFLICT-surfacing, issue-filing, verify-command, or push gates. Both skills run against the
-same PR with no human gates anywhere — sweep is fire-and-forget by design.
+spawn-cap, CONFLICT-surfacing, issue-filing, verify-command, or push gates.
+Both skills run against the same PR with no human gates anywhere — sweep is
+fire-and-forget by design.
 
 Use when you want both an AI review pass and cleanup of any open bot or
 human comment threads in a single unattended invocation. Use `/review:pr`
@@ -132,8 +133,8 @@ The `--non-interactive` flag suppresses `/review:resolve`'s Step 4
 spawn-cap gate, Step 5 CONFLICT-surfacing and issue-filing gates, and
 Step 6 verify-command and push-confirmation gates; each falls back to its
 documented unattended rule (for issues: at most 3 per PR, and only with a
-one-line out-of-scope reason). The Skill tool returns no machine-readable exit
-status, so the wrapper cannot programmatically detect whether
+one-line out-of-scope reason). The Skill tool returns no machine-readable
+exit status, so the wrapper cannot programmatically detect whether
 `/review:pr` errored or its fixes weren't pushed — sweep proceeds
 unconditionally; if `/review:pr` left no fixes to resolve against,
 `/review:resolve` will simply find fewer threads to address. Post-hoc
@@ -191,7 +192,8 @@ Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
 [review:sweep] PR #<PR#>
   Review:  completed (unattended; see /review:pr output above)
   Resolve: <the fields of /review:resolve's `Resolve:` line after its label,
-            e.g. "5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0">
+            e.g. "5 resolved, 2 fixed, 1 issues filed, 1 blocking,
+            push=ok, verify=skipped, ratelimited=0">
   Ledger:  <pending> pending, <attention> need attention — /review:triage <PR#>
 ```
 

@@ -217,8 +217,7 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q 'Never print the full fold' "$TRIAGE"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'Never put a title, reason or other stored'
   grep -q '"\$RL" resolve-path <PR> <finding_id> --head <headRefOid>' "$TRIAGE"
-  run grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
-  [ "$status" -eq 1 ]
+  run ! grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
   grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
 }
 
@@ -254,8 +253,7 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
   [ "$rec" -lt "$cards" ]
   grep -q '"\$RL" prune <PR>' "$TRIAGE"
-  run grep -q 'rm -' "$TRIAGE"
-  [ "$status" -eq 1 ]
+  ! grep -q 'rm -' "$TRIAGE"
 }
 
 @test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
@@ -264,8 +262,7 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep"; after a failed refresh, append "(state not recorded, exit <N>)" to the question. Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
   # Step 2 (prune) is named only by those two bullets
   [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
-  run grep -q 'run Step 2 and stop' "$TRIAGE"
-  [ "$status" -eq 1 ]
+  ! grep -q 'run Step 2 and stop' "$TRIAGE"
 }
 
 @test "triage: a closed PR's state is recorded before the prune question" {
@@ -319,10 +316,8 @@ assert_head_ref_checkout() {
   [ "$(printf '%s' "$block" | grep -n 'case "$head_ref"' | cut -d: -f1)" -lt \
     "$(printf '%s' "$block" | grep -n 'check-ref-format' | cut -d: -f1)" ]
   # the value is never templated into command text anywhere in the file
-  run grep -qE '"<headRefName>"|"<branch>"' "$f"
-  [ "$status" -eq 1 ]
-  run grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
-  [ "$status" -eq 1 ]
+  run ! grep -qE '"<headRefName>"|"<branch>"' "$f"
+  ! grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
 }
 
 @test "review-pr: headRefName is captured into a variable and validated before any command" {
@@ -360,8 +355,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -qF 'Always, whatever step 1 did:** print' <<<"$block"
   grep -qF '[review:sweep-all] No open non-draft PRs found. Nothing to sweep.' <<<"$block"
   # the exit is not conjoined with the prune condition
-  run grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
-  [ "$status" -eq 1 ]
+  ! grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
 }
 
 @test "sweep: unattended triage never prunes a PR that closed after the state check" {
@@ -381,8 +375,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
   grep -q '`--prune <PR#>`' "$SWEEP_ALL"
   # the prune query covers every author, not the --author @me sweep list
-  run grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
-  [ "$status" -eq 1 ]
+  ! grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
 }
 
 @test "sweep-all: the summary table carries a Residual column from the ledger" {
@@ -469,14 +462,12 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 @test "resolve-stack: keys on the not attempted tokens /review:resolve emits" {
   grep -q 'not attempted (cluster cap)' "$RESOLVE_STACK"
   grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
-  run grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
-  [ "$status" -eq 1 ]
+  ! grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
 }
 
 @test "resolver agent: no Bash tool, and edit bounds point at clusters.md" {
   tools=$(sed -n '/^tools:/,/^---$/p' "$RESOLVER_AGENT")
-  run grep -q 'Bash' <<<"$tools"
-  [ "$status" -eq 1 ]
+  run ! grep -q 'Bash' <<<"$tools"
   grep -q 'references/resolve/clusters.md' "$RESOLVER_AGENT"
   grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }
@@ -515,12 +506,43 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 # The dirty-tree and rate-limit stops must finish the current PR (clean-tree
 # check, revert, row) before ending the walk, and name the summary heading.
-@test "resolve-stack: dirty-tree stop reverts, checks the result, and names the summary heading" {
-  grep -q -- '--pr "<PR#>" --revert-dirty' "$RESOLVE_STACK"
+DIRTY_REF="$BATS_TEST_DIRNAME/../references/resolve/dirty-tree-cleanup.md"
+
+@test "resolve-stack: dirty-tree stop uses the shared cleanup, names the summary heading, exits 1" {
+  grep -qF 'references/resolve/dirty-tree-cleanup.md' "$RESOLVE_STACK"
   grep -q 'aborted at PR #<PR#>: working tree dirty after resolve' "$RESOLVE_STACK"
-  grep -q 'treeClean: false' "$RESOLVE_STACK"
+  grep -q 'revert incomplete' "$RESOLVE_STACK"
+  grep -q 'unrecognized changes left in place' "$RESOLVE_STACK"
+  grep -q 'not attempted (dirty tree)' "$RESOLVE_STACK"
   grep -q 'go to `### Step 4: Final aggregate summary`' "$RESOLVE_STACK"
-  ! grep -q 'go to Step 4' "$RESOLVE_STACK"
+  grep -q 'the command exits `1`' "$RESOLVE_STACK"
+  run ! grep -q 'go to Step 4' "$RESOLVE_STACK"
+}
+
+@test "dirty-tree-cleanup: lists with -z, owns via the files API, and handles both revert branches" {
+  grep -qF 'git status --porcelain=v1 -z --untracked-files=all' "$DIRTY_REF"
+  grep -qF 'pr-changed-ranges" "<PR#>"' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only -- ' "$DIRTY_REF"
+  grep -q 'do NOT run `--revert-dirty`' "$DIRTY_REF"
+  grep -q 'treeClean: false' "$DIRTY_REF"
+  grep -q 'revert incomplete' "$DIRTY_REF"
+  grep -q 'unrecognized changes left in place' "$DIRTY_REF"
+  grep -q 'exits non-zero' "$DIRTY_REF"
+  grep -q '#973' "$DIRTY_REF"
+  # a failed ownership lookup leaves every path unrecognized
+  grep -qE 'no path is owned through the PR file list' "$DIRTY_REF"
+  # agent memory is not trusted config, and the reference says why
+  grep -qF 'except `.claude/agent-memory/`' "$DIRTY_REF"
+  grep -q 'memory: project' "$DIRTY_REF"
+}
+
+@test "dirty-tree cleanup is defined once: resolve-stack and sweep-all point to it, neither copies it" {
+  for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
+    grep -qF 'references/resolve/dirty-tree-cleanup.md' "$f" || { echo "no pointer in $f"; false; }
+    run ! grep -qE -e '--revert-(dirty|only)' "$f"
+    run ! grep -qF 'gh pr diff' "$f"
+  done
 }
 
 @test "resolve-stack: a rate-limited PR is finished before the walk stops" {
@@ -530,19 +552,47 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q -- '--include-outdated' "$RESOLVE_STACK"
 }
 
-@test "sweep-all: the rate-limit stop runs after the clean-tree check" {
+@test "sweep-all: the rate-limit stop runs after the clean-tree check, and both stops exit 1" {
   clean=$(grep -n 'Clean-tree check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   rate=$(grep -n 'Rate-limit stop' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   [ -n "$clean" ] && [ -n "$rate" ] && [ "$clean" -lt "$rate" ]
-  grep -q -- '--pr "<PR#>" --revert-dirty' "$SWEEP_ALL"
+  grep -qF 'references/resolve/dirty-tree-cleanup.md' "$SWEEP_ALL"
   grep -q 'go to `### Step 5: End-of-loop' "$SWEEP_ALL"
-  ! grep -q 'go to Step 5' "$SWEEP_ALL"
   grep -q 'Re-pass wait: up to' "$SWEEP_ALL"
+  grep -q 'Dirty tree after a sweep' "$SWEEP_ALL"
+  grep -q 'Rate-limited PR' "$SWEEP_ALL"
+  [ "$(grep -c 'exits `1`' "$SWEEP_ALL")" -ge 2 ]
+  run ! grep -q 'go to Step 5' "$SWEEP_ALL"
+}
+
+@test "sweep-all: a dirty tree after the cleanup skips compound and the remaining PRs" {
+  grep -qF 'skipped — working tree dirty after PR' "$SWEEP_ALL"
+  grep -qF '[review:sweep-all] Skipping /flow:compound — working tree not clean.' "$SWEEP_ALL"
+  grep -q 'Dirty-tree guard' "$SWEEP_ALL"
+  grep -qF 'working tree dirty after sweep (patch: <patch>)' "$SWEEP_ALL"
 }
 
 @test "resolve-stack, sweep and sweep-all read the same Resolve: contract fields" {
   for f in "$RESOLVE_STACK" "$SWEEP" "$SWEEP_ALL"; do
     grep -q 'ratelimited=' "$f" || { echo "no ratelimited= in $f"; false; }
+  done
+  # resolve-stack names every field of the line; sweep shows them in its example
+  for field in '<r> resolved' '<f> fixed' '<i> issues filed' '<b> blocking' 'push=<' 'verify=<' 'ratelimited=<0|1>'; do
+    grep -qF "$field" "$RESOLVE_STACK" || { echo "missing $field in resolve-stack"; false; }
+  done
+  for field in 'resolved' 'fixed' 'issues filed' 'blocking' 'push=ok' 'verify=skipped' 'ratelimited=0'; do
+    tr '\n' ' ' <"$SWEEP" | tr -s ' ' | grep -qF "$field" || { echo "missing $field in sweep"; false; }
+  done
+  grep -q 'blocking' "$SWEEP_ALL"
+}
+
+@test "Resolve: ratelimited rule is defined once in dispositions.md and the callers point to it" {
+  for marker in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'only rate-limit state'; do
+    tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ' | grep -qF "$marker" || { echo "missing $marker"; false; }
+  done
+  for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
+    grep -qF 'references/resolve/dispositions.md' "$f" || { echo "no pointer in $f"; false; }
+    run ! grep -qiE 'HTTP 403/429' "$f"
   done
 }
 
@@ -646,8 +696,7 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   printf '%s\n' "$step3f" | grep -qF 'mktemp -d'
   printf '%s\n' "$step3f" | grep -qF 'touch "$MARK_DIR/ignored-marker"'
   # No trap in the minting call: the trap lives in the consuming call.
-  run grep -q '^trap ' <<<"$step3f"
-  [ "$status" -eq 1 ]
+  ! printf '%s\n' "$step3f" | grep -q '^trap '
   step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
   printf '%s\n' "$step6" | grep -qF -- '--ignored-since "$MARK_DIR/ignored-marker"'
   printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"

@@ -197,17 +197,14 @@ failures and continue.
    flag suppresses that command's spawn-cap, CONFLICT, issue-filing,
    verify-command, and push-confirmation gates so it resolves, commits, and
    submits without prompting. Its last output line is the contract line
-   `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking,
-   push=<...>, verify=<...>, ratelimited=<0|1>`
-   (`references/resolve/dispositions.md`). The command emits no contract line
-   when a rate limit stops it before its last step, so treat output with an
-   explicit rate-limit error (HTTP 403/429, `rate limit`), or a missing
-   contract line after a rate-limit message, as `ratelimited=1` too. If it
-   reports `ratelimited=1`, remember that and finish **this** PR first —
-   items 3, 3b and 5, skipping only its restack — and list it under Needs manual attention as `rate
-   limited`. Then mark every remaining PR `not attempted (rate limit)` and
-   go to `### Step 4: Final aggregate summary`: the next PR would hit the
-   same limit.
+   `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<...>, verify=<...>, ratelimited=<0|1>`
+   (`references/resolve/dispositions.md`, which also defines how to read
+   `ratelimited` when the line is missing). If `ratelimited=1`, remember that
+   and finish **this** PR first — items 3, 3b and 5, skipping only its
+   restack — and list it under Needs manual attention as `rate limited`. Then
+   mark every remaining PR `not attempted (rate limit)` and go to
+   `### Step 4: Final aggregate summary`: the next PR would hit the same
+   limit.
 
 3. **Self-verify** — parse the `Resolve:` line from step 2's output for
    `b` (blocking), `i` (issues filed) and `push`. The `Skill` tool returns no
@@ -236,11 +233,12 @@ failures and continue.
    when the two disagree — the `Resolve:` line is missing, or the count
    exceeds `b` (open threads the command did not report as blocking; `b`
    also counts `CHANGES_REQUESTED` reviewers, so a count at or below `b` is
-   not proof of agreement); record that as `self-verify disagreement`. On non-zero exit: record the PR's
-   verification as `inconclusive` with the stderr output and flag it. When
-   the stderr shows a rate limit (HTTP 403/429, `rate limit`), also treat the
-   PR as `ratelimited=1` under item 2's rule: skip its restack and stop the
-   walk after this PR.
+   not proof of agreement); record that as `self-verify disagreement`. On
+   non-zero exit: record the PR's verification as `inconclusive` with the
+   stderr output and flag it. When the stderr contains
+   `GitHub API rate limit exceeded` (the `get-pr-comments` marker), also treat
+   the PR as `ratelimited=1` under item 2's rule: skip its restack and stop
+   the walk after this PR.
 
    **3b. Clean-tree check** — continuing on a dirty tree would carry this PR's
    edits onto the next branch:
@@ -251,27 +249,16 @@ failures and continue.
 
    Non-empty output: print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
-   followed by the file list. The tree was clean at pre-flight, but an editor
-   or build may have touched it since, so revert only the resolve's own edits.
-   The resolve's own paths are the PR's changed files (first column of
-   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" "<PR#>"`,
-   which uses the paginated files API and works past `gh pr diff`'s size
-   limits; if it exits non-zero, treat no path as the resolve's own) plus the
-   trusted-config paths a refused
-   edit must never leave on disk: anything under `.claude/`,
-   `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
-   `.mcp.json`. If any dirty path is not the resolve's own, do NOT run
-   `--revert-dirty`: revert only the trusted-config paths among them with
-   `run-verify-command --pr "<PR#>" --revert-only -- <paths>` and list the
-   rest under Needs manual attention as `unrecognized changes left in place`.
-   When every dirty path is the resolve's own, save and revert the leftover
-   edits with
-   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty`
-   and print its `patch` path when it is not null. If the script exits
-   non-zero or reports `treeClean: false`, print `[review:resolve-stack]
-   revert incomplete:` with `git status --porcelain` and list it under Needs
-   manual attention. Then mark the remaining PRs `not attempted (dirty
-   tree)` and go to `### Step 4: Final aggregate summary` (exit `1`).
+   followed by the file list. Read
+   `${CLAUDE_PLUGIN_ROOT}/references/resolve/dirty-tree-cleanup.md` and run its
+   procedure with this PR's number to revert the resolve's own edits. Print
+   the `patch` path it reports when it is not null. If it reports `revert
+   incomplete`, print `[review:resolve-stack] revert incomplete:` with the
+   output of `git status --porcelain=v1 --untracked-files=all` and list the PR
+   under Needs manual attention; list any unrecognized changes there as
+   `unrecognized changes left in place`. Then mark the remaining PRs
+   `not attempted (dirty tree)` and go to `### Step 4: Final aggregate summary`
+   (exit `1`).
 
 4. **Restack** — `gt upstack restack`. If it reports a conflict: do not pause —
    run `gt abort` to clear the conflicted restack (without this, the repo stays
@@ -350,8 +337,12 @@ is not a failure.
 - **`gt checkout` failure mid-walk** — log and skip that PR, continue.
 - **A PR's resolve leaves the working tree dirty** (a failed commit, a
   verify revert that could not clean up, a rejected push) — step 3b stops
-  the walk with `aborted at PR #<N>` and the file list, and the command
-  exits `1`. Continuing would carry those edits onto the next branch.
+  the walk with `aborted at PR #<N>` and the file list, and the command exits
+  `1`. Continuing would carry those edits onto the next branch.
+- **A PR is rate limited** (`ratelimited=1` on its `Resolve:` line, or the
+  self-verify marker) — the walk finishes that PR except its restack, marks
+  the remaining PRs `not attempted (rate limit)`, and the command exits `1`
+  because the rate-limited PR is under Needs manual attention.
 - **PR merged or closed between stack-build and the walk reaching it** —
   `/review:resolve` detects the non-open state and reports; record the PR as
   skipped and continue.
