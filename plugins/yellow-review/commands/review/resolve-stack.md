@@ -326,9 +326,9 @@ failure), and PRs not attempted (rate limit / dirty tree).
 Finally, a **Needs manual attention** section listing every PR with:
 blocking threads (`b > 0`), residual unresolved threads (`>0` from step 3),
 a self-verify disagreement or inconclusive self-verify, a restack conflict,
-a push failure, a dirty-tree abort or incomplete revert, a `not attempted
-(cluster cap)` note surfaced by `/review:resolve`, a rate-limited PR, or
-`not attempted (rate limit)`. If that section is empty, print
+a push failure, a dirty-tree abort or incomplete revert, a rate-limited PR, or
+a `not attempted (cluster cap)` or `not attempted (rate limit)` note surfaced
+by `/review:resolve`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
 **Exit code contract.** Exit `0` only when every walked PR is fully resolved —
