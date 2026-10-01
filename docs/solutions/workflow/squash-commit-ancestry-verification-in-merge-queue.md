@@ -12,7 +12,22 @@ source: compound-staging
 
 ## Context
 
-Squash-commit ancestry verification in merge-queue workflows. Graphite merge-queue artifacts can diverge from reviewed PR content, so confirm the squash commit is on origin/main before comparing content. This is a manual recovery step, not something `/plan:complete` Gate C enforces: run `git merge-base --is-ancestor "$SQUASH_SHA" origin/main` yourself, as shown in `docs/solutions/workflow/plan-lifecycle-management.md`. Skipping it risks content drift validation errors when queued PRs land on main.
+Graphite merge-queue artifacts can diverge from the reviewed PR content. When
+you already know the PR number and its squash commit, check that the squash
+commit reached `origin/main` before comparing content. Fetch first, or the
+check runs against a stale ref:
+
+```bash
+git fetch origin main
+git merge-base --is-ancestor "$SQUASH_SHA" origin/main \
+  || echo "squash commit is not on origin/main: nothing landed"
+```
+
+This is corroborating evidence, not a standalone gate: it proves the commit
+landed, not that its content matches the reviewed branch. Pair it with the
+landed-content comparison in `docs/solutions/workflow/plan-lifecycle-management.md`
+("Verifying an MQ merge when Gate C has nothing"). It is a manual recovery step;
+`/plan:complete` Gate C does not run it.
 
 ## Source
 

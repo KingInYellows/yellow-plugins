@@ -23,13 +23,9 @@ Remedy, in order (full detail in
 3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed` (verified once: 388 memories re-embedded to 384-dim). If `wouldDrop` was nonzero and the user confirmed the loss, add `--drop-missing`; without it reembed refuses to proceed.
 4. Restart Claude Code before any further write. The running MCP server holds the pre-reembed snapshot, and its next save would overwrite the reembedded store.
 
-Run `hooks reembed` only with writes quiesced, and restart Claude Code before any further write.
-
 ## Source
 
 Auto-promoted by yellow-core's compound-staging pipeline from session
 `394983d5-0363-4094-8dcd-635002066498` (priority 0.85, category fact).
-
-See `ruvector-adr210-embedding-provenance-refusal.md` for the full runbook.
 
 See `plans/complete/background-compounding-triggers.md` for the pipeline architecture.

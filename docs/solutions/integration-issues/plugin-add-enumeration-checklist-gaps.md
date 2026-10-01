@@ -41,12 +41,8 @@ validators are the authority on what actually fails.
    workspace, because the `plugins/*` glob matches direct children only.
    yellow-cursor's `installSdk` runs an unlocked `npm install` without
    `--ignore-scripts`, a supply-chain gap not to copy.
-6. **Verify provider routing in code, not header comments.** Comments in
-   `scripts/validate-provider-groups.js` can lag the groups it actually
-   enforces (`stacked-pr` and `remote-agent`); read the group tables and
-   consumer-site checks before deciding which groups a new provider needs.
-   Its `ERROR-PROVIDER-*`
-   codes are built by string concatenation so `scripts/lint-error-codes.js`
+6. **Keep `ERROR-PROVIDER-*` codes concatenated.** The codes in
+   `scripts/validate-provider-groups.js` are built by string concatenation so `scripts/lint-error-codes.js`
    does not flag literal catalog codes in `scripts/`; keep that style.
 
 ## Why This Matters

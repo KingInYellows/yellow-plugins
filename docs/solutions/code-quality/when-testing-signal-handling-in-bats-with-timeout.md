@@ -43,7 +43,8 @@ Treat the other statuses as distinct failures, not as success:
 
 Keep an assertion on what the handler did (forwarded output, restored file, removed temp file). The status alone only proves the signal was sent.
 
-For a case that expects SIGKILL (`-s KILL`, or a TERM-ignoring child hit by `-k`), `timeout` reports 137 rather than 124; assert 137 there and check the filesystem state afterwards. `plugins/yellow-core/tests/context-observer.bats` ("T10" tests) uses `run "$killer" -s KILL 1 ...` and then checks the record is intact. The "R19" test in the same file shows the `|| true` form this doc replaces; prefer the status assertion above for new tests.
+For SIGKILL cases assert 137 and check the filesystem afterwards; see the "T10" tests in
+`plugins/yellow-core/tests/context-observer.bats`, and "R19" there for the `|| true` form this doc replaces.
 
 ## Source
 
