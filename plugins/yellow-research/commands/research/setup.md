@@ -332,7 +332,7 @@ else
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
   if { [ "$provider_status" = "ACTIVE" ] || [ "$provider_status" = "INVALID" ]; } && has_userconfig yellow-research exa_api_key; then
-    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here."
+    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run an exa tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
 fi
@@ -429,7 +429,7 @@ else
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
   if { [ "$provider_status" = "ACTIVE" ] || [ "$provider_status" = "INVALID" ]; } && has_userconfig yellow-research tavily_api_key; then
-    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here."
+    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a tavily tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
 fi
@@ -529,7 +529,7 @@ else
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
   if { [ "$provider_status" = "ACTIVE" ] || [ "$provider_status" = "INVALID" ]; } && has_userconfig yellow-research perplexity_api_key; then
-    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here. Perplexity counts as active only once Step 3.5 sees its MCP tools."
+    provider_detail="Shell key probe: $provider_status (HTTP $http_status). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a perplexity tool call to validate the userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status; pending MCP-visibility confirmation)"
   fi
 fi

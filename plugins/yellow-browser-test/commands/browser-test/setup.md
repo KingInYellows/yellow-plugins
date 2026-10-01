@@ -83,17 +83,19 @@ if [ -f "$repo_top/docker-compose.yml" ] && \
   signals="$signals docker_http"
 fi
 if [ -n "$signals" ]; then
-  printf 'is_web: true (signals:%s)\n' "$signals"
+  printf 'is_web: true (signals:%s; checked: %s)\n' "$signals" "$repo_top"
 else
-  printf 'is_web: false\n'
+  printf 'is_web: false (checked: %s)\n' "$repo_top"
 fi
 ```
 
 If `is_web` is `false`, use AskUserQuestion:
 
-> "No web-app signals found (checked: package.json, Gemfile, Python deps,
-> go.mod, Cargo.toml, PaaS config, docker-compose ports). Browser testing
-> requires a web app with a dev server."
+> "No web-app signals found in {the `checked:` path from the output above}
+> (checked: package.json, Gemfile, Python deps, go.mod, Cargo.toml, PaaS
+> config, docker-compose ports). That path is the git root, which may differ
+> from your current directory. Browser testing requires a web app with a dev
+> server."
 >
 > Options:
 > - "Continue anyway" — proceed to app discovery
