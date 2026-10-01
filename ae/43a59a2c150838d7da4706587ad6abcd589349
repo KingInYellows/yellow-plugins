@@ -4,6 +4,7 @@ plugins/yellow-review/skills/pr-review-workflow/SKILL.md
   s_becc7011266565::t_ec80a38e9b8cbe 453-454,462-463,465-468
 plugins/yellow-review/CLAUDE.md
   s_5667e810256031::t_906608fb37b4e9 212
+  s_5667e810256031::t_a02510ca1d424d 213
 ---
 {
   "schema_version": "authorship/3.0.0",
