@@ -65,10 +65,11 @@ gh pr view <PR#> --json state -q .state
 If the command fails or the state is not "OPEN", report the error and stop.
 
 **Non-interactive mode** suppresses the Step 9 push-confirmation gate and
-the Step 9b P2-only "save learnings" prompt — so the command runs unattended.
-It is set automatically when `/review:sweep` invokes this command; an
-interactive user can also pass `--non-interactive` explicitly. When the flag
-is absent, every gate behaves exactly as before.
+the Step 9b P2-only "save learnings" prompt, and Step 9a stages findings for
+the compound-staging drain instead of spawning the gated knowledge-compounder,
+so the command runs unattended. It is set automatically when `/review:sweep`
+invokes this command; an interactive user can also pass `--non-interactive`
+explicitly. When the flag is absent, every gate behaves exactly as before.
 
 ### Step 2: Check Working Directory
 
@@ -1077,13 +1078,14 @@ skip both steps.
 
 Otherwise, Read
 `${CLAUDE_PLUGIN_ROOT}/references/review-pr/knowledge-compounding.md` and
-execute Steps 9a (knowledge-compounder dispatch) and 9b (tiered ruvector
-memory record) exactly as written there. Do not improvise either step
-from memory: the findings-table fence format, the P0/P1-auto vs
-P2-prompted vs P3-skip tier rules, the non-interactive-mode suppression,
-and the 0.82 dedup threshold with its retry-once error contract are all
-load-bearing — a paraphrased version silently writes unfenced untrusted
-content or pollutes memory with duplicates.
+execute Steps 9a (knowledge-compounder dispatch, or compound-staging when
+non-interactive) and 9b (tiered ruvector memory record) exactly as written
+there. Do not improvise either step from memory: the findings-table fence
+format, the P0/P1-auto vs P2-prompted vs P3-skip tier rules, the
+non-interactive-mode suppression, and the 0.82 dedup threshold with its
+retry-once error contract are all load-bearing — a paraphrased version
+silently writes unfenced untrusted content or pollutes memory with
+duplicates.
 
 Non-negotiable floor, independent of whether the Read succeeds: any
 findings text passed to a spawned agent MUST be wrapped in

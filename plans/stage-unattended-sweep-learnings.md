@@ -328,7 +328,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 2.2: Rewrite Step 9a in
+- [x] 2.2: Rewrite Step 9a in
       `plugins/yellow-review/references/review-pr/knowledge-compounding.md`.
   - Keep the existing skip guard (no P0–P2 findings).
   - Branch on non-interactive mode.
@@ -369,7 +369,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 2.3: Update the `review-pr.md` Step 1 non-interactive paragraph (around
+- [x] 2.3: Update the `review-pr.md` Step 1 non-interactive paragraph (around
       lines 64–69) and the Steps 9a+9b stub (around 1068–1083) to say that
       non-interactive mode stages to compound-staging instead of spawning the
       compounder. Keep the 9a body in the reference file, since `review-pr.md`
