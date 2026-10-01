@@ -90,9 +90,11 @@ Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skippe
 
 Optional `resolve_pr.verify_command` runs before the commit. Interactive
 runs ask first; unattended runs need `resolve_pr.verify_unattended: true`,
-an untracked `yellow-plugins.local.md`, and no runner files in the fix. If
-it fails, the fixes are saved as a patch under the git common dir and
-reverted. The full contract is `references/resolve/dispositions.md`.
+an untracked `yellow-plugins.local.md`, and no runner files in the fix.
+Keep that file ignored as well as untracked (add it to `.git/info/exclude`),
+or the clean-tree check stops the run. If verify fails, the fixes are saved
+as a patch under the git common dir and reverted. The full contract is
+`references/resolve/dispositions.md`.
 
 ## Agents
 

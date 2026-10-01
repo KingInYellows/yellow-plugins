@@ -237,7 +237,10 @@ failures and continue.
    exceeds `b` (open threads the command did not report as blocking; `b`
    also counts `CHANGES_REQUESTED` reviewers, so a count at or below `b` is
    not proof of agreement); record that as `self-verify disagreement`. On non-zero exit: record the PR's
-   verification as `inconclusive` with the stderr output and flag it.
+   verification as `inconclusive` with the stderr output and flag it. When
+   the stderr shows a rate limit (HTTP 403/429, `rate limit`), also treat the
+   PR as `ratelimited=1` under item 2's rule: skip its restack and stop the
+   walk after this PR.
 
    **3b. Clean-tree check** — continuing on a dirty tree would carry this PR's
    edits onto the next branch:
@@ -250,8 +253,11 @@ failures and continue.
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
    followed by the file list. The tree was clean at pre-flight, but an editor
    or build may have touched it since, so revert only the resolve's own edits.
-   The resolve's own paths are the PR's changed files
-   (`gh pr diff "<PR#>" --name-only`) plus the trusted-config paths a refused
+   The resolve's own paths are the PR's changed files (first column of
+   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" "<PR#>"`,
+   which uses the paginated files API and works past `gh pr diff`'s size
+   limits; if it exits non-zero, treat no path as the resolve's own) plus the
+   trusted-config paths a refused
    edit must never leave on disk: anything under `.claude/`,
    `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
    `.mcp.json`. If any dirty path is not the resolve's own, do NOT run
