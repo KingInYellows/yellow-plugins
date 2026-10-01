@@ -1,0 +1,21 @@
+plugins/yellow-browser-test/agents/testing/app-discoverer.md
+  s_46afba3fd1243f::t_35e5ac96e38d03 70-71
+.changeset/browser-test-setup-web-signals.md
+  s_46afba3fd1243f::t_2daf6578f64431 10-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cc6b95a3c811b7c5b1d3c2ddae40df11e3fdcfba",
+  "prompts": {},
+  "sessions": {
+    "s_46afba3fd1243f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "551287bb-653b-4f77-987f-3999e3653fd2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
