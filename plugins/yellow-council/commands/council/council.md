@@ -1191,13 +1191,35 @@ printf '%s\n' "$SYNTH_TOKEN" >| "$SYNTH_DIR/.token" || {
 }
 # Line 1 = directory, line 2 = token. Mode 0600 from creation (umask 077),
 # then chmod as a belt-and-braces; >| overwrites under zsh noclobber.
-( umask 077; printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE" ) \
-  && chmod 600 "$SYNTH_STATE" || {
-  rm -rf -- "$SYNTH_DIR"
+# One synthesis per worktree: claim the state file atomically (ln fails if it
+# exists) so a concurrent /council cannot overwrite another run's capability.
+# A state file whose directory is gone or over an hour old is a dead run's
+# leftover and is reclaimed.
+if [ -f "$SYNTH_STATE" ]; then
+  OLD_DIR=$(sed -n '1p' "$SYNTH_STATE" 2>/dev/null)
+  case "$OLD_DIR" in
+    *..*|/tmp/council-synth-*/*) OLD_DIR="" ;;
+    /tmp/council-synth-*) ;;
+    *) OLD_DIR="" ;;
+  esac
+  if [ -n "$OLD_DIR" ] && [ -d "$OLD_DIR" ] && [ ! -L "$OLD_DIR" ] \
+    && [ -n "$(find "$OLD_DIR" -maxdepth 0 -mmin -60 2>/dev/null)" ]; then
+    rm -rf -- "$SYNTH_DIR"
+    printf '[council] Error: another council synthesis is in progress in this worktree (%s); wait for it or remove %s\n' "$OLD_DIR" "$SYNTH_STATE" >&2
+    exit 1
+  fi
   rm -f -- "$SYNTH_STATE"
-  printf '[council] Error: cannot write the synthesis state file\n' >&2
+fi
+SYNTH_STATE_TMP="$SYNTH_STATE.$$"
+( umask 077; printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE_TMP" ) \
+  && chmod 600 "$SYNTH_STATE_TMP" \
+  && ln -- "$SYNTH_STATE_TMP" "$SYNTH_STATE" || {
+  rm -rf -- "$SYNTH_DIR"
+  rm -f -- "$SYNTH_STATE_TMP"
+  printf '[council] Error: cannot claim the synthesis state file (another run may hold it)\n' >&2
   exit 1
 }
+rm -f -- "$SYNTH_STATE_TMP"
 printf 'COUNCIL_SYNTH_DIR=%s\n' "$SYNTH_DIR"
 ```
 
@@ -2229,7 +2251,7 @@ council_cleanup_claude_only() {
   esac
   [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
   # Synthesis handoff state file (Step 5a); removing it never touches the dir.
-  [ -n "$GIT_ROOT" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+  [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
 }
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; council_cleanup_claude_only; exit 1; }
 STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
@@ -2875,7 +2897,7 @@ case "$CLAUDE_FENCED" in
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
-[ -n "$GIT_ROOT" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+[ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
 exit 0
 ```
 
@@ -2980,7 +3002,7 @@ case "$CLAUDE_FENCED" in
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
-[ -n "$GIT_ROOT" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
+[ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ] && rm -f -- "$GIT_ROOT/.git/council-synth.state"
 
 # Apply the verification result now that cleanup has run.
 [ "$WRITE_OK" -eq 1 ] || exit 1

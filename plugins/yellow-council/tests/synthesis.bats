@@ -615,12 +615,17 @@ teardown() {
     printf '%s\n' "$GOOD" >| "$SD/.token"
     printf '%s\n' "$BAD" >| "$EVIL/.token"
     printf '%s\n' 'S1:claude' >| "$EVIL/labels.txt"
-    printf '%s\n' 'S1:claude' >| "$SD/labels.txt"
     printf '%s\n' '| F1 | x |' >| "$EVIL/pass-a.md"
     printf '%s\n' '| F1 | y |' >| "$SD/pass-a.md"
     write_synth_state "$SD" "$GOOD"
     # Whatever the orchestrator might try to inject (env vars, arguments,
     # edited literals) cannot name the attacker dir: the fences read the state file.
+    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' COUNCIL_SYNTH_DIR='$EVIL' . '$s5b.sub'"
+    [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
+    [[ "$output" == *"COUNCIL_SYNTH_FORWARD=$SD/forward.txt"* ]]
+    [[ "$output" != *"$EVIL"* ]]
+    [ -f "$SD/forward.txt" ] && [ ! -e "$EVIL/forward.txt" ] && [ ! -e "$EVIL/reverse.txt" ]
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' COUNCIL_SYNTH_DIR='$EVIL' . '$s5d'"
     [ "$status" -eq 0 ] || { echo "$profile 5d: $stderr"; return 1; }
     [[ "$output" == *"| F1 | y |"* ]] && [[ "$output" != *"| F1 | x |"* ]]
@@ -631,6 +636,26 @@ teardown() {
     [ -d "$EVIL" ] && [ "$(cat "$EVIL/.token")" = "$BAD" ] && [ -f "$EVIL/labels.txt" ] && [ -f "$EVIL/pass-a.md" ]
     rm -rf "$EVIL" "$REPO"
   done
+}
+
+@test "the state-file reload prefix is identical in 5b, 5d and 5e" {
+  local f
+  for f in 5b 5d 5e; do
+    case "$f" in
+      5b) extract_fence_after "$COUNCIL_MD" '#### 5b ' "${BATS_TEST_TMPDIR}/$f.sh" ;;
+      5d) extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "${BATS_TEST_TMPDIR}/$f.sh" ;;
+      5e) extract_fence_after "$COUNCIL_MD" '#### 5e ' "${BATS_TEST_TMPDIR}/$f.sh" ;;
+    esac
+    # GIT_ROOT lookup through the SYNTH_DIR shape check (first esac), comments and blank lines dropped.
+    awk '/^GIT_ROOT=/ {buf=""; seen=0} /^SYNTH_STATE=/ {seen=1}
+         !/^[[:space:]]*(#|$)/ {buf = buf $0 "\n"}
+         seen && /^esac$/ {printf "%s", buf; exit}' \
+      "${BATS_TEST_TMPDIR}/$f.sh" >| "${BATS_TEST_TMPDIR}/$f.reload"
+    [ -s "${BATS_TEST_TMPDIR}/$f.reload" ]
+  done
+  # A drift in one copy (e.g. a new state field) must fail here, not silently desync.
+  cmp "${BATS_TEST_TMPDIR}/5b.reload" "${BATS_TEST_TMPDIR}/5d.reload"
+  cmp "${BATS_TEST_TMPDIR}/5b.reload" "${BATS_TEST_TMPDIR}/5e.reload"
 }
 
 @test "5b, 5d and 5e fail closed on a missing, garbled, symlinked or foreign-dir state file" {
@@ -694,6 +719,24 @@ teardown() {
     SD=""
     rm -rf "$REPO"
   done
+}
+
+@test "Step 8 cancel cleanup unlinks a regular state file but leaves a symlinked one" {
+  local s8="${BATS_TEST_TMPDIR}/8.sh" st
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  # A symlink at the state path is not ours to unlink; its target is untouched.
+  printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
+  ln -s "$BATS_TEST_TMPDIR/target" "$st"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ -L "$st" ] && [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
+  # A regular, user-owned state file is removed.
+  rm -f "$st"
+  write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ ! -e "$st" ]
+  rm -rf "$REPO"
 }
 
 @test "5d resume block fences a valid Pass A table and refuses a non-table or wrong token" {
