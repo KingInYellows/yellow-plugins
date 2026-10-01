@@ -14,27 +14,45 @@
 #   Added lines that look like a credential are refused (exit 3, stderr
 #   "credential-shaped") unless --allow-credential-shaped is passed, which an
 #   interactive caller does only after the user confirms a second time.
+#   The same check runs again on the commit itself: a credential a git hook
+#   added is refused with exit 4 (the commit is undone), not 3.
+#   --allow-credential-shaped together with --unattended is a usage error
+#   (exit 2): the override needs a human.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
-# Exit codes: 2 usage, 3 staged mismatch or refused path, 4 commit failed
-#             (or the commit's files or added lines differ from the checked
-#             set, or the tree is dirty after it, e.g. a hook changed or
-#             created files; the commit is then undone and
-#             its changes left unstaged for the caller's revert),
-#             5 submit failed, 6 verify mismatch. After 5 or 6 the commit
-#             exists locally: resubmit through the provider rather than
-#             re-running this script (a re-run sees a clean tree: NOOP).
+# Exit codes: 2 usage (including --allow-credential-shaped with
+#             --unattended), 3 staged mismatch, refused path or
+#             pre-commit credential-shaped refusal, 4 commit failed
+#             (or no new commit appeared, changes remain staged, the
+#             commit's files or added lines differ from the checked set
+#             (including a credential a hook added), or the tree is dirty
+#             after it, e.g. a hook changed or created files; the commit is
+#             then undone and its changes left unstaged for the caller's
+#             revert), 5 submit failed or timed out, 6 verify mismatch or a
+#             verify call timed out. After 5 or 6 the commit exists locally:
+#             resubmit through the provider rather than re-running this
+#             script (a re-run sees a clean tree: NOOP).
 # Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
 #        (default: the sibling github-workflow plugin).
 #      YELLOW_REVIEW_VERIFY_BACKOFF (default "2 4 8 16") — seconds between
 #        PR head checks after the first.
+#      YELLOW_REVIEW_SUBMIT_TIMEOUT (default 300) and
+#      YELLOW_REVIEW_NET_TIMEOUT (default 30) — seconds allowed for the
+#        provider submit and for each gh / git ls-remote call, enforced with
+#        timeout(1) or gtimeout when installed (no limit otherwise). Worst
+#        case with the defaults is under 600 s, the caller's Bash budget.
 # Contract: references/resolve/dispositions.md. This script never pushes
 # directly; the provider's submit is the only publish path.
 
 set -euo pipefail
 
 MAX_MESSAGE_CHARS=200
+
+# shellcheck source=../../../lib/resolve-paths.sh
+. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
@@ -48,7 +66,6 @@ PR=""
 MESSAGE=""
 UNATTENDED=0
 ALLOW_CREDENTIAL=0
-FILES=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
@@ -58,16 +75,14 @@ while [ $# -gt 0 ]; do
         --allow-credential-shaped) ALLOW_CREDENTIAL=1; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
-            [ -f "$2" ] && [ -r "$2" ] || die 2 "--files-from not readable: $2"
-            while IFS= read -r line || [ -n "$line" ]; do
-                [ -n "$line" ] && FILES+=("$line")
-            done <"$2"
+            rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
             shift 2
             ;;
-        --) shift; FILES+=("$@"); break ;;
+        --) shift; RP_FILES+=("$@"); break ;;
         *) usage ;;
     esac
 done
+FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
 
 case "$PROVIDER" in
     graphite|github) ;;
@@ -84,29 +99,31 @@ for tool in git gh jq; do
     command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
 done
 
+# Bound every network call. Without timeout(1) or gtimeout (macOS without
+# coreutils) calls run unbounded. A timeout exits 124, which every caller
+# below already treats as a failure of that step.
+SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
+NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
+TIMEOUT_BIN=$(command -v timeout || command -v gtimeout || true)
+bounded() {
+    local secs="$1"
+    shift
+    if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "$secs" "$@"; else "$@"; fi
+}
+GH_BIN=$(command -v gh)
+# Shadows gh for this script and the sourced rp_pr_files.
+gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
+
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP"
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
-# shellcheck source=../../../lib/resolve-paths.sh
-. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
-# shellcheck source=../../../lib/resolve-text.sh
-. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
-
 # The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.
 find_runtime() {
-    local root cand ver
+    local root
     root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
-    cand="$root/../github-workflow/lib/github-stack-runtime.js"
-    [ -f "$cand" ] && { printf '%s' "$cand"; return 0; }
-    ver=$(for d in "$root"/../../github-workflow/*/; do
-        d="${d%/}"; d="${d##*/}"
-        [[ "$d" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$d"
-    done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
-    cand="$root/../../github-workflow/$ver/lib/github-stack-runtime.js"
-    [ -n "$ver" ] && [ -f "$cand" ] && { printf '%s' "$cand"; return 0; }
-    return 1
+    rp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
 }
 
 if [ "$PROVIDER" = github ]; then
@@ -142,15 +159,9 @@ fi
 # the commit (or be left behind): refuse before staging anything.
 DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE"' EXIT
-{ git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
-    >"$DIRTY_FILE" || die 3 "git diff failed"
-while IFS= read -r -d '' d; do
-    found=0
-    for f in ${EXPECTED[@]+"${EXPECTED[@]}"}; do
-        [ "$d" = "$f" ] && { found=1; break; }
-    done
-    [ "$found" = 1 ] || die 3 "change outside the expected set: $d"
-done <"$DIRTY_FILE"
+rp_tree_changes "$DIRTY_FILE" || die 3 "cannot list tree changes"
+d=$(rp_assert_only_listed "$DIRTY_FILE" ${EXPECTED[@]+"${EXPECTED[@]}"}) \
+    || die 3 "change outside the expected set: $d"
 
 emit() {
     jq -nc --arg s "$1" --arg sha "$2" --arg b "$BRANCH" '{status: $s, sha: $sha, branch: $b}'
@@ -177,7 +188,7 @@ fi
 ADDED=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE" "$ADDED"' EXIT
 git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
-    | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' >"$ADDED"
+    | rt_added_lines >"$ADDED"
 if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}"
     die 3 "credential-shaped: staged changes look like they contain a credential; nothing committed"
@@ -185,29 +196,31 @@ fi
 
 # --- Commit (always a new commit; never amend) ---
 BEFORE=$(git rev-parse HEAD)
+SHA=""
+# Undo the new commit (changes left unstaged) and exit 4, so nothing is
+# submitted and a later submit — for example of an upstack branch — cannot
+# publish it.
+undo_commit() {
+    git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "${SHA:-HEAD}" >&2
+    die 4 "$1"
+}
 case "$PROVIDER" in
     graphite) gt modify -c -m "$MESSAGE" --no-interactive >&2 || die 4 "gt modify -c failed" ;;
     github) git commit -q -m "$MESSAGE" >&2 || die 4 "git commit failed" ;;
 esac
 SHA=$(git rev-parse HEAD)
-[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || die 4 "no new commit was created on top of the previous HEAD"
-git diff --cached --quiet || die 4 "changes remain staged after the commit"
+[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || undo_commit "no new commit was created on top of the previous HEAD"
+git diff --cached --quiet || undo_commit "changes remain staged after the commit"
 
 # A pre-commit hook can stage more files or edit listed ones after the checks
-# above, so compare what the commit actually holds. On a mismatch nothing is
-# submitted and the commit is undone (changes left unstaged), so a later
-# submit — for example of an upstack branch — cannot publish it.
-undo_commit() {
-    git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "$SHA" >&2
-    die 4 "$1"
-}
+# above, so compare what the commit actually holds.
 COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0' '\n' | LC_ALL=C sort)
 if [ "$COMMITTED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
     undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
-    | awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }' >|"$ADDED"
+    | rt_added_lines >|"$ADDED"
 if [ "$ALLOW_CREDENTIAL" = 0 ] && rt_looks_secret "$ADDED"; then
     undo_commit "credential-shaped: the commit looks like it contains a credential (a hook may have added it); nothing submitted"
 fi
@@ -244,11 +257,13 @@ case "$PROVIDER" in
     graphite)
         # No --update-only: it has not been shown to leave the set of
         # submitted stack branches unchanged, and the PR already exists.
-        gt submit --no-interactive --no-edit >&2 || die 5 "gt submit failed"
+        bounded "$SUBMIT_TIMEOUT" gt submit --no-interactive --no-edit >&2 \
+            || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
-        OUT=$(node "$RUNTIME" submit --remote "$REMOTE_NAME") || die 5 "github-stack-runtime submit crashed"
+        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit --remote "$REMOTE_NAME") \
+            || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then
             printf '%s\n' "$OUT" >&2
@@ -260,7 +275,7 @@ esac
 # --- Verify the published head ---
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
-REMOTE=$(git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
+REMOTE=$(bounded "$NET_TIMEOUT" git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)
 [ "$REMOTE" = "$SHA" ] || die 6 "head not verified: local=$SHA remote=${REMOTE:-none}"
 PR_HEAD=""
 for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do

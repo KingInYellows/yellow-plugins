@@ -14,6 +14,8 @@ resolve_repo_init() {
   : >| "$STUB_LOG"
   unset STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_DIFF_FAIL
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
+  # Fixture repos must not inherit the developer's or CI's git config.
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
   ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   REPO="$BATS_TEST_TMPDIR/repo"

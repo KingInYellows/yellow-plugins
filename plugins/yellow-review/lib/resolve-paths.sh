@@ -29,15 +29,18 @@ rp_canonical() {
 }
 
 # rp_denied <path>: the resolver deny list, matched case-insensitively
-# (macOS and WSL mounts are case-insensitive).
+# (macOS and WSL mounts are case-insensitive) and at any depth: a nested
+# .claude/ or CLAUDE.md steers tooling just as the root one does.
 rp_denied() {
     local l
     l=$(rp_lower "$1")
     case "$l" in
-        .github/*|.circleci/*|.git/*|.claude/*|.vscode/*|.devcontainer/*|.idea/*) return 0 ;;
-        yellow-plugins.local.md|claude.md|agents.md|.mcp.json) return 0 ;;
+        .github/*|*/.github/*|.circleci/*|*/.circleci/*|.git/*|*/.git/*) return 0 ;;
+        .claude/*|*/.claude/*|.vscode/*|*/.vscode/*) return 0 ;;
+        .devcontainer/*|*/.devcontainer/*|.idea/*|*/.idea/*) return 0 ;;
     esac
     case "${l##*/}" in
+        yellow-plugins.local.md|claude.md|agents.md|.mcp.json) return 0 ;;
         .gitlab-ci.yml|.travis.yml|.drone.yml|jenkinsfile|azure-pipelines.yml|bitbucket-pipelines.yml) return 0 ;;
         dockerfile|dockerfile.*|*.dockerfile|docker-compose*.yml|docker-compose*.yaml|compose.yml|compose.yaml) return 0 ;;
         .env|.env.*|secrets.*|*.pem|*.key|*.p12|*.pfx|*.tfvars|*.tfstate) return 0 ;;
@@ -67,15 +70,26 @@ rp_runner() {
     hooks=$(git config --get core.hooksPath 2>/dev/null || true)
     if [ -n "$hooks" ]; then
         top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+        # Normalise to a path relative to the toplevel: strip an absolute
+        # toplevel prefix, leading ./ segments and trailing slashes. Git
+        # resolves a relative hooksPath from the toplevel too.
+        if [ -n "$top" ]; then
+            case "$hooks" in "$top"|"$top"/*) hooks="${hooks#"$top"}"; hooks="${hooks#/}" ;; esac
+        fi
+        while :; do
+            case "$hooks" in
+                ./*) hooks="${hooks#./}" ;;
+                */) hooks="${hooks%/}" ;;
+                *) break ;;
+            esac
+        done
         # A hooks path that is the repository root itself: Git runs every
         # root-level file as a hook, so any path without a slash is a runner.
-        if [ -n "$top" ] && { [ "$hooks" = "$top" ] || [ "$hooks" = "$top/" ]; }; then
-            case "$l" in */*) ;; *) return 0 ;; esac
-            return 1
+        if [ -z "$hooks" ] || [ "$hooks" = . ]; then
+            case "$l" in */*) return 1 ;; *) return 0 ;; esac
         fi
-        [ -n "$top" ] && hooks="${hooks#"$top"/}"
-        hooks=$(rp_lower "${hooks#./}")
-        case "$l" in "${hooks%/}"/*) return 0 ;; esac
+        hooks=$(rp_lower "$hooks")
+        case "$l" in "$hooks"/*) return 0 ;; esac
     fi
     return 1
 }
@@ -84,4 +98,64 @@ rp_runner() {
 # files API, which works past GitHub's diff-size limits (gh pr diff does not).
 rp_pr_files() {
     gh api --paginate "repos/{owner}/{repo}/pulls/$1/files?per_page=100" --jq '.[].filename'
+}
+
+# rp_tree_changes <outfile>: every change in the tree, as git lists it
+# (tracked or staged, then untracked; the two sets are disjoint),
+# NUL-delimited so a newline in a filename cannot forge a second path. A
+# listing failure returns non-zero and must stop the caller, never read as
+# "clean". The caller owns <outfile> (a mktemp file it removes on exit).
+rp_tree_changes() {
+    { git diff --no-renames --name-only -z HEAD -- && git ls-files --others --exclude-standard -z; } \
+        >"$1" 2>/dev/null
+}
+
+# rp_assert_only_listed <changes-file> [path...]: succeeds when every path in
+# the NUL-delimited <changes-file> is one of the listed paths. Otherwise
+# prints the first unlisted path and returns 1.
+rp_assert_only_listed() {
+    local list="$1" d f found
+    shift
+    while IFS= read -r -d '' d; do
+        [ -n "$d" ] || continue
+        found=0
+        for f in "$@"; do
+            [ "$d" = "$f" ] && { found=1; break; }
+        done
+        [ "$found" = 1 ] || { printf '%s' "$d"; return 1; }
+    done <"$list"
+    return 0
+}
+
+# rp_read_file_list <file>: append the non-empty lines of <file> to the
+# global RP_FILES array. Returns 1 when <file> is not a readable regular file.
+RP_FILES=()
+rp_read_file_list() {
+    local line
+    [ -f "$1" ] && [ -r "$1" ] || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] && RP_FILES+=("$line")
+    done <"$1"
+    return 0
+}
+
+# rp_sibling_file <plugin-root> <plugin> <relpath>: print the path of a file
+# in a sibling plugin. Source tree first (plugins/<plugin>/<relpath>), then
+# the newest numeric version in the installed cache
+# (<marketplace>/<plugin>/<version>/<relpath>). <plugin-root> is this
+# plugin's directory (cache: <marketplace>/<name>/<version>/).
+rp_sibling_file() {
+    local root="$1" plugin="$2" rel="$3" path dir name ver
+    path="$root/../$plugin/$rel"
+    if [ -f "$path" ]; then
+        printf '%s' "$path"
+        return 0
+    fi
+    ver=$(for dir in "$root/../../$plugin"/*/; do
+        name="${dir%/}"; name="${name##*/}"
+        [[ "$name" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$name"
+    done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+    path="$root/../../$plugin/$ver/$rel"
+    [ -n "$ver" ] && [ -f "$path" ] && { printf '%s' "$path"; return 0; }
+    return 1
 }
