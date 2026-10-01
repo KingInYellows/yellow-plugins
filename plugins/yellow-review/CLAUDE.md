@@ -181,9 +181,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   mutation
 - `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
   File (or find) the follow-up issue for an out-of-scope thread, deduped by a
-  viewer-authored marker. `--find <owner/repo> <PRRT_id>` only looks, never
-  files. Not yet invoked by `/review:resolve`; see
-  `references/resolve/dispositions.md`
+  viewer-authored marker; `--find <owner/repo> <PRRT_id>` only looks, never
+  files. `/review:resolve` calls it for `oos` threads (see
+  `references/resolve/dispositions.md`)
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
   like a credential, or has an image, an `@` mention or a foreign URL (for
   text posted outside the resolve scripts); exits 6
