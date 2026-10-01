@@ -1,0 +1,23 @@
+plugins/yellow-research/commands/research/setup.md
+  s_46afba3fd1243f::t_a5f6847a0af787 432,532
+  s_46afba3fd1243f::t_5debf27e4678da 335
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_46afba3fd1243f::t_a5f6847a0af787 86,88,95-98
+  s_46afba3fd1243f::t_5debf27e4678da 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "820a3c8bb75c19653176e2b471beffd98e74de99",
+  "prompts": {},
+  "sessions": {
+    "s_46afba3fd1243f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "551287bb-653b-4f77-987f-3999e3653fd2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
