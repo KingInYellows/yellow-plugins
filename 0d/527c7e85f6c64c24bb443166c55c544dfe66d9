@@ -8,7 +8,7 @@ plugins/yellow-review/tests/check-resolve-text.bats
   s_fc95207836202a::t_6b4c9c622dfb26 55-70,74-76
   s_3a67c5309460ff::t_231b1e87decfdc 71-73
 plugins/yellow-review/lib/resolve-text.sh
-  s_fc95207836202a::t_80d0f2498847ab 21-31
+  s_fc95207836202a::t_80d0f2498847ab 21-31,21-29,31
 plans/review-resolve-hardening.md
   s_fc95207836202a::t_d6f74eaf7c2135 510-512
   s_fc95207836202a::t_4e61a2e5866392 62-66
