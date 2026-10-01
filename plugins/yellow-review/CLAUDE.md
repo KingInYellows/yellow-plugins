@@ -225,10 +225,12 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   `gtimeout(1)` is installed; without either `gh` runs unbounded.
 - `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
   `run-verify-command`) — canonical-path check, the case-insensitive resolver
-  deny list, and the runner-file list (files a git hook or verify command
-  would execute)
+  deny list (agent-tool config dirs and instruction files included), the
+  runner-file list (files a git hook or verify command would execute) and
+  `rp_tree_changes`; a `git config` failure other than exit 1 fails closed
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
-  process-group and redacted-log helpers for the verify run
+  process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
+  accepts only a `timeout`/`gtimeout` that supports `--kill-after`
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
