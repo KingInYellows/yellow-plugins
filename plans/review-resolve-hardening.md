@@ -530,8 +530,8 @@ Decisions from the brainstorm and the planning round:
   - `resolve_pr.verify_unattended` (default `false`, boolean; any value other
     than `true` warns and is treated as `false`, so unattended runs skip
     verify);
-  - `resolve_pr.verify_timeout_seconds` (default 600);
-  - `resolve_pr.repass_wait_seconds` (default 120, range 0–600);
+  - `resolve_pr.verify_timeout_seconds` (default 540, range 1–540);
+  - `resolve_pr.repass_wait_seconds` (default 120, range 0–480);
   - `resolve_pr.resolve_human_threads` (`evidence|never|all`).
 
   Note that unattended runs skip `verify_command` when the file is tracked.

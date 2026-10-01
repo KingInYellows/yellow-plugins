@@ -135,7 +135,8 @@ while true; do
     _GH_STDERR=$(cat "$_STDERR_FILE")
     if [ "$_GH_EXIT" -ne 0 ]; then
         # Parse error category from stderr. Rate limits come first: GitHub
-        # reports a secondary rate limit as HTTP 403. Status codes match only
+        # reports a secondary rate limit as HTTP 403, and callers
+        # (poll-new-threads) detect it by the "rate limit" wording. Status codes match only
         # as "HTTP <code>", so digits elsewhere in the text do not classify.
         _GH_LC=$(printf '%s' "$_GH_STDERR" | tr '[:upper:]' '[:lower:]')
         case "$_GH_LC" in
