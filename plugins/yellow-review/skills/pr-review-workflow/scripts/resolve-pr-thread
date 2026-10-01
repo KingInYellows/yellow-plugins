@@ -87,12 +87,6 @@ mutation($threadId: ID!) {
 _WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
 trap 'rm -rf "$_WORK_DIR"' EXIT
 gg_init "$_WORK_DIR"
-run_mutation() {
-    gg_call -F threadId="$THREAD_ID" -f query="$MUTATION" || true
-    RESPONSE=$(cat "$GG_RESP")
-    _GH_STDERR=$(cat "$GG_ERR")
-    _GH_EXIT=$GG_EXIT
-}
 # fail_reason <token>: exit 3 with the reason token on its own stderr line.
 fail_reason() {
     case "$1" in
@@ -104,12 +98,12 @@ fail_reason() {
 }
 # A timed-out call may have applied the mutation: report it, never retry.
 fail_if_timed_out() {
-    if [ "$_GH_EXIT" -eq 124 ]; then
+    if [ "$GG_EXIT" -eq 124 ]; then
         printf 'Error: gh timed out after %ss resolving %s; not retried.\n' "$GG_TIMEOUT" "$THREAD_ID" >&2
         exit 4
     fi
 }
-run_mutation
+gg_call -F threadId="$THREAD_ID" -f query="$MUTATION" || true
 fail_if_timed_out
 if gg_is_rate_limited; then
     _W=$(gg_rate_limit_wait)
@@ -119,7 +113,7 @@ if gg_is_rate_limited; then
     fi
     printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_W" >&2
     sleep "$_W"
-    run_mutation
+    gg_call -F threadId="$THREAD_ID" -f query="$MUTATION" || true
     fail_if_timed_out
 fi
 if gg_is_rate_limited; then
@@ -127,7 +121,9 @@ if gg_is_rate_limited; then
     exit 4
 fi
 gg_pace
-if [ "$_GH_EXIT" -ne 0 ]; then
+RESPONSE=$(cat "$GG_RESP")
+_GH_STDERR=$(cat "$GG_ERR")
+if [ "$GG_EXIT" -ne 0 ]; then
     case "$_GH_STDERR" in
         *"already resolved"*|*"ALREADY_RESOLVED"*)
             # Idempotent — treat as success

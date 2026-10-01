@@ -4,9 +4,11 @@
 # classification, so both scripts agree on exit-code meanings.
 # shellcheck shell=sh
 
-# Waits over this exit 4 instead: the whole call must fit the caller's Bash
-# tool timeout (120 s by default).
+# Longest rate-limit wait a caller may sleep before its single retry; a longer
+# wait exits 4 instead, so the whole call fits the caller's Bash tool timeout
+# (120 s by default).
 GG_MAX_WAIT_SECONDS=90
+# Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
 # Seconds one gh call may run (YELLOW_REVIEW_GH_TIMEOUT, default 30; invalid
 # values fall back to 30). Enforced only when timeout(1) is installed.
@@ -70,10 +72,10 @@ gg_reason() {
         FORBIDDEN) printf 'permission'; return 0 ;;
         NOT_FOUND) printf 'not-found'; return 0 ;;
     esac
-    if grep -qiE 'HTTP 403|FORBIDDEN|Resource not accessible' "$GG_ERR"; then
+    if grep -qiE 'HTTP 403([^0-9]|$)|FORBIDDEN|Resource not accessible' "$GG_ERR"; then
         printf 'permission'; return 0
     fi
-    if grep -qiE 'Could not resolve to|NOT_FOUND|HTTP 404' "$GG_ERR"; then
+    if grep -qiE 'Could not resolve to a|NOT_FOUND|HTTP 404([^0-9]|$)' "$GG_ERR"; then
         printf 'not-found'; return 0
     fi
     return 1

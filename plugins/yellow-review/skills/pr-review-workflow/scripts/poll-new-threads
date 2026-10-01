@@ -1,31 +1,33 @@
 #!/bin/bash
 # Poll for review threads that appeared after round 1 of /review:resolve.
-# Usage: poll-new-threads --wait <seconds> [--interval <seconds>] <owner/repo> <pr-number> <round1-ids-file> <out-file>
+# Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>
 #   --wait 0 fetches exactly once with no sleep. Otherwise the script sleeps
-#   min(interval, remaining) (default interval 20), fetches, and stops at the
-#   first fetch that shows a thread ID missing from <round1-ids-file> (one ID
-#   per line) or when the wait is used up; it always fetches at least once.
+#   min(20, remaining) seconds, fetches, and stops at the first fetch that
+#   shows a thread ID missing from <round1-ids-file> (one ID per line; blank
+#   lines and CRs are ignored) or when the wait is used up; it always fetches
+#   at least once.
 # Output: the last successful get-pr-comments JSON in <out-file>; progress
 #   lines "poll t=<s> new=<0|1>" and a final "repass fetched=<0|1> found=<0|1>"
 #   on stdout. fetched=0 means no fetch succeeded (inconclusive).
 # Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
 #             ("poll rate-limited" is printed; stop mutating).
-# A failed fetch or jq parse is never read as "no new threads": it leaves
-# fetched unchanged and the loop moves on.
+# A failed fetch, jq parse or grep is never read as "no new threads": the
+# round is skipped and the loop moves on. A failed copy to <out-file> resets
+# fetched to 0, since <out-file> would hold stale data.
 
 set -u
 
+STEP=20
+
 usage() {
-    printf 'Usage: poll-new-threads --wait <seconds> [--interval <seconds>] <owner/repo> <pr-number> <round1-ids-file> <out-file>\n' >&2
+    printf 'Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>\n' >&2
     exit 2
 }
 
 WAIT=""
-INTERVAL=20
 while [ $# -gt 0 ]; do
     case "$1" in
         --wait) [ $# -ge 2 ] || usage; WAIT="$2"; shift 2 ;;
-        --interval) [ $# -ge 2 ] || usage; INTERVAL="$2"; shift 2 ;;
         --*) usage ;;
         *) break ;;
     esac
@@ -33,12 +35,14 @@ done
 [ $# -eq 4 ] || usage
 REPO="$1"; PR="$2"; ROUND1="$3"; OUT="$4"
 case "$WAIT" in ''|*[!0-9]*) usage ;; esac
-case "$INTERVAL" in ''|*[!0-9]*|0) usage ;; esac
 [ -r "$ROUND1" ] || { printf 'Error: round-1 file not readable: %s\n' "$ROUND1" >&2; exit 2; }
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 WORK=$(mktemp -d) || exit 1
 trap 'rm -rf "$WORK"' EXIT
+
+# Blank lines would make grep -F match everything; CRs would never match.
+tr -d '\r' <"$ROUND1" | grep -v '^$' >"$WORK/round1" || :
 
 fetched=0
 found=0
@@ -46,22 +50,27 @@ waited=0
 while :; do
     if [ "$waited" -lt "$WAIT" ]; then
         step=$((WAIT - waited))
-        [ "$step" -gt "$INTERVAL" ] && step=$INTERVAL
+        [ "$step" -gt "$STEP" ] && step=$STEP
         sleep "$step"
         waited=$((waited + step))
     fi
     if "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR" >"$WORK/new" 2>"$WORK/err"; then
         if jq -r '.[].threadId' "$WORK/new" >"$WORK/ids" 2>/dev/null; then
-            cp "$WORK/new" "$OUT" && fetched=1
-            grep -qvxF -f "$ROUND1" "$WORK/ids"
-            [ "$?" -eq 0 ] && found=1
-            printf 'poll t=%s new=%s\n' "$waited" "$found"
+            grep_rc=0
+            grep -qvxF -f "$WORK/round1" "$WORK/ids" || grep_rc=$?
+            # grep exits 0 for a new ID, 1 for none, 2 or more on error.
+            if [ "$grep_rc" -le 1 ] && cp "$WORK/new" "$OUT"; then
+                fetched=1
+                if [ "$grep_rc" -eq 0 ]; then found=1; fi
+                printf 'poll t=%s new=%s\n' "$waited" "$found"
+            else
+                fetched=0
+            fi
         fi
     elif grep -qi 'rate limit' "$WORK/err"; then
         printf 'poll rate-limited\n'
         exit 4
     fi
-    [ "$found" = 1 ] && break
-    [ "$waited" -ge "$WAIT" ] || [ "$SECONDS" -ge "$WAIT" ] && break
+    if [ "$found" = 1 ] || [ "$waited" -ge "$WAIT" ]; then break; fi
 done
 printf 'repass fetched=%s found=%s\n' "$fetched" "$found"

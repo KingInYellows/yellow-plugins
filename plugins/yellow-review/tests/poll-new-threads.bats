@@ -66,3 +66,94 @@ setup() {
   [ "$status" -eq 4 ]
   [[ "$output" == *"poll rate-limited"* ]]
 }
+
+# --- Fake get-pr-comments: the script runs the sibling next to itself, so
+# these tests copy it beside a stub that replays FAKE_RESULTS, one per call
+# (the last repeats): "ok:<id,id>", "fail", "badjson".
+fake_setup() {
+  FAKE_DIR="${BATS_TEST_TMPDIR}/fake"
+  mkdir -p "$FAKE_DIR"
+  cp "$SCRIPT" "$FAKE_DIR/poll-new-threads"
+  cat >"$FAKE_DIR/get-pr-comments" <<'EOS'
+#!/bin/bash
+n=$(( $(cat "$FAKE_STATE" 2>/dev/null || echo 0) + 1 ))
+printf '%s' "$n" >"$FAKE_STATE"
+IFS='|' read -ra results <<<"$FAKE_RESULTS"
+r="${results[$((n - 1))]:-${results[$((${#results[@]} - 1))]}}"
+case "$r" in
+  ok:*) printf '%s' "${r#ok:}" | jq -Rc 'split(",") | map(select(. != "") | {threadId: .})' ;;
+  badjson) printf 'not json' ;;
+  *) echo "boom" >&2; exit 1 ;;
+esac
+EOS
+  chmod +x "$FAKE_DIR/get-pr-comments"
+  export FAKE_STATE="${BATS_TEST_TMPDIR}/fake_state"
+  rm -f "$FAKE_STATE"
+}
+
+@test "rejects a non-numeric or missing --wait and unknown options" {
+  : >"$ROUND1"
+  run "$SCRIPT" --wait abc "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --wait "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --wait 0 --interval 5 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+}
+
+@test "an unreadable round-1 file exits 2" {
+  run "$SCRIPT" --wait 0 "o/r" 123 "${BATS_TEST_TMPDIR}/missing" "$OUT"
+  [ "$status" -eq 2 ]
+}
+
+@test "unparseable fetch output is inconclusive, never no-new-threads" {
+  fake_setup
+  : >"$ROUND1"
+  FAKE_RESULTS="badjson" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [ ! -e "$OUT" ]
+}
+
+@test "mixed outcomes: a failed fetch and bad JSON are skipped, then a later fetch finds the new thread" {
+  fake_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FAKE_RESULTS="fail|badjson|ok:PRRT_a,PRRT_b" run "$FAKE_DIR/poll-new-threads" --wait 100 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"poll t=60 new=1"* ]]
+  [[ "$output" == *"repass fetched=1 found=1"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20,20,20" ]
+}
+
+@test "a failure after a success keeps fetched=1 with the earlier output" {
+  fake_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FAKE_RESULTS="ok:PRRT_a|fail" run "$FAKE_DIR/poll-new-threads" --wait 40 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  [ "$(jq -r '.[0].threadId' "$OUT")" = "PRRT_a" ]
+}
+
+@test "blank and CRLF round-1 lines do not hide a new thread or fake one" {
+  fake_setup
+  printf 'PRRT_a\r\n\r\n\nPRRT_b\r\n' >"$ROUND1"
+  FAKE_RESULTS="ok:PRRT_a,PRRT_b" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  FAKE_RESULTS="ok:PRRT_a,PRRT_c" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"repass fetched=1 found=1"* ]]
+}
+
+@test "a failed copy to the out file resets fetched" {
+  fake_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FAKE_RESULTS="ok:PRRT_a,PRRT_b" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "${BATS_TEST_TMPDIR}/no-such-dir/out.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+}
+
+@test "a secondary rate limit (HTTP 403) from the fetch exits 4" {
+  : >"$ROUND1"
+  run "$SCRIPT" --wait 0 "o/r" 403 "$ROUND1" "$OUT"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"poll rate-limited"* ]]
+}

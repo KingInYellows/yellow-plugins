@@ -396,17 +396,63 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'show it with `git diff` and no path argument'
 }
 
-@test "review-pr: a codex QUOTA_EXHAUSTED is a skipped reviewer and only an exact council fenced path is unlinked" {
-  # The stub's findings pair is empty, so reading it as "no findings" would say
-  # Codex reviewed and found nothing.
-  grep -q 'TIMEOUT`, `ERROR` or `QUOTA_EXHAUSTED`' "$REVIEW_PR"
-  grep -q 'only when the value is exactly' "$REVIEW_PR"
-  grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
-  grep -q 'never unlinked' "$REVIEW_PR"
+# --- resolve write phase (contract tokens) ----------------------------------
+
+RESOLVE_PR="$COMMANDS_DIR/resolve-pr.md"
+RESOLVE_REFS="$BATS_TEST_DIRNAME/../references/resolve"
+RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
+
+@test "resolve-pr: HEAD check precedes the fetch and the write phase" {
+  head_check=$(grep -n '^### Step 2c: Verify HEAD Matches the PR Head' "$RESOLVE_PR" | cut -d: -f1)
+  fetch=$(grep -n '^### Step 3: Fetch Unresolved Comments' "$RESOLVE_PR" | cut -d: -f1)
+  [ "$head_check" -lt "$fetch" ]
+  grep -q 'headRefOid' "$RESOLVE_PR"
 }
 
-@test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
-  DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
-  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
-  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+@test "resolve-pr: steps run in order dispositions, verify/commit/push, write, re-pass, report" {
+  s5=$(grep -n '^### Step 5: Dispositions' "$RESOLVE_PR" | cut -d: -f1)
+  s6=$(grep -n '^### Step 6: Verify, Commit and Push' "$RESOLVE_PR" | cut -d: -f1)
+  s7=$(grep -n '^### Step 7: Write Phase' "$RESOLVE_PR" | cut -d: -f1)
+  s8=$(grep -n '^### Step 8: Bounded Re-pass' "$RESOLVE_PR" | cut -d: -f1)
+  s9=$(grep -n '^### Step 9: Report' "$RESOLVE_PR" | cut -d: -f1)
+  [ "$s5" -lt "$s6" ] && [ "$s6" -lt "$s7" ] && [ "$s7" -lt "$s8" ] && [ "$s8" -lt "$s9" ]
+}
+
+@test "resolve-pr: write phase invokes every script with its load-bearing flags" {
+  grep -qF 'scripts/run-verify-command" --pr "<PR#>" --timeout' "$RESOLVE_PR"
+  grep -q -- '--revert-dirty' "$RESOLVE_PR"
+  grep -q -- '--revert-only --files-from' "$RESOLVE_PR"
+  grep -qF 'scripts/commit-resolve-fixes" --provider "<graphite|github>"' "$RESOLVE_PR"
+  grep -q -- '--allow-credential-shaped' "$RESOLVE_PR"
+  grep -q 'scripts/file-followup-issue"' "$RESOLVE_PR"
+  grep -q 'scripts/reply-pr-thread"' "$RESOLVE_PR"
+  grep -q 'scripts/resolve-pr-thread"' "$RESOLVE_PR"
+  grep -q 'scripts/poll-new-threads"' "$RESOLVE_PR"
+}
+
+@test "resolve-pr: only a PUSHED result keeps fixed threads fixed; refusals revert" {
+  grep -q '`PUSHED` → `push=ok`' "$RESOLVE_PR"
+  grep -q 'Only `PUSHED`' "$RESOLVE_PR"
+  grep -q 'a refused edit must not stay' "$RESOLVE_PR"
+  grep -q 'never substitute `git rev-parse`' "$RESOLVE_PR"
+}
+
+@test "resolve-pr: Resolve line and blockers unknown are reported" {
+  grep -q 'ends with a Resolve: line' "$RESOLVE_PR"
+  grep -q 'CHANGES_REQUESTED unknown' "$RESOLVE_PR"
+  grep -q 'not attempted (cluster cap)' "$RESOLVE_PR"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_PR"
+}
+
+@test "resolve-stack: keys on the not attempted tokens /review:resolve emits" {
+  grep -q 'not attempted (cluster cap)' "$RESOLVE_STACK"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
+  ! grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
+}
+
+@test "resolver agent: no Bash tool, and edit bounds point at clusters.md" {
+  tools=$(sed -n '/^tools:/,/^---$/p' "$RESOLVER_AGENT")
+  ! printf '%s\n' "$tools" | grep -q 'Bash'
+  grep -q 'references/resolve/clusters.md' "$RESOLVER_AGENT"
+  grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }

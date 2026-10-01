@@ -164,6 +164,32 @@ stub_sleep() {
   [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_long")" = 1 ]
 }
 
+# --- x-ratelimit-reset wait source ---
+
+@test "a reset time in the future sets the wait to the seconds remaining" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" "PRRT_rl_reset"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" =~ retrying\ once\ in\ (29|30)s ]]
+  grep -qE '^(29|30)$' "$SLEEP_LOG"
+}
+
+@test "a reset time in the past retries after 0 s" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" "PRRT_rl_resetpast"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"retrying once in 0s"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_resetpast")" = 2 ]
+}
+
+@test "a reset time over the 90 s cap exits 4 without retrying" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" "PRRT_rl_resetfar"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"exceeds 90s"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_resetfar")" = 1 ]
+}
+
 # --- Rate-limit wait fallback and cap ---
 
 @test "the rate-limit wait defaults to 60 s" {

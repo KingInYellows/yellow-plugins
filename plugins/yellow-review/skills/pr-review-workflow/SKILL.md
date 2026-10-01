@@ -437,7 +437,7 @@ Located at `skills/pr-review-workflow/scripts/`:
   GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are
   listed. Exit 1 on a fetch failure, 2 on usage. `/review:resolve` Step 4
   builds the resolver's `PR-changed lines` and `PR files` from it.
-- **poll-new-threads** `--wait <s> [--interval <s>] <owner/repo> <pr> <round1-ids-file> <out-file>`
+- **poll-new-threads** `--wait <s> <owner/repo> <pr> <round1-ids-file> <out-file>`
   — The Step 8 re-pass poll: fetches at least once (`--wait 0` fetches once
   with no sleep), stops at the first fetch with a thread ID not in the
   round-1 file, and ends with `repass fetched=<0|1> found=<0|1>`. A failed

@@ -509,11 +509,16 @@ case "$ALL_ARGS" in
     printf 'gh: API rate limit exceeded for user.\n' >&2
     exit 1
     ;;
+  *"number=403"*)
+    # Secondary rate limit: GitHub answers it with HTTP 403.
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
   *"number=401"*)
     printf 'Bad credentials' >&2
     exit 1
     ;;
-  *"number=403"*)
+  *"number=431"*)
     printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
     exit 1
     ;;
@@ -589,6 +594,26 @@ case "$ALL_ARGS" in
     http "HTTP/2.0 429 Too Many Requests" "Retry-After: 120"
     printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
     exit 1
+    ;;
+  *"PRRT_rl_reset"*|*"PRRT_rl_resetpast"*|*"PRRT_rl_resetfar"*)
+    # x-ratelimit-reset wait source (no Retry-After). resetfar (+500 s) is
+    # always limited; reset (+30 s) and resetpast (-100 s) only on call 1.
+    _n=$(bump "resolve_$(printf '%s' "$ALL_ARGS" | grep -o 'PRRT_rl_reset[a-z]*' | head -1)")
+    case "$ALL_ARGS" in *"PRRT_rl_resetfar"*) _lim=1 ;; *) [ "$_n" -eq 1 ] && _lim=1 || _lim=0 ;; esac
+    if [ "$_lim" = 1 ]; then
+      _now=$(date +%s)
+      case "$ALL_ARGS" in
+        *"PRRT_rl_resetfar"*) _at=$((_now + 500)) ;;
+        *"PRRT_rl_resetpast"*) _at=$((_now - 100)) ;;
+        *) _at=$((_now + 30)) ;;
+      esac
+      MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+      http "HTTP/2.0 429 Too Many Requests" "$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$_at")"
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+      exit 1
+    fi
+    MOCK_BODY=$(cat "$FIXTURE_DIR/resolve-success-response.json")
+    http "HTTP/2.0 200 OK" ""
     ;;
   *"PRRT_gqlnf_exit0"*)
     printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'

@@ -10,12 +10,6 @@ ends; the command and the agent point here instead of restating it.
 
 GitHub thread state is the record. The review-findings ledger is not involved.
 
-**Implementation status.** Implemented by this stack so far: `get-pr-comments`
-(`--include-outdated`), `get-pr-blockers`, `reply-pr-thread`,
-`file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes`,
-`run-verify-command`, `resolve-pr-thread` (with the 2/3/4 exit codes below),
-`lib/resolve-text.sh`, `lib/resolve-gh.sh` and `lib/resolve-paths.sh`.
-
 ## Dispositions
 
 | Disposition | Meaning                                             | Write action                                              |
@@ -39,12 +33,17 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
 ```
 
 - `evidence` for `fixed`: the files and lines changed. For `addressed`: a
-  `path:line` or a commit SHA (see Evidence rules). For `disagree`: the one-line
-  reason. For `unclear`: what is missing.
+  `path:line` (see Evidence rules). For `disagree`: the
+  one-line reason. For `unclear`: what is missing.
 - `oos_reason` is required for `oos` and empty otherwise.
 - Values are single-line plain text. No reviewer text is quoted. A `|` in a
-  value is forbidden (it is the field delimiter); a line whose value contains
-  one parses as malformed and downgrades to `unclear`.
+  value is forbidden (it is the field delimiter). A line is well-formed only
+  when it matches this regex in full, so a bare `|` in a value fails it;
+  anything else is malformed and downgrades to `unclear`:
+
+  ```text
+  ^THREAD (PRRT_[A-Za-z0-9_-]+) \| disposition=(fixed|addressed|oos|disagree|unclear) \| evidence=([^|]*) \| oos_reason=([^|]*)$
+  ```
 - Resolver text is untrusted (comments steer it). The orchestrator never
   pastes it onto a command line: evidence values are checked against the
   patterns below first, and file lists are written to a file with the
@@ -86,31 +85,19 @@ Fixed reply for suspicious requests:
 
 ## Evidence rules for `addressed`
 
-Accept exactly one of:
-
-- `path:line`, split on the last `:`, where the line matches `^[1-9][0-9]{0,6}$`
-  and is within the file's length at HEAD, and the path matches
-  `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment and no segment
-  starting with `-` (an option-shaped name such as `-config.yml` is refused, as
-  `lib/resolve-paths.sh` `rp_canonical` does), exists at HEAD, and equals the
-  thread's `path` (for outdated or review-level threads: is one of the PR's
-  changed files);
-- a commit SHA matching `^[0-9a-f]{7,40}$` that is inside the PR's range —
-  `git merge-base --is-ancestor <sha> HEAD` passes and
-  `git merge-base --is-ancestor <sha> "$(git merge-base HEAD <base-oid>)"`
-  fails, where `<base-oid>` is the PR's `baseRefOid` (from `gh pr view`),
-  must match `^[0-9a-f]{40}$` and exist locally (otherwise the thread is
-  `unclear`; never use an `origin/<base>` ref, which may not exist) — and whose diff (`git show --name-only <sha>`) touches the thread's
-  anchor path. The resolver has no shell, so SHAs come from the
-  orchestrator's own `git log` over the PR range, never from resolver text
-  alone.
+Accept only `path:line`, split on the last `:`, where the line matches
+`^[1-9][0-9]{0,6}$` and is within the file's length at HEAD, and the path
+matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment, exists at
+HEAD, and equals the thread's `path` (for outdated or review-level threads: is
+one of the PR's changed files). The resolver has no shell and the envelope
+carries no commit list, so a commit SHA is not accepted as evidence.
 
 A value that fails its pattern is never used in a command; the thread becomes
 `unclear`.
 
-A reasoning-only claim is `disagree`, not `addressed`. When the anchored hunk or
-file was deleted, the thread counts as `addressed` only when the deleting commit
-is cited and passes the SHA rule.
+A reasoning-only claim is `disagree`, not `addressed`. When the anchored
+hunk or file was deleted, the resolver cannot cite the deleting commit, so the
+thread is `unclear`.
 
 For outdated threads, the resolver looks for the concern in the file at HEAD,
 not in the original diff position.
