@@ -1,0 +1,38 @@
+docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md
+  s_5667e810256031::t_7a9ba8066392d2 1-82
+  s_5667e810256031::t_2393ed1a668428 83-118
+docs/solutions/logic-errors/resolve-stack-state-stale-after-fix-commit-push.md
+  s_5667e810256031::t_69b781076a1ee8 1-63
+docs/solutions/code-quality/state-rules-once-and-update-unwired-prose.md
+  s_5667e810256031::t_91d5628045916c 1-77
+  s_5667e810256031::t_09f28113f5e222 78-104
+docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md
+  s_5667e810256031::t_41eae8c3229130 1-93
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_5667e810256031::t_537a3b60fa3023 1-78
+  s_5667e810256031::t_6698db15c81b8c 79-145
+docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md
+  s_5667e810256031::t_61bcd627cc7020 1-88
+docs/solutions/code-quality/bats-negated-grep-mid-test-never-fails.md
+  s_5667e810256031::t_2c60360d800925 1-69
+docs/solutions/code-quality/fence-output-cap-and-untested-orchestration.md
+  s_5667e810256031::t_58800795b50b79 91-102
+docs/solutions/code-quality/solution-doc-citations-die-on-restack.md
+  s_5667e810256031::t_a9ce0851975543 128-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ab54f67243be9ec3660a6feb2a642ba35edd2f0",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
