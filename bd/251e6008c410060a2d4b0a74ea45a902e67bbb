@@ -1,0 +1,19 @@
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_adf5c03515e8f4 3-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bd251e6008c410060a2d4b0a74ea45a902e67bbb",
+  "prompts": {},
+  "sessions": {
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
