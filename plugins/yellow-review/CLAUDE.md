@@ -91,7 +91,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
-  columns), and a single `/flow:compound` pass at the end. A rate limit, a
+  columns). Each PR stages its learnings for the compound-staging drain;
+  there is no end-of-loop compounding pass. A rate limit, a
   dirty tree or a missing `Resolve:` contract line ends the batch and exits 1;
   a PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of PRs
   missing from an all-authors open-PR query and deletes them via
@@ -359,6 +360,16 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   The procedure lives once in `references/review-pr/ledger.md`; both
   commands read it, so keep them in parity through that file. A ledger
   error never aborts a review — it is reported in Coverage.
+- `lib/stage-learning.sh tmpfile | stage <pr> <file>` — stages an unattended
+  `/review:pr` run's outcome narrative (Step 9a under `--non-interactive`) in
+  yellow-core's compound-staging ledger via `cs_stage_entry`, as
+  `review-pr-<owner>-<repo>-<pr>` under the main checkout's project slug, for
+  the drain to score and promote at a later session start. It replaces the
+  `knowledge-compounder` spawn, whose confirmation gate stalls unattended.
+  Always exits 0 with one success or `learning staging skipped (<reason>)`
+  line. The compound-staging ledger
+  (`~/.claude/projects/<slug>/compound-staging/`) and the review-findings
+  ledger above are separate stores; this script never touches the latter.
 
 ### Hooks (1)
 
@@ -405,8 +416,8 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
 - **`/review:sweep-all`** — Loop `/review:sweep` over every open non-draft
   PR you authored, sequentially. One upfront M3 confirmation shows the PR
   list; after Proceed, runs unattended end-to-end. Skip-and-continue on
-  per-PR failure, summary table, and an end-of-loop `/flow:compound`
-  pass to capture learnings. Best for clearing review + resolve backlog
+  per-PR failure and a summary table; each unattended `/review:pr`
+  stages its learnings for the compound-staging drain. Best for clearing review + resolve backlog
   across multiple open PRs at once, and the re-entry sweeper for reviewer
   replies and late bot comments that arrive after a `/review:resolve` run.
   Distinct from `/review:all scope=all` (which runs the deeper review

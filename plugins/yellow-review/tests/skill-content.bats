@@ -802,10 +802,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   run ! grep -q 'go to Step 5' "$SWEEP_ALL"
 }
 
-@test "sweep-all: a dirty tree after the cleanup skips compound and the remaining PRs" {
+@test "sweep-all: a dirty tree after the cleanup stops project commands and the remaining PRs" {
   grep -qF 'skipped — working tree dirty after PR' "$SWEEP_ALL"
-  grep -qF '[review:sweep-all] Skipping /flow:compound — working tree not clean.' "$SWEEP_ALL"
-  grep -q 'Dirty-tree guard' "$SWEEP_ALL"
+  tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ' | grep -qF 'Run no further project commands after this stop.'
   grep -qF 'working tree dirty after sweep (patch: <patch>)' "$SWEEP_ALL"
 }
 
@@ -926,20 +925,11 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [ "$pre" -lt "$inv" ]
 }
 
-@test "sweep-all: an early stop's exit 1 survives Step 6 and compound's failure path" {
+@test "sweep-all: an early stop exits 1 after the summary, even with zero attempts" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
-  step6=$(awk '/^### Step 6:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP_ALL")
-  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
-  flat6=$(tr '\n' ' ' <<<"$step6" | tr -s ' ')
-  [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 2 ]
-  grep -qF '**Final exit (every path, including the zero-attempt skip):**' <<<"$flat6"
-  grep -qF 'read `pending-exit-1`' <<<"$flat6"
-  grep -qF 'exits `1` regardless of Step 6' <<<"$flat6"
-  grep -qF '(`pending-exit-1` unset)' <<<"$flat6"
-  # the zero-attempt early return goes to the final exit instead of stopping
-  grep -qF 'Then go straight to the **Final exit** below' <<<"$flat6"
-  grep -qF 'this early return still reads `pending-exit-1`' <<<"$flat6"
-  run ! grep -qF 'no PRs attempted. ``` Then stop.' <<<"$flat6"
+  [ "$(grep -c 'Record `pending-exit-1`' <<<"$step4")" -eq 4 ]
+  grep -qF '**Final exit (every path, including zero attempts):** read `pending-exit-1`.' "$SWEEP_ALL"
+  grep -qF 'If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.' "$SWEEP_ALL"
 }
 
 @test "sweep-all: Step 4 Reads its resolve-contract.md before the loop so the ratelimited and no-contract rules are loaded" {
@@ -1201,14 +1191,45 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'Unless item 4, 5, 5b or 5c stopped the loop'* ]]
 }
 
-@test "sweep-all: no /flow:compound after a verify-skipped stop" {
-  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
-  [[ "$flat" == *'**Verify-skipped guard:** if Step 4 item 5c stopped the loop, skip this step'* ]]
-  [[ "$flat" == *'Do NOT invoke `/flow:compound`: it runs project commands'* ]]
+@test "sweep-all: no project command after a verify-skipped stop" {
+  flat=$(tr '
+' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  grep -qF 'no project command may run while that file is on disk.' <<<"$flat"
+  run grep -n 'flow:compound' "$SWEEP_ALL"
+  [ "$status" -eq 1 ]
 }
 
 @test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
   DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
   tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
   tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+}
+
+@test "review-pr Step 9a: unattended runs stage learnings, attended runs keep the compounder" {
+  KC="$BATS_TEST_DIRNAME/../references/review-pr/knowledge-compounding.md"
+  step9a=$(awk '/^## Step 9a:/ { p = 1; next } /^## Step 9b:/ { p = 0 } p' "$KC")
+  grep -qF '**In non-interactive mode**, do not spawn any agent' <<<"$step9a"
+  grep -qF '"$RL" fold <PR> | jq -c '"'"'[.findings[] | {finding_id, state, fix_sha}]'"'" <<<"$step9a"
+  grep -qF 'lib/stage-learning.sh" tmpfile' <<<"$step9a"
+  grep -qF 'lib/stage-learning.sh" stage <PR> <path>' <<<"$step9a"
+  grep -qF 'Never write "verified" or "tests pass"' <<<"$(tr '\n' ' ' <<<"$step9a" | tr -s ' ')"
+  # The interactive branch still spawns the compounder with fenced findings.
+  grep -qF '**In interactive mode**, spawn the `knowledge-compounder` agent' <<<"$step9a"
+  grep -qF -e '--- begin review-findings ---' <<<"$step9a"
+  # The staging branch comes before the spawn.
+  stage_line=$(grep -n 'In non-interactive mode' <<<"$step9a" | head -1 | cut -d: -f1)
+  spawn_line=$(grep -n 'In interactive mode' <<<"$step9a" | head -1 | cut -d: -f1)
+  [ "$stage_line" -lt "$spawn_line" ]
+}
+
+@test "review-pr: Step 1 says non-interactive mode stages instead of compounding" {
+  tr '\n' ' ' <"$REVIEW_PR" | tr -s ' ' | grep -qF 'Step 9a stages findings for the compound-staging drain instead of spawning the gated knowledge-compounder'
+}
+
+@test "sweep-all: no end-of-loop compounding pass remains" {
+  run grep -n 'flow:compound' "$SWEEP_ALL"
+  [ "$status" -eq 1 ]
+  run grep -n '^### Step 6' "$SWEEP_ALL"
+  [ "$status" -eq 1 ]
+  grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
 }

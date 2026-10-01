@@ -16,15 +16,15 @@ each one sequentially with no per-PR prompts. A single upfront
 `AskUserQuestion` confirms the PR list before any work begins; the loop
 runs unattended after that. Failures on individual PRs are logged and
 skipped — the loop never pauses and never aborts on a per-PR failure; only
-the dirty-tree, rate-limit and no-contract stops in Step 4 end it early. After all PRs are
-processed, one `/flow:compound` pass captures learnings from the
-batch (skipped if zero PRs were swept).
+the dirty-tree, rate-limit and no-contract stops in Step 4 end it early. Each PR's
+`/review:pr --non-interactive` stages its learnings for yellow-core's
+compound-staging drain; sweep-all runs no compounding pass of its own.
 
 Use when you want to clear review + resolve backlog across all your open
 PRs in one batch. Each per-PR sweep runs `/review:pr --non-interactive`
 then `/review:resolve --non-interactive` — fully unattended end-to-end
 once you confirm the upfront list. For a single PR, use `/review:sweep`
-directly. For multi-PR pipelines with deeper compounding per PR, use
+directly. For multi-PR pipelines with attended compounding per PR, use
 `/review:all scope=all`.
 
 ## Workflow
@@ -293,23 +293,21 @@ For each iteration:
    `unrecognized changes left in place: <files>` for any unrecognized paths.
    Either way mark every remaining PR `skipped — working tree dirty after PR
    #<PR#>` and go to `### Step 5: End-of-loop summary table`: sweeping on
-   would carry these edits onto the next branch. Also skip Step 6 (print
-   `[review:sweep-all] Skipping /flow:compound — working tree not clean.`)
-   whenever the tree is still dirty at this point, so compounding never
-   runs over unresolved edits. Record `pending-exit-1` (this stop forces the
-   final exit; see Step 6). The command exits `1` after the summary.
+   would carry these edits onto the next branch. Run no further project
+   commands after this stop. Record `pending-exit-1` (this stop forces the
+   final exit; see the Final exit below). The command exits `1` after the summary.
 5. **Rate-limit stop** — only after item 4: if this PR reports `ratelimited=1` on a
    valid final contract line (item 3), add `rate limited` to its `Notes`, mark every
    remaining PR `skipped — not attempted (rate limit)`, and go to
    `### Step 5: End-of-loop summary table`: the next sweep would hit the same
    GitHub limit. Record `pending-exit-1` (this stop forces the final exit; see
-   Step 6). The command exits `1` after the summary.
+   the Final exit below). The command exits `1` after the summary.
 5b. **No-contract stop** — only after item 4: if this PR has no valid final
    contract line (item 3 recorded `no contract`), mark every remaining PR
    `skipped — not attempted (no contract)` and go to
    `### Step 5: End-of-loop summary table`: an unknown outcome is not safe to
    sweep past. Record `pending-exit-1` (this stop forces the final exit; see
-   Step 6). The command exits `1` after the summary.
+   the Final exit below). The command exits `1` after the summary.
 5c. **Verify-skipped stop** — only after item 4: if this PR's valid final
    contract line has `verify=skipped` (a refusal; the ignored-file stop is one:
    a resolver edited a gitignored file that nothing could restore, and the
@@ -318,7 +316,7 @@ For each iteration:
    `skipped — not attempted (verify skipped)` and go to
    `### Step 5: End-of-loop summary table`: no project command may run while
    that file is on disk. Record `pending-exit-1` (this stop forces the final
-   exit; see Step 6). The command exits `1` after the summary.
+   exit; see the Final exit below). The command exits `1` after the summary.
 6. **Continue** to the next PR otherwise. Unless item 4, 5, 5b or 5c stopped the
    loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
@@ -373,54 +371,11 @@ or `applied` (fixed locally, not yet published); attention findings are
 Truncate long titles at ~30 characters with `…` if needed for table
 readability. Both the table and the totals line are required.
 
-### Step 6: Knowledge compounding (conditional)
+Learnings staged by each PR's `/review:pr` drain at the next session started
+in the main checkout; the per-PR sweep output carries the staging line.
 
-**Skip guard (first line of this step):** If `attempted_count == 0` — every
-PR in the loop ended in `skipped` outcome, or the upfront list had only
-errors — skip this step entirely. Do NOT invoke `/flow:compound`.
-Print:
-
-```text
-[review:sweep-all] Skipping /flow:compound — no PRs attempted.
-```
-
-Then go straight to the **Final exit** below: this early return still reads
-`pending-exit-1`, so a Step 4 stop recorded while `attempted_count` is zero
-(for example a skipped first PR followed by the dirty-tree stop) exits `1`.
-
-**Dirty-tree guard:** if Step 4 item 4 left the tree dirty (an incomplete
-revert or unrecognized changes), skip this step and print the message
-given there. Do NOT invoke `/flow:compound`.
-
-**Verify-skipped guard:** if Step 4 item 5c stopped the loop, skip this step and
-print `[review:sweep-all] Skipping /flow:compound — verification was refused.`
-Do NOT invoke `/flow:compound`: it runs project commands, and a gitignored file
-the resolver edited may still be on disk.
-
-Otherwise, with `attempted_count >= 1`:
-
-1. Invoke the `Skill` tool with `skill: "flow:compound"` and
-   `args: "sweep-all: attempted PRs <comma-separated attempted PR numbers>"`
-   (e.g., `"sweep-all: attempted PRs #123, #124, #126"`). The args string is
-   a free-text hint; `/flow:compound` reads the conversation
-   context (last 25 turns) for the actual learning extraction.
-2. `/flow:compound` may fail silently — the Skill tool returns no
-   machine-readable exit status (see Step 4 item 3). If compound's
-   stderr/output contains `Error:`, `fatal:`, or `pre-flight failed`, print:
-
-   ```text
-   [review:sweep-all] Warning: /flow:compound failed; learnings not captured. (Run /flow:compound manually if desired.)
-   ```
-
-   Then continue — do NOT fail the command because of compounding. When
-   no early stop occurred (`pending-exit-1` unset), sweep-all succeeded;
-   only the optional compounding step failed.
-
-**Final exit (every path, including the zero-attempt skip):** after Step 6
-finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4, 5, 5b or 5c set it, the command exits `1`
-regardless of Step 6's outcome: a clean compound pass, a skip, or a compound
-warning never turns an early stop into success, and the "sweep-all
-succeeded" wording above does not apply. Otherwise exit `0`.
+**Final exit (every path, including zero attempts):** read `pending-exit-1`.
+If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
 
 ## Error Handling
 
@@ -438,23 +393,19 @@ succeeded" wording above does not apply. Otherwise exit `0`.
   stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
 - **Dirty tree after a sweep** (Step 4 item 4): the loop stops after
   reverting the sweep's own edits, marks every remaining PR `skipped —
-  working tree dirty after PR #<PR#>`, skips Step 6 while the tree is still
-  dirty, prints the summary, and exits `1`.
+  working tree dirty after PR #<PR#>`, prints the summary, and exits `1`.
 - **Rate-limited PR** (Step 4 item 5): the loop stops after that PR, marks
   every remaining PR `skipped — not attempted (rate limit)`, prints the
-  summary, and exits `1`. Step 6 still runs when the tree is clean, but the
-  pending exit `1` is kept after it.
+  summary, and exits `1`.
 - **Sweep ends without a valid final contract line** (Step 4 item 5b): the PR
   is noted `no contract` (never `rate limited`) and counts blocking; after its
   clean-tree check the loop stops, marks every remaining PR `skipped — not
   attempted (no contract)`, prints the summary, and exits `1`. No text in the
   output is read as a rate-limit signal.
 - **Every PR skipped for per-PR reasons** (no Step 4 stop): summary table is
-  still printed; compound is skipped (per Step 6's guard); exit 0. sweep-all
+  still printed; exit 0. sweep-all
   itself succeeded — the batch completed without hitting a stop condition,
   and the skipped PRs are counted separately from attempted ones.
-- **`/flow:compound` failure**: warning is printed; the exit code is
-  unchanged (`0` unless a stop above set `pending-exit-1`, which stays `1`). Compounding is best-effort, not load-bearing.
 - **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at
   Step 1 does NOT serialize concurrent sweeps — `/review:pr` and
   `/review:resolve` clean the working tree between PRs (via a commit +

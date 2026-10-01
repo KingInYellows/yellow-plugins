@@ -392,7 +392,7 @@ PR already stages at Step 9a.
 
 ### Phase 3: sweep-all and docs
 
-- [ ] 3.1: In `sweep-all.md`:
+- [x] 3.1: In `sweep-all.md`:
   - Delete `### Step 6: Knowledge compounding (conditional)`.
   - Delete the Error Handling bullets about the Step 6 guard and the
     `/flow:compound` failure.
@@ -412,7 +412,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 3.2: In `sweep.md`, update the wording on line 24, the `/review:all`
+- [x] 3.2: In `sweep.md`, update the wording on line 24, the `/review:all`
       compounding pointer.
 
   <!-- deepen-plan: codebase -->
@@ -425,17 +425,17 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 3.3: In `plugins/yellow-review/CLAUDE.md`:
+- [x] 3.3: In `plugins/yellow-review/CLAUDE.md`:
   - Fix the `/review:sweep-all` entry (line 80) and the "end-of-loop
     `/flow:compound` pass" text (around line 256).
   - Add `lib/stage-learning.sh` to the script list.
   - State that the compound-staging ledger and the review-findings ledger are
     separate stores.
-- [ ] 3.4: In `plugins/yellow-core/CLAUDE.md`:
+- [x] 3.4: In `plugins/yellow-core/CLAUDE.md`:
   - Document `cs_stage_entry` in the lib list and the Compound Staging section,
     including that it now has a second producer besides the Stop hook.
   - Add the new tests.
-- [ ] 3.5: Update
+- [x] 3.5: Update
       `docs/solutions/workflow/compounder-m3-gate-non-interactive.md` to say the
       pipelines now use the staging path, citing this PR.
 
@@ -506,7 +506,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 4.3: `plugins/yellow-review/tests/skill-content.bats`. Cases:
+- [x] 4.3: `plugins/yellow-review/tests/skill-content.bats`. Cases:
   - The Step 9a non-interactive branch names `stage-learning.sh` and keeps the
     interactive compounder spawn.
   - `sweep-all.md` has no `flow:compound` and no `### Step 6`.

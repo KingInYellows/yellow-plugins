@@ -327,9 +327,11 @@ cross-plugin pattern:
   for `/setup:all` dashboards
 - `compound-staging.sh` — helpers for the background-compounding pipeline
   (project-slug derivation, atomic JSONL writes, secret redaction, drain-budget
-  observability counter, ANTHROPIC_API_KEY auth-route detection). Sourced by
+  observability counter, ANTHROPIC_API_KEY auth-route detection, and
+  `cs_stage_entry` for staging a non-transcript narrative). Sourced by
   yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
-  `_stop-capture-subshell.sh`, and the `/compound:review-staged` command
+  `_stop-capture-subshell.sh`, and the `/compound:review-staged` command, and
+  by yellow-review's `lib/stage-learning.sh` and `lib/review-ledger.sh`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
@@ -444,6 +446,14 @@ detail):**
 - Stop hook (pure shell, < 500ms) writes a JSONL pending entry to
   `~/.claude/projects/<slug>/compound-staging/pending/<session_id>.jsonl`.
   Secrets are redacted before write; transcript_tail capped at 100 lines.
+- `cs_stage_entry <cwd> <session_id> <file>` is the second producer: it
+  writes the same entry shape from a narrative file. yellow-review's
+  unattended `/review:pr` Step 9a uses it (through `lib/stage-learning.sh`)
+  instead of spawning the M3-gated `knowledge-compounder`. It caps the text
+  at 8 KiB, strips control and invisible characters, redacts, then prefixes
+  `> ` to lines that could forge a fence or role turn (`---`, code fences,
+  `system:`), in that order; returns 0 staged, 1 bad args, 2 no jq,
+  3 sanitisation failed, 4 write failed.
 - SessionStart hook checks thresholds (`count >= 5` OR `oldest > 48h`),
   acquires an atomic `.drain-lock` (mkdir-based), and disowns a
   `claude -p` drain subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env var
