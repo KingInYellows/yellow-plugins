@@ -31,7 +31,7 @@ plugins/yellow-review/lib/verify-run.sh
 plugins/yellow-review/tests/check-resolve-text.bats
   s_9802901455b679::t_2a8cc309842a86 124
   s_c22a55971bf452::t_d8ab67274d0936 112
-  s_fc95207836202a::t_70fc0d71009b16 113-118,120-122,125-126,128-131
+  s_fc95207836202a::t_70fc0d71009b16 77,113-118,120-122,125-126,128-131
   s_fc95207836202a::t_cbdd9147009bde 22,123,127
   s_9802901455b679::t_4122f706d67b73 119
 plugins/yellow-review/tests/helpers/resolve-repo.bash
@@ -47,6 +47,7 @@ plugins/yellow-review/lib/resolve-text.sh
   s_fc95207836202a::t_113c8731e294ee 10-15,26,31,36,73-75,101-102,105-106,116-118
   s_c22a55971bf452::t_d67172a980bc81 2-3,103-104,107-113
   s_9802901455b679::t_63c33d7d66b592 98,114-115
+  s_c22a55971bf452::t_8bee237817cbe1 99-100
 plugins/yellow-review/references/resolve/dispositions.md
   s_fc95207836202a::t_4594cef2ba5cfd 243-251,254-264
   s_9802901455b679::t_13bd4d6d31a384 349-350
