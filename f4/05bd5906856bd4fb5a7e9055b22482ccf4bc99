@@ -1,0 +1,55 @@
+plugins/yellow-review/lib/resolve-paths.sh
+  s_fc95207836202a::t_13e9fd3c64b112 32-33,38-40,43,73-85,88-89,91-92,102-147,152-153,157,160-161
+  s_fc95207836202a::t_f266a74ee7a007 148-151,154-156,158-159
+plugins/yellow-review/lib/resolve-text.sh
+  s_fc95207836202a::t_13e9fd3c64b112 106-113
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_fc95207836202a::t_b11b735740127c 52-56,78,81,85,124,126,162-164,191,223
+  s_fc95207836202a::t_87eeba5bd02a1b 17-20,24-35,40-44,102-116,199-206,212-213,216,260-261,265-266,278
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_fc95207836202a::t_cf1ff160b39cab 41-123,185-204,254-296,496-534
+  s_fc95207836202a::t_1a51fd2ab4cd9a 462-473
+  s_fc95207836202a::t_06b11a2f39a4dc 297,535
+plugins/yellow-review/tests/run-verify-command.bats
+  s_fc95207836202a::t_2a2f0d2085bb72 383-388,395-424,426-615
+  s_fc95207836202a::t_21187d3acd9b8d 69,211-212,337,350
+  s_fc95207836202a::t_67d2bf8c77a044 425
+plugins/yellow-review/tests/resolve-paths.bats
+  s_fc95207836202a::t_ecb64966fc96e8 7,35-44,49-62,79,84,90-106
+  s_fc95207836202a::t_cd20346b75b7f2 107
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_fc95207836202a::t_d9845381c07172 3-4,12-15,23-26,30-43,45-47,57-58,60,62-64,72-74,87-88,101,112,114-124,130,134,138,143-153,156-157,161-162,185-186,190-193,195-201,204-224,226-253,255-257,260-261,264-268,270-284,290-294,298-302,304,306,309-312,316-317,323,325-327,333-337,339,341-354,357,360,363-364,367-376,379-380,382-385,387-388
+  s_fc95207836202a::t_b11b735740127c 59,61,65,91,94,98,126-128,131,158-159
+plugins/yellow-review/lib/verify-run.sh
+  s_fc95207836202a::t_8d0f5bab793959 1-125
+plugins/yellow-review/tests/helpers/resolve-repo.bash
+  s_fc95207836202a::t_ecb64966fc96e8 17-18
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_68fd9277864ed4 404-407
+  s_fc95207836202a::t_e3c4bc55458109 193-196,236-243,245-253,260-272,289-291,295-297,301-321,326,328-333,346-355,418-419
+  s_c22a55971bf452::t_0a3984c00134d9 192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f405bd5906856bd4fb5a7e9055b22482ccf4bc99",
+  "prompts": {},
+  "sessions": {
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
