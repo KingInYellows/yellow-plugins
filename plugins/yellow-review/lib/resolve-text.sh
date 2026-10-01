@@ -495,3 +495,11 @@ rt_report_refusal() {
         printf 'resolve-text: scan failed%s\n' "${1:+ in=$1}" >&2
     fi
 }
+
+# rt_added_lines: read a unified diff on stdin, print its added lines without
+# the leading "+". Only lines inside hunks count (a file header is skipped by
+# position, so an added "++ x" line is still printed). Feed the output to
+# rt_looks_secret.
+rt_added_lines() {
+    awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'
+}

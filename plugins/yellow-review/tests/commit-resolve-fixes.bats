@@ -38,9 +38,89 @@ run_crf() {
   [ "$status" -eq 2 ]
 }
 
-@test "the script never runs git push" {
-  run grep -c 'git push' "$SCRIPT"
-  [ "$output" = 0 ]
+@test "a full run never invokes git push" {
+  # A git shim that fails any push, and logs it, in front of the real git.
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+for a in "\$@"; do
+  if [ "\$a" = push ]; then echo "git push attempted" >> "$BATS_TEST_TMPDIR/push.log"; exit 99; fi
+done
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  printf 'one\nfeature\nfix2\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/push.log" ]
+}
+
+@test "rejects a missing or non-numeric --pr (exit 2)" {
+  run_crf --provider graphite --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr abc --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr 0 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "rejects an unknown provider, an unknown flag and a flag missing its value (exit 2)" {
+  run_crf --provider svn --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr 7 --message "$MSG" --bogus
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr
+  [ "$status" -eq 2 ]
+}
+
+@test "rejects a message over the length cap (exit 2)" {
+  long="fix: $(printf 'x%.0s' $(seq 1 200))"
+  run_crf --provider graphite --pr 7 --message "$long" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"exceeds"* ]]
+}
+
+@test "an unreadable --files-from is a usage error (exit 2)" {
+  run_crf --provider graphite --pr 7 --message "$MSG" --files-from "$BATS_TEST_TMPDIR/nope"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--files-from not readable"* ]]
+}
+
+@test "a detached HEAD is a usage error (exit 2)" {
+  git checkout -q --detach
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"detached"* ]]
+}
+
+@test "running outside a git repository is a usage error (exit 2)" {
+  cd "$BATS_TEST_TMPDIR"
+  GIT_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not inside a git repository"* ]]
+}
+
+@test "a glob-shaped path is taken literally and stages nothing (exit 3)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- 'src/*'
+  [ "$status" -eq 3 ]
+  run_crf --provider graphite --pr 7 --message "$MSG" -- 'src/[ab].txt'
+  [ "$status" -eq 3 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "a file whose name is a glob is committed alone" {
+  printf 'x\n' >| 'src/*.txt'
+  git add -f -- 'src/*.txt' && git commit -q -m "chore: glob name"
+  git push -q origin feature 2>/dev/null
+  printf 'y\n' >| 'src/*.txt'
+  run_crf --provider graphite --pr 7 --message "$MSG" -- 'src/*.txt'
+  [ "$status" -eq 0 ]
+  [ "$(git show --name-only --format= HEAD)" = 'src/*.txt' ]
 }
 
 # --- Staging ---
@@ -102,6 +182,26 @@ run_crf() {
   ! grep -q '^gt ' "$STUB_LOG"
 }
 
+@test "no files but a dirty tree is refused (exit 3)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the expected set: src/a.txt"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ ! -s "$STUB_LOG" ]
+}
+
+@test "a staged stray outside the expected set aborts before committing (exit 3)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'two\nstray\n' >| src/b.txt
+  git add src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the expected set: src/b.txt"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt ' "$STUB_LOG"
+}
+
 @test "no files and a clean tree is NOOP without committing or submitting" {
   run_crf --provider graphite --pr 7 --message "$MSG" --
   [ "$status" -eq 0 ]
@@ -149,6 +249,50 @@ run_crf() {
   [[ "$stderr" == *"head not verified"* ]]
   # One check plus one per backoff entry ("0 0").
   [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+}
+
+@test "a PR headRefOid that lags then matches is verified after the backoff" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+case "$*" in
+  "pr view "*)
+    n=$(cat "$LAG_COUNT" 2>/dev/null || echo 0)
+    if [ "$n" -lt 2 ]; then
+      echo $((n + 1)) >| "$LAG_COUNT"
+      printf 'gh %s\n' "$*" >> "$STUB_LOG"
+      printf '{"headRefOid":"0000000000000000000000000000000000000000"}\n'
+      exit 0
+    fi
+    ;;
+esac
+exec "$(dirname "$0")/gh.real" "$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  export LAG_COUNT="$BATS_TEST_TMPDIR/lag"
+  export YELLOW_REVIEW_VERIFY_BACKOFF="0 0 0"
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+  [ "$(grep -c '^gh pr view' "$STUB_LOG")" -eq 3 ]
+}
+
+@test "a submit that exceeds the timeout exits 5" {
+  command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || skip "no timeout command"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  cat >| "$STUB_BIN/gt" <<'STUB'
+#!/bin/sh
+case "$1" in
+  modify) exec git commit -q -m "$(printf '%s' "$*" | sed 's/.* -m //; s/ --no-interactive$//')" ;;
+  submit) exec sleep 30 ;;
+esac
+STUB
+  chmod +x "$STUB_BIN/gt"
+  export YELLOW_REVIEW_SUBMIT_TIMEOUT=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  [[ "$stderr" == *"timed out"* ]]
 }
 
 # --- Untrusted file lists ---
@@ -315,6 +459,18 @@ run_crf() {
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+@test "changes left staged by a post-commit hook undo the commit (exit 4)" {
+  printf '#!/bin/sh\nprintf "late\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/post-commit
+  chmod +x .git/hooks/post-commit
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"remain staged"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
 @test "a sole remote not named origin is the one verified" {
   git remote rename origin upstream
   printf 'one\nfeature\nfix\n' >| src/a.txt
@@ -335,6 +491,46 @@ run_crf() {
   [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
   grep -q '^node .* submit --remote origin$' "$STUB_LOG"
   [ "$(git --git-dir="$OTHER" rev-parse -q --verify refs/heads/feature || true)" = "" ]
+}
+
+@test "pushDefault alone selects the remote for submit and verification" {
+  OTHER="$BATS_TEST_TMPDIR/other.git"
+  git init -q --bare -b main "$OTHER"
+  git remote add other "$OTHER"
+  git push -q other main feature 2>/dev/null
+  git config remote.pushDefault other
+  export ORIGIN_DIR="$OTHER"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^node .* submit --remote other$' "$STUB_LOG"
+}
+
+@test "branch.<name>.remote is used when no push remote is configured" {
+  git remote rename origin upstream
+  git remote add other "$BATS_TEST_TMPDIR/other.git"
+  git config branch.feature.remote upstream
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^node .* submit --remote upstream$' "$STUB_LOG"
+}
+
+@test "several remotes and no configuration fall back to origin" {
+  git remote add other "$BATS_TEST_TMPDIR/other.git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^node .* submit --remote origin$' "$STUB_LOG"
+}
+
+@test "a local upstream (.) with a sole remote uses that remote" {
+  git remote rename origin upstream
+  git config branch.feature.remote .
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^node .* submit --remote upstream$' "$STUB_LOG"
 }
 
 @test "a missing github runtime fails before committing (exit 2)" {
