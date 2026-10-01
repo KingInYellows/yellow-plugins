@@ -628,7 +628,7 @@ Decisions from the brainstorm and the planning round:
   - `cd plugins/yellow-review && bats tests/`
   - `pnpm test:integration`, since the push-detector parity test must be
     untouched.
-- [ ] 4.5: Manual end-to-end on a scratch PR in a test repo with both a bot
+- [x] 4.5: Manual end-to-end on a scratch PR in a test repo with both a bot
   thread and a human thread. Cover:
   - `fixed`, `addressed`, `oos` and `disagree`;
   - an outdated thread;
@@ -647,6 +647,23 @@ Decisions from the brainstorm and the planning round:
     `verify_command`. Found and fixed: the unattended `*/scripts/*` runner
     rule was too broad (now root `scripts/` only), and a post-hook commit
     mismatch now undoes the local commit.
+  - **2026-10-01 run on scratch PR KingInYellows/yellow-review-e2e#1**
+    (worktree scripts and resolver body, Graphite provider, two
+    `--non-interactive` runs, `verify_unattended: true` with an untracked
+    config). Run 1 (`verify_command: exit 1`): LGTM dropped and resolved
+    with no reply; 3 `oos` threads filed issues #2–#4 with the thread link
+    and marker, replied and resolved; a suspicious `.github/` request got
+    the fixed `disagree` reply and stayed open; verify failed, saved a 0600
+    patch, left the tree clean and held the `fixed` thread open. Run 2
+    (`verify_command: true`, 4 new `oos` asks): verify passed, the fix
+    landed as a new commit (`PUSHED`), the `fixed` reply cited its SHA and
+    resolved; 3 issues (#5–#7) filed and the 4th got the over-cap reply
+    and stayed blocking; the repeated `disagree` reply was skipped as
+    `already-replied`; the 20 s re-pass found no new threads. Not covered:
+    human-reviewer threads — every seeded comment came from the resolving
+    account, which the lane rule treats as bot, and a second account is
+    out of scope by decision; the human lane relies on review of the lane
+    table. Scratch PR and issues closed afterwards.
 - [x] 4.6: File the follow-up issues (#957–#966):
   - `review-pr.md:1047` and `review-all.md:376` `gt modify -m` → stage + `-c`;
   - a sticky blocking-threads PR comment for repos without enforcement;
@@ -847,4 +864,4 @@ Decisions from the brainstorm and the planning round:
 - [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
 - [x] 2. agent/feat/resolve-commit-verify-scripts (completed 2026-09-30)
 - [x] 3. agent/fix/resolve-dispositions (completed 2026-09-30)
-- [ ] 4. agent/feat/resolve-stack-callers
+- [x] 4. agent/feat/resolve-stack-callers (completed 2026-10-01)
