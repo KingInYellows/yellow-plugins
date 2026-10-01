@@ -257,6 +257,8 @@ printf '\n=== Web App Signals (yellow-browser-test) ===\n'
 # Probe for web-app signals so the classifier can decide whether to OMIT
 # yellow-browser-test on non-web repos. Any single match flips
 # web_signal_count > 0; the classifier uses the count, not individual flags.
+# Mirrored in yellow-browser-test `commands/browser-test/setup.md` Step 2.5
+# ("Check for Web Application") — update both when a signal changes.
 web_signal_count=0
 if [ -n "$repo_top" ] && [ -f "$repo_top/package.json" ] && \
    grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
