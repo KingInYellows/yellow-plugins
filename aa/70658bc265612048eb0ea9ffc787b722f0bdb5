@@ -8,12 +8,17 @@ plugins/yellow-review/tests/resolve-paths.bats
 plugins/yellow-review/tests/commit-resolve-fixes.bats
   s_fc95207836202a::t_1c11cfffbba28b 471-472
   s_fc95207836202a::t_80269fbe92afe8 453-470,473-488
+  s_c22a55971bf452::t_eaf13b67633ece 410
+  s_c22a55971bf452::t_35f8e11497946c 407-408
+  s_c22a55971bf452::t_4cb2447eb47c89 405-406,409,411-417
 plugins/yellow-review/tests/check-resolve-text.bats
   s_fc95207836202a::t_cbdd9147009bde 22,123-124,127
   s_fc95207836202a::t_70fc0d71009b16 77,113-118,120-122,125-126,128-131
   s_fc95207836202a::t_4f6cc41d91d2d9 119
+  s_c22a55971bf452::t_d8ab67274d0936 112
 plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
   s_fc95207836202a::t_80269fbe92afe8 32-34,204-206,209-211
+  s_c22a55971bf452::t_d7fdb322699f60 194,196,231-232
 plugins/yellow-review/tests/run-verify-command.bats
   s_fc95207836202a::t_70fc0d71009b16 343,350-367
   s_fc95207836202a::t_f1ef824565ac5b 501,507
@@ -24,6 +29,8 @@ plugins/yellow-review/lib/resolve-paths.sh
 plugins/yellow-review/lib/resolve-text.sh
   s_fc95207836202a::t_b62fa7200041b4 91
   s_fc95207836202a::t_113c8731e294ee 10-15,26,31,36,56-58,70,73-74,77-78,88-90
+  s_c22a55971bf452::t_d67172a980bc81 2-3,75-76,79-85
+  s_c22a55971bf452::t_8bee237817cbe1 71-72
 plugins/yellow-review/references/resolve/dispositions.md
   s_fc95207836202a::t_4594cef2ba5cfd 243-251,254-264
   s_fc95207836202a::t_48aa23855e7069 313-322
@@ -34,6 +41,14 @@ plugins/yellow-review/references/resolve/dispositions.md
   "base_commit_sha": "aa70658bc265612048eb0ea9ffc787b722f0bdb5",
   "prompts": {},
   "sessions": {
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
     "s_fc95207836202a": {
       "agent_id": {
         "tool": "claude",
