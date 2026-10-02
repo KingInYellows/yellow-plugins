@@ -550,18 +550,33 @@ trust boundary from the pack and fenced-output files above:
   Bash fence as well as `Write`, so a `Write` deny rule for
   `.git/council-synth.state` only narrows the residual. Closing it needs a
   capability held where no model-launched process can write.
+- **Known residual (stale-state reclaim race)**: "one synthesis per checkout"
+  holds except while a stale state file is being reclaimed. Two runs that both
+  find the same leftover can each remove the other's fresh claim between 5a's
+  stale check and its `ln`, so two syntheses can proceed in one checkout. The
+  window is milliseconds and is left open because `sh` has no atomic
+  compare-and-remove.
 - **Cleanup and retention**: 5e and `council_synth_abort` remove the directory
   and the state file; the state file goes even when the directory cannot be
   removed, because nothing reads it to find the directory and a surviving one
-  would block the next run. Step 7 early exit, Step 8 Cancel, and Step 9
-  cleanup remove the state file only (a symlink at that path is unlinked, not
-  followed), and a 5d-resume or 5e failure runs the Step 8 Cancel block. The
-  next run's 5a sweep deletes `/tmp/council-synth-*` directories older than 24
-  hours, so an interrupted run leaves redacted, normalized reviewer text in
-  `/tmp` for up to about 24 hours. A `.git/council-synth.state` left by such a
-  run stays until the next 5a reclaims it (directory gone or over 24 hours old;
-  before that 5a refuses to start another synthesis in the checkout) or you
-  remove it by hand.
+  would block the next run. When `rm -rf` fails (a non-writable directory),
+  they run `chmod -R u+rwx` on the directory and retry once, only for a real
+  directory the user owns under `/tmp/council-synth-*`; if it still cannot be
+  removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command
+  to run by hand. Step 7 early exit, Step 8 Cancel, and Step 9 cleanup remove
+  the state file only (a symlink at that path is unlinked, not followed), and
+  only when this run's 5a claimed it: a run whose 5a refused (another run's
+  file, a lost claim race, or the symlink or foreign entry) leaves that path
+  alone and reports it. A 5d-resume or 5e failure runs the Step 8 Cancel
+  block. 24 hours is the eligibility threshold for the 5a sweep, not a maximum
+  retention: the sweep runs only when a later `/council` invocation reaches 5a,
+  and then deletes `/tmp/council-synth-*` directories older than 24 hours
+  (with the same chmod-then-remove for an owned directory). An interrupted run
+  leaves redacted, normalized reviewer text in `/tmp` until that later run, or
+  until you remove it. A `.git/council-synth.state` left by such a run stays
+  until a later 5a reclaims it (directory gone or over 24 hours old; before
+  that 5a refuses to start another synthesis in the checkout) or you remove it
+  by hand.
 - **Prompt-injection boundary**: all staged reviewer text is untrusted. It is
   redacted in Step 4, normalized, fenced with `[ESCAPED]` delimiter handling,
   and read from files rather than large Bash results. Labels hide reviewer

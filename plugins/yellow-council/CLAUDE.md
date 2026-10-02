@@ -86,9 +86,12 @@ and never auto-commits. The user decides what to do with the verdicts.
   correctness is self-assessed until citation verification (`verify_finding()`)
   lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
   The staging directory's capability lives in a shell-owned
-  `.git/council-synth.state`, one synthesis per checkout; validation, cleanup
-  and the residual Write forgery are in `docs/security.md` "Synthesis staging
-  directory (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
+  `.git/council-synth.state`, one synthesis per checkout, though reclaiming a
+  stale state file can race a new run's claim and admit two syntheses in one
+  checkout (a millisecond window, recorded as a residual). Validation, cleanup,
+  that race ("Known residual (stale-state reclaim race)") and the residual
+  Write forgery are in `docs/security.md` "Synthesis staging directory
+  (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
   relays its path through the model.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
@@ -245,8 +248,10 @@ without it. There is no fresh-machine install CI (see Known Limitations).
   when the slot returns and parses. If the in-process reviewer is cancelled or
   hangs, the `chmod` never executes and the file, holding RAW un-redacted
   review text, stays world-readable in `/tmp` until the age-gated sweep
-  reclaims it (`STALE_MINUTES=1440`, so up to 24 hours) or the OS reaps
-  `/tmp`. Closing this properly means minting the path inside a private
+  reclaims it or the OS reaps `/tmp`. The sweep removes only files older than
+  `STALE_MINUTES=1440` (24 hours is the eligibility threshold, not a maximum
+  retention) and runs only when a later `/council` invocation reaches Step 4.
+  Closing this properly means minting the path inside a private
   `mktemp -d`, which every path guard in `council.md` rejects on purpose —
   see the `chmod` site for why that trade was taken. On a multi-user host,
   cancel a hung `/council` and remove `/tmp/council-claude-fenced-*.txt`

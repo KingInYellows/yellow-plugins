@@ -82,6 +82,8 @@ pyproject.toml|dependencies = ["Django>=4"]|python
 go.mod|require github.com/gin-gonic/gin v1.9.1|go
 Cargo.toml|[dependencies]\naxum = "0.7"|rust
 Cargo.toml|[dependencies.axum]\nversion = "0.7"|rust
+Cargo.toml|[dependencies.axum] # web server\nversion = "0.7"|rust
+Cargo.toml|[dependencies.axum]# web server\nversion = "0.7"|rust
 Cargo.toml|[dependencies]\naxum.workspace = true|rust
 Cargo.toml|[dependencies]\nwarp.version = "0.3"|rust
 Cargo.toml|[dependencies]\nweb = { package = "axum", version = "0.7" }|rust
@@ -106,6 +108,7 @@ go.mod|require github.com/spf13/cobra v1.8.0
 Cargo.toml|[dependencies]\n# axum = "0.7"\ntower = "0.4"
 Cargo.toml|[package]\nname = "my-axum-app"
 Cargo.toml|[package.metadata.warp.config]\nx = 1
+Cargo.toml|[dependencies.axum] garbage\nversion = "0.7"
 compose.yaml|services:\n  db:\n    ports:\n      - "5432:5432"
 SPECS
   fixture empty

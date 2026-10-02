@@ -224,7 +224,9 @@ MCP uses the userConfig key. Perplexity's label ends with `; pending
 MCP-visibility confirmation`.
 
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
-`UNREACHABLE` / `PRESENT (untested)` (when user skips testing) /
+`UNREACHABLE` / `UNVERIFIED (shell key rejected; …)` (shell key got 401/403 but
+a keychain or userConfig key may take precedence and cannot be inspected) /
+`PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
 (shell key probed with any result, but a userConfig key is also set and the
 MCP uses that one; Perplexity's label ends with `; pending MCP-visibility
@@ -346,6 +348,11 @@ else
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run an exa tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
+  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+    provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run an exa tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+  fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
 printf 'provider=exa\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
@@ -448,6 +455,11 @@ else
   elif has_userconfig yellow-research tavily_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a tavily tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
+  fi
+  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+    provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a tavily tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -554,6 +566,11 @@ else
   elif has_userconfig yellow-research perplexity_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a perplexity tool call to validate the userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status; pending MCP-visibility confirmation)"
+  fi
+  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+    provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -705,8 +722,9 @@ Tool name: mcp__plugin_yellow-research_perplexity__perplexity_search
 Test: ToolSearch probe only (a real call burns API quota)
 ```
 
-Tool found: record Perplexity as `ACTIVE` for Step 4's promotion. Tool absent:
-record `UNAVAILABLE`.
+Tool found: visibility reflects the MCP as it was last started, so it confirms
+only the key as of that start. Record `ACTIVE (as of the MCP's last start)` for
+Step 4's promotion. Tool absent: record `UNAVAILABLE`.
 
 Never stop on a per-source error — record the status and continue to the next
 source. A failing MCP source does not affect API key checks or overall command
@@ -757,13 +775,14 @@ active (three — EXA, Tavily, Perplexity). A key counts as **active** when
 its Step 3 status is any of:
 
 - `ACTIVE` — live-tested and confirmed working.
-- `PRESENT (validated via MCP startup — userConfig only)` — Perplexity
-  hard-fails at startup without a valid key; reach this status only after
-  Step 3.5's Perplexity visibility check finds the MCP tools. Promote
-  `PRESENT (userConfig only — pending MCP-visibility confirmation)` to this
-  label when that check reports perplexity ACTIVE; otherwise keep the
-  pending label and append "MCP did not load — credential validity
-  unconfirmed."
+- `PRESENT (validated via MCP startup — userConfig only; reflects the key as of
+  the MCP's last start)` — Perplexity hard-fails at startup without a valid
+  key; reach this status only after Step 3.5's visibility check finds the MCP
+  tools. Promote the pending label to this one only if the key was not added
+  or changed this session; otherwise keep it pending and add "restart Claude
+  Code, then re-run /research:setup — a changed key is not visible until the
+  MCP restarts." If the MCP is absent, keep the pending label and append "MCP
+  did not load — credential validity unconfirmed."
 - `PRESENT (keychain — MCP starts without credential validation)` — exa /
   tavily start without validating; key is stored and reachable to the MCP
   but not yet confirmed valid. Still counts as active for capability-summary
@@ -780,7 +799,9 @@ its Step 3 status is any of:
   problem. Perplexity's label ends with `; pending MCP-visibility
   confirmation` and follows the pending rule below; when the visibility check
   finds the tools, promote it by replacing that suffix with `; validated via
-  MCP startup`. Step 5 never shows setup instructions for these statuses.
+  MCP startup; reflects the key as of the MCP's last start`, with the same
+  keep-pending rule for a key changed this session. Step 5 never shows setup
+  instructions for these statuses.
 - `PRESENT (userConfig takes precedence — shell key format invalid)` — both
   keys are set and the shell key failed Step 2's format check, so no probe ran.
   Treated like the precedence status above: active for EXA and Tavily, pending
@@ -790,7 +811,8 @@ its Step 3 status is any of:
 Perplexity form of `PRESENT (userConfig takes precedence — …; pending
 MCP-visibility confirmation)` do NOT count as active until Step 3.5 promotes
 them; if the Perplexity visibility check finds the MCP UNAVAILABLE, treat the
-key as inactive for the summary.
+key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` also does
+not count as active (the effective key is unconfirmed) and is not `INVALID`.
 
 Counts:
 
@@ -840,6 +862,10 @@ keychain keeps the key out of your shell environment.)
 
 Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
+
+For a key whose status starts with `UNVERIFIED`, do not show the replacement
+block. Say: restart Claude Code, run that provider's tool to see which key the
+MCP uses, and replace or unset the shell export only if no userConfig key exists.
 
 If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
 
@@ -899,7 +925,8 @@ research), `Done`.
 | All 3 keys absent                        | Show all INACTIVE in table + full setup instructions block                       | Complete normally   |
 | Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
-| HTTP 401/403                             | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
+| HTTP 401/403, no keychain possible       | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
+| HTTP 401/403, macOS or no jq             | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify.| Record per-provider |
 | HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale or wrong.      | Record per-provider |
 | Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |

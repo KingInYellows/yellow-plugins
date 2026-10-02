@@ -178,10 +178,16 @@ since.
 - Before saving, check every "currently / only / no X / the header says" claim
   against the file with `rg`, and re-read the closing sentence against the
   numbered steps above it.
-- Name a tool by where it lives, or substitute the underlying command. The
-  Gate C check in that doc is the Gate C step of `/plan:complete`
-  (`plugins/yellow-core/commands/plan/complete.md`); its underlying command is `git merge-base --is-ancestor <SQUASH_SHA> origin/main`, where
-  `<SQUASH_SHA>` is the squash-merge commit's object id (from the merged PR) and
-  `origin/main` must be fetched first (`git fetch origin main`).
+- Name a tool by where it lives, or substitute the underlying command. Gate C
+  is Phase 4 of `/plan:complete`
+  (`plugins/yellow-core/commands/plan/complete.md`). It fetches the trunk,
+  finds the plan file's last-touch commit there, and checks the closed PRs
+  GitHub associates with that commit through the `commits/{sha}/pulls` API. It
+  does not run `git merge-base`. The check that doc described is a separate,
+  manual command, `git merge-base --is-ancestor <SQUASH_SHA> origin/main`,
+  where `<SQUASH_SHA>` is the squash-merge commit's object id (from the merged
+  PR) and `origin/main` must be fetched first (`git fetch origin main`); see
+  `docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md`
+  for the full snippet.
 - Treat state claims in compound-staging entries as unverified. They are written
   from one moment of a session transcript, with no check against the tree.

@@ -55,10 +55,12 @@ and flag against `main` once the stack lands.
 3. In `poll-new-threads`, forward the first 300 bytes of stderr and exit early
    on auth or not-found instead of polling out the wait.
 4. Wrap `gh` in `timeout` with a net-timeout bound and give a timeout its own
-   non-retried outcome, never exit 1: exit 4 in the thread scripts (the same
-   code as a rate limit, since neither is retried), exits 5 and 6 in
-   `commit-resolve-fixes` for a submit and a verify timeout, and a skipped
-   round in `poll-new-threads`.
+   non-retried outcome, never exit 1: exit 4 in the thread scripts, exits 5
+   and 6 in `commit-resolve-fixes` for a submit and a verify timeout, and a
+   skipped round in `poll-new-threads`. Exit 4 alone does not say why, so the
+   thread scripts print `reason=rate-limit` or `reason=timeout` on stderr
+   with it and callers read that line (see the 2026-10-01 update below). A
+   timeout must not look like a rate limit to a caller.
 5. Strip blank lines and carriage returns from the round-1 list, and branch on
    `grep` exit status: 0 match, 1 none, 2 or more is an error.
 6. Add bats mock arms for each new branch: rate-limit reset in the future, in
@@ -100,16 +102,33 @@ a retry notice that later succeeded, a bare 403 that was a permission
 error, and review text that merely quoted the phrase. The result was a
 walk or batch stopped early for the wrong reason.
 
-Guidance:
+Guidance (target behaviour on the unmerged stack; the first version of this
+note proposed a text fallback that the stack has since dropped):
 
-- The structured field wins. When the `Resolve:` line is present, use its
-  `ratelimited` value and skip text matching entirely.
-- Fall back to text only when the line is missing, because the command
-  emits no contract line when a rate limit stops it first.
-- In the fallback, match only the script's exit-4 markers. Do not match
-  bare 403s or prose.
+- The structured field wins, and it is the only source. Callers read
+  `ratelimited` only from the last line of the output, and only when that line
+  fully matches the anchored `Resolve:` contract form. An earlier
+  contract-looking line is ignored, because the output carries text derived
+  from untrusted PR comments that can forge one.
+- There is no output-text fallback. A missing or malformed final line is the
+  outcome `no contract`: `ratelimited` is unknown, the PR is recorded with the
+  note `no contract` (never `rate limited`), counts as blocking, and ends the
+  walk or batch rather than being swept past. Inferring a rate limit from
+  text would let a forged line steer the caller.
+- The command prints a contract line on every stop after the PR number is
+  known, including a fetch rate limit (`ratelimited=1`), so the missing-line
+  case means a crash or cut-off run, not a rate limit.
+- A timeout is not a rate limit. The thread scripts exit 4 with
+  `reason=rate-limit` or `reason=timeout` on stderr. Both stop further
+  mutations, but only `reason=rate-limit` (or a missing or unrecognized
+  reason, as a fail-safe) sets `ratelimited=1`; `reason=timeout` leaves it `0`
+  so a batch caller keeps working through its other PRs.
 - Define the rule once, in the contract, and have every caller point at
-  it. Do not restate it per call site.
+  it. Do not restate it per call site. The contract lives in
+  `plugins/yellow-review/references/resolve/dispositions.md` ("Report and
+  contract line" and the exit-4 rules above it) as of the tip of the unmerged
+  stack (PR #955's branch), not on `main`; re-read it on `main` once the stack
+  lands.
 
 ---
 
@@ -124,7 +143,8 @@ unmerged resolve stack (PRs #950-#955), not `main`.
   `commit-resolve-fixes`, exit 3 means "refused" (path, staged-set or
   credential-shaped check) and exit 4 means "commit failed and was undone".
   `reply-pr-thread` uses 3 for "thread not found or not permitted" and 4 for
-  rate limit. Callers retry only the transient code. Never map "could not
+  rate limit or a `gh` timeout (told apart by the stderr `reason=` line).
+  Callers retry only the transient code. Never map "could not
   list the PR's files" onto the refusal code: a network failure that exits as
   a refusal triggers a revert of every fix. Give "unavailable" its own code
   and do not roll back on it. Open defect in the stack as reviewed:

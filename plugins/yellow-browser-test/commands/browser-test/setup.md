@@ -70,7 +70,7 @@ if [ -f "$repo_top/go.mod" ] && \
   web_signals="$web_signals go"
 fi
 if [ -f "$repo_top/Cargo.toml" ] && \
-   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*$|[[:space:]]*=)|^[[:space:]]*(axum|actix-web|rocket|warp)\.[A-Za-z_-]+[[:space:]]*=|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
+   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*(#.*)?$|[[:space:]]*=)|^[[:space:]]*(axum|actix-web|rocket|warp)\.[A-Za-z_-]+[[:space:]]*=|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
   web_signals="$web_signals rust"
 fi
 for f in fly.toml render.yaml vercel.json netlify.toml; do

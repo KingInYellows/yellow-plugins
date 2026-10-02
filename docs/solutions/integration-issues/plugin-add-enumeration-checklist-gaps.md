@@ -67,11 +67,12 @@ that consumes an earlier shell's enumeration checklist.
 
 ## Examples
 
-### Testing a forbidden path: transport fixtures vs. no mutating runtime path
+### Testing a forbidden path: transport fixtures vs. zero observed mutations
 
 In `plans/specs/yellow-jules-integration.md`, R50 required create, 429/5xx and
 lost-2xx transport fixtures, while R52's PR2 negative test required that same PR
-to compile no vendor-mutating runtime path. Resolution:
+to have its fake server observe zero mutating requests across every subcommand
+it ships. Resolution:
 
 - Export pure builders (`buildClientOptions`, `buildCreateSessionConfig`) and an
   error classifier from the adapter.

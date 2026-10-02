@@ -15,14 +15,25 @@ source: compound-staging
 
 Graphite merge-queue artifacts can diverge from the reviewed PR content. When
 you already know the PR number and its squash commit, check that the squash
-commit reached `origin/main` before comparing content. Fetch first, or the
-check runs against a stale ref:
+commit reached `origin/main` before comparing content. Fetch first and stop if
+the fetch fails, or the check runs against a stale ref. `git merge-base
+--is-ancestor` exits 1 for "not an ancestor" and another nonzero status (128
+for an unknown object) when it cannot answer, so only exit 1 means nothing
+landed:
 
 ```bash
-git fetch origin main
-if ! git merge-base --is-ancestor "$SQUASH_SHA" origin/main; then
+if ! git fetch origin main; then
+  echo "git fetch origin main failed: cannot verify against a stale ref" >&2
+  exit 1
+fi
+rc=0
+git merge-base --is-ancestor "$SQUASH_SHA" origin/main || rc=$?
+if [ "$rc" -eq 1 ]; then
   echo "squash commit is not on origin/main: nothing landed" >&2
   exit 1
+elif [ "$rc" -ne 0 ]; then
+  echo "could not verify squash commit ancestry (git exit $rc)" >&2
+  exit "$rc"
 fi
 ```
 
