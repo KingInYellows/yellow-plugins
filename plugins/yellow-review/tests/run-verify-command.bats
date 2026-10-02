@@ -1130,3 +1130,34 @@ assert_no_raw_left() {
   run ! grep -qF "$SECRET" "$log"
   assert_no_raw_left
 }
+
+@test "--revert-only refuses a tracked directory and keeps its untracked files and edits" {
+  printf 'precious\n' >| src/precious.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a replaced file"* ]]
+  [[ "$stderr" == *": src"* ]]
+  [ "$(cat src/precious.txt)" = precious ]
+  [ -f src/new.txt ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--revert-only refuses a directory with nothing at HEAD and keeps its files" {
+  mkdir src/fresh && printf 'precious\n' >| src/fresh/work.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/fresh
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a replaced file"* ]]
+  [[ "$stderr" == *"src/fresh"* ]]
+  [ "$(cat src/fresh/work.txt)" = precious ]
+}
+
+@test "--revert-dirty lists the files of a dirty tracked directory and reverts them" {
+  printf 'precious\n' >| src/precious.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ ! -e src/new.txt ]
+  [ ! -e src/precious.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
