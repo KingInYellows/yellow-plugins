@@ -159,7 +159,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -182,7 +182,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -241,7 +241,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -264,7 +264,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -320,7 +320,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -343,7 +343,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1

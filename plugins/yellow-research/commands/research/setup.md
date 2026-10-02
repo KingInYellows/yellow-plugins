@@ -100,8 +100,9 @@ printf '\n=== API Keys ===\n'
 # 2-arg has_userconfig: identical copies live in the research, devin and
 # semgrep setup commands (tests/has-userconfig.bats in yellow-research fails
 # on drift) — if you change one, change all copies (search for
-# "has_userconfig()" across plugins/). `grep -qF` (fixed-string) in the no-jq fallback guards
-# against regex metacharacters sneaking into the search pattern.
+# "has_userconfig()" across plugins/). The no-jq fallback matches the plugin id with
+# `grep -qF` (fixed-string) and the option with `grep -qE` as a key followed by a
+# non-empty string value, so an empty stored value does not count (same as jq).
 has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
@@ -113,7 +114,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -136,7 +137,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -227,13 +228,14 @@ Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
 `UNREACHABLE` / `UNVERIFIED (shell key rejected; …)` (shell key got 401/403 on macOS,
 where a keychain key cannot be inspected, or without `jq` when the substring
 fallback finds this provider's userConfig option in a settings or credentials
-file; on Linux when the fallback finds no trace of the option, or with `jq`
-finding no userConfig key, the status stays `INVALID`) /
+file; on Linux when the fallback finds no non-empty value for the option, or with
+`jq` finding no userConfig key, the status stays `INVALID`; Perplexity's label
+ends with `; pending MCP-visibility confirmation`) /
 `UNVERIFIED (shell key passed; …)` (shell key got 200, but without `jq` the
-substring fallback finds this provider's userConfig option in a settings or
-credentials file, so a userConfig key that takes precedence in the MCP may be
-invalid; macOS alone does not trigger it, and Perplexity's label ends with `;
-pending MCP-visibility confirmation`) /
+fallback finds a non-empty value for this provider's userConfig option in a
+settings or credentials file, so a userConfig key that takes precedence in the
+MCP may be invalid; macOS alone does not trigger it, and Perplexity's label ends
+with `; pending MCP-visibility confirmation`) /
 `PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
 (shell key probed with any result, but a userConfig key is also set and the
@@ -272,7 +274,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -295,7 +297,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -348,9 +350,11 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  # Without jq has_userconfig is a substring match over the settings and
-  # credentials files. It can false-positive, but a miss is definitive: no trace
-  # of this provider's option means no userConfig key exists (Linux has no keychain).
+  # Without jq has_userconfig is a pattern match over the settings and
+  # credentials files and ignores empty values. It can still false-positive (the
+  # plugin id and option are matched independently), but a miss is definitive: no
+  # non-empty value for this provider's option means no userConfig key exists
+  # (Linux has no keychain).
   userconfig_maybe=0
   if ! command -v jq >/dev/null 2>&1; then
     if has_userconfig yellow-research exa_api_key 2>/dev/null; then
@@ -397,7 +401,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -420,7 +424,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -472,9 +476,11 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  # Without jq has_userconfig is a substring match over the settings and
-  # credentials files. It can false-positive, but a miss is definitive: no trace
-  # of this provider's option means no userConfig key exists (Linux has no keychain).
+  # Without jq has_userconfig is a pattern match over the settings and
+  # credentials files and ignores empty values. It can still false-positive (the
+  # plugin id and option are matched independently), but a miss is definitive: no
+  # non-empty value for this provider's option means no userConfig key exists
+  # (Linux has no keychain).
   userconfig_maybe=0
   if ! command -v jq >/dev/null 2>&1; then
     if has_userconfig yellow-research tavily_api_key 2>/dev/null; then
@@ -521,7 +527,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -544,7 +550,7 @@ has_userconfig() {
       esac
     else
       { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -599,9 +605,11 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  # Without jq has_userconfig is a substring match over the settings and
-  # credentials files. It can false-positive, but a miss is definitive: no trace
-  # of this provider's option means no userConfig key exists (Linux has no keychain).
+  # Without jq has_userconfig is a pattern match over the settings and
+  # credentials files and ignores empty values. It can still false-positive (the
+  # plugin id and option are matched independently), but a miss is definitive: no
+  # non-empty value for this provider's option means no userConfig key exists
+  # (Linux has no keychain).
   userconfig_maybe=0
   if ! command -v jq >/dev/null 2>&1; then
     if has_userconfig yellow-research perplexity_api_key 2>/dev/null; then
@@ -615,10 +623,11 @@ else
   # Still INVALID only if no userConfig key was found. Unknown on macOS (the
   # Keychain cannot be inspected) and without jq when the substring check found
   # this provider's option in a settings or credentials file (it cannot confirm
-  # the value). A substring miss keeps INVALID.
+  # the value). A miss keeps INVALID. Perplexity stays pending for Step 3.5's
+  # MCP-visibility check, like the passed-key UNVERIFIED case below.
   if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || [ "$userconfig_maybe" -eq 1 ]; }; then
-    provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
-    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, this provider's option found in a settings or credentials file) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+    provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected); pending MCP-visibility confirmation"
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, this provider's option found in a settings or credentials file) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
   fi
   # The shell key passed, but a non-empty userConfig key wins in the MCP
   # (bin/lib/resolve-mcp-key.sh) and may itself be invalid. Without jq the
@@ -637,7 +646,8 @@ printf 'provider=perplexity\nprovider_status=%s\nprovider_detail=%s\n' "$provide
 Each provider block above runs its own inline decision tree (in the same
 subprocess as the curl probe) so `$curl_exit` and `$http_status` stay in
 scope, and ends by printing its `provider`, `provider_status` and
-`provider_detail` lines: those printed lines are what Steps 4 and 5 read. A standalone post-probe decision tree was tried earlier but failed —
+`provider_detail` lines: those printed lines are what Steps 4 and 5 read. A
+standalone post-probe decision tree was tried earlier but failed —
 each ``` ```bash``` ``` block is a fresh subprocess, so variables set in one
 block are invisible to the next. See
 `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
@@ -780,8 +790,9 @@ Test: ToolSearch probe only (a real call burns API quota)
 ```
 
 Tool found: visibility reflects the MCP as it was last started, so it confirms
-only the key as of that start. Record `ACTIVE (as of the MCP's last start)` for
-Step 4's promotion. Tool absent: record `UNAVAILABLE`.
+only the key as of that start. Record `VISIBLE (as of the MCP's last start)` and
+let Step 4 promote the pending status with one of its two promotion shapes. Tool
+absent: record `UNAVAILABLE`.
 
 Never stop on a per-source error — record the status and continue to the next
 source. A failing MCP source does not affect API key checks or overall command
@@ -829,7 +840,11 @@ Capability summary:
 
 Adjust the capability summary based on how many functional API keys are
 active (three — EXA, Tavily, Perplexity). A key counts as **active** when
-its Step 3 status is any of:
+its Step 3 status is any of the following. A pending Perplexity status is
+promoted only by Step 3.5's visibility check, and only into one of two shapes,
+both of which count as active: `PRESENT (validated via MCP startup — userConfig
+only; …)` and the `PRESENT (userConfig takes precedence — …; validated via MCP
+startup; …)` suffix replacement.
 
 - `ACTIVE` — live-tested and confirmed working.
 - `PRESENT (validated via MCP startup — userConfig only; reflects the key as of
@@ -870,12 +885,15 @@ MCP-visibility confirmation)` do NOT count as active until Step 3.5 promotes
 them; if the Perplexity visibility check finds the MCP UNAVAILABLE, treat the
 key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` and
 `UNVERIFIED (shell key passed; …)` also do not count as active (the effective
-key is unconfirmed) and are not `INVALID`. Perplexity's `UNVERIFIED (shell key
-passed; …); pending MCP-visibility confirmation` becomes
-`ACTIVE (validated via MCP startup; reflects the key as of the MCP's last
-start)` and counts as active only when Step 3.5 finds the MCP tools, with the
-same keep-pending rule for a key changed this session; otherwise it stays
-unverified and inactive.
+key is unconfirmed) and are not `INVALID`. For Perplexity, both end with
+`; pending MCP-visibility confirmation`. When Step 3.5 finds the MCP tools, each
+becomes
+`PRESENT (userConfig takes precedence — shell key probe: <result>; validated via
+MCP startup; reflects the key as of the MCP's last start)`, where `<result>` is
+`INVALID` for the rejected status and `ACTIVE` for the passed one (the MCP
+started, so it resolved a key, and a userConfig key wins when one is set). It
+counts as active, with the same keep-pending rule for a key changed this
+session; otherwise it stays unverified and inactive.
 
 Counts:
 
@@ -992,8 +1010,8 @@ research), `Done`.
 | Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
 | HTTP 401/403, Linux, no userConfig key (jq found none, or no jq and no config file) | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
-| HTTP 401/403, macOS, or no jq and this provider's userConfig option found in a config file | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify. | Record per-provider |
-| HTTP 200, no jq and this provider's userConfig option found in a config file | "UNVERIFIED — shell key passed, but a userConfig key may take precedence." Install jq or check plugin settings. | Record per-provider |
+| HTTP 401/403, macOS, or no jq and a non-empty value for this provider's userConfig option found in a config file | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify. Perplexity adds `; pending MCP-visibility confirmation`; Step 3.5 promotes it to the `PRESENT (userConfig takes precedence — …; validated via MCP startup; …)` label when the MCP tools are visible. | Record per-provider |
+| HTTP 200, no jq and a non-empty value for this provider's userConfig option found in a config file | "UNVERIFIED — shell key passed, but a userConfig key may take precedence." Install jq or check plugin settings. Perplexity is promoted like the row above. | Record per-provider |
 | HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale or wrong.      | Record per-provider |
 | Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |

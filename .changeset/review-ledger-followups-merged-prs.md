@@ -1,6 +1,8 @@
 ---
 'yellow-council': patch
 'yellow-research': patch
+'yellow-devin': patch
+'yellow-semgrep': patch
 'yellow-browser-test': patch
 'yellow-core': patch
 ---
@@ -29,7 +31,15 @@ and setup-command PRs.
   Step 3.5 checks Perplexity visibility through ToolSearch only and does not
   promote on visibility alone, because a changed key needs a Claude Code
   restart. The shell-env wording says Claude Code must have been launched with
-  the key exported.
+  the key exported. A Perplexity `UNVERIFIED` status, passed or rejected shell
+  key, stays pending until Step 3.5 sees the MCP tools; Step 4 then promotes it
+  to `PRESENT (userConfig takes precedence — …; validated via MCP startup; …)`,
+  one of the two established promotion shapes, and counts it as active.
+- `yellow-research`, `yellow-devin` and `yellow-semgrep`: the jq-less fallback in
+  `has_userconfig` matches only a non-empty string value for the option, like
+  the jq path, so a leftover empty `"exa_api_key": ""` entry no longer downgrades
+  a passing shell key to `UNVERIFIED`. `has-userconfig.bats` covers the empty,
+  whitespace, other-provider and jq-absent cases.
 - `yellow-browser-test` and `yellow-core`: web-app detection recognizes dotted
   Cargo dependency keys such as `axum.workspace = true` and a trailing TOML
   comment after a dependency-table header, the outside-git fallback is the

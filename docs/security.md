@@ -567,7 +567,9 @@ trust boundary from the pack and fenced-output files above:
   partway can delete `.token` yet leave the directory, after which the file
   could no longer be authenticated and would block the next run for up to a
   day; so the file goes while `.token` is intact, and a directory that cannot be
-  removed never blocks a new run. A file that fails authentication is still
+  removed does not block a new run once its state claim is unlinked. If the
+  release itself fails and cleanup leaves a directory younger than 24 hours, 5a
+  still refuses to start. A file that fails authentication is still
   never unlinked, and a symlink is never followed. When `rm -rf` fails (a
   non-writable directory),
   they run `chmod -R u+rwx` on the directory and retry once, only for a real

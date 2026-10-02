@@ -92,8 +92,9 @@ and never auto-commits. The user decides what to do with the verdicts.
   `council_rm_synth_state` is by pathname after validation, so a reclaim that
   lands between the check and the `rm` can remove another run's fresh claim;
   narrow, same class as the reclaim race. The Step 8 Cancel block also removes
-  the staging directory after a 5d-resume or 5e failure, but only after proving
-  it is this run's and before releasing the claim. Validation, cleanup,
+  the staging directory after a 5d-resume or 5e failure: it proves the directory
+  is this run's, releases the claim, and only then removes the directory.
+  Validation, cleanup,
   that race ("Known residual (stale-state reclaim race)"), the pathname-unlink
   residual and the residual Write forgery are in `docs/security.md` "Synthesis staging directory
   (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
