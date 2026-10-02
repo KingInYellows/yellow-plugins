@@ -54,7 +54,8 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
 - Resolver text is untrusted (comments steer it). The orchestrator never
   pastes it onto a command line: evidence values are checked against the
   patterns below first, and file lists are written to a file with the
-  Write tool and passed with `--files-from`.
+  Write tool and passed with `--files-from` (a flag of the planned
+  `commit-resolve-fixes` and `run-verify-command`).
 
 ## Downgrade rules
 
@@ -142,11 +143,13 @@ reply in the write phase (the lane below).
 
 ## Lanes
 
-A thread is **bot** only when every comment the viewer did not author has
-`authorType` `Bot` and all of its comments were fetched (`commentCount`
+A thread is **bot** only when it has at least one comment the viewer did not
+author, every such comment has `authorType` `Bot`, and all of its comments
+were fetched (`commentCount`
 equals the number returned; longer threads count as human). One human reply makes it a human thread, so a human's
 objection inside a bot-opened thread is never auto-resolved. Unknown or
-missing types count as human. When comparing logins, strip a trailing
+missing types count as human, and so does a thread of only the viewer's own
+comments. When comparing logins, strip a trailing
 `[bot]`.
 
 | Lane | Rule |
@@ -182,8 +185,10 @@ record); only the resolve is withheld.
   from the ID prefix. The Linear description ends with the same marker. A
   Linear failure, or an unresolvable team, falls back to GitHub once and
   records `tracker=github (linear unavailable)`.
-- Dedupe check: `file-followup-issue --find <owner/repo> <PRRT_id>` looks up
-  the marker without filing and prints `{"exists":true,"number":N,"url":"..."}`
+- Dedupe check: run `file-followup-issue --find <owner/repo> <PRRT_id>` for
+  every candidate before either tracker is used, so a GitHub issue filed by
+  an earlier run's fallback is found even when Linear works this time. It
+  looks up the marker without filing and prints `{"exists":true,"number":N,"url":"..."}`
   or `{"exists":false}`, so a dedupe hit can be dropped from the approval list
   and the cap before anything is created. It exits 5 over a full window with
   no match, as the filing form does.
@@ -303,7 +308,8 @@ A refused set is a staged mismatch (exit 3): nothing is committed and every
 
 ## Bash timeouts
 
-Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
+The verify and `commit-resolve-fixes` timeouts apply once those scripts land
+(planned). Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
 `timeout` of `(verify_timeout_seconds + 60) × 1000` ms for verify,
 `(repass_wait_seconds + 120) × 1000` ms for the Step 8 poll, and 600000 ms
 for `commit-resolve-fixes` (hooks, submit and the head check). The settings
@@ -316,9 +322,10 @@ comment was authored by the viewer (`viewerDidAuthor`) and ends with a
 marker for the same thread, whatever its disposition, it skips the reply
 (`already-replied`), reports the posted marker's disposition in the skip
 JSON, and the orchestrator retries only the resolve (when the lane allows
-it). A re-run therefore never posts a second, contradicting reply. A
-reviewer comment after ours makes the marker no longer last, so the thread
-is processed again.
+it). A re-run right after our reply therefore never posts a second,
+contradicting reply. Any comment after ours, including a bot's
+acknowledgement, makes the marker no longer last, so the thread is processed
+again; ignoring such later replies is not implemented.
 
 `get-pr-comments` fetches `comments(first: 50)`; do not use that list to
 decide whether our marker is last. The reply script's own `comments(last:1)`
@@ -362,14 +369,15 @@ Replies and issue bodies end with:
 ## Pacing and rate limits
 
 - Mutations run serially. `reply-pr-thread` sleeps 1 s after each post.
-- On a rate limit (stderr matching "rate limit" or "HTTP 429", or a GraphQL
-  error whose message mentions a rate limit), `reply-pr-thread` waits the
+- On a rate limit (stderr matching "rate limit", "abuse" or "HTTP 429", or a
+  GraphQL error whose message mentions a rate limit or abuse
+  detection), `reply-pr-thread` waits the
   `Retry-After` header, else the time to `x-ratelimit-reset` when
   `x-ratelimit-remaining` is 0, else `YELLOW_REVIEW_RATE_LIMIT_WAIT`
   (default 60 s), then retries once per script run. A second limit, or a
   required wait over 90 s, exits 4. A bare 403 is not a rate limit: it exits
-  3. `file-followup-issue` never waits or retries; a rate limit exits 4 at
-  once.
+  3. `file-followup-issue` never waits or retries; stderr matching "rate limit"
+  or "HTTP 429" (it does not match "abuse") exits 4 at once.
 - `reply-pr-thread` also exits 4 when a `gh` call exceeds
   `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)`). It does not
   retry, because the killed call may already have posted the reply. A re-run
@@ -384,17 +392,19 @@ Replies and issue bodies end with:
 
 ## Script exit codes
 
-Exit 1 is always a non-usage failure (missing tool, unreadable file,
-network, unexpected response).
+For `reply-pr-thread`, `file-followup-issue` and `check-resolve-text`, exit 1
+is a non-usage failure (missing tool, `gh` or network failure, unexpected
+response) and exit 2 covers usage and unreadable input files. `resolve-pr-thread`
+and `get-pr-comments` exit 1 for every failure, usage included.
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reply-pr-thread` | replied or skipped | usage / body too long / credential or scan failure | not found or permission | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
+| `reply-pr-thread` | replied or skipped | usage / unreadable or over-long body / credential or scan failure | not found or permission | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
 | `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry), or a `gh` call timed out (a create may have filed) | dedupe window full with no marker (not transient) | — |
+| `file-followup-issue` | created or found | usage / unreadable title or body file / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry), or a `gh` call timed out (a create may have filed) | dedupe window full with no marker (not transient) | — |
 | `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
-| `check-resolve-text` | clean | usage / credential or scan failure | — | — | — | — |
+| `check-resolve-text` | clean | usage / unreadable file / credential or scan failure | — | — | — | — |
 
 `get-pr-comments` exits 1 on any failure (usage included) and 3 when the
 thread list is truncated by the page cap or a missing cursor; stdout then
@@ -439,13 +449,20 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - The Linear follow-up path has no marker lookup before `save_issue`, and an
   ambiguous Linear failure falls back to GitHub. Marker dedupe therefore
   holds only for the GitHub tracker: a Linear issue that was created but not
-  confirmed can be followed by a GitHub issue for the same thread.
+  confirmed can be followed by a GitHub issue for the same thread, and a
+  re-run that reaches Linear again can file a second Linear issue.
+- The credential screen refuses credential shapes only. Resolver-written
+  text can still carry `@` mentions, external URLs or markdown images; the
+  200-character single-line limit on `evidence` and `oos_reason` bounds it,
+  and the reply templates put the outcome first.
+- A repo with Issues disabled makes `file-followup-issue` exit 1 (`gh issue
+  list` fails), so its `oos` threads get no reply and stay open on every run.
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
   definition files are refused, but the code the hooks run is not. How
   unattended commits should treat hooks is an open decision.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds
-  of threads) are slow. A batch apply script is a tracked follow-up.
+  of threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply;
   markers dedupe only per viewer.
 - Where branch protection does not require conversation resolution, an open

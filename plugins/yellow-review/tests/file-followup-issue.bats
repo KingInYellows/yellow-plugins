@@ -11,7 +11,7 @@ setup() {
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
   unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL MOCK_GH_ISSUE_LIST_FULL MOCK_GH_ISSUE_LIST_COUNT \
     MOCK_GH_ISSUE_LIST_FAIL MOCK_GH_VIEWER_FAIL MOCK_GH_THREAD_FAIL MOCK_GH_THREAD_URL GH_HOST \
-    MOCK_GH_RESCAN MOCK_GH_ISSUE_CLOSE_FAIL
+    MOCK_GH_RESCAN MOCK_GH_ISSUE_CLOSE_FAIL MOCK_GH_ISSUE_LIST_MARKER_THREAD
   TITLE="${BATS_TEST_TMPDIR}/title.txt"
   BODY="${BATS_TEST_TMPDIR}/body.txt"
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
@@ -443,4 +443,53 @@ SH
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 2 ]
   [[ "$stderr" != *"resolve-text:"* ]]
+}
+
+@test "a thread that does not exist exits 2 and files nothing" {
+  export MOCK_GH_THREAD_FAIL=notfound
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"was not found"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a null thread node exits 2 and files nothing" {
+  export MOCK_GH_THREAD_FAIL=nullnode
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"was not found"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a marker inside a full window is a dedupe hit, not a window refusal" {
+  export MOCK_GH_ISSUE_LIST_FULL=1 MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[50,false]' ]
+  [ ! -e "$CREATES" ]
+}
+
+@test "with several marker issues the oldest wins, for filing and for --find" {
+  export MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[50,false]' ]
+  run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.exists, .number]')" = '[true,50]' ]
+}
+
+@test "a failed post-create rescan says the duplicate check did not run" {
+  export MOCK_GH_RESCAN=fail
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"post-create issue list failed"* ]]
+  [[ "$stderr" == *"#77"* ]]
+}
+
+@test "a failed duplicate close names the issue to close by hand" {
+  export MOCK_GH_RESCAN=winner MOCK_GH_ISSUE_CLOSE_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"could not close duplicate issue #77"* ]]
 }

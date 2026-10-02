@@ -1,6 +1,25 @@
 #!/bin/sh
 # Mock gh CLI for bats tests
-# Serves fixture JSON based on PR number or thread ID in arguments
+# Serves fixture JSON based on PR number or thread ID in arguments, and
+# scripts the calls the resolve scripts make. Arms keyed on query or
+# endpoint text come first; each arm documents its own drivers:
+#   FollowupViewer / FollowupThreadUrl   MOCK_GH_VIEWER, MOCK_GH_VIEWER_FAIL,
+#                                        MOCK_GH_THREAD_URL, MOCK_GH_THREAD_FAIL
+#   issue list / create / close          MOCK_GH_ISSUE_LIST_{FAIL,COUNT,FULL,
+#                                        MARKER_THREAD}, MOCK_GH_RESCAN,
+#                                        MOCK_GH_ISSUE_CREATE_FAIL,
+#                                        MOCK_GH_ISSUE_CLOSE_FAIL
+#   ReplyPrecheck / addPullRequestReviewThreadReply
+#                                        PRRT_reply_* thread ids pick the
+#                                        scenario (rate-limit sequences with
+#                                        Retry-After or reset headers, 5xx,
+#                                        missing comment, spoofed marker)
+#   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
+#   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES
+#   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
+#                                        BASE_OID}
+# The reply arms match bare thread-id substrings, so order matters: a new id
+# must not contain an earlier arm's id (PRRT_reply_rl also matches rl2).
 set -eu
 
 FIXTURE_DIR="${BATS_FIXTURE_DIR:-$(dirname "$0")/../fixtures}"
@@ -73,7 +92,15 @@ case "$ALL_ARGS" in
   *"FollowupThreadUrl"*)
     # MOCK_GH_THREAD_FAIL=1|ratelimit simulates a failed lookup;
     # MOCK_GH_THREAD_URL overrides the first comment URL (empty = none).
+    # MOCK_GH_THREAD_FAIL=notfound is gh's error for an unknown node id;
+    # MOCK_GH_THREAD_FAIL=nullnode is a null node with no error.
     case "${MOCK_GH_THREAD_FAIL:-0}" in
+      notfound) printf 'gh: Could not resolve to a node with the global id of PRRT_gone. (HTTP 200)\n' >&2; exit 1 ;;
+      nullnode)
+        MOCK_BODY='{"data":{"node":null}}'
+        emit "$@"
+        exit 0
+        ;;
       ratelimit) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
       1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
     esac
@@ -113,10 +140,19 @@ case "$ALL_ARGS" in
     _n="${MOCK_GH_ISSUE_LIST_COUNT:-}"
     [ -z "$_n" ] && [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ] && _n=200
     if [ -n "$_n" ]; then
-      jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]'
-      exit 0
+      _base=$(jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]')
+    else
+      _base=$(cat "$FIXTURE_DIR/issue-list-response.json")
     fi
-    cat "$FIXTURE_DIR/issue-list-response.json"
+    # MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_x appends two issues carrying
+    # that thread's marker, #90 listed before #50, so the oldest must win.
+    if [ -n "${MOCK_GH_ISSUE_LIST_MARKER_THREAD:-}" ]; then
+      printf '%s' "$_base" | jq --arg t "$MOCK_GH_ISSUE_LIST_MARKER_THREAD" '. + [ (90, 50) as $n
+        | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
+           body: "Out of scope.\n\n<!-- yellow-review:resolve v1 thread=\($t) disposition=oos -->"} ]'
+    else
+      printf '%s\n' "$_base"
+    fi
     exit 0
     ;;
   "issue create "*)
@@ -180,6 +216,10 @@ case "$ALL_ARGS" in
         fi
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_rlboth","comments":{"nodes":[{"viewerDidAuthor":false,"body":"x"}]}}}}'
         ;;
+      *"PRRT_reply_badbody"*)
+        # Our last comment with a non-string body: the prior-marker jq errors.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_badbody","comments":{"nodes":[{"viewerDidAuthor":true,"body":5}]}}}}'
+        ;;
       *"PRRT_reply_done"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
         ;;
@@ -216,7 +256,7 @@ case "$ALL_ARGS" in
           exit 1
         fi
         ;;
-      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
+      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
         # Wait-source arms. ra120 / resetfar are always limited (over the
         # cap); the rest are limited on the first call only.
         case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_resetfar"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
@@ -226,6 +266,7 @@ case "$ALL_ARGS" in
           case "$ALL_ARGS" in
             *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
             *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
+            *"PRRT_reply_radate"*) _hdr="Retry-After: Wed, 21 Oct 2026 07:28:00 GMT" ;;
             *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
             *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
             *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 30))") ;;

@@ -16,13 +16,13 @@
 #             never the text: `refused rule=<rule> line=<n>` for a credential
 #             hit, `scan failed` when the scan did not run; look for that
 #             line anywhere on stderr, it is not always first), or a thread
-#             that belongs to a different pull request, 4 rate limited or a gh call timed out (no retry
-#             here; the caller stops mutating; a timed-out create or
-#             duplicate close may have changed state, and a re-run finds the
-#             issue by its marker), 5 the dedupe
-#             window is full and holds no marker: an older issue may carry
-#             it, so nothing is filed and the thread stays open (not a
-#             transient failure; retrying does not help).
+#             that belongs to a different pull request or does not exist,
+#             4 rate limited or a gh call timed out (no retry here; the
+#             caller stops mutating; a timed-out create or duplicate close may
+#             have changed state, and a re-run finds the issue by its marker),
+#             5 the dedupe window is full and holds no marker: an older issue
+#             may carry it, so nothing is filed and the thread stays open (not
+#             a transient failure; retrying does not help).
 # Env: YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
 #      timeout(1), skipped when it is not installed (lib/resolve-gh.sh).
 # Contract: references/resolve/dispositions.md
@@ -145,19 +145,31 @@ case "$RAW_VIEWER" in
 esac
 
 # The trailing " disposition=" keeps PRRT_ab from matching PRRT_abc.
-MARKER_PREFIX="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition="
+MARKER="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition=oos -->"
+
+# list_viewer_issues <out-file>: the viewer's newest LIST_LIMIT issues, any
+# state. --author filters server-side (not the lagging search index), so other
+# users' issues cannot push ours out of the window.
+list_viewer_issues() {
+    rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
+        --json number,url,body,author >"$1" 2>"$ERR"
+}
+
+# first_marker_issue <issues-file>: the lowest-numbered viewer-authored issue
+# whose body ends with the marker, as {number,url,created:false}; empty when
+# there is none. One predicate serves the pre-create and post-create scans.
+first_marker_issue() {
+    jq -c --arg viewer "$VIEWER" --arg marker "$MARKER" '
+        [ .[]
+          | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
+          | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
+        | sort_by(.number) | first // empty
+        | {number, url, created: false}' "$1"
+}
 
 # --- Dedupe: scan the viewer's issue bodies ---
-# --author filters server-side (not the lagging search index), so other
-# users' issues cannot push ours out of the window.
-rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
-    --json number,url,body,author >"$WORK_DIR/issues.json" 2>"$ERR" || gh_fail 'issue list'
-EXISTING=$(jq -c --arg viewer "$VIEWER" --arg marker "${MARKER_PREFIX}oos -->" '
-    [ .[]
-      | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
-      | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
-    | sort_by(.number) | first // empty
-    | {number, url, created: false}' "$WORK_DIR/issues.json")
+list_viewer_issues "$WORK_DIR/issues.json" || gh_fail 'issue list'
+EXISTING=$(first_marker_issue "$WORK_DIR/issues.json")
 if [ -n "$EXISTING" ]; then
     if [ "$FIND_ONLY" -eq 1 ]; then
         printf '%s\n' "$EXISTING" | jq -c '{exists: true, number, url}'
@@ -189,13 +201,17 @@ PR_URL="$LINK"
 # shellcheck disable=SC2016
 if THREAD_URL=$(rg_gh api graphql -f threadId="$THREAD_ID" \
         -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { comments(first: 1) { nodes { url } } } } }' \
-        --jq '.data.node.comments.nodes[0].url // empty' 2>"$ERR"); then
+        --jq 'if .data.node == null then "NOTFOUND" else (.data.node.comments.nodes[0].url // "") end' 2>"$ERR"); then
     # GitHub returns the canonical owner/repo casing; compare case-insensitively.
     THREAD_URL_LC=$(printf '%s' "$THREAD_URL" | tr '[:upper:]' '[:lower:]')
     PR_URL_LC=$(printf '%s' "$PR_URL" | tr '[:upper:]' '[:lower:]')
     case "$THREAD_URL_LC" in
         "$PR_URL_LC"[/#?]*|"$PR_URL_LC") LINK="$THREAD_URL" ;;
         '') printf 'Note: no thread URL returned; linking the PR instead.\n' >&2 ;;
+        notfound)
+            printf 'Error: Thread %s was not found; refusing to file an issue for it.\n' "$THREAD_ID" >&2
+            exit 2
+            ;;
         *)
             printf 'Error: Thread %s does not belong to %s#%s (its first comment is at %s).\n' \
                 "$THREAD_ID" "$REPO" "$PR_NUMBER" "$THREAD_URL" >&2
@@ -209,11 +225,17 @@ else
     if [ "$LOOKUP_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
         gh_fail 'thread link lookup' "$LOOKUP_RC"
     fi
+    # A thread that does not exist is not a transient failure: filing an
+    # issue for it would leave an orphan.
+    if grep -qiE 'Could not resolve to a node|NOT_FOUND' "$ERR"; then
+        printf 'Error: Thread %s was not found; refusing to file an issue for it.\n' "$THREAD_ID" >&2
+        exit 2
+    fi
     printf 'Note: thread link lookup failed (%s); linking the PR instead.\n' "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
 fi
 
 ISSUE_BODY="$WORK_DIR/issue-body.md"
-jq -Rrs --arg link "$LINK" --arg pr "$PR_NUMBER" --arg marker "${MARKER_PREFIX}oos -->" \
+jq -Rrs --arg link "$LINK" --arg pr "$PR_NUMBER" --arg marker "$MARKER" \
     'sub("\\s+$"; "") + "\n\nFollow-up from review thread on #" + $pr + ": " + $link + "\n\n" + $marker' \
     <"$BODY_FILE" >"$ISSUE_BODY"
 
@@ -229,14 +251,11 @@ fi
 # concurrent run filed first, the lowest-numbered marker issue wins; close ours
 # as a duplicate (best effort) and report the winner.
 MY_NUMBER=${URL##*/}
-if rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
-        --json number,url,body,author >"$WORK_DIR/issues-after.json" 2>"$ERR"; then
-    WINNER=$(jq -c --arg viewer "$VIEWER" --arg marker "${MARKER_PREFIX}oos -->" '
-        [ .[]
-          | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
-          | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
-        | sort_by(.number) | first // empty
-        | {number, url, created: false}' "$WORK_DIR/issues-after.json" 2>/dev/null || true)
+if list_viewer_issues "$WORK_DIR/issues-after.json"; then
+    if ! WINNER=$(first_marker_issue "$WORK_DIR/issues-after.json" 2>/dev/null); then
+        printf 'Note: could not read the post-create issue list; a concurrent duplicate of #%s, if any, was not checked.\n' "$MY_NUMBER" >&2
+        WINNER=""
+    fi
     if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
         # Ordinary close failures are best effort; a timeout may have changed
         # state, and a rate limit leaves the duplicate open; both stop the
@@ -250,6 +269,8 @@ if rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limi
             if [ "$CLOSE_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
                 gh_fail 'duplicate issue close' "$CLOSE_RC"
             fi
+            printf 'Note: could not close duplicate issue #%s (%s); close it by hand.\n' \
+                "$MY_NUMBER" "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
         fi
         printf '%s\n' "$WINNER"
         exit 0
@@ -261,6 +282,7 @@ else
     if [ "$RESCAN_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
         gh_fail 'post-create issue list' "$RESCAN_RC"
     fi
+    printf 'Note: post-create issue list failed; a concurrent duplicate of #%s, if any, was not checked.\n' "$MY_NUMBER" >&2
 fi
 
 jq -nc --arg url "$URL" '{number: ($url | sub(".*/issues/"; "") | tonumber), url: $url, created: true}'

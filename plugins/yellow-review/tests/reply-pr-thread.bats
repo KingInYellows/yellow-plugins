@@ -272,3 +272,52 @@ stub_sleep() {
   [ "$status" -eq 2 ]
   [[ "$stderr" != *"resolve-text:"* ]]
 }
+
+@test "a non-numeric Retry-After (an HTTP date) falls back to the env default wait" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=5 run --separate-stderr "$SCRIPT" PRRT_reply_radate fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"retrying in 5s"* ]]
+  grep -qx 5 "$SLEEP_LOG"
+}
+
+@test "a last comment the prior-marker check cannot read exits 1 and posts nothing" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_badbody fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"could not read the last comment"* ]]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a non-numeric pacing value does not fail a reply that already posted" {
+  YELLOW_REVIEW_PACE_SECONDS=abc run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+# A PATH of symlinks to the tools the script needs, minus timeout.
+path_without_timeout() {
+  _bin="${BATS_TEST_TMPDIR}/notimeout"
+  mkdir -p "$_bin"
+  for _t in sh bash jq awk tr head grep sed date sleep mktemp rm cat dirname env printf; do
+    _p=$(command -v "$_t" 2>/dev/null) && [ -x "$_p" ] && ln -sf "$_p" "$_bin/$_t"
+  done
+  ln -sf "${BATS_TEST_DIRNAME}/mocks/gh" "$_bin/gh"
+}
+
+@test "gtimeout is used when timeout is not installed" {
+  path_without_timeout
+  printf '#!/bin/sh\nprintf x >> "%s/gtimeout_used"\nshift\nexec "$@"\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/notimeout/gtimeout"
+  chmod +x "${BATS_TEST_TMPDIR}/notimeout/gtimeout"
+  PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ -s "${BATS_TEST_TMPDIR}/gtimeout_used" ]
+  [[ "$stderr" != *"neither timeout"* ]]
+}
+
+@test "with neither timeout nor gtimeout the script says so and still runs" {
+  path_without_timeout
+  PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
