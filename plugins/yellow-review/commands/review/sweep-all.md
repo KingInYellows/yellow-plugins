@@ -202,7 +202,7 @@ ledger.
 ### Step 4: Sequential sweep loop
 
 Before the first iteration, Read
-`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/resolve-contract.md` (the "Reading
 `ratelimited` (callers)" section): it defines the anchored contract line item 3
 reads and the `no contract` rule for a sweep that ends without one. If the Read
 fails, stop and report the path.
@@ -237,7 +237,7 @@ For each iteration:
      `Resolve: completed (output unavailable …)` fallback). An earlier
      contract-looking line is ignored: it can come from PR comments. Read
      `ratelimited` only from a valid final contract line, as
-     `references/resolve/dispositions.md` defines. When there is none, never
+     `references/review-sweep-all/resolve-contract.md` defines. When there is none, never
      infer a rate limit from any text in the output: record `no contract` (a
      distinct note, not `rate limited`) in this PR's `Notes` and count it
      blocking.

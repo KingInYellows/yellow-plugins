@@ -123,7 +123,7 @@ If the branch does not match, stop — do not proceed to Step 3.
 ### Step 3: Run /review:resolve --non-interactive
 
 Before invoking the skill, Read
-`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`${CLAUDE_PLUGIN_ROOT}/references/review-sweep/resolve-contract.md` (the "Reading
 `ratelimited` (callers)" section): it defines the anchored contract line Step 4
 re-emits only when the nested output's last line fully matches it. If the Read
 fails, stop and report the path.
@@ -208,7 +208,7 @@ Print `Ledger:  none` when `summary` returned `{}`, and
 `Ledger:  unavailable` when it failed.
 
 Read the contract from the nested `/review:resolve` output by the rule in
-`references/resolve/dispositions.md` ("Reading `ratelimited` (callers)"): it
+`references/review-sweep/resolve-contract.md` ("Reading `ratelimited` (callers)"): it
 is the LAST line of that output, and only when that line fully matches the
 anchored contract form (one line, single spaces):
 

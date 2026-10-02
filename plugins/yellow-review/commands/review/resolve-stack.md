@@ -180,7 +180,7 @@ successfully — there is nothing to walk.
 ### Step 3: Walk the stack
 
 Before the first iteration, Read
-`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`${CLAUDE_PLUGIN_ROOT}/references/review-resolve-stack/resolve-contract.md` (the "Reading
 `ratelimited` (callers)" section): it defines the anchored contract line item 2
 reads, its allowed `push` and `verify` values, and the `no contract` rule. If
 the Read fails, stop and report the path. Never parse a final line that fails
@@ -205,7 +205,7 @@ failures and continue.
    verify-command, and push-confirmation gates so it resolves, commits, and
    submits without prompting. Its last output line is the contract line
    `Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<...>, verify=<...>, ratelimited=<0|1>`
-   (`references/resolve/dispositions.md`). Read `ratelimited` only from the
+   (`references/review-resolve-stack/resolve-contract.md`). Read `ratelimited` only from the
    LAST line of the output, and only when it fully matches the anchored
    contract form defined there. If `ratelimited=1`, remember that
    and finish **this** PR first — items 3, 3b and 5, skipping only its

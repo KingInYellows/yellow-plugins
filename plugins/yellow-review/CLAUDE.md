@@ -250,7 +250,13 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
 revert lives at `references/review-resolve-stack/dirty-tree-cleanup.md`;
 `references/review-sweep-all/dirty-tree-cleanup.md` is its byte-identical copy
 for `/review:sweep-all` (offloaded detail stays under each command's own
-`references/<slug>/`; `skill-content.bats` fails when the copies differ).
+`references/<slug>/`; `skill-content.bats` fails when the copies differ). The
+caller-side `Resolve:` contract works the same way: `/review:sweep`,
+`/review:sweep-all` and `/review:resolve-stack` each Read their own
+byte-identical `resolve-contract.md` (`references/review-sweep/`,
+`references/review-sweep-all/`, `references/review-resolve-stack/`), which
+carries the anchored line and the `Reading ratelimited (callers)` rule from
+`dispositions.md`.
 
 ### Library
 
