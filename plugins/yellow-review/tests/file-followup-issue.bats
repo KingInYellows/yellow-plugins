@@ -462,7 +462,8 @@ SH
 }
 
 @test "a marker inside a full window is a dedupe hit, not a window refusal" {
-  export MOCK_GH_ISSUE_LIST_FULL=1 MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
+  # 198 unrelated + the mock's 2 marker issues = a full 200-issue response.
+  export MOCK_GH_ISSUE_LIST_COUNT=198 MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[50,false]' ]

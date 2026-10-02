@@ -125,11 +125,12 @@ rt_looks_secret() {
                 r = substr(r, RSTART + RLENGTH)
                 sub(/^[^:]*:\/\/[^:]*:/, "", seg)
                 sub(/@$/, "", seg)
-                # `%` marks a placeholder only as `%NAME%`, `%(name)s` or a
-                # format spec (`%s`); a `%HH` escape (`p%40ss`) is password
-                # content and must be scanned.
+                # `%` marks a placeholder only when it is the WHOLE password:
+                # `%NAME%`, `%(name)s` or a bare format spec (`%s`). A password
+                # that merely contains one (`Hunter2%s`) or a `%HH` escape
+                # (`p%40ss`) is a credential and must be scanned.
                 if (seg ~ /[<${\[]/ || index(ph, " " seg " ") > 0) continue
-                if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /%\(|%[g-z]|%[0-9a-f]([^0-9a-f]|$)/) continue
+                if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /^%[0-9]*[a-z]$/ || seg ~ /^%\([a-z_][a-z0-9_]*\)[a-z]$/) continue
                 flag("url-userinfo")
             }
             # Authorization header or Bearer/Basic scheme with an opaque
