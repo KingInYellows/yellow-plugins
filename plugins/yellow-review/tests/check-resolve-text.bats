@@ -449,6 +449,19 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 2 ]
 }
 
+@test "a URL password that merely contains a percent placeholder is refused; whole-password placeholders stay clean" {
+  for t in 'https://u:Hunter2%s@example.com/x' 'https://u:p%zz1word@host' \
+    'https://deploy:p%40ss%21word@example.com/x'; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ]
+  done
+  printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
+    'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
 @test "rt_looks_secret_strict skips keyword rules but keeps high-precision ones" {
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
   # shellcheck source=../lib/resolve-text.sh
