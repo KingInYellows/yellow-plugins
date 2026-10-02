@@ -1,0 +1,63 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_7a82748dd606d9::t_9f43bbcabe3590 20-22
+  s_7a82748dd606d9::t_24a5026a5f8e33 241-252
+  s_7a82748dd606d9::t_8af93869f30071 15-18
+plugins/yellow-review/lib/resolve-text.sh
+  s_7a82748dd606d9::t_f1249297e71b4a 180
+  s_7a82748dd606d9::t_b9381a62e9f857 66
+  s_7a82748dd606d9::t_5341338ffe6feb 85
+  s_7a82748dd606d9::t_01078018d5fd25 53-56
+  s_7a82748dd606d9::t_6d2242c9dd82ec 96-98,103-104
+  s_7a82748dd606d9::t_b579b881e4d5a0 168-169
+  s_7a82748dd606d9::t_9d0c51b6a55021 118
+  s_7a82748dd606d9::t_a870d3c1bdecc8 99-102
+  s_7a82748dd606d9::t_047516f5619136 132
+plugins/yellow-review/skills/pr-review-workflow/scripts/check-resolve-text
+  s_7a82748dd606d9::t_4aab91115336d5 9-12
+docs/security.md
+  s_7a82748dd606d9::t_7b8a177cff48fc 355-361
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_4a96f547ca8652 203-206
+  s_7a82748dd606d9::t_b3e0f106334513 207-209
+  s_2881f618bf3867::t_fd08649b5249a9 210
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_7a82748dd606d9::t_2f9b46a6b7ad8d 181-195
+  s_7a82748dd606d9::t_57c7414f9c082e 60-76
+  s_7a82748dd606d9::t_5ee88b677d91dd 311-323
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_7a82748dd606d9::t_25d686dac23dae 422-425
+plugins/yellow-review/tests/mocks/gh
+  s_7a82748dd606d9::t_889ab2fea70c31 88,91-92,99
+plugins/yellow-review/references/resolve/dispositions.md
+  s_7a82748dd606d9::t_dec2dd3710694f 353-357
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_7a82748dd606d9::t_df5e6944593e3a 396-404
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_7a82748dd606d9::t_54dc9f3ed0548d 14-18
+plugins/yellow-review/lib/resolve-gh.sh
+  s_7a82748dd606d9::t_e4ce1b24c80a04 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e8235e5f712915becba288bf914758b9a066c758",
+  "prompts": {},
+  "sessions": {
+    "s_2881f618bf3867": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aef69395631171e0c",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

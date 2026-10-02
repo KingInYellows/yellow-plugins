@@ -1,0 +1,29 @@
+plugins/yellow-review/tests/mocks/gh
+  s_becc7011266565::t_025997a3c97bab 14-72,137-138
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_becc7011266565::t_be56b608b722d1 1-46,49-130
+  s_becc7011266565::t_c527f56caa50c6 47-48
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_becc7011266565::t_025997a3c97bab 1-3,6-77
+  s_becc7011266565::t_a25628cf8de106 4-5
+plugins/yellow-review/tests/fixtures/blockers-response.json
+  s_becc7011266565::t_025997a3c97bab 1-42
+plans/review-resolve-hardening.md
+  s_becc7011266565::t_4190849199c82c 253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cc904a40437f80197b1dd1dafd5c4484094295c6",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

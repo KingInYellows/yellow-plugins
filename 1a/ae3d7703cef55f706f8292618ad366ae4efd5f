@@ -1,0 +1,45 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_abf654ee5b037d::t_c8bc7ba21e09ea 37-38
+plugins/yellow-review/references/resolve/dispositions.md
+  s_abf654ee5b037d::t_942da7182b5d4d 378
+  s_abf654ee5b037d::t_dd7e155902cac0 383-387
+  s_abf654ee5b037d::t_79079d735ece35 376
+  s_abf654ee5b037d::t_4b24ee5839687b 360-363,365-367
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_abf654ee5b037d::t_08d3cbb41cc26a 425-426
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_abf654ee5b037d::t_44abab9e80f9d7 10-17
+  s_abf654ee5b037d::t_2841627dc272b2 92-94,96-98,100-101
+  s_abf654ee5b037d::t_7cf81c0bfad1fd 87
+plugins/yellow-review/CLAUDE.md
+  s_abf654ee5b037d::t_8ad497304e467d 376-378
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_abf654ee5b037d::t_6782d26d3be98e 175,178
+  s_abf654ee5b037d::t_712233375e6e77 137-141
+  s_abf654ee5b037d::t_555878a9e95fff 188-191
+plugins/yellow-review/lib/resolve-text.sh
+  s_abf654ee5b037d::t_c83642a3193250 32-33
+  s_abf654ee5b037d::t_9c6d1bd0c69556 42-52
+  s_abf654ee5b037d::t_e2e653f8958ef0 91-93
+docs/security.md
+  s_abf654ee5b037d::t_a55c828ab84996 328-353,357
+  s_abf654ee5b037d::t_e90609ed3d8134 354-356
+plugins/yellow-review/tests/mocks/gh
+  s_abf654ee5b037d::t_a54db7b0638409 196-198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1aae3d7703cef55f706f8292618ad366ae4efd5f",
+  "prompts": {},
+  "sessions": {
+    "s_abf654ee5b037d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ade8c746-d202-4a8b-b6ca-0ee0be76b706",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
