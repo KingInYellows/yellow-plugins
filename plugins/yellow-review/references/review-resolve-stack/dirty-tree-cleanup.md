@@ -7,6 +7,11 @@ an editor or build touched it. Revert only what the run owns and leave
 everything else in place. `<PR#>` is the PR just processed; the caller
 substitutes the literal number.
 
+Each command loads its own copy, because offloaded detail lives under that
+command's `references/<slug>/`: this file and
+`references/review-sweep-all/dirty-tree-cleanup.md` are byte-identical.
+Change both together; `tests/skill-content.bats` fails when they differ.
+
 ## 1. List the dirty paths
 
 ```bash

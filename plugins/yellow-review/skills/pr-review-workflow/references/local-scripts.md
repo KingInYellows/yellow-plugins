@@ -1,0 +1,23 @@
+# Local Scripts for the Resolve Write Phase
+
+Local (non-GraphQL) scripts used by `/review:resolve` Steps 5–7 and the
+callers that walk several PRs. Exit codes and markers are defined in
+`references/resolve/dispositions.md`.
+
+- **commit-resolve-fixes** `--provider graphite|github --pr <N> --message
+  <msg> [--unattended] [--allow-credential-shaped] [--files-from <f>]
+  [-- <files...>]` — Stage, new commit, submit, verify remote head; never
+  runs a push itself
+- **run-verify-command** — prints `{result, patch, log, treeClean}`:
+  - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended]
+    [--files-from <f>]` runs `resolve_pr.verify_command`; on failure it
+    saves a patch, reverts the files and reports whether the tree is clean
+  - `--pr <N> --revert-only [--files-from <f>] [-- <files...>]` saves a
+    patch and reverts the listed files without running anything
+  - `--pr <N> --revert-dirty` does the same for every change in the tree
+    (no file list); `/review:resolve-stack` runs it after a dirty resolve
+    through `references/review-resolve-stack/dirty-tree-cleanup.md` and
+    `/review:sweep-all` through `references/review-sweep-all/dirty-tree-cleanup.md`
+- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
+  credential or cannot be read; run it on text posted outside the resolve
+  scripts (for example a Linear issue)

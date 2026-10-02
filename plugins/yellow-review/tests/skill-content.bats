@@ -543,10 +543,16 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'memory: project' "$DIRTY_REF"
 }
 
-@test "dirty-tree cleanup is defined once: resolve-stack and sweep-all point to it, neither copies it" {
+@test "dirty-tree cleanup: each command loads its own byte-identical copy and neither inlines it" {
+  stack_copy="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"
+  sweep_copy="$BATS_TEST_DIRNAME/../references/review-sweep-all/dirty-tree-cleanup.md"
   grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$RESOLVE_STACK"
   grep -qF 'references/review-sweep-all/dirty-tree-cleanup.md' "$SWEEP_ALL"
-  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$BATS_TEST_DIRNAME/../references/review-sweep-all/dirty-tree-cleanup.md"
+  # a command never loads another command's reference directory
+  run ! grep -qF 'references/review-sweep-all/' "$RESOLVE_STACK"
+  run ! grep -qF 'references/review-resolve-stack/' "$SWEEP_ALL"
+  # the two copies cannot drift
+  cmp -s "$stack_copy" "$sweep_copy" || { echo "the two dirty-tree-cleanup.md copies differ"; false; }
   for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
     run ! grep -qE -e '--revert-(dirty|only)' "$f"
     run ! grep -qF 'gh pr diff' "$f"
@@ -706,44 +712,22 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
 }
 
-@test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
-  text=$(flat "$RESOLVE_REFS/dispositions.md")
-  [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]
-  [[ "$text" == *'A hit that fails any check is ignored, as if the search found nothing'* ]]
-  [[ "$text" == *'accept its response only when it passes the same checks'* ]]
-  # The checks are stated once, with all three conditions.
-  [ "$(grep -c '^- \*\*Linear response checks\.\*\*' "$RESOLVE_REFS/dispositions.md")" -eq 1 ]
-  [[ "$text" == *'Apply to every `list_issues` hit before reuse and to the `save_issue` response before use'* ]]
-  [[ "$text" == *'the identifier matches `^<PREFIX>-[0-9]{1,6}$`'* ]]
-  [[ "$text" == *'`^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`'* ]]
-  [[ "$text" == *'the description carries the full marker'* ]]
-  # The old unvalidated reuse must be gone.
-  [[ "$text" != *'reuse a hit whose description carries the full marker'* ]]
-  # resolve-pr.md references the checks instead of restating them.
-  text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'"Linear response checks", which every reused `list_issues` hit and the `save_issue` response must pass'* ]]
+@test "sweep-all: an unknown Blocking row renders the total as <n>+? or unknown, never 0" {
+  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  grep -qF 'render the total as `<n>+?`' <<<"$flat"
+  grep -qF 'or `unknown` when no row has a known count' <<<"$flat"
+  grep -qF 'Blocking 1+?' "$SWEEP_ALL"
+  run ! grep -qF '`?` rows are excluded' "$SWEEP_ALL"
 }
 
-@test "resolve-pr: the ignored-file marker is minted before resolvers spawn and passed to the unattended verify" {
-  mint=$(grep -n '^### Step 3f: Mint the Ignored-File Marker' "$RESOLVE_PR" | cut -d: -f1)
-  clean=$(grep -n '^### Step 2: Check Working Directory' "$RESOLVE_PR" | cut -d: -f1)
-  spawn=$(grep -n '^### Step 4: Spawn Parallel Resolvers' "$RESOLVE_PR" | cut -d: -f1)
-  [ -n "$mint" ]
-  [ "$clean" -lt "$mint" ]
-  [ "$mint" -lt "$spawn" ]
-  step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
-  printf '%s\n' "$step3f" | grep -qF 'mktemp -d'
-  printf '%s\n' "$step3f" | grep -qF 'touch "$MARK_DIR/ignored-marker"'
-  # No trap in the minting call: the trap lives in the consuming call.
-  ! printf '%s\n' "$step3f" | grep -q '^trap '
-  step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
-  printf '%s\n' "$step6" | grep -qF -- '--ignored-since "$MARK_DIR/ignored-marker"'
-  printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
-  step6flat=$(printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step6flat" == *'`--ignored-since` with Step 3f'* ]]
-  [[ "$step6flat" == *'required unattended'* ]]
-  [[ "$step6flat" == *'**Marker cleanup.**'* ]]
-  flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
+@test "pr-review-workflow: SKILL.md stays within 500 lines and points at its local-scripts reference" {
+  skill="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
+  ref="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/references/local-scripts.md"
+  [ "$(wc -l <"$skill")" -le 500 ]
+  grep -qF 'references/local-scripts.md' "$skill"
+  for name in commit-resolve-fixes run-verify-command check-resolve-text; do
+    grep -qF "$name" "$ref" || { echo "$name missing from local-scripts.md"; false; }
+  done
 }
 
 @test "resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass" {

@@ -307,13 +307,16 @@ Print a pipe-delimited markdown summary table:
 | 125 | refactor(yellow-core): split lib | skipped   | —        | —        | PR closed before sweep |                              |
 | 126 | docs: update CLAUDE.md           | attempted | 0/0      | ?        |                        | Error: stack-provider adoption failed (…) |
 
-Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention | Blocking 1
+Totals: Attempted 3 | Skipped 1 | Total 4 | Residual 2 pending, 1 need attention | Blocking 1+?
 ```
 
 `Blocking` is the `b` count from the `Resolve:` line: review threads
 `/review:resolve` left open (disagree, unclear, held human threads) plus
-`CHANGES_REQUESTED` reviewers; `?` rows are excluded
-from the total. Blocking threads do not change the exit code — re-run
+`CHANGES_REQUESTED` reviewers. A `?` row (no valid contract line, so the count
+is unknown) is blocking but has no number: when any row is `?`, render the
+total as `<n>+?` (the sum of the known rows, then `+?`), or `unknown` when no
+row has a known count, so the total never reads `0` while an unknown PR is
+blocking. Blocking threads do not change the exit code — re-run
 `/review:sweep-all` later to pick up reviewer replies and late comments.
 
 `Residual` is `pending/attention`: pending findings are `open`, `reopened`
