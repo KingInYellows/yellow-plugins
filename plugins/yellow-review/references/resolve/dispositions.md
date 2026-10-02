@@ -370,8 +370,8 @@ Replies and issue bodies end with:
 
 - Mutations run serially. `reply-pr-thread` sleeps 1 s after each post.
 - On a rate limit (stderr matching "rate limit", "abuse" or "HTTP 429", or a
-  GraphQL error whose message mentions a rate limit or abuse
-  detection), `reply-pr-thread` waits the
+  GraphQL `errors[]` entry whose `message` contains "rate limit" or "abuse",
+  case-insensitive; the error `type` is not checked), `reply-pr-thread` waits the
   `Retry-After` header, else the time to `x-ratelimit-reset` when
   `x-ratelimit-remaining` is 0, else `YELLOW_REVIEW_RATE_LIMIT_WAIT`
   (default 60 s), then retries once per script run. A second limit, or a
