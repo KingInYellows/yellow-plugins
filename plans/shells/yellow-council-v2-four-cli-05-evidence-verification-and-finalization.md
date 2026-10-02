@@ -115,11 +115,16 @@ time.
   cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap,
   writes a random `.token` file into the dir as Step 5a does, and prints the
   complete destination path, `<dir>/synthesis.md` (one fixed file name), not
-  just the directory; (2) `Write` stages `SYNTHESIS_MD` to exactly that printed
+  just the directory, plus the token value on a separate labelled line, which
+  the orchestrator carries as a literal into block (3) as Step 5a does (shell
+  variables do not survive, and reading the expected token from the same
+  untrusted dir would make the check vacuous); (2) `Write` stages `SYNTHESIS_MD` to exactly that printed
   path, with no other child name and no appended segments; (3) a later block
-  installs the `trap` (removing the dir on every exit of that block), then
-  re-validates the full destination and `cat`s the file and runs the rest of
-  council.md Step 7. The path crosses from one Bash process through
+  first validates the dir, token and full destination (below), and only then
+  installs the `trap` (removing the dir on every exit of that block), so a
+  rejected path never reaches `rm -rf`. The trap body repeats the dir
+  validation before deleting. The block then `cat`s the file and runs the rest
+  of council.md Step 7. The path crosses from one Bash process through
   model-controlled substitution into `Write`, `cat` and `rm -rf`, so every
   block that reads or deletes it first re-validates the dir: it
   matches `/tmp/council-synth-*` with no `..` and no further `/`, is not a
@@ -129,8 +134,7 @@ time.
   symlink (`! -L`), and owned by the current user (`-O`). Refuse and stop on
   any mismatch; never delete on name alone. `Write` is not path-scoped at
   runtime, so shell validation cannot stop a model that deliberately writes
-  elsewhere (see
-  `docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md`).
+  elsewhere.
   The guarantee is narrower: nothing destructive trusts a relayed path, and a
   stray write outside the validated file is never read or deleted. The real
   mitigation for that is a `Write` deny rule; document this residual.
@@ -173,7 +177,9 @@ time.
   a word (`snake_case`) are never touched. `__init__` and `__important__` are
   syntactically identical, so no rule can keep one and strip the other; keeping
   both is the safe side (a lost identifier breaks evidence, a kept emphasis
-  marker only leaves style). Golden cases: `__init__` kept,
+  marker only leaves style). Update the existing `synthesis.bats` golden case
+  that strips `_unbounded_` (a single word wrapped in underscores) so its
+  expected output keeps the underscores. Golden cases: `__init__` kept,
   `_private_fn` kept, `*ptr` kept, `**important**` stripped, `__two words__`
   stripped, `snake_case` untouched. `strip_emph` works per whitespace token, so
   multi-word pairing needs phrase-level state, which cannot live in `strip_words`:
@@ -235,7 +241,8 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    lineage warning, tie presentation, single-pass bypass, rubric output,
    verification hit/miss paths), verify every shipped PR carried its
    changeset, and run the full validation suite end-to-end, including
-   `pnpm validate:shell-compat`, `pnpm check:shell-parse`, and the council
+   `pnpm lint:plugins`, `pnpm validate:shell-compat`,
+   `pnpm check:shell-parse`, and the council
    plugin's Bats suite (`bats tests/synthesis.bats`, or all of `bats tests/`,
    from `plugins/yellow-council`) — the Bats run is what actually executes the
    F3/F4 golden cases; the shell lint/parse checks do not.
