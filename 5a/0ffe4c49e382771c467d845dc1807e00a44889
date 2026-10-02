@@ -1,0 +1,48 @@
+docs/plugin-scope-mode-protocol.md
+  s_becc7011266565::t_aafdc24533e145 47-49
+plugins/yellow-review/commands/review/sweep.md
+  s_becc7011266565::t_aafdc24533e145 193-194
+plugins/yellow-review/README.md
+  s_becc7011266565::t_aafdc24533e145 41-43,52-54,62-66
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_becc7011266565::t_aafdc24533e145 464-465,468-481
+  s_c22a55971bf452::t_91d9e18cd90c37 461
+plugins/yellow-review/CLAUDE.md
+  s_becc7011266565::t_3ad31414dde3ac 455-460
+  s_becc7011266565::t_aafdc24533e145 216-218,248-249,442-445,448-454
+  s_c22a55971bf452::t_91d9e18cd90c37 446-447
+  s_5667e810256031::t_4237f6cdeb4e0e 219
+  s_5667e810256031::t_4c4adeee2b29ad 220-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5a0ffe4c49e382771c467d845dc1807e00a44889",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
