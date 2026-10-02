@@ -251,30 +251,24 @@ transition_todo_state() {
   # plain `--arg val ---` (or any value starting with `-`) as an option.
   local reason_json
   reason_json=$(jq -n --arg s "$clean_reason" '$s') || return 1
+  # One filter for every target: drop all three reason fields, then set the one
+  # this state keeps. A legacy wont_fix source with no new reason keeps its
+  # hand-written wont_fix_reason, cleaned like a new one.
+  local keep="" legacy=false
   case "$new_state" in
-    wont-fix)
-      if [ -z "$clean_reason" ] && [[ "$current_state" =~ ^(wont_fix|wontfix|wont\ fix)$ ]]; then
-        # Legacy repair: keep the hand-written reason, cleaned like a new one.
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y '
-          (if (.wont_fix_reason | type) == "string" then .wont_fix_reason |= (gsub("[\n\r]"; "") | .[0:200]) else . end)
-          | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      elif [ -n "$clean_reason" ]; then
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --argjson val "$reason_json" '.wont_fix_reason = $val | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      else
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.wont_fix_reason) | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      fi
-      ;;
-    deferred)
-      if [ -n "$clean_reason" ]; then
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --argjson val "$reason_json" '.deferred_reason = $val | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      else
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      fi
-      ;;
-    *)
-      updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-      ;;
+    wont-fix) keep=wont_fix_reason ;;
+    deferred) keep=deferred_reason ;;
   esac
+  if [[ "$current_state" =~ ^(wont_fix|wontfix|wont\ fix)$ ]]; then legacy=true; fi
+  updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y \
+    --arg keep "$keep" --argjson val "$reason_json" --argjson legacy "$legacy" '
+    .wont_fix_reason as $old
+    | del(.deferred_reason, .wont_fix_reason, .defer_reason)
+    | if $keep == "" then .
+      elif $val != "" then .[$keep] = $val
+      elif $legacy and $keep == "wont_fix_reason" and ($old | type) == "string"
+        then .[$keep] = ($old | gsub("[\n\r]"; "") | .[0:200])
+      else . end' 2>/dev/null) || return 1
 
   # Close-time identity: a todo closed as wont-fix or deleted gets its
   # fingerprint now, while the flagged code still matches. Best effort — a
