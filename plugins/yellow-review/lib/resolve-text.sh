@@ -102,7 +102,7 @@ rt_looks_secret() {
         toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { flag("private-key") }
         # NAME_KEY=value with a literal-looking value (8+ token characters,
         # so `API_KEY = process.env.API_KEY` in code does not match).
-        /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASSPHRASE|_PASSCODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
             # A CRLF file leaves \r on the token, which would hide an
             # all-letter literal from the value rules below.
@@ -118,7 +118,7 @@ rt_looks_secret() {
             # a `pass` keyword, but camelCase `userPassword="..."` is.
             r = l
             base = 0
-            while (match(r, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
+            while (match(r, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
                 if (++nq > 200) { flag("too-many-matches"); break }
@@ -137,7 +137,7 @@ rt_looks_secret() {
             # flagged either way.
             r = l
             base = 0
-            while (match(r, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
+            while (match(r, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
@@ -151,12 +151,19 @@ rt_looks_secret() {
             # `  hunter` on the next line, YAML style) is checked against the
             # next non-blank line: only that line, then the carry resets.
             # Only a single token counts there, so prose after a keyword line
-            # stays clean. Blank lines do not use up the carry.
-            if (carry && $0 !~ /^[ \t\r]*$/) {
+            # stays clean. Blank lines do not use up the carry. A YAML block
+            # scalar (`password: |`, `>-`, `|2`) is a keyword-only line too,
+            # and a line that is only the indicator keeps the carry. A
+            # trailing YAML comment (whitespace, then `#`) is not part of the
+            # token; a `#` inside the token is.
+            if (carry && $0 ~ /^[ \t]*[|>][-+0-9]*[ \t\r]*$/) {
+                # keep carry and carryin for the value line
+            } else if (carry && $0 !~ /^[ \t\r]*$/) {
                 carry = 0
                 r = l
                 sub(/\r$/, "", r)
                 sub(/^[ \t]*(-[ \t]*)?/, "", r)
+                sub(/[ \t]+#.*$/, "", r)
                 q = (r ~ /^["\047]/)
                 sub(/^["\047]/, "", r)
                 if (match(r, /^[^ \t"\047,;)]+/)) {
@@ -165,7 +172,7 @@ rt_looks_secret() {
                     if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, carryin)) flag(q ? "quoted-keyword-assignment" : "unquoted-keyword-value")
                 }
             }
-            if (match(l, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t\r]*$/)) {
+            if (match(l, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*([|>][-+0-9]*)?[ \t\r]*$/)) {
                 pre = substr($0, 1, RSTART - 1)
                 if (pre ~ /^[ \t]*(-[ \t]*)?["\047]?[A-Za-z0-9_.-]*$/) {
                     carry = 1
