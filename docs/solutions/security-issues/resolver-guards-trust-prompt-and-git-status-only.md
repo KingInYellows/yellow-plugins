@@ -20,7 +20,11 @@ rules in `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`). PR
 Point-in-time: PR #950 adds the deny-list contract in
 `plugins/yellow-review/references/resolve/dispositions.md`. That file is not
 on trunk until #950 merges, so on a checkout without it the agent file above is
-the only place the deny list lives.
+the only place the deny list lives. The same holds for `run-verify-command`
+(`--revert-only`, PRs #950 to #955) and `lib/resolve-paths.sh` (PR #952): they
+are on the unmerged resolve stack, not on `main`. The Solution below is the
+target design; step 1 (the hash and restore guard) is not implemented in any
+open PR and is tracked in issue #973.
 
 ## Symptoms
 
@@ -49,10 +53,11 @@ the only place the deny list lives.
 
 ## Solution
 
-1. Before the resolver waves, record existence, hash, and keep a copy of
-   every deny-listed path that git ignores or that lives under `.git`
-   (`yellow-plugins.local.md`, `.claude`, `.env`, hooks, git config). After
-   the waves, re-hash and compare. On any change or creation, restore first:
+1. (Proposed, tracked in #973.) Before the resolver waves, record existence,
+   hash, and keep a copy of every deny-listed path that git ignores or that
+   lives under `.git`. The path set is the resolver deny list in
+   `references/resolve/dispositions.md` and `rp_denied`
+   (see the Update below), not a list copied here. After the waves, re-hash and compare. On any change or creation, restore first:
    put a changed file back from its pre-flight copy and delete a newly created
    one. Then re-hash and stop only if every path matches its pre-flight state,
    reporting the path; do not commit or push. Fail closed if a restore fails
@@ -111,10 +116,10 @@ to it never appears in `git status --porcelain`, so the dirty-tree stop
 and the trusted-config revert both miss it. The edit then runs as a shell
 command on the next PR in the walk.
 
-Guidance: do not detect trusted-config tampering through git. At
-pre-flight, record whether each trusted-config path exists, and hash every
-one that does, ignored ones included. The path set is the resolver deny
-list: the "File set" section of `plugins/yellow-review/references/resolve/dispositions.md`
+Guidance: do not detect trusted-config tampering through git. Apply Solution
+step 1 at the walk level: at pre-flight, record whether each trusted-config
+path exists, and hash every one that does, ignored ones included. The path
+set is the resolver deny list: the "File set" section of `plugins/yellow-review/references/resolve/dispositions.md`
 (PR #950 adds the file with that section marked planned; PR #954 makes it
 final) and `rp_denied` in `plugins/yellow-review/lib/resolve-paths.sh` are the canonical source,
 so do not copy the list here or into the walk. Point-in-time: neither
@@ -122,10 +127,9 @@ file is on trunk yet. `plugins/yellow-review/lib/resolve-paths.sh` ships with PR
 #954 stacks on, so a checkout without those PRs has no canonical list.
 After each resolve, compare both existence and content, because a resolver
 can create an optional file such as `yellow-plugins.local.md` that a later
-command then loads. On any creation or change, restore the pre-flight state (delete a
-created file, restore a changed one from its pre-flight copy) and stop the
-walk. A restore that fails is itself a stop condition. Tracked in #973;
-point-in-time, as the walk-level check is not on main yet.
+command then loads. On any creation or change, restore as in Solution step 1
+and stop the walk. Tracked in #973; point-in-time, as the walk-level check is
+not on main yet.
 
 ### `--revert-only` was called loosely
 

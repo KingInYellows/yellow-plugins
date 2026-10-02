@@ -10,12 +10,21 @@ components: [yellow-review]
 
 ## Problem
 
-`/review:resolve-stack` walks a stack of PRs and runs the resolver on each.
-When the first PR receives a fix commit, the PRs above it are restacked
-locally, but the restacked branches were not published. Step 2c, which
-validates each PR against its remote head, then rejected every PR above the
-first. A related defect: the re-pass reused PR-changed ranges computed before
-the round-1 push. PR #954 review (adversarial, with architecture) found both.
+`/review:resolve-stack` walks a stack of PRs and runs the resolver
+(`/review:resolve`) on each. When the first PR receives a fix commit, the PRs
+above it are restacked locally, but the restacked branches were not published.
+`/review:resolve`'s "Verify HEAD matches the PR head" step (Step 2c in the
+resolve-stack PRs), which validates each PR against its remote head, then
+rejected every PR above the first. A related defect: the re-pass reused
+PR-changed ranges computed before the round-1 push. PR #954 review
+(adversarial, with architecture) found both.
+
+Point-in-time: the commands and scripts named here (`/review:resolve`'s head
+check, `pr-changed-ranges`) belong to the unmerged resolve stack (PRs #950 to
+#955) and are not on `main`. As of that stack, the `/review:resolve` re-pass
+re-runs `pr-changed-ranges` after a push, but `/review:resolve-stack` restacks
+upstack without a publish step, so Solution step 1 is a recommendation, not
+shipped behaviour. Name the shipping PR here once it lands.
 
 ## Symptoms
 

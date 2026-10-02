@@ -1,7 +1,7 @@
 ---
 title:
   'Solution Docs Written Mid-Stack Cite Commit Hashes That Rebasing Destroys,
-  and Prescribe Fixes the Named Tool Cannot Perform'
+  Prescribe Fixes the Named Tool Cannot Perform, and State Code Claims That Rot'
 date: '2026-09-11'
 category: 'code-quality'
 track: 'knowledge'
@@ -12,7 +12,10 @@ problem:
   author machine, so the citation looks live locally and is dead for every other
   reader — and named the wrong commit for the claim besides, while the other
   prescribed verifying a tarball sha512 before extraction using a command that
-  has no such step'
+  has no such step. A later batch of auto-promoted docs added a third kind:
+  claims about the state of code or tooling (plan-time prose read as current,
+  self-contradiction, stale or phantom tool references) that were false when
+  written or became false when the work shipped'
 tags:
   - solution-docs
   - knowledge-compounding
@@ -20,6 +23,8 @@ tags:
   - restack
   - commit-citation
   - prescription-verification
+  - plan-time-docs
+  - state-claims
   - self-review
 components:
   - docs/solutions/code-quality/layered-contract-fixes-cross-cutting-collision.md
@@ -118,6 +123,9 @@ a lesson.
    interesting work is done.
 4. **Prefer shape to tally** for anything the in-flight process will change:
    pass counts, finding counts, "currently N of M."
+5. **Check state claims before saving** (Finding 3 below): mark pre-ship docs
+   plan-time, `rg` every "currently / only / no X" claim, and name tools by
+   where they live.
 
 ## When to Apply
 
@@ -125,6 +133,8 @@ a lesson.
   branch that is not yet merged.
 - Any solution doc that references the work that produced it, in a repository
   using Graphite, stacked PRs, squash merges, or any rebase-based workflow.
+- Any doc, including auto-promoted compound-staging entries, that describes the
+  state of code or tooling that may not have shipped yet (Finding 3).
 
 ---
 
@@ -168,8 +178,9 @@ since.
 - Before saving, check every "currently / only / no X / the header says" claim
   against the file with `rg`, and re-read the closing sentence against the
   numbered steps above it.
-- Name a tool by where it lives, or substitute the underlying command. Here that
-  command is `git merge-base --is-ancestor <SQUASH_SHA> origin/main`, where
+- Name a tool by where it lives, or substitute the underlying command. The
+  Gate C check in that doc is the Gate C step of `/plan:complete`
+  (`plugins/yellow-core/commands/plan/complete.md`); its underlying command is `git merge-base --is-ancestor <SQUASH_SHA> origin/main`, where
   `<SQUASH_SHA>` is the squash-merge commit's object id (from the merged PR) and
   `origin/main` must be fetched first (`git fetch origin main`).
 - Treat state claims in compound-staging entries as unverified. They are written

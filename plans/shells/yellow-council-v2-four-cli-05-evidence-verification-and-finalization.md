@@ -100,6 +100,7 @@ changing the synthesis shell's mechanical combination rule.
 
 ## Covers Spec Requirements
 
+- R10 (partial: F3/F4 normalizer edge cases; the rest shipped in shell 03)
 - R15 (partial: correctness-dimension-verification-wiring)
 - R22
 - R23
@@ -128,9 +129,15 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand time.
   moved, the library is sourced directly from markdown fences under the user's
   login shell (often zsh), so it must also be classified under the
   CONTRIBUTING.md "Bash and zsh" tier contract (Tier 4 if sourced directly),
-  registered in `scripts/shell-compat-config.json`, given a
+  registered under `tier4Libraries` in `scripts/shell-compat-config.json`
+  (`tier3Libraries` only if every fence sources it through the
+  `bash /dev/fd/3 3<<'TAG'` wrapper), given a
   `tests/shell-compat/drivers/<plugin>--<lib>.sh` driver if Tier 4, and pass
-  `pnpm test:shell-compat` and `pnpm validate:shell-compat`.
+  `pnpm test:shell-compat` and `pnpm validate:shell-compat`. Whichever way F1
+  goes, update `plugins/yellow-council/CLAUDE.md` where it says `synthesis.bats`
+  extracts the Step 5b library "between the `council-synthesis-lib` markers",
+  and `tests/lib/extract-synthesis-lib.bash`'s header comment: both go stale
+  when the library moves.
 - **F2 — council.md Step 7 heredoc.** council.md Step 7 still carries
   `SYNTHESIS_MD` in a quoted heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03
   only escapes that delimiter in council.md Step 5b input and in Step 5e's
@@ -192,17 +199,28 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand time.
   remove its `synthesis.bats` case and the 5e rule in the same change.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
-  through unnormalized (identity and style signal survive). Buffer fenced lines
-  and, at end of input, re-process an unclosed fence as ordinary text, or cap
-  it; add a golden case.
+  through unnormalized (identity and style signal survive). Chosen behavior:
+  hold back the opening-fence line together with every fenced line after it, and
+  when input ends with the fence still open, re-process the whole held block,
+  opening-fence line included, as ordinary text (no cap). A closed fence keeps
+  the byte-for-byte contract unchanged. Reword the library header comment in
+  `council.md` ("Copies byte-for-byte: fenced code blocks...") to say "closed
+  fenced code blocks; an unclosed fence is normalized as ordinary text, its
+  opening line included". Golden cases: a closed fence stays byte-identical; an
+  unclosed fence with a reviewer-name line and a bullet line inside it comes out
+  scrubbed and flattened, opening fence line included.
 - **F4 — bare identifiers lose edge underscores.** `strip_emph` strips
   leading/trailing `*`/`_` runs from any non-path word, so bare `__init__`,
   `_private_fn` or `*ptr` in prose become `init`, `private_fn`, `ptr` — which
   can break a finding's claim text that a reader relies on. F4 applies only to
   the synthesis-side normalized copy; `verify_finding()` must compare the
   verbatim cited excerpt against the source line (R22), so do not run F4 (or any
-  other normalizer pass) on the excerpt passed to verification. Rule: `*` runs
-  strip only when the same-length run wraps the word or phrase on both sides
+  other normalizer pass) on the excerpt passed to verification. F4 narrows spec
+  R10 (shell 03 stripped every edge emphasis run): a single word wrapped in
+  underscore runs keeps its markers, so those leave a small style fingerprint;
+  accepted because a lost identifier breaks evidence while a kept marker only
+  leaves style, and R10 stays covered (see Covers). Rule: `*` runs strip only
+  when the same-length run wraps the word or phrase on both sides
   (`**important**`, `*x*`); an unpaired leading or trailing `*` (`*ptr`) is
   kept. `_`/`__` runs strip only when they wrap a multi-word phrase
   (`__two words__`); a single word wrapped in underscore runs (`__init__`,
@@ -234,7 +252,12 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand time.
   stripped likewise, ``*ptr `x` y`` kept with its leading `*` (unpaired),
   `*ptr is handled differently by Codex` keeps the `*` but the reviewer name is
   still scrubbed, and a run opened on one line with its closer on the next keeps
-  its emphasis characters on both lines.
+  its emphasis characters on both lines. Punctuation-adjacent forms: the rules
+  above apply to the token after peeling leading and trailing punctuation
+  (`( [ {` and `) ] } . , : ; ! ?`), and the peeled punctuation is kept. Golden
+  cases: `__init__()`, `__init__.`, `(__init__)` and `*ptr,` come out intact
+  (`__init__()` is mangled today), and `**important**:` comes out as
+  `important:`.
 
 ## Implementation Steps (High-Level)
 
@@ -267,12 +290,13 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
 6. **Bound the cost** — per-reviewer verification cap and concurrency with
    synthesis prompt construction.
 7. **Report staging (F2, council.md Step 7)** — implement F2's cross-call
-   staging lifecycle per "Carried follow-ups"; keep the council.md Step 7
-   appendix loop untouched (`scripts/validate-council-roster.js` Rule D1). The
-   existing `synthesis.bats` extraction does not cover the Step 7 report block,
-   so add extraction of that block plus behavioral cases for the lifecycle:
-   path, token and symlink guards, trap ordering, a successful read, and cleanup
-   after a failed `Write`.
+   staging lifecycle per "Carried follow-ups"; keep exactly one column-0
+   `for reviewer in claude codex gemini opencode; do` line in council.md, in
+   roster order (`scripts/validate-council-roster.js` Rule D1; the state-driven
+   `"${STATE_REVIEWERS[@]}"` loops are exempt). The existing `synthesis.bats`
+   extraction does not cover the Step 7 report block, so add extraction of that
+   block plus behavioral cases for the lifecycle: path, token and symlink
+   guards, trap ordering, a successful read, and cleanup after a failed `Write`.
 8. **Finalization sweep** — skill contract, both configuration tables, component
    counts and README/CHANGELOG, manual e2e scenarios (quota ETA, lineage
    warning, tie presentation, single-pass bypass, rubric output, verification

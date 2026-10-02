@@ -85,12 +85,11 @@ and never auto-commits. The user decides what to do with the verdicts.
   prompt-level inside one orchestrator context — not isolated passes — and
   correctness is self-assessed until citation verification (`verify_finding()`)
   lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
-  The staging directory's capability (path + random token) lives in
-  `.git/council-synth.state`, written only by 5a and never relayed through the
-  model; it does not stop a deliberate `Write` forgery, and one synthesis runs
-  per worktree. Validation, cleanup and that residual are in
-  `docs/security.md` "Synthesis staging directory (yellow-council)". The
-  `CLAUDE_FENCED_FILE` literal handoff still relays its path through the model.
+  The staging directory's capability lives in a shell-owned
+  `.git/council-synth.state`, one synthesis per checkout; validation, cleanup
+  and the residual Write forgery are in `docs/security.md` "Synthesis staging
+  directory (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
+  relays its path through the model.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via

@@ -480,11 +480,25 @@ is_mode_600() {
   [ "$(ls -ld "$1" | cut -c1-10)" = "-rw-------" ]
 }
 
-# synth_dirs — sorted list of staging dirs in /tmp younger than 5a's stale
-# sweep threshold (STALE_MINUTES=1440), so 5a reclaiming an older leftover
-# does not change the listing.
-synth_dirs() {
-  find /tmp -maxdepth 1 -type d -name 'council-synth-*' -mmin -1440 | sort
+# MKTEMP_RECORDER — a shell function, sourced ahead of 5a, that logs every
+# `mktemp -d` directory to $MADE_DIRS. A test can then assert on exactly the
+# staging dirs THIS 5a invocation created, instead of diffing the whole
+# /tmp/council-synth-* listing, which a parallel bats run, a real /council run
+# or the 24h sweep also change.
+MKTEMP_RECORDER='mktemp() { local d; d=$(command mktemp "$@") || return; case "$1" in -d) printf "%s\n" "$d" >> "$MADE_DIRS" ;; esac; printf "%s\n" "$d"; }'
+
+# fresh_made_dirs — start an empty $MADE_DIRS log (exported for run_in's child).
+fresh_made_dirs() {
+  export MADE_DIRS="${BATS_TEST_TMPDIR}/made-dirs"
+  : >| "$MADE_DIRS"
+}
+
+# assert_made_dirs_gone — every staging dir the recorded 5a minted was removed.
+assert_made_dirs_gone() {
+  local d
+  while IFS= read -r d; do
+    [ ! -e "$d" ] || { echo "staging dir left behind: $d"; return 1; }
+  done < "$MADE_DIRS"
 }
 
 # age_dir <dir> <hours> — set <dir>'s mtime <hours> hours in the past (GNU
@@ -497,6 +511,7 @@ age_dir() {
 
 teardown() {
   rm -f "${CF:-}" "${GF:-}" "${CX:-}"
+  [ -z "${LIVE:-}" ] || rm -rf "$LIVE"
   [ -z "${SD:-}" ] || { chmod -R u+rwx "$SD" 2>/dev/null; rm -rf "$SD"; }
   [ -z "${EVIL:-}" ] || rm -rf "$EVIL"
 }
@@ -700,8 +715,8 @@ teardown() {
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|placeholder|" "$s5b" >| "$s5b.sub"
   local GOOD=0123456789abcdef0123456789abcdef f
   # A foreign-owned state file or directory is not covered: creating one needs
-  # root (chown), and the -O ownership test it exercises is the same one the
-  # symlink and shape cases reach.
+  # root (chown). Every case below fails on an earlier test (missing, -L, shape,
+  # token), so none is decided by the -O ownership check itself.
   for profile in $PROFILES; do
     setup_council_run
     SD=$(mktemp -d /tmp/council-synth-XXXXXX)
@@ -779,21 +794,20 @@ teardown() {
 }
 
 @test "5a refuses while another synthesis is live or the state path is a directory, and reclaims an aged one" {
-  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   for profile in $PROFILES; do
     setup_council_run
-    local st="$REPO/.git/council-synth.state" LIVE
+    local st="$REPO/.git/council-synth.state"
     LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
     write_synth_state "$LIVE" 0123456789abcdef0123456789abcdef
     # A recent directory named by the state file: another run holds it.
-    before=$(synth_dirs)
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    fresh_made_dirs
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && . '$s5a'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"another council synthesis is in progress"* ]] || { echo "$profile live: $stderr"; return 1; }
     [ "$(sed -n 1p "$st")" = "$LIVE" ]
-    after=$(synth_dirs)
-    [ "$before" = "$after" ]
+    assert_made_dirs_gone
     # Just inside the 24-hour retention (23 hours old) it is still live: the
     # sweep leaves it and the lock refuses.
     age_dir "$LIVE" 23
@@ -808,38 +822,38 @@ teardown() {
     [ "$status" -eq 0 ] || { echo "$profile aged: $stderr"; return 1; }
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     [ "$(sed -n 1p "$st")" = "$SD" ]
+    [[ "$stderr" == *"Note: reclaimed a stale synthesis state file (it named $LIVE)"* ]] || { echo "$profile aged: $stderr"; return 1; }
     rm -rf "$SD" "$LIVE"
-    # A directory at the state path is refused.
+    # A directory at the state path is refused before any staging dir is minted.
     rm -f "$st"
     mkdir "$st"
-    before=$(synth_dirs)
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    fresh_made_dirs
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && . '$s5a'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"symlink or not our regular file"* ]] || { echo "$profile dir: $stderr"; return 1; }
-    after=$(synth_dirs)
-    [ "$before" = "$after" ]
+    [ ! -s "$MADE_DIRS" ]
     SD=""
     rm -rf "$REPO"
   done
 }
 
 @test "5a rolls back the staging directory when the state file cannot be written" {
-  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile
   [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   for profile in $PROFILES; do
     setup_council_run
     # A read-only git dir: the state temp file cannot be created.
     chmod 555 "$REPO/.git"
-    before=$(synth_dirs)
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    fresh_made_dirs
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && . '$s5a'"
     chmod 755 "$REPO/.git"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"cannot create the synthesis state temp file"* ]] || { echo "$profile: $stderr"; return 1; }
     [[ "$stderr" != *"cannot claim the synthesis state file"* ]]
     [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
-    after=$(synth_dirs)
-    [ "$before" = "$after" ]
+    [ -s "$MADE_DIRS" ]
+    assert_made_dirs_gone
     [ ! -e "$REPO/.git/council-synth.state" ]
     SD=""
     rm -rf "$REPO"
@@ -847,20 +861,20 @@ teardown() {
 }
 
 @test "5a fails the claim and leaves no stray link when a directory appears at the state path before ln" {
-  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   for profile in $PROFILES; do
     setup_council_run
-    before=$(synth_dirs)
+    fresh_made_dirs
     # The ln function stands in for another process that wins the race: it
     # creates a directory at the state path just before the real ln runs, so
     # plain ln would succeed by linking inside that directory.
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && ln() { mkdir '$REPO/.git/council-synth.state'; command ln \"\$@\"; } && . '$s5a'"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && ln() { mkdir '$REPO/.git/council-synth.state'; command ln \"\$@\"; } && . '$s5a'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"cannot claim the synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
     [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
-    after=$(synth_dirs)
-    [ "$before" = "$after" ]
+    [ -s "$MADE_DIRS" ]
+    assert_made_dirs_gone
     # The racing directory is untouched and empty: no stray hard link, no temp file.
     [ -d "$REPO/.git/council-synth.state" ]
     [ -z "$(find "$REPO/.git/council-synth.state" -mindepth 1)" ]
@@ -871,7 +885,7 @@ teardown() {
 }
 
 @test "5a refusing a live synthesis, then the Step 8 Cancel block told to keep it, leaves the live state file" {
-  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st LIVE
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
   grep -q '^KEEP_SYNTH_STATE=' "$s8.raw"
@@ -899,7 +913,7 @@ teardown() {
 }
 
 @test "5a losing the claim race to another run, then the Step 8 Cancel block told to keep it, leaves the winner's state file" {
-  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st LIVE stub
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st stub
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
   setup_council_run
@@ -925,7 +939,7 @@ teardown() {
   rm -rf "$LIVE" "$REPO"
 }
 
-@test "5e keeps the state file, warns and still prints the label map when the staging dir cannot be removed" {
+@test "5e removes the state file, warns and still prints the label map when the staging dir cannot be removed" {
   local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" st
   [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
@@ -944,25 +958,26 @@ teardown() {
     chmod 755 "$SD"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
-    [[ "$stderr" == *"could not remove $SD; kept $st"* ]] || { echo "$profile: $stderr"; return 1; }
-    [ -f "$st" ]
-    [ "$(sed -n 1p "$st")" = "$SD" ]
+    [[ "$stderr" == *"could not remove $SD; the 24h sweep reclaims it"* ]] || { echo "$profile: $stderr"; return 1; }
+    # Nothing reads the state file to find the directory, and a surviving one
+    # would make the next 5a refuse while the directory is under a day old.
+    [ ! -e "$st" ]
     [ -d "$SD" ]
     rm -rf "$SD" "$REPO"
     SD=""
   done
 }
 
-@test "Step 8 cancel cleanup unlinks a regular state file but leaves a symlinked one" {
+@test "Step 8 cancel cleanup unlinks the state file, a symlink without touching its target" {
   local s8="${BATS_TEST_TMPDIR}/8.sh" st
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8"
   setup_council_run
   st="$REPO/.git/council-synth.state"
-  # A symlink at the state path is not ours to unlink; its target is untouched.
+  # rm -f unlinks a symlink at the state path without following it.
   printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
   ln -s "$BATS_TEST_TMPDIR/target" "$st"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
-  [ -L "$st" ]
+  [ ! -e "$st" ] && [ ! -L "$st" ]
   [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
   # A regular, user-owned state file is removed.
   rm -f "$st"
@@ -972,15 +987,15 @@ teardown() {
   rm -rf "$REPO"
 }
 
-# check_state_cleanup <script> — a cleanup fence leaves a symlink at the synth
-# state path alone (its target untouched) and removes a regular user-owned one.
-# Expects setup_council_run to have run.
+# check_state_cleanup <script> — a cleanup fence unlinks a symlink at the synth
+# state path without following it (its target untouched) and removes a regular
+# user-owned one. Expects setup_council_run to have run.
 check_state_cleanup() {
   local script="$1" st="$REPO/.git/council-synth.state"
   printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
   ln -s "$BATS_TEST_TMPDIR/target" "$st"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
-  [ -L "$st" ]
+  [ ! -e "$st" ] && [ ! -L "$st" ]
   [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
   rm -f "$st"
   write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
@@ -988,7 +1003,7 @@ check_state_cleanup() {
   [ ! -e "$st" ]
 }
 
-@test "Step 7 early-exit cleanup unlinks a regular state file but leaves a symlinked one" {
+@test "Step 7 early-exit cleanup unlinks the state file, a symlink without touching its target" {
   local s7="${BATS_TEST_TMPDIR}/7.sh"
   extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   setup_council_run
@@ -1001,7 +1016,7 @@ check_state_cleanup() {
   rm -rf "$REPO"
 }
 
-@test "Step 9 cleanup unlinks a regular state file but leaves a symlinked one" {
+@test "Step 9 cleanup unlinks the state file, a symlink without touching its target" {
   local s9="${BATS_TEST_TMPDIR}/9.sh"
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
   setup_council_run
@@ -1165,4 +1180,92 @@ EOF2
     [ ! -e "$SD/gemini.summary.txt" ]
     rm -rf "$SD" "$REPO"
   done
+}
+
+@test "5a tells a state file that cannot be written or hard-linked apart from lock contention" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  for profile in $PROFILES; do
+    setup_council_run
+    fresh_made_dirs
+    # ln fails and nothing appears at the state path: not a concurrent run.
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && ln() { return 1; } && . '$s5a'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"cannot write or hard-link the synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$stderr" != *"another run may hold it"* ]]
+    [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
+    [ -s "$MADE_DIRS" ]
+    assert_made_dirs_gone
+    [ ! -e "$REPO/.git/council-synth.state" ]
+    [ -z "$(find "$REPO/.git" -maxdepth 1 -name 'council-synth.state.*')" ]
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "5a fails closed and rolls back when a stale state file cannot be removed" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile st
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  for profile in $PROFILES; do
+    setup_council_run
+    st="$REPO/.git/council-synth.state"
+    printf '%s\n%s\n' /tmp/council-synth-stale 00000000000000000000000000000000 >| "$st"
+    fresh_made_dirs
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && $MKTEMP_RECORDER && rm() { case \"\$*\" in *council-synth.state) return 1 ;; esac; command rm \"\$@\"; } && . '$s5a'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"cannot remove the stale synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
+    assert_made_dirs_gone
+    [ "$(sed -n 1p "$st")" = /tmp/council-synth-stale ]
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "a failed 5d resume then the Step 8 Cancel block lets the next 5a start" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5d="${BATS_TEST_TMPDIR}/5d.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "$s5d"
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ]
+  SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  # No pass-a.md: the resume block refuses. Without cleanup, a re-run is locked out.
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5d'"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"pass-a.md is missing"* ]]
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"another council synthesis is in progress"* ]]
+  # The documented Cancel cleanup (placeholder left unsubstituted: not KEEP=1) frees it.
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s8.raw" >| "$s8"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [ ! -e "$st" ]
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  LIVE=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  [ "$(sed -n 1p "$st")" = "$LIVE" ]
+  rm -rf "$REPO"
+}
+
+@test "5b aborts with a warning and still drops the state file when the staging dir cannot be removed" {
+  local s5b="${BATS_TEST_TMPDIR}/5b.sh" TOKEN=0123456789abcdef0123456789abcdef
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  setup_council_run
+  SD=$(mktemp -d /tmp/council-synth-XXXXXX)
+  printf '%s\n' "$TOKEN" >| "$SD/.token"
+  write_synth_state "$SD" "$TOKEN"
+  chmod 555 "$SD"
+  # CLAUDE_FENCED_FILE left unsubstituted: council_synth_abort runs.
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5b'"
+  chmod 755 "$SD"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"could not remove $SD; the 24h sweep reclaims it"* ]] || { echo "$stderr"; return 1; }
+  [ ! -e "$REPO/.git/council-synth.state" ]
+  [ -d "$SD" ]
+  rm -rf "$REPO"
 }

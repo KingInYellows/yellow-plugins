@@ -10,10 +10,18 @@ components: [yellow-review]
 
 ## Problem
 
-The new `gh` and GraphQL scripts in PR #954 (`get-pr-comments`,
-`poll-new-threads`, `resolve-pr-thread`, `gh-graphql.sh`) treated different
-failures as the same thing, so callers retried the wrong cases, polled
-pointlessly, or read errors as "nothing new".
+The new `gh` and GraphQL scripts in the yellow-review resolve PRs
+(`get-pr-comments`, `poll-new-threads`, `resolve-pr-thread`, `gh-graphql.sh`)
+treated different failures as the same thing, so callers retried the wrong
+cases, polled pointlessly, or read errors as "nothing new".
+
+Point-in-time: this doc describes the unmerged resolve stack (PRs #950, #952,
+#954 and #955, all open when written). On `main`, `get-pr-comments` and
+`resolve-pr-thread` exist without these fixes; `poll-new-threads`,
+`commit-resolve-fixes`, `reply-pr-thread`, `file-followup-issue`,
+`get-pr-blockers` and `lib/gh-graphql.sh` are on those PR branches only. The
+"Solution" below states the target behaviour; re-verify each script, exit code
+and flag against `main` once the stack lands.
 
 ## Symptoms
 
@@ -46,8 +54,11 @@ pointlessly, or read errors as "nothing new".
    failures, once, after a short sleep.
 3. In `poll-new-threads`, forward the first 300 bytes of stderr and exit early
    on auth or not-found instead of polling out the wait.
-4. Wrap `gh` in `timeout` with a net-timeout bound and treat a timeout as
-   exit 1, matching `commit-resolve-fixes`.
+4. Wrap `gh` in `timeout` with a net-timeout bound and give a timeout its own
+   non-retried outcome, never exit 1: exit 4 in the thread scripts (the same
+   code as a rate limit, since neither is retried), exits 5 and 6 in
+   `commit-resolve-fixes` for a submit and a verify timeout, and a skipped
+   round in `poll-new-threads`.
 5. Strip blank lines and carriage returns from the round-1 list, and branch on
    `grep` exit status: 0 match, 1 none, 2 or more is an error.
 6. Add bats mock arms for each new branch: rate-limit reset in the future, in
@@ -106,7 +117,8 @@ Guidance:
 
 The same defect class appears in the yellow-review resolve scripts. The
 guard-script contract is: each distinct outcome gets its own exit code, and a
-gate sees all of its input.
+gate sees all of its input. Script names and exit codes below describe the
+unmerged resolve stack (PRs #950-#955), not `main`.
 
 - **Refusal, transient failure and unavailable are three outcomes.** In
   `commit-resolve-fixes`, exit 3 means "refused" (path, staged-set or
@@ -115,11 +127,13 @@ gate sees all of its input.
   rate limit. Callers retry only the transient code. Never map "could not
   list the PR's files" onto the refusal code: a network failure that exits as
   a refusal triggers a revert of every fix. Give "unavailable" its own code
-  and do not roll back on it.
+  and do not roll back on it. Open defect in the stack as reviewed:
+  `commit-resolve-fixes` still exits 3 when the changed-file listing fails.
+  Fix it before the stack lands.
 - **Do not duplicate the classifier.** `reply-pr-thread` classifies errors
   through the shared `gg_is_rate_limited` / `gg_reason` helpers in
-  `lib/gh-graphql.sh`. `file-followup-issue` still has a local `gh_fail` that
-  greps stderr for `rate limit|HTTP 429`. Two classifiers will drift. The
+  `lib/gh-graphql.sh`. `file-followup-issue` has a local `gh_fail` that greps
+  stderr for `rate limit|HTTP 429` (as reviewed). Two classifiers will drift. The
   credential heuristics have the same split: `lib/resolve-text.sh`,
   `RL_SUSP_AWK` in `lib/review-ledger.sh` and yellow-core's
   `cs_redact_secrets` are separate implementations. Point-in-time: the
@@ -128,21 +142,25 @@ gate sees all of its input.
   unmerged branches, not on `main`; `RL_SUSP_AWK` and `cs_redact_secrets` are
   already on `main`. Re-grep for `gg_is_rate_limited` before relying on these
   names once those PRs land.
-- **A truncated read must not look complete.** `get-pr-comments` warns on
-  stderr when pagination stops at the page limit or loses its cursor, then
-  continues to exit 0 with a partial thread list. A caller deciding "nothing
+- **A truncated read must not look complete.** An earlier `get-pr-comments`
+  warned on stderr when pagination stopped at the page limit or lost its
+  cursor, then exited 0 with a partial thread list. A caller deciding "nothing
   left to resolve" from that list can be wrong. A gate that refuses on what it
   saw must either exit non-zero on truncation or emit an explicit truncated
-  marker.
-- **`null` cannot mean both "none" and "lookup failed".** `get-pr-blockers`
-  passes GitHub's `reviewDecision` through unchanged (null when the repo
-  requires no reviews) and also emits null when the lookup fails. A consumer
-  cannot tell "no policy" from "unknown". Use a separate failure value, as the
-  `conversationResolution: "unknown"` field already does.
-- **Check the newest marker-bearing comment, not the last comment.**
-  `reply-pr-thread`'s idempotency precheck reads `comments(last: 1)`. If
-  another author replies after our marker comment, the precheck misses the
-  marker and the script posts again.
+  marker. The resolve stack's `get-pr-comments` now exits 3 with the threads
+  fetched so far; main's copy still has the warn-and-exit-0 behaviour.
+- **`null` cannot mean both "none" and "lookup failed".** GitHub's
+  `reviewDecision` is null when the repo requires no reviews, so a wrapper that
+  also emits null on a failed lookup leaves the consumer unable to tell "no
+  policy" from "unknown". `get-pr-blockers` in the resolve stack signals the
+  failure separately: `lookupFailed: true` (with `changesRequested` null) and
+  `conversationResolution: "unknown"`. Consumers must read those fields and
+  treat a failed lookup as blocking-unknown, never as "no blockers".
+- **Check the newest marker-bearing comment, not the last comment.** An
+  idempotency precheck that reads only the final comment misses our marker as
+  soon as another author replies after it, and the script posts again.
+  `reply-pr-thread` in the resolve stack reads `comments(last: 10)` and skips
+  when our latest marker is followed only by Bot comments.
 
 Prevention: for each gate script, test a rate-limit stderr, a transient
 failure, a refusal and an unavailable lookup, and assert four different exit

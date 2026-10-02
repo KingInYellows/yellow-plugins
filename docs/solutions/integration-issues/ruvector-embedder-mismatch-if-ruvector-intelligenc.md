@@ -16,7 +16,8 @@ source: compound-staging
 If `.ruvector/intelligence.json` is stamped with the 64-dim hash embedder but the MCP server runs 384-dim onnx-minilm, every `hooks_remember` write is refused (ADR-210 provenance check). Reads still succeed: `hooks_recall` returns near-zero-similarity, low-quality results rather than failing, so the write loss is easy to miss.
 
 Remedy, in order (full detail in
-`ruvector-adr210-embedding-provenance-refusal.md`):
+`docs/solutions/integration-issues/ruvector-adr210-embedding-provenance-refusal.md`
+and the remediation block of `plugins/yellow-ruvector/commands/ruvector/status.md`):
 
 1. Quiesce writes. Finish or abandon any ruvector-writing command in the session.
 2. Run the plugin-pinned wrapper with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed --dry-run`. If `wouldDrop` is nonzero, confirm with the user before accepting the loss of those memories (`--drop-missing` discards them).
@@ -25,8 +26,9 @@ Remedy, in order (full detail in
    - Create a backup first: `cp .ruvector/intelligence.json ".ruvector/intelligence.json.bak-$(date +%Y%m%d-%H%M%S)"`.
    - The user's answer decides whether `--drop-missing` is added. Without it, reembed refuses to proceed when `wouldDrop` is nonzero.
 
-   Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed`, adding `--drop-missing` only after the user confirmed the drop (verified once: 388 memories re-embedded to 384-dim).
+   Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed`, adding `--drop-missing` only after the user confirmed the drop.
 4. Restart Claude Code before any further write. The running MCP server holds the pre-reembed snapshot, and its next save would overwrite the reembedded store.
+5. In the fresh session, run `/ruvector:status` and expect `PROVENANCE: OK`.
 
 ## Source
 

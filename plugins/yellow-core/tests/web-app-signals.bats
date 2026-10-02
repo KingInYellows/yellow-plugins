@@ -82,6 +82,8 @@ pyproject.toml|dependencies = ["Django>=4"]|python
 go.mod|require github.com/gin-gonic/gin v1.9.1|go
 Cargo.toml|[dependencies]\naxum = "0.7"|rust
 Cargo.toml|[dependencies.axum]\nversion = "0.7"|rust
+Cargo.toml|[dependencies]\naxum.workspace = true|rust
+Cargo.toml|[dependencies]\nwarp.version = "0.3"|rust
 Cargo.toml|[dependencies]\nweb = { package = "axum", version = "0.7" }|rust
 Cargo.toml|[dev-dependencies]\nactix-web = "4"|rust
 fly.toml|app = "x"|paas(fly.toml)
@@ -103,6 +105,7 @@ requirements.txt|requests==2.31
 go.mod|require github.com/spf13/cobra v1.8.0
 Cargo.toml|[dependencies]\n# axum = "0.7"\ntower = "0.4"
 Cargo.toml|[package]\nname = "my-axum-app"
+Cargo.toml|[package.metadata.warp.config]\nx = 1
 compose.yaml|services:\n  db:\n    ports:\n      - "5432:5432"
 SPECS
   fixture empty
@@ -125,11 +128,11 @@ SPECS
   local sh
   for sh in $SHELLS; do
     probe "$FIX" "$sh"
-    [[ "$SETUP_OUT" == *"checked: ."* ]] || { echo "$sh: $SETUP_OUT"; return 1; }
+    [[ "$SETUP_OUT" == *"checked: $FIX)" ]] || { echo "$sh: $SETUP_OUT"; return 1; }
   done
   fixture nogit-empty
   probe "$FIX" bash
-  [[ "$SETUP_OUT" == "is_web: false (checked: .)" ]]
+  [[ "$SETUP_OUT" == "is_web: false (checked: $FIX)" ]]
 }
 
 @test "inside a git repository setup.md checks the repository root" {

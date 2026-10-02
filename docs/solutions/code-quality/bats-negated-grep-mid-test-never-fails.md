@@ -10,9 +10,9 @@ components: [yellow-council, bats-tests]
 
 ## Context
 
-PR #971's `plugins/yellow-council/tests/synthesis.bats` used assertions such as
-`! grep -q 'leaked finding' "$SD/forward.txt"` as guards that a string is
-absent. Review (architecture) flagged them: bats runs each test under
+PR #948 added `plugins/yellow-council/tests/synthesis.bats` with assertions
+such as `! grep -q 'leaked finding' "$SD/forward.txt"` as guards that a string
+is absent. PR #971's review (architecture) flagged them: bats runs each test under
 `errexit`, and bash exempts a command whose status is inverted with `!` from
 `errexit`. If the `grep` matches, `!` turns that into status 1, the shell does
 not exit, and the test continues. Only a `!` on the **last** command of the test
@@ -33,6 +33,8 @@ the same pitfall.
   asserting `-eq 1` also catches a missing file that `-ne 0` would let through.)
 - For several files, use `run grep -q ... a b c` and assert `1`, or loop and
   assert per file.
+- With bats 1.5 or later, `run ! cmd` asserts that the command fails and works
+  at any position; it needs `bats_require_minimum_version 1.5.0` in the file.
 
 ## Why This Matters
 
@@ -43,13 +45,11 @@ catches because the line looks correct.
 ## When to Apply
 
 Any bats test (or `set -e` script) that asserts absence with `!`. Grep a test
-file for lines that start with `!` and check each is the last command.
-
-Also from the same review: name a negative test after the guard it actually
-exercises. A "not ours" directory case that fails the shape check never reaches
-the symlink, directory or ownership guards, so add real symlinked and
-nonexistent directory cases instead of relying on one case with a misleading
-name.
+file for lines that start with `!` and check each is the last command. Other
+suites still have mid-test `! grep` lines (for example
+`plugins/yellow-review/tests/review-ledger.bats` and
+`plugins/gt-workflow/tests/gt-amend.bats`); audit them when you touch those
+files.
 
 ## Examples
 

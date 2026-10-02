@@ -3,8 +3,9 @@ title: 'Squash-commit ancestry verification in merge-queue workflows'
 date: 2026-09-29
 category: workflow
 track: knowledge
-problem: 'Graphite merge-queue artifacts can diverge from reviewed PR content, causing content drift validation errors unless the squash commit is verified on origin/main first.'
+problem: 'Graphite merge-queue artifacts can diverge from reviewed PR content, so a manual recovery check should first confirm the squash commit is on origin/main before comparing landed content.'
 tags: [graphite-workflow, merge-queue, git-verification]
+components: [yellow-core]
 source: compound-staging
 ---
 
@@ -19,8 +20,10 @@ check runs against a stale ref:
 
 ```bash
 git fetch origin main
-git merge-base --is-ancestor "$SQUASH_SHA" origin/main \
-  || echo "squash commit is not on origin/main: nothing landed"
+if ! git merge-base --is-ancestor "$SQUASH_SHA" origin/main; then
+  echo "squash commit is not on origin/main: nothing landed" >&2
+  exit 1
+fi
 ```
 
 This is corroborating evidence, not a standalone gate: it proves the commit

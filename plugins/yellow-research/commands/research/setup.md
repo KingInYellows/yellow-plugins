@@ -153,7 +153,7 @@ check_key() {
   if [ $has_env -eq 1 ] && [ $has_cfg -eq 1 ]; then
     printf '%-22s set (both shell & userConfig)\n' "$label:"
   elif [ $has_env -eq 1 ]; then
-    printf '%-22s set (shell env; MCP uses it via the start-*.sh fallback unless a keychain userConfig key exists, which this check cannot see on macOS)\n' "$label:"
+    printf '%-22s set (shell env; the MCP uses it via the start-*.sh fallback only if Claude Code was launched with it exported, and not when a keychain userConfig key exists, which this check cannot see on macOS)\n' "$label:"
   elif [ $has_cfg -eq 1 ]; then
     printf '%-22s set (userConfig only)\n' "$label:"
   else
@@ -226,8 +226,9 @@ MCP-visibility confirmation`.
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
 `UNREACHABLE` / `PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
-(shell key probed with any result, but a userConfig key is also set and the MCP uses that one;
-Perplexity's label ends with `; pending MCP-visibility confirmation`).
+(shell key probed with any result, but a userConfig key is also set and the
+MCP uses that one; Perplexity's label ends with `; pending MCP-visibility
+confirmation`).
 
 ### Step 3: Optional Live API Testing
 
@@ -324,7 +325,7 @@ else
     # A 401 here means the shell-env key was rejected (only shell keys reach
     # this probe). The start-*.sh wrappers fall back to shell env, but
     # userConfig wins when both are set; the both-set override below reports it.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard. If a userConfig or keychain key is also set, the MCP uses that one instead."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -427,7 +428,7 @@ else
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
     # Shell-env 401 diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard. If a userConfig or keychain key is also set, the MCP uses that one instead."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -533,7 +534,7 @@ else
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
     # Shell-env 401 diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard. If a userConfig or keychain key is also set, the MCP uses that one instead."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -694,6 +695,19 @@ Run all seven ToolSearch probes. For sources that are found, run their test
 calls (except Parallel Task and Ceramic, which use ToolSearch-only). Record
 each source's status for the Step 4 report table.
 
+**Perplexity visibility** (not an eighth source row — it settles a pending
+Perplexity key status, so run it only when a Perplexity status ends with
+`pending MCP-visibility confirmation`):
+
+```text
+ToolSearch keyword: "perplexity_search"
+Tool name: mcp__plugin_yellow-research_perplexity__perplexity_search
+Test: ToolSearch probe only (a real call burns API quota)
+```
+
+Tool found: record Perplexity as `ACTIVE` for Step 4's promotion. Tool absent:
+record `UNAVAILABLE`.
+
 Never stop on a per-source error — record the status and continue to the next
 source. A failing MCP source does not affect API key checks or overall command
 completion.
@@ -745,9 +759,9 @@ its Step 3 status is any of:
 - `ACTIVE` — live-tested and confirmed working.
 - `PRESENT (validated via MCP startup — userConfig only)` — Perplexity
   hard-fails at startup without a valid key; reach this status only after
-  Step 3.5 confirms the MCP tools are visible. Promote
+  Step 3.5's Perplexity visibility check finds the MCP tools. Promote
   `PRESENT (userConfig only — pending MCP-visibility confirmation)` to this
-  label when Step 3.5 reports perplexity ACTIVE; otherwise keep the
+  label when that check reports perplexity ACTIVE; otherwise keep the
   pending label and append "MCP did not load — credential validity
   unconfirmed."
 - `PRESENT (keychain — MCP starts without credential validation)` — exa /
@@ -764,8 +778,9 @@ its Step 3 status is any of:
   export is stale or wrong. For EXA and Tavily it counts as active, like
   `PRESENT (keychain …)`: the first MCP call surfaces any userConfig auth
   problem. Perplexity's label ends with `; pending MCP-visibility
-  confirmation` and follows the pending rule below. Step 5 never shows setup
-  instructions for these statuses.
+  confirmation` and follows the pending rule below; when the visibility check
+  finds the tools, promote it by replacing that suffix with `; validated via
+  MCP startup`. Step 5 never shows setup instructions for these statuses.
 - `PRESENT (userConfig takes precedence — shell key format invalid)` — both
   keys are set and the shell key failed Step 2's format check, so no probe ran.
   Treated like the precedence status above: active for EXA and Tavily, pending
@@ -774,8 +789,8 @@ its Step 3 status is any of:
 `PRESENT (userConfig only — pending MCP-visibility confirmation)` and the
 Perplexity form of `PRESENT (userConfig takes precedence — …; pending
 MCP-visibility confirmation)` do NOT count as active until Step 3.5 promotes
-them; if Step 3.5 finds the MCP UNAVAILABLE, treat the key as inactive for the
-summary.
+them; if the Perplexity visibility check finds the MCP UNAVAILABLE, treat the
+key as inactive for the summary.
 
 Counts:
 
@@ -796,7 +811,7 @@ If any key's status is exactly `ABSENT`, `FORMAT INVALID`, or `INVALID`, show
 this block. Match the whole status, not a substring: every
 `PRESENT (userConfig takes precedence — shell key probe: …)` or
 `PRESENT (userConfig takes precedence — shell key format invalid)` status
-contains the word INVALID or ACTIVE but never triggers it.
+may contain the word INVALID or ACTIVE as a substring but never triggers it.
 
 ```text
 To enable missing providers (recommended path, no restart required):
@@ -818,8 +833,9 @@ Never commit API keys to version control.
 
 (Power users can skip userConfig: the start-*.sh wrappers fall back to the
 EXA_API_KEY / TAVILY_API_KEY / PERPLEXITY_API_KEY shell env vars when no
-userConfig value is set. userConfig wins when both are present and is
-preferred: the keychain keeps the key out of your shell environment.)
+userConfig value is set, provided Claude Code was launched from a shell that
+exports them. userConfig wins when both are present and is preferred: the
+keychain keeps the key out of your shell environment.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all three if some
@@ -884,7 +900,7 @@ research), `Done`.
 | Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
 | HTTP 401/403                             | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
-| HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale.               | Record per-provider |
+| HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale or wrong.      | Record per-provider |
 | Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |
 | HTTP 5xx                                 | "UNREACHABLE — API server error."                                                | Record per-provider |
