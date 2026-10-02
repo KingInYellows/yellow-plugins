@@ -5,16 +5,25 @@
 # shellcheck shell=sh
 
 # Longest rate-limit wait a caller may sleep before its single retry; a longer
-# wait exits 4 instead, so the whole call fits the caller's Bash tool timeout
-# (120 s by default).
+# wait exits 4 instead. This caps the wait only: reply-pr-thread's worst case is
+# the pre-check, the wait, the retried pre-check and the reply, each gh call up
+# to GG_TIMEOUT (30 + 90 + 30 + 30 = 180 s by default), so a caller that must
+# survive it passes a Bash tool timeout above that, not the 120 s default.
 GG_MAX_WAIT_SECONDS=90
 # Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
 # Seconds one gh call may run (YELLOW_REVIEW_GH_TIMEOUT, default 30; invalid
-# values and 0, which timeout(1) treats as "no limit", fall back to 30). Enforced only when timeout(1) is installed.
+# values and 0, which timeout(1) treats as "no limit", fall back to 30).
+# Enforced only when timeout(1) or gtimeout(1) is installed.
 GG_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GG_TIMEOUT" in ''|*[!0-9]*) GG_TIMEOUT=30 ;; esac
 [ "$GG_TIMEOUT" -gt 0 ] 2>/dev/null || GG_TIMEOUT=30
+# GNU coreutils on macOS installs it as gtimeout.
+GG_TIMEOUT_BIN=""
+for _gg_t in timeout gtimeout; do
+    if command -v "$_gg_t" >/dev/null 2>&1; then GG_TIMEOUT_BIN=$_gg_t; break; fi
+done
+[ -n "$GG_TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; gh calls run without a time limit.\n' >&2
 
 # gg_init <work-dir>: set the scratch file paths the other helpers read.
 gg_init() {
@@ -26,14 +35,14 @@ gg_init() {
 
 # gg_call <gh api graphql args...>: run `gh api -i graphql` and split the
 # output into $GG_HEADERS and $GG_RESP (output with no status line is all
-# body). Sets GG_EXIT and returns it; 124 means timeout(1) killed gh, and the
+# body). Sets GG_EXIT and returns it; 124 means timeout(1) or gtimeout(1) killed gh, and the
 # mutation may or may not have been applied, so callers must not retry it.
 gg_call() {
     : >"$GG_HEADERS"
     : >"$GG_RESP"
     GG_EXIT=0
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "$GG_TIMEOUT" gh api -i graphql "$@" >"$GG_OUT" 2>"$GG_ERR" || GG_EXIT=$?
+    if [ -n "$GG_TIMEOUT_BIN" ]; then
+        "$GG_TIMEOUT_BIN" "$GG_TIMEOUT" gh api -i graphql "$@" >"$GG_OUT" 2>"$GG_ERR" || GG_EXIT=$?
     else
         gh api -i graphql "$@" >"$GG_OUT" 2>"$GG_ERR" || GG_EXIT=$?
     fi
