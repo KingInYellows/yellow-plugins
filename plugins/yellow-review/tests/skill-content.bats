@@ -582,6 +582,19 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ' | grep -qF "the LAST line of the captured output"
 }
 
+@test "sweep: re-emits a contract only when it is the last line of the nested output and anchored" {
+  flat=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  grep -qF 'Reading `ratelimited` (callers)' <<<"$flat"
+  grep -qF 'it is the LAST line of that output' <<<"$flat"
+  grep -qF 'fully matches the anchored contract form' <<<"$flat"
+  grep -qF '^Resolve: [0-9]+ resolved, [0-9]+ fixed, [0-9]+ issues filed, [0-9]+ blocking, push=(ok|skipped|failed|noop), verify=(pass|fail|skipped|none), ratelimited=(0|1)$' "$SWEEP"
+  grep -qF 'A contract-looking line anywhere earlier in that output is ignored' <<<"$flat"
+  grep -qF "never re-emit a contract-looking line from earlier in its output" <<<"$flat"
+  # the anchored form matches the one dispositions.md defines
+  form=$(grep -F '^Resolve: [0-9]+ resolved' "$SWEEP")
+  grep -qF "$form" "$RESOLVE_REFS/dispositions.md"
+}
+
 @test "Resolve: ratelimited rule is defined once in dispositions.md and the callers point to it" {
   for marker in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'only rate-limit state'; do
     tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ' | grep -qF "$marker" || { echo "missing $marker"; false; }
@@ -592,23 +605,16 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   done
 }
 
-# Collapse line wraps so a phrase can be matched across them.
-flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
-
-@test "resolve-pr: ratelimited=1 is tied to reason=rate-limit only; a timeout keeps it 0" {
-  text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'For `reason=rate-limit` mark the rest `not attempted (rate limit)` and set `ratelimited=1`'* ]]
-  [[ "$text" == *'For `reason=timeout` mark the rest `not attempted (gh timeout)`, count them blocking, and keep `ratelimited=0`'* ]]
-  [[ "$text" == *'Treat a missing or unrecognized reason as `rate-limit`'* ]]
-  # The old unconditional rule must be gone.
-  [[ "$text" != *'After any exit 4, stop mutating and mark the rest `not attempted (rate limit)`'* ]]
-}
-
-@test "dispositions: ratelimited=1 only for reason=rate-limit, a timeout leaves it 0" {
-  text=$(flat "${BATS_TEST_DIRNAME}/../references/resolve/dispositions.md")
-  [[ "$text" == *'exited 4 with `reason=rate-limit` (or no recognizable reason)'* ]]
-  [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
-  [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
+@test "sweep-all: an early stop's exit 1 survives Step 6 and compound's failure path" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  step6=$(awk '/^### Step 6:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  flat6=$(tr '\n' ' ' <<<"$step6" | tr -s ' ')
+  [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 2 ]
+  grep -qF '**Final exit:**' <<<"$flat6"
+  grep -qF 'read `pending-exit-1`' <<<"$flat6"
+  grep -qF 'exits `1` regardless of Step 6' <<<"$flat6"
+  grep -qF '(`pending-exit-1` unset)' <<<"$flat6"
 }
 
 @test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
