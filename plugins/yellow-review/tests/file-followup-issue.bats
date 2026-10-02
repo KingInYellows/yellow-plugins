@@ -493,3 +493,30 @@ SH
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"could not close duplicate issue #77"* ]]
 }
+
+# A PATH of symlinks to the tools the script needs, minus timeout and gtimeout.
+path_without_timeout() {
+  _bin="${BATS_TEST_TMPDIR}/notimeout"
+  mkdir -p "$_bin"
+  for _t in sh bash jq awk tr head tail grep sed date sleep mktemp rm cat dirname basename env printf sort uniq cut wc mkdir; do
+    _p=$(command -v "$_t" 2>/dev/null) && [ -x "$_p" ] && ln -sf "$_p" "$_bin/$_t"
+  done
+  ln -sf "${BATS_TEST_DIRNAME}/mocks/gh" "$_bin/gh"
+}
+
+@test "gtimeout is used when timeout is not installed" {
+  path_without_timeout
+  printf '#!/bin/sh\nprintf x >> "%s/gtimeout_used"\nshift\nexec "$@"\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/notimeout/gtimeout"
+  chmod +x "${BATS_TEST_TMPDIR}/notimeout/gtimeout"
+  PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ -s "${BATS_TEST_TMPDIR}/gtimeout_used" ]
+  [[ "$stderr" != *"neither timeout"* ]]
+}
+
+@test "with neither timeout nor gtimeout the script says so and still runs" {
+  path_without_timeout
+  PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
