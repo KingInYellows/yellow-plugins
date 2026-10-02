@@ -199,13 +199,19 @@ record); only the resolve is withheld.
   plain sentence `Out of scope for this PR; a follow-up issue was already
   filed.`). Otherwise search with `list_issues` (`query` set to the marker's
   `thread=<id>` text, the resolved team, `includeArchived` true) and reuse a
-  hit whose description carries the full marker. Only then write the title and
-  description (ending with the marker) to files and run `check-resolve-text`
-  on them (exit 2 → the plain title and body, no resolver text), then call
-  `save_issue`. Accept only an identifier matching `^<PREFIX>-[0-9]{1,6}$` and
-  a URL matching
-  `^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`; anything
-  else counts as a failure.
+  hit only when it passes the **Linear response checks** below. A hit that
+  fails any check is ignored, as if the search found nothing. Only then write
+  the title and description (ending with the marker) to files and run
+  `check-resolve-text` on them (exit 2 → the plain title and body, no
+  resolver text), then call `save_issue`, and accept its response only when
+  it passes the same checks; a failure counts as a Linear failure.
+- **Linear response checks.** Apply to every `list_issues` hit before reuse
+  and to the `save_issue` response before use. All three must hold: the
+  identifier matches `^<PREFIX>-[0-9]{1,6}$`, with `<PREFIX>` the resolved
+  team key; the URL matches
+  `^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`, with
+  `<ID>` the identifier; the description carries the full marker. Only a
+  response that passes may supply the link for the public reply.
 - Dedupe check: run `file-followup-issue --find <owner/repo> <PRRT_id>` for
   every candidate before either tracker is used, so a GitHub issue filed by
   an earlier run's fallback is found even when Linear works this time. It
@@ -361,7 +367,13 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   file is outside the PR (or the PR's file list cannot be fetched), and with
   `--unattended` also when a file is a runner file; it reports
   `result: skipped`; a PR file listing that times out
-  (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. `--revert-only`
+  (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. With `--unattended`,
+  `--ignored-since <marker-file>` is required: the command refuses when any
+  gitignored file is newer than the marker, because the resolver has no shell
+  and cannot backdate an mtime. `/review:resolve` Step 3f mints the marker in
+  a private `mktemp -d` directory before any resolver runs, and Step 6 passes
+  it to every verify call (interactive runs may pass it too) and removes the
+  directory. `--revert-only`
   saves a patch and reverts the listed files without running anything
   (Step 5's CONFLICT rollback). It waives only the deny-list check; an
   unchanged listed file is skipped and named in `reason`

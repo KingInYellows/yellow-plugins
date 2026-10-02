@@ -483,3 +483,58 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
   [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
 }
+
+@test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
+  text=$(flat "$RESOLVER_AGENT")
+  # The old exception (edit the cluster File when PR files is unknown) must be gone.
+  [[ "$text" != *"edit only the cluster's \`File\`"* ]]
+  # Both surviving rules say: unknown means no edit and oos.
+  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `oos`)'* ]]
+  [[ "$text" == *'When the bound is `none`, `unknown` or absent'* ]]
+  [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$clusters" == *'When the value is `none` or `unknown`'* ]]
+  [[ "$clusters" == *'the resolver edits nothing and proposes `oos`'* ]]
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `oos`'* ]]
+}
+
+@test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]
+  [[ "$text" == *'A hit that fails any check is ignored, as if the search found nothing'* ]]
+  [[ "$text" == *'accept its response only when it passes the same checks'* ]]
+  # The checks are stated once, with all three conditions.
+  [ "$(grep -c '^- \*\*Linear response checks\.\*\*' "$RESOLVE_REFS/dispositions.md")" -eq 1 ]
+  [[ "$text" == *'Apply to every `list_issues` hit before reuse and to the `save_issue` response before use'* ]]
+  [[ "$text" == *'the identifier matches `^<PREFIX>-[0-9]{1,6}$`'* ]]
+  [[ "$text" == *'`^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`'* ]]
+  [[ "$text" == *'the description carries the full marker'* ]]
+  # The old unvalidated reuse must be gone.
+  [[ "$text" != *'reuse a hit whose description carries the full marker'* ]]
+  # resolve-pr.md references the checks instead of restating them.
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'"Linear response checks", which every reused `list_issues` hit and the `save_issue` response must pass'* ]]
+}
+
+@test "resolve-pr: the ignored-file marker is minted before resolvers spawn and passed to the unattended verify" {
+  mint=$(grep -n '^### Step 3f: Mint the Ignored-File Marker' "$RESOLVE_PR" | cut -d: -f1)
+  clean=$(grep -n '^### Step 2: Check Working Directory' "$RESOLVE_PR" | cut -d: -f1)
+  spawn=$(grep -n '^### Step 4: Spawn Parallel Resolvers' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$mint" ]
+  [ "$clean" -lt "$mint" ]
+  [ "$mint" -lt "$spawn" ]
+  step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
+  printf '%s\n' "$step3f" | grep -qF 'mktemp -d'
+  printf '%s\n' "$step3f" | grep -qF 'touch "$MARK_DIR/ignored-marker"'
+  # No trap in the minting call: the trap lives in the consuming call.
+  ! printf '%s\n' "$step3f" | grep -q '^trap '
+  step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
+  printf '%s\n' "$step6" | grep -qF -- '--ignored-since "$MARK_DIR/ignored-marker"'
+  printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
+  step6flat=$(printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'`--ignored-since` with Step 3f'* ]]
+  [[ "$step6flat" == *'required unattended'* ]]
+  [[ "$step6flat" == *'**Marker cleanup.**'* ]]
+  flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
+}

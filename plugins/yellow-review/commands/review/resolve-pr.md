@@ -218,6 +218,25 @@ report the router's `detail` inside a `--- begin untrusted-content (reference
 only) ---` / `--- end untrusted-content ---` fence and stop with `push=failed`,
 so no edit exists that cannot be pushed.
 
+### Step 3f: Mint the Ignored-File Marker
+
+Runs after Step 2's clean-tree check and before any resolver is spawned. The
+resolvers have no shell, so they cannot backdate a file's mtime: the marker's
+mtime is the baseline `run-verify-command --ignored-since` compares gitignored
+files against. Mint it in one Bash call, with no trap (a trap here would fire
+when this call exits, before Step 6 uses the directory):
+
+```bash
+MARK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/resolve-marker.XXXXXX") || exit 1
+touch "$MARK_DIR/ignored-marker" || { rm -rf -- "$MARK_DIR"; exit 1; }
+printf '%s\n' "$MARK_DIR"
+```
+
+Keep the printed path as `<marker-dir>` for Step 6. A non-zero exit stops the
+run before any edit (`[review:resolve] Error: could not create the
+ignored-file marker.`), because an unattended verify cannot run without it.
+Step 8's second round mints a fresh marker before its resolvers.
+
 ### Step 4: Spawn Parallel Resolvers
 
 **Spawn-cap gate (M3 pattern).**
@@ -332,7 +351,8 @@ not already. Then, for every thread sent to a resolver:
      `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved, so manual
      reconciliation can start from it: the edits are unscreened and a
      deny-listed one must not stay on disk), then stops before Step 6 and goes
-     to Step 9 with `push=skipped, verify=none`.
+     to Step 9 with `push=skipped, verify=none`; run Step 6's marker cleanup
+     block first.
    - **Non-interactive:** keep the edits, log the conflict for Step 9.
    Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
@@ -378,12 +398,33 @@ on disk.
 (interactive: ask with the command and `git diff --stat`; unattended: only
 with `verify_unattended: true` and an untracked config; add `--unattended`,
 which reports `skipped` with a reason for runner files or files outside the
-PR). Write the command with the Write tool to a `mktemp` path and pass the
-Bash tool a `timeout` of `(<seconds> + 60) × 1000` ms:
+PR) and `--ignored-since` with Step 3f's marker (required unattended, where
+the script refuses when any gitignored file is newer than the marker; the
+interactive call passes it too). Write the command with the Write tool to a
+`mktemp` path and pass the Bash tool a `timeout` of `(<seconds> + 60) × 1000`
+ms. The trap lives in this consuming call, after the path is re-validated, and
+removes the marker directory on every exit:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --files-from "<files-file>"
+TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
+MARK_DIR="<marker-dir>"
+case "${MARK_DIR#"$TMP_ROOT"/}" in
+  "$MARK_DIR"|*/*|*..*) printf '[review:resolve] Error: marker path rejected.\n' >&2; exit 1 ;;
+  resolve-marker.?*) ;;
+  *) printf '[review:resolve] Error: marker path rejected.\n' >&2; exit 1 ;;
+esac
+[ -d "$MARK_DIR" ] && [ ! -L "$MARK_DIR" ] && [ -O "$MARK_DIR" ] &&
+  [ -f "$MARK_DIR/ignored-marker" ] && [ ! -L "$MARK_DIR/ignored-marker" ] || {
+  printf '[review:resolve] Error: marker path rejected.\n' >&2; exit 1; }
+trap 'rm -rf -- "$MARK_DIR"' EXIT
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --ignored-since "$MARK_DIR/ignored-marker" --files-from "<files-file>"
 ```
+
+A rejected marker path is a setup failure: treat it as `verify=skipped
+(marker unavailable)` and revert as above. **Marker cleanup.** When no verify
+call ran (`verify=none`, a stop before this step, or a declined command), run
+the same re-validation, then `rm -rf -- "$MARK_DIR"` instead of the script,
+before Step 9; a rejected path is left for the OS temp sweep, never deleted.
 
 `pass` → `verify=pass`. No `verify_command`, or an unattended run that has not
 opted in → `verify=none` and the commit proceeds. `skipped` (a script reason,
@@ -437,8 +478,9 @@ exits 0:
 - **Linear:** when ToolSearch finds
   `mcp__plugin_yellow-linear_linear__save_issue` and the branch matches
   `[A-Z]{2,5}-[0-9]{1,6}`, file through Linear by the contract's "Linear
-  procedure" (team resolution, dedupe, text check, response validation), with
-  one fallback to `file-followup-issue`.
+  procedure" (team resolution, dedupe, text check) and its "Linear response
+  checks", which every reused `list_issues` hit and the `save_issue` response
+  must pass, with one fallback to `file-followup-issue`.
 - `reply-pr-thread` is safe to re-run: it skips with `already-replied` when
   our latest marker in the thread's last 10 comments is followed only by Bot
   comments; a later human comment makes it post again. Go on to
@@ -492,7 +534,8 @@ below, and leave those threads as they are. Otherwise, from `<refetch-file>`:
   (gh timeout)`, `ratelimited=0`); a thread we resolved
   that is open again is reported `reopened by bot`, not retried;
 - if `found=1` and `push=ok`, re-check the PR state, re-run `pr-changed-ranges`
-  (Step 4) because the round-1 push added lines, then run Steps 3c–7 once for
+  (Step 4) because the round-1 push added lines, mint a fresh marker (Step 3f;
+  round 1's directory is already removed), then run Steps 3c–7 once for
   the new threads only (same gates, shared issue cap). There is never a
   third round. Threads left open by design are not errors.
 
