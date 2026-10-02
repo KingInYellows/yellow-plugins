@@ -606,10 +606,12 @@ Replies and issue bodies end with:
 
 ## Script exit codes
 
-For `reply-pr-thread`, `file-followup-issue` and `check-resolve-text`, exit 1
-is a non-usage failure (missing tool, `gh` or network failure, unexpected
-response) and exit 2 covers usage and unreadable input files. `resolve-pr-thread`
-and `get-pr-comments` exit 1 for every failure, usage included.
+For `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue` and
+`check-resolve-text`, exit 1 is a non-usage failure (missing tool, `gh` or
+network failure, unexpected response) and exit 2 covers usage (and unreadable
+input files). The distinct codes 3 and 4 are in the table below and are not
+failures to retry as exit 1. `get-pr-comments` is the exception: it exits 1 on
+any failure, usage included.
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
