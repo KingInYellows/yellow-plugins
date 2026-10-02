@@ -1,0 +1,19 @@
+plugins/yellow-review/CLAUDE.md
+  s_5667e810256031::t_b757c1c6677f39 227-229,231-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed7d6137d6e85b0a0fcf697eb86e3810d3461b8a",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
