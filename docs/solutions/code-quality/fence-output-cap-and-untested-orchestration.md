@@ -88,3 +88,21 @@ See also `docs/solutions/code-quality/llm-as-judge-style-bias-dominance.md`
 for why synthesis input completeness matters, and
 `docs/solutions/security-issues/preserve-reviewer-evidence-through-fencing.md`
 for the evidence-fidelity side of the same change.
+
+---
+
+## Update — 2026-10-01
+
+PR #955 (open when this note was written; its tests are not on `main`) added
+`skill-content.bats` tests for resolve-stack and sweep-all. Review found the
+first drafts of the contract and dirty-tree tests only grepped for
+`ratelimited=`, so the safety-critical branches (each field of the `Resolve:`
+line, the revert branches, the compound-skip text) could be deleted without
+failing a test. Later rounds on that PR added assertions for the
+`--revert-dirty` and `--revert-only` branches, `treeClean: false`, the
+compound-skip text, the stop ordering and the `Blocking` column, and the shared
+contract test now checks the `Resolve:` fields in resolve-stack and sweep.
+What remains thin: the sweep-all check of the contract line is a loose
+`blocking` grep. The general rule stands: assert each field and each branch by
+name, so removing a branch fails a test. For absence checks, see
+[A negated grep in the middle of a bats test never fails](bats-negated-grep-mid-test-never-fails.md).

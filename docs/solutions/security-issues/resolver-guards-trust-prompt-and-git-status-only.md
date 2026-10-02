@@ -1,0 +1,142 @@
+---
+title: 'Resolver guards that trust the prompt and git status miss ignored and .git paths'
+date: 2026-10-01
+category: security-issues
+track: bug
+problem: pr-comment-resolver edits to gitignored or .git paths bypass the git-status revert, and the deny list is prompt-only
+tags: [pr-comment-resolver, review-resolve, deny-list, gitignore, fail-closed, trust-boundary, yellow-review]
+components: [yellow-review]
+---
+
+## Problem
+
+`/review:resolve` dispatches `pr-comment-resolver` agents to edit files, then
+verifies and, on failure, reverts their work using `git status`. Two guards
+carried the safety weight: the revert, which sees only what git sees, and a
+deny list, which was enforced only by the resolver's prompt (the `Do NOT:`
+rules in `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`). PR
+#954 review (architecture and security) rated this P1.
+
+Point-in-time: PR #950 adds the deny-list contract in
+`plugins/yellow-review/references/resolve/dispositions.md`. That file is not
+on trunk until #950 merges, so on a checkout without it the agent file above is
+the only place the deny list lives.
+
+## Symptoms
+
+- A resolver edit to `yellow-plugins.local.md`, `.claude/`, `.env`, hooks or
+  git config leaves a clean `git status`, so the verify step and the revert
+  never see it.
+- The deny list has no runtime check; an agent that ignores or misreads the
+  prompt edits a denied path with no consequence.
+- One resolver's wrong `Files modified` list makes the revert discard every
+  cluster's fixes and turns every fixed thread into `unclear`.
+- A thread that cites its own anchor passes the "addressed" evidence check, so
+  a human-authored thread can be auto-resolved without any fix.
+- Null-path (PR-level) clusters run alongside path-anchored resolvers and may
+  edit any line of any PR file, racing the other clusters.
+
+## What Didn't Work
+
+- Relying on `git status` as the change oracle. Ignored and `.git` paths are
+  outside it by definition.
+- Stating the deny list in the resolver prompt only. A prompt rule is advice,
+  not enforcement.
+- Trusting the resolver's self-reported `Files modified` list as the revert
+  scope and accepting any string in it.
+- Accepting a citation of the thread's own anchor as evidence that the thread
+  was addressed.
+
+## Solution
+
+1. Before the resolver waves, record existence, hash, and keep a copy of
+   every deny-listed path that git ignores or that lives under `.git`
+   (`yellow-plugins.local.md`, `.claude`, `.env`, hooks, git config). After
+   the waves, re-hash and compare. On any change or creation, restore first:
+   put a changed file back from its pre-flight copy and delete a newly created
+   one. Then re-hash and stop only if every path matches its pre-flight state,
+   reporting the path; do not commit or push. Fail closed if a restore fails
+   or the post-restore hash still differs. Stopping without restoring leaves
+   the tampered file as the next run's baseline, so its `verify_command`
+   would run. Where the runtime allows it, enforce the deny list directly
+   instead of detecting violations afterwards.
+2. Require `Files modified` entries to be repo-relative paths, and drop any
+   file with no diff before writing the files file, so a bad entry cannot widen
+   the revert. These checks bound the string, not the attribution: a resolver
+   can still list a file another parallel resolver legitimately changed, and a
+   failed revert would then undo that fix. Derive each resolver's revert scope
+   from an independent per-resolver snapshot or worktree, or from enforced edit
+   bounds, not from its `Files modified` report.
+3. Run null-path clusters serially in a final wave, after all path-anchored
+   clusters finish, and bound their edits to the PR's changed line ranges.
+4. Reject a thread's own anchor as addressed-evidence. Require fixed paths
+   that appear in the pushed diff.
+
+## Why This Works
+
+The hash comparison covers exactly the paths git cannot report on, so the
+detection no longer depends on the tool that has the blind spot. Failing
+closed turns a silent bypass into a stopped run. Validating the self-reported
+file list and moving evidence to the pushed diff means no guard accepts a claim
+the resolver can make about itself. Serializing PR-level clusters removes the
+race with path-anchored work.
+
+## Prevention
+
+- Any guard that checks an agent's work must use an oracle independent of the
+  agent's own report and of the VCS view if the guarded paths can be ignored.
+- A deny list in a prompt must have a runtime counterpart (hash check or
+  enforced tool restriction), or the doc must say it is advisory.
+- When adding a resolver or editor agent, list which paths are invisible to
+  `git status` and test one of them.
+- Add a bats or contract test that edits a gitignored deny-listed fixture and
+  asserts the run fails closed.
+- Evidence rules need a negative test: a thread citing its own anchor must not
+  resolve.
+
+See also `docs/solutions/security-issues/tracked-file-as-untrusted-input-channel.md`.
+
+---
+
+## Update — 2026-10-01
+
+PR #955 (`/review:resolve-stack` dirty-tree stop) review found two more
+places where the guard trusted what `git status` shows.
+
+### A gitignored trusted-config file is invisible to the revert
+
+`yellow-plugins.local.md` is gitignored in most consumer repos, and it
+carries `verify_command` and `verify_unattended`. A steered resolver edit
+to it never appears in `git status --porcelain`, so the dirty-tree stop
+and the trusted-config revert both miss it. The edit then runs as a shell
+command on the next PR in the walk.
+
+Guidance: do not detect trusted-config tampering through git. At
+pre-flight, record whether each trusted-config path exists, and hash every
+one that does, ignored ones included. The path set is the resolver deny
+list: the "File set" section of `plugins/yellow-review/references/resolve/dispositions.md`
+(PR #950 adds the file with that section marked planned; PR #954 makes it
+final) and `rp_denied` in `plugins/yellow-review/lib/resolve-paths.sh` are the canonical source,
+so do not copy the list here or into the walk. Point-in-time: neither
+file is on trunk yet. `plugins/yellow-review/lib/resolve-paths.sh` ships with PR #952, which
+#954 stacks on, so a checkout without those PRs has no canonical list.
+After each resolve, compare both existence and content, because a resolver
+can create an optional file such as `yellow-plugins.local.md` that a later
+command then loads. On any creation or change, restore the pre-flight state (delete a
+created file, restore a changed one from its pre-flight copy) and stop the
+walk. A restore that fails is itself a stop condition. Tracked in #973;
+point-in-time, as the walk-level check is not on main yet.
+
+### `--revert-only` was called loosely
+
+The revert step called `run-verify-command` by bare name, so it depended
+on `PATH` instead of the plugin root. It passed paths in porcelain shape
+(quoted, with rename arrows), and it never checked the exit code or
+`treeClean`. A failed revert looked like a successful one.
+
+- Call the script by its full `${CLAUDE_PLUGIN_ROOT}/...` path.
+- List paths with `git status --porcelain=v1 -z --untracked-files=all`
+  so names with spaces or quotes survive and untracked files in new
+  directories show up.
+- Treat a non-zero exit or `treeClean: false` as a reported failure
+  that stops the walk. Never as a silent success.
