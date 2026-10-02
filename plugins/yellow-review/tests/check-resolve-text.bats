@@ -533,3 +533,77 @@ https://user:[REDACTED]@host
 https://user:%PASSWORD%@host
 CASES
 }
+
+@test "an inline YAML comment after a credential value does not hide it" {
+  printf 'password:\n  hunter22 # note\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'password: hunter22 # note\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'password:\n  "hunter22" # note\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a hash inside a token is part of the token" {
+  # Refused by the existing separated-literal rule, not by comment handling.
+  printf 'token: abc#def\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "passphrase and passcode labels are credential keywords" {
+  check() {  # <line text>
+    printf '%b\n' "$1" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $1"; false; }
+  }
+  check 'passphrase: correcthorse'
+  check 'pass_phrase = "abcd efgh"'
+  check 'pass-phrase: hunter22'
+  check 'passcode: hunter22'
+  check 'passphrase:\n  correcthorse'
+  check 'DB_PASSPHRASE=abcdefgh1234'
+}
+
+@test "a placeholder passphrase and in-word labels stay clean" {
+  while IFS= read -r t; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged: $t"; false; }
+  done <<'CASES'
+passphrase: string
+passcode: <your passcode>
+bypass: something
+CASES
+}
+
+@test "a YAML block scalar after a credential keyword is checked" {
+  check() {  # <line text>
+    printf '%b\n' "$1" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $1"; false; }
+  }
+  check 'password: |\n  hunter'
+  check 'password: >-\n  abcdefghij'
+  check 'token: |2\n   s3cr3tvalue'
+  check 'password: |\n\n  hunter22'
+  check 'password:\n  |\n  hunter22'
+}
+
+@test "a block scalar of placeholders or prose stays clean and expires the carry" {
+  printf 'password: |\n  <your password>\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  printf 'password: |\n\nNext paragraph of prose.\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  printf 'bypass: |\n  something\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  # The carry covers one value line only.
+  printf 'password: |\n  <your password>\n  hunter22\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
