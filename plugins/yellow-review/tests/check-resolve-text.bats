@@ -438,3 +438,43 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "a keyword alone on a line checks the next non-blank line as its value" {
+  check() {
+    printf "$2" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"rule=$1 "* ]]
+  }
+  check unquoted-keyword-value 'password:\n  hunter\n'
+  check unquoted-keyword-value 'token:\n  abcdefghij\n'
+  check unquoted-keyword-value 'db_password:\n\n  - hunter22\n'
+  check unquoted-keyword-value 'password:\r\n  hunter\r\n'
+  check quoted-keyword-assignment 'api_key:\n    "s3cr3tvalue"\n'
+}
+
+@test "next-line values that are placeholders, prose or out of reach stay clean" {
+  while IFS= read -r t; do
+    printf "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ]
+  done <<'CASES'
+password:\n  string\n
+token:\n  <your token>\n
+password:\n\nNext paragraph of prose.\n
+password:\n  Rotation is scheduled for Friday\n
+Keep the password:\nthe team agreed to rotate it\n
+Keep the password:\nsomething\n
+password:\nok\nhunterhunter\n
+bypass:\n  something\n
+CASES
+}
+
+@test "CRLF line endings do not hide an all-letter literal; a CRLF placeholder stays clean" {
+  printf 'password: hunter\r\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'password: string\r\ntoken: <your token>\r\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}

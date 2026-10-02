@@ -42,8 +42,36 @@ rt_looks_secret() {
         function flag(rule) {
             if (!hit) { hit = 1; hitrule = rule; hitline = NR }
         }
+        # litval(seg, inword): 1 when an unquoted keyword value looks like a
+        # literal credential. Flag only a plausible one: 6+ characters, a
+        # digit or all letters (minus placeholder words), and no
+        # call/reference punctuation, so `password: string`,
+        # `password: z.string()` and `token: $TOKEN` stay clean.
+        function litval(seg, inword,    np, parts, allph, j) {
+            sub(/[.!?]+$/, "", seg)
+            if (length(seg) < 6 || seg ~ /[(<${\[]/) return 0
+            if (seg ~ /[0-9]/) return 1
+            # All-letter literal (`password: hunter`): flag unless it is a
+            # known type or prose placeholder.
+            if (inword) return 0
+            if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) return 1
+            # Separated lowercase literal (`password: correct-horse-battery`,
+            # `password: hunter@cats`): separators are punctuation that
+            # passwords commonly use. Flag unless every part is a
+            # placeholder word. A property access on a common config or
+            # environment object (`token = process.env.api_key`) is a
+            # reference, not a literal.
+            if (seg ~ /^(process\.env|import\.meta\.env|os\.environ|env|this|self|config|settings|secrets|args|params|props)\./) return 0
+            if (seg ~ /^[a-z]+([_\/.@+!#%^&*:-][a-z]+)+$/) {
+                np = split(seg, parts, /[_\/.@+!#%^&*:-]/)
+                allph = 1
+                for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
+                return !allph
+            }
+            return 0
+        }
         BEGIN {
-            ph = " string number integer boolean object array unknown undefined"
+            ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
             ph = ph " masked hidden default missing invalid expired empty bearer"
@@ -55,6 +83,9 @@ rt_looks_secret() {
         # so `API_KEY = process.env.API_KEY` in code does not match).
         /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
+            # A CRLF file leaves \r on the token, which would hide an
+            # all-letter literal from the value rules below.
+            sub(/\r$/, "")
             l = tolower($0)
             # Each loop below copies the rest of the line per match, which is
             # quadratic on a huge hostile line. Cap the matches per loop and
@@ -92,25 +123,31 @@ rt_looks_secret() {
                 r = substr(r, RSTART + RLENGTH)
                 inword = (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
-                sub(/[.!?]+$/, "", seg)
-                if (length(seg) < 6 || seg ~ /[(<${\[]/) continue
-                if (seg ~ /[0-9]/) flag("unquoted-keyword-value")
-                # All-letter literal (`password: hunter`): flag unless it is a
-                # known type or prose placeholder.
-                else if (inword) continue
-                else if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) flag("unquoted-keyword-value")
-                # Separated lowercase literal (`password: correct-horse-battery`,
-                # `password: hunter@cats`): separators are punctuation that
-                # passwords commonly use. Flag unless every part is a
-                # placeholder word. A property access on a common config or
-                # environment object (`token = process.env.api_key`) is a
-                # reference, not a literal.
-                else if (seg ~ /^(process\.env|import\.meta\.env|os\.environ|env|this|self|config|settings|secrets|args|params|props)\./) continue
-                else if (seg ~ /^[a-z]+([_\/.@+!#%^&*:-][a-z]+)+$/) {
-                    np = split(seg, parts, /[_\/.@+!#%^&*:-]/)
-                    allph = 1
-                    for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
-                    if (!allph) flag("unquoted-keyword-value")
+                if (litval(seg, inword)) flag("unquoted-keyword-value")
+            }
+            # A keyword alone on its line (`password:` then an indented
+            # `  hunter` on the next line, YAML style) is checked against the
+            # next non-blank line: only that line, then the carry resets.
+            # Only a single token counts there, so prose after a keyword line
+            # stays clean. Blank lines do not use up the carry.
+            if (carry && $0 !~ /^[ \t\r]*$/) {
+                carry = 0
+                r = l
+                sub(/\r$/, "", r)
+                sub(/^[ \t]*(-[ \t]*)?/, "", r)
+                q = (r ~ /^["\047]/)
+                sub(/^["\047]/, "", r)
+                if (match(r, /^[^ \t"\047,;)]+/)) {
+                    seg = substr(r, RSTART, RLENGTH)
+                    r = substr(r, RSTART + RLENGTH)
+                    if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, carryin)) flag(q ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+                }
+            }
+            if (match(l, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t\r]*$/)) {
+                pre = substr($0, 1, RSTART - 1)
+                if (pre ~ /^[ \t]*(-[ \t]*)?["\047]?[A-Za-z0-9_.-]*$/) {
+                    carry = 1
+                    carryin = (RSTART > 1 && substr($0, RSTART - 1, 1) ~ /[A-Za-z]/ && substr($0, RSTART, 1) !~ /[A-Z]/)
                 }
             }
             # Credentials in URL userinfo (scheme://user:pass@host); a
