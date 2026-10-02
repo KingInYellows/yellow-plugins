@@ -1,0 +1,35 @@
+docs/brainstorms/2026-10-01-give-yellow-debt-a-first-class-way-to-cl-brainstorm.md
+  s_74f7fdc088fb86::t_a7b551a5172a46 1-127
+plans/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_9b18bec49799ea 118
+  s_e0e3718c40e1d0::t_45696112c4a42c 134
+  s_74f7fdc088fb86::t_54802d6ca1cb0a 1-35,47-69,81-86,113-117,119,121-122,124,138-139,172-184,197-212,226,264-266,269,273-288,292-294,296-301,316-329,341-346,348-351,370-372,376-377,380-392,395-401,405-406,408-412,422-433,435,437-441,446-447
+  s_e0e3718c40e1d0::t_ef3266764d7d46 123
+  s_e0e3718c40e1d0::t_fce61910d19c9a 164
+  s_e0e3718c40e1d0::t_ff201f1daf3111 120
+  s_74f7fdc088fb86::t_9d69c89b2ea496 36-46,70-80,87-112,125-133,135-137,140-163,165-171,185-196,213-225,227-263,267-268,270-272,289-291,295,302-315,330-340,347,352-369,373-375,378-379,393-394,402-404,407,413-421,434,436,442-445,448-464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0cb2a49506bfbb1c1f4c977edecdd88eb34d650",
+  "prompts": {},
+  "sessions": {
+    "s_74f7fdc088fb86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c7e10b7-da4a-4ecf-8516-be722c732289",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
