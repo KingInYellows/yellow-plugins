@@ -1,0 +1,23 @@
+docs/solutions/logic-errors/closed-finding-suppression-over-matches-and-over-deletes.md
+  s_e0e3718c40e1d0::t_71177ffbe3f216 1-83
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+  s_e0e3718c40e1d0::t_71177ffbe3f216 501-516
+docs/solutions/code-quality/agent-prose-shell-belongs-in-library-functions.md
+  s_e0e3718c40e1d0::t_71177ffbe3f216 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3342dbb8ccf5fcd032b1fbff1637611a332466e6",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
