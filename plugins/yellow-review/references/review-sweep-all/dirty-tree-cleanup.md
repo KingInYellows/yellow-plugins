@@ -98,8 +98,8 @@ delete failed). The script exits `0` for both, so check `reason` even after a
 zero exit.
 
 `--revert-only` deletes a listed file that is untracked and not ignored,
-whoever created it, because the pre-resolve state is not recorded (tracked in
-#973). A gitignored listed path makes the call exit `2` with nothing
+whoever created it, because the pre-resolve state is not recorded (tracked
+in #973). A gitignored listed path makes the call exit `2` with nothing
 reverted.
 
 The caller says what to do with the outcome: the patch path, `revert
