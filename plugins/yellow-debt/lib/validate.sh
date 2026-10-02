@@ -525,28 +525,34 @@ debt_pending_todos() {
 }
 
 # Print the next free todo ids, one per line, zero-padded to three digits: COUNT
-# consecutive ids (default 1) starting one above the highest leading number of
-# any *.md under todos/debt/. Ids are 1-6 digits everywhere else, so a larger
-# one is ignored, and so is a symlink (a planted one must not move the
-# counter). Run from the git root.
+# ids (default 1) above the highest leading number of any regular *.md under
+# todos/debt/, skipping a number a symlink holds (dangling or not: the resolver
+# sees it, so reusing the number would make the new todo ambiguous). A symlink
+# never raises the counter, so a planted `999999-…` link cannot exhaust the id
+# space. Ids are 1-6 digits everywhere else, so a larger one is ignored. Run
+# from the git root.
 # Usage: debt_next_todo_id [COUNT]
 debt_next_todo_id() {
-  local count="${1:-1}" f base id max=0 k
+  local count="${1:-1}" f base id max=0 k n held=" "
   [[ "$count" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$count))" -ge 1 ] || {
     printf '[debt] Error: count must be 1-9999\n' >&2; return 1; }
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/*.md; do
-    [ -e "$f" ] && [ ! -L "$f" ] || continue
+    [ -e "$f" ] || [ -L "$f" ] || continue
     base="${f##*/}"; id="${base%%-*}"
     [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
+    if [ -L "$f" ]; then held="$held$((10#$id)) "; continue; fi
     [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
   done
-  if [ "$((max + 10#$count))" -gt 999999 ]; then
-    printf '[debt] Error: todo ids exhausted\n' >&2
-    return 1
-  fi
+  n=$max
   for ((k = 1; k <= 10#$count; k++)); do
-    printf '%03d\n' "$((max + k))"
+    n=$((n + 1))
+    while [[ "$held" == *" $n "* ]]; do n=$((n + 1)); done
+    if [ "$n" -gt 999999 ]; then
+      printf '[debt] Error: todo ids exhausted\n' >&2
+      return 1
+    fi
+    printf '%03d\n' "$n"
   done
 }
 

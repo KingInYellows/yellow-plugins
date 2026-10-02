@@ -979,6 +979,15 @@ sha16_ref() {
   [ "$output" = "005" ]
 }
 
+@test "debt_next_todo_id skips a number held by a dangling symlink" {
+  : > todos/debt/004-ready-high-a.md
+  ln -s missing.md todos/debt/005-ready-high-gone.md
+  run debt_next_todo_id 2
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "006" ]
+  [ "${lines[1]}" = "007" ]
+}
+
 @test "debt_next_todo_id starts at 001 with no todos and refuses when ids run out" {
   run debt_next_todo_id
   [ "$output" = "001" ]

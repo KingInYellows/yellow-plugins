@@ -142,6 +142,10 @@ Closing a todo does not close its Linear issue.
 - Large codebases (100K+ LOC) require file chunking (implemented in audit
   command)
 - Linear sync requires yellow-linear plugin to be installed
+- A kept todo written before fingerprints existed is rehashed from its
+  recorded `affected_files` lines. If lines were inserted above the code since,
+  that range hashes other text and the finding resurfaces once; closing it again
+  stamps a fingerprint that survives later drift
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
 - Scanner output schema v1.0 is no longer accepted; the synthesizer warns
