@@ -1,0 +1,56 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread
+  s_7a82748dd606d9::t_f7201b0cf70758 10-11
+  s_7a82748dd606d9::t_cf79d573e5aed2 46-47
+plugins/yellow-review/references/resolve/dispositions.md
+  s_7a82748dd606d9::t_ec27c91495b2fc 594
+  s_7a82748dd606d9::t_defa37b00bd739 487-503
+  s_7a82748dd606d9::t_eae61a20693600 587-588
+plugins/yellow-review/lib/gh-graphql.sh
+  s_7a82748dd606d9::t_529839358f9548 9-13
+  s_7a82748dd606d9::t_a8d410400889c9 24-26,29-30,35
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_5f3c790204572b 241-242
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_7a82748dd606d9::t_cde3e1793170d4 421
+plugins/yellow-review/lib/resolve-gh.sh
+  s_7a82748dd606d9::t_a353beb07097bb 10-13,18
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_7a82748dd606d9::t_f51519e6087624 35-36
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_7a82748dd606d9::t_a62f0b41f09cba 27-30
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_563e62082e5b1c 601-629
+  s_7a82748dd606d9::t_15cac9b16908f9 630-635
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_7a82748dd606d9::t_4265401614fcd4 462-477
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_7a82748dd606d9::t_e615a9b69b6b59 20
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_7a82748dd606d9::t_1c4990fe806ddb 473-475
+  s_7a82748dd606d9::t_262cceb2c229ea 162-165
+plugins/yellow-review/tests/resolve-pr-thread.bats
+  s_7a82748dd606d9::t_a7c49aad999811 377-394
+plugins/yellow-review/tests/poll-new-threads.bats
+  s_7a82748dd606d9::t_267a9c19a6e816 346-358
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_7a82748dd606d9::t_f60265a2159308 567-592
+plugins/yellow-review/skills/pr-review-workflow/scripts/poll-new-threads
+  s_7a82748dd606d9::t_74b3e88c222115 16-18
+  s_7a82748dd606d9::t_8e9aad5d1c920d 30-32,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "42a6c296f60b2c32171381df0f2485022c42e8a6",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
