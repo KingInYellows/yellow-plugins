@@ -793,3 +793,26 @@ STUB
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   [ -z "$(git diff --cached --name-only)" ]
 }
+
+@test "with --allow-credential-shaped, a hook that adds a different credential-shaped line is refused and undone (exit 4)" {
+  # The approved line and the hook's line are assembled from pieces.
+  approved="key = \"AKIA""ABCDEFGHIJKLMNOP\""
+  printf '#!/bin/sh\nprintf "other = \\"AKIA%s\\"\\n" >> src/a.txt && git add src/a.txt\n' "QRSTUVWXYZ012345" >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\n%s\n' "$approved" >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "with --allow-credential-shaped, a hook that changes nothing is still allowed" {
+  printf '#!/bin/sh\nexit 0\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  printf 'one\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
+  [ "$status" -eq 0 ]
+  grep -q '^gt submit' "$STUB_LOG"
+}

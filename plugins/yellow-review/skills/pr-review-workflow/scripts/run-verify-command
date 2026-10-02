@@ -221,12 +221,29 @@ fi
 # before any watchdog starts, and a socket, device or directory is no edit to
 # keep. Running refuses; the revert modes delete the entry without opening it,
 # so refusal cleanup still completes.
+TOP_REAL=$(pwd -P)
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
     fi
     [ "$MODE" != run ] || die 2 "refusing a path that is not a regular file or symlink: $f"
-    rm -f -- "$f" 2>/dev/null
+    if [ -d "$f" ] && [ ! -L "$f" ]; then
+        # A real directory (a resolver replaced a file with one): `rm -f` cannot
+        # remove it. Delete it recursively only after its physical path is
+        # confirmed inside the repo and is neither the root nor .git; rm -r
+        # never follows a symlink, and a symlinked parent that escapes the repo
+        # fails the containment check.
+        REAL=$(cd -P -- "$f" 2>/dev/null && pwd -P) \
+            || die 2 "cannot resolve the directory at: $f"
+        case "$REAL" in
+            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $f" ;;
+            "$TOP_REAL/"*) ;;
+            *) die 2 "refusing to remove a directory outside the repository: $f" ;;
+        esac
+        rm -rf -- "$f" 2>/dev/null
+    else
+        rm -f -- "$f" 2>/dev/null
+    fi
     if [ -e "$f" ] || [ -L "$f" ]; then
         die 2 "cannot remove a path that is not a regular file or symlink: $f"
     fi
