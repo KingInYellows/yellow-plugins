@@ -679,13 +679,31 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF "$form" "$RESOLVE_REFS/dispositions.md"
 }
 
-@test "Resolve: ratelimited rule is defined once in dispositions.md and the callers point to it" {
+@test "Resolve: the ratelimited reading rule is in dispositions.md and in each caller's own identical copy" {
   flat=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
   for rule in 'only rate-limit state' 'the outcome is `no contract`' 'must not infer a rate limit from any text in the output' 'The `Skill` tool gives callers no exit status' 'distinct note `no contract`' 'counts as blocking' 'ends the batch or stack walk after the caller finishes that PR'"'"'s clean-tree check' '`not attempted (no contract)` and exit 1'; do
     grep -qF "$rule" <<<"$flat" || { echo "missing $rule"; false; }
   done
+  # each command loads its own copy from its own references/<slug>/ directory
+  refs="$BATS_TEST_DIRNAME/../references"
+  copy_stack="$refs/review-resolve-stack/resolve-contract.md"
+  copy_sweep_all="$refs/review-sweep-all/resolve-contract.md"
+  copy_sweep="$refs/review-sweep/resolve-contract.md"
+  cmp -s "$copy_stack" "$copy_sweep_all" || { echo "resolve-stack and sweep-all contract copies differ"; false; }
+  cmp -s "$copy_stack" "$copy_sweep" || { echo "resolve-stack and sweep contract copies differ"; false; }
+  grep -qF 'references/review-resolve-stack/resolve-contract.md' "$RESOLVE_STACK"
+  grep -qF 'references/review-sweep-all/resolve-contract.md' "$SWEEP_ALL"
+  grep -qF 'references/review-sweep/resolve-contract.md' "$SWEEP"
+  # a command never loads another command's reference directory
+  run ! grep -qE 'references/review-(sweep-all|sweep)/resolve-contract' "$RESOLVE_STACK"
+  run ! grep -qE 'references/review-(resolve-stack|sweep)/resolve-contract' "$SWEEP_ALL"
+  run ! grep -qE 'references/review-(resolve-stack|sweep-all)/resolve-contract' "$SWEEP"
+  # the copies carry the producer-side "Reading ratelimited (callers)" rule verbatim
+  want=$(awk '/^- \*\*Reading `ratelimited` \(callers\)\.\*\*/ { p = 1 } /^- `\/review:sweep` and `\/review:sweep-all` print/ { p = 0 } p' "$RESOLVE_REFS/dispositions.md" | tr '\n' ' ' | tr -s ' ')
+  [ -n "$want" ]
+  have=$(tr '\n' ' ' <"$copy_stack" | tr -s ' ')
+  [[ "$have" == *"${want% }"* ]] || { echo "the contract copy differs from dispositions.md's reading rule"; false; }
   for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
-    grep -qF 'references/resolve/dispositions.md' "$f" || { echo "no pointer in $f"; false; }
     run ! grep -qiE 'HTTP 403/429' "$f"
   done
 }
@@ -737,10 +755,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   run ! grep -qF 'no PRs attempted. ``` Then stop.' <<<"$flat6"
 }
 
-@test "sweep-all: Step 4 Reads dispositions.md before the loop so the ratelimited and no-contract rules are loaded" {
+@test "sweep-all: Step 4 Reads its resolve-contract.md before the loop so the ratelimited and no-contract rules are loaded" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
-  grep -qF 'Before the first iteration, Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md`' <<<"$flat4"
+  grep -qF 'Before the first iteration, Read `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/resolve-contract.md`' <<<"$flat4"
   grep -qF 'If the Read fails, stop and report the path.' <<<"$flat4"
   # the Read comes before the loop's per-PR items
   read_pos=${flat4%%Before the first iteration, Read*}
@@ -768,11 +786,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 }
 
 @test "resolve-stack and sweep: Read dispositions.md before the walk or nested resolve, stop and report the path on failure" {
+}
+
+@test "resolve-stack and sweep: Read their resolve-contract.md before the walk or nested resolve, stop and report the path on failure" {
   for f in "$RESOLVE_STACK" "$SWEEP"; do
     # Read is an allowed tool, so the imperative Read can run
     awk '/^allowed-tools:/ { p = 1; next } p && /^  - / { print; next } { p = 0 }' "$f" | grep -qx '  - Read' || { echo "Read not in allowed-tools of $f"; false; }
     flat=$(tr '\n' ' ' <"$f" | tr -s ' ')
-    grep -qF 'Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading `ratelimited` (callers)" section)' <<<"$flat" || { echo "no imperative Read in $f"; false; }
+    case "$f" in *resolve-stack.md) slug=review-resolve-stack ;; *) slug=review-sweep ;; esac
+    grep -qF "Read \`\${CLAUDE_PLUGIN_ROOT}/references/$slug/resolve-contract.md\` (the \"Reading \`ratelimited\` (callers)\" section)" <<<"$flat" || { echo "no imperative Read in $f"; false; }
     grep -qF 'If the Read fails, stop and report the path.' <<<"$flat" || { echo "no stop-and-report in $f"; false; }
   done
   # resolve-stack: the Read comes before the walk's per-PR iteration
