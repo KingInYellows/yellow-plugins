@@ -1,0 +1,19 @@
+.changeset/core-setup-all-web-signals-mirror-note.md
+  s_46afba3fd1243f::t_e2c0816fba8b2a 5-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "12bf1087d3e2ec27cc59c37e468cfd46dcb31f0f",
+  "prompts": {},
+  "sessions": {
+    "s_46afba3fd1243f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "551287bb-653b-4f77-987f-3999e3653fd2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
