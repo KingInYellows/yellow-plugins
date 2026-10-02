@@ -86,7 +86,7 @@ remain: report "No pending findings match the filter criteria." and stop.
 
 Sort filtered findings by severity: critical first, then high, medium, low.
 Extract severity from the filename pattern
-(`{id}-{status}-{severity}-{slug}-{hash}.md`) or from frontmatter if the
+(`{id}-{status}-{severity}-{slug}[-{hash}].md`) or from frontmatter if the
 pattern doesn't match.
 
 ## Step 5: Pre-Loop Overview (user confirmation gate)
@@ -206,7 +206,8 @@ __YELLOW_DEBT_BASH__
 bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
-DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt")
+[ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
 rm -f -- "$2/reason.txt"
 rmdir -- "$2"
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -259,7 +260,8 @@ __YELLOW_DEBT_BASH__
 bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
-REASON=$(tr -d '\n\r' < "$2/reason.txt")
+[ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
 rm -f -- "$2/reason.txt"
 rmdir -- "$2"
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -315,7 +317,8 @@ Run /debt:fix to begin remediation of accepted findings."
 **Defer** → Transitions to `deferred` state with reason
 - Valid finding but not addressing now
 - Optional reason (validated: no newlines, max 200 chars)
-- Will be re-evaluated in next audit
+- Kept in `todos/debt/`: a re-audit skips a matching finding until you reopen
+  the todo to `pending` (`deferred → pending`)
 
 **Won't fix** → Transitions to `wont-fix` state with optional reason
 - Valid finding that is deliberately not being fixed
@@ -326,15 +329,24 @@ Run /debt:fix to begin remediation of accepted findings."
 - Its Linear issue, if synced, is not touched: close it by hand
 - A finding that is already `ready`, `in-progress` or `deferred` is closed with
   the helper directly. Replace `<current-status>` with `ready`, `in-progress`
-  or `deferred`:
+  or `deferred`. To record a reason, make the private directory and `reason.txt`
+  as in Defer and pass the directory as `'<reason-dir>'`; pass `'-'` for none:
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 '<todo-id>' '<current-status>' 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<todo-id>' '<current-status>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+REASON=""
+if [ "$3" != "-" ]; then
+  debt_refuse_symlinks "$3" "$3/reason.txt" || exit 1
+  [ -f "$3/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+  REASON=$(tr -d '\n\r' < "$3/reason.txt") || exit 1
+  rm -f -- "$3/reason.txt"
+  rmdir -- "$3"
+fi
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
-transition_todo_state "$todo_file" wont-fix || {
+transition_todo_state "$todo_file" wont-fix "$REASON" || {
 printf '[debt:triage] Error: transition failed\n' >&2
 exit 1
 }

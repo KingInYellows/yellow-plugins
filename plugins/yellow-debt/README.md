@@ -206,13 +206,16 @@ wont-fix → pending
 `wont-fix` closes a valid finding you are deliberately not fixing and keeps its
 file (unlike `deleted`, which means the finding was wrong). Triage offers it
 for pending findings. To close one that is already `ready`, `in-progress` or
-`deferred`, run from the git root in a bash child that sources `lib/validate.sh`:
-`transition_todo_state "$(debt_resolve_todo '<id>' <current-status>)" wont-fix`.
+`deferred`, use the wrapped recipe in the `debt-conventions` skill or in
+`/debt:triage` "Triage Decisions" (`transition_todo_state` run from the git root
+in a bash child that sources `lib/validate.sh`).
 Closing a todo does not touch its Linear issue: close that by hand.
 
 A re-audit skips a new finding that matches any kept todo (every status except
 `pending`) by `fingerprint`, a hash of the category, path and flagged code, so
-a closed finding does not come back. Findings whose code changed resurface.
+a closed finding does not come back. Findings whose code changed resurface. A
+`deferred` finding is also kept, so it stays quiet until you reopen it to
+`pending`.
 
 All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
 

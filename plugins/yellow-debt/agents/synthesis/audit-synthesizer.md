@@ -139,9 +139,12 @@ Record gate stats:
 
 ### 5. Reconciliation
 
-Count existing pending todos, confirm deletion via AskUserQuestion. Match only
-names whose status field is `pending`: an unanchored `*-pending-*.md` also
-matches a `ready` todo whose slug contains `-pending-`.
+Count existing pending todos, confirm deletion via AskUserQuestion.
+`debt_pending_todos` lists a todo only when its file name and its frontmatter
+both say `pending`: an unanchored `*-pending-*.md` also matches a `ready` todo
+whose slug contains `-pending-`, and a file renamed `-pending-` whose
+frontmatter says `wont_fix` is a closed todo that must not be deleted (it is
+reported on stderr instead).
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -149,16 +152,7 @@ matches a `ready` todo whose slug contains `-pending-`.
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_refuse_symlinks todos todos/debt || exit 1
-count=0
-for f in todos/debt/[0-9]*-pending-*.md; do
-  [ -f "$f" ] && [ ! -L "$f" ] || continue
-  # The status is the field right after the id; a slug word is not a status.
-  if [[ "${f##*/}" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]]; then
-    count=$((count + 1))
-  fi
-done
-printf '%s\n' "$count"
+debt_pending_todos | grep -c . || true
 __YELLOW_DEBT_BASH__
 ```
 
@@ -171,13 +165,7 @@ If "No": stop. If "Yes", delete them:
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_refuse_symlinks todos todos/debt || exit 1
-for f in todos/debt/[0-9]*-pending-*.md; do
-  [ -f "$f" ] && [ ! -L "$f" ] || continue
-  if [[ "${f##*/}" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]]; then
-    rm -f -- "$f"
-  fi
-done
+debt_pending_todos | while IFS= read -r f; do rm -f -- "$f"; done
 __YELLOW_DEBT_BASH__
 ```
 
@@ -186,9 +174,9 @@ wont-fix).
 
 #### 5a. Skip findings that match a kept todo
 
-A finding the user already closed (`wont-fix`, `complete`, `deleted`) or is
-still working (`ready`, `in-progress`, `deferred`) must not come back as a new
-pending todo. Match by code, not by line numbers: scanner line ranges drift
+A finding the user already closed (`wont-fix`, `complete`, `deleted`) or has
+accepted or parked (`ready`, `in-progress`, `deferred`) must not come back as a
+new pending todo. Match by code, not by line numbers: scanner line ranges drift
 between runs.
 
 First clear any file a cloned repository may have planted at the path the
@@ -201,14 +189,15 @@ bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
 debt_refuse_symlinks .debt || exit 1
-rm -f -- .debt/surviving-findings.json
+rm -f -- .debt/surviving-findings.json .debt/fingerprints.json
 __YELLOW_DEBT_BASH__
 ```
 
 Then write the surviving findings from Step 4 (after Step 2 deduplication) to
 `.debt/surviving-findings.json` with the Write tool, as a JSON array of the
 in-memory v2.0 records (each needs `category` and `file.path`; `file.lines`
-is optional). Then run:
+is needed to match). Then run the matcher. It writes `.debt/fingerprints.json`
+and prints one `skipped:` line per matched finding:
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -216,101 +205,14 @@ is optional). Then run:
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_refuse_symlinks todos todos/debt .debt .debt/surviving-findings.json .debt/fingerprints.json || exit 1
-US=$'\x1f'
-
-# Split "path:START-END" (or "path:LINE", or a bare path) into p, s, e.
-split_loc() {
-  p="$1"; s=""; e=""
-  case "$1" in
-    *:*)
-      p="${1%:*}"; s="${1##*:}"; e="$s"
-      case "$s" in *-*) e="${s##*-}"; s="${s%%-*}" ;; esac
-      ;;
-  esac
-}
-
-# Only a kept todo that names a surviving finding's path can match, so read
-# frontmatter (one yq process each) for those files alone.
-paths=$(mktemp .debt/.paths.XXXXXX) || exit 1
-jq -r '.[].file.path // empty' .debt/surviving-findings.json | grep -v '^$' | LC_ALL=C sort -u >| "$paths"
-candidates=()
-while IFS= read -r f; do candidates+=("$f"); done < <(grep -lF -f "$paths" -- todos/debt/[0-9]*.md 2>/dev/null)
-rm -f -- "$paths"
-
-# Kept todos: every well-named candidate that is not pending. Fingerprints come
-# from frontmatter; older todos have none, so compute them from the tree.
-k_id=(); k_status=(); k_cat=(); k_path=(); k_fp=(); k_anchor=()
-for f in "${candidates[@]}"; do
-  [ -f "$f" ] && [ ! -L "$f" ] || continue
-  base="${f##*/}"
-  [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
-  st="${BASH_REMATCH[1]}"
-  [ "$st" != pending ] || continue
-  meta=$(extract_frontmatter "$f" | yq -r '[(.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || continue
-  IFS="$US" read -r cat loc fp anchor <<<"$meta"
-  split_loc "$loc"
-  if [ -z "$fp" ] && [ -n "$cat" ] && [ -n "$p" ]; then
-    fp=$(debt_fingerprint "$cat" "$p" "$s" "$e" 2>/dev/null) || fp=""
-  fi
-  if [ -z "$anchor" ] && [ -n "$s" ]; then
-    anchor=$(debt_anchor_hashes "$p" "$s" "$e" 1 2>/dev/null) || anchor=""
-  fi
-  k_id+=("${base%%-*}"); k_status+=("$st"); k_cat+=("$cat"); k_path+=("$p"); k_fp+=("$fp"); k_anchor+=("$anchor")
-done
-
-out=$(mktemp .debt/.fingerprints.XXXXXX) || exit 1
-n=$(jq 'length' .debt/surviving-findings.json) || exit 1
-for ((i = 0; i < n; i++)); do
-  rec=$(jq -r --argjson i "$i" '.[$i] | [(.category // ""), (.file.path // ""), ((.file.lines // "") | tostring)] | join("\u001f")' .debt/surviving-findings.json)
-  IFS="$US" read -r cat fpath lines <<<"$rec"
-  loc="$fpath"; [ -z "$lines" ] || loc="$fpath:$lines"
-  split_loc "$loc"
-  fp=$(debt_fingerprint "$cat" "$fpath" "$s" "$e" 2>/dev/null) || fp=""
-
-  # Exact fingerprint first; then same category and path whose anchor_hash is
-  # one of this range's line hashes (never for security-debt: a closed
-  # finding must not hide a different security finding). Only a unique match
-  # suppresses. Line hashes are computed only when a candidate needs them.
-  match_idx=-1; matches=0; how=""; hashes=""; hashed=0
-  if [ -n "$fp" ]; then
-    for j in "${!k_id[@]}"; do
-      [ "${k_fp[j]}" = "$fp" ] || continue
-      matches=$((matches + 1)); match_idx=$j
-    done
-    [ "$matches" -eq 1 ] && how=fingerprint
-  fi
-  if [ -z "$how" ] && [ "$matches" -eq 0 ] && [ -n "$s" ] && [ "$cat" != security-debt ]; then
-    for j in "${!k_id[@]}"; do
-      [ "${k_cat[j]}" = "$cat" ] && [ "${k_path[j]}" = "$fpath" ] && [ -n "${k_anchor[j]}" ] || continue
-      if [ "$hashed" -eq 0 ]; then
-        hashes=$(debt_anchor_hashes "$fpath" "$s" "$e" 2>/dev/null) || hashes=""
-        hashed=1
-      fi
-      [ -n "$hashes" ] || break
-      printf '%s\n' "$hashes" | grep -qxF -- "${k_anchor[j]}" || continue
-      matches=$((matches + 1)); match_idx=$j
-    done
-    [ "$matches" -eq 1 ] && how=anchor
-  fi
-
-  if [ -n "$how" ]; then
-    jq -cn --argjson i "$i" --arg id "${k_id[match_idx]}" --arg st "${k_status[match_idx]}" --arg how "$how" \
-      '{index: $i, skip: true, kept_id: $id, status: $st, match: $how}' >> "$out"
-  else
-    anchor=""
-    if [ -n "$s" ]; then
-      if [ "$hashed" -eq 1 ]; then anchor="${hashes%%$'\n'*}"; else anchor=$(debt_anchor_hashes "$fpath" "$s" "$e" 1 2>/dev/null) || anchor=""; fi
-    fi
-    jq -cn --argjson i "$i" --arg fp "$fp" --arg anchor "$anchor" \
-      '{index: $i, skip: false, fingerprint: (if $fp == "" then null else $fp end), anchor_hash: (if $anchor == "" then null else $anchor end)}' >> "$out"
-  fi
-done
-jq -s '.' "$out" | debt_write_file .debt/fingerprints.json
-rm -f -- "$out"
-jq -r '.[] | select(.skip) | "skipped: finding \(.index) matches kept todo \(.kept_id) (\(.status), \(.match))"' .debt/fingerprints.json
+debt_match_kept_todos
 __YELLOW_DEBT_BASH__
 ```
+
+If the block exits non-zero, stop and report its stderr: do not read
+`.debt/fingerprints.json`, which the block removes first. A `Warning:` line on
+stderr means some kept todos or findings could not be matched and may
+resurface; include it in the report.
 
 Read `.debt/fingerprints.json`. Drop every entry with `skip: true` from the
 surviving list and record it in `skipped_kept[]` (finding index, `kept_id`,
@@ -351,25 +253,16 @@ Format: `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
 
 Existing todos keep their ids. A new todo that reused a number would collide
 with a kept file, so take the next free id from every `*.md` under
-`todos/debt/`, not only the well-named ones:
+`todos/debt/`, not only the well-named ones. Run this once and count up from
+its output:
 
 ```bash
-# Bash-only arithmetic (10# keeps ids such as 008 from reading as octal): run
-# this block in bash even when the Bash tool's shell is zsh.
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_refuse_symlinks todos todos/debt || exit 1
-max=0
-for f in todos/debt/*.md; do
-  [ -e "$f" ] || continue
-  base="${f##*/}"; id="${base%%-*}"
-  [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
-  [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
-done
-# Ids are 1-6 digits everywhere else (DEBT_TODO_NAME_RE, debt_resolve_todo).
-[ "$max" -lt 999999 ] || { printf '[synthesizer] ERROR: todo ids exhausted\n' >&2; exit 1; }
-printf '%03d\n' "$((max + 1))"
+debt_next_todo_id
 __YELLOW_DEBT_BASH__
 ```
 
@@ -404,15 +297,22 @@ the on-disk frontmatter, not the in-memory v2.0 record.
 **CRITICAL SECURITY - Slug Derivation**:
 
 ```bash
-# The Bash block runs in a fresh subprocess. The LLM agent iterates over
-# the surviving-findings JSON array; for each iteration it must export
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+# The block runs in a fresh subprocess. The LLM agent iterates over the
+# surviving-findings JSON array; for each iteration it must export
 # `$record` (the single in-memory finding object as a JSON string) and
-# `$id`/`$severity`/`$content_hash` (the per-finding fields: the next free id,
-# the severity, and the 8 hex digits taken from the fingerprint) into the shell environment BEFORE invoking this block — variables
-# from prose context are NOT inherited automatically by a fresh subprocess.
-# Derive $finding from $record FIRST in this same block as a sanity check
-# (a missing $record will produce empty $finding and the whitelist below
-# will reject the empty slug, surfacing the missing-input bug loudly):
+# `$id`/`$severity`/`$fp_prefix` (the per-finding fields: the next free id, the
+# severity, and the 8 hex digits taken from the finding's fingerprint, or empty)
+# into the shell environment BEFORE invoking this block — variables from prose
+# context are NOT inherited automatically by a fresh subprocess.
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Derive $finding from $record FIRST (a missing $record produces an empty
+# $finding and the whitelist below rejects the empty slug, surfacing the
+# missing-input bug loudly):
 finding=$(printf '%s' "$record" | jq -r '.finding')
 
 # Lowercase, replace special chars, truncate, validate.
@@ -421,12 +321,12 @@ slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' 
 # CRITICAL: whitelist validation
 [[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | sha256sum | cut -d' ' -f1 | cut -c1-16)
 
-todo_filename="todos/debt/${id}-pending-${severity}-${slug}${content_hash:+-$content_hash}.md"
+todo_filename="todos/debt/${id}-pending-${severity}-${slug}${fp_prefix:+-$fp_prefix}.md"
 
-# Defense in depth: id and hash come from the agent, so check the final name
-# against the todo contract before writing.
-[[ "$content_hash" =~ ^([0-9a-f]{8})?$ ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
-[[ "${todo_filename##*/}" =~ $DEBT_TODO_NAME_RE ]] || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
+# Defense in depth: id, severity and hash come from the agent, so the final
+# name must fit the todo contract before anything is written.
+[[ "$fp_prefix" =~ ^([0-9a-f]{8})?$ ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
+debt_todo_name_ok "${todo_filename##*/}" || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
 
 # Defense in depth: verify path stays in todos/debt/
 resolved=$(realpath -m "$todo_filename")
@@ -434,6 +334,7 @@ case "$resolved" in
   "$(pwd)/todos/debt/"*) ;;
   *) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
 esac
+__YELLOW_DEBT_BASH__
 ```
 
 Prevents path traversal via: (1) whitelist validation, (2) hash fallback, (3)

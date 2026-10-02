@@ -103,8 +103,9 @@ if [ -d todos/debt ]; then
       wont_fix|wontfix|"wont fix")
         # Hand-written spelling. The value is frontmatter text: print it only
         # through %s, never inside a heredoc.
-        if debt_todo_name_ok "${todo_file##*/}"; then
-          printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: transition_todo_state "$(debt_resolve_todo <id> <filename-status>)" wont-fix\n' "$STATUS" "$todo_file" >&2
+        legacy_base="${todo_file##*/}"
+        if [[ "$legacy_base" =~ $DEBT_TODO_NAME_RE ]]; then
+          printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: close todo id %s (name status %s) as wont-fix with the recipe in the debt-conventions skill\n' "$STATUS" "$todo_file" "${legacy_base%%-*}" "${BASH_REMATCH[1]}" >&2
         else
           printf '[status] WARNING: Status "%s" in %s should be wont-fix, but the file name does not fit the todo pattern; rename it by hand to the -pending- form first\n' "$STATUS" "$todo_file" >&2
         fi
@@ -239,7 +240,7 @@ Estimated Remaining Effort: ~${EFFORT_HOURS} hours
 EOF
 
   if [ $ERROR_COUNT -gt 0 ]; then
-    printf 'WARNING: %d corrupted todo file(s) skipped\n\n' "$ERROR_COUNT"
+    printf 'WARNING: %d todo file(s) need attention (see warnings above)\n\n' "$ERROR_COUNT"
   fi
 
   # Next steps based on current state

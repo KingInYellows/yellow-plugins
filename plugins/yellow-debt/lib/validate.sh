@@ -253,10 +253,10 @@ transition_todo_state() {
   reason_json=$(jq -n --arg s "$clean_reason" '$s') || return 1
   case "$new_state" in
     wont-fix)
-      if [ -z "$clean_reason" ] && [ "$current_state" = "wont_fix" ]; then
-        # Legacy repair: keep the hand-written reason, truncated like a new one.
+      if [ -z "$clean_reason" ] && [[ "$current_state" =~ ^(wont_fix|wontfix|wont\ fix)$ ]]; then
+        # Legacy repair: keep the hand-written reason, cleaned like a new one.
         updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y '
-          (if (.wont_fix_reason | type) == "string" then .wont_fix_reason |= .[0:200] else . end)
+          (if (.wont_fix_reason | type) == "string" then .wont_fix_reason |= (gsub("[\n\r]"; "") | .[0:200]) else . end)
           | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       elif [ -n "$clean_reason" ]; then
         updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --argjson val "$reason_json" '.wont_fix_reason = $val | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
@@ -273,6 +273,28 @@ transition_todo_state() {
       ;;
     *)
       updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      ;;
+  esac
+
+  # Close-time identity: a todo closed as wont-fix or deleted gets its
+  # fingerprint now, while the flagged code still matches. Best effort — a
+  # failure leaves the todo unstamped and never blocks the transition.
+  case "$new_state" in
+    wont-fix|deleted)
+      local st_fp st_cat st_loc st_new st_anchor
+      st_fp=$(printf '%s' "$updated_frontmatter" | yq -r '.fingerprint // ""' 2>/dev/null) || st_fp="x"
+      if [ -z "$st_fp" ]; then
+        st_cat=$(printf '%s' "$updated_frontmatter" | yq -r '.category // ""' 2>/dev/null) || st_cat=""
+        st_loc=$(printf '%s' "$updated_frontmatter" | yq -r '.affected_files[0] // ""' 2>/dev/null) || st_loc=""
+        _debt_split_loc "$st_loc"
+        if st_fp=$(debt_fingerprint "$st_cat" "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 2>/dev/null); then
+          st_anchor=$(debt_anchor_hashes "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || st_anchor=""
+          if st_new=$(printf '%s' "$updated_frontmatter" | yq -y --arg fp "$st_fp" --arg an "$st_anchor" \
+              '.fingerprint = $fp | (if $an != "" then .anchor_hash = $an else . end)' 2>/dev/null); then
+            updated_frontmatter="$st_new"
+          fi
+        fi
+      fi
       ;;
   esac
   body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$todo_file")
@@ -302,6 +324,14 @@ transition_todo_state() {
   esac
   new_filename="${todo_dir}/${id}-${new_state}-${rest}"
 
+  # A hand-edited frontmatter status can leave the name already correct: replace
+  # the file in place (removing "$todo_file" afterwards would remove the new one).
+  if [ "$new_filename" = "$todo_file" ]; then
+    mv -- "$temp_file" "$new_filename" || return 1
+    temp_file=""
+    return 0
+  fi
+
   # Check for collision (a dangling symlink fails -e, so test -L as well)
   if [ -e "$new_filename" ] || [ -L "$new_filename" ]; then
     printf '[debt] Target file already exists: %s\n' "$new_filename" >&2
@@ -322,6 +352,23 @@ transition_todo_state() {
 # spaces, tabs and CR removed (re-indenting does not change it), the same idea
 # as GitHub's primaryLocationLineHash. The value is versioned (`fp/v1:`) so the
 # normalisation can change later.
+
+# Lines of a flagged range that are hashed, and the shortest line (whitespace
+# removed) that can serve as an anchor.
+DEBT_FLAG_WINDOW=200
+DEBT_ANCHOR_MIN_CHARS=8
+
+# Split "path:START-END" (or "path:LINE", or a bare path) into _DEBT_P, _DEBT_S
+# and _DEBT_E.
+_debt_split_loc() {
+  _DEBT_P="$1"; _DEBT_S=""; _DEBT_E=""
+  case "$1" in
+    *:*)
+      _DEBT_P="${1%:*}"; _DEBT_S="${1##*:}"; _DEBT_E="$_DEBT_S"
+      case "$_DEBT_S" in *-*) _DEBT_E="${_DEBT_S##*-}"; _DEBT_S="${_DEBT_S%%-*}" ;; esac
+      ;;
+  esac
+}
 
 # Print the first 16 hex digits of the SHA-256 of stdin.
 _debt_sha16() {
@@ -344,49 +391,175 @@ _debt_flagged_text() {
   [ ! -L "$path" ] && [ -f "$path" ] || return 1
   [[ "$start" =~ ^[0-9]{1,9}$ && "$end" =~ ^[0-9]{1,9}$ ]] || return 1
   [ "$((10#$start))" -ge 1 ] && [ "$((10#$start))" -le "$((10#$end))" ] || return 1
-  # A scanner range is a few dozen lines; a huge one is malformed and makes
-  # the finding resurface instead of hashing thousands of lines.
-  [ "$((10#$end - 10#$start))" -lt 200 ] || return 1
-  # File on stdin: BSD sed reads a `--` after the script as a file name.
-  sed -n "$((10#$start)),$((10#$end))p;$((10#$end))q" < "$path" | tr -d ' \t\r'
+  # A long range hashes its first DEBT_FLAG_WINDOW lines, so a god-module
+  # finding still gets a stable identity. File on stdin: BSD sed reads a `--`
+  # after the script as a file name.
+  local last=$((10#$end))
+  [ "$((last - 10#$start))" -lt "$DEBT_FLAG_WINDOW" ] || last=$((10#$start + DEBT_FLAG_WINDOW - 1))
+  sed -n "$((10#$start)),${last}p;${last}q" < "$path" | tr -d ' \t\r'
 }
 
-# Usage: debt_fingerprint CATEGORY PATH [START END]
-# Prints `fp/v1:<16 hex>` of sha256("fp/v1\0category\0path\0text"). Without a
-# line range the text is empty, so the fingerprint covers category and path
-# only. A range with no code in it (past end of file, or only blanks) fails, so
-# the finding cannot match anything and resurfaces.
+# Usage: debt_fingerprint CATEGORY PATH START END
+# Prints `fp/v1:<16 hex>` of sha256("fp/v1\0category\0path\0text"). A finding
+# needs a line range: without one the key would cover the whole file, and one
+# closed finding would hide every later finding of that category in it. A range
+# with no code in it (past end of file, or only blanks) fails too, so the
+# finding cannot match anything and resurfaces.
 debt_fingerprint() {
-  local category="$1" path="$2" start="${3:-}" end="${4:-}" text=""
+  local category="$1" path="$2" start="${3:-}" end="${4:-}" text digest
   validate_category "$category" || return 1
-  if [ -n "$start" ] || [ -n "$end" ]; then
-    text=$(_debt_flagged_text "$path" "$start" "$end") || return 1
-    [ -n "$(printf '%s' "$text" | tr -d '\n')" ] || return 1
-  else
-    command -v validate_file_path >/dev/null 2>&1 || return 1
-    validate_file_path "$path" "$PWD" || return 1
-  fi
-  local digest
+  text=$(_debt_flagged_text "$path" "$start" "$end") || return 1
+  [ -n "$(printf '%s' "$text" | tr -d '\n')" ] || return 1
   digest=$({ printf 'fp/v1\0%s\0%s\0' "$category" "$path"; printf '%s' "$text"; } | _debt_sha16) || return 1
   printf 'fp/v1:%s\n' "$digest"
 }
 
 # Usage: debt_anchor_hashes PATH START END [LIMIT]
 # Prints one 16-hex hash per substantive line of the range, in order: a line
-# with at least 8 characters once whitespace is removed. Shorter lines (`}`,
+# with at least DEBT_ANCHOR_MIN_CHARS characters once whitespace is removed. Shorter lines (`}`,
 # `else {`, `return nil`) occur all over a file and would match unrelated
-# findings. The first hash is the todo's `anchor_hash`; the rest let a later
-# run match a finding whose range shifted. LIMIT stops after that many hashes.
+# findings. The first hash is the todo's `anchor_hash`. LIMIT stops after that
+# many hashes.
 debt_anchor_hashes() {
   local line text limit="${4:-0}" n=0
   [[ "$limit" =~ ^[0-9]{1,4}$ ]] || return 1
   text=$(_debt_flagged_text "$1" "$2" "$3") || return 1
   while IFS= read -r line || [ -n "$line" ]; do
-    [ "${#line}" -ge 8 ] || continue
+    [ "${#line}" -ge "$DEBT_ANCHOR_MIN_CHARS" ] || continue
     printf '%s' "$line" | _debt_sha16 || return 1
     n=$((n + 1))
     [ "$limit" -eq 0 ] || [ "$n" -lt "$limit" ] || break
   done <<<"$text"
+}
+
+# Well-named todos whose file name AND frontmatter both say pending, one path
+# per line. A file named pending whose frontmatter says otherwise (a hand edit,
+# such as the legacy wont_fix spelling) is a closed todo: it is reported on
+# stderr and left alone. Run from the git root.
+debt_pending_todos() {
+  local f base st
+  debt_refuse_symlinks todos todos/debt || return 1
+  for f in todos/debt/[0-9]*-pending-*.md; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    base="${f##*/}"
+    [[ "$base" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]] || continue
+    st=$(extract_frontmatter "$f" | yq -r '.status // ""' 2>/dev/null) || st=""
+    if [ "$st" = pending ]; then
+      printf '%s\n' "$f"
+    else
+      printf '[debt] Leaving %s: its frontmatter status is "%s", not pending\n' "$f" "${st//[^A-Za-z_ -]/?}" >&2
+    fi
+  done
+  return 0
+}
+
+# Print the next free todo id, zero-padded to three digits: one above the
+# highest leading number of any *.md under todos/debt/. Ids are 1-6 digits
+# everywhere else, so a larger one is ignored. Run from the git root.
+debt_next_todo_id() {
+  local f base id max=0
+  debt_refuse_symlinks todos todos/debt || return 1
+  for f in todos/debt/*.md; do
+    [ -e "$f" ] || continue
+    base="${f##*/}"; id="${base%%-*}"
+    [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
+    [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
+  done
+  if [ "$max" -ge 999999 ]; then
+    printf '[debt] Error: todo ids exhausted\n' >&2
+    return 1
+  fi
+  printf '%03d\n' "$((max + 1))"
+}
+
+# Decide which surviving findings already have a kept todo (any status but
+# pending). Reads .debt/surviving-findings.json (an array of v2.0 records),
+# writes .debt/fingerprints.json (one entry per finding, by index) and prints a
+# line per skipped finding. Exact fingerprint first; then same category and
+# path whose anchor_hash equals the first substantive line of the new range
+# (never for security-debt). Only a unique match suppresses; a tie, an
+# unreadable range or no match leaves the finding to resurface. Run from the
+# git root.
+debt_match_kept_todos() {
+  local US=$'\x1f' paths out f base st meta cat loc fp anchor
+  local -a k_id=() k_status=() k_cat=() k_path=() k_fp=() k_anchor=() candidates=()
+  local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged
+  debt_refuse_symlinks todos todos/debt .debt .debt/surviving-findings.json .debt/fingerprints.json || return 1
+  rm -f -- .debt/fingerprints.json
+  command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || {
+    printf '[debt] Error: sha256sum or shasum is required\n' >&2; return 1; }
+  paths=$(mktemp .debt/.paths.XXXXXX) || return 1
+  out=$(mktemp .debt/.fingerprints.XXXXXX) || { rm -f -- "$paths"; return 1; }
+  trap 'rm -f -- "$paths" "$out"; trap - RETURN' RETURN
+  n=$(jq 'length' .debt/surviving-findings.json) || return 1
+
+  # Only a kept todo that names a surviving finding's path can match, so read
+  # frontmatter (one yq process each) for those files alone.
+  jq -r '.[].file.path // empty' .debt/surviving-findings.json | grep -v '^$' | LC_ALL=C sort -u >| "$paths"
+  while IFS= read -r f; do candidates+=("$f"); done < <(grep -lF -f "$paths" -- todos/debt/[0-9]*.md 2>/dev/null)
+
+  for f in "${candidates[@]}"; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    base="${f##*/}"
+    [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
+    st="${BASH_REMATCH[1]}"
+    [ "$st" != pending ] || continue
+    meta=$(extract_frontmatter "$f" | yq -r '[(.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || { unreadable=$((unreadable + 1)); continue; }
+    IFS="$US" read -r cat loc fp anchor <<<"$meta"
+    _debt_split_loc "$loc"
+    # An older todo has no stored identity. Rehash it from the tree, except a
+    # complete one: its code was changed by the fix, so the tree says nothing.
+    if [ "$st" != complete ] && [ -n "$cat" ] && [ -n "$_DEBT_S" ]; then
+      [ -n "$fp" ] || fp=$(debt_fingerprint "$cat" "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || fp=""
+      [ -n "$anchor" ] || anchor=$(debt_anchor_hashes "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || anchor=""
+    fi
+    k_id+=("${base%%-*}"); k_status+=("$st"); k_cat+=("$cat"); k_path+=("$_DEBT_P"); k_fp+=("$fp"); k_anchor+=("$anchor")
+  done
+
+  for ((i = 0; i < n; i++)); do
+    rec=$(jq -r --argjson i "$i" '.[$i] | [(.category // ""), (.file.path // ""), ((.file.lines // "") | tostring)] | join("\u001f")' .debt/surviving-findings.json) || return 1
+    IFS="$US" read -r cat fpath lines <<<"$rec"
+    loc="$fpath"; [ -z "$lines" ] || loc="$fpath:$lines"
+    _debt_split_loc "$loc"
+    fp=$(debt_fingerprint "$cat" "$fpath" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || { fp=""; unfingerprinted=$((unfingerprinted + 1)); }
+    first=""; first_done=0; match_idx=-1; matches=0; how=""
+    if [ -n "$fp" ]; then
+      for j in "${!k_id[@]}"; do
+        [ "${k_fp[j]}" = "$fp" ] || continue
+        matches=$((matches + 1)); match_idx=$j
+      done
+      [ "$matches" -eq 1 ] && how=fingerprint
+    fi
+    if [ -z "$how" ] && [ "$matches" -eq 0 ] && [ -n "$fp" ] && [ "$cat" != security-debt ]; then
+      for j in "${!k_id[@]}"; do
+        [ "${k_cat[j]}" = "$cat" ] && [ "${k_path[j]}" = "$fpath" ] && [ -n "${k_anchor[j]}" ] || continue
+        if [ "$first_done" -eq 0 ]; then
+          first=$(debt_anchor_hashes "$fpath" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || first=""
+          first_done=1
+        fi
+        [ "${k_anchor[j]}" = "$first" ] || continue
+        matches=$((matches + 1)); match_idx=$j
+      done
+      [ "$matches" -eq 1 ] && how=anchor
+    fi
+    if [ -n "$how" ]; then
+      jq -cn --argjson i "$i" --arg id "${k_id[match_idx]}" --arg st "${k_status[match_idx]}" --arg how "$how" \
+        '{index: $i, skip: true, kept_id: $id, status: $st, match: $how}' >> "$out" || return 1
+    else
+      if [ "$first_done" -eq 0 ] && [ -n "$fp" ]; then
+        first=$(debt_anchor_hashes "$fpath" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || first=""
+      fi
+      jq -cn --argjson i "$i" --arg fp "$fp" --arg anchor "$first" \
+        '{index: $i, skip: false, fingerprint: (if $fp == "" then null else $fp end), anchor_hash: (if $anchor == "" then null else $anchor end)}' >> "$out" || return 1
+    fi
+  done
+  merged=$(jq -s '.' "$out") || return 1
+  printf '%s\n' "$merged" | debt_write_file .debt/fingerprints.json || return 1
+  jq -r '.[] | select(.skip) | "skipped: finding \(.index) matches kept todo \(.kept_id) (\(.status), \(.match))"' .debt/fingerprints.json
+  if [ "$unreadable" -gt 0 ] || [ "$unfingerprinted" -gt 0 ]; then
+    printf '[debt] Warning: %d kept todo(s) unreadable, %d finding(s) without a usable line range; those cannot match and may resurface\n' \
+      "$unreadable" "$unfingerprinted" >&2
+  fi
 }
 
 validate_transition() {
@@ -400,10 +573,11 @@ validate_transition() {
     deferred→pending) return 0 ;;
     # wont-fix: valid finding deliberately not fixed. Reopen goes back to
     # pending for re-triage. `wont_fix` is the spelling an agent once wrote by
-    # hand; it is accepted as a source only so the helper can repair it.
+    # hand (also `wontfix` and `wont fix`); they are accepted as sources only so
+    # the helper can repair them.
     pending→wont-fix|ready→wont-fix|in-progress→wont-fix|deferred→wont-fix) return 0 ;;
     wont-fix→pending) return 0 ;;
-    wont_fix→wont-fix) return 0 ;;
+    wont_fix→wont-fix|wontfix→wont-fix|"wont fix→wont-fix") return 0 ;;
     *) return 1 ;;
   esac
 }

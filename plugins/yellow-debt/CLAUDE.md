@@ -121,15 +121,16 @@ runtime source is `CLAUDE_PLUGIN_ROOT`-gated. Hook config lives in
 `pnpm generate:manifests` — do not add `hooks/hooks.json` (Claude Code
 auto-loads it as a second hook source). Findings live at
 `${CLAUDE_PROJECT_DIR}/todos/debt/` named
-`{id}-{status}-{severity}-{slug}-{hash}.md`; the SessionStart hook counts only
+`{id}-{status}-{severity}-{slug}[-{hash}].md`; the SessionStart hook counts only
 `pending|ready` × `critical|high` filenames.
 
 `wont-fix` closes a valid finding that is deliberately not fixed; the file stays
 (unlike `deleted`) and a re-audit skips findings that match a kept todo. Each
 todo carries a shell-computed `fingerprint: fp/v1:…` (category, path and flagged
-code with whitespace removed) and an `anchor_hash`; `audit-synthesizer` Step 5a
-matches on the fingerprint first, then on the anchor, and only a unique match
-suppresses. Closing a todo does not close its Linear issue.
+code with whitespace removed, so a finding needs a line range) and an
+`anchor_hash`; `audit-synthesizer` Step 5a (`debt_match_kept_todos`) matches on
+the fingerprint first, then on the anchor, and only a unique match suppresses.
+Closing a todo does not close its Linear issue.
 
 ## Known Limitations
 

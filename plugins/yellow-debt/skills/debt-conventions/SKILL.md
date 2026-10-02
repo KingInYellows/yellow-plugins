@@ -299,9 +299,28 @@ Todo files must use one of the following status values:
   so a re-audit does not recreate it; reopen it to `pending` to re-triage.
   Distinct from `deleted`, which means the finding was wrong.
 
-`wont_fix`, `wontfix` and `wont fix` are not valid. A todo carrying one is
-repaired with `transition_todo_state "$(debt_resolve_todo '<id>'
-<filename-status>)" wont-fix`; `/debt:status` prints this recipe.
+`wont_fix`, `wontfix` and `wont fix` are not valid statuses, but the helper
+accepts them as the source of a transition to `wont-fix`, which repairs the
+file. To close a todo as `wont-fix`, repair one, or reopen one to `pending`,
+run this from any directory (replace `<current-status>` with the status in the
+file NAME, for example `pending`, and `<new-status>` with `wont-fix` or
+`pending`; a reason needs `/debt:triage`):
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-id>' '<current-status>' '<new-status>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
+transition_todo_state "$todo_file" "$3" || {
+  printf '[debt] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+```
+
+`/debt:status` points here for a todo carrying a legacy spelling.
 
 **Remediation**: Run `lib/validate.sh` validation functions to check status
 field against allowed values.
@@ -311,12 +330,15 @@ field against allowed values.
 New todos carry `fingerprint: fp/v1:<16 hex>` and `anchor_hash`, both computed
 in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
 fingerprint hashes the category, the path and the flagged code with spaces,
-tabs and CR removed; `anchor_hash` hashes the first substantive flagged line (8+ characters once
-whitespace is removed). Anchor matching never applies to `security-debt`.
-`audit-synthesizer` uses them to skip a new finding that matches a kept todo
-(any status except `pending`): exact fingerprint first, then the same category
-and path with a matching anchor. Only a unique match suppresses; ties and edited
-code resurface as new pending todos.
+tabs and CR removed (the first 200 lines of a longer range); a finding without a
+line range gets none. `anchor_hash` hashes the first substantive flagged line
+(8+ characters once whitespace is removed). `audit-synthesizer` uses them to
+skip a new finding that matches a kept todo (any status except `pending`):
+exact fingerprint first, then the same category and path whose anchor equals the
+first substantive line of the new range (never for `security-debt`). Only a
+unique match suppresses; ties and edited code resurface as new pending todos. A
+todo closed as `wont-fix` or `deleted` is stamped at close time; older ones are
+rehashed from the tree, except `complete` ones, which are not.
 
 ### Invalid Priority Values
 

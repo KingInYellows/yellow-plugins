@@ -368,6 +368,30 @@ Decisions (user-confirmed unless marked):
 > through at least test 74.
 <!-- /deepen-plan -->
 
+## As Shipped
+
+Deviations from the decisions above, found in review. This section is the
+record; the decisions are kept as written at plan time.
+
+- Decision 3: the helper accepts `wont_fix`, `wontfix` and `wont fix` as repair
+  sources (the plan's hint named all three but the transition table only one).
+  The only accepted target spelling is still `wont-fix`.
+- Decision 7: a finding needs a line range, since a range-less fingerprint
+  covered a whole file. A longer range hashes its first 200 lines. The anchor is
+  the first line with 8 or more non-whitespace characters, and it matches only
+  when it equals the first such line of the new range, and never for
+  `security-debt`. Older kept todos are rehashed from the tree, except
+  `complete` ones; a todo closed as `wont-fix` or `deleted` is stamped at close.
+  The matching, pending listing and next-id logic live in `lib/validate.sh`
+  (`debt_match_kept_todos`, `debt_pending_todos`, `debt_next_todo_id`), not in
+  agent prose.
+- The Step 5 wipe leaves a file named `-pending-` whose frontmatter status says
+  otherwise (a closed legacy todo).
+- Decision 9 was wrong: the fixer runs in a separate worktree and does not see a
+  rename made in the main checkout, so it does not fail closed. `fix.md` says so.
+- Decision 10: the yellow-debt suite runs as a step in `shell-compat-tests`, not
+  a new job. Missing `yq` or `zsh` fails the suite when `CI` is set.
+
 ## Technical Details
 
 Files to modify, all under `plugins/yellow-debt/` unless noted:

@@ -23,13 +23,20 @@ teardown() {
   rm -rf "$WORK" "$OUTSIDE"
 }
 
+# A missing tool skips the test locally but fails it in CI, where a silent skip
+# would leave this suite green with its coverage gone.
 require_kislyuk_yq() {
-  command -v yq >/dev/null 2>&1 && yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' \
-    || skip "kislyuk yq not installed"
+  if command -v yq >/dev/null 2>&1 && yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk'; then
+    return 0
+  fi
+  [ -z "${CI:-}" ] || { echo "kislyuk yq is required in CI"; return 1; }
+  skip "kislyuk yq not installed"
 }
 
 require_zsh() {
-  command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
+  command -v zsh >/dev/null 2>&1 && return 0
+  [ -z "${CI:-}" ] || { echo "zsh is required in CI"; return 1; }
+  skip "zsh not installed"
 }
 
 # Hostile names run `touch pwned` / `touch pwned2` (a name cannot hold `/`),
@@ -654,17 +661,35 @@ frontmatter_field() {
   init_repo
   make_todo 003 ready 003-ready-high-long-fn-abc123.md
   extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 7 \
-    | sed "s#'<todo-id>'#'003'#; s#'<current-status>'#'ready'#" > "$BATS_TEST_TMPDIR/recipe.zsh"
+    | sed "s#'<todo-id>'#'003'#; s#'<current-status>'#'ready'#; s#'<reason-dir>'#'-'#" > "$BATS_TEST_TMPDIR/recipe.zsh"
   CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/recipe.zsh"
   [ "$status" -eq 0 ]
   [ -f todos/debt/003-wont-fix-high-long-fn-abc123.md ]
 }
 
-# --- debt_fingerprint / audit-synthesizer kept-todo matching ---
+# --- debt_fingerprint, anchors and kept-todo matching ---
 
 make_source() {
   mkdir -p src
-  printf 'top\nfoo(alpha)\n  bar(beta)\nbaz()\nqux()\n' > src/a.js
+  printf 'toplevel_x\nfoo(alpha)\n  bar(beta)\nbaz()\nqux()\n' > src/a.js
+}
+
+# Loads .debt/fingerprints.json into `lines`, one compact object per element.
+load_fingerprints() {
+  lines=()
+  local line
+  while IFS= read -r line; do lines+=("$line"); done < <(jq -c '.[]' .debt/fingerprints.json)
+}
+
+write_surviving() {
+  printf '[' > .debt/surviving-findings.json
+  local first=1 spec
+  for spec in "$@"; do
+    [ "$first" -eq 1 ] || printf ',' >> .debt/surviving-findings.json
+    first=0
+    printf '{"category":"complexity","file":{"path":"src/a.js","lines":"%s"},"finding":"f"}' "$spec" >> .debt/surviving-findings.json
+  done
+  printf ']' >> .debt/surviving-findings.json
 }
 
 @test "debt_fingerprint ignores inserted lines above and re-indentation, not code edits" {
@@ -676,6 +701,15 @@ make_source() {
   printf 'n1\nn2\nn3\ntop\n      foo(gamma)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
   [ "$(debt_fingerprint complexity src/a.js 5 6)" != "$before" ]
   [ "$(debt_fingerprint duplication src/a.js 5 6)" != "$(debt_fingerprint complexity src/a.js 5 6)" ]
+}
+
+@test "debt_fingerprint known answer: the fp/v1 recipe does not drift" {
+  printf 'alpha_one\n  beta_two\n' > known.js
+  # Pinned literals, and the same recipe recomputed without the library.
+  [ "$(debt_fingerprint complexity known.js 1 2)" = "fp/v1:cc4716b3d795354d" ]
+  [ "$(printf 'fp/v1\0complexity\0known.js\0alpha_one\nbeta_two' | sha256sum | cut -c1-16)" = "cc4716b3d795354d" ]
+  [ "$(debt_anchor_hashes known.js 1 2 1)" = "335ac87956c40516" ]
+  [ "$(printf '%s' alpha_one | sha256sum | cut -c1-16)" = "335ac87956c40516" ]
 }
 
 @test "debt_fingerprint refuses traversal, absolute and symlinked paths and bad ranges" {
@@ -691,116 +725,20 @@ make_source() {
   [ "$status" -eq 1 ]
 }
 
-@test "debt_fingerprint without a range covers category and path only" {
+@test "debt_fingerprint needs a line range, so one closed finding cannot cover a whole file" {
   make_source
-  one=$(debt_fingerprint complexity src/a.js)
-  printf 'changed\n' > src/a.js
-  [ "$(debt_fingerprint complexity src/a.js)" = "$one" ]
-}
-
-# Runs the synthesizer's kept-todo matching block (Step 5a), then loads the
-# per-finding results from .debt/fingerprints.json into `lines`, one compact
-# object per element. Call it directly, not through `run`.
-run_match_block() {
-  mkdir -p .debt
-  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 4 > "$BATS_TEST_TMPDIR/match.sh"
-  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/match.sh"
-  [ "$status" -eq 0 ]
-  lines=()
-  while IFS= read -r line; do lines+=("$line"); done < <(jq -c '.[]' .debt/fingerprints.json)
-}
-
-write_surviving() {
-  printf '[' > .debt/surviving-findings.json
-  local first=1 lines
-  for lines in "$@"; do
-    [ "$first" -eq 1 ] || printf ',' >> .debt/surviving-findings.json
-    first=0
-    printf '{"category":"complexity","file":{"path":"src/a.js","lines":"%s"},"finding":"f"}' "$lines" >> .debt/surviving-findings.json
-  done
-  printf ']' >> .debt/surviving-findings.json
-}
-
-@test "synthesizer block skips a finding that matches a kept wont-fix todo after the code moved" {
-  require_kislyuk_yq
-  init_repo
-  make_source
-  fp=$(debt_fingerprint complexity src/a.js 2 3)
-  anchor=$(debt_anchor_hashes src/a.js 2 3 | head -n 1)
-  make_todo 007 wont-fix 007-wont-fix-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
-  printf 'n1\nn2\nn3\ntop\n      foo(alpha)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
-  mkdir -p .debt
-  write_surviving 5-6 5-7 4-4
-  run_match_block
-  [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'*'"status":"wont-fix"'*'"match":"fingerprint"'* ]]
-  [[ "${lines[1]}" == *'"skip":true'*'"match":"anchor"'* ]]
-  [[ "${lines[2]}" == *'"skip":false'*'"fingerprint":"fp/v1:'* ]]
-}
-
-@test "synthesizer block does not suppress on a tie between two kept todos" {
-  require_kislyuk_yq
-  init_repo
-  make_source
-  fp=$(debt_fingerprint complexity src/a.js 2 3)
-  make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
-  make_todo 008 complete 008-complete-high-bbb.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
-  mkdir -p .debt
-  write_surviving 2-3
-  run_match_block
-  [[ "${lines[0]}" == *'"skip":false'* ]]
-}
-
-@test "synthesizer block never matches a pending todo" {
-  require_kislyuk_yq
-  init_repo
-  make_source
-  fp=$(debt_fingerprint complexity src/a.js 2 3)
-  make_todo 007 pending 007-pending-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
-  mkdir -p .debt
-  write_surviving 2-3
-  run_match_block
-  [[ "${lines[0]}" == *'"skip":false'* ]]
-}
-
-@test "synthesizer next-id block counts above every file, including 8x and malformed names" {
-  mkdir -p todos/debt
-  : > todos/debt/008-ready-high-a.md
-  : > todos/debt/009-wont-fix-high-b.md
-  : > todos/debt/012-pending-bogus-name.md
-  : > todos/debt/notes.md
-  init_repo
-  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 5 > "$BATS_TEST_TMPDIR/nextid.sh"
-  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/nextid.sh"
-  [ "$status" -eq 0 ]
-  [ "$output" = "013" ]
-}
-
-@test "synthesizer pending wipe leaves a ready todo whose slug contains -pending-" {
-  require_kislyuk_yq
-  init_repo
-  : > todos/debt/001-pending-high-old-finding.md
-  : > todos/debt/002-ready-high-fix-pending-queue.md
-  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 2 > "$BATS_TEST_TMPDIR/wipe.sh"
-  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/wipe.sh"
-  [ "$status" -eq 0 ]
-  [ ! -e todos/debt/001-pending-high-old-finding.md ]
-  [ -f todos/debt/002-ready-high-fix-pending-queue.md ]
-}
-
-@test "a defer reason that starts with a dash is stored, not read as a yq option" {
-  require_kislyuk_yq
-  make_todo 001 pending 001-pending-high-long-fn-abc123.md
-  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md deferred '--help'
-  [ "$status" -eq 0 ]
-  [ "$(frontmatter_field todos/debt/001-deferred-high-long-fn-abc123.md .deferred_reason)" = "--help" ]
-}
-
-@test "debt_fingerprint refuses a range of 200 lines or more" {
-  seq 1 400 | sed 's/^/statement_/' > big.js
-  run debt_fingerprint complexity big.js 1 100
-  [ "$status" -eq 0 ]
-  run debt_fingerprint complexity big.js 1 300
+  run debt_fingerprint complexity src/a.js
   [ "$status" -eq 1 ]
+  run debt_fingerprint complexity src/a.js 2
+  [ "$status" -eq 1 ]
+  run debt_fingerprint complexity src/a.js 2 2
+  [ "$status" -eq 0 ]
+}
+
+@test "debt_fingerprint hashes the first 200 lines of a longer range" {
+  seq 1 400 | sed 's/^/statement_/' > big.js
+  [ "$(debt_fingerprint complexity big.js 1 300)" = "$(debt_fingerprint complexity big.js 1 200)" ]
+  [ "$(debt_fingerprint complexity big.js 1 199)" != "$(debt_fingerprint complexity big.js 1 200)" ]
 }
 
 @test "debt_anchor_hashes skips short lines and honours LIMIT" {
@@ -811,14 +749,292 @@ write_surviving() {
   [ "${#lines[@]}" -eq 1 ]
 }
 
-@test "synthesizer block never anchor-matches a security-debt finding" {
+@test "closing a todo as wont-fix stamps its fingerprint and anchor from the tree" {
+  require_kislyuk_yq
+  make_source
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3"
+  transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix "later"
+  f=todos/debt/001-wont-fix-high-long-fn-abc123.md
+  [ "$(frontmatter_field $f .fingerprint)" = "$(debt_fingerprint complexity src/a.js 2 3)" ]
+  [ "$(frontmatter_field $f .anchor_hash)" = "$(debt_anchor_hashes src/a.js 2 3 1)" ]
+}
+
+@test "a transition never fails because the todo has no usable affected_files" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md "affected_files:\n  - ../outside.js:1-2"
+  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md deleted
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/001-deleted-high-long-fn-abc123.md ]
+  [ "$(frontmatter_field todos/debt/001-deleted-high-long-fn-abc123.md '.fingerprint // "absent"')" = "absent" ]
+}
+
+@test "debt_match_kept_todos skips a finding that matches a kept wont-fix todo after the code moved" {
   require_kislyuk_yq
   init_repo
   make_source
-  anchor=$(debt_anchor_hashes src/a.js 2 3 | head -n 1)
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  anchor=$(debt_anchor_hashes src/a.js 2 3 1)
+  make_todo 007 wont-fix 007-wont-fix-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
+  printf 'n1\nn2\nn3\ntop\n      foo(alpha)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
+  mkdir -p .debt
+  write_surviving 5-6 5-7 4-4
+  run debt_match_kept_todos
+  [ "$status" -eq 0 ]
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'*'"status":"wont-fix"'*'"match":"fingerprint"'* ]]
+  [[ "${lines[1]}" == *'"skip":true'*'"match":"anchor"'* ]]
+  [[ "${lines[2]}" == *'"skip":false'*'"fingerprint":"fp/v1:'* ]]
+}
+
+@test "debt_match_kept_todos does not anchor-match a range that merely contains the anchor line" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  anchor=$(debt_anchor_hashes src/a.js 2 3 1)
+  make_todo 007 wont-fix 007-wont-fix-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
+  mkdir -p .debt
+  write_surviving 1-5
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos does not suppress on a tie between two kept todos" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  make_todo 008 complete 008-complete-high-bbb.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  mkdir -p .debt
+  write_surviving 2-3
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos does not suppress on a tie between two kept anchors" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  anchor=$(debt_anchor_hashes src/a.js 2 3 1)
+  make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-2\nanchor_hash: $anchor"
+  make_todo 008 deferred 008-deferred-high-bbb.md "affected_files:\n  - src/a.js:2-4\nanchor_hash: $anchor"
+  mkdir -p .debt
+  write_surviving 2-5
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos never matches a pending todo or another category" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  anchor=$(debt_anchor_hashes src/a.js 2 3 1)
+  make_todo 007 pending 007-pending-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
+  printf -- '---\nstatus: wont-fix\ncategory: duplication\naffected_files:\n  - src/a.js:2-3\nanchor_hash: %s\n---\nB\n' "$anchor" > todos/debt/008-wont-fix-high-bbb.md
+  mkdir -p .debt
+  write_surviving 2-3
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos rehashes an older todo with no stored identity, except a complete one" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-3"
+  mkdir -p .debt
+  write_surviving 2-3
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'* ]]
+  rm todos/debt/007-wont-fix-high-aaa.md
+  make_todo 009 complete 009-complete-high-ccc.md "affected_files:\n  - src/a.js:2-3"
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos never anchor-matches a security-debt finding" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  anchor=$(debt_anchor_hashes src/a.js 2 3 1)
   printf -- '---\nstatus: wont-fix\ncategory: security-debt\naffected_files:\n  - src/a.js:2-3\nanchor_hash: %s\n---\nB\n' "$anchor" > todos/debt/007-wont-fix-high-aaa.md
   mkdir -p .debt
-  printf '[{"category":"security-debt","file":{"path":"src/a.js","lines":"1-5"},"finding":"f"}]' > .debt/surviving-findings.json
-  run_match_block
+  printf '[{"category":"security-debt","file":{"path":"src/a.js","lines":"2-5"},"finding":"f"}]' > .debt/surviving-findings.json
+  debt_match_kept_todos
+  load_fingerprints
   [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos removes a stale fingerprints.json, even when it fails" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  mkdir -p .debt
+  printf '[{"index":0,"skip":true}]' > .debt/fingerprints.json
+  printf 'not json' > .debt/surviving-findings.json
+  run debt_match_kept_todos
+  [ "$status" -ne 0 ]
+  [ ! -e .debt/fingerprints.json ]
+  [ -z "$(find .debt -name '.paths.*' -o -name '.fingerprints.*')" ]
+}
+
+@test "debt_match_kept_todos refuses a symlinked fingerprints.json and writes nothing through it" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  mkdir -p .debt
+  ln -s "$OUTSIDE/target" .debt/fingerprints.json
+  write_surviving 2-3
+  run debt_match_kept_todos
+  [ "$status" -ne 0 ]
+  [ "$(cat "$OUTSIDE/target")" = "sentinel" ]
+}
+
+@test "debt_match_kept_todos warns about findings it cannot fingerprint" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  mkdir -p .debt
+  printf '[{"category":"complexity","file":{"path":"src/a.js"},"finding":"f"}]' > .debt/surviving-findings.json
+  run --separate-stderr debt_match_kept_todos
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"without a usable line range"* ]]
+}
+
+@test "debt_next_todo_id counts above every file, including 8x and malformed names" {
+  : > todos/debt/008-ready-high-a.md
+  : > todos/debt/009-wont-fix-high-b.md
+  : > todos/debt/012-pending-bogus-name.md
+  : > todos/debt/notes.md
+  run debt_next_todo_id
+  [ "$status" -eq 0 ]
+  [ "$output" = "013" ]
+}
+
+@test "debt_next_todo_id starts at 001 with no todos and refuses when ids run out" {
+  run debt_next_todo_id
+  [ "$output" = "001" ]
+  : > todos/debt/999999-ready-high-a.md
+  run debt_next_todo_id
+  [ "$status" -eq 1 ]
+}
+
+@test "debt_pending_todos skips a ready todo whose slug contains -pending- and a legacy closed one" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-old-finding.md
+  make_todo 002 ready 002-ready-high-fix-pending-queue.md
+  make_todo 052 wont_fix 052-pending-high-legacy-closed.md
+  run --separate-stderr debt_pending_todos
+  [ "$status" -eq 0 ]
+  [ "$output" = "todos/debt/001-pending-high-old-finding.md" ]
+  [[ "$stderr" == *"052-pending-high-legacy-closed.md"* ]]
+}
+
+@test "the synthesizer blocks call the library functions this suite tests" {
+  local f="$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" fn misses=""
+  for fn in debt_pending_todos debt_match_kept_todos debt_next_todo_id debt_todo_name_ok; do
+    grep -qF -- "$fn" "$f" || misses="$misses $fn"
+  done
+  [ -z "$misses" ] || { echo "not called from the synthesizer:$misses"; return 1; }
+}
+
+@test "a defer reason that starts with a dash is stored, not read as a yq option" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md deferred '--help'
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/001-deferred-high-long-fn-abc123.md .deferred_reason)" = "--help" ]
+}
+
+@test "every legacy wont-fix spelling can be repaired, in place when the name is already right" {
+  require_kislyuk_yq
+  make_todo 001 wontfix 001-pending-high-aaa.md
+  make_todo 002 "wont fix" 002-pending-high-bbb.md
+  make_todo 003 wont_fix 003-wont-fix-high-ccc.md 'wont_fix_reason: kept'
+  transition_todo_state todos/debt/001-pending-high-aaa.md wont-fix
+  transition_todo_state todos/debt/002-pending-high-bbb.md wont-fix
+  run transition_todo_state todos/debt/003-wont-fix-high-ccc.md wont-fix
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/001-wont-fix-high-aaa.md ] && [ -f todos/debt/002-wont-fix-high-bbb.md ]
+  [ -f todos/debt/003-wont-fix-high-ccc.md ]
+  [ "$(frontmatter_field todos/debt/003-wont-fix-high-ccc.md .status)" = "wont-fix" ]
+  [ "$(frontmatter_field todos/debt/003-wont-fix-high-ccc.md .wont_fix_reason)" = "kept" ]
+}
+
+@test "legacy repair strips newlines from a hand-written reason" {
+  require_kislyuk_yq
+  printf -- '---\nid: "9"\nstatus: wont_fix\ncategory: complexity\nseverity: high\nwont_fix_reason: "one\\ntwo"\n---\nB\n' > todos/debt/009-pending-high-aaa.md
+  transition_todo_state todos/debt/009-pending-high-aaa.md wont-fix
+  [ "$(frontmatter_field todos/debt/009-wont-fix-high-aaa.md .wont_fix_reason)" = "onetwo" ]
+}
+
+@test "triage won't-fix block refuses a symlinked reason file and a missing one" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  reason_dir=$(mktemp -d)
+  ln -s "$OUTSIDE/target" "$reason_dir/reason.txt"
+  extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 5 \
+    | sed "s#'<todo-id>'#'001'#; s#'<reason-dir>'#'$reason_dir'#" > "$BATS_TEST_TMPDIR/wf.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf.zsh"
+  [ "$status" -ne 0 ]
+  [ -f todos/debt/001-pending-high-long-fn-abc123.md ]
+  rm -f "$reason_dir/reason.txt"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf.zsh"
+  [ "$status" -ne 0 ]
+  [ -f todos/debt/001-pending-high-long-fn-abc123.md ]
+}
+
+@test "triage recipe records a reason from a reason directory" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  make_todo 003 deferred 003-deferred-high-long-fn-abc123.md
+  reason_dir=$(mktemp -d)
+  printf 'cost\n' > "$reason_dir/reason.txt"
+  extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 7 \
+    | sed "s#'<todo-id>'#'003'#; s#'<current-status>'#'deferred'#; s#'<reason-dir>'#'$reason_dir'#" > "$BATS_TEST_TMPDIR/recipe.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/recipe.zsh"
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/003-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "cost" ]
+}
+
+# Runs the status block against the todos in the current directory.
+run_status_block() {
+  awk '/^bash \/dev\/fd\/3/{f=1;next} /^__YELLOW_DEBT_BASH__$/{f=0} f' "$PLUGIN_ROOT/commands/debt/status.md" > "$BATS_TEST_TMPDIR/status-block.sh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run --separate-stderr bash "$BATS_TEST_TMPDIR/status-block.sh" "$@"
+}
+
+@test "status counts wont-fix, keeps --json valid and explains a legacy status" {
+  require_kislyuk_yq
+  init_repo
+  make_todo 001 wont-fix 001-wont-fix-high-aaa.md
+  make_todo 002 wont_fix 002-pending-high-bbb.md
+  make_todo 003 pending 003-pending-high-ccc.md
+  run_status_block --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq '.by_status.wont_fix')" = "1" ]
+  [ "$(printf '%s' "$output" | jq '.by_status.pending')" = "1" ]
+  [ "$(printf '%s' "$output" | jq '.total_findings')" = "3" ]
+  [[ "$stderr" == *'close todo id 002 (name status pending)'* ]]
+  run_status_block
+  [[ "$output" == *"Won't fix:   1 findings (closed)"* ]]
+}
+
+@test "status tells a legacy todo with a nonconforming name to be renamed by hand" {
+  require_kislyuk_yq
+  init_repo
+  make_todo 004 wont_fix 004-wont_fix-high-ddd.md
+  run_status_block --json
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"rename it by hand"* ]]
 }
