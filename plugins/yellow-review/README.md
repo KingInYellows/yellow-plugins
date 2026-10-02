@@ -23,6 +23,35 @@ resolution, and sequential stack review.
 Run `/review:setup` after install to verify the local prerequisites and optional
 yellow-core integration before reviewing real PRs.
 
+## Optional integrations
+
+### yellow-linear (follow-up issues)
+
+`yellow-linear` is an optional dependency. `/review:resolve` files a follow-up
+issue for each out-of-scope review thread. By default it files on GitHub through
+`file-followup-issue`. When the yellow-linear plugin is installed (its
+`save_issue` tool is discoverable) and the branch name matches
+`[A-Z]{2,5}-[0-9]{1,6}`, it files through Linear instead, with the team taken
+from the ID prefix. That means running `/review:resolve` may write to Linear
+through the yellow-linear MCP server (`https://mcp.linear.app/mcp`, OAuth
+browser login on first use; see the yellow-linear README).
+
+- **Dedupe:** every candidate is checked first with `file-followup-issue
+  --find`, so an issue an earlier run filed on GitHub is found. For Linear the
+  command then looks for the thread's marker in the thread's last
+  viewer-authored comment or with a Linear text search, and reuses a hit only
+  when its identifier, URL and marker match. Linear dedupe is best effort; see
+  "Known limits" in `references/resolve/dispositions.md`.
+- **Fallback:** a Linear failure, a response that fails those checks, or an
+  unresolvable team falls back to GitHub once and is reported as
+  `tracker=github (linear unavailable)`.
+- **Text screening:** the resolver's issue title and description go through
+  `check-resolve-text` before `save_issue`. Credential-shaped text is refused,
+  and the issue gets a plain title and body with no resolver text.
+
+Without yellow-linear, or on a branch with no Linear ID, nothing is written to
+Linear.
+
 ## Commands
 
 | Command                 | Description                                                               |

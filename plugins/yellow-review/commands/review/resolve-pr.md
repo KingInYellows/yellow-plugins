@@ -494,13 +494,18 @@ exits 0:
   (a timed-out call may have posted; re-run once in a later run). For
   `reason=rate-limit` mark the rest `not attempted (rate limit)` and set
   `ratelimited=1`. For `reason=timeout` mark the rest `not attempted (gh
-  timeout)`, count them blocking, and keep `ratelimited=0`. Treat a missing or
+  timeout)`, count them blocking, and keep `ratelimited=0`, but also record
+  `write_stopped=timeout` so Step 8 does not run. Treat a missing or
   unrecognized reason as `rate-limit`.
 
 ### Step 8: Bounded Re-pass
 
-Run only when the tree is clean, no rate limit was hit, and the snapshot's
-`repass_wait_seconds` is not 0. Before polling, and again after the poll
+Run only when the tree is clean, no exit 4 stopped the write phase (neither
+`ratelimited=1` nor `write_stopped=timeout`), and the snapshot's
+`repass_wait_seconds` is not 0. After a timeout stop, skip this step and report
+that the re-pass was skipped because the write phase stopped on a timeout: the
+timed-out call may have landed, so retries and new-thread writes wait for a
+later run. Before polling, and again after the poll
 returns, before any retry or second-round write, capture the PR state with no
 pipe, as in Step 2b:
 
@@ -531,7 +536,7 @@ below, and leave those threads as they are. Otherwise, from `<refetch-file>`:
   permission` or `not found` per its `reason=` line; exit 4 → stop and apply
   Step 7's exit 4 rule: `reason=rate-limit` → mark the rest `not attempted
   (rate limit)` and set `ratelimited=1`; `reason=timeout` → `not attempted
-  (gh timeout)`, `ratelimited=0`); a thread we resolved
+  (gh timeout)`, `ratelimited=0`, `write_stopped=timeout`); a thread we resolved
   that is open again is reported `reopened by bot`, not retried;
 - if `found=1` and `push=ok`, re-check the PR state, re-run `pr-changed-ranges`
   (Step 4) because the round-1 push added lines, mint a fresh marker (Step 3f;
