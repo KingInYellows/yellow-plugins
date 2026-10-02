@@ -893,3 +893,37 @@ CASES
   stays_clean 'bypassaccess_key: hunter\n'
   refuses unquoted-keyword-value 'thesecretkey: abc123xyz\n'
 }
+
+@test "an unquoted spaced value after a line-start keyword is judged whole" {
+  refuses unquoted-keyword-value 'password: my correct horse battery staple\n'
+  refuses unquoted-keyword-value '  - passphrase: to be or not\n'
+  refuses unquoted-keyword-value 'export secret_key=my very secret words\n'
+  refuses unquoted-keyword-value 'token: a b c d e f\n'
+  refuses unquoted-keyword-value 'db_password: my correct horse\n'
+  refuses unquoted-keyword-value 'password: my correct horse # note\n'
+  refuses unquoted-keyword-value 'password: my correct horse battery staple\r\n'
+  refuses unquoted-keyword-value '  - passphrase: to be or not\r\n'
+  refuses unquoted-keyword-value 'export secret_key=my very secret words\r\n'
+  refuses unquoted-keyword-value 'token: a b c d e f\r\n'
+}
+
+@test "mid-sentence prose, placeholders and type words after a keyword stay clean" {
+  stays_clean 'Keep the password: the team agreed to rotate it\n'
+  stays_clean 'Rotate the token: it expires tomorrow\n'
+  stays_clean 'Keep the password: the team agreed to rotate it\r\n'
+  stays_clean 'password: string\n'
+  stays_clean 'password: <your password>\n'
+  stays_clean 'password: optional string\n'
+  stays_clean 'password: string or number\n'
+  stays_clean 'password: str = None\n'
+  stays_clean 'password: my\n'
+  stays_clean 'password: a b\n'
+  stays_clean 'password: optional string\r\n'
+  stays_clean 'password: <your password> # fill in\n'
+}
+
+@test "the whole-value rule leaves the in-word keyword and next-line prose alone" {
+  stays_clean 'bypass: my correct horse battery staple\n'
+  stays_clean 'mysecretkey: my correct horse\n'
+  stays_clean 'password:\n  Rotation is scheduled for Friday\n'
+}
