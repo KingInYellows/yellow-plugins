@@ -247,8 +247,9 @@ lanes, write order, issue cap, `Resolve:` line), `clusters.md` (clustering and
 the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
 `branch-check.md` and `memory-recall.md`. The dirty-tree ownership check and
 revert lives at `references/review-resolve-stack/dirty-tree-cleanup.md`;
-`references/review-sweep-all/dirty-tree-cleanup.md` points `/review:sweep-all`
-at it.
+`references/review-sweep-all/dirty-tree-cleanup.md` is its byte-identical copy
+for `/review:sweep-all` (offloaded detail stays under each command's own
+`references/<slug>/`; `skill-content.bats` fails when the copies differ).
 
 ### Library
 
