@@ -1,0 +1,110 @@
+plugins/yellow-review/tests/resolve-paths.bats
+  s_fc95207836202a::t_d62b0039147670 75,79,81,118-120
+  s_9802901455b679::t_4535674c7ebb29 76-78,80
+  s_9802901455b679::t_771d3ecc25bd6e 63
+  s_fc95207836202a::t_4594cef2ba5cfd 121
+  s_9802901455b679::t_37033fc6e738ba 4-5
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_c22a55971bf452::t_d7fdb322699f60 211,213,256-257
+  s_9802901455b679::t_8970bb3931ff1f 245-248
+  s_9802901455b679::t_17f9805cef6503 228-231
+  s_9802901455b679::t_d4ca57d1016d6c 254-255
+  s_9802901455b679::t_2369e784313eeb 167-174
+  s_9802901455b679::t_8c6fd35c4508ce 223-224
+  s_fc95207836202a::t_80269fbe92afe8 32-34,221-222,227,232
+  s_9802901455b679::t_18a58e560bd8d6 109-110,112-114,118-122
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_9802901455b679::t_897e05ea3446ee 363
+  s_9802901455b679::t_a8606f99715777 335-342,344
+  s_9802901455b679::t_09a6cfc446f90c 266-294,296-297
+  s_9802901455b679::t_75cb997401ffb6 359-361
+  s_9802901455b679::t_e4133901d25693 210
+  s_9802901455b679::t_f8a63dc1d91b6c 255-259
+  s_9802901455b679::t_1d27f4c17ab510 322
+  s_9802901455b679::t_5325b3ad0849f8 354
+  s_9802901455b679::t_556f6c1a038b28 261-262
+  s_fc95207836202a::t_48aa23855e7069 355-358,367
+plugins/yellow-review/lib/verify-run.sh
+  s_9802901455b679::t_e456ece70563f9 99-101,111-116,118-119
+  s_9802901455b679::t_a8cd6a36003cdf 69-70,73,76-77,80
+  s_9802901455b679::t_63058c3938f5da 102-109
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_9802901455b679::t_2a8cc309842a86 440
+  s_c22a55971bf452::t_d8ab67274d0936 133
+  s_fc95207836202a::t_70fc0d71009b16 98,429-434,436-438,441-442,444-447
+  s_fc95207836202a::t_cbdd9147009bde 22,439,443
+  s_9802901455b679::t_4122f706d67b73 435
+plugins/yellow-review/tests/helpers/resolve-repo.bash
+  s_9802901455b679::t_574bc8c918c4d8 126-129
+  s_9802901455b679::t_7473f0370a95e4 18-23
+  s_fc95207836202a::t_27e9e8f1a860a2 94-95
+  s_9802901455b679::t_a04a7ee0b37e16 143
+  s_fc95207836202a::t_80269fbe92afe8 15,76-80,82-93,96-100,157-167
+  s_9802901455b679::t_e57441dcc4c803 81
+  s_fc95207836202a::t_028b60169b7bd4 168
+plugins/yellow-review/lib/resolve-text.sh
+  s_fc95207836202a::t_b62fa7200041b4 292
+  s_fc95207836202a::t_113c8731e294ee 16-19,24,128,270-271,275-276,289-291
+  s_c22a55971bf452::t_d67172a980bc81 2-3,272-273,277-280,283
+  s_9802901455b679::t_63c33d7d66b592 287-288
+  s_c22a55971bf452::t_8bee237817cbe1 268-269
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_4594cef2ba5cfd 267-275,278-288
+  s_9802901455b679::t_13bd4d6d31a384 373-374
+  s_fc95207836202a::t_48aa23855e7069 337-346
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_c22a55971bf452::t_eaf13b67633ece 418
+  s_fc95207836202a::t_80269fbe92afe8 461-478,481-483,485-496
+  s_c22a55971bf452::t_35f8e11497946c 415-416
+  s_9802901455b679::t_771d3ecc25bd6e 243-245,255,264,283,484
+  s_fc95207836202a::t_1c11cfffbba28b 479-480
+  s_c22a55971bf452::t_4cb2447eb47c89 413-414,417,419-425
+  s_9802901455b679::t_99dea8dda76bc4 110,113
+  s_9802901455b679::t_df5ec3f91f720d 170
+  s_9802901455b679::t_b34ce89562ed0e 394-396
+plugins/yellow-review/lib/resolve-paths.sh
+  s_9802901455b679::t_267f462c151c45 45-46
+  s_9802901455b679::t_ce1121b9535a4b 77
+  s_9802901455b679::t_a6d315fe1a22b3 78-81
+  s_9802901455b679::t_c63fdde1c95d84 92-96
+  s_9802901455b679::t_5f28f21e1f0630 144
+  s_9802901455b679::t_1565c6fad41e77 111-113
+  s_9802901455b679::t_944f0eb9e6f7ab 120-122,124-125
+  s_fc95207836202a::t_d62b0039147670 52-60,75-76
+plugins/yellow-review/tests/run-verify-command.bats
+  s_9802901455b679::t_e1c24981393db6 523-524
+  s_fc95207836202a::t_f1ef824565ac5b 501,507
+  s_fc95207836202a::t_70fc0d71009b16 343,350-367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "840da4bb5ea9358b8acfc6952b2164196dcdbdb8",
+  "prompts": {},
+  "sessions": {
+    "s_9802901455b679": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f501cfef-9027-447b-b582-2e7ff130242b",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": null
+    },
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
