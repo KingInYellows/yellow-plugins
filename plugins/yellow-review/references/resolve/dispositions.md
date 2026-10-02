@@ -202,13 +202,19 @@ only the resolve is withheld.
   plain sentence `Out of scope for this PR; a follow-up issue was already
   filed.`). Otherwise search with `list_issues` (`query` set to the marker's
   `thread=<id>` text, the resolved team, `includeArchived` true) and reuse a
-  hit whose description carries the full marker. Only then write the title and
-  description (ending with the marker) to files and run `check-resolve-text`
-  on them (exit 2 → the plain title and body, no resolver text), then call
-  `save_issue`. Accept only an identifier matching `^<PREFIX>-[0-9]{1,6}$` and
-  a URL matching
-  `^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`; anything
-  else counts as a failure.
+  hit only when it passes the **Linear response checks** below. A hit that
+  fails any check is ignored, as if the search found nothing. Only then write
+  the title and description (ending with the marker) to files and run
+  `check-resolve-text` on them (exit 2 → the plain title and body, no
+  resolver text), then call `save_issue`, and accept its response only when
+  it passes the same checks; a failure counts as a Linear failure.
+- **Linear response checks.** Apply to every `list_issues` hit before reuse
+  and to the `save_issue` response before use. All three must hold: the
+  identifier matches `^<PREFIX>-[0-9]{1,6}$`, with `<PREFIX>` the resolved
+  team key; the URL matches
+  `^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`, with
+  `<ID>` the identifier; the description carries the full marker. Only a
+  response that passes may supply the link for the public reply.
 - Dedupe check: run `file-followup-issue --find <owner/repo> <PRRT_id>` for
   every candidate before either tracker is used, so a GitHub issue filed by
   an earlier run's fallback is found even when Linear works this time. It
@@ -364,45 +370,22 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `credential-shaped`; an interactive run may re-run with
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
-  because the commit's git hooks would execute them. The commit message is
-  screened like posted text (`rt_text_clean`) before anything is staged: a
-  credential shape, image, mention or foreign URL in it exits 2 with the
-  `resolve-text: refused` line on stderr, and no override excuses it. Commit
-  signing is forced off (`commit.gpgSign=false`, with `push.gpgSign` and
-  `log.showSignature`, one stderr note) when the repository's own local or
-  worktree config sets `commit.gpgsign` or a `gpg.*`
-  key, because signing runs the configured `gpg.program`; the user's global or
-  system signing config is left alone. A repository-local or worktree-scope
-  `core.sshCommand`, `core.askPass`, `core.gitProxy` or `credential.helper`
-  (also `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
-  command (the stock Git LFS commands excepted), would be run by the submit or
-  by `git add` and checkout with submission authority, so it exits 3 before any network call, naming the key (never the
-  value) and committing nothing; the user's global or system config is not
-  judged, and no key is overridden with an empty value (that would disable the
-  user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
-  `jq` are found through `PATH`: one whose canonical directory is inside the
-  repository's working tree (an ignored `node_modules/.bin`, say) could be
-  replaced by a resolver without a tracked change, so it exits 3 naming the tool
-  and directory before any of them runs. A tool outside the repository, the
-  normal case, is not judged. The Graphite submit's output reaches
-  stderr only through the credential redactor, and is withheld when the redactor
-  is unavailable;
-- `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
-  `lib/sibling-plugin.sh`, `lib/resolve-text.sh` and `lib/verify-run.sh` before
-  any tree check. When the plugin's `lib/` directory is inside the repository's
-  working tree (a source checkout), each file must be tracked, show tag `H` in
-  `git ls-files -v` (so not assume-unchanged or skip-worktree) and equal its
-  blob in HEAD, or the script exits (3 for `commit-resolve-fixes`, 2 for
-  `run-verify-command`) naming the file, with nothing committed or reverted. An
-  installed plugin outside the repository is not judged;
-- `run-verify-command` refuses gitignored files, and when running a command also
-  unchanged files, and refuses to run when the tree has changes outside the
-  listed files. It does not run the command when a file is outside the PR (or
-  the PR's file list cannot be fetched), and with `--unattended` also when a
-  file is a runner file; it reports `result: skipped`; a PR file listing that
-  times out (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way.
-  `--revert-only` saves a patch and reverts the listed files without running
-  anything (Step 5's CONFLICT rollback). It waives only the deny-list check; an
+  because the commit's git hooks would execute them;
+- `run-verify-command` refuses gitignored files, and when running a command
+  also unchanged files, and refuses to run when the tree has changes outside
+  the listed files. It does not run the command when a
+  file is outside the PR (or the PR's file list cannot be fetched), and with
+  `--unattended` also when a file is a runner file; it reports
+  `result: skipped`; a PR file listing that times out
+  (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. With `--unattended`,
+  `--ignored-since <marker-file>` is required: the command refuses when any
+  gitignored file is newer than the marker, because the resolver has no shell
+  and cannot backdate an mtime. `/review:resolve` Step 3f mints the marker in
+  a private `mktemp -d` directory before any resolver runs, and Step 6 passes
+  it to every verify call (interactive runs may pass it too) and removes the
+  directory. `--revert-only`
+  saves a patch and reverts the listed files without running anything
+  (Step 5's CONFLICT rollback). It waives only the deny-list check; an
   unchanged listed file is skipped and named in `reason`
   (`skipped, no changes: <f>`), while a gitignored or unverifiable entry exits 2
   with nothing reverted. It deletes a listed untracked, non-ignored file whoever

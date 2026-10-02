@@ -199,7 +199,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   Step 6; see `references/resolve/dispositions.md`)
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout; on
   failure save a patch and revert the files (`--unattended` skips runner
-  files; `--revert-only`, `--revert-dirty`). The verify gate: interactive runs
+  files and requires `--ignored-since <marker-file>`, which refuses when a
+  gitignored file is newer than the marker; `--revert-only`, `--revert-dirty`). The verify gate: interactive runs
   ask first, unattended runs need `verify_unattended: true` and an untracked
   config (`/review:resolve` Step 6; see `references/resolve/dispositions.md`)
 - `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
