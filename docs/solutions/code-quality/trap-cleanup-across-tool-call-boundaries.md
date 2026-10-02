@@ -86,7 +86,12 @@ Right, as three calls (plus an abort cover):
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
 STAGE_DIR="$(mktemp -d "$TMP_ROOT/stage.XXXXXX")" || exit 1
 STAGE_TOKEN="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
-printf '%s' "$STAGE_TOKEN" > "$STAGE_DIR/.token" || exit 1
+# Every failure after mkdtemp removes the directory: Call 3 never sees it.
+case "$STAGE_TOKEN" in
+  ????????????????????????????????) ;;
+  *) rm -rf -- "$STAGE_DIR"; exit 1 ;;
+esac
+printf '%s' "$STAGE_TOKEN" > "$STAGE_DIR/.token" || { rm -rf -- "$STAGE_DIR"; exit 1; }
 printf '%s\n%s\n' "$STAGE_DIR" "$STAGE_TOKEN"   # line 1: dir, line 2: token
 ```
 

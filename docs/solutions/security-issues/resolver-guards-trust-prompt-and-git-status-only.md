@@ -62,7 +62,11 @@ the only place the deny list lives.
    instead of detecting violations afterwards.
 2. Require `Files modified` entries to be repo-relative paths, and drop any
    file with no diff before writing the files file, so a bad entry cannot widen
-   the revert.
+   the revert. These checks bound the string, not the attribution: a resolver
+   can still list a file another parallel resolver legitimately changed, and a
+   failed revert would then undo that fix. Derive each resolver's revert scope
+   from an independent per-resolver snapshot or worktree, or from enforced edit
+   bounds, not from its `Files modified` report.
 3. Run null-path clusters serially in a final wave, after all path-anchored
    clusters finish, and bound their edits to the PR's changed line ranges.
 4. Reject a thread's own anchor as addressed-evidence. Require fixed paths
