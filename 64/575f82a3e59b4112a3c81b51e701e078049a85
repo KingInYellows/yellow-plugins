@@ -1,0 +1,54 @@
+plans/review-resolve-hardening.md
+  s_7a82748dd606d9::t_2afe969d1921fd 611-614
+plugins/yellow-review/commands/review/sweep-all.md
+  s_7a82748dd606d9::t_cba198765279b9 368-369
+  s_7a82748dd606d9::t_abb0e160bd8eb0 253-255
+  s_7a82748dd606d9::t_c065a145dd9d14 228-234,242
+.changeset/review-resolve-hardening.md
+  s_7a82748dd606d9::t_8735ac1e9abe1e 9-11
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_7a82748dd606d9::t_ab68206e897f64 330-332
+  s_7a82748dd606d9::t_abdb70682afa47 333
+  s_7a82748dd606d9::t_29d923ccec945b 480
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_c2715424dc3c80 193-195
+  s_7a82748dd606d9::t_610a5869903788 222-228
+  s_7a82748dd606d9::t_6dfad39ea8c70f 69-75
+  s_7a82748dd606d9::t_5a4faaea8d8ef2 247-250
+docs/plugin-scope-mode-protocol.md
+  s_7a82748dd606d9::t_abd2219f2b7939 34
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_7a82748dd606d9::t_c19cd3f23f0877 231-234
+  s_7a82748dd606d9::t_5762616c2aff4c 321
+  s_7a82748dd606d9::t_2da575065813e0 310-314
+  s_7a82748dd606d9::t_b43466b5fddeb8 240-242
+  s_7a82748dd606d9::t_3d9934793d1bb6 257
+plugins/yellow-review/references/resolve/dispositions.md
+  s_7a82748dd606d9::t_cf9c7eaaaec06f 593-599
+  s_7a82748dd606d9::t_701151fc678657 591-592,600-602,604-617
+plugins/yellow-review/README.md
+  s_7a82748dd606d9::t_a1634374e7ac85 56-59
+  s_7a82748dd606d9::t_4d8218dd42d4f6 49
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_b35476376a43c3 26-27,39-40,58-60,69-77
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_9990ec04d3c9a3 1-9
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_7b360d67fa532a 467,470,499-501,519
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "64575f82a3e59b4112a3c81b51e701e078049a85",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
