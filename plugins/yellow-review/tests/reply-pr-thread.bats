@@ -206,6 +206,35 @@ stub_sleep() {
   [[ "$stderr" == *"timed out"* ]]
 }
 
+# Put a timeout stub first on PATH that logs its first argument, then times out.
+stub_timeout_logging() {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$1" > "%s/timeout_arg"\nexit 124\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
+}
+
+@test "YELLOW_REVIEW_GH_TIMEOUT=0 falls back to the 30 s default, not no limit" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=0 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a non-numeric YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=abc run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a valid YELLOW_REVIEW_GH_TIMEOUT is passed to timeout" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=7 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 7 ]
+}
+
 @test "refuses a body that looks like a credential, before any API call" {
   printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
