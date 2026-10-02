@@ -1,0 +1,19 @@
+plugins/yellow-debt/lib/validate.sh
+  s_e0e3718c40e1d0::t_c6774f58090d59 254-257,259-260,262-271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1fab13ca3a724295148edda4725f74a61336a58b",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

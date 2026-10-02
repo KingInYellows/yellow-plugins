@@ -1,0 +1,41 @@
+plugins/yellow-debt/lib/validate.sh
+  s_e0e3718c40e1d0::t_c6c6cb12acc16b 532,541-542,553-556,568-569,573-582,590-595,604-606,640-647
+  s_e0e3718c40e1d0::t_130f31d27fffef 41-50,97,117,127-128,248-260,262-271,284-285,299-302,371,386,506-510,512-514,522,526-528
+plugins/yellow-debt/CLAUDE.md
+  s_e0e3718c40e1d0::t_7cdf4737972890 128-129
+.changeset/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_98663038823e29 22-26
+plugins/yellow-debt/README.md
+  s_e0e3718c40e1d0::t_7cdf4737972890 207-208
+plugins/yellow-debt/skills/debt-conventions/SKILL.md
+  s_e0e3718c40e1d0::t_98663038823e29 347-351
+plugins/yellow-debt/tests/security.bats
+  s_e0e3718c40e1d0::t_286c02d3b7ffd6 23-24,37-42,283,295,1223-1295,1297-1341
+  s_e0e3718c40e1d0::t_cb2618712e07fd 1296
+plugins/yellow-debt/tests/status-parity.bats
+  s_e0e3718c40e1d0::t_286c02d3b7ffd6 108-109,111,114,117,120
+  s_e0e3718c40e1d0::t_cb2618712e07fd 110,112-113,115-116,118-119
+plugins/yellow-debt/agents/synthesis/audit-synthesizer.md
+  s_e0e3718c40e1d0::t_e6d7d2a0337683 267-270,275,278,303,333,336,345-349,357
+  s_e0e3718c40e1d0::t_286c02d3b7ffd6 352
+plugins/yellow-debt/commands/debt/status.md
+  s_e0e3718c40e1d0::t_7cdf4737972890 78,93-98,112-114,209,342
+plugins/yellow-debt/commands/debt/triage.md
+  s_e0e3718c40e1d0::t_e6d7d2a0337683 208,211-212,262,265-266,324-325,346,349-352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c93c68c17169375991b7d2c6769f84b6fcb7b4ba",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

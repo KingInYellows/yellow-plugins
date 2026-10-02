@@ -1,0 +1,44 @@
+docs/architecture-overview.md
+  s_e0e3718c40e1d0::t_2f20108f708c98 353-354
+plugins/yellow-debt/agents/synthesis/audit-synthesizer.md
+  s_e0e3718c40e1d0::t_4a303f6a5668fc 135,141-148,156-157,162,205-206,214-234,256,302,306,353-354
+plugins/yellow-debt/commands/debt/triage.md
+  s_e0e3718c40e1d0::t_9700ba5a1d10bb 41-45,48-51,57-58,313,319-323
+plans/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_cceb928b49dc09 391-397
+.changeset/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_cceb928b49dc09 17-24
+plugins/yellow-debt/lib/validate.sh
+  s_e0e3718c40e1d0::t_9700ba5a1d10bb 447,452-456,464-466
+  s_e0e3718c40e1d0::t_f6ffe74edfab20 8-11,13-15,33-34,284-286,295-296,299-301,364,424-428,430,500-503,522-530,552-553,556-557,559,563-566,592
+plugins/yellow-debt/skills/debt-conventions/SKILL.md
+  s_e0e3718c40e1d0::t_2f20108f708c98 307-309,337-347
+docs/operations/ci.md
+  s_e0e3718c40e1d0::t_2f20108f708c98 222-225
+.github/workflows/validate-schemas.yml
+  s_e0e3718c40e1d0::t_cceb928b49dc09 1514-1516
+  s_e0e3718c40e1d0::t_2f20108f708c98 1523-1524,1614-1617
+plugins/yellow-debt/CLAUDE.md
+  s_e0e3718c40e1d0::t_2f20108f708c98 113
+plugins/yellow-debt/tests/security.bats
+  s_e0e3718c40e1d0::t_c4eafeab3a30d6 64-78,661,667,679,1015,1033,1070-1215
+  s_e0e3718c40e1d0::t_f42f1e0bdd1970 690,715,717,723,725-728,761-762,764,794,819,830
+  s_e0e3718c40e1d0::t_9700ba5a1d10bb 309,311,313,315-317,321
+  s_e0e3718c40e1d0::t_09a70979937fc1 331,347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0325ab5437e2a74babc0e7fca493890cb2a553a9",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

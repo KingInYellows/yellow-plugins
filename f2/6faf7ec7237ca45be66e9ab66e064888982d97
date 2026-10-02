@@ -1,0 +1,30 @@
+plans/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_ec5aca1ebba34f 346
+  s_e0e3718c40e1d0::t_e4a5bf7ba28dfd 352
+  s_e0e3718c40e1d0::t_2c65d13ef1d339 348
+  s_e0e3718c40e1d0::t_32315ea891e567 349
+plugins/yellow-debt/CLAUDE.md
+  s_e0e3718c40e1d0::t_3f4a2e813a37ba 112-117,127-132
+  s_e0e3718c40e1d0::t_d2e3cce1659908 133
+.github/workflows/validate-schemas.yml
+  s_e0e3718c40e1d0::t_43e584247b6ef8 1521-1524,1570-1571,1611-1617
+  s_e0e3718c40e1d0::t_b66024579e4bd0 1618
+.changeset/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_3f4a2e813a37ba 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f26faf7ec7237ca45be66e9ab66e064888982d97",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
