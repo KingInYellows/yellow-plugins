@@ -49,10 +49,15 @@ State the guarantee the change actually provides and document the residual:
 2. It does **not** defend against a model that deliberately calls `Write` on
    the state file and the `.token`. Say so in `council.md` and
    `docs/security.md` ("Known residual").
-3. Reviewers suggested real mitigations: a deny rule on `Write` to
-   `.git/council-synth.state`, or a secret held only by the shell (for example
-   a token never printed to the transcript, kept in the process environment or
-   a file the model has no path to).
+3. Reviewers suggested mitigations. Only one fits the model this doc
+   describes: a deny rule on `Write` to `.git/council-synth.state`. They also
+   suggested a secret held only by the shell (a token never printed to the
+   transcript, kept in the process environment or in a file the model has no
+   path to), but treat that as unproven here: every Bash call is a fresh
+   process, so an environment variable does not reach the next block, and
+   `Write` and `Read` reach any path the user can write, so a hidden file is
+   not hidden from them. Do not rely on either until it is tested against
+   those two facts.
 4. Keep the shape checks (`/tmp/council-synth-*`, no `..`, not a symlink,
    owned by the user). They bound what a forged state can reach: only a
    directory the forger also populated.
