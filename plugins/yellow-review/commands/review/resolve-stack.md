@@ -228,14 +228,18 @@ failures and continue.
    rm -f "$PC_OUT" "$PC_OUT.err"
    ```
 
-   On exit 0 the count is the PR's open threads (outdated included). Flag the
+   Only exit 0 yields a complete count: the PR's open threads (outdated
+   included). Exit 3 means the thread list was truncated (page cap or missing
+   cursor) and stdout holds a partial array; treat it like any other non-zero
+   exit and never use that partial `length` as the count. Flag the
    PR for "Needs manual attention" when `b > 0`, when the count is `> 0`, or
    when the two disagree — the `Resolve:` line is missing, or the count
    exceeds `b` (open threads the command did not report as blocking; `b`
    also counts `CHANGES_REQUESTED` reviewers, so a count at or below `b` is
    not proof of agreement); record that as `self-verify disagreement`. On
-   non-zero exit: record the PR's verification as `inconclusive` with the
-   stderr output and flag it. When the stderr contains
+   non-zero exit (including exit 3): record the PR's verification as
+   `inconclusive` with the stderr output, count it as blocking, and flag it.
+   When the stderr contains
    `GitHub API rate limit exceeded` (the `get-pr-comments` marker), also treat
    the PR as `ratelimited=1` under item 2's rule: skip its restack and stop
    the walk after this PR.
@@ -250,7 +254,7 @@ failures and continue.
    Non-empty output: print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
    followed by the file list. Read
-   `${CLAUDE_PLUGIN_ROOT}/references/resolve/dirty-tree-cleanup.md` and run its
+   `${CLAUDE_PLUGIN_ROOT}/references/review-resolve-stack/dirty-tree-cleanup.md` and run its
    procedure with this PR's number to revert the resolve's own edits. Print
    the `patch` path it reports when it is not null. If it reports `revert
    incomplete`, print `[review:resolve-stack] revert incomplete:` with the
@@ -303,15 +307,18 @@ PR#  | blocking | issues | remaining unresolved | push status | restack status
 
 `blocking`, `issues` and `push status` come from the PR's `Resolve:` line
 (`-` when it is missing); `remaining unresolved` is the step 3 count;
-`restack status` is `-` for a PR whose walk stopped before its restack. If
-the walk aborted, the last line is `aborted at PR #<N>`.
+`restack status` is `-` for a PR whose walk stopped before its restack. Only
+the step 3b dirty-tree stop prints `aborted at PR #<N>`, and it prints that
+line before the revert output, so it is not necessarily the last line. A
+rate-limit stop prints no such line; its `not attempted (rate limit)` rows
+signal the truncated walk.
 
 Then totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
 PRs with residual comments, PRs skipped (no open PR / draft / checkout
 failure), and PRs not attempted (rate limit / dirty tree).
 
 Finally, a **Needs manual attention** section listing every PR with:
-blocking threads (`b > 0`), residual unresolved threads (`>0` from step 3),
+blocking items (`b > 0`), residual unresolved threads (`>0` from step 3),
 a self-verify disagreement or inconclusive self-verify, a restack conflict,
 a push failure, a dirty-tree abort or incomplete revert, a rate-limited PR, or
 a `not attempted (cluster cap)` or `not attempted (rate limit)` note surfaced

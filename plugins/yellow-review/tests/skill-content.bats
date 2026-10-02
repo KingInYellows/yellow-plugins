@@ -489,10 +489,10 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 # The dirty-tree and rate-limit stops must finish the current PR (clean-tree
 # check, revert, row) before ending the walk, and name the summary heading.
-DIRTY_REF="$BATS_TEST_DIRNAME/../references/resolve/dirty-tree-cleanup.md"
+DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"
 
 @test "resolve-stack: dirty-tree stop uses the shared cleanup, names the summary heading, exits 1" {
-  grep -qF 'references/resolve/dirty-tree-cleanup.md' "$RESOLVE_STACK"
+  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$RESOLVE_STACK"
   grep -q 'aborted at PR #<PR#>: working tree dirty after resolve' "$RESOLVE_STACK"
   grep -q 'revert incomplete' "$RESOLVE_STACK"
   grep -q 'unrecognized changes left in place' "$RESOLVE_STACK"
@@ -521,8 +521,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/resolve/dirty-tree-cleanup.md"
 }
 
 @test "dirty-tree cleanup is defined once: resolve-stack and sweep-all point to it, neither copies it" {
+  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$RESOLVE_STACK"
+  grep -qF 'references/review-sweep-all/dirty-tree-cleanup.md' "$SWEEP_ALL"
+  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$BATS_TEST_DIRNAME/../references/review-sweep-all/dirty-tree-cleanup.md"
   for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
-    grep -qF 'references/resolve/dirty-tree-cleanup.md' "$f" || { echo "no pointer in $f"; false; }
     run ! grep -qE -e '--revert-(dirty|only)' "$f"
     run ! grep -qF 'gh pr diff' "$f"
   done
@@ -539,7 +541,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/resolve/dirty-tree-cleanup.md"
   clean=$(grep -n 'Clean-tree check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   rate=$(grep -n 'Rate-limit stop' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   [ -n "$clean" ] && [ -n "$rate" ] && [ "$clean" -lt "$rate" ]
-  grep -qF 'references/resolve/dirty-tree-cleanup.md' "$SWEEP_ALL"
+  grep -qF 'references/review-sweep-all/dirty-tree-cleanup.md' "$SWEEP_ALL"
   grep -q 'go to `### Step 5: End-of-loop' "$SWEEP_ALL"
   grep -q 'Re-pass wait: up to' "$SWEEP_ALL"
   grep -q 'Dirty tree after a sweep' "$SWEEP_ALL"

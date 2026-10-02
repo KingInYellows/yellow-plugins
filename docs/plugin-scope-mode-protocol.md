@@ -31,7 +31,7 @@ flag accept responsibility for pushes and skipped confirmation prompts.
 | Parsing | split on whitespace; remove the flag token; any OTHER `--`-prefixed token is a hard error (`unknown flag`) |
 | Default | OFF |
 | Effect (`/review:pr`) | suppresses the push-confirmation prompt and the "save learnings" prompt (P2 memory writes are skipped, not prompted) — the command file's flag handling names the exact gate steps |
-| Effect (`/review:resolve`) | suppresses the spawn-cap, CONFLICT, issue-filing, verify-command, and push-confirmation gates; each falls back to the unattended rule in `plugins/yellow-review/references/resolve/dispositions.md` |
+| Effect (`/review:resolve`) | suppresses the spawn-cap, CONFLICT, issue-filing, verify-command, and push-confirmation gates; each falls back to an unattended rule: the spawn-cap, CONFLICT, and push rules live in `plugins/yellow-review/commands/review/resolve-pr.md` Steps 4-6, while the issue-filing and verify-command write rules live in `plugins/yellow-review/references/resolve/dispositions.md` |
 
 Defined identically in
 `plugins/yellow-review/commands/review/review-pr.md` Step 1 and

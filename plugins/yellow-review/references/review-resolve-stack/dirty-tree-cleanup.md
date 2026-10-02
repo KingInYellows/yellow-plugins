@@ -23,7 +23,8 @@ contents: revert nothing and report `revert incomplete`.
 
 A path is **owned** when it is one of:
 
-- a changed file of the PR: the first column of
+- a changed file of the PR, except anything under `.claude/agent-memory/`
+  (never owned, even when the PR changes it): the first column of
   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" "<PR#>"`
   (paginated files API; it works past `gh pr diff` size limits and lists only
   paths matching `^[A-Za-z0-9._/-]+$`);
@@ -35,7 +36,8 @@ A path is **owned** when it is one of:
 `.claude/agent-memory/` is excluded because agents with `memory: project`
 write learnings there as a normal part of a run. Those writes are not
 evidence of a refused edit, and reverting them would delete legitimate
-memory. They are not owned, so they follow the unrecognized path below.
+memory. They are not owned, even when the PR's own file list includes them,
+so they follow the unrecognized path below.
 
 Every other path is **unrecognized**. When `pr-changed-ranges` exits non-zero,
 no path is owned through the PR file list (only trusted-config paths remain
@@ -53,8 +55,9 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty
   ```
 
-  Print its `patch` path when it is not null. A non-zero exit or
-  `treeClean: false` is `revert incomplete`.
+  Print its `patch` path when it is not null. A non-zero exit,
+  `treeClean: false`, or an incomplete-revert `reason` (below) is
+  `revert incomplete`.
 - **Any dirty path is unrecognized** — do NOT run `--revert-dirty`. Revert
   only the trusted-config paths among them, passing the exact paths from step
   1 after `--`:
@@ -63,10 +66,15 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only -- <trusted-config paths>
   ```
 
-  Skip the call when there are none. A non-zero exit is `revert incomplete`;
-  `treeClean` stays `false` here because the unrecognized paths remain, so do
-  not read it as a failure. Report the unrecognized paths as
-  `unrecognized changes left in place`.
+  Skip the call when there are none. A non-zero exit or an incomplete-revert
+  `reason` (below) is `revert incomplete`; `treeClean` stays `false` here
+  because the unrecognized paths remain, so do not read it as a failure.
+  Report the unrecognized paths as `unrecognized changes left in place`.
+
+An **incomplete-revert `reason`** is a `reason` in the JSON containing
+`nothing was reverted` (patch save failed) or `revert failed:` (a checkout or
+delete failed). The script exits `0` for both, so check `reason` even after a
+zero exit.
 
 `--revert-only` deletes a listed file that is untracked and not ignored,
 whoever created it, because the pre-resolve state is not recorded (tracked in

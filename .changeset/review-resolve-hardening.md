@@ -6,8 +6,9 @@ Harden `/review:resolve` so every unresolved review thread ends in an honest,
 durable state. Each thread gets a disposition (`fixed`, `addressed`, `oos`,
 `disagree`, `unclear`) that the command validates against the contract in
 `references/resolve/dispositions.md` before writing anything; a thread is
-resolved only after its reply posts, and a `fixed` thread only after a
-verified push. Out-of-scope threads can file a follow-up issue (capped at 3
+normally resolved only after its reply posts (non-actionable threads dropped by
+the actionability filter, such as LGTM or a bare nit, are resolved without a
+reply), and a `fixed` thread only after a verified push. Out-of-scope threads can file a follow-up issue (capped at 3
 per PR when unattended). Replies and issues carry an idempotency marker, so
 re-runs dedupe by marker on GitHub (Linear dedupe is best-effort, so a rerun can
 still file a second issue if the first was not indexed before its reply failed). The command commits and pushes fixes as a new
