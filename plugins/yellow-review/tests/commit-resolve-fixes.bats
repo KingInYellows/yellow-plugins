@@ -1157,3 +1157,151 @@ plant_hook() {
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
 }
+
+# --- A hooks path through a symlink inside the working tree ---
+
+@test "a relative hooks path that is a symlink to an external directory is refused (exit 3)" {
+  plant_hook "$BATS_TEST_TMPDIR/ext-hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" .hooks
+  printf '.hooks\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  for provider in github graphite; do
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $provider" >&2; return 1; }
+    [[ "$stderr" == *"hooks path goes through the symlink '.hooks'"* ]]
+    [[ "$stderr" != *"ext-hooks"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+  done
+  ! grep -q '^node \|^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "an absolute in-tree hooks path through a symlinked parent is refused (exit 3)" {
+  mkdir "$BATS_TEST_TMPDIR/ext-parent"
+  plant_hook "$BATS_TEST_TMPDIR/ext-parent/hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-parent" parent
+  printf 'parent\n' >> .git/info/exclude
+  git config core.hooksPath "$(pwd -P)/parent/hooks"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"hooks path goes through the symlink 'parent'"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+@test "a .git/hooks that is a symlink is refused (exit 3)" {
+  plant_hook "$BATS_TEST_TMPDIR/ext-hooks"
+  rm -rf .git/hooks
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" .git/hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"hooks path goes through the symlink '.git/hooks'"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+@test "a plain in-tree untracked hooks directory is still refused and a tracked one allowed" {
+  plant_hook .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"hooks directory '.hooks' holds untracked or ignored files"* ]]
+  git add -f .hooks && git commit -q -m "chore: hooks"
+  git push -q origin feature 2>/dev/null
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+# --- Credential-bearing network diagnostics ---
+
+# A credential-shaped value assembled from pieces, so no source line holds it.
+cred_value() { printf '%s' "Zq9x""Lm4v""Pw7k""Rt2b""Nc8d""Hy5f"; }
+
+# gh_stub_failing_view <stderr-line>: gh pr view <PR> --json headRefOid prints
+# the line to stderr and fails; every other call goes to the real stub.
+gh_stub_failing_view() {
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<STUB
+#!/bin/sh
+case "\$*" in
+  "pr view "*headRefOid*)
+    echo '$1' >&2
+    exit 1
+    ;;
+esac
+exec "\$(dirname "\$0")/gh.real" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+}
+
+@test "a token assignment or bearer header in a gh pr view diagnostic never reaches stderr or the JSON output" {
+  v=$(cred_value)
+  for line in "error: credential helper said token=$v" "Authorization: Bearer $v"; do
+    gh_stub_failing_view "$line"
+    printf 'one\nfeature\nfix\n' >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 6 ] || { echo "status $status for: ${line%%$v*}" >&2; return 1; }
+    [[ "$stderr" == *"head not verified"* ]]
+    [[ "$stderr" != *"$v"* ]]
+    [[ "$output" != *"$v"* ]]
+    # Back to a clean tree and the real stub for the next form.
+    git reset -q --hard "$FIRST_SHA"
+    mv "$STUB_BIN/gh.real" "$STUB_BIN/gh"
+  done
+}
+
+@test "a token assignment or bearer header in a git ls-remote diagnostic never reaches stderr or the JSON output" {
+  v=$(cred_value)
+  for line in "fatal: helper printed token=$v" "Authorization: Bearer $v"; do
+    git_shim_failing "if [ \"\$1\" = ls-remote ]; then echo '$line' >&2; exit 1; fi"
+    printf 'one\nfeature\nfix\n' >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 6 ] || { echo "status $status for: ${line%%$v*}" >&2; return 1; }
+    [[ "$stderr" == *"head not verified"* ]]
+    [[ "$stderr" != *"$v"* ]]
+    [[ "$output" != *"$v"* ]]
+    git reset -q --hard "$FIRST_SHA"
+    rm -f "$STUB_BIN/git"
+  done
+}
+
+@test "a diagnostic keeps its non-secret text and the URL userinfo mask once redacted" {
+  v=$(cred_value)
+  gh_stub_failing_view "fatal: unable to access https://user:$v@example.com/o/r: connection reset"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"connection reset"* ]]
+  [[ "$stderr" == *"https://***@example.com"* ]]
+  [[ "$stderr" != *"$v"* ]]
+}
+
+@test "a diagnostic is capped to 200 characters after redaction" {
+  gh_stub_failing_view "fatal: $(printf 'x%.0s' $(seq 1 400))"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [ "$(printf '%s' "$stderr" | grep -o 'x' | wc -l)" -le 200 ]
+}
+
+@test "with no credential redactor the diagnostic is withheld, never printed raw (exit 6)" {
+  v=$(cred_value)
+  # A copy of the plugin with no yellow-core sibling: the redactor cannot load.
+  copy="$BATS_TEST_TMPDIR/isolated/yellow-review"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" "$copy/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$copy/skills/pr-review-workflow/scripts"
+  gh_stub_failing_view "error: helper said token=$v"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  SCRIPT="$copy/skills/pr-review-workflow/scripts/commit-resolve-fixes"
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"diagnostic withheld: credential redaction unavailable"* ]]
+  [[ "$stderr" != *"$v"* ]]
+  [[ "$output" != *"$v"* ]]
+}

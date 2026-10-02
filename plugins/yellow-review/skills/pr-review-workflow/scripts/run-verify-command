@@ -21,7 +21,12 @@
 #                  command). The caller touches <marker-file> before the
 #                  resolvers start; before running, any ignored regular file or
 #                  symlink with an mtime newer than the marker makes the run
-#                  refuse (exit 2, up to 20 paths named, never contents). A
+#                  refuse (exit 2, up to 20 paths named, never contents). An
+#                  ignored symlink is judged by its target too (a write through
+#                  it leaves the link's own mtime alone): a target file, or a
+#                  file inside a target directory, newer than the marker
+#                  refuses, a dangling target does not, and a target that cannot
+#                  be examined refuses (fail closed). A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
 #                  failure. Attended runs may omit it. The revert modes ignore
@@ -134,7 +139,7 @@ gh() {
 }
 usage() {
     printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file is newer than the marker; required with --unattended\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
     exit 2
 }
 

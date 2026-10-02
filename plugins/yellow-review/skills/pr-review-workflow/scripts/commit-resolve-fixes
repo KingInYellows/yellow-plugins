@@ -26,7 +26,7 @@
 # Exit codes: 2 usage (including --allow-credential-shaped with
 #             --unattended), 3 staged mismatch, refused path,
 #             pre-commit credential-shaped refusal, an untracked or ignored
-#             hook file, or a remote that does not push to the PR's head
+#             hook file, a hooks path through an in-tree symlink, or a remote that does not push to the PR's head
 #             repository (unparseable push URL, other scheme, host or
 #             owner/repo; nothing committed), 4 commit failed
 #             (or no new commit appeared, changes remain staged, the
@@ -73,7 +73,12 @@
 # Hooks: the effective hooks directory (core.hooksPath honoured) must not hold
 # untracked or ignored files when it lies inside the working tree, else exit 3
 # before anything is staged: the commit would run them and the dirty-set check
-# cannot see them (lib/resolve-paths.sh rp_hooks_untracked).
+# cannot see them (lib/resolve-paths.sh rp_hooks_untracked). A hooks path that
+# passes through a symlink located inside the working tree (a symlinked
+# .hooks, or .git/hooks) is refused the same way, whatever it points to.
+# Network diagnostics in the verify messages (git ls-remote, gh pr view
+# stderr) go through the credential redactor lib/verify-run.sh loads
+# (vr_load_redactor); with no redactor the diagnostic is withheld.
 # --unattended also refuses the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file when it
 # is inside the repository and listed (rp_runner).
 # The github runtime is given --remote only for an explicit choice
@@ -95,6 +100,9 @@ MAX_MESSAGE_CHARS=200
 . "$(dirname -- "$0")/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# Resolved before the script changes directory: $0 may be relative.
+PLUGIN_ROOT=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
     printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [-- <files...>]\n' >&2
@@ -229,11 +237,35 @@ ADDED=$(mktemp) || die 2 "mktemp failed"
 APPROVED=$(mktemp) || die 2 "mktemp failed"
 REMAINING=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED" "$APPROVED" "$REMAINING"' EXIT
+# redact_line: stdin (one line) to stdout through the plugin's credential
+# redactor (vr_load_redactor, then vr_redact_filter, as run-verify-command's
+# log stream uses). Fails when the redactor cannot be loaded or run, or the
+# filter withheld the text, so a caller never prints an unscreened line.
+redact_line() {
+    local out
+    vr_load_redactor "$PLUGIN_ROOT" || return 1
+    declare -F cs_redact_secrets >/dev/null 2>&1 || return 1
+    command -v fold >/dev/null 2>&1 || return 1
+    out=$(set -o pipefail; vr_redact_filter) || return 1
+    case "$out" in *"$VR_FOLD_SENTINEL"*) return 1 ;; esac
+    printf '%s' "$out"
+}
 # last_err: the first line of the last network call's stderr, for a message.
-# One line, control characters dropped, credentials in URLs masked, capped.
+# One line, control characters dropped, credentials in URLs masked, then the
+# credential redactor applied (a token assignment or Authorization header that
+# a credential helper printed is not URL userinfo), capped. When the redactor
+# is unavailable the diagnostic is withheld, not printed raw.
 last_err() {
+    local line
     [ -s "$NET_ERR" ] || return 0
-    head -n 1 "$NET_ERR" | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g' | cut -c1-200
+    # Bounded before screening: the file is a network tool's raw stderr.
+    line=$(head -c 8192 "$NET_ERR" 2>/dev/null | head -n 1 | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g') || true
+    [ -n "$line" ] || return 0
+    if ! line=$(printf '%s\n' "$line" | redact_line 2>/dev/null); then
+        printf '%s' '[diagnostic withheld: credential redaction unavailable]'
+        return 0
+    fi
+    printf '%s' "$line" | tr -d '[:cntrl:]' | cut -c1-200
 }
 rp_tree_changes "$DIRTY_FILE" || die 3 "cannot list tree changes"
 d=$(rp_assert_only_listed "$DIRTY_FILE" ${EXPECTED[@]+"${EXPECTED[@]}"}) \
@@ -362,11 +394,14 @@ host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
 # hooks directory inside the working tree is invisible to the dirty-set check
 # above, so a resolver could have planted or edited one: refuse before staging.
 # (A hooks directory outside the working tree, or one whose files are all
-# tracked, is unchanged; see rp_hooks_untracked.)
+# tracked, is unchanged; see rp_hooks_untracked.) A hooks path that goes
+# through a symlink inside the working tree is refused too: a resolver can edit
+# the hooks through the link with no change Git reports.
 HOOKS_RC=0
 HOOKS_DIR=$(rp_hooks_untracked "$DIRTY_FILE") || HOOKS_RC=$?
 case "$HOOKS_RC" in
     0) die 3 "refusing to commit: git hooks directory '$(safe_name "$HOOKS_DIR")' holds untracked or ignored files that the commit would run; nothing committed" ;;
+    3) die 3 "refusing to commit: the git hooks path goes through the symlink '$(safe_name "$HOOKS_DIR")' inside the working tree, so hook edits would be invisible to the change check; nothing committed" ;;
     1) ;;
     *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
 esac
