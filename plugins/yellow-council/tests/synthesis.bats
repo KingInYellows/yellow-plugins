@@ -884,15 +884,15 @@ teardown() {
   done
 }
 
-# cancel_script <raw> <out> <claimed> — the Step 8 Cancel block with the
-# CLAUDE_FENCED_FILE literal substituted and SYNTH_STATE_CLAIMED set to
-# <claimed> (empty leaves the placeholder, as a model that forgot would).
+# cancel_script <raw> <out> <claimed> [own_dir] — the Step 8 Cancel block with
+# the CLAUDE_FENCED_FILE literal substituted, SYNTH_STATE_CLAIMED set to
+# <claimed> and SYNTH_OWN_DIR set to [own_dir] (empty leaves the placeholder, as
+# a model that forgot would).
 cancel_script() {
-  if [ -n "$3" ]; then
-    sed -e "s|^SYNTH_STATE_CLAIMED=.*|SYNTH_STATE_CLAIMED=$3|" -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$1" >| "$2"
-  else
-    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$1" >| "$2"
-  fi
+  local -a expr=(-e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|")
+  [ -z "$3" ] || expr+=(-e "s|^SYNTH_STATE_CLAIMED=.*|SYNTH_STATE_CLAIMED=$3|")
+  [ -z "${4:-}" ] || expr+=(-e "s|^SYNTH_OWN_DIR=.*|SYNTH_OWN_DIR=\"$4\"|")
+  sed "${expr[@]}" "$1" >| "$2"
 }
 
 @test "5a refusing a live synthesis, then the Step 8 Cancel block for a run that claimed nothing, leaves the live state file" {
@@ -923,8 +923,13 @@ cancel_script() {
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.default'"
   [ -f "$st" ]
   [ "$(sed -n 1p "$st")" = "$LIVE" ]
-  # Only a run whose 5a claimed the file unlinks it.
-  cancel_script "$s8.raw" "$s8.claimed" 1
+  # Claimed but naming a different directory: not this run's file either.
+  printf '%s\n' 0123456789abcdef0123456789abcdef >| "$LIVE/.token"
+  cancel_script "$s8.raw" "$s8.other" 1 /tmp/council-synth-other
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.other'"
+  [ -f "$st" ]
+  # Only a run whose 5a claimed the file, and whose directory it names, unlinks it.
+  cancel_script "$s8.raw" "$s8.claimed" 1 "$LIVE"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.claimed'"
   [ ! -e "$st" ]
   rm -rf "$LIVE" "$REPO"
@@ -1074,6 +1079,8 @@ cancel_script() {
     chmod 555 "$stale"
     age_dir "$stale" 25
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && chmod() { return 1; } && . '$s5a'"
+    # The unremovable stale dir only warns: 5a itself must still succeed.
+    [ "$status" -eq 0 ] || { chmod -R u+rwx "$stale"; rm -rf "$stale"; echo "$profile 5a: $stderr"; return 1; }
     chmod -R u+rwx "$stale"
     local msg_ok=0
     [[ "$stderr" == *"could not remove stale $stale; remove it by hand: chmod -R u+rwx $stale && rm -rf $stale"* ]] && msg_ok=1
@@ -1085,19 +1092,21 @@ cancel_script() {
   done
 }
 
-@test "Step 8 cancel cleanup, for a run that claimed the state file, unlinks it, a symlink without touching its target" {
+@test "Step 8 cancel cleanup, for a run that claimed the state file, unlinks its own file and never follows or removes a symlink" {
   local s8="${BATS_TEST_TMPDIR}/8.sh" st
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
   setup_council_run
-  cancel_script "$s8.raw" "$s8" 1
+  cancel_script "$s8.raw" "$s8" 1 /tmp/council-synth-x
   st="$REPO/.git/council-synth.state"
-  # rm -f unlinks a symlink at the claimed state path without following it.
+  # A symlink at the claimed state path is left in place and never followed.
   printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
   ln -s "$BATS_TEST_TMPDIR/target" "$st"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
-  [ ! -e "$st" ] && [ ! -L "$st" ]
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
+  [ -L "$st" ]
   [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
-  # A regular, user-owned state file is removed.
+  # A regular, user-owned state file naming this run's directory is removed.
   rm -f "$st"
   write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
@@ -1105,27 +1114,30 @@ cancel_script() {
   rm -rf "$REPO"
 }
 
-# check_state_cleanup <script> — a cleanup fence unlinks a symlink at the synth
-# state path without following it (its target untouched) and removes a regular
-# user-owned one. Expects setup_council_run to have run.
+# check_state_cleanup <script> — a cleanup fence (substituted with own dir
+# /tmp/council-synth-x) leaves a symlink at the synth state path in place
+# without following it (its target untouched), then removes a regular
+# user-owned state file naming that directory. Expects setup_council_run to
+# have run.
 check_state_cleanup() {
   local script="$1" st="$REPO/.git/council-synth.state"
   printf 'untouched\n' >| "$BATS_TEST_TMPDIR/target"
   ln -s "$BATS_TEST_TMPDIR/target" "$st"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
-  [ ! -e "$st" ] && [ ! -L "$st" ]
+  [ -L "$st" ]
   [ "$(cat "$BATS_TEST_TMPDIR/target")" = untouched ]
+  [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
   rm -f "$st"
   write_synth_state /tmp/council-synth-x 0123456789abcdef0123456789abcdef
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
   [ ! -e "$st" ]
 }
 
-@test "Step 7 early-exit cleanup unlinks the state file, a symlink without touching its target" {
+@test "Step 7 early-exit cleanup unlinks its own state file, leaves a symlink untouched" {
   local s7="${BATS_TEST_TMPDIR}/7.sh"
   extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   setup_council_run
-  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s7.raw" >| "$s7"
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s7.raw" >| "$s7"
   # No Step 4 state file: the guard exits through council_cleanup_claude_only.
   rm -f "$REPO/.git/council-state.tsv"
   check_state_cleanup "$s7"
@@ -1134,11 +1146,11 @@ check_state_cleanup() {
   rm -rf "$REPO"
 }
 
-@test "Step 9 cleanup unlinks the state file, a symlink without touching its target" {
+@test "Step 9 cleanup unlinks its own state file, leaves a symlink untouched" {
   local s9="${BATS_TEST_TMPDIR}/9.sh"
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
   setup_council_run
-  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s9.raw" >| "$s9"
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s9.raw" >| "$s9"
   # REPORT_PATH_ABS is unset, so verification fails, but cleanup still runs first.
   check_state_cleanup "$s9"
   [ "$status" -eq 1 ]
@@ -1359,7 +1371,7 @@ EOF2
   [[ "$stderr" == *"another council synthesis is in progress"* ]]
   # The documented Cancel cleanup for a run that claimed the file (5a printed
   # COUNCIL_SYNTH_DIR, so SYNTH_STATE_CLAIMED=1) frees it.
-  cancel_script "$s8.raw" "$s8" 1
+  cancel_script "$s8.raw" "$s8" 1 "$SD"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
   [ "$status" -eq 0 ]
   [ ! -e "$st" ]
@@ -1405,5 +1417,152 @@ EOF2
   [[ "$stderr" == *"could not remove $SD; remove it by hand: chmod -R u+rwx $SD && rm -rf $SD"* ]] || { echo "$stderr"; return 1; }
   [[ "$stderr" != *"sweep reclaims it"* ]]
   [ ! -e "$REPO/.git/council-synth.state" ]
+  rm -rf "$REPO"
+}
+
+@test "cleanup after a successful 5e treats a missing file as success and leaves a newly created live claim untouched" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" s7="${BATS_TEST_TMPDIR}/7.sh" \
+    s8="${BATS_TEST_TMPDIR}/8.sh" s9="${BATS_TEST_TMPDIR}/9.sh" st tsv profile script
+  local T2=fedcba9876543210fedcba9876543210
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
+  for profile in $PROFILES; do
+    setup_council_run
+    st="$REPO/.git/council-synth.state"
+    tsv="$REPO/.git/council-state.tsv"
+    cp "$tsv" "$tsv.bak"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
+    # 5e says this run's claim is released.
+    [[ "$stderr" == *"released this run's synthesis state claim"* ]] || { echo "$profile: $stderr"; return 1; }
+    [ ! -e "$SD" ]
+    [ ! -e "$st" ]
+    cancel_script "$s8.raw" "$s8" 1 "$SD"
+    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s7.raw" >| "$s7"
+    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s9.raw" >| "$s9"
+    # The file is gone: every later cleanup succeeds quietly (Steps 7 and 9 exit 1
+    # only for their own unrelated reasons).
+    for script in "$s8" "$s9" "$s7"; do
+      cp "$tsv.bak" "$tsv"
+      [ "$script" != "$s7" ] || rm -f "$tsv"
+      run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
+      [[ "$stderr" != *"leaving"* ]] || { echo "$profile ${script##*/}: $stderr"; return 1; }
+      [[ "$stderr" != *"could not remove"* ]] || { echo "$profile ${script##*/}: $stderr"; return 1; }
+      [ ! -e "$st" ]
+    done
+    # Another /council claimed the path after 5e released it: no later cleanup
+    # of this run may delete that live claim.
+    LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
+    printf '%s\n' "$T2" >| "$LIVE/.token"
+    write_synth_state "$LIVE" "$T2"
+    for script in "$s8" "$s9" "$s7"; do
+      cp "$tsv.bak" "$tsv"
+      [ "$script" != "$s7" ] || rm -f "$tsv"
+      run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
+      [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$profile ${script##*/}: $stderr"; return 1; }
+      [ -f "$st" ] && [ ! -L "$st" ]
+      [ "$(sed -n 1p "$st")" = "$LIVE" ]
+      [ "$(sed -n 2p "$st")" = "$T2" ]
+      [ -d "$LIVE" ]
+    done
+    rm -rf "$LIVE" "$REPO"
+    LIVE=""
+    SD=""
+  done
+}
+
+@test "Cancel after a 5e failure leaves another run's or a token-mismatched state file alone, and removes the matching one" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st tsv
+  local OTHER=fedcba9876543210fedcba9876543210 BAD=ffffffffffffffffffffffffffffffff TOKEN
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  tsv="$REPO/.git/council-state.tsv"
+  cp "$tsv" "$tsv.bak"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ] || { echo "5a: $stderr"; return 1; }
+  SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  TOKEN=$(sed -n 2p "$st")
+  printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
+  cancel_script "$s8.raw" "$s8" 1 "$SD"
+
+  # A paused run past 24 hours: another /council reclaimed the stale file and
+  # holds a live claim on a different directory. 5e refuses it (no label map in
+  # that directory), and the Cancel block must not delete it.
+  LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
+  printf '%s\n' "$OTHER" >| "$LIVE/.token"
+  write_synth_state "$LIVE" "$OTHER"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *COUNCIL_LABEL_MAP* ]]
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
+  [ -f "$st" ]
+  [ "$(sed -n 1p "$st")" = "$LIVE" ]
+  [ "$(sed -n 2p "$st")" = "$OTHER" ]
+  [ -d "$LIVE" ]
+
+  # The state file names this run's directory but its token does not match the
+  # directory's .token: 5e exits on the mismatch and Cancel leaves the file.
+  cp "$tsv.bak" "$tsv"
+  write_synth_state "$SD" "$BAD"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$stderr"; return 1; }
+  [ -d "$SD" ]
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
+  [ "$(sed -n 2p "$st")" = "$BAD" ]
+
+  # Matching directory and token: the same Cancel block removes the file.
+  cp "$tsv.bak" "$tsv"
+  write_synth_state "$SD" "$TOKEN"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"leaving"* ]] || { echo "$stderr"; return 1; }
+  [ ! -e "$st" ]
+  rm -rf "$LIVE" "$REPO"
+  LIVE=""
+}
+
+@test "cleanup never follows or removes a symlink at the state path, even one whose target looks like this run's claim" {
+  local s7="${BATS_TEST_TMPDIR}/7.sh" s8="${BATS_TEST_TMPDIR}/8.sh" s9="${BATS_TEST_TMPDIR}/9.sh" st tsv script
+  local TOKEN=0123456789abcdef0123456789abcdef
+  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  tsv="$REPO/.git/council-state.tsv"
+  cp "$tsv" "$tsv.bak"
+  SD=$(mktemp -d /tmp/council-synth-XXXXXX)
+  printf '%s\n' "$TOKEN" >| "$SD/.token"
+  cancel_script "$s8.raw" "$s8" 1 "$SD"
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s7.raw" >| "$s7"
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s9.raw" >| "$s9"
+  # The target is a well-formed claim for THIS run's directory and token.
+  printf '%s\n%s\n' "$SD" "$TOKEN" >| "$BATS_TEST_TMPDIR/target"
+  for script in "$s8" "$s9" "$s7"; do
+    cp "$tsv.bak" "$tsv"
+    [ "$script" != "$s7" ] || rm -f "$tsv"
+    ln -s "$BATS_TEST_TMPDIR/target" "$st"
+    run_in bash "$FIRST_AWK" "cd '$REPO' && . '$script'"
+    [[ "$stderr" == *"leaving $st in place"* ]] || { echo "${script##*/}: $stderr"; return 1; }
+    [ -L "$st" ]
+    [ "$(sed -n 1p "$BATS_TEST_TMPDIR/target")" = "$SD" ]
+    [ "$(sed -n 2p "$BATS_TEST_TMPDIR/target")" = "$TOKEN" ]
+    rm -f "$st"
+  done
   rm -rf "$REPO"
 }

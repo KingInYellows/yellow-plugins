@@ -59,7 +59,7 @@ and flag against `main` once the stack lands.
    and 6 in `commit-resolve-fixes` for a submit and a verify timeout, and a
    skipped round in `poll-new-threads`. Exit 4 alone does not say why, so the
    thread scripts print `reason=rate-limit` or `reason=timeout` on stderr
-   with it and callers read that line (see the 2026-10-01 update below). A
+   with it; the resolver uses that reason to set its final contract (see the 2026-10-01 update below). A
    timeout must not look like a rate limit to a caller.
 5. Strip blank lines and carriage returns from the round-1 list, and branch on
    `grep` exit status: 0 match, 1 none, 2 or more is an error.

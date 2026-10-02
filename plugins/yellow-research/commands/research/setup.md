@@ -224,8 +224,11 @@ MCP uses the userConfig key. Perplexity's label ends with `; pending
 MCP-visibility confirmation`.
 
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
-`UNREACHABLE` / `UNVERIFIED (shell key rejected; …)` (shell key got 401/403 but
-a keychain or userConfig key may take precedence and cannot be inspected) /
+`UNREACHABLE` / `UNVERIFIED (shell key rejected; …)` (shell key got 401/403 on macOS,
+where a keychain key cannot be inspected, or without `jq` while a settings or
+credentials file exists that the substring check could not interpret; on Linux
+with no such file, or with `jq` finding no userConfig key, the status stays
+`INVALID`) /
 `PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
 (shell key probed with any result, but a userConfig key is also set and the
@@ -340,18 +343,28 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
+  # Without jq has_userconfig is a substring match over these two files. With
+  # neither present no userConfig key can exist, and Linux has no keychain.
+  config_file_present=0
+  for config_file in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
+    if [ -r "$config_file" ]; then config_file_present=1; fi
+  done
   if ! command -v jq >/dev/null 2>&1; then
-    # Without jq has_userconfig is a substring match that can false-positive, so
-    # keep the shell probe result and say the userConfig claim is unconfirmed.
-    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    # A present file the substring match cannot interpret leaves the userConfig
+    # claim unconfirmed: keep the shell probe result and say so.
+    if [ "$config_file_present" -eq 1 ]; then
+      provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    fi
   elif has_userconfig yellow-research exa_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run an exa tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
-  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
-  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+  # Still INVALID only if no userConfig key was found. Unknown on macOS (the
+  # Keychain cannot be inspected) and without jq when a settings or credentials
+  # file exists that the substring check could not interpret.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || { ! command -v jq >/dev/null 2>&1 && [ "$config_file_present" -eq 1 ]; }; }; then
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
-    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run an exa tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, settings or credentials file present) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run an exa tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -448,18 +461,28 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
+  # Without jq has_userconfig is a substring match over these two files. With
+  # neither present no userConfig key can exist, and Linux has no keychain.
+  config_file_present=0
+  for config_file in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
+    if [ -r "$config_file" ]; then config_file_present=1; fi
+  done
   if ! command -v jq >/dev/null 2>&1; then
-    # Without jq has_userconfig is a substring match that can false-positive, so
-    # keep the shell probe result and say the userConfig claim is unconfirmed.
-    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    # A present file the substring match cannot interpret leaves the userConfig
+    # claim unconfirmed: keep the shell probe result and say so.
+    if [ "$config_file_present" -eq 1 ]; then
+      provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    fi
   elif has_userconfig yellow-research tavily_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a tavily tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
-  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
-  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+  # Still INVALID only if no userConfig key was found. Unknown on macOS (the
+  # Keychain cannot be inspected) and without jq when a settings or credentials
+  # file exists that the substring check could not interpret.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || { ! command -v jq >/dev/null 2>&1 && [ "$config_file_present" -eq 1 ]; }; }; then
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
-    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a tavily tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, settings or credentials file present) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a tavily tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -559,18 +582,28 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
+  # Without jq has_userconfig is a substring match over these two files. With
+  # neither present no userConfig key can exist, and Linux has no keychain.
+  config_file_present=0
+  for config_file in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
+    if [ -r "$config_file" ]; then config_file_present=1; fi
+  done
   if ! command -v jq >/dev/null 2>&1; then
-    # Without jq has_userconfig is a substring match that can false-positive, so
-    # keep the shell probe result and say the userConfig claim is unconfirmed.
-    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    # A present file the substring match cannot interpret leaves the userConfig
+    # claim unconfirmed: keep the shell probe result and say so.
+    if [ "$config_file_present" -eq 1 ]; then
+      provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+    fi
   elif has_userconfig yellow-research perplexity_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a perplexity tool call to validate the userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status; pending MCP-visibility confirmation)"
   fi
-  # Still INVALID only if no userConfig key was found; on macOS (Keychain) or without jq that is unknown.
-  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || ! command -v jq >/dev/null 2>&1; }; then
+  # Still INVALID only if no userConfig key was found. Unknown on macOS (the
+  # Keychain cannot be inspected) and without jq when a settings or credentials
+  # file exists that the substring check could not interpret.
+  if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || { ! command -v jq >/dev/null 2>&1 && [ "$config_file_present" -eq 1 ]; }; }; then
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
-    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+    provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, settings or credentials file present) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -925,8 +958,8 @@ research), `Done`.
 | All 3 keys absent                        | Show all INACTIVE in table + full setup instructions block                       | Complete normally   |
 | Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
-| HTTP 401/403, no keychain possible       | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
-| HTTP 401/403, macOS or no jq             | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify.| Record per-provider |
+| HTTP 401/403, Linux, no userConfig key (jq found none, or no jq and no config file) | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
+| HTTP 401/403, macOS, or no jq with a config file present | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify. | Record per-provider |
 | HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale or wrong.      | Record per-provider |
 | Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |

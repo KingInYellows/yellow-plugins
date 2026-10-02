@@ -564,11 +564,17 @@ trust boundary from the pack and fenced-output files above:
   directory the user owns under `/tmp/council-synth-*`; if it still cannot be
   removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command
   to run by hand. Step 7 early exit, Step 8 Cancel, and Step 9 cleanup remove
-  the state file only (a symlink at that path is unlinked, not followed), and
-  only when this run's 5a claimed it: a run whose 5a refused (another run's
-  file, a lost claim race, or the symlink or foreign entry) leaves that path
-  alone and reports it. A 5d-resume or 5e failure runs the Step 8 Cancel
-  block. 24 hours is the eligibility threshold for the 5a sweep, not a maximum
+  the state file only, and only when this run's 5a claimed it AND the file is
+  still this run's claim (`council_rm_synth_state`: a regular, non-symlink file
+  owned by the user whose line 1 equals the `COUNCIL_SYNTH_DIR` this run's 5a
+  printed and, while that directory exists, whose token equals its `.token`).
+  A missing file is success. A symlink (never followed or removed), a foreign
+  owner, another run's directory or a token mismatch leaves the path alone with
+  a one-line note: this covers a run whose 5a refused, a 5e that already removed
+  the file (it prints that this run's claim is released) and a paused run whose
+  stale state another `/council` reclaimed. The relayed `COUNCIL_SYNTH_DIR` is
+  only compared, never deleted; a wrong or missing literal fails closed. A
+  5d-resume or 5e failure runs the Step 8 Cancel block. 24 hours is the eligibility threshold for the 5a sweep, not a maximum
   retention: the sweep runs only when a later `/council` invocation reaches 5a,
   and then deletes `/tmp/council-synth-*` directories older than 24 hours
   (with the same chmod-then-remove for an owned directory). An interrupted run
