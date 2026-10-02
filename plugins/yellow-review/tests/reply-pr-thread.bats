@@ -261,3 +261,14 @@ stub_sleep() {
   [ "$(cat "$CALLS")" = 2 ]
   [[ "$stderr" == *"retry is already spent"* ]]
 }
+
+@test "a credential refusal prints the resolve-text token; an over-long body does not" {
+  printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"resolve-text: refused rule=token-prefix line=1"* ]]
+  head -c 1001 /dev/zero | tr '\0' 'a' >| "$BODY"
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" != *"resolve-text:"* ]]
+}

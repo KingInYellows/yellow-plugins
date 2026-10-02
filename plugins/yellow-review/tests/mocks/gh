@@ -84,6 +84,23 @@ case "$ALL_ARGS" in
     ;;
   "issue list "*)
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
+    _call=$(bump issue_list)
+    # MOCK_GH_RESCAN shapes the second list call (the post-create rescan):
+    # winner = an older marker issue #70 plus ours (#77); own = ours (#77)
+    # plus a later marker issue #80; fail / ratelimit = the list fails.
+    if [ "$_call" -ge 2 ] && [ -n "${MOCK_GH_RESCAN:-}" ]; then
+      _nums=""
+      case "$MOCK_GH_RESCAN" in
+        ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+        fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+        winner) _nums='70 77' ;;
+        own) _nums='77 80' ;;
+      esac
+      jq -n --arg nums "$_nums" '[ ($nums | split(" ")[] | tonumber) as $n
+        | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
+           body: "Follow-up\n\n<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->"} ]'
+      exit 0
+    fi
     # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit simulates a failed list.
     case "${MOCK_GH_ISSUE_LIST_FAIL:-0}" in
       ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
@@ -131,6 +148,15 @@ case "$ALL_ARGS" in
       esac
     done
     printf 'Creating issue in test/repo\n\nhttps://github.com/test/repo/issues/77\n'
+    exit 0
+    ;;
+  "issue close "*)
+    # Saves the arguments. MOCK_GH_ISSUE_CLOSE_FAIL=1 simulates a failure.
+    printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_close_args"
+    if [ "${MOCK_GH_ISSUE_CLOSE_FAIL:-0}" = 1 ]; then
+      printf 'HTTP 403: Forbidden\n' >&2
+      exit 1
+    fi
     exit 0
     ;;
   *"ReplyPrecheck"*)
@@ -322,6 +348,32 @@ case "$ALL_ARGS" in
   *"number=401"*)
     printf 'Bad credentials' >&2
     exit 1
+    ;;
+  *"number=403"*)
+    printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"number=420"*)
+    # GitHub reports a secondary rate limit as HTTP 403.
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"number=429"*)
+    printf 'gh: Too Many Requests (HTTP 429)\n' >&2
+    exit 1
+    ;;
+  *"number=502"*)
+    printf 'gh: Server Error (HTTP 502)\n' >&2
+    exit 1
+    ;;
+  *"number=778"*)
+    # Status-code digits that are not an HTTP status must not classify.
+    printf 'gh: request 4012345-5001 failed (HTTP 418)\n' >&2
+    exit 1
+    ;;
+  *"number=360"*)
+    # Endless pagination: every page says there is another, with a cursor.
+    printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
   *"PRRT_valid"*)
     cat "$FIXTURE_DIR/resolve-success-response.json"

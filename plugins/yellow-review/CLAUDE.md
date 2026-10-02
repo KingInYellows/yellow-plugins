@@ -168,7 +168,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API; outdated threads are excluded
-  unless `--include-outdated` is passed
+  unless `--include-outdated` is passed; exits 3 (partial array on stdout)
+  when the thread list is truncated
 - `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
   `reviewDecision`, and whether conversation resolution is enforced
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a review
@@ -178,7 +179,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   mutation
 - `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
   File (or find) the follow-up issue for an out-of-scope thread, deduped by a
-  viewer-authored marker. Not yet invoked by `/review:resolve`; see
+  viewer-authored marker. `--find <owner/repo> <PRRT_id>` only looks, never
+  files. Not yet invoked by `/review:resolve`; see
   `references/resolve/dispositions.md`
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
   like a credential (for text posted outside the resolve scripts)
@@ -197,6 +199,11 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue` and `check-resolve-text`) — the credential-shape
   check for resolver-written text; a match means the text is never posted.
+  On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal`
+  prints the `resolve-text: refused rule=... line=...` stderr line (never the
+  text) that tells a refusal from a usage error.
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`) — runs `gh`
+  under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a timeout.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,

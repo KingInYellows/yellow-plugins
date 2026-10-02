@@ -172,3 +172,55 @@ setup() {
   grep -q 'repos/test/repo/branches/feature%2Fa%20b/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
   grep -q 'repos/test/repo/rules/branches/feature%2Fa%20b' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
 }
+
+# A stand-in timeout(1) that kills (exit 124) any gh call whose arguments
+# contain $MOCK_TIMEOUT_ON and runs every other call normally.
+fake_timeout() {
+  mkdir -p "${BATS_TEST_TMPDIR}/tbin"
+  cat >| "${BATS_TEST_TMPDIR}/tbin/timeout" <<'SH'
+#!/bin/sh
+shift
+case "$*" in *"$MOCK_TIMEOUT_ON"*) exit 124 ;; esac
+exec "$@"
+SH
+  chmod +x "${BATS_TEST_TMPDIR}/tbin/timeout"
+  export PATH="${BATS_TEST_TMPDIR}/tbin:${PATH}"
+}
+
+@test "a timed-out review lookup exits 0 with lookupFailed true and says so" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=graphql
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.lookupFailed, .changesRequested]')" = '[true,null]' ]
+  [[ "$stderr" == *"timed out"* ]]
+}
+
+@test "a timed-out classic protection lookup leaves conversationResolution unknown" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=/protection MOCK_GH_RULES=none
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "unknown" ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = "false" ]
+  [[ "$stderr" == *"timed out"* ]]
+}
+
+@test "a timed-out rules lookup leaves conversationResolution unknown" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=/rules/branches/ MOCK_GH_PROTECTION=disabled
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = "unknown" ]
+  [[ "$stderr" == *"timed out"* ]]
+}
+
+@test "a missing resolve-gh library exits 0 with unknown fields" {
+  tmp="${BATS_TEST_TMPDIR}/copy"
+  mkdir -p "$tmp/skills/pr-review-workflow/scripts" "$tmp/lib"
+  cp "$SCRIPT" "$tmp/skills/pr-review-workflow/scripts/get-pr-blockers"
+  run --separate-stderr "$tmp/skills/pr-review-workflow/scripts/get-pr-blockers" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = "true" ]
+  [[ "$stderr" == *"resolve-gh.sh not readable"* ]]
+}

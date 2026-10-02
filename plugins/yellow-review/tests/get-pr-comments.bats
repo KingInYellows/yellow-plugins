@@ -206,6 +206,38 @@ teardown() {
   [[ "$output" == *"Repository or PR not found"* ]]
 }
 
+@test "a secondary rate limit reported as HTTP 403 is a rate limit, not a permissions error" {
+  run "$SCRIPT" "test/repo" "420"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"rate limit exceeded"* ]]
+  [[ "$output" != *"Insufficient permissions"* ]]
+}
+
+@test "HTTP 429 is a rate limit" {
+  run "$SCRIPT" "test/repo" "429"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"rate limit exceeded"* ]]
+}
+
+@test "HTTP 403 is insufficient permissions" {
+  run "$SCRIPT" "test/repo" "403"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Insufficient permissions"* ]]
+}
+
+@test "HTTP 502 is a server error" {
+  run "$SCRIPT" "test/repo" "502"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"GitHub server error"* ]]
+}
+
+@test "digits that are not an HTTP status do not classify the error" {
+  run "$SCRIPT" "test/repo" "778"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"GraphQL query failed"* ]]
+  [[ "$output" != *"Authentication failed"* ]]
+}
+
 # --- Pagination ---
 
 @test "accumulates threads across multiple pages" {
@@ -232,16 +264,28 @@ teardown() {
   [ "$ids" = "PRRT_mp_thread1 PRRT_mp_thread3 PRRT_mp_thread4 " ]
 }
 
-@test "warns on null cursor with hasNextPage true" {
-  # Capture stderr separately to check for warning
+@test "a null cursor with hasNextPage true exits 3 with the threads fetched so far" {
+  # Capture stderr separately to check for the truncation message
   local stderr_file="${BATS_TEST_TMPDIR}/stderr_350"
   run bash -c "'$SCRIPT' test/repo 350 2>'$stderr_file'"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 3 ]
 
-  # Should still return the available threads
+  # Stdout is still the plain array of what was fetched
   thread_count=$(printf '%s' "$output" | jq 'length')
   [ "$thread_count" -eq 1 ]
 
-  # Should warn about truncation on stderr
   [[ "$(cat "$stderr_file")" == *"pagination truncated"* ]]
+}
+
+@test "hitting the page cap exits 3 with an array on stdout" {
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_360"
+  run bash -c "'$SCRIPT' test/repo 360 2>'$stderr_file'"
+  [ "$status" -eq 3 ]
+  [ "$(printf '%s' "$output" | jq -c '.')" = '[]' ]
+  [[ "$(cat "$stderr_file")" == *"pagination limit"* ]]
+}
+
+@test "a complete multi-page fetch still exits 0" {
+  run "$SCRIPT" "test/repo" "300"
+  [ "$status" -eq 0 ]
 }

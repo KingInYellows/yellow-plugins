@@ -16,7 +16,9 @@
 # the branch-protection or ruleset lookup was unreadable, and it can occur
 # while lookupFailed is false.
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
-# with unknown fields and a note on stderr.
+# with unknown fields and a note on stderr. That includes a gh call that
+# exceeds YELLOW_REVIEW_GH_TIMEOUT (default 30 s, needs timeout(1); see
+# lib/resolve-gh.sh): it is treated like any other failed lookup.
 
 set -eu
 
@@ -48,6 +50,21 @@ if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
     unknown_json
     exit 0
 fi
+
+# A missing library must not fail the caller, and sourcing a missing file
+# would abort a non-interactive shell.
+RG_LIB="$(dirname -- "$0")/../../../lib/resolve-gh.sh"
+if [ ! -r "$RG_LIB" ]; then
+    note 'lib/resolve-gh.sh not readable; blockers unknown'
+    unknown_json
+    exit 0
+fi
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$RG_LIB"
+
+timeout_note() {
+    if [ "$1" -eq 124 ]; then note "gh timed out after ${RG_GH_TIMEOUT}s on the $2 lookup"; fi
+}
 
 ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/get-pr-blockers.XXXXXX") || { note 'mktemp failed; blockers unknown'; unknown_json; exit 0; }
 trap 'rm -f "$ERR_FILE"' EXIT
@@ -82,8 +99,10 @@ REVIEW_DECISION=null
 LOOKUP_FAILED=true
 BASE=""
 RESPONSE=""
-if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
-        -f query="$QUERY" 2>"$ERR_FILE") \
+REVIEW_RC=0
+RESPONSE=$(rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
+    -f query="$QUERY" 2>"$ERR_FILE") || REVIEW_RC=$?
+if [ "$REVIEW_RC" -eq 0 ] \
     && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e 'if ((.errors // []) | length) > 0 then empty else .data.repository.pullRequest | objects end' 2>/dev/null); then
     # A page past the first 100 reviewers would undercount; report unknown.
     if [ "$(printf '%s' "$PR_JSON" | jq -r '.latestOpinionatedReviews.pageInfo.hasNextPage // false')" = true ]; then
@@ -110,6 +129,7 @@ if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NU
 else
     # gh can exit 0 with a null pullRequest and the reason in .errors.
     GQL_MSG=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null) || GQL_MSG=""
+    timeout_note "$REVIEW_RC" review
     note "review lookup failed; changesRequested unknown: $(head -c 300 "$ERR_FILE")${GQL_MSG:+ $GQL_MSG}"
 fi
 
@@ -124,8 +144,10 @@ fi
 if [ -n "$BASE" ] && [ -z "$BASE_ENC" ]; then
     note 'base branch name could not be encoded; conversationResolution unknown'
 elif [ -n "$BASE" ]; then
-    if OUT=$(gh api "repos/$OWNER/$NAME/branches/$BASE_ENC/protection" \
-            --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE"); then
+    CLASSIC_RC=0
+    OUT=$(rg_gh api "repos/$OWNER/$NAME/branches/$BASE_ENC/protection" \
+        --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE") || CLASSIC_RC=$?
+    if [ "$CLASSIC_RC" -eq 0 ]; then
         case "$OUT" in
             true) CLASSIC=true ;;
             *) CLASSIC=false ;;
@@ -133,6 +155,7 @@ elif [ -n "$BASE" ]; then
     elif grep -q 'Branch not protected' "$ERR_FILE"; then
         CLASSIC=false
     else
+        timeout_note "$CLASSIC_RC" 'classic branch protection'
         # 403/404 for callers without admin rights: the setting is not visible.
         note 'classic branch protection not readable; treating as unknown'
     fi
@@ -140,7 +163,9 @@ elif [ -n "$BASE" ]; then
     # The endpoint returns 30 rules per page. --paginate prints one JSON array
     # per page, so combine every page with jq -s before applying any; a failed
     # page fails the whole lookup and RULES stays unknown.
-    if PAGES=$(gh api --paginate "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" 2>"$ERR_FILE") \
+    RULES_RC=0
+    PAGES=$(rg_gh api --paginate "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" 2>"$ERR_FILE") || RULES_RC=$?
+    if [ "$RULES_RC" -eq 0 ] \
         && OUT=$(printf '%s' "$PAGES" | jq -s \
             '[.[][] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
             2>>"$ERR_FILE"); then
@@ -149,6 +174,7 @@ elif [ -n "$BASE" ]; then
             *) RULES=false ;;
         esac
     else
+        timeout_note "$RULES_RC" 'branch rules'
         note "branch rules lookup failed: $(head -c 300 "$ERR_FILE")"
     fi
 fi
