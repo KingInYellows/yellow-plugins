@@ -1251,7 +1251,10 @@ through `Write`).
 
 If this block exits non-zero, do not synthesize: run the Step 8 Cancel
 cleanup block (substituting the same `CLAUDE_FENCED_FILE` literal), then
-stop.
+stop. Exception: when the error is `another council synthesis is in
+progress`, the state file belongs to that run and the Cancel block would
+unlink it, so also set the block's `KEEP_SYNTH_STATE` literal to `1`; the
+block then leaves the state file alone.
 
 #### 5b — Normalize and label
 
@@ -2844,6 +2847,10 @@ If user selects **Cancel**:
 
 ```bash
 # Self-contained: fresh subprocess, so re-load state inline
+# Leave at the placeholder (any value but 1) so the synthesis state file is
+# unlinked below. Set to 1 only after 5a refused because another synthesis is
+# live: that state file is the other run's capability, not ours to delete.
+KEEP_SYNTH_STATE="<0, or 1 only after 5a refused because another synthesis is live>"
 # Do NOT `|| exit 1` here: this line sits INSIDE the cleanup section, so
 # exiting on it skips the very unlinks this section exists to guarantee. A
 # missing git root only costs us the state file's contents — the minted claude
@@ -2914,7 +2921,7 @@ case "$CLAUDE_FENCED" in
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
-if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ]; then
+if [ "$KEEP_SYNTH_STATE" != 1 ] && [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.git/council-synth.state" ] && [ ! -L "$GIT_ROOT/.git/council-synth.state" ] && [ -O "$GIT_ROOT/.git/council-synth.state" ]; then
   rm -f -- "$GIT_ROOT/.git/council-synth.state" \
     || printf '[council] Warning: could not remove %s\n' "$GIT_ROOT/.git/council-synth.state" >&2
 fi
