@@ -350,10 +350,11 @@ Replies and issue bodies end with:
   the orchestrator runs on a Linear issue's title and description before
   `save_issue`). Exit 2 also means usage, an over-long body or a thread on a
   different pull request, so key the fallback on stderr, not the code: a
-  refusal prints one line first, `resolve-text: refused rule=<rule>
-  line=<n>` (`in=title` or `in=body` from `file-followup-issue`), or
-  `resolve-text: scan failed` when the scan did not run. The line names the
-  rule and line, never the text. Only then does the orchestrator post the
+  refusal prints a `resolve-text:` line, `refused rule=<rule> line=<n>`
+  (`in=title` or `in=body` from `file-followup-issue`) for a credential hit,
+  or `scan failed` when the scan did not run. Look for that line anywhere on
+  stderr rather than assume it is first (a missing `awk` writes its own error
+  line before it). The line names the rule and line, never the text. Only then does the orchestrator post the
   plain outcome sentence for that disposition, with no resolver text; any
   other exit 2 is a bad invocation to fix, not a reason to rewrite the text.
 - The body is written to a file and passed by path, never on a command line.

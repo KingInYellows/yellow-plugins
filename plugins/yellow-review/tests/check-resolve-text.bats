@@ -57,6 +57,23 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "a line of many keyword matches under the cap finishes quickly and is clean" {
+  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
+  # 150 inword `bypass="false"` matches: below the per-line cap, not credentials.
+  awk 'BEGIN { for (i = 0; i < 150; i++) printf "bypass=\"false\" "; printf "\n" }' >| "$A"
+  run timeout 20 "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a line over the per-line match cap is refused, not scanned quadratically" {
+  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
+  # ~1.5 MB of non-credential matches; the cap bounds the work and refuses.
+  awk 'BEGIN { for (i = 0; i < 100000; i++) printf "bypass=\"false\" "; printf "\n" }' >| "$A"
+  run --separate-stderr timeout 20 "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"resolve-text: refused rule=too-many-matches line=1"* ]]
+}
+
 @test "an unquoted lowercase credential assignment exits 2" {
   printf '%s\n' 'password: hunter22' >| "$A"
   run "$SCRIPT" "$A"
@@ -157,6 +174,21 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
 @test "a placeholder-only separated value is not flagged" {
   printf '%s\n' 'token: optional-string' 'password: required-value' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "unquoted values separated by punctuation such as . and @ exit 2" {
+  for t in 'password: hunter@cats' 'token: correct.horse.battery' 'secret: horse+battery!staple'; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done
+}
+
+@test "placeholder-only punctuation-separated values and prose stay clean" {
+  printf '%s\n' 'password: <placeholder>' 'token: the.value' 'secret: optional@string' \
+    'The token: see the docs.' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
@@ -272,6 +304,19 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
   printf 'leaked %s\n' 'qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "the identifier exemption stops at 256 characters so appended key material is refused" {
+  local unit='Abcd' body='' i
+  for i in $(seq 1 63); do body="$body$unit"; done
+  printf 'Renamed %sab12 today.\n' "$body" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  body=''
+  for i in $(seq 1 65); do body="$body$unit"; done
+  printf 'leaked %s%s\n' "$body" 'qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 2 ]
 }

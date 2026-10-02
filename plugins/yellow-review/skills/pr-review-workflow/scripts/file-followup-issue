@@ -12,11 +12,14 @@
 #   --find prints {"exists":true,"number":N,"url":"..."} for such an issue
 #   and {"exists":false} when the window shows none.
 # Exit codes: 1 gh failure, 2 usage, text that looks like a credential (or
-#             cannot be scanned; stderr then starts with a `resolve-text:`
-#             line naming the rule and line, never the text), or a thread
+#             cannot be scanned; a refusal prints a `resolve-text:` line,
+#             never the text: `refused rule=<rule> line=<n>` for a credential
+#             hit, `scan failed` when the scan did not run; look for that
+#             line anywhere on stderr, it is not always first), or a thread
 #             that belongs to a different pull request, 4 rate limited or a gh call timed out (no retry
-#             here; the caller stops mutating; a timed-out create may have
-#             filed, and a re-run finds it by its marker), 5 the dedupe
+#             here; the caller stops mutating; a timed-out create or
+#             duplicate close may have changed state, and a re-run finds the
+#             issue by its marker), 5 the dedupe
 #             window is full and holds no marker: an older issue may carry
 #             it, so nothing is filed and the thread stays open (not a
 #             transient failure; retrying does not help).
@@ -235,9 +238,18 @@ if rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limi
         | sort_by(.number) | first // empty
         | {number, url, created: false}' "$WORK_DIR/issues-after.json" 2>/dev/null || true)
     if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
-        rg_gh issue close "$URL" --reason 'not planned' \
-            --comment "Duplicate of #$(printf '%s\n' "$WINNER" | jq -r '.number'), filed concurrently for the same review thread." \
-            >/dev/null 2>&1 || true
+        # Ordinary close failures are best effort; a timeout may have changed
+        # state, so it stops the caller (exit 4) like any other timed-out call.
+        if rg_gh issue close "$URL" --reason 'not planned' \
+                --comment "Duplicate of #$(printf '%s\n' "$WINNER" | jq -r '.number'), filed concurrently for the same review thread." \
+                >/dev/null 2>"$ERR"; then
+            :
+        else
+            CLOSE_RC=$?
+            if [ "$CLOSE_RC" -eq 124 ]; then
+                gh_fail 'duplicate issue close' "$CLOSE_RC"
+            fi
+        fi
         printf '%s\n' "$WINNER"
         exit 0
     fi
