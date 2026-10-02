@@ -563,8 +563,8 @@ debt_pending_todos() {
 }
 
 # Print the next free todo ids, one per line, zero-padded to three digits: COUNT
-# ids (default 1) above the highest leading number of any regular *.md under
-# todos/debt/, skipping a number a symlink or directory holds (the resolver
+# ids (default 1; 0 prints nothing) above the highest leading number of any
+# regular *.md under todos/debt/, skipping a number a symlink or directory holds (the resolver
 # sees it, so reusing the number would make the new todo ambiguous). Neither
 # ever raises the counter, so a planted `999999-…` link cannot exhaust the id
 # space. Ids are 1-6 digits everywhere else, so a larger one is ignored. Run
@@ -572,8 +572,10 @@ debt_pending_todos() {
 # Usage: debt_next_todo_id [COUNT]
 debt_next_todo_id() {
   local count="${1:-1}" f base id max=0 k n held=" "
-  [[ "$count" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$count))" -ge 1 ] || {
-    printf '[debt] Error: count must be 1-9999\n' >&2; return 1; }
+  [[ "$count" =~ ^[0-9]{1,4}$ ]] || {
+    printf '[debt] Error: count must be 0-9999\n' >&2; return 1; }
+  # A clean audit, or one where every finding matches a kept todo, needs none.
+  [ "$((10#$count))" -ge 1 ] || return 0
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/*.md; do
     [ -e "$f" ] || [ -L "$f" ] || continue

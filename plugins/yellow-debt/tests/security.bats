@@ -996,6 +996,15 @@ sha16_ref() {
   [ "${lines[1]}" = "007" ]
 }
 
+@test "debt_next_todo_id accepts zero as a no-output success" {
+  run debt_next_todo_id 0
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run --separate-stderr debt_next_todo_id x
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"count must be 0-9999"* ]]
+}
+
 @test "debt_next_todo_id starts at 001 with no todos and refuses when ids run out" {
   run debt_next_todo_id
   [ "$output" = "001" ]
