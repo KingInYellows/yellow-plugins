@@ -1,0 +1,25 @@
+.changeset/core-setup-all-web-signals-mirror-note.md
+  s_7a82748dd606d9::t_df25e80fa8d030 11-12
+.changeset/research-setup-shell-env-wording.md
+  s_7a82748dd606d9::t_27f71c7464bca2 13-17
+plugins/yellow-core/tests/web-app-signals.bats
+  s_7a82748dd606d9::t_c4a46fb12c0353 1-159
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_72831edea7c976 340-344,349-350,443-447,452-453,549-553,558-559,564-565
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b86e5d7f4c29730e31755d02ad407d441b78a079",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
