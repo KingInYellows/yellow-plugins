@@ -581,7 +581,13 @@ Replies and issue bodies end with:
     attempted (rate limit)`, counts as blocking, and sets `ratelimited=1`.
   - `reason=timeout`: every remaining thread is reported as `not attempted
     (gh timeout)` and counts as blocking. `ratelimited` stays `0`: no limit
-    occurred, so batch callers keep working through their other PRs.
+    occurred, so batch callers keep working through their other PRs. Step 7
+    also records `write_stopped=timeout`.
+  - The re-pass (Step 8) runs only when no exit 4 stopped the write phase:
+    after `reason=rate-limit` (`ratelimited=1`) or `reason=timeout`
+    (`write_stopped=timeout`) it is skipped, because a timed-out call may have
+    landed and retries or new-thread writes wait for a later run. The report
+    says the re-pass was skipped because the write phase stopped on a timeout.
   - A missing or unrecognized reason is treated as `rate-limit` (fail
     safe).
 

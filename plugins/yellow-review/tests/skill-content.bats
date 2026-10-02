@@ -538,3 +538,29 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$step6flat" == *'**Marker cleanup.**'* ]]
   flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
 }
+
+@test "resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'keep `ratelimited=0`, but also record `write_stopped=timeout` so Step 8 does not run'* ]]
+  [[ "$text" == *'no exit 4 stopped the write phase (neither `ratelimited=1` nor `write_stopped=timeout`)'* ]]
+  [[ "$text" == *'report that the re-pass was skipped because the write phase stopped on a timeout'* ]]
+  # The old entry condition keyed on a rate limit alone.
+  [[ "$text" != *'Run only when the tree is clean, no rate limit was hit,'* ]]
+}
+
+@test "dispositions: the re-pass is skipped after any exit 4, rate limit or timeout" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'The re-pass (Step 8) runs only when no exit 4 stopped the write phase'* ]]
+  [[ "$text" == *'(`write_stopped=timeout`) it is skipped'* ]]
+  [[ "$text" == *'the re-pass was skipped because the write phase stopped on a timeout'* ]]
+}
+
+@test "README: documents the optional yellow-linear routing, dedupe, fallback and text check" {
+  text=$(flat "${BATS_TEST_DIRNAME}/../README.md")
+  [[ "$text" == *'`yellow-linear` is an optional dependency'* ]]
+  [[ "$text" == *'the branch name matches `[A-Z]{2,5}-[0-9]{1,6}`'* ]]
+  [[ "$text" == *'may write to Linear through the yellow-linear MCP server'* ]]
+  [[ "$text" == *'falls back to GitHub once'* ]]
+  [[ "$text" == *'`tracker=github (linear unavailable)`'* ]]
+  [[ "$text" == *'`check-resolve-text` before `save_issue`'* ]]
+}
