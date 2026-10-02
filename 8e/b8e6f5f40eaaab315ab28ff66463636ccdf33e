@@ -1,0 +1,19 @@
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_e0e3718c40e1d0::t_79fd8f1295308c 85-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8eb8e6f5f40eaaab315ab28ff66463636ccdf33e",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
