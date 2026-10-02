@@ -1,0 +1,21 @@
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_a19610affb8572 1254-1257,2850-2853,2924
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_a8cd3e6016af2d 490-497,500,519-520,614-616,621-623,655-657,660-661,664-665,667-670,743-745,797-806,848-903,913-914,931-932
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4a9c68530c4d2f7b26123b5103b3c7924b55ac66",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
