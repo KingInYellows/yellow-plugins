@@ -1397,7 +1397,7 @@ run_status_block() {
   run debt_next_todo_id 3
   [ "$status" -eq 0 ]
   [ "$output" = $'009\n010\n011' ]
-  run debt_next_todo_id 0
+  run debt_next_todo_id 10000
   [ "$status" -eq 1 ]
   run debt_next_todo_id abc
   [ "$status" -eq 1 ]
