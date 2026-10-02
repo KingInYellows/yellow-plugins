@@ -110,11 +110,11 @@ command on the next PR in the walk.
 Guidance: do not detect trusted-config tampering through git. At
 pre-flight, record whether each trusted-config path exists, and hash every
 one that does, ignored ones included. The path set is the resolver deny
-list: the "File set" section of `references/resolve/dispositions.md`
+list: the "File set" section of `plugins/yellow-review/references/resolve/dispositions.md`
 (PR #950 adds the file with that section marked planned; PR #954 makes it
-final) and `rp_denied` in `lib/resolve-paths.sh` are the canonical source,
+final) and `rp_denied` in `plugins/yellow-review/lib/resolve-paths.sh` are the canonical source,
 so do not copy the list here or into the walk. Point-in-time: neither
-file is on trunk yet. `lib/resolve-paths.sh` ships with PR #952, which
+file is on trunk yet. `plugins/yellow-review/lib/resolve-paths.sh` ships with PR #952, which
 #954 stacks on, so a checkout without those PRs has no canonical list.
 After each resolve, compare both existence and content, because a resolver
 can create an optional file such as `yellow-plugins.local.md` that a later

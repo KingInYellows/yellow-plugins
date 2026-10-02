@@ -128,8 +128,15 @@ for that residual.
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
 STAGE_DIR="<literal path from call 1>"
 STAGE_TOKEN="<literal token from call 1>"
-# Run every Call 3 check verbatim here (non-empty, root-strip case, -d/-L/-O
-# and the .token comparison), each ending in `|| exit 1`, so a mismatch refuses to delete.
+[ -n "$STAGE_DIR" ] && [ -n "$STAGE_TOKEN" ] || exit 1
+case "${STAGE_DIR#"$TMP_ROOT"/}" in
+  "$STAGE_DIR"|*/*|*..*) exit 1 ;;
+  stage.?*) ;;
+  *) exit 1 ;;
+esac
+[ -d "$STAGE_DIR" ] && [ ! -L "$STAGE_DIR" ] && [ -O "$STAGE_DIR" ] || exit 1
+[ -f "$STAGE_DIR/.token" ] && [ ! -L "$STAGE_DIR/.token" ] || exit 1
+[ "$(cat -- "$STAGE_DIR/.token")" = "$STAGE_TOKEN" ] || exit 1
 rm -rf -- "$STAGE_DIR"
 ```
 
