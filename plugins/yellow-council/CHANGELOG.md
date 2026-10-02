@@ -1,5 +1,28 @@
 # yellow-council
 
+## 0.4.0
+
+### Minor Changes
+
+- [`f7987a5`](https://github.com/KingInYellows/yellow-plugins/commit/f7987a5d7fac5b15cc487a4a6258080ffde6df2e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rebuild
+  `/council` synthesis to resist synthesizer bias: reviewer text is normalized
+  (markdown and severity formats flattened, code, citations and evidence quotes
+  kept byte-for-byte) and relabeled with per-run random `S1`–`S4` labels before
+  synthesis; Pass A enumerates findings before comparing them and scores each on
+  a four-dimension rubric (correctness self-assessed for now) combined without
+  weighting; an order-swapped Pass B marks verdict flips as
+  `low-confidence-synthesis` ties and reports their share in the headline. Adds
+  `--single-pass` and `COUNCIL_DOUBLE_PASS_SYNTHESIS` to skip Pass B.
+
+### Patch Changes
+
+- [`ca91e6a`](https://github.com/KingInYellows/yellow-plugins/commit/ca91e6ae496fd9ff100f7e5031dfbe3be8ca6d32)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Keep
+  `/council`'s synthesis staging directory and token in a shell-owned
+  `.git/council-synth.state` file instead of model-relayed text; see
+  `docs/security.md` "Synthesis staging directory (yellow-council)".
+
 ## 0.3.4
 
 ### Patch Changes
