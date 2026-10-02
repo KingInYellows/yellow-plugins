@@ -206,6 +206,15 @@ synthesizing a plausible-looking summary. Blocking threads do not change
 this command's exit code: they are reported, and `/review:sweep-all` (or a
 later `/review:sweep`) picks up anything a reviewer adds afterwards.
 
+Finish with the contract line as the very last line of output, after the
+summary block and the ledger line. Print it exactly as `/review:resolve`
+emitted it: unindented, with no label or prefix added, and nothing printed
+after it. When Step 3 produced no `Resolve:` line, print the
+`Resolve: completed (output unavailable — see above)` fallback instead.
+The indented `Resolve:` row in the summary stays; the final line repeats the
+contract so `/review:sweep-all` (which reads only the last line of this
+command's output) can parse `blocking` and `ratelimited`.
+
 ## Error Handling
 
 - **Argument unresolvable** (input is not numeric, a recognizable
@@ -229,7 +238,7 @@ later `/review:sweep`) picks up anything a reviewer adds afterwards.
   state — inspect its output and re-run components manually if needed.
 - **`/review:resolve` returns no `Resolve:` line**: report
   `Resolve: completed (output unavailable — see above)` rather than
-  synthesizing one.
+  synthesizing one. Either way, that line is printed last (Step 4).
 - **Ledger step fails** (Step 3b): report `Ledger:  unavailable` and finish
   normally — the ledger never blocks a sweep.
 - **Zero unresolved threads** is a clean outcome — `/review:resolve`

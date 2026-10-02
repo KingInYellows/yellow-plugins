@@ -4,6 +4,7 @@ description: 'Run /review:sweep on every open non-draft PR authored by the curre
 argument-hint: ''
 allowed-tools:
   - Bash
+  - Read
   - AskUserQuestion
   - Skill
 ---
@@ -238,7 +239,7 @@ For each iteration:
      the sweep is item 4's stop, not a skip.
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
    leaves the tree clean (fixes are committed and pushed; a failed verify
-   reverts its files). If it is dirty, read
+   reverts its files). If it is dirty, Read
    `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/dirty-tree-cleanup.md` and run its
    procedure with this PR's number to revert the sweep's own edits. Add
    `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes` —
