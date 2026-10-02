@@ -155,9 +155,9 @@ Closing a todo does not close its Linear issue.
   says `wont_fix` is still counted as pending there; `/debt:status` reports
   it and prints the repair recipe
 - Suppression trusts the `todos/debt/` files in the repository: a well-named
-  `wont-fix`, `ready`, `in-progress` or `deleted` todo hides the finding it
-  describes, `security-debt` included, without a triage decision on this
-  machine. That is how a team shares decisions through git, so audit only
+  `wont-fix`, `ready`, `in-progress`, `deleted` or `complete` todo hides the
+  finding it describes, `security-debt` included, without a triage decision on
+  this machine. That is how a team shares decisions through git, so audit only
   repositories you trust, and do not read an audit of a repository you do not
   control as proof that it has no findings
 - Fix agent modifies working directory — commit or stash changes first

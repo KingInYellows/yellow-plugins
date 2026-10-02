@@ -1150,7 +1150,7 @@ run_status_block() {
   done
   run env -u _VALIDATE_FS_LOADED CLAUDE_PLUGIN_ROOT="$cache/yellow-debt/1.0.0" bash -c '. "$CLAUDE_PLUGIN_ROOT/lib/validate.sh" 2>&1; printf "%s\n" "$_VFS_MARK"'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"1.10.0" ]]
+  [ "${lines[-1]}" = "1.10.0" ]
 }
 
 @test "validate.sh ranks numeric prerelease identifiers numerically" {
@@ -1162,7 +1162,7 @@ run_status_block() {
   done
   run env -u _VALIDATE_FS_LOADED CLAUDE_PLUGIN_ROOT="$cache/yellow-debt/1.0.0" bash -c '. "$CLAUDE_PLUGIN_ROOT/lib/validate.sh" 2>&1; printf "%s\n" "$_VFS_MARK"'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"beta.10" ]]
+  [ "${lines[-1]}" = "1.10.0-beta.10" ]
 }
 
 @test "reconciliation stops when yq is missing instead of treating every todo as unreadable" {
