@@ -4,8 +4,8 @@ date: 2026-05-17
 category: code-quality
 track: knowledge
 problem: 'When should cross-plugin shared logic be inlined vs skills: frontmatter vs subagent vs bash lib'
-tags: [cross-plugin, skills, mcp, context7, inline-replication, toolsearch, fallback-chain, rule-13, validate-agent-authoring]
-components: [yellow-core, yellow-research, validate-agent-authoring]
+tags: [cross-plugin, skills, mcp, context7, inline-replication, toolsearch, fallback-chain, rule-13, validate-agent-authoring, versioned-plugin-cache, claude-plugin-root]
+components: [yellow-core, yellow-research, validate-agent-authoring, plugins/yellow-debt/lib/validate.sh]
 ---
 
 ## Context
@@ -314,3 +314,44 @@ wildcards), but the gap was real for any author who did. **Fixed** — added
 a `CONTEXT7_WILDCARD_TOOL = 'mcp__context7__*'` literal checked alongside
 the `CONTEXT7_TOOLS` Set, plus a regression fixture proving the wildcard
 form now trips RULE 13.
+
+---
+
+## Update — 2026-10-02
+
+### A sibling-plugin lib path that works in a checkout fails in the installed cache (PR #977 review)
+
+yellow-debt's `lib/validate.sh` sourced yellow-core's shared helper through
+`${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/validate-fs.sh`. In a checkout the
+plugins are siblings, so the path resolves. In the installed cache each plugin
+sits in a versioned directory (`yellow-debt/1.7.4`, `yellow-core/2.6.0`), so
+`../yellow-core` does not exist. `validate_file_path` was left undefined, every
+new fingerprint call failed silently, and the feature did nothing for installed
+users. CI stayed green because every bats suite sourced
+`../../yellow-core/lib/validate-fs.sh` directly and never went through
+`CLAUDE_PLUGIN_ROOT`. Architecture and adversarial review found it; tests could
+not. The same path was already on `main`, so older callers were affected too.
+
+**Fix** (commit `d00e1229`):
+
+- Try the checkout path first, then fall back to the highest versioned sibling:
+  `"${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh | sort -V | tail -n 1`.
+  Use `sort -V`, not lexical order (see
+  `docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md`).
+- Fail loudly, naming the missing dependency, when neither path resolves. A
+  caller must never hit exit 127 or a silent no-op with no hint.
+- Add a test that builds a `cache/<plugin>/<version>` tree (several yellow-core
+  versions, `1.9.0` and `1.10.0` to prove version ordering), sets
+  `CLAUDE_PLUGIN_ROOT`, and sources the library through it
+  (`plugins/yellow-debt/tests/security.bats`, "finds the highest yellow-core in
+  the versioned plugin cache").
+
+**Prevention:**
+
+- [ ] A cross-plugin `source` path is a layout claim. State both layouts
+      (checkout sibling, versioned cache) and test the one users run.
+- [ ] A suite that sources the dependency directly cannot see a broken
+      runtime path. At least one test must enter through `CLAUDE_PLUGIN_ROOT`
+      with a cache-shaped tree.
+- [ ] Fail loudly when a cross-plugin helper is missing; a silent no-op passes
+      CI and ships.

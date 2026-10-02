@@ -81,3 +81,38 @@ source of truth (frontmatter) first.
   transition table it relies on must be asserted to match its text.
 - Related: `docs/solutions/logic-errors/stale-sweep-deletes-hand-authored-file.md`,
   `docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md`.
+
+---
+
+## Update — 2026-10-02
+
+Second review round on PR #977 (fixed in `d00e1229`) found four more faults in
+the same feature.
+
+- **Status source disagreed between functions.** A matcher took a todo's status
+  from its file name while the delete step took it from the frontmatter, so a
+  closed legacy todo named `pending` survived the wipe but never suppressed its
+  finding. Every function that decides what is closed must read the frontmatter
+  status, and legacy spellings are mapped once.
+- **The fuzzy anchor tier was too wide.** It matched `complete` and `deleted`
+  todos, so a fixed function that regrew, or a later real finding on the same
+  line, stayed hidden. The tier now applies only to statuses whose code is
+  expected to be unchanged, and needs a substantive line (20+ bytes).
+- **An exact-identity tie was treated as ambiguous.** Two kept todos with the
+  same fingerprint made a finding closed twice come back every audit. An exact
+  fingerprint is unambiguous: suppress on one or more. Keep the uniqueness rule
+  for the fuzzy tier only.
+- **Delete ran before the fallible matcher.** A matcher failure then left
+  neither the old nor the new todos. The audit now runs the read-only matcher
+  first and deletes afterwards, and stops if listing pending todos fails.
+
+**Prevention additions:**
+
+- [ ] Order read-only, fallible steps before destructive ones.
+- [ ] Apply "uncertain means resurface" only to fuzzy matching. Exact identity
+      is not uncertain, and treating a tie there as doubt re-opens closed work.
+- [ ] Decision logic that appears in several functions (what counts as closed)
+      should have one reader of the source-of-truth field.
+- See also the installed-layout lesson in
+  `docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md`
+  ("Update — 2026-10-02").
