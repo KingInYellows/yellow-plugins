@@ -205,6 +205,7 @@ __YELLOW_DEBT_BASH__
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
 DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt")
 rm -f -- "$2/reason.txt"
 rmdir -- "$2"
@@ -257,6 +258,7 @@ __YELLOW_DEBT_BASH__
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
 REASON=$(tr -d '\n\r' < "$2/reason.txt")
 rm -f -- "$2/reason.txt"
 rmdir -- "$2"

@@ -340,11 +340,15 @@ _debt_sha16() {
 _debt_flagged_text() {
   local path="$1" start="$2" end="$3"
   command -v validate_file_path >/dev/null 2>&1 || return 1
-  validate_file_path "$path" || return 1
+  validate_file_path "$path" "$PWD" || return 1
   [ ! -L "$path" ] && [ -f "$path" ] || return 1
   [[ "$start" =~ ^[0-9]{1,9}$ && "$end" =~ ^[0-9]{1,9}$ ]] || return 1
   [ "$((10#$start))" -ge 1 ] && [ "$((10#$start))" -le "$((10#$end))" ] || return 1
-  sed -n "$((10#$start)),$((10#$end))p" -- "$path" | tr -d ' \t\r'
+  # A scanner range is a few dozen lines; a huge one is malformed and makes
+  # the finding resurface instead of hashing thousands of lines.
+  [ "$((10#$end - 10#$start))" -lt 200 ] || return 1
+  # File on stdin: BSD sed reads a `--` after the script as a file name.
+  sed -n "$((10#$start)),$((10#$end))p;$((10#$end))q" < "$path" | tr -d ' \t\r'
 }
 
 # Usage: debt_fingerprint CATEGORY PATH [START END]
@@ -360,23 +364,28 @@ debt_fingerprint() {
     [ -n "$(printf '%s' "$text" | tr -d '\n')" ] || return 1
   else
     command -v validate_file_path >/dev/null 2>&1 || return 1
-    validate_file_path "$path" || return 1
+    validate_file_path "$path" "$PWD" || return 1
   fi
   local digest
   digest=$({ printf 'fp/v1\0%s\0%s\0' "$category" "$path"; printf '%s' "$text"; } | _debt_sha16) || return 1
   printf 'fp/v1:%s\n' "$digest"
 }
 
-# Usage: debt_anchor_hashes PATH START END
-# Prints one 16-hex hash per non-blank line of the range, in order. The first
-# is the todo's `anchor_hash`; the rest let a later run match a finding whose
-# range shifted by a few lines.
+# Usage: debt_anchor_hashes PATH START END [LIMIT]
+# Prints one 16-hex hash per substantive line of the range, in order: a line
+# with at least 8 characters once whitespace is removed. Shorter lines (`}`,
+# `else {`, `return nil`) occur all over a file and would match unrelated
+# findings. The first hash is the todo's `anchor_hash`; the rest let a later
+# run match a finding whose range shifted. LIMIT stops after that many hashes.
 debt_anchor_hashes() {
-  local line text
+  local line text limit="${4:-0}" n=0
+  [[ "$limit" =~ ^[0-9]{1,4}$ ]] || return 1
   text=$(_debt_flagged_text "$1" "$2" "$3") || return 1
   while IFS= read -r line || [ -n "$line" ]; do
-    [ -n "$line" ] || continue
+    [ "${#line}" -ge 8 ] || continue
     printf '%s' "$line" | _debt_sha16 || return 1
+    n=$((n + 1))
+    [ "$limit" -eq 0 ] || [ "$n" -lt "$limit" ] || break
   done <<<"$text"
 }
 

@@ -311,7 +311,8 @@ field against allowed values.
 New todos carry `fingerprint: fp/v1:<16 hex>` and `anchor_hash`, both computed
 in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
 fingerprint hashes the category, the path and the flagged code with spaces,
-tabs and CR removed; `anchor_hash` hashes the first non-blank flagged line.
+tabs and CR removed; `anchor_hash` hashes the first substantive flagged line (8+ characters once
+whitespace is removed). Anchor matching never applies to `security-debt`.
 `audit-synthesizer` uses them to skip a new finding that matches a kept todo
 (any status except `pending`): exact fingerprint first, then the same category
 and path with a matching anchor. Only a unique match suppresses; ties and edited

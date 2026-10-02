@@ -664,16 +664,16 @@ frontmatter_field() {
 
 make_source() {
   mkdir -p src
-  printf 'top\nfoo(1)\n  bar()\nbaz()\nqux()\n' > src/a.js
+  printf 'top\nfoo(alpha)\n  bar(beta)\nbaz()\nqux()\n' > src/a.js
 }
 
 @test "debt_fingerprint ignores inserted lines above and re-indentation, not code edits" {
   make_source
   before=$(debt_fingerprint complexity src/a.js 2 3)
   [[ "$before" =~ ^fp/v1:[0-9a-f]{16}$ ]]
-  printf 'n1\nn2\nn3\ntop\n      foo(1)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  printf 'n1\nn2\nn3\ntop\n      foo(alpha)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
   [ "$(debt_fingerprint complexity src/a.js 5 6)" = "$before" ]
-  printf 'n1\nn2\nn3\ntop\n      foo(2)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  printf 'n1\nn2\nn3\ntop\n      foo(gamma)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
   [ "$(debt_fingerprint complexity src/a.js 5 6)" != "$before" ]
   [ "$(debt_fingerprint duplication src/a.js 5 6)" != "$(debt_fingerprint complexity src/a.js 5 6)" ]
 }
@@ -698,14 +698,16 @@ make_source() {
   [ "$(debt_fingerprint complexity src/a.js)" = "$one" ]
 }
 
-# Runs the synthesizer's kept-todo matching block (Step 5a) and prints the
-# per-finding results from .debt/fingerprints.json, one compact object per line.
+# Runs the synthesizer's kept-todo matching block (Step 5a), then loads the
+# per-finding results from .debt/fingerprints.json into `lines`, one compact
+# object per element. Call it directly, not through `run`.
 run_match_block() {
   mkdir -p .debt
-  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 3 > "$BATS_TEST_TMPDIR/match.sh"
+  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 4 > "$BATS_TEST_TMPDIR/match.sh"
   CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/match.sh"
   [ "$status" -eq 0 ]
-  jq -c '.[]' .debt/fingerprints.json
+  lines=()
+  while IFS= read -r line; do lines+=("$line"); done < <(jq -c '.[]' .debt/fingerprints.json)
 }
 
 write_surviving() {
@@ -726,11 +728,10 @@ write_surviving() {
   fp=$(debt_fingerprint complexity src/a.js 2 3)
   anchor=$(debt_anchor_hashes src/a.js 2 3 | head -n 1)
   make_todo 007 wont-fix 007-wont-fix-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
-  printf 'n1\nn2\nn3\ntop\n      foo(1)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  printf 'n1\nn2\nn3\ntop\n      foo(alpha)\n\t\tbar(beta)\nbaz()\nqux()\n' > src/a.js
   mkdir -p .debt
   write_surviving 5-6 5-7 4-4
-  run run_match_block
-  [ "$status" -eq 0 ]
+  run_match_block
   [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'*'"status":"wont-fix"'*'"match":"fingerprint"'* ]]
   [[ "${lines[1]}" == *'"skip":true'*'"match":"anchor"'* ]]
   [[ "${lines[2]}" == *'"skip":false'*'"fingerprint":"fp/v1:'* ]]
@@ -745,8 +746,7 @@ write_surviving() {
   make_todo 008 complete 008-complete-high-bbb.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
   mkdir -p .debt
   write_surviving 2-3
-  run run_match_block
-  [ "$status" -eq 0 ]
+  run_match_block
   [[ "${lines[0]}" == *'"skip":false'* ]]
 }
 
@@ -758,7 +758,7 @@ write_surviving() {
   make_todo 007 pending 007-pending-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
   mkdir -p .debt
   write_surviving 2-3
-  run run_match_block
+  run_match_block
   [[ "${lines[0]}" == *'"skip":false'* ]]
 }
 
@@ -769,8 +769,8 @@ write_surviving() {
   : > todos/debt/012-pending-bogus-name.md
   : > todos/debt/notes.md
   init_repo
-  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 4 > "$BATS_TEST_TMPDIR/nextid.sh"
-  run bash "$BATS_TEST_TMPDIR/nextid.sh"
+  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 5 > "$BATS_TEST_TMPDIR/nextid.sh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/nextid.sh"
   [ "$status" -eq 0 ]
   [ "$output" = "013" ]
 }
@@ -793,4 +793,32 @@ write_surviving() {
   run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md deferred '--help'
   [ "$status" -eq 0 ]
   [ "$(frontmatter_field todos/debt/001-deferred-high-long-fn-abc123.md .deferred_reason)" = "--help" ]
+}
+
+@test "debt_fingerprint refuses a range of 200 lines or more" {
+  seq 1 400 | sed 's/^/statement_/' > big.js
+  run debt_fingerprint complexity big.js 1 100
+  [ "$status" -eq 0 ]
+  run debt_fingerprint complexity big.js 1 300
+  [ "$status" -eq 1 ]
+}
+
+@test "debt_anchor_hashes skips short lines and honours LIMIT" {
+  printf '}\nelse {\nlong_statement(one)\nlong_statement(two)\n' > a.js
+  run debt_anchor_hashes a.js 1 4
+  [ "${#lines[@]}" -eq 2 ]
+  run debt_anchor_hashes a.js 1 4 1
+  [ "${#lines[@]}" -eq 1 ]
+}
+
+@test "synthesizer block never anchor-matches a security-debt finding" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  anchor=$(debt_anchor_hashes src/a.js 2 3 | head -n 1)
+  printf -- '---\nstatus: wont-fix\ncategory: security-debt\naffected_files:\n  - src/a.js:2-3\nanchor_hash: %s\n---\nB\n' "$anchor" > todos/debt/007-wont-fix-high-aaa.md
+  mkdir -p .debt
+  printf '[{"category":"security-debt","file":{"path":"src/a.js","lines":"1-5"},"finding":"f"}]' > .debt/surviving-findings.json
+  run_match_block
+  [[ "${lines[0]}" == *'"skip":false'* ]]
 }

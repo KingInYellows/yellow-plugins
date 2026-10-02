@@ -79,7 +79,9 @@ check_status_md() {
   readme_block=$(awk '/^## State Machine/{f=1;next} /^## /{f=0} f' "$README_MD")
   preserve=$(awk '/Preserve all other states/{f=1} f{print} f&&/\)/{exit}' "$SYNTH_MD" | tr '\n' ' ')
   transitions=$(awk '/^validate_transition\(\)/{f=1} f{print} f&&/^}/{exit}' "$PLUGIN_ROOT/lib/validate.sh")
-  [ -n "$readme_block" ] && [ -n "$preserve" ] && [ -n "$transitions" ]
+  [ -n "$readme_block" ] || { echo "no README State Machine block"; return 1; }
+  [ -n "$preserve" ] || { echo "no synthesizer preserve list"; return 1; }
+  [ -n "$transitions" ] || { echo "no validate_transition body"; return 1; }
   for st in $(canonical_statuses); do
     need_literal "$SKILL_MD" "- \`$st\` —" "SKILL.md bullet for $st"
     need_token "$st" "README State Machine token for $st" <<<"$readme_block"

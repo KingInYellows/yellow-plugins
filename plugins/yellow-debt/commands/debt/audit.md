@@ -106,7 +106,8 @@ fi
 # A cloned repository can ship .debt/ or its files as symlinks; refuse
 # rather than write through them. debt_write_file writes via mktemp + mv.
 debt_refuse_symlinks .debt .debt/scanner-output .debt/file-list.txt \
-  .debt/scanners-to-run.txt .debt/severity-filter.txt || exit 1
+  .debt/scanners-to-run.txt .debt/severity-filter.txt \
+  .debt/surviving-findings.json .debt/fingerprints.json || exit 1
 
 # Create scanner output directory
 mkdir -p .debt/scanner-output || {

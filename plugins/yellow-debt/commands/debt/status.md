@@ -103,7 +103,11 @@ if [ -d todos/debt ]; then
       wont_fix|wontfix|"wont fix")
         # Hand-written spelling. The value is frontmatter text: print it only
         # through %s, never inside a heredoc.
-        printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: transition_todo_state "$(debt_resolve_todo <id> <filename-status>)" wont-fix (a filename containing wont_fix needs a manual rename to the -pending- form first)\n' "$STATUS" "$todo_file" >&2
+        if debt_todo_name_ok "${todo_file##*/}"; then
+          printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: transition_todo_state "$(debt_resolve_todo <id> <filename-status>)" wont-fix\n' "$STATUS" "$todo_file" >&2
+        else
+          printf '[status] WARNING: Status "%s" in %s should be wont-fix, but the file name does not fit the todo pattern; rename it by hand to the -pending- form first\n' "$STATUS" "$todo_file" >&2
+        fi
         ERROR_COUNT=$((ERROR_COUNT + 1))
         ;;
       *)
