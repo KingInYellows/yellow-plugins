@@ -20,7 +20,12 @@ Remedy, in order (full detail in
 
 1. Quiesce writes. Finish or abandon any ruvector-writing command in the session.
 2. Run the plugin-pinned wrapper with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed --dry-run`. If `wouldDrop` is nonzero, confirm with the user before accepting the loss of those memories (`--drop-missing` discards them).
-3. Confirm with the user immediately before the real reembed, whatever `wouldDrop` is: an agent asks via `AskUserQuestion`, because the reembed rewrites `.ruvector/intelligence.json` while the running MCP server still holds an older snapshot. Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed` (verified once: 388 memories re-embedded to 384-dim). If `wouldDrop` was nonzero, state in the confirmation that the dropped memories are lost irreversibly and that a backup of `.ruvector/intelligence.json` should exist first; only after the user confirms, add `--drop-missing` (without it reembed refuses to proceed).
+3. Confirm with the user before the real reembed, whatever `wouldDrop` is: an agent asks via `AskUserQuestion`, because the reembed rewrites `.ruvector/intelligence.json`. Settle everything below before running the command:
+   - If `wouldDrop` is nonzero, tell the user the dropped memories are lost irreversibly.
+   - Create a backup first: `cp .ruvector/intelligence.json ".ruvector/intelligence.json.bak-$(date +%Y%m%d-%H%M%S)"`.
+   - The user's answer decides whether `--drop-missing` is added. Without it, reembed refuses to proceed when `wouldDrop` is nonzero.
+
+   Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed`, adding `--drop-missing` only after the user confirmed the drop (verified once: 388 memories re-embedded to 384-dim).
 4. Restart Claude Code before any further write. The running MCP server holds the pre-reembed snapshot, and its next save would overwrite the reembedded store.
 
 ## Source
