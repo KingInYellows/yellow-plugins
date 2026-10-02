@@ -1,0 +1,34 @@
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_becc7011266565::t_7f17ab5c749ff8 254-255
+  s_becc7011266565::t_dfdbae1f8c3539 202-207,234-236,251-253,275-276,299-301,303-305,310-312
+plugins/yellow-review/commands/review/sweep-all.md
+  s_becc7011266565::t_166bb629a89589 167-169,225-227,235-247,284-286
+plugins/yellow-review/tests/skill-content.bats
+  s_becc7011266565::t_6e1e0f2270a0e7 391
+  s_becc7011266565::t_867a3dfb51421a 403,465-496
+  s_5667e810256031::t_c54bc65bb0919e 464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "68ec0f14866e2a2d84ba6f516b045642526cd6f8",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

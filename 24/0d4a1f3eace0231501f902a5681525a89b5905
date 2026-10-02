@@ -1,0 +1,23 @@
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_b6107e4f6274e3 184-185,191-195
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_7a82748dd606d9::t_dcc99c48e2ff0d 423-425,431-433
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_74876309396ee7 473-491
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "240d4a1f3eace0231501f902a5681525a89b5905",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
