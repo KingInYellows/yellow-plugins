@@ -203,7 +203,7 @@ Cluster the post-3c threads as `${CLAUDE_PLUGIN_ROOT}/references/resolve/cluster
 describes (algorithm, snapshot `cluster_line_distance`, cluster fields and
 edit bounds). Report the reduction:
 
-```
+```text
 [cluster] N threads → M clusters across K files (Δ = N - M consolidated)
   - <path>:<line_range> — <threadId_count> threads
   ...
@@ -324,7 +324,8 @@ share a path (the line-anchored, outdated and review-level clusters of one
 file) run in waves, so no two resolvers edit one file at once: spawn the first
 cluster of every path together, wait for the wave, then spawn the next
 cluster of each path. Clusters with a `null` path can touch any PR file, so
-run them last, one at a time, after every path-anchored wave has finished. Each Agent invocation MUST set `run_in_background: true`:
+run them last, one at a time, after every path-anchored wave has finished.
+Each Agent invocation MUST set `run_in_background: true`:
 `pr-comment-resolver` declares `background: true`, but true parallelism also
 needs the spawning call to run in the background.
 

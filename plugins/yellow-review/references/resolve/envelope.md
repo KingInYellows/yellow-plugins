@@ -34,7 +34,8 @@ before it reaches a resolver prompt.
    response and a PR author controls changed file names, so it is never
    trusted, and passing the grammar check does not make it safe: a valid path
    can still read as an instruction. The path and line range go inside the
-   `cluster path` fence below, never in the unfenced metadata. Dispatch a path-anchored cluster only when `cluster.path` matches
+   `cluster path` fence below, never in the unfenced metadata. Dispatch a
+   path-anchored cluster only when `cluster.path` matches
    `^[A-Za-z0-9._/-]+$` (the contract's path pattern) and has no empty, `.`
    or `..` segment and no segment starting with `-`. A path that fails is
    never interpolated into any prompt or command: skip

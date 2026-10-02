@@ -46,6 +46,7 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
   ```text
   ^THREAD (PRRT_[A-Za-z0-9_-]+) \| disposition=(fixed|addressed|oos|disagree|unclear) \| evidence=([^|]*) \| oos_reason=([^|]*)$
   ```
+
 - Resolver text is untrusted (comments steer it). The orchestrator never
   pastes it onto a command line: evidence values are checked against the
   patterns below first, and file lists are written to a file with the
@@ -560,8 +561,10 @@ Replies and issue bodies end with:
   `YELLOW_REVIEW_RATE_LIMIT_WAIT` (default 60 s), then retry once per script
   run (`reply-pr-thread` shares that one retry across its calls). A second
   limit, or a required wait over 90 s, exits 4, which bounds the call to the
-  190 s worst case the write-phase `timeout` covers. `file-followup-issue` never waits or retries: stderr matching "rate limit" or
-  "HTTP 429" (it does not match "abuse") exits 4 at once. A bare 403 is not a rate limit: it exits 3.
+  190 s worst case the write-phase `timeout` covers. `file-followup-issue`
+  never waits or retries: stderr matching "rate limit" or "HTTP 429" (it does
+  not match "abuse") exits 4 at once. A bare 403 is not a rate limit: it
+  exits 3.
 - Each `gh` call in `reply-pr-thread`, `resolve-pr-thread` and
   `file-followup-issue` is bounded by `YELLOW_REVIEW_GH_TIMEOUT` (default
   30 s; needs `timeout(1)`; `file-followup-issue` and `get-pr-blockers`
