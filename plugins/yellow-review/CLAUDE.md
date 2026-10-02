@@ -373,8 +373,9 @@ explicit-invocation wording live in the skill body and description.
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
 `check-resolve-text.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
-`tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
-invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
+`tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
+(pins the thermonuclear line-count invariant alongside
+`skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
 absent), `session-start.bats` (the hook's counts, orphan and stale-state

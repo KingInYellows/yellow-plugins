@@ -134,8 +134,11 @@ PR_URL="$LINK"
 if THREAD_URL=$(gh api graphql -f threadId="$THREAD_ID" \
         -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { comments(first: 1) { nodes { url } } } } }' \
         --jq '.data.node.comments.nodes[0].url // empty' 2>"$ERR"); then
-    case "$THREAD_URL" in
-        "$PR_URL"[/#?]*|"$PR_URL") LINK="$THREAD_URL" ;;
+    # GitHub returns the canonical owner/repo casing; compare case-insensitively.
+    THREAD_URL_LC=$(printf '%s' "$THREAD_URL" | tr '[:upper:]' '[:lower:]')
+    PR_URL_LC=$(printf '%s' "$PR_URL" | tr '[:upper:]' '[:lower:]')
+    case "$THREAD_URL_LC" in
+        "$PR_URL_LC"[/#?]*|"$PR_URL_LC") LINK="$THREAD_URL" ;;
         '') printf 'Note: no thread URL returned; linking the PR instead.\n' >&2 ;;
         *)
             printf 'Error: Thread %s does not belong to %s#%s (its first comment is at %s).\n' \
@@ -169,10 +172,10 @@ fi
 MY_NUMBER=${URL##*/}
 if gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "$LIST_LIMIT" \
         --json number,url,body,author >"$WORK_DIR/issues-after.json" 2>"$ERR"; then
-    WINNER=$(jq -c --arg viewer "$VIEWER" --arg prefix "$MARKER_PREFIX" '
+    WINNER=$(jq -c --arg viewer "$VIEWER" --arg marker "${MARKER_PREFIX}oos -->" '
         [ .[]
           | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
-          | select((.body // "") | contains($prefix)) ]
+          | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
         | sort_by(.number) | first // empty
         | {number, url, created: false}' "$WORK_DIR/issues-after.json" 2>/dev/null || true)
     if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
@@ -182,6 +185,10 @@ if gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limit "
         printf '%s\n' "$WINNER"
         exit 0
     fi
+elif grep -qiE 'rate limit|HTTP 429' "$ERR"; then
+    # The issue exists, but the contract requires exit 4 after any rate limit.
+    # Re-running finds the created issue by its thread marker.
+    gh_fail 'post-create issue list'
 fi
 
 jq -nc --arg url "$URL" '{number: ($url | sub(".*/issues/"; "") | tonumber), url: $url, created: true}'

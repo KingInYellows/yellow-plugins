@@ -29,7 +29,8 @@ rt_looks_secret() {
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
             ph = ph " masked hidden default missing invalid expired empty bearer"
-            ph = ph " options config value values bytes buffer promise function "
+            ph = ph " options config value values bytes buffer promise function"
+            ph = ph " or and not the on of any null nil none true false "
         }
         toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { hit = 1 }
         # NAME_KEY=value with a literal-looking value (8+ token characters,
@@ -38,8 +39,17 @@ rt_looks_secret() {
         {
             l = tolower($0)
             # keyword = "quoted value" (a type annotation such as
-            # `token: string` is not a credential).
-            if (l ~ /(pass(word|wd)?|secret|token|api[_-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/) hit = 1
+            # `token: string` is not a credential). The keyword must start a
+            # word, as in the unquoted branch below: `bypass="false"` is not
+            # a `pass` keyword, but camelCase `userPassword="..."` is.
+            r = l
+            base = 0
+            while (match(r, /(pass(word|wd)?|secret|token|api[_-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
+                start = base + RSTART
+                base += RSTART + RLENGTH - 1
+                r = substr(r, RSTART + RLENGTH)
+                if (!(start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)) hit = 1
+            }
             # keyword: unquoted-value. Flag only a plausible literal: 6+
             # characters, a digit or all letters (minus placeholder words),
             # and no call/reference punctuation, so `password: string`,
@@ -78,7 +88,9 @@ rt_looks_secret() {
             # placeholder or variable password stays clean.
             # Guarded: the scheme pattern is quadratic on one huge line.
             r = index(l, "://") ? l : ""
-            while (match(r, /[a-z][a-z0-9+.-]*:\/\/[^\/@ \t:]+:[^\/@ \t]+@/)) {
+            # The username may be empty (`https://:pass@host`); `?` and `#`
+            # end the authority, so they cannot be part of the userinfo.
+            while (match(r, /[a-z][a-z0-9+.-]*:\/\/[^\/@?# \t:]*:[^\/@?# \t]+@/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 r = substr(r, RSTART + RLENGTH)
                 sub(/^[^:]*:\/\/[^:]*:/, "", seg)

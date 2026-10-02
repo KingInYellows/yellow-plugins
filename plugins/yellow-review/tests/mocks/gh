@@ -193,9 +193,9 @@ case "$ALL_ARGS" in
           case "$ALL_ARGS" in
             *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
             *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
-            *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
-            *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
-            *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
+            *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
+            *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
+            *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
             *) _hdr="" ;;
           esac
           http "HTTP/2.0 429 Too Many Requests" "$_hdr"
