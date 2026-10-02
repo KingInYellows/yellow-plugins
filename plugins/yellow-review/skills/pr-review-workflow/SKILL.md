@@ -418,7 +418,7 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
   (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
   permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,
-  default 30 s, not retried). It sleeps 1 s after the mutation
+  default 30 s, clamped to 60 s, not retried). It sleeps 1 s after the mutation
   (`YELLOW_REVIEW_PACE_SECONDS`) and, on a rate limit, waits `Retry-After`
   (else 60 s) and retries once; a required wait over 90 s exits 4. After exit
   4, stop mutating. The contract's "Script exit codes" and "Pacing and rate

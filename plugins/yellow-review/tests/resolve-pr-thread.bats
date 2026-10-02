@@ -374,3 +374,21 @@ stub_timeout_logging() {
   [ "$status" -eq 4 ]
   [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
 }
+
+@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to the default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=9999 run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  [[ "$stderr" == *"timed out after 60s"* ]]
+}
+
+@test "the default and a zero YELLOW_REVIEW_GH_TIMEOUT stay at 30 s; 45 passes through" {
+  stub_timeout_logging
+  run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+  YELLOW_REVIEW_GH_TIMEOUT=0 run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+  YELLOW_REVIEW_GH_TIMEOUT=45 run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 45 ]
+}

@@ -13,6 +13,9 @@
 #   on stdout. fetched=0 means no fetch succeeded (inconclusive).
 # Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
 #             ("poll rate-limited" is printed; stop mutating).
+# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30; 0, non-numeric or over 4 digits
+#      falls back to 30; a larger valid value is clamped to 60) — seconds one
+#      fetch may run. The script ends within --wait + 60 s.
 # A failed fetch, jq parse or grep is never read as "no new threads": the
 # round is skipped and the loop moves on. The first 300 bytes of a failed
 # fetch's stderr go to this script's stderr ("poll fetch-failed: ..."). An
@@ -24,11 +27,14 @@ set -u
 
 STEP=20
 
-# Seconds one get-pr-comments call may run (see header).
+# Seconds one get-pr-comments call may run (see header). A valid value over 60
+# is clamped to 60, so the last fetch ends within --wait + 60 s, inside the
+# (wait + 120) x 1000 ms Bash tool timeout the caller passes.
 FETCH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$FETCH_TIMEOUT" in ''|*[!0-9]*) FETCH_TIMEOUT=30 ;; esac
 [ "${#FETCH_TIMEOUT}" -le 4 ] || FETCH_TIMEOUT=30
 [ "$FETCH_TIMEOUT" -gt 0 ] 2>/dev/null || FETCH_TIMEOUT=30
+[ "$FETCH_TIMEOUT" -le 60 ] || FETCH_TIMEOUT=60
 # GNU coreutils on macOS installs it as gtimeout.
 TIMEOUT_BIN=""
 for _t in timeout gtimeout; do

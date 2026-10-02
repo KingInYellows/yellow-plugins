@@ -503,3 +503,19 @@ path_without_timeout() {
   [ "$status" -eq 4 ]
   [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
 }
+
+@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to the default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=9999 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  [[ "$stderr" == *"timed out after 60s"* ]]
+}
+
+@test "YELLOW_REVIEW_GH_TIMEOUT=61 is clamped to 60 and 60 passes through" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=61 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  YELLOW_REVIEW_GH_TIMEOUT=60 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+}

@@ -7,11 +7,15 @@
 # Seconds per gh call (YELLOW_REVIEW_GH_TIMEOUT, default 30, as in
 # reply-pr-thread). timeout(1) treats 0 as "no limit", so 0, a non-number or
 # a value over 4 digits (past what `[ -gt ]` compares safely) falls back to the
-# default.
+# default. A valid value over 60 is clamped to 60: file-followup-issue makes up
+# to six gh calls (360 s at 60 s each), which the write phase's 420000 ms Bash
+# tool timeout covers (references/resolve/dispositions.md, "Bash timeouts").
+RG_MAX_TIMEOUT=60
 RG_GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$RG_GH_TIMEOUT" in ''|*[!0-9]*) RG_GH_TIMEOUT=30 ;; esac
 [ "${#RG_GH_TIMEOUT}" -le 4 ] || RG_GH_TIMEOUT=30
 [ "$RG_GH_TIMEOUT" -gt 0 ] 2>/dev/null || RG_GH_TIMEOUT=30
+[ "$RG_GH_TIMEOUT" -le "$RG_MAX_TIMEOUT" ] || RG_GH_TIMEOUT=$RG_MAX_TIMEOUT
 
 # GNU coreutils on macOS installs it as gtimeout.
 RG_TIMEOUT_BIN=""

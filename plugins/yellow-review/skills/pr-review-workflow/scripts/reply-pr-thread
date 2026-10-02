@@ -36,7 +36,8 @@
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says;
 #        non-numeric or over 4 digits falls back to 60.
 #      YELLOW_REVIEW_GH_TIMEOUT (default 30; 0, non-numeric or over 4 digits
-#        falls back to 30) — seconds per gh call; needs
+#        falls back to 30; a larger valid value is clamped to 60, so the worst
+#        case is 3 x 60 + 90 + 10 = 280 s) — seconds per gh call; needs
 #        timeout(1) or gtimeout(1), skipped with a stderr note when neither
 #        is installed.
 

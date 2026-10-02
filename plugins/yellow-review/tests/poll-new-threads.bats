@@ -343,3 +343,16 @@ EOS
   [[ "$output" == *"repass fetched=1 found=0"* ]]
   [ "$(grep -c 'neither timeout nor gtimeout' <<<"$stderr")" -eq 1 ]
 }
+
+@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to 30" {
+  fake_setup
+  : >"$ROUND1"
+  export TIMEOUT_LOG="${BATS_TEST_TMPDIR}/timeout.log"
+  bin_setup bin-timeout $BASE_TOOLS
+  make_expiring_timeout timeout
+  : >"$TIMEOUT_LOG"
+  PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" YELLOW_REVIEW_GH_TIMEOUT=9999 \
+    run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TIMEOUT_LOG")" = "60" ]
+}

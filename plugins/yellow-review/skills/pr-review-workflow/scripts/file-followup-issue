@@ -24,8 +24,10 @@
 #             5 the dedupe window is full and holds no marker: an older issue
 #             may carry it, so nothing is filed and the thread stays open (not
 #             a transient failure; retrying does not help).
-# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
-#      timeout(1), skipped when it is not installed (lib/resolve-gh.sh).
+# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30, clamped to 60) — seconds per gh
+#      call; needs timeout(1), skipped when it is not installed
+#      (lib/resolve-gh.sh). At most six gh calls (viewer, issue list, thread
+#      link, create, post-create list, duplicate close), so 6 x 60 = 360 s.
 # Contract: references/resolve/dispositions.md
 
 set -eu

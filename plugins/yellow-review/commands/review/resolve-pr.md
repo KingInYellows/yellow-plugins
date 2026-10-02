@@ -159,6 +159,10 @@ rate limit means `ratelimited=1` on the `Resolve:` line. Then:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-blockers" "<owner/repo>" "<PR#>"
 ```
 
+Give both of these read-only calls a Bash tool `timeout` of 300000 ms: each
+makes several `gh` calls bounded at 60 s apiece, so the 120 s default could
+kill a slow lookup.
+
 It never fails the run; keep its JSON (`changesRequested`,
 `conversationResolution`, `lookupFailed`) for Step 9.
 
@@ -466,10 +470,9 @@ not `OPEN`, print `PR #<N> is <STATE>; write phase stopped` and go to Step 9.
 Process threads serially, sorted by path, line, threadId — including Step
 3c's dropped threads — per the contract's write order and lanes. Write each
 text with the Write tool to a `mktemp` path, never on a command line. Run each
-script below as its own Bash call with a `timeout` of 240000 ms (worst case
-`reply-pr-thread`: three 30 s `gh` calls + a 90 s rate-limit wait + 10 s
-pacing = 190 s), and start a thread's next stage only after the previous one
-exits 0:
+script below as its own Bash call with a `timeout` of 420000 ms (the
+contract's "Bash timeouts" derives it from the 60 s per-call `gh` cap), and
+start a thread's next stage only after the previous one exits 0:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" "<owner/repo>" "<PR#>" "<threadId>" "<title-file>" "<body-file>"
