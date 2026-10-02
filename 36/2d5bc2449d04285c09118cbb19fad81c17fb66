@@ -1,0 +1,21 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_becc7011266565::t_b8566916490215 116,122
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_becc7011266565::t_e13c3577909c96 8-9,65,77-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "362d5bc2449d04285c09118cbb19fad81c17fb66",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

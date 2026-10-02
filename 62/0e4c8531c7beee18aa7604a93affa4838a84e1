@@ -1,0 +1,74 @@
+plugins/yellow-review/references/resolve/dispositions.md
+  s_5667e810256031::t_fb996b6c492b2f 310-315
+  s_f6f77814bd466d::t_3f441fea1b550e 352-359,365-366,412
+plugins/yellow-review/CLAUDE.md
+  s_5667e810256031::t_add6f93637f2b2 175-176,181-182,189-190,197-199,375-376
+plugins/yellow-review/README.md
+  s_5667e810256031::t_2c27b36c79b729 76-91
+plugins/yellow-review/lib/resolve-text.sh
+  s_5667e810256031::t_158437f5270fa7 14-15,17-19,47-51,53,56-57,59,66,77-88
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_5667e810256031::t_9853f9f033fb34 407-414,417-425
+plugins/yellow-review/skills/pr-review-workflow/scripts/check-resolve-text
+  s_5667e810256031::t_9dcc35fcae7c63 7-9,23
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_5667e810256031::t_4294b515d411b4 9-11,132,138-144,149-150,162
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_5667e810256031::t_68567ebde39c09 7-14,23,55,63,79,81,89-91,94-99,101-102,104-106,115-119,139,161-163
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments
+  s_5667e810256031::t_82db775ad36153 6-15,243
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_5667e810256031::t_d2e1ffb6bd1133 8-22,26-27,35-36,94-95,100-105,122-123,127,132-133,144-148,160-163,166-171,183-186,191,210-212,214-220
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_5667e810256031::t_2890d4ae5b800a 22,34,37-42,52-54,56,116-227
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_5667e810256031::t_1e5aeb047f7c6a 12-13,86,89-104,106,108,112-164,172-180,212-278
+plugins/yellow-review/tests/fixtures/blockers-approved.json
+  s_5667e810256031::t_c970ee9bdaf5ce 1-29
+plugins/yellow-review/tests/fixtures/blockers-ghost.json
+  s_5667e810256031::t_1b87efaa0669a2 1-26
+plugins/yellow-review/tests/fixtures/blockers-malformed.json
+  s_5667e810256031::t_58f5749e3fd135 1-16
+plugins/yellow-review/tests/fixtures/blockers-next-page.json
+  s_5667e810256031::t_bb3885814de804 1-29
+plugins/yellow-review/tests/fixtures/blockers-no-policy.json
+  s_5667e810256031::t_6ba02613bb63ee 1-16
+plugins/yellow-review/tests/fixtures/blockers-null-pr.json
+  s_5667e810256031::t_1fe6a0cf2ce731 1-13
+plugins/yellow-review/tests/fixtures/blockers-slash-branch.json
+  s_5667e810256031::t_161c9f2cd1c696 1-29
+plugins/yellow-review/tests/fixtures/viewer-fields-response.json
+  s_5667e810256031::t_27cae00758fa79 1-574
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_5667e810256031::t_9a887b8f0d22ee 12,21-28,69,98,101-174
+plugins/yellow-review/tests/get-pr-comments.bats
+  s_5667e810256031::t_8a90139ab05e94 17,177-194,206,227-234
+plugins/yellow-review/tests/mocks/gh
+  s_5667e810256031::t_c313651c99572d 63-68,74-81,87-97,114-119,180,186-221,309-312
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_5667e810256031::t_7ec83a4f4096c5 21-30,82-95,113,116-117,137-164,185-187,190-223,225-241,262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "620e4c8531c7beee18aa7604a93affa4838a84e1",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f6f77814bd466d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "903378af-ff69-4d66-a5bc-b1dcb24d2ac2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

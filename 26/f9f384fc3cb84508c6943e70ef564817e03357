@@ -1,0 +1,82 @@
+plans/review-resolve-hardening.md
+  s_fc95207836202a::t_7d2cea83bf9bb3 156-160
+  s_fc95207836202a::t_d6f74eaf7c2135 510-512
+  s_fc95207836202a::t_66bc7ca53a39e2 675-678
+  s_fc95207836202a::t_4e61a2e5866392 62-66
+plugins/yellow-review/lib/resolve-text.sh
+  s_fc95207836202a::t_80d0f2498847ab 28,32-36,43
+  s_c22a55971bf452::t_0523b89252eaf4 29-31
+  s_c22a55971bf452::t_7294da9e649baf 37-42
+  s_c22a55971bf452::t_71143c723bd976 12-18
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_28e87b41759b07 385-387
+  s_3a67c5309460ff::t_0fd484dffd33ab 347
+  s_c22a55971bf452::t_d3a46a6146f52b 148
+  s_3a67c5309460ff::t_c7a03b44af2dae 3-9
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_becc7011266565::t_1b5dac6451fe2f 9-10
+  s_fc95207836202a::t_40cfdab98a69fe 133
+  s_c22a55971bf452::t_332193f8ad4942 91,93,96-100
+  s_3a67c5309460ff::t_20c2811abfe798 78-81
+  s_c22a55971bf452::t_1e757ea04c5541 108
+  s_c22a55971bf452::t_d1fc782c835124 135-137
+  s_c22a55971bf452::t_6e2eadf76b5fce 101
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_fc95207836202a::t_9130c17f22a424 49-62
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_fc95207836202a::t_d0de40a9ad22a3 85-93,110,113
+  s_3a67c5309460ff::t_4e659edb93a012 107-109,111-112
+  s_c22a55971bf452::t_4d152f0d6baaaf 65,71
+plugins/yellow-review/tests/mocks/gh
+  s_3a67c5309460ff::t_ff09c3dff421a5 78-81
+  s_fc95207836202a::t_2ecc149acdd911 197-199,201-213
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_fc95207836202a::t_ed0576edccb31a 113-118
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_3a67c5309460ff::t_231b1e87decfdc 71-73
+  s_fc95207836202a::t_6b4c9c622dfb26 55-70,74-76
+plugins/yellow-review/CLAUDE.md
+  s_3a67c5309460ff::t_3b04f47270ff1c 167-175,178-182,187-189,369-370
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments
+  s_3a67c5309460ff::t_d668ddd442318a 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "26f9f384fc3cb84508c6943e70ef564817e03357",
+  "prompts": {},
+  "sessions": {
+    "s_3a67c5309460ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf180525-44ba-4076-9ae7-0a9ec39ef387",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": null
+    },
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
