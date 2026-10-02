@@ -111,6 +111,30 @@ _rt_scan() {
             for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
             return !allph
         }
+        # benignword(w): 1 when one word of an unquoted value is a placeholder,
+        # type word, bare punctuation (`=`, `|`), a call or a generic type, so
+        # `password: str = None` and `password: optional string` stay clean.
+        function benignword(w) {
+            sub(/[.,;:!?)]+$/, "", w)
+            if (w == "" || w !~ /[a-z0-9]/ || isplaceholder(w)) return 1
+            if (index(ph, " " w " ") > 0) return 1
+            if (w ~ /^[a-z_][a-z0-9_.]*\(([a-z_][a-z0-9_.]*)?$/) return 1
+            return w ~ /^[a-z_][a-z0-9_.]*[<\[][a-z_][a-z_.|<\[]*[>\]]*$/
+        }
+        # wordcred(v): 1 when the WHOLE unquoted value v of an assignment that
+        # starts the line (`password: my correct horse`) looks like a literal
+        # credential, however it splits on whitespace: several words, 4+
+        # characters in total, not a whole placeholder and not only
+        # placeholder/type words. The per-token rule in litval would judge
+        # only `my` and let the rest through. A single word is left to litval.
+        function wordcred(v,    np, parts, j) {
+            sub(/(^|[ \t]+)#.*$/, "", v)
+            sub(/[ \t]+$/, "", v)
+            if (v !~ /[ \t]/ || length(v) < 4 || isplaceholder(v)) return 0
+            np = split(v, parts, /[ \t]+/)
+            for (j = 1; j <= np; j++) if (!benignword(parts[j])) return 1
+            return 0
+        }
         # Multi-line quoted value. A credential keyword whose value opens a
         # quote that does not close on its line starts a carry (mqo): the
         # following lines are joined with a space until the closing quote,
@@ -185,6 +209,7 @@ _rt_scan() {
             ph = ph " secret password passwd token credential credentials apikey"
             ph = ph " masked hidden default missing invalid expired empty bearer"
             ph = ph " options config value values bytes buffer promise function"
+            ph = ph " str int bool float"
             ph = ph " or and not the on of any null nil none true false "
         }
         toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { flag("private-key") }
@@ -263,13 +288,20 @@ _rt_scan() {
             base = 0
             while (match(r, kw "[ \t]*[=:][ \t]*[^ \t\"\047,;)]+")) {
                 seg = substr(r, RSTART, RLENGTH)
+                val = substr(r, RSTART)
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
                 if (++nu > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 inword = (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
+                sub(/^[^=:]*[=:][ \t]*/, "", val)
                 if (litval(seg, inword)) flag("unquoted-keyword-value")
+                # A keyword that starts the line (indentation, list dashes,
+                # `export`, a quote and a key-name prefix such as `db_` may
+                # precede it) is an assignment: judge the whole value, not
+                # its first word. Mid-sentence prose keeps the token rule.
+                else if (!inword && substr(l, 1, start - 1) ~ /^[ \t]*(-[ \t]*)*(export[ \t]+)?["\047]?[a-z0-9_.-]*$/ && wordcred(val)) flag("unquoted-keyword-value")
             }
             # Logical records. A keyword alone on its line (`password:`, YAML
             # style) is a header whose value is on the following lines. The
