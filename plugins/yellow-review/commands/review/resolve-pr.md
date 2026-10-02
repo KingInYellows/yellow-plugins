@@ -439,6 +439,10 @@ exits 0:
   `[A-Z]{2,5}-[0-9]{1,6}`, file through Linear by the contract's "Linear
   procedure" (team resolution, dedupe, text check, response validation), with
   one fallback to `file-followup-issue`.
+- `reply-pr-thread` is safe to re-run: it skips with `already-replied` when
+  our latest marker in the thread's last 10 comments is followed only by Bot
+  comments; a later human comment makes it post again. Go on to
+  `resolve-pr-thread` after a skip.
 - Exit 3 from `reply-pr-thread` or `resolve-pr-thread` prints a stderr line
   `reason=permission` or `reason=not-found`. Report `needs permission` only
   for the first and `not found` for the second.

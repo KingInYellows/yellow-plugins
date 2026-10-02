@@ -184,7 +184,7 @@ only the resolve is withheld.
   `--- end untrusted-content ---`). Dedupe before filing: when the thread's
   last viewer-authored comment already carries this thread's marker with
   `disposition=oos`, the issue exists, so do not file; go to the reply stage
-  (the reply script skips when the marker is still last; otherwise post the
+  (the reply script skips when only Bot comments follow the marker; otherwise post the
   plain sentence `Out of scope for this PR; a follow-up issue was already
   filed.`). Otherwise search with `list_issues` (`query` set to the marker's
   `thread=<id>` text, the resolved team, `includeArchived` true) and reuse a
@@ -508,11 +508,14 @@ out of the same budget.
 
 ## Recovery rule
 
-`reply-pr-thread` reads the thread's last comment before posting. When that
-comment was authored by the viewer (`viewerDidAuthor`) and ends with a
-marker for the same thread, it skips the reply (`already-replied`) and
-reports the posted marker's disposition in the skip JSON. A re-run
-therefore never posts a second, contradicting reply. Two rules follow:
+`reply-pr-thread` reads the thread's last 10 comments (`viewerDidAuthor`,
+`body`, `author { __typename }`) before posting and takes the latest comment
+the viewer authored. It skips the reply (`already-replied`) when that comment
+ends with a marker for the same thread and every comment after it was written
+by a Bot author. The skip JSON reports the posted marker's disposition. A
+re-run after a reply that landed but whose resolve failed therefore never
+posts a second, contradicting reply, even when a bot acknowledgement arrived
+in between. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
   `addressed` or `oos` reply. That reply carries the evidence the resolve needs,
@@ -522,12 +525,15 @@ therefore never posts a second, contradicting reply. Two rules follow:
   asked for. Any other posted disposition leaves the thread open and is reported
   as `reply posted as <d> (open)`.
 
-A reviewer comment after ours makes the marker no longer last, so the thread
-is processed again.
+A later comment from a human, or from an author the script cannot read, is new
+input: the script posts. It also posts when our latest comment in the window
+carries no marker for this thread, or when our marker has fallen out of the
+10-comment window. A response the script cannot parse exits 1 and posts
+nothing.
 
 `get-pr-comments` fetches `comments(first: 50)`; do not use that list to
-decide whether our marker is last. The reply script's own `comments(last:1)`
-check is authoritative.
+decide whether our marker was already posted. The reply script's own
+`comments(last: 10)` check is authoritative.
 
 ## Marker
 
@@ -698,6 +704,8 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   hooks is an open decision.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds
   of threads) are slow. A batch apply script would help and is not written.
+- The reply pre-check sees only a thread's last 10 comments. If more than ten
+  comments follow our marker, a re-run posts a second reply.
 - Two accounts resolving the same PR concurrently can each post a reply;
   markers dedupe only per viewer.
 - Two runs as the same viewer on one thread at the same moment can both pass

@@ -24,6 +24,17 @@ set -u
 
 STEP=20
 
+# Seconds one get-pr-comments call may run (see header).
+FETCH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
+case "$FETCH_TIMEOUT" in ''|*[!0-9]*) FETCH_TIMEOUT=30 ;; esac
+[ "$FETCH_TIMEOUT" -gt 0 ] 2>/dev/null || FETCH_TIMEOUT=30
+# GNU coreutils on macOS installs it as gtimeout.
+TIMEOUT_BIN=""
+for _t in timeout gtimeout; do
+    if command -v "$_t" >/dev/null 2>&1; then TIMEOUT_BIN=$_t; break; fi
+done
+[ -n "$TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; fetches run without a time limit.\n' >&2
+
 usage() {
     printf 'Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>\n' >&2
     exit 2
@@ -61,6 +72,14 @@ tick() {
     [ "$waited" -lt "$slept" ] && waited=$slept
     return 0
 }
+# fetch_threads: run get-pr-comments; exit 124 means the time limit killed it.
+fetch_threads() {
+    if [ -n "$TIMEOUT_BIN" ]; then
+        "$TIMEOUT_BIN" "$FETCH_TIMEOUT" "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+    else
+        "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+    fi
+}
 while :; do
     tick
     if [ "$waited" -lt "$WAIT" ]; then
@@ -70,7 +89,9 @@ while :; do
         slept=$((slept + step))
         tick
     fi
-    if "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR" >"$WORK/new" 2>"$WORK/err"; then
+    fetch_rc=0
+    fetch_threads >"$WORK/new" 2>"$WORK/err" || fetch_rc=$?
+    if [ "$fetch_rc" -eq 0 ]; then
         if jq -r '.[].threadId' "$WORK/new" >"$WORK/ids" 2>/dev/null; then
             grep_rc=0
             grep -qvxF -f "$WORK/round1" "$WORK/ids" || grep_rc=$?
@@ -83,6 +104,11 @@ while :; do
                 fetched=0
             fi
         fi
+    elif [ "$fetch_rc" -eq 124 ] && [ -n "$TIMEOUT_BIN" ]; then
+        # A stalled fetch is inconclusive and unlikely to clear: stop here so
+        # the final status line still prints.
+        printf 'poll fetch-failed: get-pr-comments timed out after %ss\n' "$FETCH_TIMEOUT" >&2
+        break
     elif grep -qi 'rate limit' "$WORK/err"; then
         printf 'poll rate-limited\n'
         exit 4

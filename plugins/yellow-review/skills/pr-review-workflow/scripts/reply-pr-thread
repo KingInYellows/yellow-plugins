@@ -6,23 +6,21 @@
 # Output: JSON to stdout:
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
 #   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
-#     (skipped when the newest comment of ours in the last PRECHECK_WINDOW
-#     comments carries a marker for this thread and no later comment is from a
-#     human; "disposition" is the one found. Bot replies after our marker do
-#     not count, and neither do our own Bot-typed comments (gh signed in as a
-#     bot account); a later comment from our own human account does. The one exception: a
-#     prior disagree or unclear marker never blocks a fixed, addressed or oos
-#     reply, because that reply carries the evidence the later resolve needs.
-#     A caller resolves after a skip only when "disposition" equals the one
-#     it asked for.)
+#     (skipped when our latest comment in the thread's last 10 carries a
+#     marker for this thread and every comment after it is from a Bot author;
+#     "disposition" is the one found. The one exception: a prior disagree or
+#     unclear marker never blocks a fixed, addressed or oos reply, because
+#     that reply carries the evidence the later resolve needs. A caller
+#     resolves after a skip only when "disposition" equals the one it asked
+#     for.)
 # Concurrency: the marker makes re-runs idempotent, not the pre-check and
 #   the reply atomic. Two runs as the same viewer that reach one thread at
 #   the same moment can both pass the pre-check and both post, possibly with
 #   different dispositions; this script does not detect that after the write
 #   (it has no lock, no post-write rescan and never deletes a comment). Run
-#   one resolve or sweep per PR at a time. A later re-run reports the found
-#   disposition in the skip, so the caller's disposition check still guards
-#   the resolve.
+#   one resolve or sweep per PR at a time. A later re-run reports the
+#   disposition of our latest marked comment in its skip, so the caller's
+#   disposition check still guards the resolve.
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a
@@ -164,15 +162,14 @@ call_with_retry() {
     done
 }
 
-# --- Pre-check: skip when our newest comment already carries a marker ---
-# The window holds the newest PRECHECK_WINDOW comments, oldest first.
+# --- Pre-check: skip when our latest comment already carries a marker ---
 # shellcheck disable=SC2016
 PRECHECK='
 query ReplyPrecheck($threadId: ID!, $window: Int!) {
   node(id: $threadId) {
     ... on PullRequestReviewThread {
       id
-      comments(last: $window) { nodes { viewerDidAuthor body author { __typename } } }
+      comments(last: 10) { nodes { viewerDidAuthor body author { __typename } } }
     }
   }
 }'
@@ -184,37 +181,27 @@ if ! jq -e '.data.node.id' "$GG_RESP" >/dev/null 2>&1; then
 fi
 
 # A marker counts only on a comment the viewer authored; a reviewer quoting
-# our marker never causes a skip. The newest viewer comment that carries a
-# marker for this thread decides; viewer comments without one are ignored, so
-# when gh authenticates as a bot account its own acknowledgement (also
-# viewerDidAuthor) cannot displace the marker comment, and a bot-authored
-# marker still counts. A later comment that is not from a Bot, including one
-# from the viewer's own human account and one with a missing author type,
-# means the thread moved on and is processed again. Any
-# disposition counts: a re-run after a crash (reply posted, resolve failed)
-# must not post a contradictory reply.
-# The exception is an upgrade from a reply that left the thread open
-# (disagree, unclear) to one that lets the caller resolve it (fixed,
-# addressed, oos): skipping would resolve the thread with no evidence posted.
-# No match prints nothing and exits 0; a jq failure must not read as "no
-# marker", or the reply the marker exists to prevent would be posted.
+# our marker never causes a skip. Only our LATEST comment in the 10-comment
+# window is checked, and only comments after it by a Bot author (an
+# acknowledgement) are ignored; a human or unreadable author is new input, so
+# the reply is posted. Any disposition counts: a re-run after a crash (reply
+# posted, resolve failed) must not post a contradictory reply. The exception
+# is an upgrade from a reply that left the thread open (disagree, unclear) to
+# one that lets the caller resolve it (fixed, addressed, oos): skipping would
+# resolve the thread with no evidence posted. No match prints nothing and
+# exits 0; a jq failure must not read as "no marker", or the reply the marker
+# exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
-    ("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$") as $re
-    | (.data.node.comments.nodes // []) as $nodes
-    | ([ $nodes | to_entries[]
-         | select(.value.viewerDidAuthor == true)
-         | select((.value.body // "") | sub("\\s+$"; "") | test($re)) ] | last) as $ours
-    | $ours
-    | select(. != null)
-    | select([ $nodes[(.key + 1):][]
-               | select((.author.__typename // "") != "Bot") ]
-             | length == 0)
-    | .value
+    .data.node.comments.nodes as $n
+    | ([range(0; $n | length) | select($n[.].viewerDidAuthor == true)] | last) as $i
+    | select($i != null)
+    | select($n[$i + 1:] | all(((.author // {}) | if type == "object" then .__typename else null end) == "Bot"))
+    | $n[$i]
     | (.body // "") | sub("\\s+$"; "")
     | capture($re)
     | .d
   ' "$GG_RESP" 2>/dev/null); then
-    printf 'Error: could not read the last comment of %s; not posting.\n' "$THREAD_ID" >&2
+    printf 'Error: could not read the recent comments of %s; not posting.\n' "$THREAD_ID" >&2
     exit 1
 fi
 case "$PRIOR_DISPOSITION:$DISPOSITION" in

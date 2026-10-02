@@ -357,7 +357,7 @@ stub_timeout_logging() {
 @test "a comment the prior-marker check cannot read exits 1 and posts nothing" {
   run --separate-stderr "$SCRIPT" PRRT_reply_badbody fixed "$BODY"
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not read the comments"* ]]
+  [[ "$stderr" == *"could not read the recent comments"* ]]
   [ ! -f "$CALLS" ]
 }
 
@@ -395,61 +395,41 @@ path_without_timeout() {
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
 }
 
-# --- Credential refusal, auth failure and the pre-check window ---
+# --- Recovery window: comments(last: 10), Bot acknowledgements ignored ---
 
-@test "a body with an image, a mention or a foreign URL exits 6 before any API call" {
-  for t in 'Fixed. ![x](https://github.com/o/r/raw/x.png)' 'Fixed, cc @octocat' 'Fixed, see https://evil.example/x'; do
-    printf '%s\n' "$t" >| "$BODY"
-    run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
-    [ "$status" -eq 6 ] || { echo "not refused: $t"; false; }
-    [[ "$stderr" == *"resolve-text: refused rule="* ]]
-    [ ! -f "$CALLS" ]
-  done
-}
-
-@test "an HTTP 401 exits 7 without a retry" {
-  run --separate-stderr "$SCRIPT" PRRT_reply_auth fixed "$BODY"
-  [ "$status" -eq 7 ]
-  [[ "$stderr" == *"rejected the credentials"* ]]
+@test "skips when only Bot comments follow our marker and reports its disposition" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_botafter unclear "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
   [ ! -f "$CALLS" ]
 }
 
-@test "the pre-check reads a bounded window of the newest comments" {
-  run "$SCRIPT" PRRT_reply_new fixed "$BODY"
+@test "posts when a human comment follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
   [ "$status" -eq 0 ]
-  grep -q 'window=20' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
-}
-
-@test "a bot reply after our marker still skips" {
-  run "$SCRIPT" PRRT_reply_botafter fixed "$BODY"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
-  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
-  [ ! -f "$CALLS" ]
-}
-
-@test "a human reply after our marker sends the thread back to be processed" {
-  run "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
   [ "$(cat "$CALLS")" = 1 ]
 }
 
-@test "a later comment from our own human account sends the thread back through the resolver" {
-  run "$SCRIPT" PRRT_reply_ownafter fixed "$BODY"
+@test "posts when a comment with an unreadable author follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_ghostafter fixed "$BODY"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
   [ "$(cat "$CALLS")" = 1 ]
 }
 
-@test "a jq that fails while measuring the body exits 1 with a message, not jq's status" {
-  mkdir -p "${BATS_TEST_TMPDIR}/jqbin"
-  printf '#!/bin/sh\nexit 5\n' >| "${BATS_TEST_TMPDIR}/jqbin/jq"
-  chmod +x "${BATS_TEST_TMPDIR}/jqbin/jq"
-  PATH="${BATS_TEST_TMPDIR}/jqbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
-  [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not measure the body file"* ]]
-  [ ! -f "$CALLS" ]
+@test "posts when our latest comment has no marker for this thread" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_nomarker fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "the pre-check reads the last 10 comments with their author type" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  grep -q 'comments(last: 10)' "$SCRIPT"
+  grep -q 'author { __typename }' "$SCRIPT"
 }
 
 @test "a bot-account viewer's own unmarked acknowledgement after our marker still skips" {

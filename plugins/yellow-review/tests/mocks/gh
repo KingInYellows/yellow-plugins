@@ -16,7 +16,8 @@
 #                                        scenario (rate-limit sequences with
 #                                        Retry-After or reset headers, 5xx,
 #                                        missing comment, spoofed marker,
-#                                        bot-account viewer: botself/botmarker)
+#                                        botafter / humanafter / nomarker /
+#                                        ghostafter marker-then-comment windows)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
@@ -288,6 +289,23 @@ case "$ALL_ARGS" in
         ;;
       *"PRRT_reply_priordisagree"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_botafter"*)
+        # Our marker, then a Bot acknowledgement: still a skip.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_botafter","comments":{"nodes":[{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Please add a null check."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_botafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks, noted."},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Looks resolved."}]}}}}'
+        ;;
+      *"PRRT_reply_humanafter"*)
+        # Our marker, then a human reply: new input, so post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_humanafter","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_humanafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks, noted."},{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"That does not fix it."}]}}}}'
+        ;;
+      *"PRRT_reply_ghostafter"*)
+        # Our marker, then a comment whose author cannot be read: post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_ghostafter","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_ghostafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":null,"body":"Deleted-user comment."}]}}}}'
+        ;;
+      *"PRRT_reply_nomarker"*)
+        # Our latest comment has no marker for this thread (an older marker
+        # sits behind it, and another thread's marker is not ours): post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_nomarker","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_nomarker disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Still broken."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Looking.\n\n<!-- yellow-review:resolve v1 thread=PRRT_other disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks."}]}}}}'
         ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
