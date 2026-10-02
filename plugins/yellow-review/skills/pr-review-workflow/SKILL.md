@@ -327,8 +327,10 @@ The commands that use these conventions resolve the active stacked-PR
 provider (`stack-provider-router` skill) before their first commit/push
 action; the message conventions above apply to both providers.
 
-`/review:resolve` always adds a **new** commit so reviewers keep their
-"changes since my last review" view. It never calls `gt modify` directly:
+When resolvers edited files, `/review:resolve` adds a **new** commit so
+reviewers keep their "changes since my last review" view. With no resolver
+edits (a reply/resolve-only run), `commit-resolve-fixes` returns `NOOP` and
+no commit is added. `/review:resolve` never calls `gt modify` directly:
 `commit-resolve-fixes` stages the exact files the resolvers changed
 (`git add -- <files>`), checks the staged set, then makes a new commit with
 the active provider, submits, and verifies the remote head. Staging
@@ -475,7 +477,7 @@ callers that walk several PRs:
   - `--pr <N> --revert-dirty` does the same for every change in the tree
     (no file list); `/review:resolve-stack` and `/review:sweep-all` run it
     after a dirty resolve, through
-    `references/resolve/dirty-tree-cleanup.md`
+    `references/review-resolve-stack/dirty-tree-cleanup.md`
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
   credential or cannot be read; run it on text posted outside the resolve
   scripts (for example a Linear issue)

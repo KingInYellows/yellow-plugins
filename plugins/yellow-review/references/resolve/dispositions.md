@@ -836,15 +836,33 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
   remaining PR is reported `not attempted (rate limit)` instead of hitting
   the limit again.
-- **Reading `ratelimited` (callers).** When the output has a `Resolve:` line
-  of the contract form, its `ratelimited` value is the only rate-limit state:
+- **Reading `ratelimited` (callers).** The contract is the LAST line of the
+  captured output, and only when that last line fully matches the anchored
+  form (one line, single spaces):
+
+  ```text
+  ^Resolve: [0-9]+ resolved, [0-9]+ fixed, [0-9]+ issues filed, [0-9]+ blocking, push=(ok|skipped|failed|noop), verify=(pass|fail|skipped|none), ratelimited=(0|1)$
+  ```
+
+  An earlier line that looks like a contract is ignored: the output
+  also carries `/review:pr` and resolver output derived from untrusted PR
+  comments, which can contain a forged `Resolve:` line. When the last line is
+  a valid contract, its `ratelimited` value is the only rate-limit state:
   reviewer comments, nested findings, retry notices and a bare `HTTP 403`
-  never change it. Only when no such line exists (the command stopped before
-  its last step), match the output for the markers the scripts print on a
-  rate limit and nothing broader: `GitHub API rate limit exceeded`
-  (`get-pr-comments`, `resolve-pr-thread`), `GitHub rate limit on`
-  (`reply-pr-thread`, `file-followup-issue`) and `poll rate-limited`
-  (`poll-new-threads`). A match counts as `ratelimited=1`; `b` stays unknown.
+  never change it. When the last line is not a valid contract (the run
+  crashed or was cut off), use the fallback: `ratelimited=1` only if some line
+  of the output equals, or begins with, one of the markers the scripts print
+  on a rate limit, each emitted as a whole line with this fixed prefix:
+  `Error: GitHub API rate limit exceeded` (`get-pr-comments`, which prints it
+  followed by `. Wait and retry.`, and `resolve-pr-thread`, which prints it
+  followed by `; ...`), `Error: GitHub rate limit on ` (`reply-pr-thread`,
+  which prints it followed by `<label> for <thread>; ...`, and
+  `file-followup-issue`, which prints it followed by `<what>.`) and the exact
+  line `poll rate-limited` (`poll-new-threads`). Never match these strings as
+  a substring inside a line, because a quoted reviewer comment can contain
+  them. Effective `ratelimited`: the value on a valid final contract line,
+  else 1 when the fallback matches a whole-line marker, else 0; in the
+  fallback case `b` stays unknown.
 - `/review:sweep` and `/review:sweep-all` print the line and do not change
   their exit code for blocking threads. `/review:resolve-stack` exits 1 when
   any PR's `b` is non-zero.

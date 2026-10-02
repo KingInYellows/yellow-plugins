@@ -225,11 +225,13 @@ For each iteration:
      lines containing `Error:` or `fatal:` from the sweep output as the
      `Notes` value for this PR; leave `Notes` empty when the output is
      clean. Take the `blocking` count `<b>` and `ratelimited` from the
-     sweep's `Resolve:` line (`?` when no line has the contract form,
-     including the `Resolve: completed (output unavailable …)` fallback).
-     Read `ratelimited` as `references/resolve/dispositions.md` defines: the
-     line's value wins, and a text match applies only when no line has the
-     contract form.
+     sweep's `Resolve:` line: the LAST line of the captured output, and only
+     when it fully matches the contract form (`?` otherwise, including the
+     `Resolve: completed (output unavailable …)` fallback). An earlier
+     contract-looking line is ignored: it can come from PR comments. Read
+     `ratelimited` as `references/resolve/dispositions.md` defines: a valid
+     final line's value wins, and the whole-line marker fallback applies only
+     when the last line is not a valid contract line.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation): outcome is `skipped — <one-line reason>`. A dirty tree after
@@ -237,7 +239,7 @@ For each iteration:
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
    leaves the tree clean (fixes are committed and pushed; a failed verify
    reverts its files). If it is dirty, read
-   `${CLAUDE_PLUGIN_ROOT}/references/resolve/dirty-tree-cleanup.md` and run its
+   `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/dirty-tree-cleanup.md` and run its
    procedure with this PR's number to revert the sweep's own edits. Add
    `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes` —
    or `revert incomplete: <files>` when the procedure reports it — and
@@ -248,8 +250,9 @@ For each iteration:
    `[review:sweep-all] Skipping /flow:compound — working tree not clean.`)
    whenever the tree is still dirty at this point, so compounding never
    runs over unresolved edits. The command exits `1` after the summary.
-5. **Rate-limit stop** — only after item 4: if this PR's `Resolve:` line
-   reported `ratelimited=1`, add `rate limited` to its `Notes`, mark every
+5. **Rate-limit stop** — only after item 4: if this PR's effective
+   `ratelimited` state (item 3: `ratelimited=1` on a valid final contract
+   line, else the documented whole-line marker fallback) is `1`, add `rate limited` to its `Notes`, mark every
    remaining PR `skipped — not attempted (rate limit)`, and go to
    `### Step 5: End-of-loop summary table`: the next sweep would hit the same
    GitHub limit. The command exits `1` after the summary.
@@ -362,7 +365,8 @@ Otherwise, with `attempted_count >= 1`:
   summary, and exits `1`. Step 6 still runs when the tree is clean.
 - **Every PR skipped for per-PR reasons** (no Step 4 stop): summary table is
   still printed; compound is skipped (per Step 6's guard); exit 0. sweep-all
-  itself succeeded — it correctly attempted every PR.
+  itself succeeded — the batch completed without hitting a stop condition,
+  and the skipped PRs are counted separately from attempted ones.
 - **`/flow:compound` failure**: warning is printed; the exit code is
   unchanged (`0` unless a stop above set `1`). Compounding is best-effort, not load-bearing.
 - **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at

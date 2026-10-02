@@ -628,8 +628,10 @@ Decisions from the brainstorm and the planning round:
   - `cd plugins/yellow-review && bats tests/`
   - `pnpm test:integration`, since the push-detector parity test must be
     untouched.
-- [x] 4.5: Manual end-to-end on a scratch PR in a test repo with both a bot
-  thread and a human thread. Cover:
+- [x] 4.5: Manual end-to-end on a scratch PR in a test repo with bot threads
+  (bot-only coverage by decision). The human-reviewer lane was not exercised
+  (out of scope: no second account) and relies on review of the lane table.
+  Cover:
   - `fixed`, `addressed`, `oos` and `disagree`;
   - an outdated thread;
   - one LGTM;

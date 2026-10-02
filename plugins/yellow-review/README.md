@@ -75,15 +75,17 @@ reply):
 | Disposition | What happens |
 | --- | --- |
 | `fixed` | New commit pushed and verified; reply cites the SHA; thread resolved |
-| `addressed` | Already handled at HEAD; reply cites a checked `path:line` or commit; thread resolved |
+| `addressed` | Already handled at HEAD; reply cites checked `path:line` evidence; thread resolved |
 | `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
 | `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
 
 Human-reviewer threads resolve only on hard evidence by default; others are
 held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
 Unattended runs file at most 3 issues per PR. Replies and issues carry a
-hidden marker, so a re-run posts no duplicates. The last output line is a
-machine summary:
+hidden marker, so a re-run skips replies and issues it already posted on
+GitHub. This is not a guarantee: a later reviewer comment can make a
+held-open thread eligible for another reply, and Linear issue deduplication
+is best-effort. The last output line is a machine summary:
 
 ```text
 Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0

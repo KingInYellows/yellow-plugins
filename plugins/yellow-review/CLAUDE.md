@@ -66,10 +66,13 @@ resolution, and sequential stack review. Graphite-native workflow.
   push-confirmation prompt and its Step 9b "save learnings" prompt (used by
   `/review:sweep`)
 - `/review:resolve` — Parallel resolution of unresolved PR review threads
-  (outdated included) via GraphQL. Every thread ends with a disposition —
-  `fixed`, `addressed`, `oos` (follow-up issue), or `disagree`/`unclear`
-  (reply, left open as blocking) — per `references/resolve/dispositions.md`,
-  and the last output line is the `Resolve:` contract line. Accepts
+  (outdated included) via GraphQL. Every attempted thread ends with a
+  disposition — `fixed`, `addressed`, `oos` (follow-up issue), or
+  `disagree`/`unclear` (reply, left open as blocking) — per
+  `references/resolve/dispositions.md`. Threads skipped by the cluster cap or
+  the interactive first-10 choice stay open and count as blocking. Every stop
+  after the PR number is known (Steps 2a-2c included) ends with the `Resolve:`
+  contract line; usage errors before it print only their error. Accepts
   `--non-interactive` to suppress its spawn-cap, CONFLICT, issue-filing,
   verify-command, and push-confirmation gates (used by
   `/review:resolve-stack` and `/review:sweep`)
@@ -187,7 +190,9 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread
   with an idempotency marker (skips when our last comment has a marker for the
   thread, any disposition), with one rate-limit retry and a per-call `gh`
-  timeout (see `references/resolve/dispositions.md`)
+  timeout, enforced only when `timeout(1)` is installed (without it `gh` runs
+  unbounded, so unattended calls can hang; see
+  `references/resolve/dispositions.md`)
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
   GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit,
   or a timed-out `gh` call, which may have changed state; same for
@@ -214,9 +219,13 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
   (`--unattended` skips runner files; `--revert-only` reverts the listed
-  files; `--revert-dirty` reverts every change in the tree, takes no file
-  list, and is what `/review:resolve-stack` and `/review:sweep-all` run
-  after a dirty resolve; both reject `--timeout`, `--command-file`,
+  files; `--revert-dirty` reverts every change in the tree and takes no
+  file list. `/review:resolve-stack` and `/review:sweep-all` run it after a
+  dirty resolve only when every dirty path is owned by the run (a PR file
+  or trusted-config path); otherwise they run `--revert-only` on the owned
+  trusted-config paths, which leaves unrecognized changes in place, so the
+  tree can stay dirty and the walk stops
+  (`references/review-resolve-stack/dirty-tree-cleanup.md`); both reject `--timeout`, `--command-file`,
   `--trusted` and `--unattended`). The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
@@ -235,9 +244,10 @@ and markers for the resolve scripts are in
 `dispositions.md` (the contract: vocabulary, downgrade and evidence rules,
 lanes, write order, issue cap, `Resolve:` line), `clusters.md` (clustering and
 the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
-`branch-check.md`, `memory-recall.md` and `dirty-tree-cleanup.md` (the
-ownership check and revert that `/review:resolve-stack` and
-`/review:sweep-all` run after a dirty tree).
+`branch-check.md` and `memory-recall.md`. The dirty-tree ownership check and
+revert lives at `references/review-resolve-stack/dirty-tree-cleanup.md`;
+`references/review-sweep-all/dirty-tree-cleanup.md` points `/review:sweep-all`
+at it.
 
 ### Library
 
