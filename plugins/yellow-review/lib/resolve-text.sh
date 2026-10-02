@@ -173,8 +173,13 @@ _rt_scan() {
         BEGIN {
             # The credential labels, once for every rule below: pass,
             # password, passwd, passphrase, pass_phrase, pass-phrase, passcode,
-            # pass_code, pass-code, secret, token, api key, credential.
-            kw = "(pass([_-]?(phrase|code)|word|wd)?|secret|token|api[_ \t-]?key|credential)"
+            # pass_code, pass-code, secret, secret key (secret_key, secret-key,
+            # secretKey), private key, access key, token, api key, credential.
+            # `client_secret`, `api_secret` and `clientSecret` are covered by
+            # `secret` (the `_`, `-` or capital starts the keyword). Do not add
+            # a `client`/`api` prefix here: it would start the match earlier,
+            # and `myclient_secret` would then count as in-word.
+            kw = "(pass([_-]?(phrase|code)|word|wd)?|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
@@ -184,7 +189,10 @@ _rt_scan() {
         }
         toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { flag("private-key") }
         # NAME_KEY=value with a literal-looking value (8+ token characters,
-        # so `API_KEY = process.env.API_KEY` in code does not match).
+        # so `API_KEY = process.env.API_KEY` in code does not match). The
+        # suffix list already covers the uppercase compounds: `SECRET_KEY`,
+        # `PRIVATE_KEY` and `ACCESS_KEY` end in `_KEY`, `CLIENT_SECRET` and
+        # `API_SECRET` in `_SECRET`.
         !strict && /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASS_?PHRASE|_PASS_?CODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         # DEVIN_ORG_ID=value, same literal-looking rule. AGENTS.md prohibits
         # committing that exact name; `_ID` names in general (USER_ID=12345678)
