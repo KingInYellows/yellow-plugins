@@ -43,8 +43,7 @@ Treat the other statuses as distinct failures, not as success:
 
 Keep an assertion on what the handler did (forwarded output, restored file, removed temp file). The status alone only proves the signal was sent.
 
-For SIGKILL cases assert 137 and check the filesystem afterwards; see the "T10" tests in
-`plugins/yellow-core/tests/context-observer.bats`, and "R19" there for the `|| true` form this doc replaces.
+For SIGKILL cases assert 137 and check the filesystem afterwards. In `plugins/yellow-core/tests/context-observer.bats`, the test "T10: a writer killed before the rename leaves the previous record intact" uses `run "$killer" -s KILL 1 ...` and checks the record on disk, but it does not assert `$status`; add `[ "$status" -eq 137 ]` in new tests. The test "R19: a SIGTERM mid-read still forwards what arrived before it" shows the `|| true` form this doc replaces.
 
 ## Source
 

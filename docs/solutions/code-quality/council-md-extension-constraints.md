@@ -55,24 +55,28 @@ at implementation time, not plan time. Verified against the shipped file
    files.
 7. **Every new temp artifact needs reclaiming on every exit path.** The
    per-reviewer shape-checked cleanup is mirrored by hand in Step 6
-   (`council_cleanup_temps`), the Step 7 guard (`council_cleanup_claude_only`),
-   Step 8 and Step 9; change one, change all. Fenced files also fall to
-   Step 4's age-gated stale sweep. The Step 5 `council-synth-*` directory has
+   (`council_cleanup_temps`), Step 8 and Step 9; change one, change all. The
+   Step 7 guard (`council_cleanup_claude_only`) is a separate case: it runs
+   when the state file is missing or unusable, so it only reclaims the minted
+   Claude fenced path and the state file, not per-reviewer files. A new
+   artifact that exists before reviewer rows are readable needs its own
+   reclaim there. Fenced files also fall to Step 4's age-gated stale sweep. The Step 5 `council-synth-*` directory has
    its own `council_synth_abort`, 5e removal and a second age-gated sweep in 5a.
 8. **Flags are parsed per fence.** Step 3's loop ignores unknown flags
    (`*) shift`), so a new flag is a silent no-op until it gets an arm.
-   `--single-pass` is stripped by an identical `sed` in Steps 1, 3 and 6, which
+   `--single-pass` is stripped by an identical `sed` in Steps 2, 3 and 6, which
    `tests/synthesis.bats` keeps in sync; later fences re-derive `REST` the same
    way.
-9. **Finding ids are stable, flip detection is prompt-level.** Normalization
-   assigns `S<n>-F<k>` ids, and Pass B reuses them so the two tables compare
-   per id. The comparison is made by the orchestrator in one context, so it is a
+9. **Finding ids are stable, flip detection is prompt-level.** The Pass A
+   enumerator (the Step 5c prompt, not `council_normalize_text`) assigns
+   `S<n>-F<k>` ids, and Pass B reuses them so the two tables compare per id.
+   Id stability is a prompt-level property, not a deterministic guarantee. The comparison is made by the orchestrator in one context, so it is a
    positional-consistency check, not a blind second evaluation. A flipped finding
    is tagged `low-confidence-synthesis` and never changes bucket.
 10. **Randomness comes from `/dev/urandom` via `od`, not `shuf` or `$RANDOM`.**
     `council_assign_labels` draws one `od -An -N4 -tu4` key per reviewer and
     orders with `sort -n`, failing closed when the entropy source is unreadable
-    (Step 2 probes it before the fan-out). Reuse that helper for any new
+    (Step 1 probes it before the fan-out). Reuse that helper for any new
     shuffle; do not fall back to a fixed order.
 11. **Validator interplay.** `validate-council-roster.js` Rules T/C/O lint
     numerals next to reviewer nouns. Rule R only proves each redaction-awk

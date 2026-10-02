@@ -26,6 +26,12 @@ provider must satisfy every obligation that applies to its group.
 - Keep the override list as the first parenthetical of the CONFLICT bullet in
   `plugins/yellow-linear/commands/linear/delegate.md`; the check reads it by
   position.
+- Map `READY_<ID>` to ``provider = `<id>` `` in a top-level bullet of the
+  `linear-delegate-providers` slice of
+  `plugins/yellow-linear/commands/linear/delegate.md`; the bullet's first line
+  must name `READY_<ID>`.
+- List the `READY_<ID>` state in the `setup-all-remote-agent-states` slice of
+  `plugins/yellow-core/commands/setup/all.md`.
 
 ## When to Apply
 

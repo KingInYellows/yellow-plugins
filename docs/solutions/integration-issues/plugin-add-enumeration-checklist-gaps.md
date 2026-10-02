@@ -42,8 +42,9 @@ validators are the authority on what actually fails.
    yellow-cursor's `installSdk` runs an unlocked `npm install` without
    `--ignore-scripts`, a supply-chain gap not to copy.
 6. **Keep `ERROR-PROVIDER-*` codes concatenated.** The codes in
-   `scripts/validate-provider-groups.js` are built by string concatenation so `scripts/lint-error-codes.js`
-   does not flag literal catalog codes in `scripts/`; keep that style.
+   `scripts/validate-provider-groups.js` are built by string concatenation, so
+   `scripts/lint-error-codes.js` does not flag literal catalog codes in
+   `scripts/`; keep that style.
 
 ## Why This Matters
 
