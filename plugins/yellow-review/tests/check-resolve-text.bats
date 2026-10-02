@@ -592,7 +592,7 @@ CASES
   check 'password:\n  |\n  hunter22'
 }
 
-@test "a block scalar of placeholders or prose stays clean and expires the carry" {
+@test "a block scalar of placeholders or prose stays clean and a dedented line expires it" {
   printf 'password: |\n  <your password>\n' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
@@ -602,8 +602,139 @@ CASES
   printf 'bypass: |\n  something\n' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
-  # The carry covers one value line only.
-  printf 'password: |\n  <your password>\n  hunter22\n' >| "$A"
+  # A dedented line ends the block: later lines are ordinary text.
+  printf 'password: |\n  <your password>\nhunter22\n' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
+}
+
+# Logical records: every value line of a block scalar is checked, a trailing
+# YAML comment on the header or a value line is ignored, and quoted values are
+# judged whole. Block rule: after a block header the first non-blank line is
+# always evaluated (indented or not); after that the block runs while lines
+# are indented more than the header and ends at the first line that is not.
+
+refuses() {  # <expected rule> <printf %b text>
+  printf '%b' "$2" >| "$A"
+  run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 2 ] || { echo "not flagged: $2"; false; }
+  [[ "$stderr" == *"rule=$1 "* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
+}
+
+stays_clean() {  # <printf %b text>
+  printf '%b' "$1" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ] || { echo "flagged: $1"; false; }
+}
+
+@test "a credential on any value line of a block scalar is refused, not only the first" {
+  refuses unquoted-keyword-value 'password: |\n  <your password>\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: >-\n  string\n  <x>\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: |\n  string\n\n  hunter22\n'
+  refuses unquoted-keyword-value 'password:\n  |\n  string\n  hunter22\n'
+  refuses unquoted-keyword-value '- password: |\n    string\n    hunter22\n'
+  refuses unquoted-keyword-value 'password: |\r\n  <x>\r\n  hunter22\r\n'
+  refuses quoted-keyword-assignment 'token: |\n  string\n  "s3cr3tvalue"\n'
+}
+
+@test "a block scalar ends at the first non-blank line indented no more than the header" {
+  stays_clean 'password: |\n  <your password>\nhunter22\n'
+  stays_clean 'password: |\n  string\n\nhunter22\n'
+  stays_clean '  password: |\n    string\n  hunter22\n'
+  # The first line after the header is evaluated even when it lost its indent.
+  refuses unquoted-keyword-value 'password: |\nhunter22\n'
+  refuses unquoted-keyword-value 'password: |\n\nhunter22\n'
+}
+
+@test "a trailing YAML comment on a header or value line does not hide the value" {
+  refuses unquoted-keyword-value 'password: | # note\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: >-   # note\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: |2 # note\n  <x>\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: # note\n  hunter22\n'
+  refuses unquoted-keyword-value 'password:\n  | # note\n  hunter22\n'
+  refuses unquoted-keyword-value 'password: |\n  string\n  hunter22 # note\n'
+  refuses unquoted-keyword-value 'password:\n# note\n  hunter22\n'
+  stays_clean 'password: | # note\n  <your password>\n'
+  stays_clean 'password: # note\n  string\n'
+}
+
+@test "block scalar controls: next-line and block placeholders, prose and a dedented paragraph stay clean" {
+  stays_clean 'password:\n  string\n'
+  stays_clean 'password: |\n  <your password>\n'
+  stays_clean 'password: |\n\nNext paragraph of prose.\n'
+  stays_clean 'password: |\n  Rotation is scheduled for Friday\n  and the team agreed\n'
+  stays_clean 'Keep the password: the team agreed to rotate it\n'
+  stays_clean 'bypass: |\n  string\n  something\n'
+}
+
+@test "separated code labels are credential keywords in every rule" {
+  while IFS= read -r t; do
+    printf '%b\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done <<'CASES'
+pass_code: hunter22
+pass-code: hunter22
+passcode = hunter22
+PASS_CODE: hunter22
+pass_code = "abcd efgh"
+pass-code: 'correct horse'
+pass-code:\n  hunter22
+pass_code: |\n  hunter22
+pass_code: |\n  string\n  hunter22
+DB_PASS_CODE=abcdefgh1234
+DB_PASS_PHRASE=abcdefgh1234
+DB_PASS_CODE: abcdefgh1234
+pass_phrase: correcthorse
+pass-phrase: hunter22
+PASSPHRASE: hunter22
+CASES
+}
+
+@test "separated code labels keep the in-word and placeholder rules" {
+  while IFS= read -r t; do
+    printf '%b\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged: $t"; false; }
+  done <<'CASES'
+pass_code: string
+pass-code: <your code>
+PASS_CODE: [REDACTED]
+pass_code = "$PASS_CODE"
+bypass_code: something
+bypass-code: something
+DB_PASS_CODE=${CODE}
+CASES
+}
+
+@test "a quoted credential is judged whole, whatever its first segment" {
+  refuses quoted-keyword-assignment 'password = "ab cd efgh ijkl"\n'
+  refuses quoted-keyword-assignment 'passphrase: "to be or not"\n'
+  refuses quoted-keyword-assignment "passphrase: 'to be or not'\\n"
+  refuses quoted-keyword-assignment '{"password": "ab cd efgh"}\n'
+  refuses quoted-keyword-assignment 'password = "a b c d"\n'
+  refuses quoted-keyword-assignment 'passphrase:\n  "to be or not"\n'
+  refuses quoted-keyword-assignment 'password = "unterminated hunter\n'
+  refuses quoted-keyword-assignment 'password: "string" and token: "hunter22"\n'
+  printf '%s\n' 'password = "ab\"cd efgh"' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a quoted whole placeholder, type word or short value stays clean" {
+  while IFS= read -r t; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged: $t"; false; }
+  done <<'CASES'
+token: "string"
+password = "<your password>"
+secret: "[REDACTED]"
+password: "$PASSWORD"
+token: "${TOKEN}"
+token: "optional string"
+password = "abc"
+bypass = "ab cd efgh"
+bypass="false"
+CASES
 }
