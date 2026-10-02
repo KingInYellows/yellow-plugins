@@ -607,10 +607,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   window is full and holds no marker for the thread, `file-followup-issue`
   exits 5 (not 1, so it is not mistaken for a transient failure) rather than
   risk a duplicate, and the thread stays open.
-- The Linear follow-up path has no marker lookup before `save_issue`, and an
-  ambiguous Linear failure falls back to GitHub. Marker dedupe therefore
-  holds only for the GitHub tracker: a Linear issue that was created but not
-  confirmed can be followed by a GitHub issue for the same thread.
+- An ambiguous Linear failure falls back to GitHub, and the fallback does not
+  look for the Linear issue: one that was created but not confirmed can be
+  followed by a GitHub issue for the same thread.
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
   definition files are refused, but the code the hooks run is not. How

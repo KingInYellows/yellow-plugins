@@ -194,3 +194,46 @@ EOS
   [[ "$output" == *"repass fetched=1 found=0"* ]]
   [ "$(paste -sd, "$SLEEP_LOG")" = "20,15" ]
 }
+
+# --- Failed-fetch diagnostics and permanent failures ---
+
+@test "an authentication failure is reported and stops polling early" {
+  : >"$ROUND1"
+  run --separate-stderr "$SCRIPT" --wait 100 "o/r" 401 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [[ "$stderr" == *"poll fetch-failed: Error: Authentication failed"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20" ]
+}
+
+@test "a permission failure stops polling early" {
+  : >"$ROUND1"
+  run --separate-stderr "$SCRIPT" --wait 100 "o/r" 431 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [[ "$stderr" == *"Insufficient permissions"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20" ]
+}
+
+@test "a transient server error is reported but polling continues" {
+  : >"$ROUND1"
+  run --separate-stderr "$SCRIPT" --wait 40 "o/r" 502 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [[ "$stderr" == *"GitHub server error"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20,20" ]
+}
+
+@test "the forwarded fetch error is capped at 300 bytes" {
+  fake_setup
+  : >"$ROUND1"
+  cat >"$FAKE_DIR/get-pr-comments" <<'EOS'
+#!/bin/bash
+printf 'x%.0s' $(seq 1 1000) >&2
+exit 1
+EOS
+  run --separate-stderr "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [ "${#stderr}" -le 330 ]
+  [[ "$stderr" == "poll fetch-failed: xxx"* ]]
+}

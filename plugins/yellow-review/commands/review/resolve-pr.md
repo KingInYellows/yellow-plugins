@@ -328,8 +328,11 @@ not already. Then, for every thread sent to a resolver:
      and run `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command"
      --pr "<PR#>" --revert-only --files-from "<file>"` (it saves a patch). The revert is per file, so list only files
      no other cluster modified; a file shared with another cluster keeps its
-     edits and the conflicted cluster's threads stay `unclear`. Cancel stops
-     before Step 6.
+     edits and the conflicted cluster's threads stay `unclear`. Cancel runs
+     `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved, so manual
+     reconciliation can start from it: the edits are unscreened and a
+     deny-listed one must not stay on disk), then stops before Step 6 and goes
+     to Step 9 with `push=skipped, verify=none`.
    - **Non-interactive:** keep the edits, log the conflict for Step 9.
    Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
@@ -357,7 +360,13 @@ not already. Then, for every thread sent to a resolver:
 
 **Files.** The expected set is the union of every resolver's `Files
 modified`, minus clusters rolled back in Step 5; write it, one path per
-line, to a `mktemp` file with the Write tool (`<files-file>`). **On any
+line, to a `mktemp` file with the Write tool (`<files-file>`). First make each
+path repo-relative (strip the working-tree root from an absolute path) and drop
+every path that `git status --porcelain --untracked-files=all` does not list as
+changed: the scripts refuse a listed file with no change, so one wrong entry
+would revert every cluster's fixes. Dropping an entry only narrows the set; a
+changed file outside it is still a refusal. Compare against the status output;
+never put a resolver path on a command line. **On any
 refusal below** — a `git status --porcelain` change outside the set, a
 script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 `credential-shaped` exit 3 first goes through the confirmation under Push), a

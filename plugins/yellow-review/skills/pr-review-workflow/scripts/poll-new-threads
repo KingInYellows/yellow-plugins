@@ -14,7 +14,10 @@
 # Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
 #             ("poll rate-limited" is printed; stop mutating).
 # A failed fetch, jq parse or grep is never read as "no new threads": the
-# round is skipped and the loop moves on. A failed copy to <out-file> resets
+# round is skipped and the loop moves on. The first 300 bytes of a failed
+# fetch's stderr go to this script's stderr ("poll fetch-failed: ..."). An
+# authentication, permission or not-found failure cannot clear by waiting, so
+# polling stops there (still exit 0, fetched=0 unless an earlier round fetched). A failed copy to <out-file> resets
 # fetched to 0, since <out-file> would hold stale data.
 
 set -u
@@ -83,6 +86,12 @@ while :; do
     elif grep -qi 'rate limit' "$WORK/err"; then
         printf 'poll rate-limited\n'
         exit 4
+    else
+        printf 'poll fetch-failed: %s\n' "$(head -c 300 "$WORK/err" | tr '\n' ' ')" >&2
+        # Permanent failures (get-pr-comments' own wording): stop early.
+        if grep -qE 'Authentication failed|Insufficient permissions|not found' "$WORK/err"; then
+            break
+        fi
     fi
     tick
     if [ "$found" = 1 ] || [ "$waited" -ge "$WAIT" ]; then break; fi
