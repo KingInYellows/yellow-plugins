@@ -600,13 +600,45 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 }
 
 @test "Resolve: ratelimited rule is defined once in dispositions.md and the callers point to it" {
-  for marker in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'only rate-limit state'; do
-    tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ' | grep -qF "$marker" || { echo "missing $marker"; false; }
+  flat=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  for rule in 'only rate-limit state' 'the outcome is `no contract`' 'must not infer a rate limit from any text in the output' 'The `Skill` tool gives callers no exit status' 'distinct note `no contract`' 'counts as blocking' 'ends the batch or stack walk after the caller finishes that PR'"'"'s clean-tree check' '`not attempted (no contract)` and exit 1'; do
+    grep -qF "$rule" <<<"$flat" || { echo "missing $rule"; false; }
   done
   for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
     grep -qF 'references/resolve/dispositions.md' "$f" || { echo "no pointer in $f"; false; }
     run ! grep -qiE 'HTTP 403/429' "$f"
   done
+}
+
+@test "ratelimited is never derived from output text: the marker fallback is gone everywhere" {
+  for f in "$RESOLVE_REFS/dispositions.md" "$RESOLVE_STACK" "$SWEEP" "$SWEEP_ALL"; do
+    flat=$(tr '\n' ' ' <"$f" | tr -s ' ')
+    for gone in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'whole-line marker' 'whole-line fallback' 'marker fallback' 'self-verify marker' 'the fallback matches'; do
+      run grep -qF "$gone" <<<"$flat"
+      [ "$status" -eq 1 ] || { echo "stale '$gone' in $f"; false; }
+    done
+  done
+}
+
+@test "resolve-stack and sweep-all treat a missing contract as no contract, not a rate limit" {
+  # the stop is distinct from the rate-limit stop and uses its own note and row text
+  flat_stack=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  grep -qF 'never infer a rate limit from any text in the output' <<<"$flat_stack"
+  grep -qF 'record the PR as `no contract` (a distinct note, not `rate limited`)' <<<"$flat_stack"
+  grep -qF 'not attempted (no contract)' <<<"$flat_stack"
+  grep -qF 'The cross-check never sets `ratelimited`' <<<"$flat_stack"
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Read `ratelimited` only from a valid final contract line' <<<"$flat4"
+  grep -qF 'never infer a rate limit from any text in the output: record `no contract` (a distinct note, not `rate limited`)' <<<"$flat4"
+  grep -qF '**No-contract stop** — only after item 4' <<<"$flat4"
+  grep -qF 'skipped — not attempted (no contract)' <<<"$flat4"
+  # item 5b records pending-exit-1 like the other early stops
+  [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 3 ]
+  # sweep's fallback line stays distinct from a rate limit
+  flat_sweep=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  grep -qF 'says nothing about rate limits' <<<"$flat_sweep"
+  grep -qF '`/review:sweep-all` treats it as `no contract`' <<<"$flat_sweep"
 }
 
 @test "sweep-all: an early stop's exit 1 survives Step 6 and compound's failure path" {
@@ -625,7 +657,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   run ! grep -qF 'no PRs attempted. ``` Then stop.' <<<"$flat6"
 }
 
-@test "sweep-all: Step 4 Reads dispositions.md before the loop so the ratelimited fallback is loaded" {
+@test "sweep-all: Step 4 Reads dispositions.md before the loop so the ratelimited and no-contract rules are loaded" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF 'Before the first iteration, Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md`' <<<"$flat4"

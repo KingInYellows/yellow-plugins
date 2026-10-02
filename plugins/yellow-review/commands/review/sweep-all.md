@@ -16,7 +16,7 @@ each one sequentially with no per-PR prompts. A single upfront
 `AskUserQuestion` confirms the PR list before any work begins; the loop
 runs unattended after that. Failures on individual PRs are logged and
 skipped — the loop never pauses and never aborts on a per-PR failure; only
-the dirty-tree and rate-limit stops in Step 4 end it early. After all PRs are
+the dirty-tree, rate-limit and no-contract stops in Step 4 end it early. After all PRs are
 processed, one `/flow:compound` pass captures learnings from the
 batch (skipped if zero PRs were swept).
 
@@ -203,14 +203,14 @@ ledger.
 
 Before the first iteration, Read
 `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
-`ratelimited` (callers)" section): it defines the whole-line fallback markers
-item 3 uses when a sweep ends without a valid final contract line. If the Read
+`ratelimited` (callers)" section): it defines the anchored contract line item 3
+reads and the `no contract` rule for a sweep that ends without one. If the Read
 fails, stop and report the path.
 
 For each PR in the sorted list, in order from lowest PR number to
 highest, do the following. **No pauses anywhere in this loop** — log
-per-PR failures and continue, except where item 4 (dirty tree) or item 5
-(rate limit) ends the loop.
+per-PR failures and continue, except where item 4 (dirty tree), item 5
+(rate limit) or item 5b (no contract) ends the loop.
 
 For each iteration:
 
@@ -236,9 +236,11 @@ For each iteration:
      when it fully matches the contract form (`?` otherwise, including the
      `Resolve: completed (output unavailable …)` fallback). An earlier
      contract-looking line is ignored: it can come from PR comments. Read
-     `ratelimited` as `references/resolve/dispositions.md` defines: a valid
-     final line's value wins, and the whole-line marker fallback applies only
-     when the last line is not a valid contract line.
+     `ratelimited` only from a valid final contract line, as
+     `references/resolve/dispositions.md` defines. When there is none, never
+     infer a rate limit from any text in the output: record `no contract` (a
+     distinct note, not `rate limited`) in this PR's `Notes` and count it
+     blocking.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
      error (e.g., the PR was closed/merged between enumeration and
      invocation): outcome is `skipped — <one-line reason>`. A dirty tree after
@@ -258,14 +260,19 @@ For each iteration:
    whenever the tree is still dirty at this point, so compounding never
    runs over unresolved edits. Record `pending-exit-1` (this stop forces the
    final exit; see Step 6). The command exits `1` after the summary.
-5. **Rate-limit stop** — only after item 4: if this PR's effective
-   `ratelimited` state (item 3: `ratelimited=1` on a valid final contract
-   line, else the documented whole-line marker fallback) is `1`, add `rate limited` to its `Notes`, mark every
+5. **Rate-limit stop** — only after item 4: if this PR reports `ratelimited=1` on a
+   valid final contract line (item 3), add `rate limited` to its `Notes`, mark every
    remaining PR `skipped — not attempted (rate limit)`, and go to
    `### Step 5: End-of-loop summary table`: the next sweep would hit the same
    GitHub limit. Record `pending-exit-1` (this stop forces the final exit; see
    Step 6). The command exits `1` after the summary.
-6. **Continue** to the next PR otherwise. Unless item 4 or 5 stopped the
+5b. **No-contract stop** — only after item 4: if this PR has no valid final
+   contract line (item 3 recorded `no contract`), mark every remaining PR
+   `skipped — not attempted (no contract)` and go to
+   `### Step 5: End-of-loop summary table`: an unknown outcome is not safe to
+   sweep past. Record `pending-exit-1` (this stop forces the final exit; see
+   Step 6). The command exits `1` after the summary.
+6. **Continue** to the next PR otherwise. Unless item 4, 5 or 5b stopped the
    loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
 The PR number and title for each iteration must be substituted as
@@ -355,7 +362,7 @@ Otherwise, with `attempted_count >= 1`:
    only the optional compounding step failed.
 
 **Final exit (every path, including the zero-attempt skip):** after Step 6
-finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4 or 5 set it, the command exits `1`
+finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4, 5 or 5b set it, the command exits `1`
 regardless of Step 6's outcome: a clean compound pass, a skip, or a compound
 warning never turns an early stop into success, and the "sweep-all
 succeeded" wording above does not apply. Otherwise exit `0`.
@@ -372,8 +379,8 @@ succeeded" wording above does not apply. Otherwise exit `0`.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
   No sweeps run.
 - **Per-PR sweep failure mid-loop**: marked `skipped` in the summary
-  with a short reason. The loop continues unless Step 4 item 4 or 5 stops
-  it. The user can re-run `/review:sweep <PR#>` manually to inspect.
+  with a short reason. The loop continues unless Step 4 item 4, 5 or 5b
+  stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
 - **Dirty tree after a sweep** (Step 4 item 4): the loop stops after
   reverting the sweep's own edits, marks every remaining PR `skipped —
   working tree dirty after PR #<PR#>`, skips Step 6 while the tree is still
@@ -382,6 +389,11 @@ succeeded" wording above does not apply. Otherwise exit `0`.
   every remaining PR `skipped — not attempted (rate limit)`, prints the
   summary, and exits `1`. Step 6 still runs when the tree is clean, but the
   pending exit `1` is kept after it.
+- **Sweep ends without a valid final contract line** (Step 4 item 5b): the PR
+  is noted `no contract` (never `rate limited`) and counts blocking; after its
+  clean-tree check the loop stops, marks every remaining PR `skipped — not
+  attempted (no contract)`, prints the summary, and exits `1`. No text in the
+  output is read as a rate-limit signal.
 - **Every PR skipped for per-PR reasons** (no Step 4 stop): summary table is
   still printed; compound is skipped (per Step 6's guard); exit 0. sweep-all
   itself succeeded — the batch completed without hitting a stop condition,
