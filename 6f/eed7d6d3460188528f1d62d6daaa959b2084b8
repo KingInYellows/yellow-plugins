@@ -1,0 +1,22 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_7a82748dd606d9::t_5dd81d39af0bb0 272-278
+  s_7a82748dd606d9::t_cc936d7dd86b53 26-29
+plugins/yellow-review/tests/run-verify-command.bats
+  s_7a82748dd606d9::t_f9c6237b77d0ae 1133-1163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6feed7d6d3460188528f1d62d6daaa959b2084b8",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

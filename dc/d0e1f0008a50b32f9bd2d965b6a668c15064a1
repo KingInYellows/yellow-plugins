@@ -1,0 +1,21 @@
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_becc7011266565::t_86ca93a1c34097 276-299
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_becc7011266565::t_86ca93a1c34097 22-23,196-202,206,211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dcd0e1f0008a50b32f9bd2d965b6a668c15064a1",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
