@@ -29,8 +29,9 @@ _rt_scan() {
     _rt_out=$(awk -v strict="$1" '
         # flag(rule): the first hit wins; END reports its rule and line,
         # never the matched text.
-        function flag(rule) {
-            if (!hit) { hit = 1; hitrule = rule; hitline = NR }
+        # An optional line names the line a multi-line value started on.
+        function flag(rule, line) {
+            if (!hit) { hit = 1; hitrule = rule; hitline = line ? line : NR }
         }
         # sentinel(inner): 1 when the text inside `<...>` or `[...]` is a known
         # redaction or template form, never arbitrary words. Either every
@@ -139,27 +140,68 @@ _rt_scan() {
         # credential, however it splits on whitespace: 4+ characters and not a
         # whole placeholder (`$NAME`, `<...>`, `[REDACTED]`) or placeholder
         # words (`string`, `optional string`). `"ab cd efgh ijkl"` is a hit;
-        # `"string"` is a type annotation.
-        function qcred(v,    np, parts, j, allph) {
+        # `"string"` is a type annotation. minlen (default 4) is the shortest
+        # value judged; a quote that never closes passes 1, so only a
+        # placeholder (or nothing) is clean.
+        function qcred(v, minlen,    np, parts, j, allph) {
             sub(/^[ \t]+/, "", v)
             sub(/[ \t]+$/, "", v)
-            if (length(v) < 4 || isplaceholder(v)) return 0
+            if (length(v) < (minlen ? minlen : 4) || isplaceholder(v)) return 0
             np = split(v, parts, /[ \t]+/)
             allph = 1
             for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
             return !allph
         }
-        # valueline(r, inword): evaluate one logical value line (leading list
-        # dash, trailing comment and CR already removed, lowercased). A quoted
-        # value is judged as a whole (qcred); anything else must be a single
-        # token (prose after a keyword line stays clean) judged by litval.
-        function valueline(r, inword,    q, n, seg) {
+        # Multi-line quoted value. A credential keyword whose value opens a
+        # quote that does not close on its line starts a carry (mqo): the
+        # following lines are joined with a space until the closing quote,
+        # then the joined value is judged like a one-line quoted value. The
+        # carry is bounded (20 lines, 2000 characters) so a hostile file stays
+        # linear. A quote that never closes (bound or end of file) fails
+        # closed: flagged unless the visible text is a placeholder.
+        function mqstart(q, v, line) {
+            mqo = 1; mqq = q; mqbuf = v; mqn = 1; mqline = line
+        }
+        function mqend(minlen) {
+            if (qcred(mqbuf, minlen)) flag("quoted-keyword-assignment", mqline)
+            mqo = 0
+            mqbuf = ""
+        }
+        # Block scalar content (explicit `|` or `>` header). The lines
+        # indented more than the header are ONE credential value, judged with
+        # the quoted-value rule (qcred) when the block ends or reaches the
+        # same bounds as above. Each line is also judged on its own by
+        # valueline. An unindented first line is not block content here (it
+        # is judged as a single token only), so prose after the header stays
+        # clean.
+        function blockadd(t) {
+            if (bdone) return
+            if (bn == 0) bline = NR
+            bbuf = bn ? bbuf " " t : t
+            if (++bn >= 20 || length(bbuf) > 2000) blockend()
+        }
+        function blockend() {
+            if (bn && !bdone && qcred(bbuf)) flag("unquoted-keyword-value", bline)
+            bdone = 1
+            bbuf = ""
+        }
+        # valueline(r, inword, mqok, rraw): evaluate one logical value line
+        # (leading list dash, trailing comment and CR already removed,
+        # lowercased; rraw is the same line before the comment was removed,
+        # because a `#` inside a quoted value is part of it). A quoted value
+        # is judged as a whole (qcred), carrying an unclosed quote onto the
+        # next lines when mqok; anything else must be a single token (prose
+        # after a keyword line stays clean) judged by litval.
+        function valueline(r, inword, mqok, rraw,    q, n, seg, v, rr) {
             q = substr(r, 1, 1)
             if (q == "\"" || q == "\047") {
                 r = substr(r, 2)
                 if (!inword) {
-                    n = qlen(r, q)
-                    if (qcred(substr(r, 1, n))) flag("quoted-keyword-assignment")
+                    rr = substr(rraw, 2)
+                    n = qlen(rr, q)
+                    v = substr(rr, 1, n)
+                    if (substr(rr, n + 1, 1) != q && mqok && !mqo && !hit) mqstart(q, v, NR)
+                    else if (qcred(v)) flag("quoted-keyword-assignment")
                     return
                 }
             }
@@ -195,6 +237,21 @@ _rt_scan() {
             # all-letter literal from the value rules below.
             sub(/\r$/, "")
             l = tolower($0)
+            # An open multi-line quote (see mqstart) takes this line first:
+            # join it, and judge the whole value once the quote closes. The
+            # line is still scanned by every rule below.
+            if (mqo) {
+                t = l
+                sub(/^[ \t]+/, "", t)
+                n = qlen(t, mqq)
+                if (substr(t, n + 1, 1) == mqq) {
+                    mqbuf = mqbuf " " substr(t, 1, n)
+                    mqend(4)
+                } else {
+                    mqbuf = mqbuf " " t
+                    if (++mqn >= 20 || length(mqbuf) > 2000) mqend(1)
+                }
+            }
             # Each loop below copies the rest of the line per match, which is
             # quadratic on a huge hostile line. Cap the matches per loop and
             # refuse past the cap (truncating would fail open).
@@ -215,9 +272,15 @@ _rt_scan() {
                 r = substr(r, RSTART + RLENGTH)
                 n = qlen(r, q)
                 v = substr(r, 1, n)
+                closed = (substr(r, n + 1, 1) == q)
                 base += n
                 r = substr(r, n + 1)
-                if (!(start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/) && qcred(v)) flag("quoted-keyword-assignment")
+                if (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/) continue
+                # A quote left open at the end of the line carries onto the
+                # next lines (see mqstart); inside an open one the text is
+                # already part of the joined value.
+                if (!closed && !mqo && !hit) mqstart(q, v, NR)
+                else if (qcred(v)) flag("quoted-keyword-assignment")
             }
             # keyword: unquoted-value. Flag only a plausible literal: 6+
             # characters, a digit or all letters (minus placeholder words),
@@ -259,21 +322,31 @@ _rt_scan() {
             #     evaluated the same way. The block ends at the first
             #     non-blank line indented the same or less; the first line
             #     after the header is always evaluated, indented or not, so
-            #     a pasted scalar that lost its indentation is still checked.
+            #     a pasted scalar that lost its indentation is still checked
+            #     as a single token. The lines indented more than the header
+            #     are also judged together as one value (blockadd).
             if (carry && $0 !~ /^[ \t]*$/) {
                 ind = match($0, /^[ \t]*/) ? RLENGTH : 0
                 if (carry == 1 && $0 ~ /^[ \t]*[|>][-+0-9]*([ \t]+#.*)?[ \t]*$/) {
                     carry = 2
                     bfirst = 1
+                    bn = 0; bbuf = ""; bdone = 0
                 } else if (carry == 1 && $0 ~ /^[ \t]*#/) {
                     # comment between the header and its value: keep waiting
                 } else if (carry == 2 && !bfirst && ind <= hind) {
+                    blockend()
                     carry = 0
                 } else {
                     r = l
                     sub(/^[ \t]*(-[ \t]*)?/, "", r)
+                    rraw = r
                     sub(/[ \t]+#.*$/, "", r)
-                    valueline(r, carryin)
+                    valueline(r, carryin, carry == 1, rraw)
+                    if (carry == 2 && !carryin && ind > hind) {
+                        t = l
+                        sub(/^[ \t]+/, "", t)
+                        blockadd(t)
+                    }
                     if (carry == 1) carry = 0
                     bfirst = 0
                 }
@@ -286,6 +359,7 @@ _rt_scan() {
                 if (pre ~ /^[ \t]*(-[ \t]*)?["\047]?[A-Za-z0-9_.-]*$/) {
                     carry = (substr(lh, kstart, RLENGTH) ~ /[=:][ \t]*[|>][-+0-9]*[ \t]*$/) ? 2 : 1
                     bfirst = 1
+                    bn = 0; bbuf = ""; bdone = 0
                     carryin = (kstart > 1 && substr($0, kstart - 1, 1) ~ /[A-Za-z]/ && substr($0, kstart, 1) !~ /[A-Z]/)
                     hind = match($0, /^[ \t]*/) ? RLENGTH : 0
                 }
@@ -374,7 +448,13 @@ _rt_scan() {
                 }
             }
         }
-        END { if (hit) print hitrule, hitline; exit hit ? 0 : 1 }
+        # End of file: a block scalar or a quote still open is judged as is.
+        END {
+            if (carry == 2) blockend()
+            if (mqo) mqend(1)
+            if (hit) print hitrule, hitline
+            exit hit ? 0 : 1
+        }
     ' < "$2") || _rt_awk_rc=$?
     if [ "$_rt_awk_rc" -eq 0 ]; then
         RT_HIT_RULE=${_rt_out%% *}
