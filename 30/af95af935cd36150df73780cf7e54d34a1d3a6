@@ -1,0 +1,23 @@
+plugins/yellow-review/commands/review/sweep-all.md
+  s_7a82748dd606d9::t_b37fe87ac28a96 253-254,260-261,345-353,375-376,382
+plugins/yellow-review/commands/review/sweep.md
+  s_7a82748dd606d9::t_182c12c1658023 203-217,222-225,251-252,254-256
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_e71fa95eccd3da 560-572,582-593
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "30af95af935cd36150df73780cf7e54d34a1d3a6",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
