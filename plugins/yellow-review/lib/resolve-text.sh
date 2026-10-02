@@ -42,18 +42,39 @@ rt_looks_secret() {
         function flag(rule) {
             if (!hit) { hit = 1; hitrule = rule; hitline = NR }
         }
+        # isplaceholder(seg): 1 when the WHOLE value is placeholder syntax:
+        # `$NAME`, `${NAME}`, `<...>` (no nested angle brackets) or a
+        # bracketed word such as `[REDACTED]`. A value that merely contains
+        # `$`, `<`, `{` or `[` (`hunter$2x`, `p<w>x`, `${NAME:-word}`) is not
+        # one; the scan runs on the lowercased line.
+        function isplaceholder(seg) {
+            if (seg ~ /^\$[a-z_][a-z0-9_]*$/) return 1
+            if (seg ~ /^\$\{[a-z_][a-z0-9_]*\}$/) return 1
+            if (seg ~ /^<[^<>]*>$/) return 1
+            return seg ~ /^\[[a-z_ -]+\]$/
+        }
         # litval(seg, inword): 1 when an unquoted keyword value looks like a
         # literal credential. Flag only a plausible one: 6+ characters, a
-        # digit or all letters (minus placeholder words), and no
-        # call/reference punctuation, so `password: string`,
-        # `password: z.string()` and `token: $TOKEN` stay clean.
+        # digit or all letters (minus placeholder words), and not a whole
+        # placeholder (`$TOKEN`, `${TOKEN}`, `<your token>`, `[REDACTED]`)
+        # or a call (`z.string()`), so `password: string`,
+        # `password: z.string()` and `token: $TOKEN` stay clean. A value that
+        # only contains `$`, `<`, `{` or `[` is a credential.
         function litval(seg, inword,    np, parts, allph, j) {
             sub(/[.!?]+$/, "", seg)
-            if (length(seg) < 6 || seg ~ /[(<${\[]/) return 0
+            if (length(seg) < 6 || isplaceholder(seg)) return 0
+            # A call such as `z.string(`: the value stops at the `)`.
+            if (seg ~ /^[a-z_][a-z0-9_.]*\(([a-z_][a-z0-9_.]*)?$/) return 0
+            # A generic type annotation such as `Optional[str]` or
+            # `Promise<string>`: a letters-only name, one opener, letters
+            # only inside, and closers at the very end (the value stops at
+            # a comma or space, so the closers may be missing).
+            if (seg ~ /^[a-z_][a-z0-9_.]*[<\[][a-z_][a-z_.|<\[]*[>\]]*$/) return 0
             if (seg ~ /[0-9]/) return 1
             # All-letter literal (`password: hunter`): flag unless it is a
             # known type or prose placeholder.
             if (inword) return 0
+            if (seg ~ /[$<{\[]/) return 1
             if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) return 1
             # Separated lowercase literal (`password: correct-horse-battery`,
             # `password: hunter@cats`): separators are punctuation that
@@ -106,8 +127,9 @@ rt_looks_secret() {
             }
             # keyword: unquoted-value. Flag only a plausible literal: 6+
             # characters, a digit or all letters (minus placeholder words),
-            # and no call/reference punctuation, so `password: string`,
-            # `password: z.string()` and `token: $TOKEN` stay clean.
+            # and not a whole placeholder or call (see litval), so
+            # `password: string`, `password: z.string()` and `token: $TOKEN`
+            # stay clean while `password: hunter$2x` is flagged.
             # For the letter-only branches below the keyword must start a
             # word: `bypass: something` is not a `pass` keyword. A letter
             # before it disqualifies it unless the keyword itself starts with
@@ -151,7 +173,7 @@ rt_looks_secret() {
                 }
             }
             # Credentials in URL userinfo (scheme://user:pass@host); a
-            # placeholder or variable password stays clean.
+            # password that is wholly a placeholder or variable stays clean.
             # Guarded: the scheme pattern is quadratic on one huge line.
             r = index(l, "://") ? l : ""
             # The username may be empty (`https://:pass@host`); `?` and `#`
@@ -166,7 +188,9 @@ rt_looks_secret() {
                 # `%NAME%`, `%(name)s` or a bare format spec (`%s`). A password
                 # that merely contains one (`Hunter2%s`) or a `%HH` escape
                 # (`p%40ss`) is a credential and must be scanned.
-                if (seg ~ /[<${\[]/ || index(ph, " " seg " ") > 0) continue
+                # `$`, `<`, `{` and `[` exempt only a whole `$NAME`, `${NAME}`,
+                # `<...>` or `[word]` password, never one that contains them.
+                if (isplaceholder(seg) || index(ph, " " seg " ") > 0) continue
                 if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /^%[0-9]*[a-z]$/ || seg ~ /^%\([a-z_][a-z0-9_]*\)[a-z]$/) continue
                 flag("url-userinfo")
             }

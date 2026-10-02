@@ -478,3 +478,58 @@ CASES
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "a value that merely contains a placeholder character is refused" {
+  while IFS= read -r t; do
+    printf '%s\n' "$t" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done <<'CASES'
+password: hunter$2x
+token=abc$def99
+secret: abc{def}ghi99
+password: hunter$cats
+token: <hunter99
+https://u:hunter${x}@host/p
+https://u:p<w>x@host
+https://u:p$w@host
+https://u:p[w]x@host
+https://u:${PASS:-hunter2}@host
+CASES
+}
+
+@test "a refused placeholder-lookalike keeps its rule name" {
+  check() {  # <expected rule> <line text>
+    printf '%s\n' "$2" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"rule=$1 "* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
+  }
+  check unquoted-keyword-value 'password: hunter$2x'
+  check unquoted-keyword-value 'secret: abc{def}ghi99'
+  check url-userinfo 'https://u:hunter${x}@host/p'
+}
+
+@test "a whole-value placeholder or call stays clean" {
+  while IFS= read -r t; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged: $t"; false; }
+  done <<'CASES'
+password: $PASSWORD
+token: ${TOKEN}
+password: <your password>
+password: <your-password>
+secret: [REDACTED]
+token=[REDACTED]
+password: z.string()
+token = process.env.api_key
+secret: Optional[str]
+token: Promise<string>
+https://user:${PASS}@host
+https://user:$PASS@host
+https://user:<password>@host
+https://user:[REDACTED]@host
+https://user:%PASSWORD%@host
+CASES
+}
