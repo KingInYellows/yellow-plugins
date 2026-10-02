@@ -1305,3 +1305,36 @@ STUB
   [[ "$stderr" != *"$v"* ]]
   [[ "$output" != *"$v"* ]]
 }
+
+# --- A symlinked ancestor of the runtime override is a runner path ---
+
+@test "--unattended refuses a listed repointing of a symlinked directory in the override path (exit 3)" {
+  mkdir -p real-tools evil
+  printf '// runtime\n' >| real-tools/rt.js
+  printf '// evil\n' >| evil/rt.js
+  ln -s real-tools tools
+  git add real-tools tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  ln -sfn evil tools
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run_crf --provider github --pr 7 --message "$MSG" --unattended -- tools
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"runner file"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "--unattended refuses the target directory's file behind a symlinked override ancestor (exit 3)" {
+  mkdir -p real-tools
+  printf '// runtime\n' >| real-tools/rt.js
+  ln -s real-tools tools
+  git add real-tools tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  printf '// edited\n' >> real-tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$(pwd -P)/tools/rt.js"
+  run_crf --provider github --pr 7 --message "$MSG" --unattended -- real-tools/rt.js
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"runner file"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  ! grep -q '^node ' "$STUB_LOG"
+}

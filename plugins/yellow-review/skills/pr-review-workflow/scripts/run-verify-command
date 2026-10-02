@@ -93,9 +93,12 @@
 #        64 KiB, so no redaction filter buffers more than one record; a cut
 #        can sever a credential from its value, so if any record was cut the
 #        log is withheld with a notice instead of published), then tail
-#        keeps the last 1 MiB of the REDACTED stream in a private mktemp file
-#        (mode 0600) outside the git directory.
-#        Only after the final credential scan is it copied to the .log path, so
+#        keeps the last 1 MiB plus 64 KiB of context of the REDACTED stream in
+#        a private mktemp file (mode 0600) outside the git directory. The extra
+#        context keeps a credential label (`password: |`) that sits just before
+#        the 1 MiB boundary in view of the final scan of its value.
+#        Only after the final credential scan of that whole buffer are the last
+#        1 MiB of it (a partial first line dropped) copied to the .log path, so
 #        that path never holds raw output (an empty file until then), even
 #        across a crash. Residual: a SIGKILL or host loss mid-run cannot run the
 #        EXIT cleanup and leaves that 0600 temp file behind; it holds redacted
@@ -109,6 +112,9 @@ set -uo pipefail
 
 KILL_AFTER=10
 LOG_CAP_BYTES=1048576
+# Extra redacted bytes kept before the cap so the final scan sees a credential
+# label whose value starts the published suffix.
+LOG_CONTEXT_BYTES=65536
 KEEP=10
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
@@ -414,12 +420,14 @@ run_verify() {
     # The redactor always drains the FIFO and tail holds at most the cap, so
     # the command never blocks or gets SIGPIPE however much it prints. tail
     # keeps the last bytes of the redacted stream (failures usually print last)
-    # and writes them when the stream ends. The subshell is its own job group,
+    # and writes them when the stream ends: the cap plus LOG_CONTEXT_BYTES, so
+    # the final scan in vr_publish_log sees a credential label that precedes
+    # the published suffix. The subshell is its own job group,
     # so vr_drain_log can kill redactor and tail together. The redactor cuts the
     # stream into records of at most 64 KiB before its line-buffered sed passes
     # (see vr_redact_filter), so memory is bounded by one record per filter, not
     # by the tail cap, which sits downstream of them and bounds only the file.
-    ( vr_redact_stream <"$FIFO" | tail -c "$LOG_CAP_BYTES" >|"$STREAM_FILE" ) &
+    ( vr_redact_stream <"$FIFO" | tail -c $((LOG_CAP_BYTES + LOG_CONTEXT_BYTES)) >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS
     if T=$(vr_timeout_bin); then
@@ -534,7 +542,7 @@ fi
 # credential scan. A log the stream job withheld already holds its notice.
 if [ -n "$LOG" ] && [ "$LOG_WITHHELD" != 1 ]; then
     PUBLISH_RC=0
-    vr_publish_log "$STREAM_FILE" "$LOG" || PUBLISH_RC=$?
+    vr_publish_log "$STREAM_FILE" "$LOG" "$LOG_CAP_BYTES" || PUBLISH_RC=$?
     [ "$PUBLISH_RC" -ne 3 ] || add_reason "log withheld: output had a record longer than 64 KiB"
 fi
 

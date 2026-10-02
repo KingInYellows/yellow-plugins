@@ -1453,3 +1453,44 @@ link_fixture() {
   [[ "$stderr" == *"cannot check gitignored files"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
+
+# --- the log tail cap must not separate a credential label from its value ---
+# The stream file keeps the cap plus 64 KiB of context and the final scan runs
+# over all of it, so a label (`password: |`) just before the 1 MiB boundary is
+# still seen with a value that opens the published suffix.
+# Filler is 1 KiB lines; the header, then the indented value line, then enough
+# filler and a marker line that the last 1048576 bytes start exactly at the
+# value line.
+cap_boundary_command() {
+  # 18 bytes of value line and 12 of the closing "done-marker" line.
+  local label="$1" valline_len=18 marker_len=12 after
+  after=$((1048576 - valline_len - marker_len))
+  printf '%s' "f=\$(head -c 1023 /dev/zero | tr '\\0' x); yes \"\$f\" | head -n 1200; printf '%s: |\\n' $label; printf '  %s%s\\n' lowentropy value; yes \"\$f\" | head -c $((after - 1)); echo; echo done-marker"
+}
+
+@test "a credential label just before the log cap boundary still withholds the log" {
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  # "pass" "word" so the literal label is not in this file.
+  TMPDIR="$STREAM_TMP" verify "$(cap_boundary_command 'pass""word')" --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[withheld: log still looks like a credential after redaction]' ]
+  run ! grep -qF lowentropyvalue "$log"
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}
+
+@test "the same boundary without a credential label keeps the log, tail intact and under the cap" {
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$(cap_boundary_command 'note')" --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  run ! grep -q 'withheld' "$log"
+  [ "$(wc -c <"$log")" -le 1048576 ]
+  [ "$(wc -c <"$log")" -gt 1040000 ]
+  [ "$(head -n 1 "$log")" = '  lowentropyvalue' ]
+  tail -n 1 "$log" | grep -q 'done-marker$'
+  [ "$(mode "$log")" = 600 ]
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}

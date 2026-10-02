@@ -60,30 +60,48 @@ rp_denied() {
 }
 
 # rp_runtime_override_rels: the repository-relative, lowercased path(s) that
-# YELLOW_REVIEW_GITHUB_STACK_RUNTIME names, one per line: the path as given
-# (its directory made physical) and each symlink hop down to the file node
-# would run. Prints nothing when the variable is unset, the file is outside
-# the repository or the path cannot be resolved. Relative values resolve from
-# the current directory, as `node "$RUNTIME"` does.
+# YELLOW_REVIEW_GITHUB_STACK_RUNTIME names, one per line. The path is walked
+# component by component as the kernel does, and every node on the way that
+# lies inside the repository is printed: each directory, each symlink (a
+# symlinked ancestor directory included, since repointing it redirects the
+# override to a directory the PR controls), the nodes below each symlink's
+# target and the final file. A symlink outside the repository is followed
+# (its target is judged), one inside is printed before it is followed. Prints
+# nothing for nodes outside the repository or when the variable is unset;
+# stops at a path that loops or exceeds the hop limit. Relative values
+# resolve from the current directory, as `node "$RUNTIME"` does.
 rp_runtime_override_rels() {
-    local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top dir t hops=0
+    local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top cur rest c next t hops=0
     [ -n "$p" ] || return 0
     top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 0
-    while :; do
-        dir=$(cd -- "$(dirname -- "$p")" 2>/dev/null && pwd -P) || return 0
-        p="${dir%/}/${p##*/}"
-        case "$p" in
-            "$top"/*) printf '%s\n' "$(rp_lower "${p#"$top"/}")" ;;
+    case "$p" in
+        /*) cur=/ ;;
+        *) cur=$(pwd -P 2>/dev/null) || return 0 ;;
+    esac
+    rest="$p"
+    while [ -n "$rest" ]; do
+        c="${rest%%/*}"
+        case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+        case "$c" in
+            ''|.) continue ;;
+            ..) cur=$(dirname -- "$cur") || return 0; continue ;;
         esac
-        [ -L "$p" ] || return 0
-        hops=$((hops + 1))
-        [ "$hops" -le 40 ] || return 0
-        t=$(readlink -- "$p") || return 0
-        case "$t" in
-            /*) p="$t" ;;
-            *) p="${p%/*}/$t" ;;
+        next="${cur%/}/$c"
+        case "$next" in
+            "$top"/*) printf '%s\n' "$(rp_lower "${next#"$top"/}")" ;;
         esac
+        if [ -L "$next" ]; then
+            hops=$((hops + 1))
+            [ "$hops" -le 40 ] || return 0
+            t=$(readlink -- "$next") || return 0
+            # A relative target resolves from the link's directory, which is
+            # cur; an absolute one restarts at the root.
+            case "$t" in /*) cur=/ ;; esac
+            rest="${t}${rest:+/$rest}"
+        else
+            cur="$next"
+        fi
     done
 }
 
