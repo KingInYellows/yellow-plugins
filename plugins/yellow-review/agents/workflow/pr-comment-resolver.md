@@ -252,7 +252,10 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
 
 The contract at `Disposition contract:` is the single source for what each
 disposition means and for the `evidence` and `oos_reason` rules; follow it
-rather than this reminder. Never put `|` in a value. Only emit `THREAD` lines
+rather than this reminder, including its prose allowlist: keep values to
+plain letters, digits, spaces and basic punctuation, with no `@`, links,
+backticks, brackets or Markdown, or the orchestrator withholds them. Never
+put `|` in a value. Only emit `THREAD` lines
 for the thread IDs you were given.
 
 Do NOT commit changes, reply to threads, resolve threads, or file issues.

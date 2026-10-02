@@ -52,6 +52,23 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
   patterns below first, and file lists are written to a file with the
   Write tool and passed with `--files-from` (a flag of the planned
   `commit-resolve-fixes` and `run-verify-command`).
+- **Prose allowlist.** This is the single source. Replies and issue bodies
+  embed `evidence` and `oos_reason`, so the orchestrator checks both values
+  before any reply, issue or resolve helper runs. A value is accepted only
+  when it is 1 to 200 characters on one line (`oos_reason` may be empty
+  when the disposition is not `oos`) and every character is an ASCII letter,
+  a digit, a space, or one of `. , : ; ! ? ' " ( ) / _ # + -`. The class has
+  no `@`, backtick, `<`, `>`, `[`, `]`, `{`, `}`, `|`, `\`, `*` or `~`, so a
+  mention, a link, an image, a tag or a code fence cannot pass. A value that
+  contains `://`, `www.`, `mailto:`, `![` or `](` fails even when each
+  character is allowed. A failing value is withheld and replaced:
+  `evidence` becomes `see the PR diff`, and `oos_reason` becomes `no reason
+  given`. `addressed` then becomes `unclear` (its evidence must pass the
+  `path:line` check below), and `oos` with the replaced reason becomes
+  `unclear`. `fixed` keeps its disposition, because the cluster `Status`,
+  `Files modified` and the diff verify it. The report line names the thread
+  and says the value was withheld by the prose allowlist; it never prints the
+  value.
 
 ## Downgrade rules
 
@@ -676,10 +693,12 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - An ambiguous Linear failure falls back to GitHub, and the fallback does not
   look for the Linear issue: one that was created but not confirmed can be
   followed by a GitHub issue for the same thread.
-- The credential screen refuses credential shapes only. Resolver-written
-  text can still carry `@` mentions, external URLs or markdown images; the
-  200-character single-line limit on `evidence` and `oos_reason` bounds it,
-  and the reply templates put the outcome first.
+- The credential screen refuses credential shapes only. The prose
+  allowlist (see Resolver line) is the mitigation for the rest: mentions,
+  external URLs and markdown images cannot appear in resolver prose, and the
+  reply templates still put the outcome first. Plain text that passes the
+  allowlist can still mislead, such as a persuasive false reason, so the
+  reply is the resolver's claim, not a verified fact.
 - A repo with Issues disabled makes `file-followup-issue` exit 1 (`gh issue
   list` fails), so its `oos` threads get no reply and stay open on every run.
 - Unattended commit and submit run the repository's git hooks (for example
