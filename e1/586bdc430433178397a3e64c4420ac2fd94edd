@@ -1,0 +1,43 @@
+plugins/yellow-debt/commands/debt/status.md
+  s_e0e3718c40e1d0::t_2ce9c7bcbcc260 106-108
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 243
+plugins/yellow-debt/skills/debt-conventions/SKILL.md
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 302-323,333-341
+plans/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_204ad33924c592 371-394
+plugins/yellow-debt/agents/synthesis/audit-synthesizer.md
+  s_e0e3718c40e1d0::t_4da25220a19f94 142-147,155,168,177-179,192,199-200,208,212-216,256-257,260-261,265
+  s_e0e3718c40e1d0::t_ca3721f8f3e68f 300-303,305-315,324,326-329,337
+plugins/yellow-debt/README.md
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 209-211,216-218
+plugins/yellow-debt/lib/validate.sh
+  s_e0e3718c40e1d0::t_5053ba1f671ccd 256-257,259,278-299,327-334,356-372,394-399,402-407,409,411-412,419,421-422,428,435-564,576-577,580
+plugins/yellow-debt/CLAUDE.md
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 124,130-133
+.changeset/yellow-debt-wont-fix-status.md
+  s_e0e3718c40e1d0::t_204ad33924c592 14-17
+plugins/yellow-debt/commands/debt/triage.md
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 89,209-210,263-264,320-321,332-333,337,339-346,349
+plugins/yellow-debt/commands/debt/fix.md
+  s_e0e3718c40e1d0::t_6a1407bd1b18f7 201-206
+plugins/yellow-debt/tests/security.bats
+  s_e0e3718c40e1d0::t_19ae4e821b9ecc 674,707-712,733-734,836-838
+  s_e0e3718c40e1d0::t_6c7bfbc6fba8b8 26-27,29-33,37-39,664,670,675,677-692,706,713-714,728,730-732,735,738-741,744-749,752-771,776,781-783,789-803,812-813,817-831,839-850,853-872,876-912,917,922-930,932-935,937-946,957-964,966-969,972-976,979-980,983-1039
+  s_e0e3718c40e1d0::t_5e18e4306b8b29 676
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e1586bdc430433178397a3e64c4420ac2fd94edd",
+  "prompts": {},
+  "sessions": {
+    "s_e0e3718c40e1d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f73803c-6ecc-4320-adb3-d45416ec9b11",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
