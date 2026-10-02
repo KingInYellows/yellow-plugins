@@ -1,0 +1,32 @@
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_f318472b3063ae 649-650
+  s_7a82748dd606d9::t_75a014e8d2a158 103-105,117,140,231-233,235-238,277,300,353-357,404,427,479-483,530,553,608-612,626-627,629-630,793-795,843-847,888-896,1013-1014
+.changeset/review-ledger-followups-merged-prs.md
+  s_7a82748dd606d9::t_01597a247ac4bc 4-5,34-42
+docs/security.md
+  s_7a82748dd606d9::t_29c083fb44cf05 570-572
+plugins/yellow-council/CLAUDE.md
+  s_7a82748dd606d9::t_4c83087016589c 95-97
+plugins/yellow-devin/commands/devin/setup.md
+  s_7a82748dd606d9::t_3d0fd67bd77c3e 38-40,52,75,169,192
+plugins/yellow-research/tests/has-userconfig.bats
+  s_7a82748dd606d9::t_0ee0558a9131d6 81-144
+plugins/yellow-semgrep/commands/semgrep/setup.md
+  s_7a82748dd606d9::t_0875437cdbac7a 162,185,244,267,323,346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5efb25f3dd4ab77ff5be4811e2b79e7ea56add09",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
