@@ -378,7 +378,7 @@ record; the decisions are kept as written at plan time.
   The only accepted target spelling is still `wont-fix`.
 - Decision 7: a finding needs a line range, since a range-less fingerprint
   covered a whole file. The whole range is hashed. The anchor is
-  the first line with 8 or more non-whitespace characters, and it matches only
+  the first line with 20 or more bytes (blanks folded), and it matches only
   when it equals the first such line of the new range, and never for
   `security-debt`. Older kept todos are rehashed from the tree, except
   `complete` ones; a todo closed as `wont-fix` or `deleted` is stamped at close.

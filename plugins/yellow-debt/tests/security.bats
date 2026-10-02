@@ -1192,6 +1192,19 @@ run_status_block() {
   [[ "${lines[0]}" == *'"skip":false'* ]]
 }
 
+@test "debt_match_kept_todos reports the numerically lowest id, not the first filename" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  make_todo 10 wont-fix 10-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-3"
+  make_todo 2 wont-fix 2-wont-fix-high-bbb.md "affected_files:\n  - src/a.js:2-3"
+  mkdir -p .debt
+  write_surviving 2-3
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"kept_id":"2"'* ]]
+}
+
 @test "debt_match_kept_todos keeps going past a kept todo it cannot read" {
   require_kislyuk_yq
   init_repo

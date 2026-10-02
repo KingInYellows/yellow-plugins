@@ -334,10 +334,12 @@ not. The same path was already on `main`, so older callers were affected too.
 
 **Fix** (commit `d00e1229`):
 
-- Try the checkout path first, then fall back to the highest versioned sibling:
-  `"${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh | sort -V | tail -n 1`.
-  Use `sort -V`, not lexical order (see
-  `docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md`).
+- Try the checkout path first, then fall back to the highest versioned sibling
+  of `"${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh`. Compare
+  versions numerically, not lexically (see
+  `docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md`),
+  and without GNU `sort -V`: BSD `sort` lacks it. `yellow-debt/lib/validate.sh`
+  loops over the glob with a dotted-decimal comparison.
 - Fail loudly, naming the missing dependency, when neither path resolves. A
   caller must never hit exit 127 or a silent no-op with no hint.
 - Add a test that builds a `cache/<plugin>/<version>` tree (several yellow-core

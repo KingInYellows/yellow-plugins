@@ -301,7 +301,7 @@ on-disk frontmatter as follows:
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
 | (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null` |
 | (shell-derived)      | `resurfaced_from:` frontmatter | The id from `.debt/fingerprints.json` when a `deferred` todo has the same fingerprint (the finding came back); single-quoted; omit when `null`. Triage then shows that this is a deferred finding that returned |
-| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ characters without whitespace) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
+| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ bytes once blanks are folded) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator

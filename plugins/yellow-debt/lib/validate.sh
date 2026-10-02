@@ -637,7 +637,7 @@ debt_match_kept_todos() {
       # suppress (a finding closed twice must stay closed). Report the lowest id.
       for j in "${!k_id[@]}"; do
         [ "${k_fp[j]}" = "$fp" ] || continue
-        [ "$matches" -gt 0 ] || match_idx=$j
+        if [ "$matches" -eq 0 ] || [ "$((10#${k_id[j]}))" -lt "$((10#${k_id[match_idx]}))" ]; then match_idx=$j; fi
         matches=$((matches + 1))
       done
       [ "$matches" -ge 1 ] && how=fingerprint

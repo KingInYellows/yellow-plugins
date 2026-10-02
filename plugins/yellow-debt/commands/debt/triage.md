@@ -54,7 +54,10 @@ GIT_ROOT="$(git rev-parse --show-toplevel)" || {
   exit 1
 }
 cd "$GIT_ROOT" || exit 1
-debt_pending_todos | LC_ALL=C sort
+# Keep the function's status: a refused symlink must stop the command, not
+# read as an empty list.
+list=$(debt_pending_todos) || exit 1
+[ -z "$list" ] || printf '%s\n' "$list" | LC_ALL=C sort
 __YELLOW_DEBT_BASH__
 ```
 
@@ -327,7 +330,9 @@ Run /debt:fix to begin remediation of accepted findings."
 - Its Linear issue, if synced, is not touched: close it by hand
 - A finding that is already `ready`, `in-progress` or `deferred` is closed with
   the helper directly. Replace `<current-status>` with `ready`, `in-progress`
-  or `deferred`. To record a reason, make the private directory and `reason.txt`
+  or `deferred`; for a legacy todo that Step 2 left out (named `-pending-`, its
+  frontmatter `wont_fix`) use `pending`, and the helper repairs name and
+  frontmatter. To record a reason, make the private directory and `reason.txt`
   as in Defer and pass the directory as `'<reason-dir>'`; pass `'-'` for none:
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash

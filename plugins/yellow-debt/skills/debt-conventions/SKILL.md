@@ -334,7 +334,7 @@ in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
 fingerprint hashes the category, the path and the whole flagged range with
 blanks folded and CR removed; a finding without a line range gets none.
 `anchor_hash` hashes the first substantive flagged line
-(20+ characters once blanks are folded, so `}` or `if err != nil {` never
+(20+ bytes once blanks are folded, so `}` or `if err != nil {` never
 anchors). `audit-synthesizer` uses them to skip a new finding that matches a
 kept todo, by the todo's frontmatter status (any status except `pending` and
 `deferred`): an exact fingerprint first (any number of kept todos may share it),
