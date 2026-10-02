@@ -1,0 +1,31 @@
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_abf654ee5b037d::t_1a6218104ca0d5 46
+docs/solutions/code-quality/scripts-validate-provider-groups-js-checks-each-co.md
+  s_abf654ee5b037d::t_bdd22b636fd5fb 29
+  s_abf654ee5b037d::t_d0c708d4a3a7f5 30-34
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_abf654ee5b037d::t_0086eeb006ba5b 45-47
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_abf654ee5b037d::t_721439c4ddd19e 58-63
+  s_abf654ee5b037d::t_e1fc60082d57ab 70-73
+  s_abf654ee5b037d::t_fb2c30dfcb8286 67
+  s_abf654ee5b037d::t_52e8f1475360a3 79
+docs/solutions/workflow/release-pr-token-bypass-only-for-new-version-prs.md
+  s_abf654ee5b037d::t_929a59b16574ec 15-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "24cf077cd61a996fec57894f8d77ef0ac4da58e2",
+  "prompts": {},
+  "sessions": {
+    "s_abf654ee5b037d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ade8c746-d202-4a8b-b6ca-0ee0be76b706",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
