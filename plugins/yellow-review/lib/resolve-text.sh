@@ -126,7 +126,54 @@ _rt_scan() {
             }
             return 0
         }
+        # qlen(rest, q): length of the quoted content at the start of rest
+        # (the text after an opening quote q), up to the first unescaped
+        # closing q or the end of the line. An unterminated quote is read to
+        # the end of the line, so it never hides a value.
+        function qlen(rest, q) {
+            if (q == "\"") match(rest, /^([^"\\]|\\.)*/)
+            else match(rest, /^([^\047\\]|\\.)*/)
+            return RLENGTH
+        }
+        # qcred(v): 1 when the WHOLE quoted value v looks like a literal
+        # credential, however it splits on whitespace: 4+ characters and not a
+        # whole placeholder (`$NAME`, `<...>`, `[REDACTED]`) or placeholder
+        # words (`string`, `optional string`). `"ab cd efgh ijkl"` is a hit;
+        # `"string"` is a type annotation.
+        function qcred(v,    np, parts, j, allph) {
+            sub(/^[ \t]+/, "", v)
+            sub(/[ \t]+$/, "", v)
+            if (length(v) < 4 || isplaceholder(v)) return 0
+            np = split(v, parts, /[ \t]+/)
+            allph = 1
+            for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
+            return !allph
+        }
+        # valueline(r, inword): evaluate one logical value line (leading list
+        # dash, trailing comment and CR already removed, lowercased). A quoted
+        # value is judged as a whole (qcred); anything else must be a single
+        # token (prose after a keyword line stays clean) judged by litval.
+        function valueline(r, inword,    q, n, seg) {
+            q = substr(r, 1, 1)
+            if (q == "\"" || q == "\047") {
+                r = substr(r, 2)
+                if (!inword) {
+                    n = qlen(r, q)
+                    if (qcred(substr(r, 1, n))) flag("quoted-keyword-assignment")
+                    return
+                }
+            }
+            if (match(r, /^[^ \t"\047,;)]+/)) {
+                seg = substr(r, RSTART, RLENGTH)
+                r = substr(r, RSTART + RLENGTH)
+                if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, inword)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+            }
+        }
         BEGIN {
+            # The credential labels, once for every rule below: pass,
+            # password, passwd, passphrase, pass_phrase, pass-phrase, passcode,
+            # pass_code, pass-code, secret, token, api key, credential.
+            kw = "(pass([_-]?(phrase|code)|word|wd)?|secret|token|api[_ \t-]?key|credential)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
@@ -137,7 +184,7 @@ _rt_scan() {
         toupper($0) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/ { flag("private-key") }
         # NAME_KEY=value with a literal-looking value (8+ token characters,
         # so `API_KEY = process.env.API_KEY` in code does not match).
-        !strict && /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASSPHRASE|_PASSCODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        !strict && /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASS_?PHRASE|_PASS_?CODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         # DEVIN_ORG_ID=value, same literal-looking rule. AGENTS.md prohibits
         # committing that exact name; `_ID` names in general (USER_ID=12345678)
         # are ordinary code, so no `_ID` suffix rule (the log redactor in
@@ -152,18 +199,25 @@ _rt_scan() {
             # quadratic on a huge hostile line. Cap the matches per loop and
             # refuse past the cap (truncating would fail open).
             nq = nu = nurl = nauth = 0
-            # keyword = "quoted value" (a type annotation such as
-            # `token: string` is not a credential). The keyword must start a
-            # word, as in the unquoted branch below: `bypass="false"` is not
-            # a `pass` keyword, but camelCase `userPassword="..."` is.
+            # keyword = "quoted value": the whole quoted string is judged
+            # (qcred), not its first whitespace-delimited segment, so a spaced
+            # passphrase is a hit and a type annotation such as `token:
+            # "string"` is not. The keyword must start a word, as in the
+            # unquoted branch below: `bypass="false"` is not a `pass`
+            # keyword, but camelCase `userPassword="..."` is.
             r = strict ? "" : l
             base = 0
-            while (match(r, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
+            while (match(r, kw "[\"\047]?[ \t]*[=:][ \t]*[\"\047]")) {
                 start = base + RSTART
+                q = substr(r, RSTART + RLENGTH - 1, 1)
                 base += RSTART + RLENGTH - 1
                 if (++nq > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
-                if (!(start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)) flag("quoted-keyword-assignment")
+                n = qlen(r, q)
+                v = substr(r, 1, n)
+                base += n
+                r = substr(r, n + 1)
+                if (!(start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/) && qcred(v)) flag("quoted-keyword-assignment")
             }
             # keyword: unquoted-value. Flag only a plausible literal: 6+
             # characters, a digit or all letters (minus placeholder words),
@@ -177,7 +231,7 @@ _rt_scan() {
             # flagged either way.
             r = strict ? "" : l
             base = 0
-            while (match(r, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
+            while (match(r, kw "[ \t]*[=:][ \t]*[^ \t\"\047,;)]+")) {
                 seg = substr(r, RSTART, RLENGTH)
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
@@ -190,36 +244,50 @@ _rt_scan() {
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
                 if (litval(seg, inword)) flag("unquoted-keyword-value")
             }
-            # A keyword alone on its line (`password:` then an indented
-            # `  hunter` on the next line, YAML style) is checked against the
-            # next non-blank line: only that line, then the carry resets.
-            # Only a single token counts there, so prose after a keyword line
-            # stays clean. Blank lines do not use up the carry. A YAML block
-            # scalar (`password: |`, `>-`, `|2`) is a keyword-only line too,
-            # and a line that is only the indicator keeps the carry. A
-            # trailing YAML comment (whitespace, then `#`) is not part of the
-            # token; a `#` inside the token is.
-            if (carry && $0 ~ /^[ \t]*[|>][-+0-9]*[ \t\r]*$/) {
-                # keep carry and carryin for the value line
-            } else if (carry && $0 !~ /^[ \t\r]*$/) {
-                carry = 0
-                r = l
-                sub(/\r$/, "", r)
-                sub(/^[ \t]*(-[ \t]*)?/, "", r)
-                sub(/[ \t]+#.*$/, "", r)
-                q = (r ~ /^["\047]/)
-                sub(/^["\047]/, "", r)
-                if (match(r, /^[^ \t"\047,;)]+/)) {
-                    seg = substr(r, RSTART, RLENGTH)
-                    r = substr(r, RSTART + RLENGTH)
-                    if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, carryin)) flag(q ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+            # Logical records. A keyword alone on its line (`password:`, YAML
+            # style) is a header whose value is on the following lines. The
+            # header is read with its trailing YAML comment (whitespace, then
+            # `#`) removed; a `#` inside a token is part of the token. Blank
+            # lines never use up a record.
+            #   plain (carry 1): only the next non-blank line is the value,
+            #     and only a single token counts, so prose after a keyword
+            #     line stays clean. A comment-only line before it is skipped.
+            #   block (carry 2): a YAML block scalar header (`password: |`,
+            #     `>-`, `|2`, optionally with a comment, or `password:` then a
+            #     line that is only the indicator). EVERY following non-blank
+            #     line indented more than the header is a value line,
+            #     evaluated the same way. The block ends at the first
+            #     non-blank line indented the same or less; the first line
+            #     after the header is always evaluated, indented or not, so
+            #     a pasted scalar that lost its indentation is still checked.
+            if (carry && $0 !~ /^[ \t]*$/) {
+                ind = match($0, /^[ \t]*/) ? RLENGTH : 0
+                if (carry == 1 && $0 ~ /^[ \t]*[|>][-+0-9]*([ \t]+#.*)?[ \t]*$/) {
+                    carry = 2
+                    bfirst = 1
+                } else if (carry == 1 && $0 ~ /^[ \t]*#/) {
+                    # comment between the header and its value: keep waiting
+                } else if (carry == 2 && !bfirst && ind <= hind) {
+                    carry = 0
+                } else {
+                    r = l
+                    sub(/^[ \t]*(-[ \t]*)?/, "", r)
+                    sub(/[ \t]+#.*$/, "", r)
+                    valueline(r, carryin)
+                    if (carry == 1) carry = 0
+                    bfirst = 0
                 }
             }
-            if (match(l, /(pass([_-]?phrase|word|wd|code)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*([|>][-+0-9]*)?[ \t\r]*$/)) {
-                pre = substr($0, 1, RSTART - 1)
+            lh = l
+            sub(/[ \t]+#.*$/, "", lh)
+            if (carry != 2 && match(lh, kw "[\"\047]?[ \t]*[=:][ \t]*([|>][-+0-9]*)?[ \t]*$")) {
+                kstart = RSTART
+                pre = substr($0, 1, kstart - 1)
                 if (pre ~ /^[ \t]*(-[ \t]*)?["\047]?[A-Za-z0-9_.-]*$/) {
-                    carry = 1
-                    carryin = (RSTART > 1 && substr($0, RSTART - 1, 1) ~ /[A-Za-z]/ && substr($0, RSTART, 1) !~ /[A-Z]/)
+                    carry = (substr(lh, kstart, RLENGTH) ~ /[=:][ \t]*[|>][-+0-9]*[ \t]*$/) ? 2 : 1
+                    bfirst = 1
+                    carryin = (kstart > 1 && substr($0, kstart - 1, 1) ~ /[A-Za-z]/ && substr($0, kstart, 1) !~ /[A-Z]/)
+                    hind = match($0, /^[ \t]*/) ? RLENGTH : 0
                 }
             }
             # Credentials in URL userinfo (scheme://user:pass@host); a
