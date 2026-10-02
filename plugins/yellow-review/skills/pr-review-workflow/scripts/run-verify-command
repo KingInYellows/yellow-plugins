@@ -23,6 +23,10 @@
 #                  #973), so pass only files a resolver edited. The patch saved
 #                  first holds its content unless the credential screen
 #                  withheld the patch.
+#                  A listed directory is removed only where HEAD has a regular
+#                  file (a replaced file); a tracked directory, a gitlink or an
+#                  untracked directory is refused (exit 2) so its untracked
+#                  files survive.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -265,6 +269,13 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
             || die 2 "cannot scan the directory for a nested repository: $f"
         [ -z "$NESTED" ] || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+        # Only a directory standing where HEAD has a regular file is a replaced
+        # file. A tracked directory (tree), a gitlink or nothing at HEAD holds
+        # work that `git checkout HEAD` would not bring back (untracked
+        # siblings), so refuse rather than remove it.
+        HEAD_TYPE=$(git cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
+        [ "$HEAD_TYPE" = blob ] \
+            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
         rm -rf -- "$f" 2>/dev/null
     else
         rm -f -- "$f" 2>/dev/null
