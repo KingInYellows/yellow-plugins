@@ -11,9 +11,10 @@ GG_MAX_WAIT_SECONDS=90
 # Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
 # Seconds one gh call may run (YELLOW_REVIEW_GH_TIMEOUT, default 30; invalid
-# values fall back to 30). Enforced only when timeout(1) is installed.
+# values and 0, which timeout(1) treats as "no limit", fall back to 30). Enforced only when timeout(1) is installed.
 GG_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GG_TIMEOUT" in ''|*[!0-9]*) GG_TIMEOUT=30 ;; esac
+[ "$GG_TIMEOUT" -gt 0 ] 2>/dev/null || GG_TIMEOUT=30
 
 # gg_init <work-dir>: set the scratch file paths the other helpers read.
 gg_init() {
