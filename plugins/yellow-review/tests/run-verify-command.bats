@@ -26,6 +26,9 @@ case "$*" in
 esac
 STUB
   chmod +x "$STUB_BIN/gh"
+  # The mtime marker --ignored-since compares against (unattended runs need it).
+  IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
+  touch "$IGN_MARKER"
 }
 
 verify() {
@@ -277,7 +280,7 @@ has_kill_after() {
 
 @test "--unattended skips a runner file without running the command" {
   printf '{"name":"y"}\n' >| package.json
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt package.json src/new.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt package.json src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
   [[ "$(printf '%s' "$output" | jq -r .reason)" == "runner files changed: package.json" ]]
@@ -288,14 +291,14 @@ has_kill_after() {
 @test "--unattended skips a file outside the PR" {
   git checkout -q -- src/a.txt && rm src/new.txt
   printf 'edited\n' >| src/c.txt
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/c.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/c.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
 @test "--unattended runs when every file is in the PR and not a runner" {
   rm src/new.txt
-  verify 'true' --timeout 5 --trusted --unattended -- src/a.txt
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
 }
 
@@ -1164,8 +1167,9 @@ assert_no_raw_left() {
 
 # The redaction filters are line-buffered sed passes, so the stream is cut into
 # records of at most 64 KiB before them. A verifier that prints megabytes with
-# no newline must finish, keep the log within the cap and still be redacted.
-@test "a 3 MiB stream with no newline finishes, stays within the log cap and has the planted credential redacted" {
+# no newline must finish without unbounded memory, and because the cut can sever
+# a credential from its value the log is withheld with a notice, never published.
+@test "a 3 MiB stream with no newline finishes and its log is withheld, with the planted credential nowhere on disk" {
   secret_pieces
   STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
   # 2.5 MiB of filler, a blank, the credential, then 0.5 MiB of filler: the
@@ -1174,9 +1178,8 @@ assert_no_raw_left() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
   log=$(printf '%s' "$output" | jq -r .log)
-  [ "$(wc -c <"$log")" -le 1048576 ]
-  [ "$(wc -c <"$log")" -gt 1000000 ]
-  grep -q 'REDACTED' "$log"
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld: output had a record longer than 64 KiB"* ]]
   run ! grep -qF "$SECRET" "$log"
   assert_no_raw_left
 }
@@ -1193,4 +1196,191 @@ assert_no_raw_left() {
   grep -q 'REDACTED' "$log"
   run ! grep -qF "$SECRET" "$log"
   assert_no_raw_left
+}
+
+# fold cuts a record longer than 64 KiB, which can sever a credential name from
+# its value (here 70000 blanks apart). The filter then fails closed.
+@test "a credential severed from its value by a fold boundary withholds the log" {
+  SECRET=lowentropyvalue
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "printf 'GITHUB_TOKEN='; head -c 70000 /dev/zero | tr '\\0' ' '; printf '$SECRET\\n'; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld: output had a record longer than 64 KiB"* ]]
+  assert_no_raw_left
+}
+
+@test "a record of exactly 64 KiB is not cut, so the log is kept" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "head -c 65536 /dev/zero | tr '\\0' a; echo; $PRINT_SECRET; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  run ! grep -q 'withheld' "$log"
+  assert_no_raw_left
+}
+
+@test "vr_redact_log withholds a log with a record longer than 64 KiB" {
+  log="$BATS_TEST_TMPDIR/long.log"
+  { printf 'GITHUB_TOKEN='; head -c 70000 /dev/zero | tr '\0' ' '; printf 'lowentropyvalue\n'; } >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [ ! -e "$log.tmp" ]
+}
+
+# --- --ignored-since: resolver edits to gitignored files -------------------
+# rp_tree_changes never lists ignored files, so an edit to node_modules/.bin/<x>
+# is caught only by comparing mtimes with the marker. Times are set explicitly
+# (touch -t) so the tests do not depend on clock granularity.
+ignored_fixture() {
+  printf 'node_modules/\n*.cache\n' >> "$REPO/.git/info/exclude"
+  mkdir -p node_modules/.bin
+  printf '#!/bin/sh\necho original\n' >| node_modules/.bin/runner
+  printf 'cached\n' >| src/gen.cache
+  touch -t 201901010000 node_modules/.bin/runner src/gen.cache
+  touch -t 202001010000 "$IGN_MARKER"
+}
+
+@test "--ignored-since refuses an ignored executable edited after the marker and names it" {
+  ignored_fixture
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/runner"* ]]
+  [[ "$stderr" != *pwned* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # Refused before anything ran: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--ignored-since refuses an ignored file created after the marker, also when the run is attended" {
+  ignored_fixture
+  printf 'new\n' >| node_modules/.bin/added
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/added"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since refuses an ignored file changed inside a directory that also holds tracked files" {
+  ignored_fixture
+  printf 'changed\n' >| src/gen.cache
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"src/gen.cache"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since refuses an ignored symlink newer than the marker" {
+  ignored_fixture
+  ln -s /nonexistent-target node_modules/.bin/link
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/link"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since judges a symlink by its own mtime, never its target's" {
+  ignored_fixture
+  ln -s runner node_modules/.bin/link
+  touch -h -t 201901010000 node_modules/.bin/link
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "--ignored-since names at most 20 paths" {
+  ignored_fixture
+  for i in $(seq 1 30); do printf 'x\n' >| "node_modules/.bin/f$i"; done
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s' "$stderr" | grep -o 'node_modules/.bin/f[0-9]*' | wc -l)" -le 20 ]
+}
+
+@test "--ignored-since passes when every ignored file predates the marker" {
+  ignored_fixture
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["pass",true]' ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since fails closed on a missing, non-regular or symlinked marker" {
+  ignored_fixture
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$BATS_TEST_TMPDIR/no-marker" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ignored-since"* ]]
+  mkdir "$BATS_TEST_TMPDIR/marker-dir"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$BATS_TEST_TMPDIR/marker-dir" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  ln -s "$IGN_MARKER" "$BATS_TEST_TMPDIR/marker-link"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$BATS_TEST_TMPDIR/marker-link" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--unattended without --ignored-since is refused before anything runs" {
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ignored-since"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "an attended run may omit --ignored-since" {
+  ignored_fixture
+  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "the revert modes ignore --ignored-since" {
+  ignored_fixture
+  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only --ignored-since "$BATS_TEST_TMPDIR/no-marker" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  printf 'again\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+}
+
+# --- a path listed twice ---------------------------------------------------
+@test "a path listed in --files-from and after -- yields a recovery patch that re-applies" {
+  printf 'src/a.txt\nsrc/new.txt\nsrc/a.txt\n' >| "$BATS_TEST_TMPDIR/list"
+  verify 'exit 3' --timeout 5 --trusted --files-from "$BATS_TEST_TMPDIR/list" -- src/new.txt src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$(grep -c '^diff --git a/src/a.txt ' "$patch")" -eq 1 ]
+  [ "$(grep -c '^diff --git a/src/new.txt ' "$patch")" -eq 1 ]
+  # The tree is back at HEAD, so the patch must apply to it.
+  git apply --check "$patch"
+  git apply "$patch"
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--revert-only deduplicates the listed files before saving the patch" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/a.txt src/new.txt src/new.txt
+  [ "$status" -eq 0 ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$(grep -c '^diff --git a/src/a.txt ' "$patch")" -eq 1 ]
+  git apply --check "$patch"
+}
+
+@test "a duplicated listed path is checked once against the tree and the PR" {
+  rm src/new.txt
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
 }

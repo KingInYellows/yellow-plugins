@@ -422,3 +422,112 @@ hooks_repo() {
   GIT_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR" run rp_hooks_untracked "$BATS_TEST_TMPDIR/out"
   [ "$status" -eq 2 ]
 }
+
+# rp_ignored_changed_since: times are set with touch -t so the tests do not
+# depend on clock granularity. Old files predate the marker; new ones follow it.
+ignored_repo() {
+  printf 'node_modules/\n*.cache\n' >| .gitignore
+  mkdir -p node_modules/.bin src
+  printf 'old\n' >| node_modules/.bin/runner
+  printf 'old\n' >| src/gen.cache
+  touch -t 201901010000 node_modules/.bin/runner src/gen.cache
+  MARKER="$BATS_TEST_TMPDIR/marker"
+  SCRATCH="$BATS_TEST_TMPDIR/scratch"
+  touch -t 202001010000 "$MARKER"
+}
+
+@test "rp_ignored_changed_since returns 0 when every ignored file predates the marker" {
+  ignored_repo
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "rp_ignored_changed_since returns 1 and names an ignored file newer than the marker" {
+  ignored_repo
+  printf 'new\n' >| node_modules/.bin/runner
+  printf 'new\n' >| src/gen.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/runner* ]]
+  [[ "$output" == *src/gen.cache* ]]
+  [[ "$output" != *new* ]]
+}
+
+@test "rp_ignored_changed_since works from a subdirectory and with a relative marker" {
+  ignored_repo
+  printf 'new\n' >| node_modules/.bin/runner
+  cd src
+  run rp_ignored_changed_since ../../marker "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.bin/runner ]
+}
+
+@test "rp_ignored_changed_since caps the listing at 20 paths" {
+  ignored_repo
+  for i in $(seq 1 40); do printf 'x\n' >| "node_modules/.bin/f$i"; done
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | wc -l)" -le 20 ]
+}
+
+@test "rp_ignored_changed_since judges a symlink by its own mtime" {
+  ignored_repo
+  ln -s runner node_modules/.bin/old-link
+  touch -h -t 201901010000 node_modules/.bin/old-link
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  ln -s /nonexistent node_modules/.bin/new-link
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.bin/new-link ]
+}
+
+@test "rp_ignored_changed_since skips .git directories inside an ignored tree" {
+  ignored_repo
+  mkdir -p node_modules/pkg/.git
+  printf 'new\n' >| node_modules/pkg/.git/config
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_ignored_changed_since shows control characters in a path as ?" {
+  ignored_repo
+  printf 'x\n' >| "$(printf 'node_modules/a\033b')"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = 'node_modules/a?b' ]
+}
+
+@test "rp_ignored_changed_since ignores a non-regular ignored entry" {
+  ignored_repo
+  mkfifo node_modules/pipe
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_ignored_changed_since fails closed on a missing, non-regular or symlinked marker" {
+  ignored_repo
+  run rp_ignored_changed_since "$BATS_TEST_TMPDIR/absent" "$SCRATCH"
+  [ "$status" -eq 2 ]
+  mkdir "$BATS_TEST_TMPDIR/dir-marker"
+  run rp_ignored_changed_since "$BATS_TEST_TMPDIR/dir-marker" "$SCRATCH"
+  [ "$status" -eq 2 ]
+  ln -s "$MARKER" "$BATS_TEST_TMPDIR/link-marker"
+  run rp_ignored_changed_since "$BATS_TEST_TMPDIR/link-marker" "$SCRATCH"
+  [ "$status" -eq 2 ]
+  chmod 000 "$MARKER"
+  if [ ! -r "$MARKER" ]; then
+    run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+    [ "$status" -eq 2 ]
+  fi
+  chmod 600 "$MARKER"
+}
+
+@test "rp_ignored_changed_since fails closed outside a repository" {
+  ignored_repo
+  cd "$BATS_TEST_TMPDIR"
+  mkdir plain && cd plain
+  GIT_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
