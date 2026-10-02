@@ -530,6 +530,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
   grep -q 'exits non-zero' "$DIRTY_REF"
   grep -q '#973' "$DIRTY_REF"
+  # renames: the owned set includes previous_filename; an entry needs both paths owned
+  grep -qF 'previous_filename' "$DIRTY_REF"
+  grep -qF 'each file'"'"'s `filename` plus its' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'owned only when **both** of its paths are owned'
   # a failed ownership lookup leaves every path unrecognized
   grep -qE 'no path is owned through the PR file list' "$DIRTY_REF"
   # agent memory is not trusted config, and the reference says why
