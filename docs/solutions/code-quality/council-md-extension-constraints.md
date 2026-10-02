@@ -82,7 +82,8 @@ at implementation time, not plan time. Verified against the shipped file
     numerals next to reviewer nouns. Rule R only proves each redaction-awk
     carrier is represented in the roster; byte-identity of the copies is checked
     by `plugins/yellow-council/tests/redaction.bats`. Assemble bats marker
-    strings at runtime (`extract.bats:17-21`).
+    strings at runtime, as the `M_ANCHOR` and `M_INNER` assignments in
+    `extract.bats`'s `setup()` do.
 
 ## When to Apply
 
