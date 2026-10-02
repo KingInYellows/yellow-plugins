@@ -88,9 +88,14 @@ and never auto-commits. The user decides what to do with the verdicts.
   The staging directory's capability lives in a shell-owned
   `.git/council-synth.state`, one synthesis per checkout, though reclaiming a
   stale state file can race a new run's claim and admit two syntheses in one
-  checkout (a millisecond window, recorded as a residual). Validation, cleanup,
-  that race ("Known residual (stale-state reclaim race)") and the residual
-  Write forgery are in `docs/security.md` "Synthesis staging directory
+  checkout (a millisecond window, recorded as a residual). The final unlink in
+  `council_rm_synth_state` is by pathname after validation, so a reclaim that
+  lands between the check and the `rm` can remove another run's fresh claim;
+  narrow, same class as the reclaim race. The Step 8 Cancel block also removes
+  the staging directory after a 5d-resume or 5e failure, but only after proving
+  it is this run's and before releasing the claim. Validation, cleanup,
+  that race ("Known residual (stale-state reclaim race)"), the pathname-unlink
+  residual and the residual Write forgery are in `docs/security.md` "Synthesis staging directory
   (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
   relays its path through the model.
 - **Read-only invocation.** Reviewers must NOT use

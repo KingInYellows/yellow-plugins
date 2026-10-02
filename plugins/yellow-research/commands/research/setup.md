@@ -229,6 +229,11 @@ where a keychain key cannot be inspected, or without `jq` when the substring
 fallback finds this provider's userConfig option in a settings or credentials
 file; on Linux when the fallback finds no trace of the option, or with `jq`
 finding no userConfig key, the status stays `INVALID`) /
+`UNVERIFIED (shell key passed; …)` (shell key got 200, but without `jq` the
+substring fallback finds this provider's userConfig option in a settings or
+credentials file, so a userConfig key that takes precedence in the MCP may be
+invalid; macOS alone does not trigger it, and Perplexity's label ends with `;
+pending MCP-visibility confirmation`) /
 `PRESENT (untested)` (when user skips testing) /
 `PRESENT (userConfig takes precedence — shell key probe: <result>)`
 (shell key probed with any result, but a userConfig key is also set and the
@@ -364,6 +369,14 @@ else
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
     provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, this provider's option found in a settings or credentials file) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run an exa tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
   fi
+  # The shell key passed, but a non-empty userConfig key wins in the MCP
+  # (bin/lib/resolve-mcp-key.sh) and may itself be invalid. Without jq the
+  # substring match cannot confirm it, so do not report ACTIVE. macOS alone does
+  # not trigger this: only a found userConfig trace does.
+  if [ "$provider_status" = "ACTIVE" ] && [ "$userconfig_maybe" -eq 1 ]; then
+    provider_status="UNVERIFIED (shell key passed; a userConfig key may take precedence and cannot be inspected)"
+    provider_detail="Shell key probe: HTTP $http_status (passed). jq is not installed and this provider's option was found in a settings or credentials file, so a userConfig key may be set; it takes precedence in the MCP and cannot be inspected without jq. Install jq and re-run, or check the key in plugin settings. Run an exa tool call to check the key the MCP uses."
+  fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
 printf 'provider=exa\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
@@ -479,6 +492,14 @@ else
   if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || [ "$userconfig_maybe" -eq 1 ]; }; then
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
     provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, this provider's option found in a settings or credentials file) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a tavily tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+  fi
+  # The shell key passed, but a non-empty userConfig key wins in the MCP
+  # (bin/lib/resolve-mcp-key.sh) and may itself be invalid. Without jq the
+  # substring match cannot confirm it, so do not report ACTIVE. macOS alone does
+  # not trigger this: only a found userConfig trace does.
+  if [ "$provider_status" = "ACTIVE" ] && [ "$userconfig_maybe" -eq 1 ]; then
+    provider_status="UNVERIFIED (shell key passed; a userConfig key may take precedence and cannot be inspected)"
+    provider_detail="Shell key probe: HTTP $http_status (passed). jq is not installed and this provider's option was found in a settings or credentials file, so a userConfig key may be set; it takes precedence in the MCP and cannot be inspected without jq. Install jq and re-run, or check the key in plugin settings. Run a tavily tool call to check the key the MCP uses."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -598,6 +619,15 @@ else
   if [ "$provider_status" = "INVALID" ] && { [ "$(uname -s 2>/dev/null)" = "Darwin" ] || [ "$userconfig_maybe" -eq 1 ]; }; then
     provider_status="UNVERIFIED (shell key rejected; a userConfig or keychain key may take precedence and cannot be inspected)"
     provider_detail="Shell key probe: HTTP $http_status. A keychain key (macOS) or userConfig key (jq missing, this provider's option found in a settings or credentials file) may be set and takes precedence in the MCP; this check cannot see it. Restart Claude Code, run a perplexity tool call to check the key the MCP uses, and replace the shell key only if you have no userConfig key."
+  fi
+  # The shell key passed, but a non-empty userConfig key wins in the MCP
+  # (bin/lib/resolve-mcp-key.sh) and may itself be invalid. Without jq the
+  # substring match cannot confirm it, so do not report ACTIVE. macOS alone does
+  # not trigger this: only a found userConfig trace does. Perplexity stays
+  # pending for Step 3.5's MCP-visibility check.
+  if [ "$provider_status" = "ACTIVE" ] && [ "$userconfig_maybe" -eq 1 ]; then
+    provider_status="UNVERIFIED (shell key passed; a userConfig key may take precedence and cannot be inspected); pending MCP-visibility confirmation"
+    provider_detail="Shell key probe: HTTP $http_status (passed). jq is not installed and this provider's option was found in a settings or credentials file, so a userConfig key may be set; it takes precedence in the MCP and cannot be inspected without jq. Install jq and re-run, or check the key in plugin settings. Perplexity counts as active only once Step 3.5 sees its MCP tools."
   fi
 fi
 # Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
@@ -838,8 +868,14 @@ its Step 3 status is any of:
 Perplexity form of `PRESENT (userConfig takes precedence — …; pending
 MCP-visibility confirmation)` do NOT count as active until Step 3.5 promotes
 them; if the Perplexity visibility check finds the MCP UNAVAILABLE, treat the
-key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` also does
-not count as active (the effective key is unconfirmed) and is not `INVALID`.
+key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` and
+`UNVERIFIED (shell key passed; …)` also do not count as active (the effective
+key is unconfirmed) and are not `INVALID`. Perplexity's `UNVERIFIED (shell key
+passed; …); pending MCP-visibility confirmation` becomes
+`ACTIVE (validated via MCP startup; reflects the key as of the MCP's last
+start)` and counts as active only when Step 3.5 finds the MCP tools, with the
+same keep-pending rule for a key changed this session; otherwise it stays
+unverified and inactive.
 
 Counts:
 
@@ -893,6 +929,9 @@ are already working).
 For a key whose status starts with `UNVERIFIED`, do not show the replacement
 block. Say: restart Claude Code, run that provider's tool to see which key the
 MCP uses, and replace or unset the shell export only if no userConfig key exists.
+For `UNVERIFIED (shell key passed; …)` say instead: the shell key works, but a
+userConfig key may take precedence and cannot be inspected without `jq`; install
+`jq` and re-run, or check the key in plugin settings.
 
 If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
 
@@ -954,6 +993,7 @@ research), `Done`.
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
 | HTTP 401/403, Linux, no userConfig key (jq found none, or no jq and no config file) | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
 | HTTP 401/403, macOS, or no jq and this provider's userConfig option found in a config file | "UNVERIFIED — a keychain/userConfig key may take precedence." Restart and verify. | Record per-provider |
+| HTTP 200, no jq and this provider's userConfig option found in a config file | "UNVERIFIED — shell key passed, but a userConfig key may take precedence." Install jq or check plugin settings. | Record per-provider |
 | HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale or wrong.      | Record per-provider |
 | Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |
