@@ -393,6 +393,15 @@ SH
   [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[70,false]' ]
 }
 
+@test "a rate-limited duplicate close exits 4 instead of reporting the winner" {
+  export MOCK_GH_RESCAN=winner MOCK_GH_ISSUE_CLOSE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"rate limit"* ]]
+  [[ "$stderr" == *"duplicate issue close"* ]]
+  [ -z "$output" ]
+}
+
 @test "a duplicate close that times out exits 4" {
   fake_timeout
   export MOCK_TIMEOUT_ON=close MOCK_GH_RESCAN=winner
