@@ -113,15 +113,27 @@ time.
   subprocess, so a `trap` set right after `mktemp -d` would fire when that
   block exits, before the separate `Write` call can stage the file. Use a
   cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap,
-  writes a random `.token` file into the dir as Step 5a does, and prints the path;
-  (2) `Write` stages `SYNTHESIS_MD` there; (3) a later block installs the
-  `trap` (removing the dir on every exit of that block), then `cat`s the file
-  and runs the rest of council.md Step 7. The path crosses from one Bash process through
+  writes a random `.token` file into the dir as Step 5a does, and prints the
+  complete destination path, `<dir>/synthesis.md` (one fixed file name), not
+  just the directory; (2) `Write` stages `SYNTHESIS_MD` to exactly that printed
+  path, with no other child name and no appended segments; (3) a later block
+  installs the `trap` (removing the dir on every exit of that block), then
+  re-validates the full destination and `cat`s the file and runs the rest of
+  council.md Step 7. The path crosses from one Bash process through
   model-controlled substitution into `Write`, `cat` and `rm -rf`, so every
-  block that reads, writes or deletes it first re-validates it: the path
+  block that reads or deletes it first re-validates the dir: it
   matches `/tmp/council-synth-*` with no `..` and no further `/`, is not a
   symlink, is owned by the current user (`-O`), and its `.token` matches the
-  token from (1). Refuse and stop on any mismatch; never delete on name alone.
+  token from (1). Block (3) also validates the file before reading it: the
+  destination is exactly `<dir>/synthesis.md`, a regular file (`-f`), not a
+  symlink (`! -L`), and owned by the current user (`-O`). Refuse and stop on
+  any mismatch; never delete on name alone. `Write` is not path-scoped at
+  runtime, so shell validation cannot stop a model that deliberately writes
+  elsewhere (see
+  `docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md`).
+  The guarantee is narrower: nothing destructive trusts a relayed path, and a
+  stray write outside the validated file is never read or deleted. The real
+  mitigation for that is a `Write` deny rule; document this residual.
   Cleanup is best effort across calls. If `Write` fails, the block (3) trap and
   the validated `rm -rf -- "<dir>"` run when the orchestrator is still running.
   If the run is cancelled or aborts between (1) and (3), the orchestrator
@@ -135,9 +147,10 @@ time.
   depth, and keep the delimiter golden case in `tests/synthesis.bats` (it still
   guards the 5b escape). Reword Step 5e quoting rule 1, which says the delimiter
   is escaped because Step 7 carries the markdown in a heredoc, so it no longer
-  claims a heredoc. Update the three council.md comments that still name the
-  Step 7 heredoc (the "inline via quoted heredoc" comment and the two "Step 7's
-  heredoc text lands in the report" comments). If you instead remove the escape,
+  claims a heredoc. Update the four council.md comments that still name the
+  Step 7 heredoc (the "inline via quoted heredoc" comment, the two "Step 7's
+  heredoc text lands in the report" comments, and the escape-set comment in
+  `council_fence_block` that ends "...and the Step 7 heredoc delimiter"). If you instead remove the escape,
   remove its `synthesis.bats` case and the 5e rule in the same change.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
@@ -164,18 +177,23 @@ time.
   `_private_fn` kept, `*ptr` kept, `**important**` stripped, `__two words__`
   stripped, `snake_case` untouched. `strip_emph` works per whitespace token, so
   multi-word pairing needs phrase-level state, which cannot live in `strip_words`:
-  it runs once per code-span segment, so state held there would pair unrelated
-  tokens across segments. Hold the pairing state at line level, in the caller
-  that splits a line into code-span and prose segments, and bound it to one
+  it sees one code-span-free prose segment at a time, so it cannot see an opener
+  in one segment and its closer in the next. Hold the pairing state at line
+  level, in the caller that walks the whole line, precisely so an opener and its
+  closer can straddle an inline code span on the same line; bound it to one
   line (reset at every newline, never carried to the next line). Resolve a
   same-length run that wraps a single token first (`**x**`, `*x*`), then pair a
   multi-word opener with the nearest same-length closer on the same line,
   skipping over inline code spans untouched. Roll back an unpaired opener: when
-  the line ends with a run still open, keep the opener and every token after it
-  verbatim. Golden cases that span an inline code span: ``**two `code` words**``
-  stripped to ``two `code` words`` (code span untouched), ``__two `code` words__``
-  stripped likewise, ``*ptr `x` y`` kept whole (unpaired), and a run opened on
-  one line with its closer on the next kept whole.
+  the line ends with a run still open, keep the opener's emphasis characters
+  verbatim, but still run every token after it through `scrub_self` and the
+  other non-emphasis normalization passes (an unpaired opener must not let
+  reviewer identity or style signals survive). Golden cases that span an inline
+  code span: ``**two `code` words**`` stripped to ``two `code` words`` (code span
+  untouched), ``__two `code` words__`` stripped likewise, ``*ptr `x` y`` kept
+  with its leading `*` (unpaired), `*ptr is handled differently by Codex` keeps
+  the `*` but the reviewer name is still scrubbed, and a run opened on one line
+  with its closer on the next keeps its emphasis characters on both lines.
 
 ## Implementation Steps (High-Level)
 
@@ -187,9 +205,13 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    F1's shell-compat requirements. Whether the library moves or stays inline,
    plan steps 1 and 7 edit fenced Bash in `council.md`, so `pnpm validate:shell-compat`
    and `pnpm check:shell-parse` (parses the edited fenced blocks under bash and
-   zsh) must pass for this shell in both cases.
+   zsh) must pass for this shell in both cases. Those two checks do not run
+   behavioral assertions; run `bats tests/synthesis.bats` from
+   `plugins/yellow-council` as well.
 1. **Normalizer fixes (F3, F4)** — implement F3 and F4 in
-   `council_normalize_text` per "Carried follow-ups", with their golden cases.
+   `council_normalize_text` per "Carried follow-ups", with their golden cases
+   in `plugins/yellow-council/tests/synthesis.bats`; verify them with
+   `bats tests/synthesis.bats` from `plugins/yellow-council`.
 2. **Verification helper** — Tier 1 mode-dependent exact match with the
    skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy
    ratio ≥85; three-state result.
@@ -213,7 +235,10 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    lineage warning, tie presentation, single-pass bypass, rubric output,
    verification hit/miss paths), verify every shipped PR carried its
    changeset, and run the full validation suite end-to-end, including
-   `pnpm validate:shell-compat` and `pnpm check:shell-parse`.
+   `pnpm validate:shell-compat`, `pnpm check:shell-parse`, and the council
+   plugin's Bats suite (`bats tests/synthesis.bats`, or all of `bats tests/`,
+   from `plugins/yellow-council`) — the Bats run is what actually executes the
+   F3/F4 golden cases; the shell lint/parse checks do not.
 
 ## Open Questions
 
