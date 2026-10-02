@@ -4,6 +4,7 @@ description: 'Run /review:pr then /review:resolve on the same PR in one unattend
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
+  - Read
   - Skill
 ---
 
@@ -120,6 +121,12 @@ ACTUAL=$(git rev-parse --abbrev-ref HEAD)
 If the branch does not match, stop — do not proceed to Step 3.
 
 ### Step 3: Run /review:resolve --non-interactive
+
+Before invoking the skill, Read
+`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`ratelimited` (callers)" section): it defines the anchored contract line Step 4
+re-emits only when the nested output's last line fully matches it. If the Read
+fails, stop and report the path.
 
 Invoke the `Skill` tool with `skill: "review:resolve"`. Pass the args
 string `<PR#> --non-interactive` (literal — substitute the actual PR

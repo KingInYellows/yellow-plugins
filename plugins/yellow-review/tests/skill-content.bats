@@ -712,6 +712,27 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
 }
 
+@test "resolve-stack and sweep: Read dispositions.md before the walk or nested resolve, stop and report the path on failure" {
+  for f in "$RESOLVE_STACK" "$SWEEP"; do
+    # Read is an allowed tool, so the imperative Read can run
+    awk '/^allowed-tools:/ { p = 1; next } p && /^  - / { print; next } { p = 0 }' "$f" | grep -qx '  - Read' || { echo "Read not in allowed-tools of $f"; false; }
+    flat=$(tr '\n' ' ' <"$f" | tr -s ' ')
+    grep -qF 'Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading `ratelimited` (callers)" section)' <<<"$flat" || { echo "no imperative Read in $f"; false; }
+    grep -qF 'If the Read fails, stop and report the path.' <<<"$flat" || { echo "no stop-and-report in $f"; false; }
+  done
+  # resolve-stack: the Read comes before the walk's per-PR iteration
+  flat=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  read_pos=${flat%%Before the first iteration, Read*}
+  walk_pos=${flat%%For each PR in the base-to-tip list*}
+  [ "${#read_pos}" -lt "${#walk_pos}" ]
+  grep -qF 'Never parse a final line that fails the anchored form defined there.' <<<"$flat"
+  # sweep: the Read comes before the nested /review:resolve invocation
+  flat=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  read_pos=${flat%%Before invoking the skill, Read*}
+  invoke_pos=${flat%%Invoke the \`Skill\` tool with \`skill: \"review:resolve\"\`*}
+  [ "${#read_pos}" -lt "${#invoke_pos}" ]
+}
+
 @test "sweep-all: an unknown Blocking row renders the total as <n>+? or unknown, never 0" {
   flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
   grep -qF 'render the total as `<n>+?`' <<<"$flat"
