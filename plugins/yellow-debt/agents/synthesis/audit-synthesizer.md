@@ -339,7 +339,8 @@ todo_filename="todos/debt/${id}-pending-${severity}-${slug}${fp_prefix:+-$fp_pre
 
 # Defense in depth: id, severity and hash come from the agent, so the final
 # name must fit the todo contract before anything is written.
-[[ "$fp_prefix" =~ ^([0-9a-f]{8})?$ ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
+hash_re='^([0-9a-f]{8})?$'
+[[ "$fp_prefix" =~ $hash_re ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
 debt_todo_name_ok "${todo_filename##*/}" || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
 
 # Defense in depth: the name check above rejects any `/`; this also pins the
