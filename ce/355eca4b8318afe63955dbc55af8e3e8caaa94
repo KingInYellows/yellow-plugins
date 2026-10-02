@@ -1,0 +1,23 @@
+plugins/yellow-review/tests/mocks/gh
+  s_becc7011266565::t_25fccd116141f6 433-440,467
+plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread
+  s_becc7011266565::t_25fccd116141f6 5-8,19,31,54,60-63,66,68-70
+plugins/yellow-review/tests/resolve-pr-thread.bats
+  s_becc7011266565::t_25fccd116141f6 10,17,23,29,57,59-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ce355eca4b8318afe63955dbc55af8e3e8caaa94",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
