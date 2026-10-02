@@ -498,3 +498,19 @@ exits 0 — so every downstream consumer treats the absence of data as valid
 data. Step 3 now hard-stops on an empty diff rather than fanning out.
 
 **Components (this Update):** `plugins/yellow-council/commands/council/council.md`.
+
+## Update — 2026-10-02: fifth recurrence (yellow-debt)
+
+A defense-in-depth check in `audit-synthesizer.md` Step 7 used
+`[[ "$name" =~ $DEBT_TODO_NAME_RE ]]` in a block that never sourced
+`plugins/yellow-debt/lib/validate.sh`. The variable was unset in the fresh
+subprocess, an empty regex matches every string, and the check passed anything.
+`[[ ... =~ $unset ]]` never fails loudly, so this class of omission is invisible
+until a reviewer reads the block.
+
+**Fix:** run the block in a `bash /dev/fd/3` child, source the library, and call
+`debt_todo_name_ok` instead of re-stating the regex. **Rule:** a regex or
+constant that a fence reads from a library counts as read state; trace it like
+any other input when auditing a fence for cross-block loss.
+
+**Components (this Update):** `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md`.
