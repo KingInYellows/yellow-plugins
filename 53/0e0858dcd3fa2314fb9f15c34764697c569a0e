@@ -1,0 +1,62 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_fc95207836202a::t_4046cc00d278b6 22-23
+  s_fc95207836202a::t_c03d26ea347a8f 214-218
+  s_fc95207836202a::t_e045c05a726771 244-256
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_fc95207836202a::t_85e9a428f44f1c 64,66,68-74,76
+  s_fc95207836202a::t_28c2b2fb0cca24 307-325
+plugins/yellow-review/lib/resolve-paths.sh
+  s_fc95207836202a::t_00b78ec9bc8ec0 16-17
+  s_fc95207836202a::t_49e58bd27ee299 70-75
+  s_fc95207836202a::t_433e8992b3ca8b 25
+plugins/yellow-review/references/resolve/dispositions.md
+  s_fc95207836202a::t_1d23dcfa163524 415
+  s_fc95207836202a::t_fa03e8c4bb2a60 293-295
+  s_fc95207836202a::t_9034cdd0327299 300-306
+  s_c22a55971bf452::t_4796ca2fc67e1e 14,16,18-20,214-216,236,267
+  s_c22a55971bf452::t_b110189e99ac2a 416
+plugins/yellow-review/tests/run-verify-command.bats
+  s_fc95207836202a::t_8da1c9fd05826c 320-332,334-360
+  s_fc95207836202a::t_8c72044304eec0 215,217,221-228
+  s_fc95207836202a::t_ab65a850d952e8 280-301
+  s_fc95207836202a::t_106d387112c48d 64-73
+  s_fc95207836202a::t_248b363133f55d 141-150
+  s_fc95207836202a::t_7325db042f82a4 18-28,216,218-220,333
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_fc95207836202a::t_5740cab248d21c 353-355
+  s_fc95207836202a::t_b60071e0e04e73 221-265
+  s_fc95207836202a::t_3460e2800ce5e0 116
+  s_fc95207836202a::t_41ad13ec01820e 92
+  s_fc95207836202a::t_d81910354a0119 126-128,135
+  s_fc95207836202a::t_36d78d09216f7a 291-296,298,303-306,308-309,312-333
+  s_fc95207836202a::t_ab81b20c1590ba 177-183
+  s_fc95207836202a::t_1f80c4e36c5664 97
+  s_fc95207836202a::t_744215d4f04c4c 193-195,198-200
+plugins/yellow-review/tests/resolve-paths.bats
+  s_fc95207836202a::t_8e6aa3b6dbb5f4 67-73
+  s_fc95207836202a::t_d0e8721eca8e03 15-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "530e0858dcd3fa2314fb9f15c34764697c569a0e",
+  "prompts": {},
+  "sessions": {
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fc95207836202a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b003cac-8083-43dc-a109-6fa9b3772118",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

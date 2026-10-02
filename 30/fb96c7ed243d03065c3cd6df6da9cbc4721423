@@ -1,0 +1,50 @@
+plugins/yellow-review/lib/verify-run.sh
+  s_7a82748dd606d9::t_d6be31ccc4963d 214-218
+  s_7a82748dd606d9::t_5b07dcb1859abb 111-119,121-149
+  s_7a82748dd606d9::t_4e5ba17f911ae1 173-175,178-181
+plugins/yellow-review/lib/resolve-paths.sh
+  s_7a82748dd606d9::t_c53ce4e0ce30d1 208-209,220-277
+  s_7a82748dd606d9::t_e86810b437374d 278-279
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_7a82748dd606d9::t_f2abd1c5e36b97 6-7,17-29
+  s_7a82748dd606d9::t_1c999b09ae8b96 68-69,73-75
+  s_7a82748dd606d9::t_38041cb755cd46 216
+  s_7a82748dd606d9::t_ba3aa6bb7b2bf5 243-246,251,253-255
+  s_7a82748dd606d9::t_2826e9415934bd 271,279-293
+  s_7a82748dd606d9::t_44f18828121ba4 181-192
+  s_7a82748dd606d9::t_c746e2b5dae237 136-137
+  s_7a82748dd606d9::t_aca556476b56f8 531-533
+  s_7a82748dd606d9::t_569858432f94ae 149,153
+  s_7a82748dd606d9::t_104576dda9f529 248,252,256
+  s_7a82748dd606d9::t_d4c56c4edfda8c 208
+  s_7a82748dd606d9::t_d6dbe920134d5a 51-53
+  s_7a82748dd606d9::t_92009c913ef281 88-90
+  s_7a82748dd606d9::t_c215742c5a332e 294
+plugins/yellow-review/tests/run-verify-command.bats
+  s_7a82748dd606d9::t_ca6ef7469f6679 29-31
+  s_7a82748dd606d9::t_e92a472d46a9c6 301
+  s_7a82748dd606d9::t_f71ecfeb721659 1170-1172
+  s_7a82748dd606d9::t_ee477ed351992b 1200-1386
+  s_7a82748dd606d9::t_36e8039fb97361 1181-1182
+  s_7a82748dd606d9::t_bb1bd3dce6d294 283
+  s_7a82748dd606d9::t_db3d824f322426 294
+plugins/yellow-review/tests/resolve-paths.bats
+  s_7a82748dd606d9::t_0e505fcb70dac7 461
+  s_7a82748dd606d9::t_bbb3a87caebe1e 425-460,462-533
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "30fb96c7ed243d03065c3cd6df6da9cbc4721423",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
