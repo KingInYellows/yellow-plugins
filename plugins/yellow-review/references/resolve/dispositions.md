@@ -526,8 +526,9 @@ Replies and issue bodies end with:
 - Mutations run serially. `reply-pr-thread` and `resolve-pr-thread` sleep
   `YELLOW_REVIEW_PACE_SECONDS` (default 1 s) after each mutation.
 - On a rate limit (stderr matching "rate limit", "abuse" (GitHub's secondary
-  limits) or "HTTP 429", or a GraphQL error whose message or type mentions
-  one), `reply-pr-thread` and
+  limits) or "HTTP 429", or a GraphQL `errors[]` entry whose `type` or `message`
+  contains "rate limit" or "abuse", or whose type is `RATE_LIMITED`,
+  case-insensitive), `reply-pr-thread` and
   `resolve-pr-thread` wait the `Retry-After` header, else the time to
   `x-ratelimit-reset` when `x-ratelimit-remaining` is 0, else
   `YELLOW_REVIEW_RATE_LIMIT_WAIT` (default 60 s), then retry once per script
