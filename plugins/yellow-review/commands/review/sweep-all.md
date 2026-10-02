@@ -201,6 +201,12 @@ ledger.
 
 ### Step 4: Sequential sweep loop
 
+Before the first iteration, Read
+`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`ratelimited` (callers)" section): it defines the whole-line fallback markers
+item 3 uses when a sweep ends without a valid final contract line. If the Read
+fails, stop and report the path.
+
 For each PR in the sorted list, in order from lowest PR number to
 highest, do the following. **No pauses anywhere in this loop** — log
 per-PR failures and continue, except where item 4 (dirty tree) or item 5
@@ -321,7 +327,9 @@ Print:
 [review:sweep-all] Skipping /flow:compound — no PRs attempted.
 ```
 
-Then stop.
+Then go straight to the **Final exit** below: this early return still reads
+`pending-exit-1`, so a Step 4 stop recorded while `attempted_count` is zero
+(for example a skipped first PR followed by the dirty-tree stop) exits `1`.
 
 **Dirty-tree guard:** if Step 4 item 4 left the tree dirty (an incomplete
 revert or unrecognized changes), skip this step and print the message
@@ -346,8 +354,8 @@ Otherwise, with `attempted_count >= 1`:
    no early stop occurred (`pending-exit-1` unset), sweep-all succeeded;
    only the optional compounding step failed.
 
-**Final exit:** after Step 6 finishes, skips, or warns, read
-`pending-exit-1`. If Step 4 item 4 or 5 set it, the command exits `1`
+**Final exit (every path, including the zero-attempt skip):** after Step 6
+finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4 or 5 set it, the command exits `1`
 regardless of Step 6's outcome: a clean compound pass, a skip, or a compound
 warning never turns an early stop into success, and the "sweep-all
 succeeded" wording above does not apply. Otherwise exit `0`.

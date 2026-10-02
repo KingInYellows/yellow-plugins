@@ -615,10 +615,25 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   flat6=$(tr '\n' ' ' <<<"$step6" | tr -s ' ')
   [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 2 ]
-  grep -qF '**Final exit:**' <<<"$flat6"
+  grep -qF '**Final exit (every path, including the zero-attempt skip):**' <<<"$flat6"
   grep -qF 'read `pending-exit-1`' <<<"$flat6"
   grep -qF 'exits `1` regardless of Step 6' <<<"$flat6"
   grep -qF '(`pending-exit-1` unset)' <<<"$flat6"
+  # the zero-attempt early return goes to the final exit instead of stopping
+  grep -qF 'Then go straight to the **Final exit** below' <<<"$flat6"
+  grep -qF 'this early return still reads `pending-exit-1`' <<<"$flat6"
+  run ! grep -qF 'no PRs attempted. ``` Then stop.' <<<"$flat6"
+}
+
+@test "sweep-all: Step 4 Reads dispositions.md before the loop so the ratelimited fallback is loaded" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Before the first iteration, Read `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md`' <<<"$flat4"
+  grep -qF 'If the Read fails, stop and report the path.' <<<"$flat4"
+  # the Read comes before the loop's per-PR items
+  read_pos=${flat4%%Before the first iteration, Read*}
+  loop_pos=${flat4%%For each PR in the sorted list*}
+  [ "${#read_pos}" -lt "${#loop_pos}" ]
 }
 
 @test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
