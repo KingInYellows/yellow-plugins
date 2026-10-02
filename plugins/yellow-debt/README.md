@@ -85,7 +85,8 @@ Interactively review and prioritize pending findings.
 ```
 
 **Actions:** Accept (→ ready), Reject (→ deleted), Defer (→ deferred with
-reason)
+reason), Won't fix (→ wont-fix with reason; a valid finding you are deliberately
+not fixing, kept so a re-audit does not bring it back)
 
 ### `/debt:fix <id | path>`
 
@@ -130,7 +131,7 @@ Push accepted findings to Linear as issues.
 1. **Validate setup**: `/debt:setup` to verify required tools and repo
    writability
 2. **Run audit**: `/debt:audit` to scan your codebase
-3. **Review findings**: `/debt:triage` to accept/reject/defer
+3. **Review findings**: `/debt:triage` to accept/reject/defer/won't fix
 4. **Fix issues**: `/debt:fix <id>` for agent-assisted remediation
 5. **Track progress**: `/debt:status` to see current state
 6. **Sync to Linear**: `/debt:sync` for team visibility
@@ -155,7 +156,9 @@ affected_files:
 linear_issue_id: null
 deferred_until: null
 deferred_reason: null
-content_hash: 'a3f2b1c4'
+wont_fix_reason: null
+fingerprint: 'fp/v1:0f3a9c27d1b84e65'
+anchor_hash: 'a3f2b1c49d0e7788'
 ---
 
 # High Cyclomatic Complexity in UserService
@@ -196,7 +199,20 @@ pending → ready/deleted/deferred
 ready → in-progress/deleted
 in-progress → complete/ready
 deferred → pending
+pending/ready/in-progress/deferred → wont-fix
+wont-fix → pending
 ```
+
+`wont-fix` closes a valid finding you are deliberately not fixing and keeps its
+file (unlike `deleted`, which means the finding was wrong). Triage offers it
+for pending findings. To close one that is already `ready`, `in-progress` or
+`deferred`, run from the git root in a bash child that sources `lib/validate.sh`:
+`transition_todo_state "$(debt_resolve_todo '<id>' <current-status>)" wont-fix`.
+Closing a todo does not touch its Linear issue: close that by hand.
+
+A re-audit skips a new finding that matches any kept todo (every status except
+`pending`) by `fingerprint`, a hash of the category, path and flagged code, so
+a closed finding does not come back. Findings whose code changed resurface.
 
 All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
 

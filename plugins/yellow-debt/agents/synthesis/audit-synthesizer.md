@@ -132,23 +132,153 @@ Record gate stats:
 ```json
 "stats": {
   "suppressed_by_confidence_gate": 12,
-  "survived_severity_exception": 2
+  "survived_severity_exception": 2,
+  "skipped_kept": 3
 }
 ```
 
 ### 5. Reconciliation
 
-Count existing pending todos, confirm deletion via AskUserQuestion:
+Count existing pending todos, confirm deletion via AskUserQuestion. Match only
+names that fit the todo contract: an unanchored `*-pending-*.md` also matches a
+`ready` todo whose slug contains `-pending-`.
 
 ```bash
-pending_count=$(find todos/debt -name '*-pending-*.md' 2>/dev/null | wc -l)
-if [ "$pending_count" -gt 0 ]; then
-  # Ask: "Delete $pending_count existing pending findings and proceed?"
-  # If "No": exit 0  |  If "Yes": rm -f todos/debt/*-pending-*.md
-fi
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+count=0
+for f in todos/debt/[0-9]*-pending-*.md; do
+  [ -f "$f" ] && [ ! -L "$f" ] && debt_todo_name_ok "${f##*/}" && count=$((count + 1))
+done
+printf '%s\n' "$count"
+__YELLOW_DEBT_BASH__
 ```
 
-Preserve all other states (ready, in-progress, complete, deferred).
+If the count is above 0, ask: "Delete N existing pending findings and proceed?"
+If "No": stop. If "Yes", delete them:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+for f in todos/debt/[0-9]*-pending-*.md; do
+  [ -f "$f" ] && [ ! -L "$f" ] && debt_todo_name_ok "${f##*/}" && rm -f -- "$f"
+done
+__YELLOW_DEBT_BASH__
+```
+
+Preserve all other states (ready, in-progress, complete, deferred, deleted,
+wont-fix).
+
+#### 5a. Skip findings that match a kept todo
+
+A finding the user already closed (`wont-fix`, `complete`, `deleted`) or is
+still working (`ready`, `in-progress`, `deferred`) must not come back as a new
+pending todo. Match by code, not by line numbers: scanner line ranges drift
+between runs.
+
+Write the surviving findings from Step 4 (after Step 2 deduplication) to
+`.debt/surviving-findings.json` with the Write tool, as a JSON array of the
+in-memory v2.0 records (each needs `category` and `file.path`; `file.lines`
+is optional). Then run:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+debt_refuse_symlinks .debt .debt/surviving-findings.json || exit 1
+US=$'\x1f'
+
+# Split "path:START-END" (or "path:LINE", or a bare path) into p, s, e.
+split_loc() {
+  p="$1"; s=""; e=""
+  case "$1" in
+    *:*)
+      p="${1%:*}"; s="${1##*:}"; e="$s"
+      case "$s" in *-*) e="${s##*-}"; s="${s%%-*}" ;; esac
+      ;;
+  esac
+}
+
+# Kept todos: every well-named todo that is not pending. Fingerprints come
+# from frontmatter; older todos have none, so compute them from the tree.
+k_id=(); k_status=(); k_cat=(); k_path=(); k_fp=(); k_anchor=()
+for f in todos/debt/[0-9]*.md; do
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
+  base="${f##*/}"
+  debt_todo_name_ok "$base" || continue
+  [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
+  st="${BASH_REMATCH[1]}"
+  [ "$st" != pending ] || continue
+  meta=$(extract_frontmatter "$f" | yq -r '[(.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || continue
+  IFS="$US" read -r cat loc fp anchor <<<"$meta"
+  split_loc "$loc"
+  if [ -z "$fp" ] && [ -n "$cat" ] && [ -n "$p" ]; then
+    fp=$(debt_fingerprint "$cat" "$p" "$s" "$e" 2>/dev/null) || fp=""
+  fi
+  if [ -z "$anchor" ] && [ -n "$s" ]; then
+    anchor=$(debt_anchor_hashes "$p" "$s" "$e" 2>/dev/null | head -n 1) || anchor=""
+  fi
+  k_id+=("${base%%-*}"); k_status+=("$st"); k_cat+=("$cat"); k_path+=("$p"); k_fp+=("$fp"); k_anchor+=("$anchor")
+done
+
+out=$(mktemp .debt/.fingerprints.XXXXXX) || exit 1
+n=$(jq 'length' .debt/surviving-findings.json) || exit 1
+for ((i = 0; i < n; i++)); do
+  rec=$(jq -r --argjson i "$i" '.[$i] | [(.category // ""), (.file.path // ""), ((.file.lines // "") | tostring)] | join("\u001f")' .debt/surviving-findings.json)
+  IFS="$US" read -r cat fpath lines <<<"$rec"
+  loc="$fpath"; [ -z "$lines" ] || loc="$fpath:$lines"
+  split_loc "$loc"
+  fp=$(debt_fingerprint "$cat" "$fpath" "$s" "$e" 2>/dev/null) || fp=""
+  hashes=""
+  [ -z "$s" ] || hashes=$(debt_anchor_hashes "$fpath" "$s" "$e" 2>/dev/null) || hashes=""
+  anchor=$(printf '%s\n' "$hashes" | head -n 1)
+
+  # Exact fingerprint first; then same category and path whose anchor_hash is
+  # one of this range's line hashes. Only a unique match suppresses.
+  match_idx=-1; matches=0; how=""
+  if [ -n "$fp" ]; then
+    for j in "${!k_id[@]}"; do
+      [ "${k_fp[j]}" = "$fp" ] || continue
+      matches=$((matches + 1)); match_idx=$j
+    done
+    [ "$matches" -eq 1 ] && how=fingerprint
+  fi
+  if [ -z "$how" ] && [ "$matches" -eq 0 ] && [ -n "$hashes" ]; then
+    for j in "${!k_id[@]}"; do
+      [ "${k_cat[j]}" = "$cat" ] && [ "${k_path[j]}" = "$fpath" ] && [ -n "${k_anchor[j]}" ] || continue
+      printf '%s\n' "$hashes" | grep -qxF -- "${k_anchor[j]}" || continue
+      matches=$((matches + 1)); match_idx=$j
+    done
+    [ "$matches" -eq 1 ] && how=anchor
+  fi
+
+  if [ -n "$how" ]; then
+    jq -cn --argjson i "$i" --arg id "${k_id[match_idx]}" --arg st "${k_status[match_idx]}" --arg how "$how" \
+      '{index: $i, skip: true, kept_id: $id, status: $st, match: $how}' >> "$out"
+  else
+    jq -cn --argjson i "$i" --arg fp "$fp" --arg anchor "$anchor" \
+      '{index: $i, skip: false, fingerprint: (if $fp == "" then null else $fp end), anchor_hash: (if $anchor == "" then null else $anchor end)}' >> "$out"
+  fi
+done
+jq -s '.' "$out" | debt_write_file .debt/fingerprints.json
+rm -f -- "$out"
+jq -r '.[] | select(.skip) | "skipped: finding \(.index) matches kept todo \(.kept_id) (\(.status), \(.match))"' .debt/fingerprints.json
+__YELLOW_DEBT_BASH__
+```
+
+Read `.debt/fingerprints.json`. Drop every entry with `skip: true` from the
+surviving list and record it in `skipped_kept[]` (finding index, `kept_id`,
+`status`, `match`). Keep each remaining entry's `fingerprint` and
+`anchor_hash` for Step 7. A finding with a tie, an unreadable range, or no
+match resurfaces as a new pending todo.
 
 ### 6. Generate Audit Report
 
@@ -159,22 +289,47 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 - Category breakdown (critical/high/medium/low)
 - Confidence-gate stats (suppressed counts per category, severity-exception
   survivors)
+- Findings skipped because a kept todo already covers them (`skipped_kept[]`:
+  kept id, its status, match type)
 - Hotspot files
 - Next steps (`/debt:triage`)
 
 ### 7. Generate Todo Files
 
-**Iterate only over the surviving findings list from Step 4 — do NOT include
-entries from `suppressed[]`.** The suppressed array is preserved on the audit
+**Iterate only over the surviving findings list from Step 4 and Step 5a — do
+NOT include entries from `suppressed[]` or `skipped_kept[]`.** The suppressed array is preserved on the audit
 report for calibration review, not for todo generation. A finding that was
 gated out at Step 4 must not become a pending todo at Step 7.
 
 Format: `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
 
-- `NNN`: zero-padded ID (001, 002...)
+- `NNN`: zero-padded ID, starting one above the highest id of any file in
+  `todos/debt/` (run the block below once, then count up from its output)
 - `SEVERITY`: critical/high/medium/low
 - `slug`: kebab-case derived from the v2.0 `finding` string (40 chars max)
-- `HASH`: SHA256(category:file:lines) first 8 chars
+- `HASH`: the first 8 hex digits after `fp/v1:` in the finding's
+  `fingerprint` from `.debt/fingerprints.json`; omit the `-HASH` segment when
+  the fingerprint is `null`
+
+Existing todos keep their ids. A new todo that reused a number would collide
+with a kept file, so take the next free id from every `*.md` under
+`todos/debt/`, not only the well-named ones:
+
+```bash
+# Bash-only arithmetic (10# keeps ids such as 008 from reading as octal): run
+# this block in bash even when the Bash tool's shell is zsh.
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+cd "$(git rev-parse --show-toplevel)" || exit 1
+max=0
+for f in todos/debt/*.md; do
+  [ -e "$f" ] || continue
+  base="${f##*/}"; id="${base%%-*}"
+  [[ "$id" =~ ^[0-9]{1,9}$ ]] || continue
+  [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
+done
+printf '%03d\n' "$((max + 1))"
+__YELLOW_DEBT_BASH__
+```
 
 #### v2.0 → todo frontmatter mapping (write side)
 
@@ -196,6 +351,8 @@ on-disk frontmatter as follows:
 | `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
+| (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); omit when `null` |
+| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first non-blank flagged line from `.debt/fingerprints.json`; omit when `null` |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator
@@ -208,8 +365,8 @@ the on-disk frontmatter, not the in-memory v2.0 record.
 # The Bash block runs in a fresh subprocess. The LLM agent iterates over
 # the surviving-findings JSON array; for each iteration it must export
 # `$record` (the single in-memory finding object as a JSON string) and
-# `$id`/`$severity`/`$content_hash` (the synthesizer-assigned per-finding
-# fields) into the shell environment BEFORE invoking this block — variables
+# `$id`/`$severity`/`$content_hash` (the per-finding fields: the next free id,
+# the severity, and the 8 hex digits taken from the fingerprint) into the shell environment BEFORE invoking this block — variables
 # from prose context are NOT inherited automatically by a fresh subprocess.
 # Derive $finding from $record FIRST in this same block as a sanity check
 # (a missing $record will produce empty $finding and the whitelist below
@@ -222,7 +379,7 @@ slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' 
 # CRITICAL: whitelist validation
 [[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | sha256sum | cut -d' ' -f1 | cut -c1-16)
 
-todo_filename="todos/debt/${id}-pending-${severity}-${slug}-${content_hash}.md"
+todo_filename="todos/debt/${id}-pending-${severity}-${slug}${content_hash:+-$content_hash}.md"
 
 # Defense in depth: verify path stays in todos/debt/
 resolved=$(realpath -m "$todo_filename")

@@ -56,7 +56,7 @@ declare -A by_severity
 declare -A by_effort
 
 # Initialize counters
-for status in pending ready in-progress deferred complete deleted; do
+for status in pending ready in-progress deferred complete deleted wont-fix; do
   by_status["$status"]=0
 done
 
@@ -96,9 +96,15 @@ if [ -d todos/debt ]; then
 
     # Validate and increment status counter
     case "$STATUS" in
-      pending|ready|in-progress|complete|deferred|deleted)
+      pending|ready|in-progress|complete|deferred|deleted|wont-fix)
         val_status=${by_status["$STATUS"]:-0}
         by_status["$STATUS"]=$((val_status + 1))
+        ;;
+      wont_fix|wontfix|"wont fix")
+        # Hand-written spelling. The value is frontmatter text: print it only
+        # through %s, never inside a heredoc.
+        printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: transition_todo_state "$(debt_resolve_todo <id> <filename-status>)" wont-fix (a filename containing wont_fix needs a manual rename to the -pending- form first)\n' "$STATUS" "$todo_file" >&2
+        ERROR_COUNT=$((ERROR_COUNT + 1))
         ;;
       *)
         printf '[status] WARNING: Unknown status "%s" in %s\n' "$STATUS" "$todo_file" >&2
@@ -173,7 +179,8 @@ if [ "$JSON_OUTPUT" = true ]; then
     "in_progress": ${by_status[in-progress]},
     "deferred": ${by_status[deferred]},
     "complete": ${by_status[complete]},
-    "deleted": ${by_status[deleted]}
+    "deleted": ${by_status[deleted]},
+    "wont_fix": ${by_status[wont-fix]}
   },
   "by_category": {
     "ai_pattern": ${by_category[ai-pattern]},
@@ -204,6 +211,7 @@ By Status:
   Deferred:    ${by_status[deferred]} findings
   Complete:    ${by_status[complete]} findings (resolved)
   Deleted:     ${by_status[deleted]} findings (removed)
+  Won't fix:   ${by_status[wont-fix]} findings (closed)
 
 By Category:
   Complexity:    ${by_category[complexity]}
@@ -272,6 +280,8 @@ By Status:
   In Progress:  1 finding
   Deferred:     3 findings
   Complete:    15 findings (resolved)
+  Deleted:      2 findings (removed)
+  Won't fix:    4 findings (closed)
 
 By Category:
   Complexity:    8 (3 critical, 5 high)
@@ -300,7 +310,9 @@ Next Steps:
     "ready": 8,
     "in_progress": 1,
     "deferred": 3,
-    "complete": 15
+    "complete": 15,
+    "deleted": 2,
+    "wont_fix": 4
   },
   "by_category": {
     "ai_pattern": 4,

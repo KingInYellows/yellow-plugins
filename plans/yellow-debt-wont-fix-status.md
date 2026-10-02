@@ -172,7 +172,7 @@ Decisions (user-confirmed unless marked):
 
 ### Phase 2: Commands, agent and docs
 
-- [ ] 2.1: `commands/debt/status.md`
+- [x] 2.1: `commands/debt/status.md`
   - add `wont-fix` to the init loop (line 59) and the valid case arm (line 99)
   - add a hint arm before `*)` for `wont_fix|wontfix|"wont fix"`: print
     (via `printf '%s'`) that the status should be `wont-fix` and the recipe
@@ -194,7 +194,7 @@ Decisions (user-confirmed unless marked):
 > exist; mention that in the hint text rather than "skipped".
 <!-- /deepen-plan -->
 
-- [ ] 2.2: `commands/debt/triage.md`
+- [x] 2.2: `commands/debt/triage.md`
   - single-line `description:` and intro mention won't-fix
   - option 3 label: "Defer or won't fix — valid, not fixing now"
   - follow-up question: Defer / Won't fix / Cancel (Cancel returns to the
@@ -223,7 +223,7 @@ Decisions (user-confirmed unless marked):
 > accept block, so appended blocks do not disturb it.
 <!-- /deepen-plan -->
 
-- [ ] 2.3: `agents/synthesis/audit-synthesizer.md`
+- [x] 2.3: `agents/synthesis/audit-synthesizer.md`
   - Step 5: anchor the pending wipe to
     `todos/debt/[0-9]*-pending-{critical,high,medium,low}-*.md` (planner
     call: fixes the existing bug that also deletes kept todos whose slug
@@ -258,19 +258,19 @@ Decisions (user-confirmed unless marked):
 > needs its own shell block.
 <!-- /deepen-plan -->
 
-- [ ] 2.4: `commands/debt/fix.md` State Transitions: one line on what happens
+- [x] 2.4: `commands/debt/fix.md` State Transitions: one line on what happens
       to a running fix when its todo is closed as `wont-fix` (see the
       decision 9 annotation; verify the worktree behaviour first).
-- [ ] 2.5: `skills/debt-conventions/SKILL.md` "Invalid Status Values": add the
+- [x] 2.5: `skills/debt-conventions/SKILL.md` "Invalid Status Values": add the
       `wont-fix` bullet (valid finding deliberately not fixed, optional
       `wont_fix_reason`, reopenable to `pending`, distinct from `deleted`
       = false positive); list `wont_fix` as invalid. Document the
       `fingerprint` and `anchor_hash` fields.
-- [ ] 2.6: `README.md`: triage Actions line, Workflow step 3, frontmatter
+- [x] 2.6: `README.md`: triage Actions line, Workflow step 3, frontmatter
       example (`wont_fix_reason`, `fingerprint`, `anchor_hash`), State
       Machine block, the closing recipe, re-audit dedup behaviour, and a note
       that Linear issues are not closed automatically.
-- [ ] 2.7: `hooks/scripts/session-start.sh`: comment only, stating terminal
+- [x] 2.7: `hooks/scripts/session-start.sh`: comment only, stating terminal
       statuses (including `wont-fix`) are excluded. No logic change.
 
 ### Phase 3: Tests

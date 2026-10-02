@@ -37,7 +37,8 @@ fi
 # DEBT_TODO_NAME_RE). Names outside it — e.g. carrying `$(…)` — are not
 # counted, matching what /debt:triage lists. Anchored to position, so slugs
 # containing status/severity keywords are not double-counted. in-progress is
-# excluded: already being worked on.
+# excluded: already being worked on. Terminal and parked statuses (complete,
+# deleted, deferred, wont-fix) are excluded too: only pending|ready count.
 count=0
 for f in "$TODOS_DIR"/*.md; do
   [ -f "$f" ] && [ ! -L "$f" ] || continue

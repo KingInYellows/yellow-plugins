@@ -293,10 +293,29 @@ Todo files must use one of the following status values:
 - `complete` — Fix completed
 - `deferred` — Postponed to future sprint (includes optional `deferred_reason`
   field in frontmatter)
-- `deleted` — Rejected or no longer relevant
+- `deleted` — Rejected or no longer relevant (a false positive)
+- `wont-fix` — Valid finding that is deliberately not being fixed (includes
+  optional `wont_fix_reason` field, 200 characters at most). The file is kept,
+  so a re-audit does not recreate it; reopen it to `pending` to re-triage.
+  Distinct from `deleted`, which means the finding was wrong.
+
+`wont_fix`, `wontfix` and `wont fix` are not valid. A todo carrying one is
+repaired with `transition_todo_state "$(debt_resolve_todo '<id>'
+<filename-status>)" wont-fix`; `/debt:status` prints this recipe.
 
 **Remediation**: Run `lib/validate.sh` validation functions to check status
 field against allowed values.
+
+### Re-audit Fingerprint Fields
+
+New todos carry `fingerprint: fp/v1:<16 hex>` and `anchor_hash`, both computed
+in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
+fingerprint hashes the category, the path and the flagged code with spaces,
+tabs and CR removed; `anchor_hash` hashes the first non-blank flagged line.
+`audit-synthesizer` uses them to skip a new finding that matches a kept todo
+(any status except `pending`): exact fingerprint first, then the same category
+and path with a matching anchor. Only a unique match suppresses; ties and edited
+code resurface as new pending todos.
 
 ### Invalid Priority Values
 
