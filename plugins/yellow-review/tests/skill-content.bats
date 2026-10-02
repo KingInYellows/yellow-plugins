@@ -504,6 +504,25 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
 }
 
+# Collapse line wraps so a phrase can be matched across them.
+flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
+
+@test "resolve-pr: ratelimited=1 is tied to reason=rate-limit only; a timeout keeps it 0" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'For `reason=rate-limit` mark the rest `not attempted (rate limit)` and set `ratelimited=1`'* ]]
+  [[ "$text" == *'For `reason=timeout` mark the rest `not attempted (gh timeout)`, count them blocking, and keep `ratelimited=0`'* ]]
+  [[ "$text" == *'Treat a missing or unrecognized reason as `rate-limit`'* ]]
+  # The old unconditional rule must be gone.
+  [[ "$text" != *'After any exit 4, stop mutating and mark the rest `not attempted (rate limit)`'* ]]
+}
+
+@test "dispositions: ratelimited=1 only for reason=rate-limit, a timeout leaves it 0" {
+  text=$(flat "${BATS_TEST_DIRNAME}/../references/resolve/dispositions.md")
+  [[ "$text" == *'exited 4 with `reason=rate-limit` (or no recognizable reason)'* ]]
+  [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
+  [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
+}
+
 # The dirty-tree and rate-limit stops must finish the current PR (clean-tree
 # check, revert, row) before ending the walk, and name the summary heading.
 DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"

@@ -420,15 +420,17 @@ Located at `skills/pr-review-workflow/scripts/`:
   unless `--include-outdated`), with `isOutdated`, `viewerCanResolve`,
   `viewerCanReply` per thread and `id`, `createdAt`, `viewerDidAuthor`,
   `authorType` per comment, and `commentsTruncated` per thread (true when it
-  has more comments than were fetched); exits 3 with the partial array on
-  stdout when the thread list is truncated
+  has more comments than were fetched, and a resolver must never resolve such a
+  thread); exits 3 with the partial array on stdout when the thread list is
+  truncated
 - **get-pr-blockers** `<owner/repo> <pr-number>` — `CHANGES_REQUESTED`
   reviewers, `reviewDecision`, and whether the base branch enforces
   conversation resolution; never fails the caller (`lookupFailed` is true,
   and fields are null or `unknown`, when a lookup did not complete)
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with
-  an idempotency marker; skips when our last comment carries a marker for
-  this thread, whatever its disposition, and reports that disposition
+  an idempotency marker; skips when our latest recent comment carries a marker for
+  this thread, whatever its disposition, and only bot comments follow it, and
+  reports that disposition
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
   (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
   permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,
