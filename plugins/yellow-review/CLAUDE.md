@@ -181,17 +181,18 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API (non-outdated only unless the flag
   is set), with thread permissions, comment author type and a per-thread
-  `commentsTruncated` flag; exits 3 (partial array on stdout) when the thread
-  list is truncated
+  `commentsTruncated` flag (a truncated thread is never resolved); exits 3
+  (partial array on stdout) when the thread list is truncated
 - `get-pr-blockers <owner/repo> <pr>` — `CHANGES_REQUESTED` reviewers,
   `reviewDecision` and whether the base branch enforces conversation
   resolution; never fails the caller (`lookupFailed` true and null or
   `unknown` fields when a lookup failed)
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread
-  with an idempotency marker (skips when our last comment has a marker for the
-  thread, any disposition), with one rate-limit retry and a per-call `gh`
-  timeout, enforced only when `timeout(1)` is installed (without it `gh` runs
-  unbounded, so unattended calls can hang; see
+  with an idempotency marker (skips when our latest recent comment has a
+  marker for the thread, any disposition, and only bot comments follow it), with
+  one rate-limit retry and a per-call `gh` timeout, enforced when `timeout(1)` or
+  `gtimeout(1)` is installed (without either `gh` runs unbounded, so unattended
+  calls can hang; see
   `references/resolve/dispositions.md`)
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
   GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit,
