@@ -929,3 +929,28 @@ STUB
   [ -f src/a.txt ] && [ ! -L src/a.txt ]
   [ -z "$(git status --porcelain)" ]
 }
+
+@test "the revert modes report no log, create none and leave a PR's kept logs alone" {
+  mkdir -p "$PATCH_DIR"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    : >| "$PATCH_DIR/7-2020010${i}T000000Z-1.log"
+  done
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .log]')" = '["reverted",null]' ]
+  printf 'x\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .log]')" = '["reverted",null]' ]
+  [ "$(find "$PATCH_DIR" -name '7-*.log' | wc -l)" -eq 10 ]
+  [ -e "$PATCH_DIR/7-20200101T000000Z-1.log" ]
+}
+
+@test "--revert-dirty refuses to remove an untracked nested git repository" {
+  mkdir src/nested && git -C src/nested init -q && printf 'precious\n' >| src/nested/work.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -d src/nested/.git ]
+  [ "$(cat src/nested/work.txt)" = precious ]
+}

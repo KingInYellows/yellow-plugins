@@ -57,7 +57,8 @@
 #                  -c for a new commit); github `git commit -m`
 #   submitStack    graphite `gt submit --no-interactive` (+ --no-edit);
 #                  github runtime `submit` (the runtime adds --auto itself)
-#   rebaseUpstack  graphite `gt restack --upstack`
+#   rebaseUpstack  graphite `gt restack --upstack` (registry: `gt restack`; the
+#                  flag limits it to the branches above the reset one)
 #   abortConflict  graphite `gt abort`
 # Remote: the github runtime is given --remote only for an explicit choice
 # (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
@@ -200,7 +201,13 @@ fi
 # the commit (or be left behind): refuse before staging anything.
 DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
 NET_ERR=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f "$DIRTY_FILE" "$NET_ERR"' EXIT
+# ADDED: the added lines of the staged diff, then of the commit. APPROVED: the
+# added lines the user saw and approved (override only). REMAINING: the
+# commit's added lines minus the approved ones.
+ADDED=$(mktemp) || die 2 "mktemp failed"
+APPROVED=$(mktemp) || die 2 "mktemp failed"
+REMAINING=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED" "$APPROVED" "$REMAINING"' EXIT
 # last_err: the first line of the last network call's stderr, for a message.
 # One line, control characters dropped, credentials in URLs masked, capped.
 last_err() {
@@ -240,12 +247,6 @@ fi
 # file the PR already changes. Scan only added lines inside hunks (a header
 # is skipped by position, so an added "++ x" line is still scanned), with
 # --text so binary-attributed files are not hidden.
-ADDED=$(mktemp) || die 2 "mktemp failed"
-# APPROVED: the added lines the user saw and approved (override only);
-# REMAINING: the commit's added lines minus the approved ones.
-APPROVED=$(mktemp) || die 2 "mktemp failed"
-REMAINING=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED" "$APPROVED" "$REMAINING"' EXIT
 if ! git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
     | rt_added_lines >|"$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}" || true

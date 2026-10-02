@@ -397,7 +397,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   command removed a listed edit (restored a file, deleted a new one) is
   treated as a failure instead: the snapshot is kept as the recovery patch,
   the files are reverted and the result is `reverted` with a `reason` naming
-  the paths. Files live under
+  the paths. The revert modes run nothing: they create no log and report
+  `log: null`. Files live under
   `<git-common-dir>/yellow-review/resolve-patches/` (mode 0600); the newest
   10 patches and 10 logs per PR are kept, and other PRs' files are never
   pruned.

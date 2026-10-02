@@ -40,8 +40,9 @@
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
 #   "reason" explains a skipped run, a withheld patch, an interrupted run, a
 #   failed revert step, a log that is withheld or may be incomplete, a
-#   --revert-only entry skipped as unchanged, or a tree that is not clean. A passing command that
-#   left changes outside the listed files reports result "pass" with
+#   --revert-only entry skipped as unchanged, or a tree that is not clean.
+#   The revert modes run nothing and report "log": null. A passing command
+#   that left changes outside the listed files reports result "pass" with
 #   treeClean false and a reason; nothing is reverted.
 # Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
 #   error (including run-only flags next to a revert flag), no --trusted,
@@ -240,6 +241,11 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
             "$TOP_REAL/"*) ;;
             *) die 2 "refusing to remove a directory outside the repository: $f" ;;
         esac
+        # An untracked nested repository is listed as a single directory; its
+        # history is not ours to delete, so refuse rather than remove it.
+        NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
+            || die 2 "cannot scan the directory for a nested repository: $f"
+        [ -z "$NESTED" ] || die 2 "refusing to remove a directory that contains a nested git repository: $f"
         rm -rf -- "$f" 2>/dev/null
     else
         rm -f -- "$f" 2>/dev/null
@@ -257,9 +263,14 @@ OUT_DIR="$COMMON/yellow-review/resolve-patches"
 (umask 077 && mkdir -p -- "$OUT_DIR") || die 2 "cannot create $OUT_DIR"
 chmod 700 -- "$OUT_DIR" 2>/dev/null || true
 STAMP="$PR-$(date -u +%Y%m%dT%H%M%SZ)-$$"
-LOG="$OUT_DIR/$STAMP.log"
 PATCH="$OUT_DIR/$STAMP.patch"
-(umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
+# Only a run has output to log; the revert modes report "log": null and leave
+# the kept logs of earlier runs alone.
+LOG=""
+if [ "$MODE" = run ]; then
+    LOG="$OUT_DIR/$STAMP.log"
+    (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
+fi
 
 RC=0
 TIMED_OUT=0
@@ -399,8 +410,10 @@ fi
 # Redact the finished log before it is capped, reported or retained. It runs
 # after the command exits, so the exit status and process-group handling are
 # untouched.
-vr_redact_log "$LOG" "$PLUGIN_ROOT"
-vr_cap_log "$LOG" "$LOG_CAP_BYTES"
+if [ -n "$LOG" ]; then
+    vr_redact_log "$LOG" "$PLUGIN_ROOT"
+    vr_cap_log "$LOG" "$LOG_CAP_BYTES"
+fi
 
 if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNALED" ]; then
     vr_prune "$OUT_DIR" "$PR" log "$KEEP"
@@ -466,7 +479,7 @@ PATCH_OUT="$PATCH"
 if [ "$SAVE_BIN_OK" != 1 ]; then
     rm -f -- "$PATCH"
     jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
-        '{result: $r, patch: null, log: $log, treeClean: false,
+        '{result: $r, patch: null, log: (if $log == "" then null else $log end), treeClean: false,
           reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
     exit 0
 fi
@@ -529,9 +542,9 @@ if ! STATUS=$(git status --porcelain --untracked-files=all 2>/dev/null) || [ -n 
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi
 
-vr_prune "$OUT_DIR" "$PR" log "$KEEP"
+[ -z "$LOG" ] || vr_prune "$OUT_DIR" "$PR" log "$KEEP"
 vr_prune "$OUT_DIR" "$PR" patch "$KEEP"
 jq -nc --arg r "$RESULT" --arg p "$PATCH_OUT" --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
-    '{result: $r, patch: (if $p == "" then null else $p end), log: $log, treeClean: $clean}
+    '{result: $r, patch: (if $p == "" then null else $p end), log: (if $log == "" then null else $log end), treeClean: $clean}
      + (if $why == "" then {} else {reason: $why} end)'
 exit 0
