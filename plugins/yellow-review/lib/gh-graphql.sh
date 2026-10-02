@@ -6,9 +6,11 @@
 
 # Longest rate-limit wait a caller may sleep before its single retry; a longer
 # wait exits 4 instead. This caps the wait only: reply-pr-thread's worst case is
-# the pre-check, the wait, the retried pre-check and the reply, each gh call up
-# to GG_TIMEOUT (30 + 90 + 30 + 30 = 180 s by default), so a caller that must
-# survive it passes a Bash tool timeout above that, not the 120 s default.
+# three gh calls (the pre-check, the wait, then the retried call and the reply),
+# the wait and the pacing pause. GG_TIMEOUT is capped at GG_MAX_TIMEOUT, so the
+# worst case is bounded: 3 x 60 + 90 + 10 = 280 s, inside the 420000 ms Bash
+# tool timeout the write phase uses (references/resolve/dispositions.md,
+# "Bash timeouts").
 GG_MAX_WAIT_SECONDS=90
 # Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
@@ -19,13 +21,18 @@ GG_MAX_DIGITS=4
 # Wait reported for a header value too long to compare; always over
 # GG_MAX_WAIT_SECONDS, so the caller exits 4 instead of sleeping.
 GG_OVERSIZE_WAIT=9999
+# Largest per-call timeout accepted; a bigger value is clamped to it, so the
+# write phase's fixed Bash tool timeout always covers the worst case.
+GG_MAX_TIMEOUT=60
 # Seconds one gh call may run (YELLOW_REVIEW_GH_TIMEOUT, default 30; invalid
 # values, values over 4 digits and 0, which timeout(1) treats as "no limit",
-# fall back to 30). Enforced only when timeout(1) or gtimeout(1) is installed.
+# fall back to 30; a valid value over GG_MAX_TIMEOUT is clamped to 60).
+# Enforced only when timeout(1) or gtimeout(1) is installed.
 GG_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GG_TIMEOUT" in ''|*[!0-9]*) GG_TIMEOUT=30 ;; esac
 [ "${#GG_TIMEOUT}" -le "$GG_MAX_DIGITS" ] || GG_TIMEOUT=30
 [ "$GG_TIMEOUT" -gt 0 ] 2>/dev/null || GG_TIMEOUT=30
+[ "$GG_TIMEOUT" -le "$GG_MAX_TIMEOUT" ] || GG_TIMEOUT=$GG_MAX_TIMEOUT
 # GNU coreutils on macOS installs it as gtimeout.
 GG_TIMEOUT_BIN=""
 for _gg_t in timeout gtimeout; do

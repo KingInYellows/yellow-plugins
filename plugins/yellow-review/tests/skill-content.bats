@@ -598,3 +598,38 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$agent" == *'including its prose allowlist'* ]]
   [[ "$agent" == *'with no `@`, links, backticks, brackets or Markdown'* ]]
 }
+
+@test "write-phase Bash budget covers the worst case at the per-call gh timeout cap" {
+  lib="$BATS_TEST_DIRNAME/../lib"
+  scripts="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/scripts"
+  # The cap is 60 s in every place that parses YELLOW_REVIEW_GH_TIMEOUT.
+  grep -q '^GG_MAX_TIMEOUT=60$' "$lib/gh-graphql.sh"
+  grep -q '^RG_MAX_TIMEOUT=60$' "$lib/resolve-gh.sh"
+  grep -q 'FETCH_TIMEOUT" -le 60 \] || FETCH_TIMEOUT=60' "$scripts/poll-new-threads"
+  # The outer budget is stated once with its arithmetic, and the command uses it.
+  budget=420000
+  refs=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$refs" == *"own Bash call with a \`timeout\` of $budget ms"* ]]
+  [[ "$refs" == *'clamped to 60 s per `gh` call'* ]]
+  [[ "$refs" == *'= 280 s'* ]]
+  [[ "$refs" == *'= 220 s'* ]]
+  [[ "$refs" == *'= 360 s'* ]]
+  [[ "$refs" == *'The largest is 360 s; 420 s adds 60 s'* ]]
+  pr=$(flat "$RESOLVE_PR")
+  [[ "$pr" == *"own Bash call with a \`timeout\` of $budget ms"* ]]
+  [[ "$pr" != *'240000'* ]]
+  [[ "$refs" != *'240000'* ]]
+  # Worst case (file-followup-issue: six calls at the cap) plus margin fits
+  # the budget, and the budget fits the Bash tool's 600000 ms maximum.
+  worst=$((6 * 60))
+  [ "$((worst * 1000))" -lt "$budget" ]
+  [ "$budget" -le 600000 ]
+  # The six-call count matches the script's own header.
+  grep -q 'six gh calls' "$scripts/file-followup-issue"
+}
+
+@test "resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls" {
+  text=$(tr '\n' ' ' <"$RESOLVE_PR" | tr -s ' ')
+  [[ "$text" == *'Give both of these read-only calls a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'bounded at 60 s apiece'* ]]
+}

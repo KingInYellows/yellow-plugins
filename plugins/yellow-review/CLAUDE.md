@@ -240,7 +240,8 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
   on stderr rather than assume it is first.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
   `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s) and returns 124 on a timeout, but only when `timeout(1)` is installed;
+  30 s, clamped to 60 s) and returns 124 on a timeout, but only when
+  `timeout(1)` is installed;
   without it `gh` runs unbounded.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
   `resolve-pr-thread`) — one GraphQL call helper with rate-limit and

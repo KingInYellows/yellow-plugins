@@ -495,10 +495,23 @@ The verify and `commit-resolve-fixes` timeouts apply once those scripts land
 for `commit-resolve-fixes` (hooks, submit and the head check). The settings
 are capped at 540 and 480 seconds. Each write-phase script
 (`file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread`) runs as its
-own Bash call with a `timeout` of 240000 ms, and the next stage starts only
-after exit 0. The worst case is `reply-pr-thread`: a pre-check, the mutation
-and the one shared retry are three `gh` calls at 30 s each, plus a 90 s
-rate-limit wait and up to 10 s of pacing, 190 s in all.
+own Bash call with a `timeout` of 420000 ms, and the next stage starts only
+after exit 0. A killed helper may have landed its mutation without printing
+its JSON or `reason=` line, so the budget must cover the worst case even when
+`YELLOW_REVIEW_GH_TIMEOUT` is set high. The setting is therefore clamped to 60
+s per `gh` call (a larger valid value becomes 60; invalid, zero or over-4-digit
+values still fall back to 30), and the budget is derived from that cap:
+
+| Script | Worst case at 60 s per `gh` call |
+|---|---|
+| `reply-pr-thread` | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s |
+| `resolve-pr-thread` | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s |
+| `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
+
+The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and
+startup, and stays under the Bash tool's 600 s maximum. Change the cap and
+this budget together. `poll-new-threads` uses the same cap for each fetch and
+ends within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget.
 
 `reply-pr-thread` and `file-followup-issue` run today, and their worst case is
 over the 120 s default, so a caller passes a `timeout` above it. `GH` is
@@ -602,13 +615,14 @@ Replies and issue bodies end with:
   `YELLOW_REVIEW_RATE_LIMIT_WAIT` (default 60 s), then retry once per script
   run (`reply-pr-thread` shares that one retry across its calls). A second
   limit, or a required wait over 90 s, exits 4, which bounds the call to the
-  190 s worst case the write-phase `timeout` covers. `file-followup-issue`
+  280 s worst case the write-phase `timeout` covers ("Bash timeouts").
+  `file-followup-issue`
   never waits or retries: stderr matching "rate limit" or "HTTP 429" (it does
   not match "abuse") exits 4 at once. A bare 403 is not a rate limit: it
   exits 3.
 - Each `gh` call in `reply-pr-thread`, `resolve-pr-thread` and
   `file-followup-issue` is bounded by `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s; needs `timeout(1)`; `file-followup-issue` and `get-pr-blockers`
+  30 s, clamped to 60 s; needs `timeout(1)`; `file-followup-issue` and `get-pr-blockers`
   share it through `lib/resolve-gh.sh`). A timeout exits 4 with no retry
   and `reason=timeout` on stderr: the mutation may have landed, a re-run of `reply-pr-thread` skips
   through its pre-check, and a re-run of `file-followup-issue` finds a
