@@ -666,14 +666,13 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 
 ## Known limits
 
-- Issue dedupe follows every page of the viewer's issues, but the whole scan is
-  one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
-  issue history can time it out (exit 4); raise the variable for that
-  repository.
-- The Linear follow-up path has no marker lookup before `save_issue`, and an
-  ambiguous Linear failure falls back to GitHub. Marker dedupe therefore
-  holds only for the GitHub tracker: a Linear issue that was created but not
-  confirmed can be followed by a GitHub issue for the same thread.
+- Issue dedupe scans the newest 200 issues the viewer authored. When that
+  window is full and holds no marker for the thread, `file-followup-issue`
+  exits 5 (not 1, so it is not mistaken for a transient failure) rather than
+  risk a duplicate, and the thread stays open.
+- An ambiguous Linear failure falls back to GitHub, and the fallback does not
+  look for the Linear issue: one that was created but not confirmed can be
+  followed by a GitHub issue for the same thread.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
   (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks
   directory holds non-sample hooks it cannot verify: `.git/hooks` or a

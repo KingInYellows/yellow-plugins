@@ -456,3 +456,11 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q 'references/resolve/clusters.md' "$RESOLVER_AGENT"
   grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }
+
+@test "resolve-pr: Step 5 cancel reverts the unscreened edits and Step 6 drops unchanged paths from the file set" {
+  step5=$(sed -n '/^### Step 5: Dispositions/,/^### Step 6/p' "$RESOLVE_PR")
+  printf '%s\n' "$step5" | tr '\n' ' ' | tr -s ' ' | grep -q 'Cancel runs `run-verify-command --pr "<PR#>" --revert-dirty`'
+  step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
+  printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'git status --porcelain --untracked-files=all'
+  printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'never put a resolver path on a command line'
+}
