@@ -257,6 +257,8 @@ printf '\n=== Web App Signals (yellow-browser-test) ===\n'
 # Probe for web-app signals so the classifier can decide whether to OMIT
 # yellow-browser-test on non-web repos. Any single match flips
 # web_signal_count > 0; the classifier uses the count, not individual flags.
+# Mirrored in yellow-browser-test `commands/browser-test/setup.md` Step 2.5
+# ("Check for Web Application") — update both when a signal changes.
 web_signal_count=0
 if [ -n "$repo_top" ] && [ -f "$repo_top/package.json" ] && \
    grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
@@ -294,7 +296,7 @@ else
   printf 'web_signal_go:                 absent\n'
 fi
 if [ -n "$repo_top" ] && [ -f "$repo_top/Cargo.toml" ] && \
-   grep -qE "^(axum|actix-web|rocket|warp)[[:space:]]*=" "$repo_top/Cargo.toml" 2>/dev/null; then
+   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*$|[[:space:]]*=)|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
   printf 'web_signal_rust:               present\n'
   web_signal_count=$((web_signal_count + 1))
 else
@@ -313,8 +315,15 @@ if [ -n "$paas_match" ]; then
 else
   printf 'web_signal_paas:               absent\n'
 fi
-if [ -n "$repo_top" ] && [ -f "$repo_top/docker-compose.yml" ] && \
-   grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/docker-compose.yml" 2>/dev/null; then
+docker_http_present=0
+for f in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+  if [ -n "$repo_top" ] && [ -f "$repo_top/$f" ] && \
+     grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/$f" 2>/dev/null; then
+    docker_http_present=1
+    break
+  fi
+done
+if [ "$docker_http_present" -eq 1 ]; then
   printf 'web_signal_docker_http:        present\n'
   web_signal_count=$((web_signal_count + 1))
 else
@@ -697,7 +706,8 @@ from Step 1's "Web App Signals" section (the bash dashboard probes
 `pyproject.toml` for Django/Flask/FastAPI, `go.mod` for Gin/Echo/Fiber/Chi/
 Gorilla, `Cargo.toml` for Axum/Actix/Rocket/Warp, PaaS configs
 `fly.toml`/`render.yaml`/`vercel.json`/`netlify.toml`, and
-`docker-compose.yml` for HTTP port mappings).
+Compose files (`compose.y*ml`, `docker-compose.y*ml`) for HTTP port
+mappings).
 
 If `web_signal_count` is `0` AND `.claude/yellow-browser-test.local.md` is
 absent, OMIT this plugin from the dashboard entirely — a non-web-app repo

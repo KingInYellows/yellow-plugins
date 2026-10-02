@@ -153,7 +153,7 @@ check_key() {
   if [ $has_env -eq 1 ] && [ $has_cfg -eq 1 ]; then
     printf '%-22s set (both shell & userConfig)\n' "$label:"
   elif [ $has_env -eq 1 ]; then
-    printf '%-22s set (shell env only — MCP WILL FAIL: plugin 2.0.0 reads userConfig, not shell env)\n' "$label:"
+    printf '%-22s set (shell env; MCP uses it via the start-*.sh fallback unless a keychain userConfig key exists, which this check cannot see on macOS)\n' "$label:"
   elif [ $has_cfg -eq 1 ]; then
     printf '%-22s set (userConfig only)\n' "$label:"
   else
@@ -217,8 +217,17 @@ fi
 
 Per-key status after this step: `ABSENT` / `FORMAT VALID` / `FORMAT INVALID`
 
+Exception: when Step 1 showed `set (both shell & userConfig)` and the shell key
+is `FORMAT INVALID`, no probe runs and the final status is
+`PRESENT (userConfig takes precedence — shell key format invalid)`, because the
+MCP uses the userConfig key. Perplexity's label ends with `; pending
+MCP-visibility confirmation`.
+
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
-`UNREACHABLE` / `PRESENT (untested)` (when user skips testing).
+`UNREACHABLE` / `PRESENT (untested)` (when user skips testing) /
+`PRESENT (userConfig takes precedence — shell key probe: <result>)`
+(shell key probed with any result, but a userConfig key is also set and the MCP uses that one;
+Perplexity's label ends with `; pending MCP-visibility confirmation`).
 
 ### Step 3: Optional Live API Testing
 
@@ -312,13 +321,10 @@ else
     provider_detail="Live test passed"
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
-    # v2.0.0 shell-env-only diagnostic: a 401 here means the key was in shell
-    # env (we ran the curl probe). The shell-env path no longer reaches the
-    # MCP — plugin.json reads ${user_config.exa_api_key} — so a valid key
-    # in shell env still fails to authenticate the MCP. Distinguish "key
-    # expired" from "key never reached MCP" so the user can act on the right
-    # cause.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+    # A 401 here means the shell-env key was rejected (only shell keys reach
+    # this probe). The start-*.sh wrappers fall back to shell env, but
+    # userConfig wins when both are set; the both-set override below reports it.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -329,7 +335,19 @@ else
     provider_status="UNREACHABLE"
     provider_detail="Unexpected HTTP $http_status"
   fi
+  # The probe tests the shell key; with both set, the MCP uses the userConfig one,
+  # so report the probe result without claiming the MCP's key was tested.
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research exa_api_key; then
+    provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run an exa tool call to validate the userConfig key."
+    provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
+  fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=exa\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 **Tavily:**
@@ -408,8 +426,8 @@ else
     provider_detail="Live test passed"
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
-    # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+    # Shell-env 401 diagnostic: see EXA block above for rationale.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -420,7 +438,19 @@ else
     provider_status="UNREACHABLE"
     provider_detail="Unexpected HTTP $http_status"
   fi
+  # The probe tests the shell key; with both set, the MCP uses the userConfig one,
+  # so report the probe result without claiming the MCP's key was tested.
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research tavily_api_key; then
+    provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a tavily tool call to validate the userConfig key."
+    provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
+  fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=tavily\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 **Perplexity:**
@@ -502,8 +532,8 @@ else
     provider_detail="Live test passed"
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
-    # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+    # Shell-env 401 diagnostic: see EXA block above for rationale.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). It may be expired or revoked — regenerate it at the provider dashboard."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -514,12 +544,25 @@ else
     provider_status="UNREACHABLE"
     provider_detail="Unexpected HTTP $http_status"
   fi
+  # The probe tests the shell key; with both set, the MCP uses the userConfig one,
+  # so report the probe result without claiming the MCP's key was tested.
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research perplexity_api_key; then
+    provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a perplexity tool call to validate the userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
+    provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status; pending MCP-visibility confirmation)"
+  fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=perplexity\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 Each provider block above runs its own inline decision tree (in the same
 subprocess as the curl probe) so `$curl_exit` and `$http_status` stay in
-scope. A standalone post-probe decision tree was tried earlier but failed —
+scope, and ends by printing its `provider`, `provider_status` and
+`provider_detail` lines: those printed lines are what Steps 4 and 5 read. A standalone post-probe decision tree was tried earlier but failed —
 each ``` ```bash``` ``` block is a fresh subprocess, so variables set in one
 block are invisible to the next. See
 `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
@@ -714,10 +757,25 @@ its Step 3 status is any of:
   any auth problem).
 - `PRESENT (untested)` — key was present and format-valid; user opted out of
   live testing.
+- `PRESENT (userConfig takes precedence — shell key probe: <result>)` —
+  both a shell key and a userConfig key are set; `<result>` is any shell probe
+  status (ACTIVE, INVALID, RATE LIMITED, UNREACHABLE). The MCP uses the
+  userConfig key, which was not tested; a rejected shell key means the shell
+  export is stale or wrong. For EXA and Tavily it counts as active, like
+  `PRESENT (keychain …)`: the first MCP call surfaces any userConfig auth
+  problem. Perplexity's label ends with `; pending MCP-visibility
+  confirmation` and follows the pending rule below. Step 5 never shows setup
+  instructions for these statuses.
+- `PRESENT (userConfig takes precedence — shell key format invalid)` — both
+  keys are set and the shell key failed Step 2's format check, so no probe ran.
+  Treated like the precedence status above: active for EXA and Tavily, pending
+  rule for Perplexity, never triggers Step 5.
 
-`PRESENT (userConfig only — pending MCP-visibility confirmation)` does NOT
-count as active until Step 3.5 promotes it; if Step 3.5 finds the MCP
-UNAVAILABLE, treat the key as inactive for the summary.
+`PRESENT (userConfig only — pending MCP-visibility confirmation)` and the
+Perplexity form of `PRESENT (userConfig takes precedence — …; pending
+MCP-visibility confirmation)` do NOT count as active until Step 3.5 promotes
+them; if Step 3.5 finds the MCP UNAVAILABLE, treat the key as inactive for the
+summary.
 
 Counts:
 
@@ -734,7 +792,11 @@ seven — Context7, Grep, WarpGrep, DeepWiki, ast-grep, Parallel Task, Ceramic):
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
-If any keys are `ABSENT`, `FORMAT INVALID`, or `INVALID`, show this block:
+If any key's status is exactly `ABSENT`, `FORMAT INVALID`, or `INVALID`, show
+this block. Match the whole status, not a substring: every
+`PRESENT (userConfig takes precedence — shell key probe: …)` or
+`PRESENT (userConfig takes precedence — shell key format invalid)` status
+contains the word INVALID or ACTIVE but never triggers it.
 
 ```text
 To enable missing providers (recommended path, no restart required):
@@ -754,9 +816,10 @@ Get keys:
 
 Never commit API keys to version control.
 
-(Fallback for power users who want a pure shell-env setup: add a per-MCP
-wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
-no longer reads the shell *_API_KEY vars directly as of 2.0.0.)
+(Power users can skip userConfig: the start-*.sh wrappers fall back to the
+EXA_API_KEY / TAVILY_API_KEY / PERPLEXITY_API_KEY shell env vars when no
+userConfig value is set. userConfig wins when both are present and is
+preferred: the keychain keeps the key out of your shell environment.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all three if some
@@ -821,6 +884,8 @@ research), `Done`.
 | Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
 | Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
 | HTTP 401/403                             | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
+| HTTP 401/403, userConfig also set        | "PRESENT (userConfig takes precedence …)" — shell export is stale.               | Record per-provider |
+| Shell key format invalid, userConfig set | "PRESENT (userConfig takes precedence — shell key format invalid)" — no probe.   | Record per-provider |
 | HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |
 | HTTP 5xx                                 | "UNREACHABLE — API server error."                                                | Record per-provider |
 | ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured."             | Record, continue    |

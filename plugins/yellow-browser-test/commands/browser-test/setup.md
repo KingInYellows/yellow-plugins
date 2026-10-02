@@ -42,24 +42,63 @@ If install fails, report error and suggest manual installation.
 
 ### Step 2.5: Check for Web Application
 
-Before spawning app discovery, check if this project is a web application:
+Before spawning app discovery, check if this project is a web application.
+The signal checks mirror the "Web App Signals" block in yellow-core's
+`commands/setup/all.md` (minus its `repo_top` guards, since `repo_top` falls
+back to `.` here) — keep the two in sync when either changes:
 
 ```bash
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-is_web=false
-if [ -f "$repo_top/package.json" ]; then
-  if grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
-    is_web=true
-  fi
+web_signals=""
+if [ -f "$repo_top/package.json" ] && \
+   grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
+  web_signals="$web_signals node"
 fi
-printf 'is_web: %s\n' "$is_web"
+if [ -f "$repo_top/Gemfile" ] && \
+   grep -qE "^[[:space:]]*gem[[:space:]]+['\"]rails['\"]" "$repo_top/Gemfile" 2>/dev/null; then
+  web_signals="$web_signals rails"
+fi
+for f in "$repo_top/requirements.txt" "$repo_top/pyproject.toml"; do
+  if [ -f "$f" ] && grep -qiE "(django|flask|fastapi|starlette|sanic)" "$f" 2>/dev/null; then
+    web_signals="$web_signals python"
+    break
+  fi
+done
+if [ -f "$repo_top/go.mod" ] && \
+   grep -qE "(gin-gonic|labstack/echo|gofiber/fiber|go-chi/chi|gorilla/mux)" "$repo_top/go.mod" 2>/dev/null; then
+  web_signals="$web_signals go"
+fi
+if [ -f "$repo_top/Cargo.toml" ] && \
+   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*$|[[:space:]]*=)|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
+  web_signals="$web_signals rust"
+fi
+for f in fly.toml render.yaml vercel.json netlify.toml; do
+  if [ -f "$repo_top/$f" ]; then
+    web_signals="$web_signals paas($f)"
+    break
+  fi
+done
+for f in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+  if [ -f "$repo_top/$f" ] && \
+     grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/$f" 2>/dev/null; then
+    web_signals="$web_signals docker_http"
+    break
+  fi
+done
+if [ -n "$web_signals" ]; then
+  printf 'is_web: true (signals:%s; checked: %s)\n' "$web_signals" "$repo_top"
+else
+  printf 'is_web: false (checked: %s)\n' "$repo_top"
+fi
 ```
 
 If `is_web` is `false`, use AskUserQuestion:
 
-> "No web framework detected in package.json. Browser testing requires a web
-> app with a dev server. (Non-Node.js web apps like Django, Rails, or Go
-> servers won't be detected here — choose 'Continue anyway' for those.)"
+> "No web-app signals found in {the `checked:` path from the output above}
+> (checked: package.json, Gemfile, Python deps, go.mod, Cargo.toml, PaaS
+> config, docker-compose ports). That path is the git root, or your current
+> directory if you are not in a git repository. Browser testing requires a web
+> app with a dev server."
 >
 > Options:
 > - "Continue anyway" — proceed to app discovery
@@ -152,7 +191,7 @@ Report setup complete and suggest:
 | -------------------- | -------------------------------------------------------------------------------------- |
 | Node.js not found    | "Node.js 22.22.0 or later required. Install from https://nodejs.org/"                  |
 | npm install fails    | Show error, suggest `sudo npm install -g agent-browser`                                |
-| No package.json      | "No package.json found. Is this a web project?" then AskUserQuestion for manual config |
+| No web signals       | Step 2.5 reports `is_web: false` — ask: continue / configure manually / skip           |
 | No routes discovered | "Could not auto-detect routes. Describe your app's main pages."                        |
 | OAuth detected       | Warn user, offer email/password or public-only options                                 |
 | Config write fails   | Check directory permissions for `.claude/`                                             |

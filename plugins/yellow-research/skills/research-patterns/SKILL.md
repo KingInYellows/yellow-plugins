@@ -115,11 +115,13 @@ If an MCP server is unavailable (key not set, connection error, rate limit):
 
 ## API Key Setup
 
-As of v2.0.0, EXA / Tavily / Perplexity API keys are stored in `userConfig`
-(system keychain). `plugin.json` reads `${user_config.<key>}`; shell env
-vars are no longer wired into the MCP processes. Perplexity hard-fails at
-startup without a valid userConfig value (tools disappear entirely); EXA
-and Tavily start but tool calls error at invocation.
+EXA / Tavily / Perplexity API keys are stored in `userConfig` (system
+keychain). Each MCP starts through a `bin/start-<server>.sh` wrapper that
+uses the userConfig value and falls back to the `EXA_API_KEY`,
+`TAVILY_API_KEY` or `PERPLEXITY_API_KEY` shell env var; userConfig wins when
+both are set. With neither, Perplexity hard-fails at startup (tools
+disappear entirely); EXA and Tavily start but tool calls error at
+invocation.
 
 To configure (one-time, no restart needed):
 
@@ -142,9 +144,9 @@ The **Parallel Task** and **Ceramic** servers use OAuth (no API key
 needed). Claude Code handles authentication automatically — you'll be
 prompted to authorize on first use of each.
 
-Power users who want a fully shell-env-driven setup can wrap each MCP in a
-per-MCP launcher script (see `plugins/yellow-morph/bin/start-morph.sh`).
-The plugin no longer reads `*_API_KEY` from shell env directly.
+Power users who already export the keys in their shell rc can skip the
+userConfig prompts; the wrappers read the shell env vars directly. userConfig
+is preferred: the keychain keeps the key out of your shell environment.
 
 ## MCP Tool Name Verification
 
