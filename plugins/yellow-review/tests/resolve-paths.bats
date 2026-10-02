@@ -289,3 +289,23 @@ setup() {
     done
   done
 }
+
+@test "rp_runner flags sibling runtime files the commit script executes" {
+  for p in plugins/github-workflow/lib/github-stack-runtime.js \
+           plugins/github-workflow/lib/sub/x.js \
+           Plugins/GitHub-Workflow/Lib/github-stack-runtime.js \
+           plugins/yellow-core/lib/compound-staging.sh; do
+    rp_runner "$p" || { echo "not a runner: $p"; false; }
+  done
+}
+
+@test "rp_runner leaves near-miss sibling runtime paths alone" {
+  for p in plugins/github-workflowx/lib/x.js plugins/github-workflow/libx/x.js \
+           plugins/github-workflow/commands/x.md \
+           plugins/yellow-core/lib/stack-operation-registry.js \
+           plugins/yellow-core/lib/compound-staging.sh.bak \
+           plugins/yellow-corex/lib/compound-staging.sh; do
+    run rp_runner "$p"
+    [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
+  done
+}
