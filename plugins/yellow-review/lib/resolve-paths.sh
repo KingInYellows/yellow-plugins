@@ -35,11 +35,19 @@ rp_denied() {
     local l
     l=$(rp_lower "$1")
     case "$l" in
-        .github/*|*/.github/*|.circleci/*|*/.circleci/*|.git/*|*/.git/*) return 0 ;;
-        .claude/*|*/.claude/*|.vscode/*|*/.vscode/*) return 0 ;;
-        .devcontainer/*|*/.devcontainer/*|.idea/*|*/.idea/*) return 0 ;;
-        .cursor/*|*/.cursor/*|.codex/*|*/.codex/*|.agents/*|*/.agents/*) return 0 ;;
-        .gemini/*|*/.gemini/*|.windsurf/*|*/.windsurf/*|.cline/*|*/.cline/*) return 0 ;;
+        .github|*/.github|.github/*|*/.github/*) return 0 ;;
+        .circleci|*/.circleci|.circleci/*|*/.circleci/*) return 0 ;;
+        .git|*/.git|.git/*|*/.git/*) return 0 ;;
+        .claude|*/.claude|.claude/*|*/.claude/*) return 0 ;;
+        .vscode|*/.vscode|.vscode/*|*/.vscode/*) return 0 ;;
+        .devcontainer|*/.devcontainer|.devcontainer/*|*/.devcontainer/*) return 0 ;;
+        .idea|*/.idea|.idea/*|*/.idea/*) return 0 ;;
+        .cursor|*/.cursor|.cursor/*|*/.cursor/*) return 0 ;;
+        .codex|*/.codex|.codex/*|*/.codex/*) return 0 ;;
+        .agents|*/.agents|.agents/*|*/.agents/*) return 0 ;;
+        .gemini|*/.gemini|.gemini/*|*/.gemini/*) return 0 ;;
+        .windsurf|*/.windsurf|.windsurf/*|*/.windsurf/*) return 0 ;;
+        .cline|*/.cline|.cline/*|*/.cline/*) return 0 ;;
     esac
     case "${l##*/}" in
         yellow-plugins.local.md|claude.md|agents.md|gemini.md|.mcp.json) return 0 ;;
@@ -66,11 +74,19 @@ rp_denied() {
 rp_runner() {
     local l hooks top rc
     l=$(rp_lower "$1")
+    # The resolve runtime itself: the orchestrator executes these scripts and
+    # sources these libraries, so an edit by an unattended resolver would run
+    # with the orchestrator's authority. Matched by repository-relative prefix
+    # (a source checkout of this plugin), at any depth below it.
+    case "$l" in
+        plugins/yellow-review/skills/pr-review-workflow/scripts/*) return 0 ;;
+        plugins/yellow-review/lib/*|plugins/yellow-review/hooks/*) return 0 ;;
+    esac
     # Only the repository-root scripts/ directory: build and hook tooling
-    # lives there. Nested scripts/ directories (e.g. a plugin's own
+    # lives there. Other nested scripts/ directories (e.g. another plugin's
     # skills/*/scripts/) are ordinary sources that hooks do not run.
     case "/$l" in
-        /scripts/*|/.husky/*|*/.husky/*|/.cargo/*|*/.cargo/*) return 0 ;;
+        /scripts/*|/.husky|*/.husky|/.husky/*|*/.husky/*|/.cargo|*/.cargo|/.cargo/*|*/.cargo/*) return 0 ;;
     esac
     case "${l##*/}" in
         package.json|package-lock.json|npm-shrinkwrap.json|pnpm-lock.yaml|yarn.lock|bun.lock|bun.lockb) return 0 ;;
@@ -119,9 +135,13 @@ rp_runner() {
             case "$l" in */*) return 1 ;; *) return 0 ;; esac
         fi
         hooks=$(rp_lower "$hooks")
-        # The entry itself counts too: a tracked symlink (e.g. .hooks) can be
-        # repointed at a directory holding an executable hook.
-        case "$l" in "$hooks"|"$hooks"/*) return 0 ;; esac
+        # The entry itself and every ancestor prefix count too: a tracked
+        # symlink (e.g. .hooks for hooksPath .hooks/bin) can be repointed at a
+        # directory holding an executable hook, and Git follows it.
+        while [ -n "$hooks" ]; do
+            case "$l" in "$hooks"|"$hooks"/*) return 0 ;; esac
+            case "$hooks" in */*) hooks="${hooks%/*}" ;; *) break ;; esac
+        done
     fi
     return 1
 }

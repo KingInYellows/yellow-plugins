@@ -240,8 +240,11 @@ fi
 # --text so binary-attributed files are not hidden.
 ADDED=$(mktemp) || die 2 "mktemp failed"
 trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED"' EXIT
-git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
-    | rt_added_lines >"$ADDED"
+if ! git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
+    | rt_added_lines >|"$ADDED"; then
+    lgit reset -q -- "${EXPECTED[@]}" || true
+    die 3 "could not extract the added lines from the staged changes for the credential scan; nothing committed"
+fi
 if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}"
     die 3 "credential-shaped: staged changes look like they contain a credential, or could not be scanned; nothing committed"

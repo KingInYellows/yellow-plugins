@@ -357,8 +357,8 @@ has_kill_after() {
   [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
 }
 
-@test "code that assigns a password or declares a token keeps its recovery patch" {
-  printf 'one\nfeature\npassword = "hunter22"\nconst API_KEY = "abcd1234efgh5678"\ntoken: string\n' >| src/a.txt
+@test "code that only declares a token keeps its recovery patch" {
+  printf 'one\nfeature\ntoken: string\n' >| src/a.txt
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
   patch=$(printf '%s' "$output" | jq -r .patch)
@@ -739,4 +739,135 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   done
   grep -q 'resolver edit' src/a.txt
   [ -f src/new.txt ]
+}
+
+# vr_redact_log run directly (bash): the log is redacted in place.
+redact_log() {
+  run bash -c '
+    root=$1; log=$2
+    . "$root/lib/resolve-paths.sh"
+    . "$root/lib/resolve-text.sh"
+    . "$root/lib/verify-run.sh"
+    vr_redact_log "$log" "$root"' _ "$BATS_TEST_DIRNAME/.." "$1"
+}
+
+@test "vr_redact_log redacts a credential ID assignment that cs_redact_secrets misses" {
+  log="$BATS_TEST_TMPDIR/id.log"
+  printf 'before\nDEVIN_ORG_ID=org-1234567\nafter\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  grep -q before "$log"
+  grep -q after "$log"
+  run ! grep -q 'org-1234567' "$log"
+  grep -q 'DEVIN_ORG_ID=\[REDACTED\]' "$log"
+}
+
+@test "vr_redact_log redacts _TOKEN, _SECRET and _KEY assignments and an exported quoted value" {
+  log="$BATS_TEST_TMPDIR/names.log"
+  printf 'MY_TOKEN: hunter2value\nexport APP_SECRET="two words"\nSVC_KEY = abc123\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  run ! grep -Eq 'hunter2value|two words|abc123' "$log"
+}
+
+@test "vr_redact_log withholds a log that still looks like a credential" {
+  log="$BATS_TEST_TMPDIR/shape.log"
+  # No credential-looking name, so only the final scan can catch it.
+  printf 'password = "correcthorsebatterystaple"\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  run ! grep -q 'correcthorsebatterystaple' "$log"
+  grep -q '^\[withheld' "$log"
+}
+
+@test "vr_redact_log keeps a clean log" {
+  log="$BATS_TEST_TMPDIR/clean.log"
+  printf 'ok 1 passes\nok 2 passes\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$log")" = "$(printf 'ok 1 passes\nok 2 passes')" ]
+}
+
+@test "a verifier that prints a credential ID leaves it out of the retained log" {
+  printf '%s\n' 'echo "DEVIN_ORG_ID=org-1234567"; echo visible' >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -q 'org-1234567' "$log"
+}
+
+@test "a keyword-shaped credential in the resolver edit is withheld from the recovery patch" {
+  printf 'one\nfeature\npassword = "hunter22"\n' >| src/a.txt
+  verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  [[ "$output" != *hunter22* ]]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  run ! grep -rq 'hunter22' "$PATCH_DIR"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a passing verify that restores a listed file keeps the recovery patch and reports reverted" {
+  verify 'git checkout -q HEAD -- src/a.txt' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"removed listed edits: src/a.txt"* ]]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  grep -q 'resolver edit' "$patch"
+  grep -q '+new' "$patch"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a passing verify that deletes a new listed file keeps the recovery patch" {
+  verify 'rm -f src/new.txt' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"src/new.txt"* ]]
+  grep -q '+new' "$(printf '%s' "$output" | jq -r .patch)"
+}
+
+@test "an untracked FIFO among the listed files is refused without hanging" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/new.txt && mkfifo src/new.txt
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"src/new.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a FIFO in place of a listed tracked file is refused before the command runs" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a regular file or symlink: src/a.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--revert-dirty deletes a tracked file's FIFO replacement unopened and restores the file" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"not a regular file or symlink: src/a.txt"* ]]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only restores a tracked file that was replaced by a FIFO" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
 }

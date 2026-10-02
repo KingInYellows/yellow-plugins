@@ -240,3 +240,52 @@ setup() {
   run rp_sibling_file "$BATS_TEST_TMPDIR/plugins/me" other lib/x.sh
   [ "$status" -eq 1 ]
 }
+
+@test "rp_denied matches trusted directory names themselves (tracked symlinks), not only descendants" {
+  for d in .github .circleci .git .claude .vscode .devcontainer .idea .cursor .codex .agents .gemini .windsurf .cline; do
+    for p in "$d" "x/$d" "x/y/$d" "$(rp_lower "$d" | tr 'a-z' 'A-Z')" "x/${d^^}"; do
+      rp_denied "$p" || { echo "not denied: $p"; false; }
+    done
+  done
+}
+
+@test "rp_runner matches .husky and .cargo directory names themselves" {
+  for p in .husky x/.husky .cargo x/.cargo .HUSKY; do
+    rp_runner "$p" || { echo "not a runner: $p"; false; }
+  done
+}
+
+@test "rp_runner flags the resolve runtime scripts and libraries" {
+  for p in plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes \
+           plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command \
+           plugins/yellow-review/skills/pr-review-workflow/scripts/sub/dir/tool \
+           plugins/yellow-review/lib/resolve-paths.sh plugins/yellow-review/lib/verify-run.sh \
+           plugins/yellow-review/lib/gh-graphql.sh plugins/yellow-review/lib/review-ledger.sh \
+           plugins/yellow-review/hooks/scripts/session-start.sh \
+           Plugins/Yellow-Review/Lib/resolve-text.sh; do
+    rp_runner "$p" || { echo "not a runner: $p"; false; }
+  done
+}
+
+@test "rp_runner leaves other yellow-review sources and other plugins' scripts alone" {
+  for p in plugins/yellow-review/agents/a.md plugins/yellow-review/commands/review/resolve.md \
+           plugins/yellow-review/skills/pr-review-workflow/references/resolve/dispositions.md \
+           plugins/yellow-other/lib/x.sh plugins/yellow-other/skills/y/scripts/tool \
+           plugins/yellow-reviewer/lib/x.sh; do
+    run rp_runner "$p"
+    [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
+  done
+}
+
+@test "rp_runner treats every ancestor prefix of a nested core.hooksPath as a runner" {
+  for hp in .hooks/bin "$(pwd -P)/.hooks/bin" ./.hooks/bin/; do
+    git config core.hooksPath "$hp"
+    for p in .hooks .hooks/bin .hooks/bin/pre-commit; do
+      rp_runner "$p" || { echo "not a runner: $p (hooksPath=$hp)"; false; }
+    done
+    for p in .hooksx .hooksx/bin src/a.ts; do
+      run rp_runner "$p"
+      [ "$status" -ne 0 ] || { echo "runner: $p (hooksPath=$hp)"; false; }
+    done
+  done
+}

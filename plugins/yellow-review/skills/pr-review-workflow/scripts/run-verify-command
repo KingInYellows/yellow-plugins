@@ -217,6 +217,22 @@ if [ "$MODE" = run ]; then
     done
 fi
 
+# Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
+# before any watchdog starts, and a socket, device or directory is no edit to
+# keep. Running refuses; the revert modes delete the entry without opening it,
+# so refusal cleanup still completes.
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
+        continue
+    fi
+    [ "$MODE" != run ] || die 2 "refusing a path that is not a regular file or symlink: $f"
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+    fi
+    add_reason "removed without reading, not a regular file or symlink: $f"
+done
+
 # cwd is the top level, so the relative common dir resolves correctly (and
 # works on git older than 2.31, which lacks --path-format).
 COMMON=$(cd -- "$(git rev-parse --git-common-dir)" && pwd) || die 2 "cannot resolve the git common dir"
@@ -332,8 +348,9 @@ save_patch() {
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
-        elif [ -e "$f" ] || [ -L "$f" ]; then
+        elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
+            # Never a FIFO or other special file: git diff would open it.
             rc=0
             git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
@@ -346,6 +363,12 @@ SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 if [ "$MODE" = run ]; then
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    # Which listed paths exist now: a verifier that deletes or recreates one
+    # has lost the resolver's edit (checked after a passing run).
+    PRE_PRESENT=()
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        if [ -e "$f" ] || [ -L "$f" ]; then PRE_PRESENT+=("$f"); fi
+    done
     run_verify
 fi
 
@@ -367,16 +390,40 @@ if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNAL
         CLEAN=false
         add_reason "the verify command changed files outside the listed files: $EXTRA"
     fi
-    jq -nc --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
-        '{result: "pass", patch: null, log: $log, treeClean: $clean}
-         + (if $why == "" then {} else {reason: $why} end)'
-    rm -f -- "$PATCH" "$TEXT_FILE"
-    exit 0
+    # A verifier that restored or deleted a listed file and exited 0 has lost
+    # the resolver's edit; the snapshot is then the only copy. Fail closed: a
+    # status that cannot be read counts as lost.
+    LOST=""
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        if ! ST=$(lgit status --porcelain --untracked-files=all -- "$f" 2>/dev/null) || [ -z "$ST" ]; then
+            LOST="${LOST:+$LOST, }$f"
+            continue
+        fi
+        PRESENT=0
+        [ -e "$f" ] || [ -L "$f" ] && PRESENT=1
+        WAS=0
+        for p in ${PRE_PRESENT[@]+"${PRE_PRESENT[@]}"}; do
+            [ "$p" = "$f" ] && WAS=1
+        done
+        [ "$PRESENT" = "$WAS" ] || LOST="${LOST:+$LOST, }$f"
+    done
+    if [ -z "$LOST" ]; then
+        jq -nc --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
+            '{result: "pass", patch: null, log: $log, treeClean: $clean}
+             + (if $why == "" then {} else {reason: $why} end)'
+        rm -f -- "$PATCH" "$TEXT_FILE"
+        exit 0
+    fi
+    # Keep the snapshot and take the failure path: it screens and keeps the
+    # patch, reverts the listed files and reports "reverted".
+    VERIFY_LOST=1
+    add_reason "the verify command removed listed edits: $LOST"
 fi
 
 RESULT=fail
 [ "$TIMED_OUT" = 1 ] && RESULT=timeout
 [ "$MODE" != run ] && RESULT=reverted
+[ -z "${VERIFY_LOST:-}" ] || RESULT=reverted
 [ -z "$SIGNALED" ] || add_reason "interrupted by SIG$SIGNALED; the verify command was stopped"
 
 # Nothing may interrupt the save and the revert.
@@ -403,19 +450,16 @@ fi
 # A resolver can paste a credential into a listed file. Do not archive it: drop
 # the patch and still revert, so the secret leaves the disk. The resolver's
 # edit is regenerable; a credential must not persist under .git. Screen a
-# forced-text diff, and treat a screen that cannot answer as a hit. The strict
-# screen (private keys, known token prefixes, long tokens) skips the keyword
-# rules, so code that assigns to `password` or declares `token: string` keeps
-# its patch; commit-resolve-fixes still runs the full screen before any commit.
-# Known gap: a keyword-shaped value (`password = "hunter22"`) passes this screen
-# and stays in the archived patch (newest 10 per PR) even if the full screen
-# later refuses the commit; that refusal does not delete the patch.
+# forced-text diff with the FULL credential rules (including the keyword rules),
+# and treat a screen that cannot answer as a hit. A keyword-shaped value such as
+# `password = "hunter22"` would otherwise stay in the archived patch under .git
+# after the later commit scan refuses it; that refusal does not delete the patch.
 ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
 if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
     rm -f -- "$PATCH"
     die 2 "cannot screen the recovery patch"
 fi
-rt_looks_secret_strict "$ADDED_FILE"
+rt_looks_secret "$ADDED_FILE"
 case $? in
     1) ;;
     0)
