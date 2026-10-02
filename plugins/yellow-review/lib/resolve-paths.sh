@@ -217,17 +217,65 @@ rp_tree_changes() {
     fi
 }
 
+# rp_link_target_changed <symlink> <marker>: judge what a symlink points to,
+# not the link: a write through it changes the target's mtime and leaves the
+# link's alone. The operating system resolves the chain, so a relative target
+# is taken from the link's own directory. Returns 0 when the target is a
+# regular file with an mtime newer than <marker>, or a directory holding a
+# regular file that is (find -H, so symlinks nested below it are not followed;
+# `.git` entries skipped). Returns 1 when it is unchanged, not a regular file or
+# directory, or dangling (nothing to write to). Returns 2 when it cannot tell:
+# the link cannot be read, the target directory cannot be walked, or the target
+# is hidden behind a directory that cannot be searched. Run it from the working
+# tree root with a path that does not begin with `-`.
+rp_link_target_changed() {
+    local l="$1" marker="$2" t p d out rc=0
+    if [ -e "$l" ]; then
+        if [ -d "$l" ]; then
+            out=$(set -o pipefail
+                find -H "$l" -name .git -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                    | head -n 1) || rc=$?
+            [ -z "$out" ] || return 0
+            [ "$rc" -eq 0 ] || return 2
+            return 1
+        fi
+        [ -f "$l" ] || return 1
+        [ "$l" -nt "$marker" ] && return 0
+        return 1
+    fi
+    # Not found: a dangling link, or a target behind a directory that cannot be
+    # searched. The nearest existing ancestor tells them apart.
+    t=$(readlink -- "$l" 2>/dev/null) || return 2
+    case "$t" in
+        /*) p="$t" ;;
+        *) p="${l%/*}/$t" ;;
+    esac
+    d="$p"
+    while :; do
+        d=$(dirname -- "$d") || return 2
+        if [ -e "$d" ]; then
+            if [ -d "$d" ] && [ ! -x "$d" ]; then return 2; fi
+            return 1
+        fi
+    done
+}
+
 # rp_ignored_changed_since <marker> <scratch>: the guard for gitignored files,
 # which rp_tree_changes cannot see: a resolver edit to an ignored executable
 # (node_modules/.bin/<runner>) would run with the verify command. A resolver
 # cannot backdate a file's mtime (it only has edit tools), so any ignored
 # regular file or symlink with an mtime newer than <marker> (a file the
-# caller touched before the resolvers started) counts as changed. Symlinks are
-# judged by their own mtime, never followed; `.git` is skipped. Prints up to 20
+# caller touched before the resolvers started) counts as changed. A symlink
+# counts when its own mtime is newer, and its target is judged too, because a
+# write through the link leaves the link's mtime alone: see
+# rp_link_target_changed. Every ignored symlink is examined, those inside
+# ignored directories included. `.git` is skipped as a walked directory, not
+# as a link target. Prints up to 20
 # repository-relative paths, one per line (control characters shown as `?`,
-# never file contents), and returns 1 when any file changed. Returns 0 when
-# none did and 2 when it cannot tell: the marker is missing, unreadable, not a
-# regular file or a symlink, or git or find fails. A caller must treat 2 as a
+# never file contents), and returns 1 when any file changed; a symlink is named
+# by its own path. Returns 0 when none did and 2 when it cannot tell: the
+# marker is missing, unreadable, not a regular file or a symlink, git or find
+# fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
 # <scratch>, a scratch file for git's NUL-delimited listing.
 rp_ignored_changed_since() {
@@ -236,9 +284,11 @@ rp_ignored_changed_since() {
     mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || return 2
     marker="$mdir/$(basename -- "$marker")"
     (
-        local top f out p rc n=0 hits=""
+        local top f out p l rc lrc symlist n=0 hits=""
         top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
+        symlist=$(mktemp) || exit 2
+        trap 'rm -f -- "$symlist"' EXIT
         git ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
@@ -251,8 +301,30 @@ rp_ignored_changed_since() {
                 out=$(set -o pipefail
                     find "./$f" -name .git -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
                         | head -n 20) || rc=$?
+                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                    # Nothing newer: judge the target of each symlink inside.
+                    find "./$f" -name .git -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
+                    while IFS= read -r -d '' l; do
+                        lrc=0
+                        rp_link_target_changed "$l" "$marker" || lrc=$?
+                        case "$lrc" in
+                            0) out="$l"; break ;;
+                            1) ;;
+                            *) exit 2 ;;
+                        esac
+                    done <"$symlist"
+                fi
             elif [ -L "./$f" ]; then
                 out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
+                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                    lrc=0
+                    rp_link_target_changed "./$f" "$marker" || lrc=$?
+                    case "$lrc" in
+                        0) out="./$f" ;;
+                        1) ;;
+                        *) exit 2 ;;
+                    esac
+                fi
             elif [ -f "./$f" ]; then
                 [ "./$f" -nt "$marker" ] && out="./$f"
             fi
@@ -262,9 +334,13 @@ rp_ignored_changed_since() {
             fi
             while IFS= read -r p; do
                 [ -n "$p" ] || continue
-                n=$((n + 1))
                 p="${p#./}"
-                hits="${hits}${p//[[:cntrl:]]/?}"$'\n'
+                p="${p//[[:cntrl:]]/?}"
+                # git lists an ignored symlink on its own and, when its whole
+                # directory is ignored, again as part of that directory.
+                case $'\n'"$hits" in *$'\n'"$p"$'\n'*) continue ;; esac
+                n=$((n + 1))
+                hits="${hits}${p}"$'\n'
                 [ "$n" -lt 20 ] || break
             done <<<"$out"
             [ "$n" -lt 20 ] || break
@@ -283,20 +359,51 @@ rp_ignored_changed_since() {
 # honours core.hooksPath). Prints its repository-relative path and returns 0
 # when it lies inside the working tree (the git directory does not count) and
 # any file under it is untracked or ignored; returns 1 when it is fine (no such
-# directory, outside the working tree, or every file tracked) and 2 when it
-# cannot be inspected, which a caller must treat as a refusal. The caller owns
-# <outfile>, a scratch file. Tools that keep generated hooks in an ignored
-# directory (husky's .husky/_) are refused too: their files cannot be told
-# from a planted one.
+# directory, outside the working tree, or every file tracked), 2 when it
+# cannot be inspected and 3 when the hooks path passes through a symlink that
+# lives inside the working tree (the git directory included, so a symlinked
+# .git/hooks or .git counts). A caller must treat 2 and 3 as refusals. On 3 it
+# prints the repository-relative path of that symlink: a resolver can edit
+# through it, to a target Git status never lists, and the commit would run the
+# edit. The path is walked component by component from the configured value
+# (made absolute against the working tree root), and only a symlink located
+# inside the working tree counts; a symlink above or outside it is just a way
+# to reach the directory. The caller owns <outfile>, a scratch file. Tools that
+# keep generated hooks in an ignored directory (husky's .husky/_) are refused
+# too: their files cannot be told from a planted one.
 rp_hooks_untracked() {
     (
-        local hp top gitdir rel spec=()
+        local hp top gitdir rel cur rest c next spec=()
         top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         top=$(pwd -P) || exit 2
         hp=$(git rev-parse --git-path hooks 2>/dev/null) || exit 2
         [ -n "$hp" ] || exit 2
         [ -d "$hp" ] || exit 1
+        # Walk the path as the kernel does: cur is always a physical directory,
+        # a symlink outside the working tree is followed, one inside refuses.
+        case "$hp" in /*) cur=/ ;; *) cur="$top" ;; esac
+        rest="$hp"
+        while [ -n "$rest" ]; do
+            c="${rest%%/*}"
+            case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+            case "$c" in
+                ''|.) continue ;;
+                ..) cur=$(dirname -- "$cur") || exit 2; continue ;;
+            esac
+            next="${cur%/}/$c"
+            if [ -L "$next" ]; then
+                case "$cur" in
+                    "$top"|"$top"/*)
+                        printf '%s' "${next#"$top"/}"
+                        exit 3
+                        ;;
+                esac
+                cur=$(cd -P -- "$next" 2>/dev/null && pwd -P) || exit 2
+            else
+                cur="$next"
+            fi
+        done
         hp=$(cd -- "$hp" 2>/dev/null && pwd -P) || exit 2
         gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || exit 2
         gitdir=$(cd -- "$gitdir" 2>/dev/null && pwd -P) || exit 2

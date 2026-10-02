@@ -1287,7 +1287,7 @@ ignored_fixture() {
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
-@test "--ignored-since judges a symlink by its own mtime, never its target's" {
+@test "--ignored-since passes an old symlink to an unchanged target" {
   ignored_fixture
   ln -s runner node_modules/.bin/link
   touch -h -t 201901010000 node_modules/.bin/link
@@ -1383,4 +1383,73 @@ ignored_fixture() {
   verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/a.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+# --- --ignored-since: the target of an ignored symlink ---
+# A write through a symlink leaves the link's own mtime alone, so the target is
+# judged too. The targets live outside the repository, so the symlinks are the
+# only ignored files the guard sees.
+
+link_fixture() {
+  ignored_fixture
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT/dir"
+  printf 'old\n' >| "$EXT/tool"
+  printf 'old\n' >| "$EXT/dir/inner"
+  touch -t 201901010000 "$EXT/tool" "$EXT/dir/inner"
+  ln -s "$EXT/tool" node_modules/.bin/tool-link
+  ln -s "$EXT/dir" node_modules/.bin/dir-link
+  ln -s "$EXT/tool" src/tool.cache
+  touch -h -t 201901010000 node_modules/.bin/tool-link node_modules/.bin/dir-link src/tool.cache
+}
+
+@test "--ignored-since refuses an ignored symlink whose file target was written after the marker" {
+  link_fixture
+  printf '#!/bin/sh\necho pwned\n' >| "$EXT/tool"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/tool-link"* ]]
+  [[ "$stderr" == *"src/tool.cache"* ]]
+  [[ "$stderr" != *pwned* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # Refused before anything ran: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since refuses an ignored symlink to a directory holding a file written after the marker" {
+  link_fixture
+  printf 'changed\n' >| "$EXT/dir/inner"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/dir-link"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since passes ignored symlinks whose targets are unchanged or dangling" {
+  link_fixture
+  ln -s /nonexistent-target node_modules/.bin/dangling
+  touch -h -t 201901010000 node_modules/.bin/dangling
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since fails closed on an ignored symlink whose target directory cannot be walked" {
+  link_fixture
+  mkdir "$EXT/locked"
+  printf 'x\n' >| "$EXT/locked/f"
+  touch -t 201901010000 "$EXT/locked/f" "$EXT/locked"
+  ln -s "$EXT/locked" node_modules/.bin/locked-link
+  touch -h -t 201901010000 node_modules/.bin/locked-link
+  chmod 000 "$EXT/locked"
+  if [ -r "$EXT/locked" ]; then
+    chmod 755 "$EXT/locked"
+    skip "directory permissions are not enforced (running as root?)"
+  fi
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  chmod 755 "$EXT/locked"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot check gitignored files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }

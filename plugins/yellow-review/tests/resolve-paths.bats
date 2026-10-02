@@ -531,3 +531,258 @@ ignored_repo() {
   GIT_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 2 ]
 }
+
+# --- A hooks path through a symlink inside the working tree ---
+# A resolver can edit through such a link with no change Git reports, to a
+# target Git status never lists, and the commit then runs the edit.
+
+# plant_hook_dir <dir>: an executable pre-commit hook in <dir> (created).
+plant_hook_dir() {
+  mkdir -p "$1"
+  printf '#!/bin/sh\n' >| "$1/pre-commit"
+  chmod +x "$1/pre-commit"
+}
+
+@test "rp_hooks_untracked refuses a relative hooks path that is a symlink to an external directory (3)" {
+  hooks_repo
+  plant_hook_dir "$BATS_TEST_TMPDIR/ext-hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" .hooks
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = ".hooks" ]
+  # A tracked symlink is the same: the target is not listed by Git either.
+  git add .hooks && git commit -q -m link
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = ".hooks" ]
+}
+
+@test "rp_hooks_untracked refuses an absolute in-tree hooks path through a symlink or a symlinked parent (3)" {
+  hooks_repo
+  plant_hook_dir "$BATS_TEST_TMPDIR/ext-hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" .hooks
+  git config core.hooksPath "$(pwd -P)/.hooks"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = ".hooks" ]
+  mkdir "$BATS_TEST_TMPDIR/ext-parent"
+  plant_hook_dir "$BATS_TEST_TMPDIR/ext-parent/hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-parent" parent
+  git config core.hooksPath "$(pwd -P)/parent/hooks"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = "parent" ]
+  # The same through a relative path and a `..` segment.
+  git config core.hooksPath "parent/hooks/../hooks/"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = "parent" ]
+}
+
+@test "rp_hooks_untracked refuses a symlink to an in-tree directory too (3)" {
+  hooks_repo
+  plant_hook_dir real-hooks
+  ln -s real-hooks .hooks
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = ".hooks" ]
+}
+
+@test "rp_hooks_untracked refuses a .git/hooks that is a symlink (3)" {
+  hooks_repo
+  plant_hook_dir "$BATS_TEST_TMPDIR/ext-hooks"
+  rm -rf .git/hooks
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" .git/hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 3 ]
+  [ "$output" = ".git/hooks" ]
+}
+
+@test "rp_hooks_untracked follows a symlink above or outside the working tree" {
+  hooks_repo
+  plant_hook_dir .hooks
+  # A second name for the repository, reached through a symlink outside it.
+  ln -s "$(pwd -P)" "$BATS_TEST_TMPDIR/alias"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/alias/.hooks"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = ".hooks" ]
+  # A symlink outside the tree to a directory outside it is still outside.
+  plant_hook_dir "$BATS_TEST_TMPDIR/ext-hooks"
+  ln -s "$BATS_TEST_TMPDIR/ext-hooks" "$BATS_TEST_TMPDIR/ext-link"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/ext-link"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_hooks_untracked still refuses a plain in-tree untracked hooks directory and allows a tracked one" {
+  hooks_repo
+  plant_hook_dir .hooks
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = ".hooks" ]
+  git add .hooks && git commit -q -m hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  # The default, real .git/hooks directory is not a symlink either.
+  git config --unset core.hooksPath
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+}
+
+# --- rp_ignored_changed_since: the target of an ignored symlink ---
+# A write through a symlink changes the target's mtime and not the link's, so
+# the target is judged as well. real/ is an untracked, unignored directory:
+# only the symlinks are ignored.
+
+link_repo() {
+  ignored_repo
+  mkdir -p real/dir
+  printf 'old\n' >| real/tool
+  printf 'old\n' >| real/dir/inner
+  touch -t 201901010000 real/tool real/dir/inner
+}
+
+# old_link <target> <link>: an ignored symlink that predates the marker.
+old_link() {
+  ln -s "$1" "$2"
+  touch -h -t 201901010000 "$2"
+}
+
+@test "rp_ignored_changed_since refuses a symlink whose file target changed after the marker" {
+  link_repo
+  old_link ../../real/tool node_modules/.bin/tool-link
+  old_link ../real/tool src/tool.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| real/tool
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/tool-link* ]]
+  [[ "$output" == *src/tool.cache* ]]
+  [[ "$output" != *new* ]]
+}
+
+@test "rp_ignored_changed_since refuses a symlink to a directory holding a file changed after the marker" {
+  link_repo
+  old_link ../../real/dir node_modules/.bin/dir-link
+  old_link ../real/dir src/dir.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| real/dir/inner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/dir-link* ]]
+  [[ "$output" == *src/dir.cache* ]]
+}
+
+@test "rp_ignored_changed_since judges a top-level ignored symlink to an absolute external target" {
+  link_repo
+  mkdir "$BATS_TEST_TMPDIR/outside"
+  printf 'old\n' >| "$BATS_TEST_TMPDIR/outside/tool"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/outside/tool"
+  old_link "$BATS_TEST_TMPDIR/outside/tool" src/abs.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| "$BATS_TEST_TMPDIR/outside/tool"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = src/abs.cache ]
+}
+
+@test "rp_ignored_changed_since follows a chain of symlinks to the final target" {
+  link_repo
+  old_link ../../real/tool node_modules/.bin/hop2
+  old_link hop2 node_modules/.bin/hop1
+  printf 'new\n' >| real/tool
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/hop1* ]]
+}
+
+@test "rp_ignored_changed_since does not follow symlinks nested below a target directory" {
+  link_repo
+  mkdir "$BATS_TEST_TMPDIR/deep"
+  printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  ln -s "$BATS_TEST_TMPDIR/deep" real/dir/nested
+  touch -h -t 201901010000 real/dir/nested
+  touch -t 201901010000 real/dir
+  old_link ../real/dir src/dir.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_ignored_changed_since treats a dangling symlink target as no change" {
+  link_repo
+  old_link /nonexistent-target-dir/tool node_modules/.bin/dangling
+  old_link ../real/missing src/dangling.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "rp_ignored_changed_since ignores a symlink target that is not a regular file or directory" {
+  link_repo
+  mkfifo real/pipe
+  old_link ../real/pipe src/pipe.cache
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_ignored_changed_since fails closed when a symlink target directory cannot be walked" {
+  link_repo
+  mkdir real/locked
+  printf 'x\n' >| real/locked/f
+  touch -t 201901010000 real/locked/f real/locked
+  old_link ../real/locked src/locked.cache
+  chmod 000 real/locked
+  if [ -r real/locked ]; then
+    chmod 755 real/locked
+    skip "directory permissions are not enforced (running as root?)"
+  fi
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  chmod 755 real/locked
+  [ "$status" -eq 2 ]
+}
+
+@test "rp_ignored_changed_since fails closed when a symlink target hides behind a directory that cannot be searched" {
+  link_repo
+  mkdir real/hidden
+  printf 'x\n' >| real/hidden/tool
+  old_link ../real/hidden/tool src/hidden.cache
+  old_link ../../real/hidden/tool node_modules/.bin/hidden
+  chmod 000 real/hidden
+  if [ -x real/hidden ]; then
+    chmod 755 real/hidden
+    skip "directory permissions are not enforced (running as root?)"
+  fi
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  chmod 755 real/hidden
+  [ "$status" -eq 2 ]
+}
+
+@test "rp_ignored_changed_since shows control characters in a symlink path as ? and caps the listing" {
+  link_repo
+  old_link ../real/tool "$(printf 'src/a\033b.cache')"
+  printf 'new\n' >| real/tool
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = 'src/a?b.cache' ]
+  for i in $(seq 1 30); do old_link ../../real/tool "node_modules/.bin/l$i"; done
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | wc -l)" -le 20 ]
+}
+
+@test "rp_ignored_changed_since leaves no scratch file behind" {
+  link_repo
+  old_link ../../real/tool node_modules/.bin/tool-link
+  export TMPDIR="$BATS_TEST_TMPDIR/tmp"
+  mkdir -p "$TMPDIR"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$(find "$TMPDIR" -type f)" ]
+}
