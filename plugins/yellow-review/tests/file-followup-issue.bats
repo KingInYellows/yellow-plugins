@@ -520,3 +520,37 @@ path_without_timeout() {
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
 }
+
+# --- structured exit-4 reason (rate-limit vs timeout) ---
+
+@test "exit 4 from a rate-limited create prints reason=rate-limit" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a rate-limited duplicate close prints reason=rate-limit" {
+  export MOCK_GH_RESCAN=winner MOCK_GH_ISSUE_CLOSE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+}
+
+@test "exit 4 from a timed-out create prints reason=timeout and no other reason" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=create
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a timed-out issue list prints reason=timeout" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=list
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+}

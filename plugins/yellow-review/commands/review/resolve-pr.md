@@ -446,9 +446,14 @@ exits 0:
 - Exit 3 from `reply-pr-thread` or `resolve-pr-thread` prints a stderr line
   `reason=permission` or `reason=not-found`. Report `needs permission` only
   for the first and `not found` for the second.
-- A failed stage stops that thread's later stages; record the per-stage
-  outcome. After any exit 4, stop mutating and mark the rest `not attempted
-  (rate limit)`.
+- Exit 4 from any of the three scripts prints a stderr line
+  `reason=rate-limit` or `reason=timeout`. A failed stage stops that thread's
+  later stages; record the per-stage outcome. After any exit 4, stop mutating
+  (a timed-out call may have posted; re-run once in a later run). For
+  `reason=rate-limit` mark the rest `not attempted (rate limit)` and set
+  `ratelimited=1`. For `reason=timeout` mark the rest `not attempted (gh
+  timeout)`, count them blocking, and keep `ratelimited=0`. Treat a missing or
+  unrecognized reason as `rate-limit`.
 
 ### Step 8: Bounded Re-pass
 
@@ -481,8 +486,10 @@ below, and leave those threads as they are. Otherwise, from `<refetch-file>`:
 
 - threads this run attempted to resolve but still open → retry
   `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
-  permission` or `not found` per its `reason=` line; exit 4 → stop, mark the
-  rest `not attempted (rate limit)`, `ratelimited=1`); a thread we resolved
+  permission` or `not found` per its `reason=` line; exit 4 → stop and apply
+  Step 7's exit 4 rule: `reason=rate-limit` → mark the rest `not attempted
+  (rate limit)` and set `ratelimited=1`; `reason=timeout` → `not attempted
+  (gh timeout)`, `ratelimited=0`); a thread we resolved
   that is open again is reported `reopened by bot`, not retried;
 - if `found=1` and `push=ok`, re-check the PR state, re-run `pr-changed-ranges`
   (Step 4) because the round-1 push added lines, then run Steps 3c–7 once for
@@ -494,7 +501,7 @@ below, and leave those threads as they are. Otherwise, from `<refetch-file>`:
 Report, per the contract: **Resolved** (by disposition, plus `resolved
 (non-actionable)`), **Blocking merge** (disagree/unclear, human-held, needs
 permission or not found, verify failed with the patch path, not attempted (cluster cap /
-rate limit), per-stage failures such as `oos: issue #12 filed, reply
+rate limit / gh timeout), per-stage failures such as `oos: issue #12 filed, reply
 failed`, and `CHANGES_REQUESTED` reviewers from `get-pr-blockers`, or
 `CHANGES_REQUESTED unknown` when `lookupFailed` is true or `changesRequested`
 is null),

@@ -539,15 +539,27 @@ Replies and issue bodies end with:
 - Each `gh` call in `reply-pr-thread`, `resolve-pr-thread` and
   `file-followup-issue` is bounded by `YELLOW_REVIEW_GH_TIMEOUT` (default
   30 s; needs `timeout(1)`; `file-followup-issue` and `get-pr-blockers`
-  share it through `lib/resolve-gh.sh`). A timeout exits 4 with no retry:
-  the mutation may have landed, a re-run of `reply-pr-thread` skips
+  share it through `lib/resolve-gh.sh`). A timeout exits 4 with no retry
+  and `reason=timeout` on stderr: the mutation may have landed, a re-run of `reply-pr-thread` skips
   through its pre-check, and a re-run of `file-followup-issue` finds a
   created issue by its marker. In `get-pr-blockers` a timeout is a failed
   lookup (`lookupFailed`, exit 0).
-- After a rate-limit exit 4 from `reply-pr-thread`, `resolve-pr-thread` or
-  `file-followup-issue`, stop mutating. Every remaining thread is reported
-  as `not attempted (rate limit)` and counts as blocking. The stop rule
-  covers these write-phase scripts only. `commit-resolve-fixes` exit 4 means
+- Every exit 4 from `reply-pr-thread`, `resolve-pr-thread` and
+  `file-followup-issue` prints a stderr line `reason=rate-limit` or
+  `reason=timeout` (the same style as `reason=not-found` on exit 3). Read
+  that line; never infer the cause from the message text.
+- After any exit 4 from those three scripts, stop mutating: a timed-out
+  call may have posted, so the one re-run (see the script's re-run
+  guidance) happens in a later run, never in this write phase.
+  - `reason=rate-limit`: every remaining thread is reported as `not
+    attempted (rate limit)`, counts as blocking, and sets `ratelimited=1`.
+  - `reason=timeout`: every remaining thread is reported as `not attempted
+    (gh timeout)` and counts as blocking. `ratelimited` stays `0`: no limit
+    occurred, so batch callers keep working through their other PRs.
+  - A missing or unrecognized reason is treated as `rate-limit` (fail
+    safe).
+
+  The stop rule covers these write-phase scripts only. `commit-resolve-fixes` exit 4 means
   the commit failed or was undone: it is handled as a refusal (see "Refusals
   revert") and does not stop the write phase.
 
@@ -562,9 +574,9 @@ any failure, usage included.
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reply-pr-thread` | replied or skipped | usage / unreadable or over-long body / credential or scan failure | not found or permission (stderr `reason=not-found` or `reason=permission`) | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
-| `resolve-pr-thread` | resolved | usage | not found or permission (stderr `reason=...` as above) | rate limited, or `gh` timed out | — | — |
-| `file-followup-issue` | created or found | usage / unreadable title or body file / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry), or a `gh` call timed out (a create may have filed) | dedupe window full with no marker (not transient) | — |
+| `reply-pr-thread` | replied or skipped | usage / unreadable or over-long body / credential or scan failure | not found or permission (stderr `reason=not-found` or `reason=permission`) | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted) | — | — |
+| `resolve-pr-thread` | resolved | usage | not found or permission (stderr `reason=...` as above) | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`) | — | — |
+| `file-followup-issue` | created or found | usage / unreadable title or body file / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | dedupe window full with no marker (not transient) | — |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch, refused path or PR file list unavailable | commit failed, or undone (a hook changed or left files) | submit failed or timed out | head not verified, or a verify call timed out |
 | `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | — | — | — | — |
 | `check-resolve-text` | clean | usage / unreadable file / credential or scan failure | — | — | — | — |
@@ -589,7 +601,7 @@ independent signal that enforcement could not be determined.
 
 The report sections are: Resolved (by disposition), Blocking merge
 (disagree/unclear, human-held, needs permission, verify failed with the
-patch path, rate-limited, `not found`, `CHANGES_REQUESTED`), Follow-up issues filed, and
+patch path, rate-limited, gh timeout, `not found`, `CHANGES_REQUESTED`), Follow-up issues filed, and
 Conversation resolution (`enforced` / `not enforced` / `unknown`, from
 `get-pr-blockers`). The last line of the command's output is exactly:
 
@@ -609,7 +621,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   hits). `b` counts open threads left blocking plus `CHANGES_REQUESTED`
   reviewers.
 - `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
-  `file-followup-issue` exited 4 (a rate limit) and mutations stopped.
+  `file-followup-issue` exited 4 with `reason=rate-limit` (or no
+  recognizable reason) and mutations stopped. An exit 4 with
+  `reason=timeout` stops mutations too but leaves `ratelimited=0`.
   `commit-resolve-fixes` exit 4 is a commit undo and never sets it.
   `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
   remaining PR is reported `not attempted (rate limit)` instead of hitting

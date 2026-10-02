@@ -302,3 +302,29 @@ stub_sleep() {
   [[ "$stderr" == *"timed out"* ]]
   [ ! -f "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_ok" ]
 }
+
+# --- structured exit-4 reason (rate-limit vs timeout) ---
+
+@test "exit 4 from a gh timeout prints reason=timeout and no other reason" {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nexit 124\n' >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}" run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a wait over the cap prints reason=rate-limit" {
+  run --separate-stderr "$SCRIPT" "PRRT_rl_long"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 after the one retry is spent prints reason=rate-limit" {
+  run --separate-stderr "$SCRIPT" "PRRT_ratelimited"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}

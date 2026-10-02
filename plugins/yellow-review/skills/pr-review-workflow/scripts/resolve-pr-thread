@@ -4,7 +4,8 @@
 # Output: JSON to stdout: {"resolved": true, "threadId": "PRRT_..."}
 # Exit codes: 1 other failure, 2 usage, 3 not found or permission (stderr
 #             carries a reason=not-found|permission line), 4 rate limited
-#             or a gh call timed out (not retried). Messages go to stderr.
+#             or a gh call timed out (not retried; stderr carries a
+#             reason=rate-limit|timeout line). Messages go to stderr.
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1, max 10) — sleep after the call.
 #      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
 #      timeout(1), skipped when it is not installed.
@@ -29,7 +30,8 @@ Exit codes:
   3  not found or not permitted; stderr has a reason=not-found or
      reason=permission line
   4  rate limited (one retry first; a required wait over 90 s skips it),
-     or a gh call timed out (not retried)
+     or a gh call timed out (not retried); stderr has a reason=rate-limit
+     or reason=timeout line
 
 Environment:
   YELLOW_REVIEW_PACE_SECONDS     sleep after the call; default 1, invalid
@@ -99,7 +101,7 @@ fail_reason() {
 # A timed-out call may have applied the mutation: report it, never retry.
 fail_if_timed_out() {
     if [ "$GG_EXIT" -eq 124 ]; then
-        printf 'Error: gh timed out after %ss resolving %s; not retried.\n' "$GG_TIMEOUT" "$THREAD_ID" >&2
+        printf 'Error: gh timed out after %ss resolving %s; not retried.\nreason=timeout\n' "$GG_TIMEOUT" "$THREAD_ID" >&2
         exit 4
     fi
 }
@@ -108,7 +110,7 @@ fail_if_timed_out
 if gg_is_rate_limited; then
     _W=$(gg_rate_limit_wait)
     if [ "$_W" -gt "$GG_MAX_WAIT_SECONDS" ]; then
-        printf 'Error: GitHub API rate limit exceeded; the required wait (%ss) exceeds %ss, not retried.\n' "$_W" "$GG_MAX_WAIT_SECONDS" >&2
+        printf 'Error: GitHub API rate limit exceeded; the required wait (%ss) exceeds %ss, not retried.\nreason=rate-limit\n' "$_W" "$GG_MAX_WAIT_SECONDS" >&2
         exit 4
     fi
     printf '[resolve-pr-thread] Rate limited; retrying once in %ss.\n' "$_W" >&2
@@ -117,7 +119,7 @@ if gg_is_rate_limited; then
     fail_if_timed_out
 fi
 if gg_is_rate_limited; then
-    printf 'Error: GitHub API rate limit exceeded; the one retry is already spent.\n' >&2
+    printf 'Error: GitHub API rate limit exceeded; the one retry is already spent.\nreason=rate-limit\n' >&2
     exit 4
 fi
 gg_pace
