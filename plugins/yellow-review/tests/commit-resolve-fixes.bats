@@ -12,8 +12,17 @@ setup() {
   resolve_repo_init
 }
 
+# The fixture remotes are local bare repositories. The script reads each
+# remote's push URL, so present the two local ones to it (and only it, via
+# environment config: the tests' own git push calls still use local paths) as
+# the PR's head repository, the gh stub's acme/widgets.
 run_crf() {
-  run --separate-stderr "$SCRIPT" "$@"
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
+    GIT_CONFIG_KEY_1="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_1="$BATS_TEST_TMPDIR/other.git" \
+    run --separate-stderr "$SCRIPT" "$@"
 }
 
 # --- Usage ---
@@ -384,7 +393,10 @@ STUB
   : >| "$cache/github-workflow/2.3.0/lib/github-stack-runtime.js"
   : >| "$cache/github-workflow/2.10.0/lib/github-stack-runtime.js"
   printf 'one\nfeature\nfix\n' >| src/a.txt
-  run --separate-stderr "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts/commit-resolve-fixes" \
+  GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
+    run --separate-stderr "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts/commit-resolve-fixes" \
     --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   grep -q "^node .*github-workflow/2.10.0/lib/github-stack-runtime.js submit --remote origin$" "$STUB_LOG"
@@ -815,4 +827,98 @@ STUB
   run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
   [ "$status" -eq 0 ]
   grep -q '^gt submit' "$STUB_LOG"
+}
+
+# --- The chosen remote must push to the PR's head repository ---
+
+# remote_with_push_url <name> <url>: a remote that fetches from origin's bare
+# repository (so the stubs still publish) but reports <url> as its push URL.
+remote_with_push_url() {
+  git remote add "$1" "$ORIGIN"
+  git config "remote.$1.pushurl" "$2"
+}
+
+@test "a pushRemote that pushes to another owner/repo is refused before committing (exit 3)" {
+  remote_with_push_url fork https://github.com/mallory/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"remote 'fork' does not push to PR #7's head repository"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "a graphite remote that pushes to another repository is refused before committing (exit 3)" {
+  remote_with_push_url fork git@github.com:acme/other-repo.git
+  export STUB_GT_REMOTE=fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"remote 'fork' does not push to PR #7's head repository"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "a push URL that cannot be parsed is refused (exit 3)" {
+  remote_with_push_url odd /some/local/path
+  git config branch.feature.pushRemote odd
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"cannot tell which repository remote 'odd' pushes to"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "a PR whose head repository cannot be read is refused (exit 3)" {
+  export STUB_PR_HEAD_REPO=none
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not read PR #7's head repository"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "a push URL of the PR's head repository is accepted in every common form" {
+  n=0
+  for url in \
+    https://github.com/acme/widgets \
+    https://github.com/acme/widgets.git \
+    HTTPS://GitHub.com/Acme/Widgets.git/ \
+    ssh://git@github.com/acme/widgets.git \
+    ssh://git@github.com:22/acme/widgets \
+    git@github.com:acme/widgets.git \
+    git@github.com:acme/widgets \
+    github.com:Acme/Widgets.git; do
+    n=$((n + 1))
+    git remote add "r$n" "$ORIGIN"
+    git config "remote.r$n.pushurl" "$url"
+    git config branch.feature.pushRemote "r$n"
+    printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "rejected: $url: $stderr" >&2; return 1; }
+    grep -q "^node .* submit --remote r$n\$" "$STUB_LOG"
+  done
+}
+
+@test "credentials in a push URL never reach stderr" {
+  remote_with_push_url fork https://user:s3cr3t-tok3n@github.com/mallory/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" != *"s3cr3t-tok3n"* ]]
+  [[ "$stderr" != *"user:"* ]]
+  # Unparseable, with credentials.
+  git remote add odd "$ORIGIN"
+  git config remote.odd.pushurl 'https://user:s3cr3t-tok3n@github.com'
+  git config branch.feature.pushRemote odd
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" != *"s3cr3t-tok3n"* ]]
+  # A pushRemote that is itself a URL with credentials.
+  git config branch.feature.pushRemote 'https://user:s3cr3t-tok3n@github.com/mallory/widgets.git'
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" != *"s3cr3t-tok3n"* ]]
 }

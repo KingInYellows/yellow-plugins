@@ -1043,3 +1043,90 @@ STUB
   run ! compgen -G "$PATCH_DIR/*.patch"
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
+
+# The verifier's output is redacted on its way to disk. A credential-shaped
+# value (assembled from pieces, so no source line holds it whole) must never
+# be written raw under .git/yellow-review or to the temp file that holds the
+# stream, and the stream's temp file must not outlive the run.
+secret_pieces() {
+  SECRET_A=ghp_
+  SECRET_B=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+  SECRET="$SECRET_A$SECRET_B"
+  PRINT_SECRET="printf '%s%s\\n' $SECRET_A $SECRET_B; printf '%s%s\\n' $SECRET_A $SECRET_B >&2"
+}
+
+# Assert nothing but kept .patch/.log files is left under .git/yellow-review,
+# no stream temp file is left, and no file holds the planted value.
+assert_no_raw_left() {
+  [ -d "$REPO/.git/yellow-review" ]
+  run ! grep -rqF "$SECRET" "$REPO/.git/yellow-review" "$STREAM_TMP"
+  [ -z "$(find "$REPO/.git/yellow-review" -type f ! -name '*.patch' ! -name '*.log')" ]
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a pass" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  [ "$(mode "$log")" = 600 ]
+  assert_no_raw_left
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a failure" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; exit 3" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a timeout" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; sleep 30" --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "the watchdog fallback redacts the log and leaves no raw file after a timeout" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  YELLOW_REVIEW_NO_TIMEOUT_BIN=1 TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; sleep 30" --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential the verifier printed is on no disk path under .git while the verifier still runs" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  printf '%s\n' "$PRINT_SECRET; sleep 4" >| "$CMD"
+  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted -- src/a.txt src/new.txt \
+    >"$BATS_TEST_TMPDIR/mid.out" 2>&1 &
+  pid=$!
+  sleep 2
+  # Mid-run: the verifier has printed, and nothing on disk may hold the value.
+  [ -d "$REPO/.git/yellow-review" ]
+  run ! grep -rqF "$SECRET" "$REPO/.git/yellow-review" "$STREAM_TMP"
+  wait "$pid"
+  log=$(jq -r .log "$BATS_TEST_TMPDIR/mid.out")
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}

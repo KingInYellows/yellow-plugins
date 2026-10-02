@@ -12,7 +12,7 @@ resolve_repo_init() {
   export PATH="$STUB_BIN:$PATH"
   export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
   : >| "$STUB_LOG"
-  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_FILES_FAIL STUB_PR_DIFF_FAIL STUB_GT_REMOTE
+  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_FILES_FAIL STUB_PR_DIFF_FAIL STUB_GT_REMOTE STUB_PR_HEAD_REPO
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
   # Fixture repos must not inherit the developer's or CI's git config.
   # GIT_CONFIG_GLOBAL needs git 2.32; sandboxing HOME works on every
@@ -162,7 +162,14 @@ printf 'gh %s\n' "$*" >> "$STUB_LOG"
 case "$*" in
   "pr view "*)
     oid="${STUB_PR_HEAD:-$(git --git-dir="$ORIGIN_DIR" rev-parse -q --verify refs/heads/feature)}"
-    printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false}\n' "$oid"
+    # The PR's head repository is acme/widgets unless STUB_PR_HEAD_REPO
+    # ("owner/name", or "none" for a deleted fork) says otherwise.
+    repo="${STUB_PR_HEAD_REPO:-acme/widgets}"
+    if [ "$repo" = none ]; then
+      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":null,"headRepositoryOwner":null}\n' "$oid"
+    else
+      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":{"name":"%s"},"headRepositoryOwner":{"login":"%s"}}\n' "$oid" "${repo#*/}" "${repo%%/*}"
+    fi
     exit 0
     ;;
   "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*)

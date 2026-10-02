@@ -59,9 +59,15 @@
 #   and exits 128+signal with the tree untouched.
 # Files: $(git rev-parse --git-common-dir)/yellow-review/resolve-patches/
 #        <pr>-<UTC ts>-<pid>.patch and .log, mode 0600; the newest 10 of each
-#        per PR are kept (other PRs' files are never pruned). The stream keeps
-#        the last 1 MiB of output while the command runs; redaction can grow
-#        the log a little, so it is capped again afterwards.
+#        per PR are kept (other PRs' files are never pruned).
+#        The verifier's output is redacted on its way to disk: a FIFO feeds
+#        vr_redact_stream, then tail keeps the last 1 MiB of the REDACTED
+#        stream in a private mktemp file (mode 0600) outside the git directory.
+#        Only after the final credential scan is it copied to the .log path, so
+#        that path never holds raw output (an empty file until then), even
+#        across a crash. Residual: a SIGKILL or host loss mid-run cannot run the
+#        EXIT cleanup and leaves that 0600 temp file behind; it holds redacted
+#        text that has not passed the final scan, never the raw stream.
 # Env: YELLOW_REVIEW_NO_TIMEOUT_BIN=1 forces the watchdog fallback (tests).
 #      YELLOW_REVIEW_NET_TIMEOUT=<s> bounds the gh call that lists the PR's
 #      files (default 30); on expiry the run is skipped.
@@ -156,6 +162,7 @@ ADDED_FILE=""
 TEXT_FILE=""
 FIFO=""
 MARKER=""
+STREAM_FILE=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -163,7 +170,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -286,6 +293,7 @@ fi
 
 RC=0
 TIMED_OUT=0
+LOG_WITHHELD=0
 SIGNALED=""
 CMD_PID=""
 WD_PID=""
@@ -301,12 +309,18 @@ on_signal() {
 }
 
 # Run the verify command in its own process group (set -m) with its output
-# streamed through a FIFO into a log that never holds more than the cap, so a
-# chatty command can neither fill the disk nor get SIGPIPE. Sets RC, TIMED_OUT
-# and SIGNALED.
+# streamed through a FIFO and the redactor into a private file that never holds
+# more than the cap, so a chatty command can neither fill the disk nor get
+# SIGPIPE. Sets RC, TIMED_OUT, SIGNALED and LOG_WITHHELD.
 run_verify() {
     local cmd T start
     cmd=$(cat -- "$COMMAND_FILE") || die 2 "cannot read --command-file: $COMMAND_FILE"
+    # Load the redactor before the verifier starts: the copy checked here is the
+    # copy that filters the stream. Unavailable: vr_redact_stream emits a notice.
+    vr_load_redactor "$PLUGIN_ROOT" || true
+    # Outside OUT_DIR on purpose: nothing under .git/yellow-review is written
+    # before redaction and the final scan.
+    STREAM_FILE=$(umask 077 && mktemp) || die 2 "cannot create the log temp file"
     FIFO="$OUT_DIR/.$STAMP.fifo"
     MARKER="$OUT_DIR/.$STAMP.timed-out"
     rm -f -- "$MARKER"
@@ -315,11 +329,13 @@ run_verify() {
     trap 'on_signal HUP' HUP
     trap 'on_signal INT' INT
     set -m
-    # tail holds at most the cap in memory and always drains the FIFO, so the
-    # command never blocks or gets SIGPIPE however much it prints. It keeps the
-    # last bytes (failures usually print last) and writes the log when the
-    # stream ends, with the mode the log was created with.
-    tail -c "$LOG_CAP_BYTES" <"$FIFO" >"$LOG" &
+    # The redactor always drains the FIFO and tail holds at most the cap, so
+    # the command never blocks or gets SIGPIPE however much it prints. tail
+    # keeps the last bytes of the redacted stream (failures usually print last)
+    # and writes them when the stream ends. The subshell is its own job group,
+    # so vr_drain_log can kill redactor and tail together. A single line is held
+    # whole by sed while it is redacted.
+    ( vr_redact_stream <"$FIFO" | tail -c "$LOG_CAP_BYTES" >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS
     if T=$(vr_timeout_bin); then
@@ -362,7 +378,7 @@ run_verify() {
     # Anything in another session can still hold the log open.
     vr_drain_log "$TAIL_PID" "$CMD_PID" "$LOG"
     case $? in
-        1) add_reason "log withheld: a process kept the output open after the command exited" ;;
+        1) LOG_WITHHELD=1; add_reason "log withheld: a process kept the output open after the command exited" ;;
         2) add_reason "log may be incomplete: the output stream failed" ;;
     esac
     # The command is done: a later signal must not turn a pass into a fail.
@@ -430,12 +446,10 @@ if [ "$MODE" = run ]; then
     run_verify
 fi
 
-# Redact the finished log before it is capped, reported or retained. It runs
-# after the command exits, so the exit status and process-group handling are
-# untouched.
-if [ -n "$LOG" ]; then
-    vr_redact_log "$LOG" "$PLUGIN_ROOT"
-    vr_cap_log "$LOG" "$LOG_CAP_BYTES"
+# Publish the redacted, bounded stream to the log path after the final
+# credential scan. A log the stream job withheld already holds its notice.
+if [ -n "$LOG" ] && [ "$LOG_WITHHELD" != 1 ]; then
+    vr_publish_log "$STREAM_FILE" "$LOG"
 fi
 
 if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNALED" ]; then

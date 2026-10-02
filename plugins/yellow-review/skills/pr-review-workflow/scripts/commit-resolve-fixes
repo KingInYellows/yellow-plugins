@@ -24,8 +24,10 @@
 #            counts and paths only, never reviewer text.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
 # Exit codes: 2 usage (including --allow-credential-shaped with
-#             --unattended), 3 staged mismatch, refused path or
-#             pre-commit credential-shaped refusal, 4 commit failed
+#             --unattended), 3 staged mismatch, refused path,
+#             pre-commit credential-shaped refusal, or a remote that does not
+#             push to the PR's head repository (unparseable push URL, other
+#             owner/repo; nothing committed), 4 commit failed
 #             (or no new commit appeared, changes remain staged, the
 #             commit's files or added lines differ from the checked set
 #             (including a credential a hook added), or the tree is dirty
@@ -60,7 +62,11 @@
 #   rebaseUpstack  graphite `gt restack --upstack` (registry: `gt restack`; the
 #                  flag limits it to the branches above the reset one)
 #   abortConflict  graphite `gt abort`
-# Remote: the github runtime is given --remote only for an explicit choice
+# Remote: resolved before anything is staged, and its push URL
+# (`git remote get-url --push`; https, ssh or scp-style, case-insensitive,
+# .git optional) must name the PR's head repository, else exit 3. A URL that
+# cannot be parsed fails closed; no message prints a URL.
+# The github runtime is given --remote only for an explicit choice
 # (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
 # refuses an ambiguous setup itself (status INVALID_ARGS, exit 5). Graphite
 # pushes to `gt repo remote` (default origin), not git's pushRemote.
@@ -189,11 +195,13 @@ if [ "${#EXPECTED[@]}" -gt 0 ]; then
     done
     # The checked-out branch must be PR <N>'s own head branch (in this
     # repository, not a fork), or the submit below would publish an unrelated
-    # branch before the head check can fail.
-    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository 2>/dev/null \
-        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring)] | join(" ")' 2>/dev/null) \
+    # branch before the head check can fail. PR_REPO (owner/name, lowercase)
+    # is the head repository the chosen remote is compared with later.
+    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository,headRepository,headRepositoryOwner 2>/dev/null \
+        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring), (((.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")) | ascii_downcase)] | join(" ")' 2>/dev/null) \
         || die 3 "could not read PR #$PR's head branch"
-    [ "$PR_META" = "$BRANCH false" ] \
+    read -r PR_BRANCH PR_CROSS PR_REPO <<<"$PR_META"
+    [ "$PR_BRANCH $PR_CROSS" = "$BRANCH false" ] \
         || die 3 "checked-out branch '$BRANCH' is not the head branch of PR #$PR (or the PR is from a fork); nothing committed"
 fi
 
@@ -230,6 +238,79 @@ fi
 if [ -z "$TIMEOUT_BIN" ]; then
     printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
 fi
+
+# remote_slug <push-url>: print the lowercase owner/repo of an https, http,
+# ssh, git or scp-style (user@host:owner/repo) URL, with or without .git;
+# fail for anything else, including a local path. Never prints the URL.
+remote_slug() {
+    local url="$1" rest
+    case "$url" in
+        *://*)
+            rest="${url#*://}"
+            [[ "$rest" == */* ]] || return 1
+            rest="${rest#*/}"
+            ;;
+        *)
+            [[ "$url" =~ ^([^/@:]+@)?[^/@:]+:(.+)$ ]] || return 1
+            rest="${BASH_REMATCH[2]}"
+            ;;
+    esac
+    rest="${rest#"${rest%%[!/]*}"}"
+    rest="${rest%"${rest##*[!/]}"}"
+    rest="${rest%.git}"
+    [[ "$rest" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]] || return 1
+    printf '%s\n' "$rest" | tr '[:upper:]' '[:lower:]'
+}
+
+# safe_name <text>: a remote name for a message. One line, control characters
+# dropped, anything before an @ masked (a pushRemote can hold a URL), capped.
+safe_name() {
+    printf '%s' "$1" | tr -d '[:cntrl:]' | sed 's#[^/[:space:]]*@#***@#g' | cut -c1-80
+}
+
+# --- Resolve the remote once ---
+# Submit and verification must agree on one remote.
+# github: the runtime's own default would pick remote.pushDefault over a
+#   branch-specific pushRemote, and it refuses an ambiguous setup. So pass
+#   --remote only for an explicit choice (pushRemote, pushDefault or the sole
+#   remote, whatever its name) and let the runtime refuse the rest.
+# graphite: gt pushes to `gt repo remote` (default origin), not git's
+#   pushRemote; the name is used only when it is a configured remote.
+# It is resolved before staging, so a remote that is not the PR's head
+# repository is refused before anything is committed or submitted.
+REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
+    || git config --get remote.pushDefault 2>/dev/null || true)
+REMOTE_EXPLICIT=0
+REMOTES=$(git remote 2>/dev/null || true)
+REMOTE_COUNT=$(printf '%s' "$REMOTES" | grep -c . || true)
+UPSTREAM_REMOTE=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+if [ -n "$REMOTE_NAME" ] && [ "$REMOTE_NAME" != . ]; then
+    REMOTE_EXPLICIT=1
+elif [ "$REMOTE_COUNT" -eq 1 ]; then
+    REMOTE_NAME="$REMOTES"
+    REMOTE_EXPLICIT=1
+elif [ -n "$UPSTREAM_REMOTE" ] && [ "$UPSTREAM_REMOTE" != . ]; then
+    # "." is a local upstream (common for stacked branches). A configured
+    # upstream remote is good enough to verify against, not to submit to.
+    REMOTE_NAME="$UPSTREAM_REMOTE"
+else
+    REMOTE_NAME=origin
+fi
+if [ "$PROVIDER" = graphite ]; then
+    GT_REMOTE=$(gt repo remote 2>/dev/null | awk 'END { print $1 }' || true)
+    if [ -n "$GT_REMOTE" ] && git remote get-url -- "$GT_REMOTE" >/dev/null 2>&1; then
+        REMOTE_NAME="$GT_REMOTE"
+    fi
+fi
+
+PUSH_SLUG=$(remote_slug "$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)") \
+    || die 3 "cannot tell which repository remote '$(safe_name "$REMOTE_NAME")' pushes to (unreadable or unparseable push URL); nothing committed"
+case "$PR_REPO" in
+    ?*/?*) ;;
+    *) die 3 "could not read PR #$PR's head repository; nothing committed" ;;
+esac
+[ "$PUSH_SLUG" = "$PR_REPO" ] \
+    || die 3 "remote '$(safe_name "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
 
 # --- Stage and compare ---
 lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
@@ -322,40 +403,6 @@ fi
 rp_tree_changes "$DIRTY_FILE" || undo_commit "could not list tree changes after the commit; nothing submitted"
 if [ -s "$DIRTY_FILE" ]; then
     undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
-fi
-
-# --- Resolve the remote once ---
-# Submit and verification must agree on one remote.
-# github: the runtime's own default would pick remote.pushDefault over a
-#   branch-specific pushRemote, and it refuses an ambiguous setup. So pass
-#   --remote only for an explicit choice (pushRemote, pushDefault or the sole
-#   remote, whatever its name) and let the runtime refuse the rest.
-# graphite: gt pushes to `gt repo remote` (default origin), not git's
-#   pushRemote; the name is used only when it is a configured remote.
-# The remote is read after the commit on purpose: nothing above depends on it.
-REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
-    || git config --get remote.pushDefault 2>/dev/null || true)
-REMOTE_EXPLICIT=0
-REMOTES=$(git remote 2>/dev/null || true)
-REMOTE_COUNT=$(printf '%s' "$REMOTES" | grep -c . || true)
-UPSTREAM_REMOTE=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-if [ -n "$REMOTE_NAME" ] && [ "$REMOTE_NAME" != . ]; then
-    REMOTE_EXPLICIT=1
-elif [ "$REMOTE_COUNT" -eq 1 ]; then
-    REMOTE_NAME="$REMOTES"
-    REMOTE_EXPLICIT=1
-elif [ -n "$UPSTREAM_REMOTE" ] && [ "$UPSTREAM_REMOTE" != . ]; then
-    # "." is a local upstream (common for stacked branches). A configured
-    # upstream remote is good enough to verify against, not to submit to.
-    REMOTE_NAME="$UPSTREAM_REMOTE"
-else
-    REMOTE_NAME=origin
-fi
-if [ "$PROVIDER" = graphite ]; then
-    GT_REMOTE=$(gt repo remote 2>/dev/null | awk 'END { print $1 }' || true)
-    if [ -n "$GT_REMOTE" ] && git remote get-url -- "$GT_REMOTE" >/dev/null 2>&1; then
-        REMOTE_NAME="$GT_REMOTE"
-    fi
 fi
 
 # --- Submit ---
