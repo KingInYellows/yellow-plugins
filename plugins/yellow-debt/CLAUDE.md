@@ -146,6 +146,12 @@ Closing a todo does not close its Linear issue.
   recorded `affected_files` lines. If lines were inserted above the code since,
   that range hashes other text and the finding resurfaces once; closing it again
   stamps a fingerprint that survives later drift
+- The matcher reads only the first `affected_files` entry of a kept todo, and
+  the SessionStart hook counts by file name alone (no frontmatter read, to keep
+  session start fast). A pre-v2 todo that lists several files therefore
+  matches only its first file, and a legacy `-pending-` file whose frontmatter
+  says `wont_fix` is still counted as pending there; `/debt:status` reports
+  and repairs it
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
 - Scanner output schema v1.0 is no longer accepted; the synthesizer warns
