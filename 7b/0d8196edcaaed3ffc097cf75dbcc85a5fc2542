@@ -1,0 +1,24 @@
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_7a82748dd606d9::t_20650dcfa7aa19 73-76
+plugins/yellow-core/commands/setup/all.md
+  s_7a82748dd606d9::t_438c85e16bb7ea 299-302
+plugins/yellow-core/tests/web-app-signals.bats
+  s_7a82748dd606d9::t_d5d5dad85085ec 116-119
+  s_7a82748dd606d9::t_dff8d3a878fca5 91-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7b0d8196edcaaed3ffc097cf75dbcc85a5fc2542",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
