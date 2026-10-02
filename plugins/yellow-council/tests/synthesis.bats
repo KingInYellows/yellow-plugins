@@ -480,9 +480,11 @@ is_mode_600() {
   [ "$(ls -ld "$1" | cut -c1-10)" = "-rw-------" ]
 }
 
-# synth_dirs — sorted list of staging dirs currently in /tmp.
+# synth_dirs — sorted list of staging dirs in /tmp younger than 5a's stale
+# sweep threshold (STALE_MINUTES=1440), so 5a reclaiming an older leftover
+# does not change the listing.
 synth_dirs() {
-  find /tmp -maxdepth 1 -type d -name 'council-synth-*' | sort
+  find /tmp -maxdepth 1 -type d -name 'council-synth-*' -mmin -1440 | sort
 }
 
 teardown() {
@@ -770,7 +772,7 @@ teardown() {
     [ "$(sed -n 1p "$st")" = "$LIVE" ]
     after=$(synth_dirs)
     [ "$before" = "$after" ]
-    # The same directory aged past 60 minutes is a dead run's leftover.
+    # The same directory aged past the 24-hour retention is a dead run's leftover.
     touch -t 200001010000 "$LIVE"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
     [ "$status" -eq 0 ] || { echo "$profile aged: $stderr"; return 1; }

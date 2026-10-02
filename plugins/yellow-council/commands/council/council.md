@@ -1192,12 +1192,15 @@ printf '%s\n' "$SYNTH_TOKEN" >| "$SYNTH_DIR/.token" || {
   exit 1
 }
 # Line 1 = directory, line 2 = token. The content is written to a temp file
-# beside the state file (mode 0600 from umask 077; chmod covers a temp file
-# that already existed), then hard-linked into place, so an interrupted write
-# never leaves a half-written state file. ln fails if the state file exists:
-# one synthesis per worktree, so a concurrent /council cannot replace another
-# run's capability. A state file whose directory is gone or over an hour old
-# is a dead run's leftover and is removed before the claim.
+# beside the state file, then hard-linked into place, so an interrupted write
+# never leaves a half-written state file. mktemp creates that temp file
+# exclusively with mode 0600 under an unpredictable name, so a pre-placed
+# symlink or file cannot be followed; it is checked as a regular file we own
+# before anything is written. ln fails if the state file exists: one synthesis
+# per worktree, so a concurrent /council cannot replace another run's
+# capability. A state file whose directory is gone or older than the 24-hour
+# staging retention (the same STALE_MINUTES window the sweep above uses) is a
+# dead run's leftover and is removed before the claim.
 if [ -f "$SYNTH_STATE" ]; then
   OLD_DIR=$(sed -n '1p' "$SYNTH_STATE" 2>/dev/null)
   case "$OLD_DIR" in
@@ -1206,16 +1209,17 @@ if [ -f "$SYNTH_STATE" ]; then
     *) OLD_DIR="" ;;
   esac
   if [ -n "$OLD_DIR" ] && [ -d "$OLD_DIR" ] && [ ! -L "$OLD_DIR" ] \
-    && [ -n "$(find "$OLD_DIR" -maxdepth 0 -mmin -60 2>/dev/null)" ]; then
+    && [ -n "$(find "$OLD_DIR" -maxdepth 0 -mmin -1440 2>/dev/null)" ]; then
     rm -rf -- "$SYNTH_DIR"
     printf '[council] Error: another council synthesis is in progress in this worktree (%s); wait for it or remove %s\n' "$OLD_DIR" "$SYNTH_STATE" >&2
     exit 1
   fi
   rm -f -- "$SYNTH_STATE"
 fi
-SYNTH_STATE_TMP="$SYNTH_STATE.$$"
-( umask 077; printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE_TMP" ) \
-  && chmod 600 "$SYNTH_STATE_TMP" \
+SYNTH_STATE_TMP=""
+SYNTH_STATE_TMP=$(mktemp "$SYNTH_STATE.XXXXXX" 2>/dev/null) \
+  && [ -f "$SYNTH_STATE_TMP" ] && [ ! -L "$SYNTH_STATE_TMP" ] && [ -O "$SYNTH_STATE_TMP" ] \
+  && printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE_TMP" \
   && ln -- "$SYNTH_STATE_TMP" "$SYNTH_STATE" || {
   rm -rf -- "$SYNTH_DIR"
   rm -f -- "$SYNTH_STATE_TMP"
@@ -3072,7 +3076,7 @@ This is the final output of the command. Exit 0.
 | Staging state file missing, symlinked, foreign or garbled in 5b/5d/5e, or its directory has no `.token` matching the state file's token | `[council] Error: ... synthesis state file ... ` or `... not the one Step 5a minted for this run`; exit 1; nothing is written or deleted. Directory and token come only from `.git/council-synth.state`, never from model-relayed text |
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; stop and re-run `/council` |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind; the next run's 5a sweep removes it once it is older than 24h |
-| Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 60 minutes old; before that, 5a exits 1 with `another council synthesis is in progress in this worktree` — wait, or remove the file by hand |
+| Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 24 hours old (`STALE_MINUTES=1440`, the staging retention); before that, 5a exits 1 with `another council synthesis is in progress in this worktree` — wait, or remove the file by hand |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |
 | Git not in repo | Pre-flight error; exit 1 |

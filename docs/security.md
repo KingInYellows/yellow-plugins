@@ -549,7 +549,7 @@ trust boundary from the pack and fenced-output files above:
   `/tmp/council-synth-*` directories older than 24 hours, so an interrupted run
   leaves redacted, normalized reviewer text in `/tmp` for up to about 24 hours.
   A `.git/council-synth.state` left by such a run stays until the next 5a
-  reclaims it (directory gone or over 60 minutes old; before that 5a refuses
+  reclaims it (directory gone or over 24 hours old; before that 5a refuses
   to start another synthesis in the worktree) or you remove it by hand.
 - **Prompt-injection boundary**: all staged reviewer text is untrusted. It is
   redacted in Step 4, normalized, fenced with `[ESCAPED]` delimiter handling,
