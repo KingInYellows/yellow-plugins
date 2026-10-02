@@ -406,6 +406,25 @@ case "$HOOKS_RC" in
     *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
 esac
 
+# An override that resolves inside the repository runs with submission
+# authority, and an ignored one can be rewritten without showing in the
+# tree-change check. Judge the file itself: it must be tracked and unmodified
+# (ignored, untracked and modified are refused, with the path and never the
+# contents). An override outside the repository and the default sibling
+# runtime are not judged. <failer> is die-compatible: `die 3` before the
+# commit, undo_commit after it.
+runtime_override_check() {
+    local failer="$1" tail="$2" bad rc=0
+    bad=$(rp_runtime_override_untrusted) || rc=$?
+    case "$rc" in
+        0) set -- "refusing to run the github-stack-runtime override '$(safe_name "$bad")': inside the repository it must be tracked and unmodified (it is ignored, untracked or modified); $tail" ;;
+        1) return 0 ;;
+        *) set -- "could not verify the github-stack-runtime override${bad:+ '$(safe_name "$bad")'}; $tail" ;;
+    esac
+    if [ "$failer" = die ]; then die 3 "$1"; else "$failer" "$1"; fi
+}
+[ "$PROVIDER" != github ] || runtime_override_check die "nothing committed"
+
 # --- Stage and compare ---
 lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
 STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort) || {
@@ -509,6 +528,9 @@ case "$PROVIDER" in
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
+        # Judged again right before it runs: a commit hook has run since the
+        # first check, and the commit is undone (exit 4) if it fails.
+        runtime_override_check undo_commit "nothing submitted"
         REMOTE_ARGS=()
         [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
         OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \

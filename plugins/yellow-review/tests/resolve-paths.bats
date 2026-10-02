@@ -854,3 +854,143 @@ override_link_repo() {
   [ "$output" = $'tools\ntools/rt.js' ]
   rp_runner tools/rt.js
 }
+
+# --- rp_runtime_override_rels raw mode, rp_runtime_override_untrusted, lgit_nohooks ---
+
+commit_repo() {
+  git config user.email test@test.com
+  git config user.name Test
+  git config commit.gpgsign false
+  git add -A && git commit -q -m "chore: initial"
+}
+
+@test "rp_runtime_override_rels raw keeps the case of each node" {
+  mkdir -p Tools && : >| Tools/Rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="Tools/Rt.js"
+  run rp_runtime_override_rels raw
+  [ "$status" -eq 0 ]
+  [ "$output" = $'Tools\nTools/Rt.js' ]
+  run rp_runtime_override_rels
+  [ "$output" = $'tools\ntools/rt.js' ]
+}
+
+@test "rp_runtime_override_untrusted is quiet and 1 when the variable is unset" {
+  unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "rp_runtime_override_untrusted is 1 for an override outside the repository" {
+  : >| "$BATS_TEST_TMPDIR/outside.js"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/outside.js"
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "rp_runtime_override_untrusted is 1 for a clean tracked file in a tracked directory" {
+  mkdir -p Tools && printf '// rt\n' >| Tools/Rt.js
+  commit_repo
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="Tools/Rt.js"
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "rp_runtime_override_untrusted prints the path and exits 0 for an ignored, untracked, modified or staged file" {
+  mkdir -p tools && printf '// rt\n' >| tools/rt.js && : >| keep
+  commit_repo
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  # modified
+  printf '// edited\n' >> tools/rt.js
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+  # staged
+  git add tools/rt.js
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+  # untracked and ignored
+  git rm -q --cached tools/rt.js
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+  printf 'tools/\n' >> .git/info/exclude
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+}
+
+@test "rp_runtime_override_untrusted refuses an assume-unchanged or skip-worktree edit" {
+  mkdir -p tools && printf '// rt\n' >| tools/rt.js
+  commit_repo
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf '// edited\n' >> tools/rt.js
+  git update-index --assume-unchanged tools/rt.js
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+  git update-index --no-assume-unchanged --skip-worktree tools/rt.js
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools/rt.js ]
+}
+
+@test "rp_runtime_override_untrusted judges an in-repo symlink on the way, not only the final file" {
+  mkdir -p real && printf '// rt\n' >| real/rt.js
+  ln -s real tools
+  commit_repo
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 1 ]
+  # Repoint the tracked symlink: modified, so refused and named.
+  mkdir -p evil && printf '// evil\n' >| evil/rt.js
+  ln -sfn evil tools
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = tools ]
+}
+
+@test "rp_runtime_override_untrusted judges an ignored file behind a tracked symlink" {
+  mkdir -p real && : >| real/keep
+  ln -s real tools
+  commit_repo
+  printf '// rt\n' >| real/rt.js
+  printf 'real/rt.js\n' >> .git/info/exclude
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run rp_runtime_override_untrusted
+  [ "$status" -eq 0 ]
+  [ "$output" = real/rt.js ]
+}
+
+@test "lgit_nohooks runs no hook, from .git/hooks or an ignored core.hooksPath, where lgit does" {
+  printf 'a\n' >| f.txt
+  commit_repo
+  for dir in .git/hooks .hooks; do
+    mkdir -p "$dir"
+    printf '#!/bin/sh\necho ran >> "%s/hook.log"\n' "$BATS_TEST_TMPDIR" >| "$dir/post-checkout"
+    chmod +x "$dir/post-checkout"
+  done
+  printf '.hooks/\n' >> .git/info/exclude
+  for hp in "" .hooks; do
+    [ -z "$hp" ] || git config core.hooksPath "$hp"
+    rm -f "$BATS_TEST_TMPDIR/hook.log"
+    printf 'b\n' >| f.txt
+    lgit_nohooks checkout -q HEAD -- f.txt
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+    [ "$(cat f.txt)" = a ]
+    printf 'b\n' >| f.txt
+    lgit checkout -q HEAD -- f.txt
+    [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+  done
+}
+
+@test "lgit_nohooks keeps pathspecs literal" {
+  mkdir -p src && printf 'a\n' >| 'src/*' && printf 'b\n' >| src/real.txt
+  run lgit_nohooks add -n -- 'src/*'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"'src/*'"* ]]
+  [[ "$output" != *real.txt* ]]
+}

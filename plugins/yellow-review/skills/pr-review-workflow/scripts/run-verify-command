@@ -271,7 +271,7 @@ else
         IGN=0
         git check-ignore -q -- "$f" || IGN=$?
         [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
-        if [ -z "$(lgit status --porcelain --untracked-files=all -- "$f")" ]; then
+        if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
             # Nothing to revert: do not abort the other files' revert.
             add_reason "skipped, no changes: $f"
@@ -494,7 +494,7 @@ save_patch() {
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
-            lgit diff --no-color --no-ext-diff --no-textconv "$fmt" \
+            lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
@@ -563,7 +563,7 @@ if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNAL
     # status that cannot be read counts as lost.
     LOST=""
     for f in ${FILES[@]+"${FILES[@]}"}; do
-        if ! ST=$(lgit status --porcelain --untracked-files=all -- "$f" 2>/dev/null) || [ -z "$ST" ]; then
+        if ! ST=$(lgit_nohooks status --porcelain --untracked-files=all -- "$f" 2>/dev/null) || [ -z "$ST" ]; then
             LOST="${LOST:+$LOST, }$f"
             continue
         fi
@@ -649,10 +649,12 @@ esac
 REVERT_FAILS=()
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
-        lgit checkout -q HEAD -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git checkout $f")
+        # Hooks off: post-checkout and post-index-change would run any hook a
+        # resolver planted, including an ignored one under core.hooksPath.
+        lgit_nohooks checkout -q HEAD -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git checkout $f")
     else
         # New file (untracked or only staged): drop it from the index too.
-        lgit rm -q --cached --ignore-unmatch -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git rm --cached $f")
+        lgit_nohooks rm -q --cached --ignore-unmatch -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git rm --cached $f")
         rm -f -- "$f" 2>/dev/null || REVERT_FAILS+=("rm $f")
     fi
 done
@@ -671,7 +673,7 @@ fi
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
 CLEAN=true
-if ! STATUS=$(git status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi
