@@ -1085,7 +1085,10 @@ is the one definition of that set. Escaping only prefixes `[ESCAPED] `, so an
 escaped quote keeps its bytes. A voting reviewer whose file cannot be read is
 never shown as an empty review: 5b warns and marks the block `reviewer text
 unavailable`. The label map is kept in the staging directory and printed only
-at assembly.
+at assembly. The staging directory and its token live in a state file only 5a
+writes, never in model-relayed text; that closes the relay vector but not a
+deliberate `Write` forgery. See `docs/security.md` "Synthesis staging
+directory (yellow-council)".
 
 **Pass A.** Enumerate every finding per label (`S<n>-F<k>`, citation, claim)
 before comparing anything; then compare across labels; then score; only then
