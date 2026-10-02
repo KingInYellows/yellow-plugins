@@ -60,8 +60,10 @@ at implementation time, not plan time. Verified against the shipped file
    when the state file is missing or unusable, so it only reclaims the minted
    Claude fenced path and the state file, not per-reviewer files. A new
    artifact that exists before reviewer rows are readable needs its own
-   reclaim there. Fenced files also fall to Step 4's age-gated stale sweep. The Step 5 `council-synth-*` directory has
-   its own `council_synth_abort`, 5e removal and a second age-gated sweep in 5a.
+   reclaim there.
+   Fenced files also fall to Step 4's age-gated stale sweep.
+   The Step 5 `council-synth-*` directory has its own `council_synth_abort`, 5e
+   removal and a second age-gated sweep in 5a.
 8. **Flags are parsed per fence.** Step 3's loop ignores unknown flags
    (`*) shift`), so a new flag is a silent no-op until it gets an arm.
    `--single-pass` is stripped by an identical `sed` in Steps 2, 3 and 6, which
@@ -70,9 +72,11 @@ at implementation time, not plan time. Verified against the shipped file
 9. **Finding ids are stable, flip detection is prompt-level.** The Pass A
    enumerator (the Step 5c prompt, not `council_normalize_text`) assigns
    `S<n>-F<k>` ids, and Pass B reuses them so the two tables compare per id.
-   Id stability is a prompt-level property, not a deterministic guarantee. The comparison is made by the orchestrator in one context, so it is a
-   positional-consistency check, not a blind second evaluation. A flipped finding
-   is tagged `low-confidence-synthesis` and never changes bucket.
+   Id stability is a prompt-level property, not a deterministic guarantee.
+   The comparison is made by the orchestrator in one context, so it is a
+   positional-consistency check, not a blind second evaluation.
+   A flipped finding is tagged `low-confidence-synthesis` and never changes
+   bucket.
 10. **Randomness comes from `/dev/urandom` via `od`, not `shuf` or `$RANDOM`.**
     `council_assign_labels` draws one `od -An -N4 -tu4` key per reviewer and
     orders with `sort -n`, failing closed when the entropy source is unreadable
