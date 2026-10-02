@@ -219,8 +219,10 @@ nothing matches exactly, a unique todo with the same category and path whose
 `anchor_hash` equals the first substantive line of the new range also
 suppresses it, so an edit elsewhere in the range can still be skipped; that
 fallback never applies to `security-debt`, nor to `complete` or `deleted`
-todos. A todo has a fingerprint and anchor only when it was stamped (a
-finding without a usable line range gets none), and a tie resurfaces. A `deferred` finding is not skipped: it comes back as a new
+todos. A todo without a stored fingerprint is rehashed from its recorded
+range at match time (except `complete`), so it can still suppress an unchanged
+finding; a finding without a usable line range gets none, and a tie
+resurfaces. A `deferred` finding is not skipped: it comes back as a new
 pending todo while the code still has the problem.
 
 All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.

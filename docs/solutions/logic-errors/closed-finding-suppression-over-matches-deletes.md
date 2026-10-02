@@ -71,10 +71,10 @@ a tree hash taken after the code changed. The fixes make identity come from
 data captured when the human decided, require it to be narrow, and make any
 doubt (no range, tie, unreadable todo) fall toward resurfacing the finding.
 Two cases still suppress by design: a `complete` todo whose flagged code
-reappears byte for byte matches on the exact fingerprint (a regression stays
-hidden), and two distinct findings of one category over identical code share
-one identity (a finding's wording is not stable between audits, so it cannot
-join the key).
+reappears with identical normalized text at the same path and category matches
+on the exact fingerprint (a regression stays hidden), and two distinct findings
+of one category at the same path over identical code share one identity (a
+finding's wording is not stable between audits, so it is not part of the key).
 A destructive step keyed on a derived label (file name) must re-read the
 source of truth (frontmatter) first.
 

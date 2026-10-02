@@ -316,7 +316,7 @@ Next Steps:
 ```json
 {
   "total_findings": 23,
-  "errors": 0,
+  "errors": 1,
   "by_status": {
     "pending": 12,
     "ready": 8,
@@ -348,7 +348,7 @@ Next Steps:
 
 **Corrupted todo files**: Skipped with warning, counted in error total **Missing
 todos/debt/ directory**: Shows zeros for all metrics **Malformed YAML
-frontmatter**: File skipped, error logged
+frontmatter**: Counted as `unknown` in `total_findings`, with a warning
 
 ## Use Cases
 

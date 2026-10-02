@@ -266,8 +266,10 @@ Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
 Existing todos keep their ids. A new todo that reused a number would collide
 with a kept file, so take the next free ids from every `*.md` under
 `todos/debt/`, not only the well-named ones. Run this once with the number of
-findings left after Step 5a in place of `<count>`; it prints that many
-consecutive ids, one per line, in the order of the findings:
+findings left after Step 5a in place of `<count>`; it prints that many free
+ids, one per line (they can skip a number a directory or symlink holds). Give
+each finding the id on the matching line, in the order of the findings, and use
+the printed text verbatim:
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -344,7 +346,9 @@ hash_re='^([0-9a-f]{8})?$'
 debt_todo_name_ok "${todo_filename##*/}" || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
 
 # Defense in depth: the name check above rejects any `/`; this also pins the
-# directory without realpath, which BSD lacks.
+# directory without realpath, which BSD lacks. A symlink added since the ids
+# were allocated would redirect the write, so check the directories again.
+debt_refuse_symlinks todos todos/debt || exit 1
 case "$todo_filename" in
   todos/debt/*/*) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
   todos/debt/*) ;;

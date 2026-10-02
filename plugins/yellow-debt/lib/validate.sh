@@ -278,6 +278,10 @@ transition_todo_state() {
       printf '[debt] %s is already %s; nothing to do\n' "${todo_file##*/}" "$new_state"
       return 0
     fi
+    case "$new_state" in
+      pending|ready|in-progress|deferred|complete|deleted|wont-fix) ;;
+      *) printf '[debt] Invalid target state\n' >&2; return 1 ;;
+    esac
     rename_only=true
   fi
 
@@ -320,15 +324,22 @@ transition_todo_state() {
     deferred) keep=deferred_reason ;;
   esac
   if debt_is_legacy_wont_fix "$current_state"; then legacy=true; fi
+  # A rename-only repair with no new reason keeps the reason the target state
+  # already has.
+  local renaming=false
+  [ "$rename_only" = false ] || renaming=true
   if [ -n "$keep" ] && [ "$reason_len" -gt 200 ]; then
     printf '[debt] Note: reason truncated from %d to 200 characters\n' "$reason_len" >&2
   fi
   updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y \
-    --arg keep "$keep" --argjson val "$reason_json" --argjson legacy "$legacy" '
+    --arg keep "$keep" --argjson val "$reason_json" --argjson legacy "$legacy" \
+    --argjson renaming "$renaming" '
     .wont_fix_reason as $old
+    | (if $keep == "" then null else .[$keep] end) as $cur
     | del(.deferred_reason, .wont_fix_reason, .defer_reason)
     | if $keep == "" then .
       elif $val != "" then .[$keep] = $val
+      elif $renaming and ($cur | type) == "string" then .[$keep] = $cur
       elif $legacy and $keep == "wont_fix_reason" and ($old | type) == "string"
         then .[$keep] = ($old | gsub("[\n\r]"; "") | .[0:200])
       else . end' 2>/dev/null) || return 1

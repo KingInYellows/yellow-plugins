@@ -1289,6 +1289,27 @@ run_status_block() {
   [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "first" ]
 }
 
+@test "a rename-only repair keeps the target state's reason" {
+  require_kislyuk_yq
+  make_todo 001 wont-fix 001-pending-high-long-fn-abc123.md "wont_fix_reason: kept"
+  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "kept" ]
+  make_todo 002 deferred 002-pending-high-long-fn-abc123.md "deferred_reason: later"
+  run transition_todo_state todos/debt/002-pending-high-long-fn-abc123.md deferred
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/002-deferred-high-long-fn-abc123.md .deferred_reason)" = "later" ]
+}
+
+@test "a malformed target state never reaches the file name" {
+  require_kislyuk_yq
+  make_todo 001 '"../x"' 001-pending-high-long-fn-abc123.md
+  run --separate-stderr transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md "../x"
+  [ "$status" -eq 1 ]
+  [ -f todos/debt/001-pending-high-long-fn-abc123.md ]
+  [ -z "$(find . -name '*x*' ! -path './todos/debt/001-pending-*' ! -path './.git/*' ! -name '*.bats')" ]
+}
+
 @test "a transition prints a receipt naming the new file" {
   require_kislyuk_yq
   make_todo 001 pending 001-pending-high-long-fn-abc123.md
@@ -1383,6 +1404,7 @@ run_status_block() {
   CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf.zsh"
   [ "$status" -ne 0 ]
   [ -f "$reason_dir/reason.txt" ]
+  rm -rf "$reason_dir"
 }
 
 @test "status survives a todo with unreadable frontmatter and lists files needing repair in JSON" {
