@@ -279,9 +279,10 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    hit/miss paths), verify every shipped PR carried its changeset, and run the
    full validation suite end-to-end, including `pnpm lint:plugins`,
    `pnpm validate:shell-compat`, `pnpm check:shell-parse`, and the council
-   plugin's Bats suite (`bats tests/synthesis.bats`, or all of `bats tests/`,
-   from `plugins/yellow-council`) — the Bats run is what actually executes the
-   F3/F4 golden cases; the shell lint/parse checks do not.
+   plugin's full Bats suite (`bats tests/` from `plugins/yellow-council`, not
+   `synthesis.bats` alone, so `redaction.bats` still verifies that every
+   embedded redaction awk copy stays byte-identical) — the Bats run is what
+   actually executes the F3/F4 golden cases; the shell lint/parse checks do not.
 
 ## Open Questions
 
