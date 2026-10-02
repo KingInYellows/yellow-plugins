@@ -1,0 +1,25 @@
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_7a82748dd606d9::t_f5845a261d8486 18-19
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_7a82748dd606d9::t_204449c3dab7f0 29-33
+docs/solutions/logic-errors/resolve-stack-state-stale-after-fix-commit-push.md
+  s_7a82748dd606d9::t_f386384f0b8468 23-24
+docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md
+  s_7a82748dd606d9::t_2c29a05a0e1171 60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5226cf00a866231c65b70a2d4b26e33e1002eeee",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
