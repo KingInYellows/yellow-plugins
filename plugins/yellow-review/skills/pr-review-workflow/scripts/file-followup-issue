@@ -239,14 +239,15 @@ if rg_gh issue list --repo "$REPO" "$AUTHOR_FILTER" "$VIEWER" --state all --limi
         | {number, url, created: false}' "$WORK_DIR/issues-after.json" 2>/dev/null || true)
     if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
         # Ordinary close failures are best effort; a timeout may have changed
-        # state, so it stops the caller (exit 4) like any other timed-out call.
+        # state, and a rate limit leaves the duplicate open; both stop the
+        # caller (exit 4) like any other timed-out or rate-limited call.
         if rg_gh issue close "$URL" --reason 'not planned' \
                 --comment "Duplicate of #$(printf '%s\n' "$WINNER" | jq -r '.number'), filed concurrently for the same review thread." \
                 >/dev/null 2>"$ERR"; then
             :
         else
             CLOSE_RC=$?
-            if [ "$CLOSE_RC" -eq 124 ]; then
+            if [ "$CLOSE_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
                 gh_fail 'duplicate issue close' "$CLOSE_RC"
             fi
         fi

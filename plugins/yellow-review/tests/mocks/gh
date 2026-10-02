@@ -153,8 +153,13 @@ case "$ALL_ARGS" in
     exit 0
     ;;
   "issue close "*)
-    # Saves the arguments. MOCK_GH_ISSUE_CLOSE_FAIL=1 simulates a failure.
+    # Saves the arguments. MOCK_GH_ISSUE_CLOSE_FAIL=1|ratelimit simulates a
+    # failure.
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_close_args"
+    if [ "${MOCK_GH_ISSUE_CLOSE_FAIL:-0}" = ratelimit ]; then
+      printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2
+      exit 1
+    fi
     if [ "${MOCK_GH_ISSUE_CLOSE_FAIL:-0}" = 1 ]; then
       printf 'HTTP 403: Forbidden\n' >&2
       exit 1
