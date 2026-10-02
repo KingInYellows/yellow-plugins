@@ -138,8 +138,10 @@ EOS
   fake_setup
   printf 'PRRT_a\r\n\r\n\nPRRT_b\r\n' >"$ROUND1"
   FAKE_RESULTS="ok:PRRT_a,PRRT_b" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
   [[ "$output" == *"repass fetched=1 found=0"* ]]
   FAKE_RESULTS="ok:PRRT_a,PRRT_c" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
   [[ "$output" == *"repass fetched=1 found=1"* ]]
 }
 
@@ -156,4 +158,39 @@ EOS
   run "$SCRIPT" --wait 0 "o/r" 403 "$ROUND1" "$OUT"
   [ "$status" -eq 4 ]
   [[ "$output" == *"poll rate-limited"* ]]
+}
+
+# --- Wall-clock bound: a fake clock (FAKE_NOW) that both sleep and the
+# get-pr-comments stub advance, so slow fetches eat into the --wait budget.
+clock_setup() {
+  fake_setup
+  export FAKE_NOW="${BATS_TEST_TMPDIR}/now"
+  printf '1000' >"$FAKE_NOW"
+  cat >"$FAKE_DIR/get-pr-comments" <<'EOS'
+#!/bin/bash
+echo $(( $(cat "$FAKE_NOW") + FETCH_COST )) >|"$FAKE_NOW"
+echo '[{"threadId":"PRRT_a"}]'
+EOS
+  printf '#!/bin/sh\ncat "$FAKE_NOW"\n' >"${BATS_TEST_TMPDIR}/stubs/date"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >>"$SLEEP_LOG"\necho $(( $(cat "$FAKE_NOW") + $1 )) >"$FAKE_NOW"\n' >"${BATS_TEST_TMPDIR}/stubs/sleep"
+  chmod +x "$FAKE_DIR/get-pr-comments" "${BATS_TEST_TMPDIR}/stubs/date" "${BATS_TEST_TMPDIR}/stubs/sleep"
+}
+
+@test "a slow fetch that passes the deadline ends polling without another round" {
+  clock_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FETCH_COST=40 run "$FAKE_DIR/poll-new-threads" --wait 50 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20" ]
+  [ "$(cat "$FAKE_NOW")" -eq 1060 ]
+}
+
+@test "fetch time shrinks the next sleep to the remaining wait" {
+  clock_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FETCH_COST=15 run "$FAKE_DIR/poll-new-threads" --wait 50 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "20,15" ]
 }

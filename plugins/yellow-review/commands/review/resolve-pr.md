@@ -34,12 +34,12 @@ write order, markers, issue cap, pacing and the `Resolve:` line — lives in
 `${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md`. Read it before
 Step 5 and follow it; this file does not restate it.
 
-**Every stop from Step 3 onward prints the `Resolve:` line** as its last line:
-an error, a cancel, a refusal or an early exit. Stops in Steps 1 to 2c (flag,
-PR, dirty tree, branch and HEAD checks) print only their error; nothing has run
-yet. The line reports what the run did so
-far (zeros when nothing was written), `push=skipped` (`failed` after a failed
-push), `verify=none`, and `ratelimited=1` only when the stop was a rate limit.
+**Every stop after the PR number is known prints the contract's `Resolve:`
+line** as its last line: an error, a cancel, a refusal or an early exit,
+including the dirty-tree, branch and HEAD stops in Steps 2a to 2c. Those early
+stops print their error, then the line for a stop before any write. Only stops
+before the PR number is known (unknown flag, too many arguments, or a failed
+branch detection) print just their error.
 
 ## Workflow
 
@@ -93,7 +93,9 @@ git status --porcelain
 If non-empty: print "Uncommitted changes detected. Please commit or stash before
 running resolve." followed by the porcelain entries (the file names only), and
 stop. For an untracked local config file such as `yellow-plugins.local.md`, add
-the hint: add it to `.git/info/exclude` instead of committing it.
+the hint: add it to the file printed by `git rev-parse --git-path info/exclude`
+(or to `.gitignore`) instead of committing it. Do not hard-code `.git/info/exclude`:
+in a linked worktree `.git` is a pointer file, not a directory.
 
 ### Step 2b: Verify Correct Branch
 
@@ -224,7 +226,11 @@ so no edit exists that cannot be pushed.
   `AskUserQuestion` showing the cluster count and a per-cluster summary
   (`<path>:<line_range>` and thread count). Options: "Resolve all M clusters" /
   "Resolve first 10 only" / "Cancel". On Cancel, stop without dispatch and go
-  to Step 9's `Resolve:` line only. The gate runs for every M ≥ 1.
+  to Step 9's `Resolve:` line only. On "Resolve first 10 only", dispatch the
+  first 10 clusters (sorted by file path, then line range) and record the
+  remaining `M − 10` clusters as `not attempted (cluster cap)` — their threads
+  get no reply, stay open, and are reported as blocking in Step 9. The gate
+  runs for every M ≥ 1.
 - **Non-interactive mode.** Skip the `AskUserQuestion` gate. Apply a hard
   cluster cap instead, the snapshot's `cluster_cap` (default 20): if
   `M ≤ cluster_cap`, dispatch all `M` clusters; otherwise dispatch the first
@@ -403,9 +409,10 @@ not `OPEN`, print `PR #<N> is <STATE>; write phase stopped` and go to Step 9.
 Process threads serially, sorted by path, line, threadId — including Step
 3c's dropped threads — per the contract's write order and lanes. Write each
 text with the Write tool to a `mktemp` path, never on a command line. Run each
-script below as its own Bash call with a `timeout` of 120000 ms (a 90 s
-rate-limit wait plus pacing), and start a thread's next stage only after the
-previous one exits 0:
+script below as its own Bash call with a `timeout` of 240000 ms (worst case
+`reply-pr-thread`: three 30 s `gh` calls + a 90 s rate-limit wait + 10 s
+pacing = 190 s), and start a thread's next stage only after the previous one
+exits 0:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" "<owner/repo>" "<PR#>" "<threadId>" "<title-file>" "<body-file>"

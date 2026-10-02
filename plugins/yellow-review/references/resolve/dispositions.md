@@ -251,7 +251,8 @@ that snapshot, so an edit to the file during the run changes nothing.
 The tracked check runs from the repository root
 (`git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch --
 yellow-plugins.local.md`). Keep the file untracked and ignored (add it to
-`.git/info/exclude` or a `.gitignore`): an untracked file that is not ignored
+the file printed by `git rev-parse --git-path info/exclude`, or a `.gitignore`;
+`.git` is a pointer file in a linked worktree): an untracked file that is not ignored
 fails Step 2's clean-tree check. A failed or timed-out verify reverts the
 files, saves a patch and holds `fixed` threads open (`verify=fail`). The
 tokens: `none` means verification was not configured or not opted in;
@@ -430,8 +431,10 @@ Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
 for `commit-resolve-fixes` (hooks, submit and the head check). The settings
 are capped at 540 and 480 seconds. Each write-phase script
 (`file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread`) runs as its
-own Bash call with a `timeout` of 120000 ms, since a 90 s rate-limit wait plus
-pacing must fit, and the next stage starts only after exit 0.
+own Bash call with a `timeout` of 240000 ms, and the next stage starts only
+after exit 0. The worst case is `reply-pr-thread`: a pre-check, the mutation
+and the one shared retry are three `gh` calls at 30 s each, plus a 90 s
+rate-limit wait and up to 10 s of pacing, 190 s in all.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls
 with a `timeout`/`gtimeout` binary that supports `--kill-after`; without one
@@ -514,8 +517,8 @@ Replies and issue bodies end with:
   `x-ratelimit-reset` when `x-ratelimit-remaining` is 0, else
   `YELLOW_REVIEW_RATE_LIMIT_WAIT` (default 60 s), then retry once per script
   run (`reply-pr-thread` shares that one retry across its calls). A second
-  limit, or a required wait over 90 s, exits 4 so the call fits the Bash
-  tool's 120 s default. `file-followup-issue` never waits or retries: a rate
+  limit, or a required wait over 90 s, exits 4, which bounds the call to the
+  190 s worst case the write-phase `timeout` covers. `file-followup-issue` never waits or retries: a rate
   limit exits 4 at once. A bare 403 is not a rate limit: it exits 3.
 - Each `gh` call in `reply-pr-thread`, `resolve-pr-thread` and
   `file-followup-issue` is bounded by `YELLOW_REVIEW_GH_TIMEOUT` (default

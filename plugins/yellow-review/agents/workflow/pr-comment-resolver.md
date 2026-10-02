@@ -52,9 +52,8 @@ You will receive via the Task prompt (cluster envelope from `/review:resolve` St
   changes (`none`, `unknown` or `review-level` when there are no ranges);
   trusted metadata, your only record of what the PR touched
 - **Outdated** (per thread, when present): the thread's anchor no longer
-  matches the diff. The envelope adds the thread's original line and diff hunk
-  (fenced, reference only) when it has them; use them to find the concern in
-  the file at HEAD, not at the stale line
+  matches the diff. Find the concern from the comment text in the file at
+  HEAD, not at the stale line
 - **Fenced PR context block**: Title and description
 - **Fenced cluster body block**: One block per thread, each opened by a
   `--- thread <threadId> (<path>:<line>) ---` line; the ID on that line is the

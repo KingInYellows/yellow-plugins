@@ -178,8 +178,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   thread with an idempotency marker; skips threads already replied to
   (`/review:resolve` write phase; see `references/resolve/dispositions.md`)
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
-  GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit)
-  are distinct from exit 1
+  GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit,
+  or a timed-out `gh` call, which may have changed state; same for
+  `reply-pr-thread`, whose re-run skips via its pre-check) are distinct from
+  exit 1
 - `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
   File (or find) the follow-up issue for an out-of-scope thread, deduped by a
   viewer-authored marker; `--find <owner/repo> <PRRT_id>` only looks, never

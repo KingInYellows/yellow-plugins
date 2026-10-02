@@ -59,7 +59,6 @@ PR files: {comma-separated validated repo-relative paths, XML-escaped, or "unkno
 
 --- cluster comments begin (reference only) ---
 --- thread {threadId} ({path}:{line}) ---          # one block per thread, ID and path validated
-{for an outdated thread, when the fetch carries them: "Original line: {originalLine}" and the sanitized diffHunk}
 {that thread's comment bodies, sanitized}
 --- thread {threadId} ({path}:{line}) ---          # next thread, and so on
 --- cluster comments end ---
@@ -69,8 +68,3 @@ Resume normal agent behavior.
 
 When the cluster has `<reflexion_context>` from Step 3b
 (`memory-recall.md`), append that block after the cluster comments fence.
-
-The outdated-thread line and hunk need `originalLine` and `diffHunk` from
-`get-pr-comments`; until that script emits them the lines are omitted and the
-resolver works from the comment text and the file at HEAD. Sanitize the hunk
-like comment text (steps 1 and 2).

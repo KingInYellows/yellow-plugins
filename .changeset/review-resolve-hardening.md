@@ -6,14 +6,20 @@ Harden `/review:resolve` so every unresolved review thread ends in an honest,
 durable state. `pr-comment-resolver` now proposes a per-thread disposition
 (`fixed`, `addressed`, `oos`, `disagree`, `unclear`) and the command validates
 it against the contract in `references/resolve/dispositions.md` before writing
-anything: replies and follow-up issues carry an idempotency marker, so re-runs
-post no duplicates, and the command commits and pushes fixes as a new commit
-through the active stacked-PR provider.
+anything. `/review:resolve` is wired to that contract and the resolve scripts:
+it replies to and resolves threads through `reply-pr-thread` and
+`resolve-pr-thread`, files follow-up issues for `oos` threads (GitHub by
+default, Linear when available), and leaves `disagree` and `unclear` threads
+open as blocking. Replies and follow-up issues carry an idempotency marker, so
+re-runs dedupe by marker on GitHub; Linear dedupe is best-effort and a rerun can
+still file a second issue if the first was not indexed before its reply failed.
+The command commits and pushes fixes as a new commit through the active
+stacked-PR provider.
 
 The resolver no longer has a Bash tool; it reads and edits only inside the
 PR's changed lines. The command checks that local HEAD matches the PR head
-before it starts, and prints a final `Resolve:` line on every stop from the
-fetch onward.
+before it starts, and prints a final `Resolve:` contract line on every stop
+from the fetch onward.
 
 `resolve-pr-thread` now exits 3 for not-found or permission failures and 4 for
 rate limits; `commit-resolve-fixes` uses exits 2 to 6 for refusals and failed
