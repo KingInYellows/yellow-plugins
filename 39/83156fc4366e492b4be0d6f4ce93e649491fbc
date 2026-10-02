@@ -1,0 +1,21 @@
+plugins/yellow-review/README.md
+  s_7a82748dd606d9::t_d8cad9e8d406c7 132
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_ea240667d6b42a 465-472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3983156fc4366e492b4be0d6f4ce93e649491fbc",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
