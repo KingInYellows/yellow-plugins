@@ -225,3 +225,108 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -ne 0 ]
   [ -z "$output" ]
 }
+
+@test "rt_looks_secret returns 2 and rt_text_clean fails on a missing file under sh, bash and zsh" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  for shell in sh bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    run "$shell" -c '. "$1"; rt_looks_secret "$2"' "$shell" "$LIB" "$BATS_TEST_TMPDIR/nope"
+    [ "$status" -eq 2 ] || { echo "$shell: rt_looks_secret status $status"; false; }
+    run "$shell" -c '. "$1"; rt_text_clean "$2"' "$shell" "$LIB" "$BATS_TEST_TMPDIR/nope"
+    [ "$status" -ne 0 ] || { echo "$shell: rt_text_clean treated a missing file as clean"; false; }
+  done
+}
+
+@test "a base64-padded Authorization or Basic token of 20+ characters exits 2" {
+  printf 'Authorization: Basic %s==\n' "$(pad 18)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'sent basic %s==\n' "$(pad 18)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'Authorization: %s==\n' "$(pad 18)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'Authorization: Basic %s==\n' "$(pad 17)" >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a token prefix after an = is flagged at its length floor and clean one below" {
+  for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24'; do
+    prefix=${spec%:*}
+    floor=${spec##*:}
+    printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged after =: $prefix"; false; }
+    printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix} - 1)))" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged below floor after =: $prefix"; false; }
+  done
+}
+
+@test "long camelCase identifiers with a digit are not flagged but random mixed-case tokens are" {
+  printf '%s\n' \
+    'Renamed reviewFindingsLedgerTransitionHelper2 and ReviewFindingsLedgerTransitionHelperFunction2.' \
+    'Added parseThreadResponseForResolverRetry3 to the resolver.' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  printf 'leaked %s\n' 'qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+# Planted credentials are assembled from pieces, as above.
+
+@test "a refusal names the rule and line on stderr and never prints the text" {
+  tok="gh""p_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+  printf 'first line is fine\nsecond has %s in it\n' "$tok" >| "$A"
+  run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"resolve-text: refused rule=token-prefix line=2"* ]]
+  [[ "$stderr" != *"$tok"* ]]
+}
+
+@test "a scanner failure reports scan failed on stderr" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"resolve-text: scan failed"* ]]
+  [[ "$stderr" != *"resolve-text: refused"* ]]
+}
+
+@test "usage and unreadable-file errors carry no resolve-text token" {
+  run --separate-stderr "$SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" != *"resolve-text:"* ]]
+  run --separate-stderr "$SCRIPT" "$BATS_TEST_TMPDIR/nope"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" != *"resolve-text:"* ]]
+}
+
+@test "RT_HIT_RULE and RT_HIT_LINE name the rule that matched, one rule per shape" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  check() {  # <expected rule> <line text>
+    printf 'clean line\n%s\n' "$2" >| "$A"
+    run sh -c '. "$1"; rt_looks_secret "$2"; printf "%s %s" "$RT_HIT_RULE" "$RT_HIT_LINE"' sh "$LIB" "$A"
+    [ "$output" = "$1 2" ] || { echo "expected '$1 2', got '$output' for: $2"; false; }
+  }
+  check private-key '-----BEGIN RSA PRIVATE KEY-----'
+  check name-key-assignment 'MY_API_KEY=abcdefgh12'
+  check quoted-keyword-assignment 'password = "hunter22x"'
+  check unquoted-keyword-value 'password: hunter22'
+  check url-userinfo 'postgres://app:hunterhunter@db.internal/app'
+  check authorization-header "Authorization: Bearer $(pad 24)"
+  check token-prefix "x AK""IA$(pad 16) y"
+  check long-token 'leaked qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U here'
+}
+
+@test "RT_HIT_RULE is empty after a clean scan or a missing file" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_looks_secret "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$A"
+  [ "$output" = "[]" ]
+  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_looks_secret "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$BATS_TEST_TMPDIR/nope"
+  [ "$output" = "[]" ]
+}

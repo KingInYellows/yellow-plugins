@@ -11,7 +11,9 @@
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a
-#               body that looks like a credential (or could not be scanned),
+#               body that looks like a credential (or could not be scanned;
+#               stderr then starts with a `resolve-text:` line naming the
+#               rule and line, never the text),
 #             3 not found or permission,
 #             4 rate limited or timed out: a second rate limit after the one
 #               retry the whole script gets, a wait over 90 s (the wait is
@@ -76,6 +78,7 @@ fi
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 if ! rt_text_clean "$BODY_FILE"; then
+    rt_report_refusal
     printf 'Error: Reply body looks like it contains a credential, or could not be scanned; refusing to post it.\n' >&2
     exit 2
 fi

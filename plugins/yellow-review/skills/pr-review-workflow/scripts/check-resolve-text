@@ -6,7 +6,8 @@
 # Output: nothing on success.
 # Exit codes: 0 clean, 2 usage, an unreadable file, or a file that looks like
 #             it contains a credential or could not be scanned (the file is
-#             named on stderr).
+#             named on stderr, after a `resolve-text:` line that names the
+#             rule and line, never the text).
 # Contract: references/resolve/dispositions.md ("Reply hygiene")
 
 set -eu
@@ -22,6 +23,7 @@ fi
 for f in "$@"; do
     [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 2; }
     if ! rt_text_clean "$f"; then
+        rt_report_refusal
         printf 'Error: %s looks like it contains a credential, or could not be scanned.\n' "$f" >&2
         exit 2
     fi

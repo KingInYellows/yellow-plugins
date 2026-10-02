@@ -11,8 +11,11 @@
 # Errors: Exit 1 with a message to stderr for every failure, usage errors
 #   included; callers key on zero vs non-zero and the rate-limit wording.
 # Truncation: when the thread list hits the page cap or GitHub returns no
-#   cursor, a warning goes to stderr and the script still exits 0 with the
-#   threads fetched so far, so stdout stays a plain array.
+#   cursor, the script exits 3 with a message on stderr and the threads
+#   fetched so far on stdout (still a plain array), so a partial list is
+#   never mistaken for the full one. A caller that stops on any non-zero
+#   exit needs no change. Per-thread comment truncation (more than 50
+#   comments) is the commentsTruncated field, not an exit code.
 
 set -euo pipefail
 
@@ -107,6 +110,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
 ALL_PAGES=()
 CURSOR=""
 PAGE=0
+TRUNCATED=false
 
 _STDERR_FILE=$(mktemp)
 trap 'rm -f "$_STDERR_FILE"' EXIT
@@ -135,21 +139,24 @@ while true; do
     fi
     _GH_STDERR=$(cat "$_STDERR_FILE")
     if [ "$_GH_EXIT" -ne 0 ]; then
-        # Parse error category from stderr
-        case "$_GH_STDERR" in
-            *"401"*|*"Bad credentials"*|*"authentication"*)
-                printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
-                ;;
-            *"403"*|*"Forbidden"*|*"permission"*|*"insufficient permissions"*)
-                printf 'Error: Insufficient permissions for this repo.\n' >&2
-                ;;
-            *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
-                printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
-                ;;
-            *"rate limit"*|*"429"*)
+        # Parse error category from stderr. Rate limits come first: GitHub
+        # reports a secondary rate limit as HTTP 403. Status codes match only
+        # as "HTTP <code>", so digits elsewhere in the text do not classify.
+        _GH_LC=$(printf '%s' "$_GH_STDERR" | tr '[:upper:]' '[:lower:]')
+        case "$_GH_LC" in
+            *"rate limit"*|*"http 429"*)
                 printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
                 ;;
-            *"5xx"*|*"5XX"*|*"Server Error"*|*"server error"*|*"500"*|*"502"*|*"503"*)
+            *"http 401"*|*"bad credentials"*|*"authentication"*)
+                printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+                ;;
+            *"http 403"*|*"forbidden"*|*"permission"*|*"resource not accessible"*)
+                printf 'Error: Insufficient permissions for this repo.\n' >&2
+                ;;
+            *"could not resolve"*|*"http 404"*|*"not found"*|*"not_found"*)
+                printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
+                ;;
+            *"http 5"[0-9][0-9]*|*"server error"*)
                 printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
                 ;;
             *)
@@ -192,7 +199,8 @@ while true; do
     CURSOR=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
     if [ -z "$CURSOR" ]; then
         # Inconsistent state: hasNextPage=true but no cursor to continue
-        printf '[get-pr-comments] Warning: pagination truncated — hasNextPage=true but no endCursor (page %d). Results may be incomplete.\n' "$PAGE" >&2
+        printf '[get-pr-comments] Error: pagination truncated — hasNextPage=true but no endCursor (page %d). Exiting 3 with the threads fetched so far.\n' "$PAGE" >&2
+        TRUNCATED=true
         break
     fi
 
@@ -206,7 +214,8 @@ while true; do
 
     if [ "$PAGE" -ge "$MAX_PAGES" ]; then
         TOTAL=$((PAGE * PAGE_SIZE))
-        printf 'Warning: Reached pagination limit (%d pages, ~%d threads). Results may be truncated.\n' "$MAX_PAGES" "$TOTAL" >&2
+        printf '[get-pr-comments] Error: Reached pagination limit (%d pages, ~%d threads). Exiting 3 with the threads fetched so far.\n' "$MAX_PAGES" "$TOTAL" >&2
+        TRUNCATED=true
         break
     fi
 done
@@ -251,3 +260,5 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
 }
 
 printf '%s\n' "$OUTPUT"
+# Exit 3 after printing: stdout holds the partial list, the status says it is partial.
+if [ "$TRUNCATED" = true ]; then exit 3; fi

@@ -406,7 +406,8 @@ Located at `skills/pr-review-workflow/scripts/`:
 
 - **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
   Returns JSON array of unresolved review threads (outdated threads are
-  excluded unless `--include-outdated` is passed)
+  excluded unless `--include-outdated` is passed); exits 3 with the partial
+  array on stdout when the thread list is truncated
 - **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
   `CHANGES_REQUESTED` reviews, `reviewDecision`, and whether conversation
   resolution is enforced
@@ -416,9 +417,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   (idempotent)
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
   <body-file>` — Files or finds the follow-up issue for an out-of-scope
-  thread
+  thread; `--find <owner/repo> <PRRT_id>` only looks and never files
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential
+  credential, after a `resolve-text: refused rule=<rule> line=<n>` line on
+  stderr (the same line `reply-pr-thread` and `file-followup-issue` print)
 
 `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
 `check-resolve-text` are not yet invoked by `/review:resolve`; the contract

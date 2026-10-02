@@ -13,7 +13,8 @@ involved.
 
 **Implementation status.** Implemented in this PR: `get-pr-comments`
 (`--include-outdated`), `get-pr-blockers`, `reply-pr-thread`,
-`file-followup-issue`, `check-resolve-text` and `lib/resolve-text.sh`, plus the
+`file-followup-issue`, `check-resolve-text`, `lib/resolve-text.sh` and
+`lib/resolve-gh.sh`, plus the
 existing `resolve-pr-thread`. **Planned**, landing in a later PR of this stack
 and not present yet: `commit-resolve-fixes`, `run-verify-command` and
 `lib/resolve-paths.sh`. The sections that depend on them (Write order phases A
@@ -181,6 +182,11 @@ record); only the resolve is withheld.
   from the ID prefix. The Linear description ends with the same marker. A
   Linear failure, or an unresolvable team, falls back to GitHub once and
   records `tracker=github (linear unavailable)`.
+- Dedupe check: `file-followup-issue --find <owner/repo> <PRRT_id>` looks up
+  the marker without filing and prints `{"exists":true,"number":N,"url":"..."}`
+  or `{"exists":false}`, so a dedupe hit can be dropped from the approval list
+  and the cap before anything is created. It exits 5 over a full window with
+  no match, as the filing form does.
 - Title: `Follow-up from PR #<N>: <path or "review">`, written to a file.
   Body: the `oos_reason`, a link to the thread, and the marker. Never the
   reviewer's text.
@@ -342,8 +348,14 @@ Replies and issue bodies end with:
 - Text that looks like a credential is refused, never posted (exit 2 from
   `reply-pr-thread`, `file-followup-issue`, and `check-resolve-text`, which
   the orchestrator runs on a Linear issue's title and description before
-  `save_issue`). The orchestrator then posts the plain outcome sentence for
-  that disposition, with no resolver text.
+  `save_issue`). Exit 2 also means usage, an over-long body or a thread on a
+  different pull request, so key the fallback on stderr, not the code: a
+  refusal prints one line first, `resolve-text: refused rule=<rule>
+  line=<n>` (`in=title` or `in=body` from `file-followup-issue`), or
+  `resolve-text: scan failed` when the scan did not run. The line names the
+  rule and line, never the text. Only then does the orchestrator post the
+  plain outcome sentence for that disposition, with no resolver text; any
+  other exit 2 is a bad invocation to fix, not a reason to rewrite the text.
 - The body is written to a file and passed by path, never on a command line.
 
 ## Pacing and rate limits
@@ -361,6 +373,9 @@ Replies and issue bodies end with:
   `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)`). It does not
   retry, because the killed call may already have posted the reply. A re-run
   skips through the idempotency pre-check if the reply landed.
+  `file-followup-issue` applies the same limit to every `gh` call through
+  `lib/resolve-gh.sh` and exits 4 the same way; a timed-out create may have
+  filed, and a re-run finds the issue by its marker.
 - After any exit 4, stop mutating. Every remaining thread is reported as
   `not attempted (rate limit)` and counts as blocking. For a timeout, the
   current thread's reply may have posted: re-run `reply-pr-thread` for it
@@ -375,10 +390,14 @@ network, unexpected response).
 | --- | --- | --- | --- | --- | --- | --- |
 | `reply-pr-thread` | replied or skipped | usage / body too long / credential or scan failure | not found or permission | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
 | `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry) | — | — |
+| `file-followup-issue` | created or found | usage / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry), or a `gh` call timed out (a create may have filed) | dedupe window full with no marker (not transient) | — |
 | `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / credential or scan failure | — | — | — | — |
+
+`get-pr-comments` exits 1 on any failure (usage included) and 3 when the
+thread list is truncated by the page cap or a missing cursor; stdout then
+holds the partial array, which a caller must not treat as complete.
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise. Key a failed
 lookup on `lookupFailed: true` (with `changesRequested` null), not on any
@@ -414,7 +433,12 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 
 - Issue dedupe scans the newest 200 issues the viewer authored. When that
   window is full and holds no marker for the thread, `file-followup-issue`
-  exits 1 rather than risk a duplicate, and the thread stays open.
+  exits 5 (not 1, so it is not mistaken for a transient failure) rather than
+  risk a duplicate, and the thread stays open.
+- The Linear follow-up path has no marker lookup before `save_issue`, and an
+  ambiguous Linear failure falls back to GitHub. Marker dedupe therefore
+  holds only for the GitHub tracker: a Linear issue that was created but not
+  confirmed can be followed by a GitHub issue for the same thread.
 - Unattended commit and submit run the repository's git hooks (for example
   a husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
   definition files are refused, but the code the hooks run is not. How
