@@ -1,0 +1,32 @@
+plugins/yellow-review/commands/review/sweep-all.md
+  s_7a82748dd606d9::t_252cf7391baa92 310,315-319
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_8c7f3288d68e49 10-14
+plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md
+  s_7a82748dd606d9::t_3c1306ac5a9600 1-23
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_b608f950bae0e0 250-252
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_608581f61241d3 529-531,534-538
+  s_7a82748dd606d9::t_9e3d14512c7e0f 678-695
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_dcfb4e1d8c6d05 1,3-8,10-106
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_7a82748dd606d9::t_488566314dbd64 466-469
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a6d441a9baff5d643b09c2ccbb06e1e8cc7d676d",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
