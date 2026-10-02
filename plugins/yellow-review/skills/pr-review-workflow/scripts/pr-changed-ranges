@@ -31,10 +31,13 @@ gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/fi
 # Walk each patch: a hunk header "@@ -a,b +<start>,c @@" sets the new-side line
 # counter, "+" lines are PR-added (recorded, counter advances), context lines
 # advance the counter, "-" and "\ No newline" lines do not. Consecutive added
-# lines collapse into one range; context lines are never reported.
+# The path filter anchors with \A and \z, not ^ and $: jq's $ also matches
+# The path filter anchors with \\A and \\z, not ^ and $: jq's $ also matches
+# before a trailing newline, and a file name may contain one (git permits it),
+# which would forge a second output row. Unsafe paths are dropped, never listed.
 jq -r '
   .[]
-  | select(.filename | test("^[A-Za-z0-9._/-]+$"))
+  | select(.filename | test("\\A[A-Za-z0-9._/-]+\\z"))
   | [ .filename,
       ( if (.patch // "") == "" then "unknown"
         else

@@ -598,6 +598,43 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'memory: project' "$DIRTY_REF"
 }
 
+# The documented previous_filename projection, extracted from the reference so
+# the test runs exactly what the procedure tells the agent to run.
+dirty_ref_jq() {
+  awk '/--jq \x27$/ {on = 1; next} on {last = /\x27$/; sub(/\x27$/, ""); print; if (last) exit}' "$DIRTY_REF"
+}
+
+@test "dirty-tree-cleanup: the previous_filename projection validates each value before output" {
+  grep -qF '\\A[A-Za-z0-9._/-]+\\z' "$DIRTY_REF"
+  grep -qF 'error("unsafe previous_filename")' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'raises an error for any value outside'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'discard its partial output and treat the lookup as failed'
+  [ -n "$(dirty_ref_jq)" ]
+}
+
+@test "dirty-tree-cleanup: the documented jq yields clean renames as one value per line" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  expr=$(dirty_ref_jq)
+  run jq -r "$expr" "$BATS_TEST_DIRNAME/fixtures/pr-files-renames.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf 'src/old.ts\nlib/orig.ts')" ]
+}
+
+@test "dirty-tree-cleanup: the documented jq fails closed on a name with a newline" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  expr=$(dirty_ref_jq)
+  # an embedded newline would print safe and victim.txt as two lines
+  run jq -r "$expr" "$BATS_TEST_DIRNAME/fixtures/pr-files-renames-newline.json"
+  [ "$status" -ne 0 ]
+  # the forged record never reaches output
+  [[ "$output" != *"victim.txt"* ]]
+  # a trailing newline is rejected as well (a bare $ anchor would accept it)
+  printf '[{"previous_filename":"lib/orig.ts\n"}]' >"$BATS_TEST_TMPDIR/trail.json"
+  run jq -r "$expr" "$BATS_TEST_TMPDIR/trail.json"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"lib/orig.ts"* ]]
+}
+
 @test "dirty-tree cleanup: each command loads its own byte-identical copy and neither inlines it" {
   stack_copy="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"
   sweep_copy="$BATS_TEST_DIRNAME/../references/review-sweep-all/dirty-tree-cleanup.md"

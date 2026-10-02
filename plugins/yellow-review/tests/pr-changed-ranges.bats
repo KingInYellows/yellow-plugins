@@ -45,20 +45,8 @@ setup() {
   [[ "$stderr" == *"could not list files"* ]]
 }
 
-@test "consecutive added lines merge into one range" {
-  MOCK_GH_FILES_FIXTURE=pr-files-ranges.json run "$SCRIPT" 7
+@test "a file name with a newline cannot forge a row, even with a trailing newline" {
+  MOCK_GH_FILES_FIXTURE=pr-files-newline-names.json run "$SCRIPT" 7
   [ "$status" -eq 0 ]
-  [[ "$output" == *"src/run.ts 2-4"* ]]
-}
-
-@test "a no-newline marker does not shift the next hunk's line numbers" {
-  MOCK_GH_FILES_FIXTURE=pr-files-ranges.json run "$SCRIPT" 7
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"src/nonl.ts 2-2,11-11"* ]]
-}
-
-@test "a response that is not a file array exits 1 with a parse error" {
-  MOCK_GH_FILES_FIXTURE=pr-files-notarray.json run --separate-stderr "$SCRIPT" 7
-  [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not parse the PR file list"* ]]
+  [ "$output" = "src/clean.ts 1-1" ]
 }

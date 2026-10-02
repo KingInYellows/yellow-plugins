@@ -1,0 +1,5 @@
+[
+  {"filename":"src/clean.ts","status":"modified","patch":"@@ -1 +1 @@\n-a\n+b"},
+  {"filename":"victim.txt\n","status":"modified","patch":"@@ -1 +1 @@\n-a\n+b"},
+  {"filename":"safe\nvictim.txt","status":"modified","patch":"@@ -1 +1 @@\n-a\n+b"}
+]
