@@ -12,6 +12,18 @@ setup() {
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$B"
 }
 
+# require_timeout: set TIMEOUT_BIN to `timeout` or `gtimeout` (macOS coreutils),
+# or skip the calling test when neither is installed.
+require_timeout() {
+  if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_BIN=timeout
+  elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_BIN=gtimeout
+  else
+    skip "neither timeout nor gtimeout is installed"
+  fi
+}
+
 @test "clean text exits 0" {
   run "$SCRIPT" "$A" "$B"
   [ "$status" -eq 0 ]
@@ -51,25 +63,25 @@ setup() {
 
 @test "a very long single line is scanned to completion" {
   # The generous timeout only guards against a hang; speed is not asserted.
-  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
+  require_timeout
   head -c 3000000 /dev/zero | tr '\0' 'a' >| "$A"
-  run timeout 120 "$SCRIPT" "$A"
+  run "$TIMEOUT_BIN" 120 "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
 @test "a line of many keyword matches under the cap finishes quickly and is clean" {
-  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
+  require_timeout
   # 150 inword `bypass="false"` matches: below the per-line cap, not credentials.
   awk 'BEGIN { for (i = 0; i < 150; i++) printf "bypass=\"false\" "; printf "\n" }' >| "$A"
-  run timeout 20 "$SCRIPT" "$A"
+  run "$TIMEOUT_BIN" 20 "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
 @test "a line over the per-line match cap is refused, not scanned quadratically" {
-  command -v timeout >/dev/null 2>&1 || skip "timeout not installed"
+  require_timeout
   # ~1.5 MB of non-credential matches; the cap bounds the work and refuses.
   awk 'BEGIN { for (i = 0; i < 100000; i++) printf "bypass=\"false\" "; printf "\n" }' >| "$A"
-  run --separate-stderr timeout 20 "$SCRIPT" "$A"
+  run --separate-stderr "$TIMEOUT_BIN" 20 "$SCRIPT" "$A"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"resolve-text: refused rule=too-many-matches line=1"* ]]
 }
@@ -783,6 +795,7 @@ CASES
 
 @test "a long unclosed quote on a huge hostile file stays linear" {
   local i
+  require_timeout
   # Placeholder-only text never flags, so every open quote runs to its bound.
   {
     for i in $(seq 1 800); do
@@ -790,7 +803,7 @@ CASES
       yes string | head -n 25
     done
   } >| "$A"
-  run timeout 30 "$SCRIPT" "$A"
+  run "$TIMEOUT_BIN" 30 "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
@@ -818,4 +831,65 @@ CASES
   stays_clean 'bypass: |\n  correct horse battery staple\n'
   stays_clean 'Keep the password: the team agreed to rotate it\n'
   stays_clean 'password:\n  correct horse\n'
+}
+
+# Compound secret labels share the one keyword definition (`kw`), so every
+# path (unquoted, quoted, next line, carry, block scalar) sees them.
+@test "compound secret-key labels with a literal value are refused" {
+  refuses unquoted-keyword-value 'secret_key: hunter\n'
+  refuses unquoted-keyword-value 'secret-key = hunter\n'
+  refuses unquoted-keyword-value 'secret key: hunter\n'
+  refuses unquoted-keyword-value 'secretKey: hunter\n'
+  refuses unquoted-keyword-value 'clientSecretKey: hunter\n'
+  refuses unquoted-keyword-value 'client_secret: hunter\n'
+  refuses unquoted-keyword-value 'api_secret: hunter\n'
+  refuses unquoted-keyword-value 'private_key: hunter\n'
+  refuses unquoted-keyword-value 'privateKey: hunter\n'
+  refuses unquoted-keyword-value 'access_key: hunter\n'
+  refuses unquoted-keyword-value 'AccessKey = hunter\n'
+  refuses unquoted-keyword-value 'secret_key = abc123xyz\n'
+  refuses unquoted-keyword-value 'my_secret_key: hunter\n'
+}
+
+@test "uppercase compound secret labels are refused" {
+  refuses name-key-assignment 'SECRET_KEY=abcdefgh12\n'
+  refuses name-key-assignment 'CLIENT_SECRET: abcdefgh12\n'
+  refuses name-key-assignment 'PRIVATE_KEY = "abcdefgh12"\n'
+  refuses name-key-assignment 'AWS_ACCESS_KEY=abcdefgh12\n'
+  refuses unquoted-keyword-value 'SECRET_KEY: hunter\n'
+  refuses unquoted-keyword-value 'PRIVATE-KEY: hunter\n'
+}
+
+@test "compound secret labels are refused in quoted, next-line and block forms" {
+  refuses quoted-keyword-assignment '"secret_key": "hunter"\n'
+  refuses quoted-keyword-assignment "secret_key: 'correct horse'\\n"
+  refuses quoted-keyword-assignment 'private_key = "correct horse battery"\n'
+  refuses quoted-keyword-assignment 'secret_key: "correct\n  horse"\n'
+  refuses unquoted-keyword-value 'secret_key:\n  hunter\n'
+  refuses unquoted-keyword-value '- private_key:\n    hunter\n'
+  refuses unquoted-keyword-value 'secret_key: |\n  correct horse battery staple\n'
+  refuses unquoted-keyword-value 'private_key: >-\n  correct horse battery staple\n'
+  refuses unquoted-keyword-value 'secret_key: |\n  string\n  hunter22\n'
+}
+
+@test "compound secret labels with placeholders, types or prose stay clean" {
+  stays_clean 'secret_key: string\n'
+  stays_clean 'secret_key: <your key>\n'
+  stays_clean 'private_key: <your private key>\n'
+  stays_clean 'secretKey: $SECRET_KEY\n'
+  stays_clean 'access_key: "string"\n'
+  stays_clean 'secret_key: "<your key>"\n'
+  stays_clean 'secret_key: |\n  <your key>\n'
+  stays_clean 'secret_key:\n  string\n'
+  stays_clean 'secret_key: z.string()\n'
+  stays_clean 'The secret key is stored in the vault\n'
+  stays_clean 'Rotate the private key and the access key regularly.\n'
+  stays_clean 'const SECRET_KEY = process.env.SECRET_KEY\n'
+}
+
+@test "a compound secret label inside a word keeps the in-word rule" {
+  stays_clean 'thesecretkey: hunter\n'
+  stays_clean 'mysecretkey: |\n  correct horse battery staple\n'
+  stays_clean 'bypassaccess_key: hunter\n'
+  refuses unquoted-keyword-value 'thesecretkey: abc123xyz\n'
 }
