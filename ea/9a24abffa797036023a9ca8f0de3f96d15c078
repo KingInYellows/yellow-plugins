@@ -1,0 +1,54 @@
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_1eaff0f8a9448d 346-351,353-357,464-469,471-475,585-590,592-596
+  s_7a82748dd606d9::t_5243f55df4e34a 962
+  s_7a82748dd606d9::t_da5537ef93bf1f 227-231
+  s_7a82748dd606d9::t_91d8ed665e7142 367,485,606
+  s_7a82748dd606d9::t_98bfc4e5997caf 362-365,480-483,601-604
+  s_7a82748dd606d9::t_c874db095d8766 961
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_7a82748dd606d9::t_ef1ba70ad7c17d 62
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_7f93fb925d8086 1374
+  s_7a82748dd606d9::t_8064d80fb88450 1082-1083
+  s_7a82748dd606d9::t_25047873d53e61 1422-1568
+  s_7a82748dd606d9::t_b28f53af215bdf 887-890,892-895
+  s_7a82748dd606d9::t_86f4d47db8d0ae 1095,1099,1101,1105-1107,1109,1117-1121,1127,1129,1136,1140
+  s_7a82748dd606d9::t_6022d54e384ca9 1149,1153
+  s_7a82748dd606d9::t_a652b8dae3440a 926-932
+docs/security.md
+  s_7a82748dd606d9::t_cd642df23aa648 567-577
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_825229a51fc285 2048-2049
+  s_7a82748dd606d9::t_679363a8667ea6 3361
+  s_7a82748dd606d9::t_4645238c98e9bd 2472-2475,2478
+  s_7a82748dd606d9::t_9747fc28d7e0e3 2157-2167
+  s_7a82748dd606d9::t_d7a36da63bed7e 3060-3089
+  s_7a82748dd606d9::t_9af59c531d9835 1683-1708,1711-1712
+  s_7a82748dd606d9::t_b82268c07f9864 1723
+  s_7a82748dd606d9::t_e6a336a8a577cd 1880-1882
+  s_7a82748dd606d9::t_3180a2e2d30add 1276-1283
+  s_7a82748dd606d9::t_65bde9bc3b2ec8 2057
+  s_7a82748dd606d9::t_b06424d504cedf 2434-2460
+  s_7a82748dd606d9::t_74dc00248dcfe4 2149-2153
+  s_7a82748dd606d9::t_9acb668b780294 1304-1306
+  s_7a82748dd606d9::t_bc2ad4e07dabfc 3363
+  s_7a82748dd606d9::t_a7d953cbe3600c 3161-3165,3169
+  s_7a82748dd606d9::t_5e4c2d5db79303 2116-2139,2145-2146
+  s_7a82748dd606d9::t_62eb6a5b0de478 3280-3284,3286-3308,3310
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ea9a24abffa797036023a9ca8f0de3f96d15c078",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
