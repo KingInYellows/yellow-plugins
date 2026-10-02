@@ -564,3 +564,37 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'`tracker=github (linear unavailable)`'* ]]
   [[ "$text" == *'`check-resolve-text` before `save_issue`'* ]]
 }
+
+@test "dispositions: the prose allowlist is the single source for evidence and oos_reason" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'**Prose allowlist.** This is the single source.'* ]]
+  [[ "$text" == *'before any reply, issue or resolve helper runs'* ]]
+  [[ "$text" == *'every character is an ASCII letter, a digit, a space, or one of `. , : ; ! ? '"'"' " ( ) / _ # + -`'* ]]
+  [[ "$text" == *'The class has no `@`, backtick, `<`, `>`, `[`, `]`, `{`, `}`, `|`, `\`, `*` or `~`'* ]]
+  [[ "$text" == *'contains `://`, `www.`, `mailto:`, `![` or `](` fails'* ]]
+  [[ "$text" == *'1 to 200 characters on one line'* ]]
+  # Fixed replacement texts and the downgrades that follow them.
+  [[ "$text" == *'`evidence` becomes `see the PR diff`'* ]]
+  [[ "$text" == *'`oos_reason` becomes `no reason given`'* ]]
+  [[ "$text" == *'`addressed` then becomes `unclear`'* ]]
+  [[ "$text" == *'`oos` with the replaced reason becomes `unclear`'* ]]
+  [[ "$text" == *'says the value was withheld by the prose allowlist; it never prints the value'* ]]
+}
+
+@test "dispositions: the known-limits bullet no longer claims mentions can appear in resolver prose" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" != *'can still carry `@` mentions'* ]]
+  [[ "$text" == *'The prose allowlist (see Resolver line) is the mitigation'* ]]
+  [[ "$text" == *'mentions, external URLs and markdown images cannot appear in resolver prose'* ]]
+}
+
+@test "resolve-pr and the resolver agent point at the dispositions prose allowlist" {
+  pr=$(flat "$RESOLVE_PR")
+  [[ "$pr" == *"against the contract's prose allowlist before any helper in Step 7 runs"* ]]
+  [[ "$pr" == *'report a withheld value by thread, never by content'* ]]
+  # The allowlist is stated once, in dispositions.md, not copied here.
+  [[ "$pr" != *'mailto:'* ]]
+  agent=$(flat "$RESOLVER_AGENT")
+  [[ "$agent" == *'including its prose allowlist'* ]]
+  [[ "$agent" == *'with no `@`, links, backticks, brackets or Markdown'* ]]
+}

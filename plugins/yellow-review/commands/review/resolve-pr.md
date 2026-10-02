@@ -359,7 +359,10 @@ not already. Then, for every thread sent to a resolver:
 2. **Parse and validate** each `THREAD` line, applying the contract's
    downgrade rules, skipped-reason mapping and `addressed` evidence rules. A
    line that does not match the contract's full-line regex is malformed: that
-   thread is `unclear`. A `fixed` thread needs the cluster `Status` `complete`
+   thread is `unclear`. Check every `evidence` and `oos_reason` value against
+   the contract's prose allowlist before any helper in Step 7 runs, apply its
+   fixed replacement texts and downgrades, and report a withheld value by
+   thread, never by content. A `fixed` thread needs the cluster `Status` `complete`
    (every thread has a final disposition and every `fixed` edit is applied;
    mixed dispositions are fine), a named file and a diff. Match each
    `addressed` evidence value (`path:line` only; a commit SHA is not accepted)
