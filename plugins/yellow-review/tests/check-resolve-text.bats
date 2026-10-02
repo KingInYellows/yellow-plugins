@@ -375,3 +375,31 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   run sh -c '. "$1"; RT_HIT_RULE=stale; rt_looks_secret "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$BATS_TEST_TMPDIR/nope"
   [ "$output" = "[]" ]
 }
+
+@test "a spaced API key label with a literal value is refused" {
+  printf 'API key: hunter\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'api key = "abcd efgh"\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf 'api\tkey: hunterhunter\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}
+
+@test "a spaced API key label with a placeholder or prose stays clean" {
+  printf 'API key: string\nAPI key: <your key>\nThe API key is required for this call.\nRotate the api key before release.\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a percent-encoded URL password is flagged; percent placeholders stay clean" {
+  printf '%s\n' 'https://deploy:p%40ss%21word@example.com/x' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
+    'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}

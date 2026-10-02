@@ -60,7 +60,7 @@ rt_looks_secret() {
             # a `pass` keyword, but camelCase `userPassword="..."` is.
             r = l
             base = 0
-            while (match(r, /(pass(word|wd)?|secret|token|api[_-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
+            while (match(r, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
                 if (++nq > 200) { flag("too-many-matches"); break }
@@ -78,7 +78,7 @@ rt_looks_secret() {
             # flagged either way.
             r = l
             base = 0
-            while (match(r, /(pass(word|wd)?|secret|token|api[_-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
+            while (match(r, /(pass(word|wd)?|secret|token|api[_ \t-]?key|credential)[ \t]*[=:][ \t]*[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
@@ -119,7 +119,11 @@ rt_looks_secret() {
                 r = substr(r, RSTART + RLENGTH)
                 sub(/^[^:]*:\/\/[^:]*:/, "", seg)
                 sub(/@$/, "", seg)
-                if (seg ~ /[<${\[%]/ || index(ph, " " seg " ") > 0) continue
+                # `%` marks a placeholder only as `%NAME%`, `%(name)s` or a
+                # format spec (`%s`); a `%HH` escape (`p%40ss`) is password
+                # content and must be scanned.
+                if (seg ~ /[<${\[]/ || index(ph, " " seg " ") > 0) continue
+                if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /%\(|%[g-z]|%[0-9a-f]([^0-9a-f]|$)/) continue
                 flag("url-userinfo")
             }
             # Authorization header or Bearer/Basic scheme with an opaque
