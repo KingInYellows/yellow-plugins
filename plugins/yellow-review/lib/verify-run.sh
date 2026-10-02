@@ -45,7 +45,7 @@ vr_watchdog() {
 }
 
 # vr_drain_log <stream-pid> <command-pgid> <log>: wait for the log stream job
-# (a background subshell running vr_redact_stream | tail -c <cap>) to see
+# (a background subshell running vr_redact_stream | tail -c <cap + context>) to see
 # end-of-input. A process that outlived the
 # command and still holds the stream open is killed along with the rest of the
 # command's group; if the stream is still open after that (a process in
@@ -166,15 +166,41 @@ vr_redact_stream() {
     return "$rc"
 }
 
-# vr_publish_log <stream-file> <log>: write the redacted, bounded stream to the
-# final log path, but only after the last credential scan (rt_looks_secret, from
-# resolve-text.sh). A stream that still looks like a credential, or that cannot
-# be scanned, is replaced by a notice. Fail closed: the log path never holds
-# text that has not passed the scan. A stream in which fold cut a record
-# (vr_fold_withheld) is replaced by a notice and the function returns 3, so the
-# caller can name it in the result's reason; every other outcome returns 0.
+# vr_write_log_tail <stream-file> <log> <cap>: copy the last <cap> bytes of
+# <stream-file> to <log>. When the cut falls inside a line, that partial first
+# line is dropped. A stream of at most <cap> bytes is copied whole.
+vr_write_log_tail() {
+    local src="$1" log="$2" cap="$3" size lead
+    size=$(wc -c <"$src" 2>/dev/null) || size=0
+    size=${size//[[:space:]]/}
+    if [[ "$cap" =~ ^[0-9]+$ ]] && [[ "$size" =~ ^[0-9]+$ ]] && [ "$cap" -gt 0 ] && [ "$size" -gt "$cap" ]; then
+        # The byte before the retained suffix: a newline means the cut fell on
+        # a line boundary and the first retained line is whole.
+        lead=$(tail -c $((cap + 1)) -- "$src" 2>/dev/null | head -c 1 | od -An -tx1 | tr -d ' \n')
+        if [ "$lead" = 0a ]; then
+            (umask 077 && tail -c "$cap" -- "$src" >|"$log")
+        else
+            (umask 077 && tail -c "$cap" -- "$src" | sed '1d' >|"$log")
+        fi
+        return
+    fi
+    (umask 077 && cat -- "$src" >|"$log")
+}
+
+# vr_publish_log <stream-file> <log> [<cap>]: write the redacted, bounded stream
+# to the final log path, but only after the last credential scan
+# (rt_looks_secret, from resolve-text.sh). <stream-file> may hold more than
+# <cap> bytes: run-verify-command keeps extra context before the cap so the scan
+# sees a credential label whose value starts the published suffix. The scan
+# covers the whole <stream-file>; only its last <cap> bytes (see
+# vr_write_log_tail) are published, and only when the scan was clean. A stream
+# that still looks like a credential, or that cannot be scanned, is replaced by
+# a notice. Fail closed: the log path never holds text that has not passed the
+# scan. A stream in which fold cut a record (vr_fold_withheld) is replaced by a
+# notice and the function returns 3, so the caller can name it in the result's
+# reason; every other outcome returns 0.
 vr_publish_log() {
-    local src="$1" log="$2" rc=0
+    local src="$1" log="$2" cap="${3:-0}" rc=0
     if vr_fold_withheld "$src"; then
         (umask 077 && printf '[log withheld: output had a record longer than 64 KiB]\n' >|"$log") || rm -f -- "$log"
         return 3
@@ -182,7 +208,7 @@ vr_publish_log() {
     if declare -F rt_looks_secret >/dev/null 2>&1; then
         rt_looks_secret "$src" || rc=$?
         if [ "$rc" -eq 1 ]; then
-            (umask 077 && cat -- "$src" >|"$log") && return 0
+            vr_write_log_tail "$src" "$log" "$cap" && return 0
             (umask 077 && printf '[withheld: the log could not be written]\n' >|"$log") || rm -f -- "$log"
             return 0
         fi

@@ -786,3 +786,71 @@ old_link() {
   [ "$status" -eq 0 ]
   [ -z "$(find "$TMPDIR" -type f)" ]
 }
+
+# --- Symlinked ancestors of the runtime override ---
+
+# override_link_repo: tools -> real-tools (a symlinked directory) holding rt.js.
+override_link_repo() {
+  mkdir -p real-tools evil src
+  : >| real-tools/rt.js
+  : >| evil/rt.js
+  ln -s real-tools tools
+}
+
+@test "rp_runner flags a symlinked ancestor directory of the runtime override" {
+  override_link_repo
+  for ov in "$(pwd -P)/tools/rt.js" tools/rt.js ./src/../tools/rt.js; do
+    export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$ov"
+    rp_runner tools || { echo "tools not a runner with override=$ov"; false; }
+    rp_runner Tools || { echo "Tools not a runner (case) with override=$ov"; false; }
+    rp_runner real-tools/rt.js || { echo "real-tools/rt.js not a runner with override=$ov"; false; }
+    run rp_runner evil/rt.js
+    [ "$status" -ne 0 ] || { echo "runner: evil/rt.js with override=$ov"; false; }
+    run rp_runner src/a.ts
+    [ "$status" -ne 0 ]
+  done
+}
+
+@test "rp_runtime_override_rels lists each lexical node and symlink hop inside the repository" {
+  override_link_repo
+  ln -s ../tools/rt.js src/rt-link.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="src/rt-link.js"
+  run rp_runtime_override_rels
+  [ "$status" -eq 0 ]
+  [ "$output" = $'src\nsrc/rt-link.js\ntools\nreal-tools\nreal-tools/rt.js' ] || { echo "$output"; false; }
+}
+
+@test "rp_runtime_override_rels follows an in-repo symlink chain through an outside directory without printing it" {
+  override_link_repo
+  ln -s "$(pwd -P)/tools" "$BATS_TEST_TMPDIR/outside-link"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/outside-link/rt.js"
+  run rp_runtime_override_rels
+  [ "$status" -eq 0 ]
+  [ "$output" = $'tools\nreal-tools\nreal-tools/rt.js' ] || { echo "$output"; false; }
+}
+
+@test "rp_runtime_override_rels prints nothing for an override outside the repository" {
+  mkdir -p "$BATS_TEST_TMPDIR/ext/real"
+  : >| "$BATS_TEST_TMPDIR/ext/real/rt.js"
+  ln -s real "$BATS_TEST_TMPDIR/ext/dir"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/ext/dir/rt.js"
+  run rp_runtime_override_rels
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "rp_runtime_override_rels stops at a symlink loop" {
+  ln -s b a && ln -s a b
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="a/rt.js"
+  run rp_runtime_override_rels
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_runtime_override_rels keeps a plain in-repo file working" {
+  mkdir -p tools
+  : >| tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run rp_runtime_override_rels
+  [ "$output" = $'tools\ntools/rt.js' ]
+  rp_runner tools/rt.js
+}
