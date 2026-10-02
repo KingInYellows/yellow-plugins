@@ -30,7 +30,26 @@ if [ ! -f "$_VALIDATE_FS_HELPER" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
     done
     [ -n "$pa" ] || { [ -n "$pb" ]; return; }
     [ -n "$pb" ] || return 1
-    [[ "$pa" > "$pb" ]]
+    # SemVer prerelease precedence: dot-separated identifiers, numeric ones
+    # compared as numbers and below alphanumeric ones; more identifiers win a tie.
+    local -a ia ib
+    local n k
+    IFS=. read -r -a ia <<<"$pa"
+    IFS=. read -r -a ib <<<"$pb"
+    n=${#ia[@]}; [ "${#ib[@]}" -ge "$n" ] || n=${#ib[@]}
+    for ((k = 0; k < n; k++)); do
+      x="${ia[k]}"; y="${ib[k]}"
+      [ "$x" != "$y" ] || continue
+      if [[ "$x" =~ ^[0-9]+$ && "$y" =~ ^[0-9]+$ ]]; then
+        [ "$((10#$x))" -gt "$((10#$y))" ]; return
+      elif [[ "$x" =~ ^[0-9]+$ ]]; then
+        return 1
+      elif [[ "$y" =~ ^[0-9]+$ ]]; then
+        return 0
+      fi
+      [[ "$x" > "$y" ]]; return
+    done
+    [ "${#ia[@]}" -gt "${#ib[@]}" ]
   }
   _best=""; _best_v=""
   for _cand in "${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh; do
@@ -519,6 +538,8 @@ debt_anchor_hashes() {
 # stderr and left alone. Run from the git root.
 debt_pending_todos() {
   local f base st skipped=0
+  command -v yq >/dev/null 2>&1 || {
+    printf '[debt] Error: yq is required but not installed\n' >&2; return 1; }
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/[0-9]*-pending-*.md; do
     [ -f "$f" ] && [ ! -L "$f" ] || continue
@@ -585,6 +606,8 @@ debt_match_kept_todos() {
   local US=$'\x1f' paths out f base st meta cat loc fp anchor
   local -a k_id=() k_status=() k_cat=() k_path=() k_fp=() k_anchor=() candidates=() d_id=() d_fp=()
   local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged fm_status resurfaced
+  command -v yq >/dev/null 2>&1 || {
+    printf '[debt] Error: yq is required but not installed\n' >&2; return 1; }
   command -v validate_file_path >/dev/null 2>&1 || {
     printf '[debt] Error: validate_file_path is unavailable (yellow-core lib/validate-fs.sh not found); cannot fingerprint findings\n' >&2
     return 1; }

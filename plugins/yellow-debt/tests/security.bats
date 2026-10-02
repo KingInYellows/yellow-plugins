@@ -1144,6 +1144,33 @@ run_status_block() {
   [[ "$output" == *"1.10.0" ]]
 }
 
+@test "validate.sh ranks numeric prerelease identifiers numerically" {
+  cache="$BATS_TEST_TMPDIR/cache/yellow-plugins"
+  mkdir -p "$cache/yellow-debt/1.0.0/lib" "$cache/yellow-core/1.10.0-beta.2/lib" "$cache/yellow-core/1.10.0-beta.10/lib"
+  cp "$PLUGIN_ROOT/lib/validate.sh" "$cache/yellow-debt/1.0.0/lib/"
+  for v in 1.10.0-beta.2 1.10.0-beta.10; do
+    { cat "$PLUGIN_ROOT/../yellow-core/lib/validate-fs.sh"; printf '_VFS_MARK=%s\n' "$v"; } > "$cache/yellow-core/$v/lib/validate-fs.sh"
+  done
+  run env -u _VALIDATE_FS_LOADED CLAUDE_PLUGIN_ROOT="$cache/yellow-debt/1.0.0" bash -c '. "$CLAUDE_PLUGIN_ROOT/lib/validate.sh" 2>&1; printf "%s\n" "$_VFS_MARK"'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"beta.10" ]]
+}
+
+@test "reconciliation stops when yq is missing instead of treating every todo as unreadable" {
+  init_repo
+  mkdir -p .debt "$BATS_TEST_TMPDIR/noyq"
+  printf '[]' > .debt/surviving-findings.json
+  for t in bash cat grep sed tr sort mktemp rm mv basename dirname jq awk chmod rmdir git; do
+    p=$(command -v "$t") && ln -sf "$p" "$BATS_TEST_TMPDIR/noyq/$t"
+  done
+  run --separate-stderr env PATH="$BATS_TEST_TMPDIR/noyq" "$BASH" -c '. "$1"; debt_pending_todos' _ "$PLUGIN_ROOT/lib/validate.sh"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"yq is required"* ]]
+  run --separate-stderr env PATH="$BATS_TEST_TMPDIR/noyq" "$BASH" -c '. "$1"; debt_match_kept_todos' _ "$PLUGIN_ROOT/lib/validate.sh"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"yq is required"* ]]
+}
+
 @test "debt_match_kept_todos fails loudly when validate_file_path is unavailable" {
   init_repo
   mkdir -p .debt
