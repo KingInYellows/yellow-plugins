@@ -38,8 +38,18 @@ A path is **owned** when it is one of:
   originals from the same files API:
 
   ```bash
-  gh api --paginate "repos/{owner}/{repo}/pulls/<PR#>/files?per_page=100" --jq '.[] | select(.previous_filename) | .previous_filename'
+  gh api --paginate "repos/{owner}/{repo}/pulls/<PR#>/files?per_page=100" --jq '
+    .[] | select(.previous_filename) | .previous_filename
+    | if test("\\A[A-Za-z0-9._/-]+\\z") then . else error("unsafe previous_filename") end'
   ```
+
+  Git permits a newline in a file name, and `--jq` prints a decoded value
+  literally, so an unchecked name would split into two output lines and forge
+  a record. The expression validates each value before output and raises an
+  error for any value outside `^[A-Za-z0-9._/-]+$` or containing a control
+  character (`\A` and `\z` anchor the whole string, so a trailing newline
+  cannot slip through). The call then exits non-zero; discard its partial
+  output and treat the lookup as failed.
 
   The PR's owned file set is each file's `filename` plus its
   `previous_filename`, under the same `^[A-Za-z0-9._/-]+$` and
