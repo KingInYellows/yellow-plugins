@@ -1,0 +1,35 @@
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_c2afa5b899de45 3237-3245,3253-3259
+  s_7a82748dd606d9::t_c23451a7d22c95 1689-1690,2466,3092-3132,3139,3378
+  s_7a82748dd606d9::t_990183d4ecc3b1 1148-1149,1669,1691,2055-2060,2112,2130-2132,2177-2183,2464-2465,3137-3138,3260,3376-3377,3440,3450-3453
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_fce2e9c6ab4420 232-236
+  s_7a82748dd606d9::t_7f0aa70a63ff93 496-503
+  s_7a82748dd606d9::t_fc747b334d37e1 372-379
+  s_7a82748dd606d9::t_7ff2984f22269a 871-878
+  s_7a82748dd606d9::t_cadf86df93d1af 623-631
+  s_7a82748dd606d9::t_0a114ed40dd1a1 996
+  s_7a82748dd606d9::t_8b3ec9c9d0518e 932-934
+docs/security.md
+  s_7a82748dd606d9::t_23782d5b044df1 559-563,576-578,587-599
+plugins/yellow-council/CLAUDE.md
+  s_7a82748dd606d9::t_c26bb0cec4ee14 91-98
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_d4272fbc36c3e1 517,1727-1877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8b38adb6cf6f329b143f3c12f4997dfccf1cba86",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
