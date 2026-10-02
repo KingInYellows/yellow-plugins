@@ -23,8 +23,10 @@ command -v validate_file_path >/dev/null 2>&1 || \
 # Todo filename contract: {id}-{status}-{severity}-{slug}[-{hash}].md. A name
 # outside it is never handed to a shell block or a model — the repository
 # controls these names, and one containing `$(…)` or a backtick would run if
-# it were pasted into shell text.
-DEBT_TODO_NAME_RE='^[0-9]{1,6}-(pending|ready|in-progress|deferred|complete|deleted)-(critical|high|medium|low)-[a-z0-9]+(-[a-z0-9]+)*\.md$'
+# it were pasted into shell text. `wont-fix` (valid finding, deliberately not
+# fixed) is hyphenated so it fits the status group; the `wont_fix` spelling an
+# agent once wrote by hand is accepted only as a transition source.
+DEBT_TODO_NAME_RE='^[0-9]{1,6}-(pending|ready|in-progress|deferred|complete|deleted|wont-fix)-(critical|high|medium|low)-[a-z0-9]+(-[a-z0-9]+)*\.md$'
 
 debt_todo_name_ok() {
   [[ "$1" =~ $DEBT_TODO_NAME_RE ]]
@@ -202,7 +204,7 @@ validate_severity() {
 transition_todo_state() {
   local todo_file="$1"
   local new_state="$2"
-  local deferred_reason="${3:-}"
+  local reason="${3:-}"
   local todo_dir temp_file="" lock_dir="${todo_file}.lock"
   todo_dir=$(dirname -- "$todo_file")
 
@@ -237,17 +239,38 @@ transition_todo_state() {
   local updated_frontmatter body
   updated_frontmatter=$(extract_frontmatter "$todo_file" | yq -y --arg val "$new_state" '.status = $val' 2>/dev/null) || return 1
 
-  # Add deferred_reason if state is deferred and reason is provided; clear it otherwise.
-  # Delete the legacy defer_reason field as part of the schema migration.
-  if [ "$new_state" = "deferred" ] && [ -n "$deferred_reason" ]; then
-    # cut -c counts chars (not bytes) when LC_CTYPE is UTF-8; falls back to bytes on C/ASCII locale
-    local clean_reason
-    clean_reason=$(printf '%s' "$deferred_reason" | tr -d '\n\r' | cut -c1-200)
-    updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.deferred_reason = $val | del(.defer_reason)' 2>/dev/null) || return 1
-  else
-    # Clear any stale deferred reason fields when not deferring (or deferring without reason).
-    updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
-  fi
+  # Reason fields: `deferred` keeps deferred_reason, `wont-fix` keeps
+  # wont_fix_reason, every other target keeps neither. The legacy defer_reason
+  # is always dropped. Clean the reason first (strip newlines, cut to 200
+  # codepoints with jq — `cut -c` counts bytes and can split a character) and
+  # test the cleaned value, so a reason made only of newlines writes no field.
+  local clean_reason
+  clean_reason=$(printf '%s' "$reason" | tr -d '\n\r')
+  clean_reason=$(jq -rn --arg s "$clean_reason" '$s[0:200]') || return 1
+  case "$new_state" in
+    wont-fix)
+      if [ -z "$clean_reason" ] && [ "$current_state" = "wont_fix" ]; then
+        # Legacy repair: keep the hand-written reason, truncated like a new one.
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y '
+          (if (.wont_fix_reason | type) == "string" then .wont_fix_reason |= .[0:200] else . end)
+          | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      elif [ -n "$clean_reason" ]; then
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.wont_fix_reason = $val | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      else
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.wont_fix_reason) | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      fi
+      ;;
+    deferred)
+      if [ -n "$clean_reason" ]; then
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.deferred_reason = $val | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      else
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      fi
+      ;;
+    *)
+      updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+      ;;
+  esac
   body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$todo_file")
 
   # Write updated content to a fresh temp file (mktemp never reuses a planted
@@ -270,6 +293,7 @@ transition_todo_state() {
   rest="${base_name#"$id"-}"
   case "$rest" in
     in-progress-*) rest="${rest#in-progress-}" ;;
+    wont-fix-*) rest="${rest#wont-fix-}" ;;
     *) rest="${rest#*-}" ;;
   esac
   new_filename="${todo_dir}/${id}-${new_state}-${rest}"
@@ -288,6 +312,70 @@ transition_todo_state() {
   return 0
 }
 
+# --- Finding fingerprints -------------------------------------------------
+# A re-audit must recognise a finding that already has a kept todo. Line
+# numbers drift between LLM runs, so identity is the flagged code itself, with
+# spaces, tabs and CR removed (re-indenting does not change it), the same idea
+# as GitHub's primaryLocationLineHash. The value is versioned (`fp/v1:`) so the
+# normalisation can change later.
+
+# Print the first 16 hex digits of the SHA-256 of stdin.
+_debt_sha16() {
+  local out
+  if command -v sha256sum >/dev/null 2>&1; then
+    out=$(sha256sum) || return 1
+  else
+    out=$(shasum -a 256) || return 1
+  fi
+  printf '%s\n' "${out:0:16}"
+}
+
+# Print lines START..END of PATH with spaces, tabs and CR removed. The path is
+# scanner output and untrusted: it must be project-relative, inside the repo
+# and not a symlink.
+_debt_flagged_text() {
+  local path="$1" start="$2" end="$3"
+  command -v validate_file_path >/dev/null 2>&1 || return 1
+  validate_file_path "$path" || return 1
+  [ ! -L "$path" ] && [ -f "$path" ] || return 1
+  [[ "$start" =~ ^[0-9]{1,9}$ && "$end" =~ ^[0-9]{1,9}$ ]] || return 1
+  [ "$((10#$start))" -ge 1 ] && [ "$((10#$start))" -le "$((10#$end))" ] || return 1
+  sed -n "$((10#$start)),$((10#$end))p" -- "$path" | tr -d ' \t\r'
+}
+
+# Usage: debt_fingerprint CATEGORY PATH [START END]
+# Prints `fp/v1:<16 hex>` of sha256("fp/v1\0category\0path\0text"). Without a
+# line range the text is empty, so the fingerprint covers category and path
+# only. A range with no code in it (past end of file, or only blanks) fails, so
+# the finding cannot match anything and resurfaces.
+debt_fingerprint() {
+  local category="$1" path="$2" start="${3:-}" end="${4:-}" text=""
+  validate_category "$category" || return 1
+  if [ -n "$start" ] || [ -n "$end" ]; then
+    text=$(_debt_flagged_text "$path" "$start" "$end") || return 1
+    [ -n "$(printf '%s' "$text" | tr -d '\n')" ] || return 1
+  else
+    command -v validate_file_path >/dev/null 2>&1 || return 1
+    validate_file_path "$path" || return 1
+  fi
+  local digest
+  digest=$({ printf 'fp/v1\0%s\0%s\0' "$category" "$path"; printf '%s' "$text"; } | _debt_sha16) || return 1
+  printf 'fp/v1:%s\n' "$digest"
+}
+
+# Usage: debt_anchor_hashes PATH START END
+# Prints one 16-hex hash per non-blank line of the range, in order. The first
+# is the todo's `anchor_hash`; the rest let a later run match a finding whose
+# range shifted by a few lines.
+debt_anchor_hashes() {
+  local line text
+  text=$(_debt_flagged_text "$1" "$2" "$3") || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    printf '%s' "$line" | _debt_sha16 || return 1
+  done <<<"$text"
+}
+
 validate_transition() {
   local from="$1"
   local to="$2"
@@ -297,6 +385,12 @@ validate_transition() {
     ready→in-progress|ready→deleted) return 0 ;;
     in-progress→complete|in-progress→ready) return 0 ;;
     deferred→pending) return 0 ;;
+    # wont-fix: valid finding deliberately not fixed. Reopen goes back to
+    # pending for re-triage. `wont_fix` is the spelling an agent once wrote by
+    # hand; it is accepted as a source only so the helper can repair it.
+    pending→wont-fix|ready→wont-fix|in-progress→wont-fix|deferred→wont-fix) return 0 ;;
+    wont-fix→pending) return 0 ;;
+    wont_fix→wont-fix) return 0 ;;
     *) return 1 ;;
   esac
 }
