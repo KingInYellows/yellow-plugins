@@ -895,3 +895,37 @@ STUB
   [ -f src/new.txt ]
   run ! compgen -G "$PATCH_DIR/*.patch"
 }
+
+@test "--revert-dirty removes a directory standing where a tracked file was and restores the file" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ ! -e src/new.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only removes a directory standing where a tracked file was and restores the file" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a listed path that is a symlink to an outside directory is not followed on revert" {
+  outside="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$outside" && printf 'keep\n' >| "$outside/survivor.txt"
+  rm -f src/a.txt && ln -s "$outside" src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f "$outside/survivor.txt" ]
+  [ "$(cat "$outside/survivor.txt")" = keep ]
+  [ -f src/a.txt ] && [ ! -L src/a.txt ]
+  [ -z "$(git status --porcelain)" ]
+}

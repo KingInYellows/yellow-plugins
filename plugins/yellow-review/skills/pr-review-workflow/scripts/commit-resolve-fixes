@@ -15,7 +15,9 @@
 #   "credential-shaped") unless --allow-credential-shaped is passed, which an
 #   interactive caller does only after the user confirms a second time.
 #   The same check runs again on the commit itself: a credential a git hook
-#   added is refused with exit 4 (the commit is undone), not 3.
+#   added is refused with exit 4 (the commit is undone), not 3. The override
+#   excuses only the added lines the user approved (those of the pre-commit
+#   staged diff); any other added line in the commit is scanned and refused.
 #   --allow-credential-shaped together with --unattended is a usage error
 #   (exit 2): the override needs a human.
 #   message: one line starting with a conventional `fix` prefix; carries
@@ -239,7 +241,11 @@ fi
 # is skipped by position, so an added "++ x" line is still scanned), with
 # --text so binary-attributed files are not hidden.
 ADDED=$(mktemp) || die 2 "mktemp failed"
-trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED"' EXIT
+# APPROVED: the added lines the user saw and approved (override only);
+# REMAINING: the commit's added lines minus the approved ones.
+APPROVED=$(mktemp) || die 2 "mktemp failed"
+REMAINING=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED" "$APPROVED" "$REMAINING"' EXIT
 if ! git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
     | rt_added_lines >|"$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}" || true
@@ -248,6 +254,14 @@ fi
 if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}"
     die 3 "credential-shaped: staged changes look like they contain a credential, or could not be scanned; nothing committed"
+fi
+# With the override, remember what was approved so the post-commit scan can
+# still refuse anything a hook adds.
+if [ "$ALLOW_CREDENTIAL" = 1 ]; then
+    cp -- "$ADDED" "$APPROVED" || {
+        lgit reset -q -- "${EXPECTED[@]}" || true
+        die 3 "could not record the approved added lines; nothing committed"
+    }
 fi
 
 # --- Commit (always a new commit; never amend) ---
@@ -291,7 +305,15 @@ fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | rt_added_lines >|"$ADDED" \
     || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
-if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
+# With the override, drop only added lines identical to an approved one (grep
+# exits 1 when nothing is left, which is fine); the rest is scanned as usual.
+SCAN_FILE="$ADDED"
+if [ "$ALLOW_CREDENTIAL" = 1 ]; then
+    LC_ALL=C grep -vxFf "$APPROVED" "$ADDED" >|"$REMAINING" || [ $? -eq 1 ] \
+        || undo_commit "could not filter the approved lines for the credential scan; nothing submitted"
+    SCAN_FILE="$REMAINING"
+fi
+if ! rt_text_clean "$SCAN_FILE"; then
     undo_commit "credential-shaped: the commit looks like it contains a credential, or could not be scanned (a hook may have added it); nothing submitted"
 fi
 # A hook can also leave edits or new files unstaged or untracked. Check before
