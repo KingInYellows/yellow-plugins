@@ -50,14 +50,22 @@ State the guarantee the change actually provides and document the residual:
    the state file and the `.token`. Say so in `council.md` and
    `docs/security.md` ("Known residual").
 3. Reviewers suggested mitigations. Only one fits the model this doc
-   describes: a deny rule on `Write` to `.git/council-synth.state`. They also
-   suggested a secret held only by the shell (a token never printed to the
-   transcript, kept in the process environment or in a file the model has no
-   path to), but treat that as unproven here: every Bash call is a fresh
-   process, so an environment variable does not reach the next block, and
-   `Write` and `Read` reach any path the user can write, so a hidden file is
-   not hidden from them. Do not rely on either until it is tested against
-   those two facts.
+   describes: a deny rule on `Write` to `.git/council-synth.state`. Treat it
+   as a partial mitigation to test, not the fix: the orchestrator also holds
+   Bash, and a redirect (`printf ... > .git/council-synth.state`) forges the
+   file without touching `Write`. It holds only if the Bash path to that file
+   is denied too. Reviewers also suggested a secret held only by the shell (a
+   token never printed to the transcript, kept in the environment or in a file
+   the model has no path to), but treat that as unproven here:
+   - A variable exported inside one Bash call does not persist to the next
+     call, which is why the state file exists.
+   - A variable placed in the parent environment is inherited by every Bash
+     call, so the model can read it (`echo "$TOKEN"`) and leak it into the
+     transcript.
+   - `Write` and `Read` reach any path the user can write, so a hidden file is
+     not hidden from them.
+
+   Do not rely on any of these until it is tested against those facts.
 4. Keep the shape checks (`/tmp/council-synth-*`, no `..`, not a symlink,
    owned by the user). They bound what a forged state can reach: only a
    directory the forger also populated.

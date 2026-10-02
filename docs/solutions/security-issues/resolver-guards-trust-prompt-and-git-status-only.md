@@ -49,12 +49,17 @@ the only place the deny list lives.
 
 ## Solution
 
-1. Before the resolver waves, hash every deny-listed path that git ignores or
-   that lives under `.git` (`yellow-plugins.local.md`, `.claude`, `.env`,
-   hooks, git config). After the waves, re-hash and fail closed on any
-   difference: stop, report the path, and do not commit or push. Where the
-   runtime allows it, enforce the deny list directly instead of detecting
-   violations afterwards.
+1. Before the resolver waves, record existence, hash, and keep a copy of
+   every deny-listed path that git ignores or that lives under `.git`
+   (`yellow-plugins.local.md`, `.claude`, `.env`, hooks, git config). After
+   the waves, re-hash and compare. On any change or creation, restore first:
+   put a changed file back from its pre-flight copy and delete a newly created
+   one. Then re-hash and stop only if every path matches its pre-flight state,
+   reporting the path; do not commit or push. Fail closed if a restore fails
+   or the post-restore hash still differs. Stopping without restoring leaves
+   the tampered file as the next run's baseline, so its `verify_command`
+   would run. Where the runtime allows it, enforce the deny list directly
+   instead of detecting violations afterwards.
 2. Require `Files modified` entries to be repo-relative paths, and drop any
    file with no diff before writing the files file, so a bad entry cannot widen
    the revert.
@@ -106,11 +111,14 @@ Guidance: do not detect trusted-config tampering through git. At
 pre-flight, record whether each trusted-config path exists, and hash every
 one that does, ignored ones included. The path set is the resolver deny
 list: the "File set" section of `references/resolve/dispositions.md`
-(PR #954) and `rp_denied` in `lib/resolve-paths.sh` are the canonical
-source, so do not copy the list here or into the walk. After each resolve,
-compare both existence and content, because a resolver can create an
-optional file such as `yellow-plugins.local.md` that a later command then
-loads. On any creation or change, restore the pre-flight state (delete a
+(PR #950 adds the file with that section marked planned; PR #954 makes it
+final) and `rp_denied` in `lib/resolve-paths.sh` are the canonical source,
+so do not copy the list here or into the walk. Point-in-time: neither
+file is on trunk yet. `lib/resolve-paths.sh` ships with PR #952, which
+#954 stacks on, so a checkout without those PRs has no canonical list.
+After each resolve, compare both existence and content, because a resolver
+can create an optional file such as `yellow-plugins.local.md` that a later
+command then loads. On any creation or change, restore the pre-flight state (delete a
 created file, restore a changed one from its pre-flight copy) and stop the
 walk. A restore that fails is itself a stop condition. Tracked in #973;
 point-in-time, as the walk-level check is not on main yet.

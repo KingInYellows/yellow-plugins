@@ -33,21 +33,24 @@ and split the lifecycle across calls:
    `trap` that removes the directory on every exit of that call, then reads
    the file and does the remaining work.
 4. **Abort cover:** if `Write` fails, or the orchestrator stays active after
-   an abort between steps 1 and 3, it runs an explicit
-   `rm -rf -- "<dir>"` block before stopping. No trap exists yet in that
-   window, so this block is the only cleanup.
+   an abort between steps 1 and 3, it runs an explicit removal block before
+   stopping. No trap exists yet in that window, so this block is the only
+   cleanup. It acts on the same relayed literal as step 3, so it runs the
+   same re-validation first and refuses to delete on any mismatch.
    If the user cancels the run in that window, the orchestrator gets no later
    tool call and this block never runs, so the directory is orphaned. Cover
    that residual with a stale-directory sweep at the start of a later run, as
    the council command's `council-synth-*` sweep does (reclaims directories
    older than a day).
 
-Re-validate the path in step 3 before the trap or any `rm -rf` can act on
-it. The value crossed a tool-call boundary as text, so check that it is
+Re-validate the path in steps 3 and 4 before the trap or any `rm -rf` can act
+on it. The value crossed a tool-call boundary as text, so check that it is
 non-empty, is a directory you own and not a symlink, and is a direct child of the
 expected temp root with the name the mint call chose. Reject any `..`. Run
-every check before installing the trap: a trap installed on an unchecked
-path deletes whatever directory that path names. A relayed literal is still
+every check before installing the trap or running the abort `rm -rf`: either
+one on an unchecked path deletes whatever directory that path names. On any
+failed check, exit without deleting and leave the stale-directory sweep to
+reclaim the real directory. A relayed literal is still
 only text; see
 [Shell-owned state is not a boundary against Write](../security-issues/shell-owned-state-is-not-a-boundary-against-write.md)
 for what these checks do and do not guarantee.
@@ -76,12 +79,15 @@ trap 'rm -rf -- "$STAGE_DIR"' EXIT   # fires when this call exits, before Write
 printf '%s\n' "$STAGE_DIR"
 ```
 
-Right, as three steps:
+Right, as three calls (plus an abort cover):
 
 ```bash
 # Call 1 -- mint only
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
-STAGE_DIR="$(mktemp -d "$TMP_ROOT/stage.XXXXXX")" && printf '%s\n' "$STAGE_DIR"
+STAGE_DIR="$(mktemp -d "$TMP_ROOT/stage.XXXXXX")" || exit 1
+STAGE_TOKEN="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+printf '%s' "$STAGE_TOKEN" > "$STAGE_DIR/.token" || exit 1
+printf '%s\n%s\n' "$STAGE_DIR" "$STAGE_TOKEN"   # line 1: dir, line 2: token
 ```
 
 ```text
@@ -92,7 +98,8 @@ Write: <STAGE_DIR>/report.md   (literal path from call 1)
 # Call 3 -- re-validate, trap, consume
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
 STAGE_DIR="<literal path from call 1>"
-[ -n "$STAGE_DIR" ] || exit 1
+STAGE_TOKEN="<literal token from call 1>"
+[ -n "$STAGE_DIR" ] && [ -n "$STAGE_TOKEN" ] || exit 1
 # Strip the root: an unchanged value is outside it, */* is nested, *..* is traversal.
 case "${STAGE_DIR#"$TMP_ROOT"/}" in
   "$STAGE_DIR"|*/*|*..*) exit 1 ;;
@@ -100,8 +107,30 @@ case "${STAGE_DIR#"$TMP_ROOT"/}" in
   *) exit 1 ;;
 esac
 [ -d "$STAGE_DIR" ] && [ ! -L "$STAGE_DIR" ] && [ -O "$STAGE_DIR" ] || exit 1
+# Shape and ownership match any user-owned stage.* directory; the token binds to the minted one.
+[ -f "$STAGE_DIR/.token" ] && [ ! -L "$STAGE_DIR/.token" ] || exit 1
+[ "$(cat -- "$STAGE_DIR/.token")" = "$STAGE_TOKEN" ] || exit 1
 trap 'rm -rf -- "$STAGE_DIR"' EXIT
 cat -- "$STAGE_DIR/report.md"
+```
+
+The name and ownership checks alone accept any user-owned `stage.*` direct
+child, so a relayed literal swapped for an existing one would have the trap
+delete it. The `.token` comparison refuses that swap: the consuming call
+deletes only a directory that holds the token call 1 printed. It does not stop
+a model that deliberately writes a matching directory and token, because
+`Write` and Bash reach the same paths. See
+[Shell-owned state is not a boundary against Write](../security-issues/shell-owned-state-is-not-a-boundary-against-write.md)
+for that residual.
+
+```bash
+# Call 4 -- abort cover, only when Write failed or the run is stopping
+TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
+STAGE_DIR="<literal path from call 1>"
+STAGE_TOKEN="<literal token from call 1>"
+# Run every Call 3 check verbatim here (non-empty, root-strip case, -d/-L/-O
+# and the .token comparison), each ending in `|| exit 1`, so a mismatch refuses to delete.
+rm -rf -- "$STAGE_DIR"
 ```
 
 Related: [Bash block subshell isolation](bash-block-subshell-isolation-in-command-files.md),
