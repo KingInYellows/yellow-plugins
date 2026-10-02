@@ -317,8 +317,8 @@ Run /debt:fix to begin remediation of accepted findings."
 **Defer** → Transitions to `deferred` state with reason
 - Valid finding but not addressing now
 - Optional reason (validated: no newlines, max 200 chars)
-- Kept in `todos/debt/`: a re-audit skips a matching finding until you reopen
-  the todo to `pending` (`deferred → pending`)
+- Kept in `todos/debt/`, but a re-audit does not skip it: the finding comes
+  back as a new pending todo while the code still has the problem
 
 **Won't fix** → Transitions to `wont-fix` state with optional reason
 - Valid finding that is deliberately not being fixed

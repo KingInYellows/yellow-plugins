@@ -333,7 +333,8 @@ fingerprint hashes the category, the path and the flagged code with spaces,
 tabs and CR removed (the first 200 lines of a longer range); a finding without a
 line range gets none. `anchor_hash` hashes the first substantive flagged line
 (8+ characters once whitespace is removed). `audit-synthesizer` uses them to
-skip a new finding that matches a kept todo (any status except `pending`):
+skip a new finding that matches a kept todo (any status except `pending` and
+`deferred`):
 exact fingerprint first, then the same category and path whose anchor equals the
 first substantive line of the new range (never for `security-debt`). Only a
 unique match suppresses; ties and edited code resurface as new pending todos. A

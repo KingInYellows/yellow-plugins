@@ -820,7 +820,7 @@ write_surviving() {
   make_source
   anchor=$(debt_anchor_hashes src/a.js 2 3 1)
   make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-2\nanchor_hash: $anchor"
-  make_todo 008 deferred 008-deferred-high-bbb.md "affected_files:\n  - src/a.js:2-4\nanchor_hash: $anchor"
+  make_todo 008 ready 008-ready-high-bbb.md "affected_files:\n  - src/a.js:2-4\nanchor_hash: $anchor"
   mkdir -p .debt
   write_surviving 2-5
   debt_match_kept_todos
@@ -855,6 +855,19 @@ write_surviving() {
   [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'* ]]
   rm todos/debt/007-wont-fix-high-aaa.md
   make_todo 009 complete 009-complete-high-ccc.md "affected_files:\n  - src/a.js:2-3"
+  debt_match_kept_todos
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "debt_match_kept_todos lets a deferred finding resurface" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  make_todo 007 deferred 007-deferred-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  mkdir -p .debt
+  write_surviving 2-3
   debt_match_kept_todos
   load_fingerprints
   [[ "${lines[0]}" == *'"skip":false'* ]]

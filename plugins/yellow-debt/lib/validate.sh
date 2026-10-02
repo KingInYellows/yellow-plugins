@@ -473,7 +473,7 @@ debt_next_todo_id() {
 }
 
 # Decide which surviving findings already have a kept todo (any status but
-# pending). Reads .debt/surviving-findings.json (an array of v2.0 records),
+# pending or deferred). Reads .debt/surviving-findings.json (an array of v2.0 records),
 # writes .debt/fingerprints.json (one entry per finding, by index) and prints a
 # line per skipped finding. Exact fingerprint first; then same category and
 # path whose anchor_hash equals the first substantive line of the new range
@@ -503,7 +503,9 @@ debt_match_kept_todos() {
     base="${f##*/}"
     [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
     st="${BASH_REMATCH[1]}"
-    [ "$st" != pending ] || continue
+    # A pending todo is about to be deleted and a deferred one is meant to come
+    # back: neither suppresses a new finding.
+    [ "$st" != pending ] && [ "$st" != deferred ] || continue
     meta=$(extract_frontmatter "$f" | yq -r '[(.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || { unreadable=$((unreadable + 1)); continue; }
     IFS="$US" read -r cat loc fp anchor <<<"$meta"
     _debt_split_loc "$loc"

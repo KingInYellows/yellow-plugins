@@ -385,6 +385,9 @@ record; the decisions are kept as written at plan time.
   The matching, pending listing and next-id logic live in `lib/validate.sh`
   (`debt_match_kept_todos`, `debt_pending_todos`, `debt_next_todo_id`), not in
   agent prose.
+- Decision 7: a `deferred` todo does not suppress a new finding (the user chose
+  this in review: Defer means "ask me again next audit"), so the kept set is
+  `ready`, `in-progress`, `complete`, `wont-fix` and `deleted`.
 - The Step 5 wipe leaves a file named `-pending-` whose frontmatter status says
   otherwise (a closed legacy todo).
 - Decision 9 was wrong: the fixer runs in a separate worktree and does not see a

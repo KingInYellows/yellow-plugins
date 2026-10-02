@@ -125,7 +125,7 @@ auto-loads it as a second hook source). Findings live at
 `pending|ready` × `critical|high` filenames.
 
 `wont-fix` closes a valid finding that is deliberately not fixed; the file stays
-(unlike `deleted`) and a re-audit skips findings that match a kept todo. Each
+(unlike `deleted`) and a re-audit skips findings that match a kept todo (not a `deferred` one). Each
 todo carries a shell-computed `fingerprint: fp/v1:…` (category, path and flagged
 code with whitespace removed, so a finding needs a line range) and an
 `anchor_hash`; `audit-synthesizer` Step 5a (`debt_match_kept_todos`) matches on

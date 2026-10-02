@@ -175,8 +175,9 @@ wont-fix).
 #### 5a. Skip findings that match a kept todo
 
 A finding the user already closed (`wont-fix`, `complete`, `deleted`) or has
-accepted or parked (`ready`, `in-progress`, `deferred`) must not come back as a
-new pending todo. Match by code, not by line numbers: scanner line ranges drift
+accepted (`ready`, `in-progress`) must not come back as a new pending todo. A
+`deferred` todo does not suppress: that finding comes back as a new pending todo
+while the code still has the problem. Match by code, not by line numbers: scanner line ranges drift
 between runs.
 
 First clear any file a cloned repository may have planted at the path the

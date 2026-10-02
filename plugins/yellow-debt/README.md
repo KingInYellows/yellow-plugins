@@ -211,11 +211,11 @@ for pending findings. To close one that is already `ready`, `in-progress` or
 in a bash child that sources `lib/validate.sh`).
 Closing a todo does not touch its Linear issue: close that by hand.
 
-A re-audit skips a new finding that matches any kept todo (every status except
-`pending`) by `fingerprint`, a hash of the category, path and flagged code, so
-a closed finding does not come back. Findings whose code changed resurface. A
-`deferred` finding is also kept, so it stays quiet until you reopen it to
-`pending`.
+A re-audit skips a new finding that matches a kept todo (every status except
+`pending` and `deferred`) by `fingerprint`, a hash of the category, path and
+flagged code, so a closed finding does not come back. Findings whose code
+changed resurface. A `deferred` finding is not skipped: it comes back as a new
+pending todo while the code still has the problem.
 
 All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
 
