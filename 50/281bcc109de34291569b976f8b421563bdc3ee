@@ -1,0 +1,49 @@
+docs/solutions/code-quality/state-rules-once-and-update-unwired-prose.md
+  s_abf654ee5b037d::t_a555718d688833 29-30
+  s_abf654ee5b037d::t_cab25cf384126e 42-47
+  s_abf654ee5b037d::t_abadfd85184f5e 74-75
+docs/solutions/code-quality/solution-doc-citations-die-on-restack.md
+  s_abf654ee5b037d::t_269917d18b3e96 137-139
+  s_abf654ee5b037d::t_690b604b0b46c3 153-156,159-161
+  s_abf654ee5b037d::t_e70f608b127d4c 147-148
+  s_abf654ee5b037d::t_a5b905a79a7a17 157-158
+  s_abf654ee5b037d::t_3af6e6667996dc 149-152
+  s_abf654ee5b037d::t_9de38c673e786b 172-174
+  s_abf654ee5b037d::t_f722e98e3362b8 141-146
+  s_abf654ee5b037d::t_2293259a071de2 140
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_abf654ee5b037d::t_d7b761b945597d 126-128
+  s_abf654ee5b037d::t_4992857fbc9642 125,129-130
+docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md
+  s_abf654ee5b037d::t_77cc683e1e8e67 35-36,39-43
+  s_abf654ee5b037d::t_2b9a0463f2d2fc 47
+  s_abf654ee5b037d::t_409c615a86d489 83-84
+  s_abf654ee5b037d::t_0e330143734946 93,95-102
+  s_abf654ee5b037d::t_c6cdfd2ce804c5 48-53
+docs/solutions/logic-errors/resolve-stack-state-stale-after-fix-commit-push.md
+  s_abf654ee5b037d::t_82f03218a706ed 62-63
+docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md
+  s_abf654ee5b037d::t_0a259f35533c6d 65-68
+  s_abf654ee5b037d::t_2e0cd739507f3c 19-21
+docs/solutions/code-quality/fence-output-cap-and-untested-orchestration.md
+  s_abf654ee5b037d::t_6aa72f10391ce3 96-106
+docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md
+  s_abf654ee5b037d::t_1bf02a9a14a612 16-23
+  s_abf654ee5b037d::t_34e618220d9881 106-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "50281bcc109de34291569b976f8b421563bdc3ee",
+  "prompts": {},
+  "sessions": {
+    "s_abf654ee5b037d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ade8c746-d202-4a8b-b6ca-0ee0be76b706",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
