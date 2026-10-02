@@ -88,6 +88,10 @@ Cargo.toml|[dependencies]\naxum.workspace = true|rust
 Cargo.toml|[dependencies]\nwarp.version = "0.3"|rust
 Cargo.toml|[dependencies]\nweb = { package = "axum", version = "0.7" }|rust
 Cargo.toml|[dev-dependencies]\nactix-web = "4"|rust
+Cargo.toml|[workspace.dependencies]\nwarp.version = "1"|rust
+Cargo.toml|[target.'cfg(unix)'.dependencies]\naxum.workspace = true|rust
+Cargo.toml|[build-dependencies]\nrocket.version = "0.5"|rust
+Cargo.toml|[dependencies] # runtime\naxum.workspace = true|rust
 fly.toml|app = "x"|paas(fly.toml)
 vercel.json|{}|paas(vercel.json)
 SPECS
@@ -109,6 +113,10 @@ Cargo.toml|[dependencies]\n# axum = "0.7"\ntower = "0.4"
 Cargo.toml|[package]\nname = "my-axum-app"
 Cargo.toml|[package.metadata.warp.config]\nx = 1
 Cargo.toml|[dependencies.axum] garbage\nversion = "0.7"
+Cargo.toml|[package.metadata.release]\nwarp.version = "internal"
+Cargo.toml|[package.metadata.dependencies]\nwarp.version = "internal"
+Cargo.toml|[dependencies]\ntower = "0.4"\n[features]\naxum.workspace = true
+Cargo.toml|[dependencies]\ntower = "0.4"\n[features]\nwarp.version = "1"
 compose.yaml|services:\n  db:\n    ports:\n      - "5432:5432"
 SPECS
   fixture empty

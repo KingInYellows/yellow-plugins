@@ -296,7 +296,10 @@ else
   printf 'web_signal_go:                 absent\n'
 fi
 if [ -n "$repo_top" ] && [ -f "$repo_top/Cargo.toml" ] && \
-   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*(#.*)?$|[[:space:]]*=)|^[[:space:]]*(axum|actix-web|rocket|warp)\.[A-Za-z_-]+[[:space:]]*=|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
+   { grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*(#.*)?$|[[:space:]]*=)|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null || \
+     awk '/^[ \t]*\[+[^]]*\]+[ \t]*(#.*)?$/ { t = $0; sub(/^[ \t]*\[+[ \t]*/, "", t); sub(/[ \t]*\]+.*$/, "", t); dep = (t ~ /^(workspace\.|target\..*\.)?(dev-|build-)?dependencies$/); next }
+          dep && /^[ \t]*(axum|actix-web|rocket|warp)\.[A-Za-z_-]+[ \t]*=/ { found = 1; exit }
+          END { exit !found }' "$repo_top/Cargo.toml" 2>/dev/null; }; then
   printf 'web_signal_rust:               present\n'
   web_signal_count=$((web_signal_count + 1))
 else
