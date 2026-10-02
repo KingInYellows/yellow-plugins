@@ -220,9 +220,12 @@ phase failed.
    (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
    allows it.
 
-Before Phase C and before the re-pass, re-check `gh pr view --json state`.
-If the PR is no longer `OPEN`, stop with `PR #<N> is <STATE>; write phase
-stopped` and do not report per-thread errors.
+Before Phase C and at the start of the re-pass, re-check `gh pr view --json
+state`. If the PR is no longer `OPEN`, stop with `PR #<N> is <STATE>; write
+phase stopped` and do not report per-thread errors. Re-check again after the
+re-pass poll returns, before any retry or second-round write; if the state is
+not `OPEN` or cannot be read, skip those writes and report the re-pass as
+`inconclusive` with the state.
 
 Each thread's outcome is recorded per stage, for the report:
 
