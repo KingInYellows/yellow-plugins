@@ -403,3 +403,25 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "every failing file is named on stderr in one call, and later files are still scanned" {
+  printf 'use AKIA''ABCDEFGHIJKLMNOP\n' >| "$A"
+  printf 'password: hunter2xyz\n' >| "$B"
+  C="$BATS_TEST_TMPDIR/c.txt"
+  printf 'clean text\n' >| "$C"
+  run --separate-stderr "$SCRIPT" "$A" "$BATS_TEST_TMPDIR/nope" "$B" "$C"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"$A looks like"* ]]
+  [[ "$stderr" == *"not readable: $BATS_TEST_TMPDIR/nope"* ]]
+  [[ "$stderr" == *"$B looks like"* ]]
+  [[ "$stderr" != *"$C"* ]]
+}
+
+@test "prose around a redaction marker is clean; a prose-embedded literal value is still refused" {
+  printf '%s\n' 'the token=[REDACTED] is checked' 'the password: [REDACTED] was rotated' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  printf '%s\n' 'the token=abcdefgh is checked' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+}

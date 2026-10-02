@@ -28,18 +28,27 @@
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
 #      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
-#        timeout(1), skipped when it is not installed.
+#        timeout(1) or gtimeout(1), skipped with a stderr note when neither
+#        is installed.
 
 set -eu
 
 MAX_BODY_CHARS=1000
-# Longer waits exit 4 instead: the whole call must fit the caller's Bash
-# tool timeout (120 s by default).
+# Longer waits exit 4 instead. This caps the wait only: the worst case is
+# the pre-check, the wait, the retried pre-check and the reply, each gh call
+# up to GH_TIMEOUT (30 + 90 + 30 + 30 = 180 s by default), so a caller that
+# must survive it passes a Bash tool timeout above that, not the 120 s default.
 MAX_WAIT_SECONDS=90
 GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GH_TIMEOUT" in ''|*[!0-9]*) GH_TIMEOUT=30 ;; esac
 # timeout(1) treats 0 as "no limit"; fall back to the default instead.
 [ "$GH_TIMEOUT" -gt 0 ] 2>/dev/null || GH_TIMEOUT=30
+# GNU coreutils on macOS installs it as gtimeout.
+TIMEOUT_BIN=""
+for _t in timeout gtimeout; do
+    if command -v "$_t" >/dev/null 2>&1; then TIMEOUT_BIN=$_t; break; fi
+done
+[ -n "$TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; gh calls run without a time limit.\n' >&2
 
 usage() {
     printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2
@@ -104,8 +113,8 @@ gh_graphql() {
     _ec=0
     : >"$HEADERS"
     : >"$RESP"
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "$GH_TIMEOUT" gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
+    if [ -n "$TIMEOUT_BIN" ]; then
+        "$TIMEOUT_BIN" "$GH_TIMEOUT" gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
     else
         gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
     fi
@@ -216,13 +225,18 @@ fi
 # A marker counts only on a comment the viewer authored; a reviewer quoting
 # our marker never causes a skip. Any disposition counts: a re-run after a
 # crash (reply posted, resolve failed) must not post a contradictory reply.
-PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
+# No match prints nothing and exits 0; a jq failure must not read as "no
+# marker", or the reply the marker exists to prevent would be posted.
+if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     .data.node.comments.nodes[-1]
     | select(. != null and .viewerDidAuthor == true)
     | (.body // "") | sub("\\s+$"; "")
     | capture("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$")
     | .d
-  ' "$RESP" 2>/dev/null || true)
+  ' "$RESP" 2>/dev/null); then
+    printf 'Error: could not read the last comment of %s; not posting.\n' "$THREAD_ID" >&2
+    exit 1
+fi
 if [ -n "$PRIOR_DISPOSITION" ]; then
     jq -nc --arg id "$THREAD_ID" --arg d "$PRIOR_DISPOSITION" '{replied: false, skipped: "already-replied", disposition: $d, threadId: $id}'
     exit 0

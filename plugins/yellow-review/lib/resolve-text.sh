@@ -5,6 +5,12 @@
 # review comment can steer the resolver into quoting a file it read. Refuse
 # (never redact-and-post) anything that looks like a credential.
 # The awk avoids {n,} intervals, which mawk does not support.
+# This is deliberately not cs_redact_secrets (yellow-core) or RL_SUSP_AWK
+# (lib/review-ledger.sh): those redact text that is then kept, and yellow-core
+# is not a dependency of the resolve scripts. This one answers a different
+# question (refuse or not), so it flags broader shapes (URL userinfo,
+# Authorization/Bearer, NAME_KEY=value) and fails closed. When a vendor
+# prefix is added to one scanner, check the other.
 # shellcheck shell=sh
 
 # rt_text_clean <file>: exit 0 only when the scan ran and found no credential

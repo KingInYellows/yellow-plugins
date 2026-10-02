@@ -292,7 +292,11 @@ Decisions from the brainstorm and the planning round:
   - retries once on 429 or a secondary limit, honouring `retry-after` or
     waiting 60 s;
   - outputs `{"replied":true,"commentId":...}`;
-  - exit codes: 2 usage, 3 not found or permission, 4 rate limited.
+  - refuses a body that looks like a credential (`lib/resolve-text.sh`, see
+    1.5a), never redacting and posting it;
+  - exit codes: 2 usage, an over-long body, or credential-shaped or
+    unscannable text; 3 not found or permission; 4 rate limited or a `gh`
+    call timed out (`YELLOW_REVIEW_GH_TIMEOUT`; the reply may have posted).
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `resolve-pr-thread` exits 1 on every failure, including a 429.
@@ -309,9 +313,23 @@ Decisions from the brainstorm and the planning round:
     number,url,body` for `thread=<id>`, where the author is the viewer;
   - otherwise runs `gh issue create --body-file`, with the marker plus a
     link back to the PR thread;
-  - outputs `{"number":N,"url":...,"created":true|false}`.
+  - outputs `{"number":N,"url":...,"created":true|false}`;
+  - has a read-only `--find <owner/repo> <PRRT_id>` mode;
+  - screens the title and body with `lib/resolve-text.sh`;
+  - exit codes: 2 usage, credential-shaped or unscannable text, or a thread
+    on a different pull request; 4 rate limited or a `gh` call timed out
+    (`YELLOW_REVIEW_GH_TIMEOUT`; a create may have filed); 5 dedupe window
+    full with no marker.
 
   GitHub only; Linear filing lives in command prose.
+- [x] 1.5a: Shared credential screen. `lib/resolve-text.sh` (POSIX sh,
+  sourced; awk without `{n,}` intervals for mawk) is the one credential-shape
+  check behind `reply-pr-thread` and `file-followup-issue`; the new
+  `skills/pr-review-workflow/scripts/check-resolve-text <file>...` exposes it
+  for text posted outside those scripts (a Linear issue title and
+  description). Both refuse and never redact; a refusal prints
+  `resolve-text: refused rule=<rule> line=<n>` (or `scan failed`) on stderr,
+  never the text. Covered by `tests/check-resolve-text.bats`.
 - [ ] 1.6: New script `skills/pr-review-workflow/scripts/commit-resolve-fixes
   --provider graphite|github --pr <N> --message <msg> -- <files...>`. It:
   - checks that each path is inside the repo and has a diff;
