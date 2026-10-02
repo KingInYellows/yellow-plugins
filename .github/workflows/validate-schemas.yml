@@ -1518,6 +1518,10 @@ jobs:
             [ -d "$d" ] || continue
             case "$d" in
               plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests|plugins/yellow-codex/tests) continue ;;
+              # Required in shell-compat-tests, the job that installs the
+              # kislyuk yq its transition tests need (this one has mikefarah
+              # yq, so those tests would skip here).
+              plugins/yellow-debt/tests) continue ;;
               # Its own job below: its timing-heavy suite alone outlasts
               # what this job's 10 minutes leave after the required suites.
               plugins/yellow-ruvector/tests) continue ;;
@@ -1563,7 +1567,8 @@ jobs:
     # (plans/bash-zsh-shell-compatibility.md): the zsh-only parse check over
     # every fenced shell block, and tests/shell-compat/ (Tier 4 libraries
     # under bash, zsh and zsh with snapshot options; Tier 3 libraries through
-    # the bash wrapper from a zsh noclobber parent). Required in ci-status.
+    # the bash wrapper from a zsh noclobber parent), plus yellow-debt's bats
+    # suite, which needs kislyuk yq. Required in ci-status.
     name: Shell Compatibility (bash + zsh)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -1602,6 +1607,14 @@ jobs:
 
       - name: Run tests/shell-compat bats suite
         run: bats tests/shell-compat/
+
+      - name: Run yellow-debt bats suite (required)
+        # Required, not advisory. The transition, reason-truncation and
+        # kept-todo matching tests need kislyuk yq and skip without it, which
+        # is why they never ran in plugin-shell-tests (mikefarah yq). The
+        # parity test fails when a todo status is missing from a site that
+        # lists statuses.
+        run: bats plugins/yellow-debt/tests/
 
   # ============================================================================
   # AGGREGATE METRICS AND REPORT

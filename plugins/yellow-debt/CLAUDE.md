@@ -109,7 +109,12 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 ## Testing
 
-`bats tests/validate.bats` from the plugin directory. Its `setup()` sources
+`bats tests/` from the plugin directory (CI runs it as a required step with
+kislyuk `yq`; the transition tests skip without it).
+`tests/status-parity.bats` fails when a status in `DEBT_TODO_NAME_RE` is
+missing from `status.md`, SKILL.md, the README state machine, the
+synthesizer's preserve list or `validate_transition` — add a status to all of
+them. `validate.bats` `setup()` sources
 `../../yellow-core/lib/validate-fs.sh` before `lib/validate.sh` because the
 runtime source is `CLAUDE_PLUGIN_ROOT`-gated. Hook config lives in
 `catalog/plugins/yellow-debt.json` and is generated into `plugin.json` by
@@ -118,6 +123,13 @@ auto-loads it as a second hook source). Findings live at
 `${CLAUDE_PROJECT_DIR}/todos/debt/` named
 `{id}-{status}-{severity}-{slug}-{hash}.md`; the SessionStart hook counts only
 `pending|ready` × `critical|high` filenames.
+
+`wont-fix` closes a valid finding that is deliberately not fixed; the file stays
+(unlike `deleted`) and a re-audit skips findings that match a kept todo. Each
+todo carries a shell-computed `fingerprint: fp/v1:…` (category, path and flagged
+code with whitespace removed) and an `anchor_hash`; `audit-synthesizer` Step 5a
+matches on the fingerprint first, then on the anchor, and only a unique match
+suppresses. Closing a todo does not close its Linear issue.
 
 ## Known Limitations
 

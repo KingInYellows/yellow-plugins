@@ -343,13 +343,13 @@ Decisions (user-confirmed unless marked):
 
 ### Phase 4: Release hygiene
 
-- [ ] 4.1: `plugins/yellow-debt/CLAUDE.md`: Testing section names the new
+- [x] 4.1: `plugins/yellow-debt/CLAUDE.md`: Testing section names the new
       parity test; note the fingerprint dedup.
-- [ ] 4.2: `pnpm changeset` → `'yellow-debt': minor`.
-- [ ] 4.3: Run `pnpm validate:agents`, `pnpm lint:plugins`,
+- [x] 4.2: `pnpm changeset` → `'yellow-debt': minor`.
+- [x] 4.3: Run `pnpm validate:agents`, `pnpm lint:plugins`,
       `pnpm validate:shell-compat`, `pnpm check:shell-parse`,
       `pnpm validate:schemas`, `pnpm test:shell-compat`.
-- [ ] 4.4: `.github/workflows/validate-schemas.yml`: add a required step or
+- [x] 4.4: `.github/workflows/validate-schemas.yml`: add a required step or
       job that installs kislyuk `yq` 3.4.3 (as the shell-compat job does)
       and runs `bats tests/` in `plugins/yellow-debt`; add yellow-debt to
       the advisory loop's skip list; if it is a new job, add it to
