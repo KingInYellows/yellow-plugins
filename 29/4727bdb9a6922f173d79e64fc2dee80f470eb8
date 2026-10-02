@@ -1,0 +1,30 @@
+docs/security.md
+  s_7a82748dd606d9::t_2e8e6e24d8e7c3 559-567
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_06b8f3e283c721 1569-1690,1692-1725
+  s_7a82748dd606d9::t_30f3ce6d52f213 1691
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_0abc890467378f 3372
+  s_7a82748dd606d9::t_8f4de671ee8883 2144-2154,2159-2160
+  s_7a82748dd606d9::t_926a9437fd2c66 1715-1722,1726-1727
+  s_7a82748dd606d9::t_ef9fd8361d041b 2179-2182
+  s_7a82748dd606d9::t_409c02494df22d 2059-2061
+.changeset/review-ledger-followups-merged-prs.md
+  s_7a82748dd606d9::t_ef9bb5b6d57c57 18-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "294727bdb9a6922f173d79e64fc2dee80f470eb8",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
