@@ -15,8 +15,8 @@ The new `gh` and GraphQL scripts in the yellow-review resolve PRs
 treated different failures as the same thing, so callers retried the wrong
 cases, polled pointlessly, or read errors as "nothing new".
 
-Point-in-time: this doc describes the unmerged resolve stack (PRs #950, #952,
-#954 and #955, all open when written). On `main`, `get-pr-comments` and
+Point-in-time: this doc describes the unmerged resolve stack (PRs #950, #952, #954
+and #955, all open when written). On `main`, `get-pr-comments` and
 `resolve-pr-thread` exist without these fixes; `poll-new-threads`,
 `commit-resolve-fixes`, `reply-pr-thread`, `file-followup-issue`,
 `get-pr-blockers` and `lib/gh-graphql.sh` are on those PR branches only. The

@@ -20,8 +20,8 @@ PR-changed ranges computed before the round-1 push. PR #954 review
 (adversarial, with architecture) found both.
 
 Point-in-time: the commands and scripts named here (`/review:resolve`'s head
-check, `pr-changed-ranges`) belong to the unmerged resolve stack (PRs #950 to
-#955) and are not on `main`. As of that stack, the `/review:resolve` re-pass
+check, `pr-changed-ranges`) belong to the unmerged resolve stack (PRs #950
+to #955) and are not on `main`. As of that stack, the `/review:resolve` re-pass
 re-runs `pr-changed-ranges` after a push, but `/review:resolve-stack` restacks
 upstack without a publish step, so Solution step 1 is a recommendation, not
 shipped behaviour. Name the shipping PR here once it lands.

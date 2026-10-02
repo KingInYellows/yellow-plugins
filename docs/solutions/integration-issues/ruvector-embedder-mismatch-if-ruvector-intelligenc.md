@@ -26,8 +26,11 @@ and the remediation block of `plugins/yellow-ruvector/commands/ruvector/status.m
    - Create a backup first: `cp .ruvector/intelligence.json ".ruvector/intelligence.json.bak-$(date +%Y%m%d-%H%M%S)"`.
    - The user's answer decides whether `--drop-missing` is added. Without it, reembed refuses to proceed when `wouldDrop` is nonzero.
 
-   Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed`, adding `--drop-missing` only after the user confirmed the drop.
-4. Restart Claude Code before any further write. The running MCP server holds the pre-reembed snapshot, and its next save would overwrite the reembedded store.
+   Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ruvector-cli.sh" hooks reembed`,
+   adding `--drop-missing` only after the user confirmed the drop.
+4. Restart Claude Code before any further write. The running MCP server holds
+   the pre-reembed snapshot, and its next save would overwrite the reembedded
+   store.
 5. In the fresh session, run `/ruvector:status` and expect `PROVENANCE: OK`.
 
 ## Source

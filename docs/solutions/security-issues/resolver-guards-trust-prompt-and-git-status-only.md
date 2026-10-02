@@ -57,7 +57,8 @@ open PR and is tracked in issue #973.
    hash, and keep a copy of every deny-listed path that git ignores or that
    lives under `.git`. The path set is the resolver deny list in
    `references/resolve/dispositions.md` and `rp_denied`
-   (see the Update below), not a list copied here. After the waves, re-hash and compare. On any change or creation, restore first:
+   (see the Update below), not a list copied here. After the waves, re-hash
+   and compare. On any change or creation, restore first:
    put a changed file back from its pre-flight copy and delete a newly created
    one. Then re-hash and stop only if every path matches its pre-flight state,
    reporting the path; do not commit or push. Fail closed if a restore fails
