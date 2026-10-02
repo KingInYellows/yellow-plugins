@@ -54,7 +54,9 @@
 #   for credentials (nothing is reverted).
 # Signals: TERM, HUP and INT stop the command and its process group, then the
 #   resolver edits are saved and reverted as for a failure (result "fail",
-#   exit 0, reason names the signal).
+#   exit 0, reason names the signal). A signal while the pre-verification
+#   snapshot is written, before the command starts, removes the partial patch
+#   and exits 128+signal with the tree untouched.
 # Files: $(git rev-parse --git-common-dir)/yellow-review/resolve-patches/
 #        <pr>-<UTC ts>-<pid>.patch and .log, mode 0600; the newest 10 of each
 #        per PR are kept (other PRs' files are never pruned). The stream keeps
@@ -154,11 +156,19 @@ ADDED_FILE=""
 TEXT_FILE=""
 FIFO=""
 MARKER=""
+# The snapshot is provisional until it is complete and credential-screened: any
+# exit before then (a signal, a die, a failed screen) removes it, so no
+# unscreened patch stays under .git.
+PATCH=""
+PATCH_PROVISIONAL=0
 cleanup() {
     local f
     for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
+    if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
+        rm -f -- "$PATCH"
+    fi
 }
 trap cleanup EXIT
 
@@ -241,8 +251,10 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
             "$TOP_REAL/"*) ;;
             *) die 2 "refusing to remove a directory outside the repository: $f" ;;
         esac
-        # An untracked nested repository is listed as a single directory; its
-        # history is not ours to delete, so refuse rather than remove it.
+        # An untracked nested repository, or a submodule's worktree (it holds a
+        # .git file), is listed as a single directory; its history and any
+        # untracked files in it are not ours to delete, so refuse rather than
+        # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
             || die 2 "cannot scan the directory for a nested repository: $f"
         [ -z "$NESTED" ] || die 2 "refusing to remove a directory that contains a nested git repository: $f"
@@ -388,6 +400,17 @@ save_patch() {
 }
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
+# A signal before the verify command starts (for example while a large diff is
+# written) leaves the tree untouched, so stop here: EXIT removes the provisional
+# patch. run_verify replaces these handlers once the command is running.
+early_signal() {
+    trap '' TERM HUP INT
+    exit $((128 + $1))
+}
+trap 'early_signal 15' TERM
+trap 'early_signal 1' HUP
+trap 'early_signal 2' INT
+PATCH_PROVISIONAL=1
 if [ "$MODE" = run ]; then
     # Both snapshots must exist before the verifier runs: it may overwrite or
     # delete a listed edit and fail, and the revert below needs a patch that
@@ -497,7 +520,10 @@ if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; th
     die 2 "cannot screen the recovery patch"
 fi
 rt_looks_secret "$ADDED_FILE"
-case $? in
+RT_RC=$?
+# Screened: a clean patch is kept, a flagged one is removed below.
+PATCH_PROVISIONAL=0
+case $RT_RC in
     1) ;;
     0)
         rm -f -- "$PATCH"

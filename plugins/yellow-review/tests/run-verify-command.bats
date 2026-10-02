@@ -954,3 +954,92 @@ STUB
   [ -d src/nested/.git ]
   [ "$(cat src/nested/work.txt)" = precious ]
 }
+
+# A dirty submodule: committed gitlink, then an untracked and a modified file
+# inside its worktree. Reverting must refuse it and keep both files.
+make_dirty_submodule() {
+  local sub="$BATS_TEST_TMPDIR/subsrc"
+  git init -q -b main "$sub"
+  git -C "$sub" config user.email test@test.com
+  git -C "$sub" config user.name Test
+  git -C "$sub" config commit.gpgsign false
+  printf 'tracked\n' >| "$sub/tracked.txt"
+  git -C "$sub" add -A && git -C "$sub" commit -q -m "chore: sub"
+  git -c protocol.file.allow=always submodule add -q "$sub" vendor/sub >/dev/null 2>&1
+  git commit -q -m "chore: add submodule"
+  printf 'dirty\n' >| vendor/sub/tracked.txt
+  printf 'precious\n' >| vendor/sub/untracked.txt
+}
+
+@test "--revert-dirty refuses a dirty submodule and keeps its files" {
+  make_dirty_submodule
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ "$(cat vendor/sub/untracked.txt)" = precious ]
+  [ "$(cat vendor/sub/tracked.txt)" = dirty ]
+}
+
+@test "--revert-only refuses a dirty submodule and keeps its files" {
+  make_dirty_submodule
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- vendor/sub
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ "$(cat vendor/sub/untracked.txt)" = precious ]
+  [ "$(cat vendor/sub/tracked.txt)" = dirty ]
+}
+
+# Starts a run whose pre-verification snapshot hangs after writing a partial,
+# credential-bearing diff, sends <signal> to the script and leaves the exit
+# status in SNAP_STATUS. The stub git records its pid, then sleeps in place.
+snapshot_interrupted_by() {
+  local sig="$1" pid i
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+case "\$*" in
+  *" diff "*--binary*)
+    echo "+GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+    echo \$\$ >| "$BATS_TEST_TMPDIR/slow.pid"
+    : >| "$BATS_TEST_TMPDIR/slow.ready"
+    exec sleep 30 ;;
+esac
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt \
+    </dev/null >"$BATS_TEST_TMPDIR/out" 2>"$BATS_TEST_TMPDIR/err" &
+  pid=$!
+  for i in $(seq 1 100); do
+    [ -e "$BATS_TEST_TMPDIR/slow.ready" ] && break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/slow.ready" ] || { kill -KILL "$pid" 2>/dev/null; return 1; }
+  # The partial patch exists while the snapshot is being written.
+  compgen -G "$PATCH_DIR/*.patch" >/dev/null || { kill -KILL "$pid" 2>/dev/null; return 1; }
+  kill -s "$sig" "$pid"
+  # The shell runs its trap once the foreground diff ends.
+  kill -s TERM "$(cat "$BATS_TEST_TMPDIR/slow.pid")" 2>/dev/null
+  SNAP_STATUS=0
+  wait "$pid" || SNAP_STATUS=$?
+}
+
+@test "a TERM while the pre-verification snapshot is written removes the partial patch" {
+  snapshot_interrupted_by TERM
+  [ "$SNAP_STATUS" -eq 143 ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # The tree is untouched: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+# INT is not tested: a background job starts with SIGINT ignored, and a shell
+# cannot trap a signal that was ignored on entry.
+@test "a HUP while the pre-verification snapshot is written removes the partial patch" {
+  snapshot_interrupted_by HUP
+  [ "$SNAP_STATUS" -eq 129 ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
