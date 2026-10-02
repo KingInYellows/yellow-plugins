@@ -153,42 +153,43 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand time.
   Step 5a does (shell variables do not survive, and reading the expected token
   from the same untrusted dir would make the check vacuous); (2) `Write` stages
   `SYNTHESIS_MD` to exactly that printed path, with no other child name and no
-  appended segments; (3) a later block first validates the dir, token and full
-  destination (below), and only then installs the `trap` (removing the dir on
-  every exit of that block), so a rejected path never reaches `rm -rf`. The trap
-  body repeats the dir validation before deleting. The block then `cat`s the
-  file and runs the rest of council.md Step 7. The path crosses from one Bash
-  process through model-controlled substitution into `Write`, `cat` and
-  `rm -rf`, so every block that reads or deletes it first re-validates the dir:
-  it matches `/tmp/council-synth-*` with no `..` and no further `/`, is not a
-  symlink, is owned by the current user (`-O`), and its `.token` matches the
-  token from (1). Block (3) also validates the file before reading it: the
-  destination is exactly `<dir>/synthesis.md`, a regular file (`-f`), not a
-  symlink (`! -L`), and owned by the current user (`-O`). Refuse and stop on any
-  mismatch; never delete on name alone. `Write` is not path-scoped at runtime,
-  so shell validation cannot stop a model that deliberately writes elsewhere.
-  The guarantee is narrower: nothing destructive trusts a relayed path, and a
-  stray write outside the validated file is never read or deleted. The real
-  mitigation for that is a `Write` deny rule; document this residual. Cleanup is
-  best effort across calls. If `Write` fails, the block (3) trap and the
-  validated `rm -rf -- "<dir>"` run when the orchestrator is still running. If
-  the run is cancelled or aborts between (1) and (3), the orchestrator cannot
-  run any cleanup, so the staged findings can remain in the 0700 dir until the
-  next run's Step 5a sweep removes it once it is older than 24 hours. Document
-  that window (in the council.md Step 7 prose and the council.md failure-mode
-  table next to the Step 5a-5e row); do not promise cleanup after cancellation
-  unless a cancellation-surviving mechanism is added. Sweep what removing the
-  heredoc leaves behind. Keep the `__EOF_COUNCIL_SYNTHESIS__` escape in
-  council.md Step 5b input and Step 5e's quoting rule as defense in depth, and
-  keep the delimiter golden case in `tests/synthesis.bats` (it still guards the
-  5b escape). Reword Step 5e quoting rule 1, which says the delimiter is escaped
-  because Step 7 carries the markdown in a heredoc, so it no longer claims a
-  heredoc. Update the four council.md comments that still name the Step 7
-  heredoc (the "inline via quoted heredoc" comment, the two "Step 7's heredoc
-  text lands in the report" comments, and the escape-set comment in
-  `council_fence_block` that ends "...and the Step 7 heredoc delimiter"). If you
-  instead remove the escape, remove its `synthesis.bats` case and the 5e rule in
-  the same change.
+  appended segments; (3) a later block first validates the dir and token
+  (below), and only then installs the `trap` (removing the dir on every exit of
+  that block), so a rejected path never reaches `rm -rf`. The trap body repeats
+  the dir validation before deleting. Only after the trap is armed does the
+  block validate the destination file and `cat` it, then run the rest of
+  council.md Step 7, so a failed or missing `Write` still removes the validated
+  dir. The path crosses from one Bash process through model-controlled
+  substitution into `Write`, `cat` and `rm -rf`, so every block that reads or
+  deletes it first re-validates the dir: it matches `/tmp/council-synth-*` with
+  no `..` and no further `/`, is not a symlink, is owned by the current user
+  (`-O`), and its `.token` matches the token from (1). Block (3) also validates
+  the file before reading it: the destination is exactly `<dir>/synthesis.md`, a
+  regular file (`-f`), not a symlink (`! -L`), and owned by the current user
+  (`-O`). Refuse and stop on any mismatch; never delete on name alone. `Write`
+  is not path-scoped at runtime, so shell validation cannot stop a model that
+  deliberately writes elsewhere. The guarantee is narrower: nothing destructive
+  trusts a relayed path, and a stray write outside the validated file is never
+  read or deleted. The real mitigation for that is a `Write` deny rule; document
+  this residual. Cleanup is best effort across calls. If `Write` fails, the
+  block (3) trap and the validated `rm -rf -- "<dir>"` run when the orchestrator
+  is still running. If the run is cancelled or aborts between (1) and (3), the
+  orchestrator cannot run any cleanup, so the staged findings can remain in the
+  0700 dir until the next run's Step 5a sweep removes it once it is older than
+  24 hours. Document that window (in the council.md Step 7 prose and the
+  council.md failure-mode table next to the Step 5a-5e row); do not promise
+  cleanup after cancellation unless a cancellation-surviving mechanism is added.
+  Sweep what removing the heredoc leaves behind. Keep the
+  `__EOF_COUNCIL_SYNTHESIS__` escape in council.md Step 5b input and Step 5e's
+  quoting rule as defense in depth, and keep the delimiter golden case in
+  `tests/synthesis.bats` (it still guards the 5b escape). Reword Step 5e quoting
+  rule 1, which says the delimiter is escaped because Step 7 carries the
+  markdown in a heredoc, so it no longer claims a heredoc. Update the four
+  council.md comments that still name the Step 7 heredoc (the "inline via quoted
+  heredoc" comment, the two "Step 7's heredoc text lands in the report"
+  comments, and the escape-set comment in `council_fence_block` that ends
+  "...and the Step 7 heredoc delimiter"). If you instead remove the escape,
+  remove its `synthesis.bats` case and the 5e rule in the same change.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
   through unnormalized (identity and style signal survive). Buffer fenced lines
@@ -267,7 +268,11 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    synthesis prompt construction.
 7. **Report staging (F2, council.md Step 7)** — implement F2's cross-call
    staging lifecycle per "Carried follow-ups"; keep the council.md Step 7
-   appendix loop untouched (`scripts/validate-council-roster.js` Rule D1).
+   appendix loop untouched (`scripts/validate-council-roster.js` Rule D1). The
+   existing `synthesis.bats` extraction does not cover the Step 7 report block,
+   so add extraction of that block plus behavioral cases for the lifecycle:
+   path, token and symlink guards, trap ordering, a successful read, and cleanup
+   after a failed `Write`.
 8. **Finalization sweep** — skill contract, both configuration tables, component
    counts and README/CHANGELOG, manual e2e scenarios (quota ETA, lineage
    warning, tie presentation, single-pass bypass, rubric output, verification
