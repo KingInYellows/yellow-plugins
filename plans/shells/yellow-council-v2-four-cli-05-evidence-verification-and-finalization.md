@@ -84,39 +84,39 @@ time.
 
 - **F1 — synthesis library location (decide first).** `council.md` is ~3,000
   lines, far past the 500-line command ceiling (RULE 21 only warns), and
-  carries the Step 5b helper library (`council_normalize_text`,
+  carries the council.md Step 5b helper library (`council_normalize_text`,
   `council_extract_fenced`, `council_assign_labels`, `council_fence_block`)
   inline between the
   `# >>> council-synthesis-lib` markers. `verify_finding()` and the five-bucket
   logic would add more. Decide — keep inline (extraction-tested by
   `tests/synthesis.bats`) or move to a shipped plugin lib/references file the
   fences source — and record the choice in `plugins/yellow-council/CLAUDE.md`.
-  Moving it changes how every Step 5 fence and `tests/lib/extract-synthesis-lib.bash`
+  Moving it changes how every council.md Step 5 fence and `tests/lib/extract-synthesis-lib.bash`
   load the helpers. If moved, the library is sourced directly from markdown
   fences under the user's login shell (often zsh), so it must also be classified
   under the CONTRIBUTING.md "Bash and zsh" tier contract (Tier 4 if sourced
   directly), registered in `scripts/shell-compat-config.json`, given a
   `tests/shell-compat/drivers/<plugin>--<lib>.sh` driver if Tier 4, and pass
   `pnpm test:shell-compat` and `pnpm validate:shell-compat`.
-- **F2 — Step 7 heredoc.** Step 7 still carries `SYNTHESIS_MD` in a quoted
+- **F2 — council.md Step 7 heredoc.** council.md Step 7 still carries `SYNTHESIS_MD` in a quoted
   heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03 only escapes that
-  delimiter in 5b input and in 5e's quoting rule; a synthesizer-authored
+  delimiter in council.md Step 5b input and in Step 5e's quoting rule; a synthesizer-authored
   (paraphrased) line could still reproduce it and run the rest as shell.
   Stage `SYNTHESIS_MD` through `Write` into a fresh
-  `mktemp -d /tmp/council-synth-XXXXXX` created and owned by Step 7, and `cat`
-  it from there, like 5a does for reviewer text. Keep the `council-synth-`
-  prefix so the existing 5a stale sweep reclaims an orphan.
-  Do not reuse the 5e staging dir: 5e runs `rm -rf -- "$SYNTH_DIR"` right
-  after printing the label map, before Step 7, so nothing is left to reuse
-  (unless 5e is deliberately changed to stop deleting it, which would move
+  `mktemp -d /tmp/council-synth-XXXXXX` created and owned by council.md Step 7,
+  and `cat` it from there, like Step 5a does for reviewer text. Keep the `council-synth-`
+  prefix so the existing Step 5a stale sweep reclaims an orphan.
+  Do not reuse the Step 5e staging dir: Step 5e runs `rm -rf -- "$SYNTH_DIR"`
+  right after printing the label map, before council.md Step 7, so nothing is
+  left to reuse (unless Step 5e is deliberately changed to stop deleting it, which would move
   cleanup ownership and is out of scope here). Each Bash block is a fresh
   subprocess, so a `trap` set right after `mktemp -d` would fire when that
   block exits, before the separate `Write` call can stage the file. Use a
   cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap,
-  writes a random `.token` file into the dir as 5a does, and prints the path;
+  writes a random `.token` file into the dir as Step 5a does, and prints the path;
   (2) `Write` stages `SYNTHESIS_MD` there; (3) a later block installs the
   `trap` (removing the dir on every exit of that block), then `cat`s the file
-  and runs the rest of Step 7. The path crosses from one Bash process through
+  and runs the rest of council.md Step 7. The path crosses from one Bash process through
   model-controlled substitution into `Write`, `cat` and `rm -rf`, so every
   block that reads, writes or deletes it first re-validates it: the path
   matches `/tmp/council-synth-*` with no `..` and no further `/`, is not a
@@ -126,10 +126,19 @@ time.
   the validated `rm -rf -- "<dir>"` run when the orchestrator is still running.
   If the run is cancelled or aborts between (1) and (3), the orchestrator
   cannot run any cleanup, so the staged findings can remain in the 0700 dir
-  until the next run's 5a sweep removes it once it is older than 24 hours.
-  Document that window (in the Step 7 prose and the council.md failure-mode
-  table next to the 5a-5e row); do not promise cleanup after cancellation
+  until the next run's Step 5a sweep removes it once it is older than 24 hours.
+  Document that window (in the council.md Step 7 prose and the council.md
+  failure-mode table next to the Step 5a-5e row); do not promise cleanup after cancellation
   unless a cancellation-surviving mechanism is added.
+  Sweep what removing the heredoc leaves behind. Keep the `__EOF_COUNCIL_SYNTHESIS__`
+  escape in council.md Step 5b input and Step 5e's quoting rule as defense in
+  depth, and keep the delimiter golden case in `tests/synthesis.bats` (it still
+  guards the 5b escape). Reword Step 5e quoting rule 1, which says the delimiter
+  is escaped because Step 7 carries the markdown in a heredoc, so it no longer
+  claims a heredoc. Update the three council.md comments that still name the
+  Step 7 heredoc (the "inline via quoted heredoc" comment and the two "Step 7's
+  heredoc text lands in the report" comments). If you instead remove the escape,
+  remove its `synthesis.bats` case and the 5e rule in the same change.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
   through unnormalized (identity and style signal survive). Buffer fenced
@@ -154,15 +163,29 @@ time.
   marker only leaves style). Golden cases: `__init__` kept,
   `_private_fn` kept, `*ptr` kept, `**important**` stripped, `__two words__`
   stripped, `snake_case` untouched. `strip_emph` works per whitespace token, so
-  multi-word pairing needs phrase-level state: `strip_words` must track an open
-  run across tokens and strip it only when a matching closing run arrives.
+  multi-word pairing needs phrase-level state, which cannot live in `strip_words`:
+  it runs once per code-span segment, so state held there would pair unrelated
+  tokens across segments. Hold the pairing state at line level, in the caller
+  that splits a line into code-span and prose segments, and bound it to one
+  line (reset at every newline, never carried to the next line). Resolve a
+  same-length run that wraps a single token first (`**x**`, `*x*`), then pair a
+  multi-word opener with the nearest same-length closer on the same line,
+  skipping over inline code spans untouched. Roll back an unpaired opener: when
+  the line ends with a run still open, keep the opener and every token after it
+  verbatim. Golden cases that span an inline code span: ``**two `code` words**``
+  stripped to ``two `code` words`` (code span untouched), ``__two `code` words__``
+  stripped likewise, ``*ptr `x` y`` kept whole (unpaired), and a run opened on
+  one line with its closer on the next kept whole.
 
 ## Implementation Steps (High-Level)
 
+The numbers below are this plan's own steps (plan step 0-8). "council.md Step N"
+always names a step of `plugins/yellow-council/commands/council/council.md`.
+
 0. **Synthesis library location (F1)** — make and record the decision before
-   any Step 5 code is added; if moving, do the move as its own step and satisfy
+   any council.md Step 5 code is added; if moving, do the move as its own step and satisfy
    F1's shell-compat requirements. Whether the library moves or stays inline,
-   Steps 1 and 7 edit fenced Bash in `council.md`, so `pnpm validate:shell-compat`
+   plan steps 1 and 7 edit fenced Bash in `council.md`, so `pnpm validate:shell-compat`
    and `pnpm check:shell-parse` (parses the edited fenced blocks under bash and
    zsh) must pass for this shell in both cases.
 1. **Normalizer fixes (F3, F4)** — implement F3 and F4 in
@@ -181,8 +204,9 @@ time.
    this phase in V2.
 6. **Bound the cost** — per-reviewer verification cap and concurrency with
    synthesis prompt construction.
-7. **Step 7 report staging (F2)** — implement F2's cross-call staging
-   lifecycle per "Carried follow-ups"; keep the Step 7 appendix loop untouched
+7. **Report staging (F2, council.md Step 7)** — implement F2's cross-call
+   staging lifecycle per "Carried follow-ups"; keep the council.md Step 7
+   appendix loop untouched
    (`scripts/validate-council-roster.js` Rule D1).
 8. **Finalization sweep** — skill contract, both configuration tables,
    component counts and README/CHANGELOG, manual e2e scenarios (quota ETA,
@@ -194,4 +218,4 @@ time.
 ## Open Questions
 
 - F1: keep the synthesis helper library inline in `council.md` or move it to a
-  shipped plugin lib/references file. Decide in Step 0, before any Step 5 code.
+  shipped plugin lib/references file. Decide in plan step 0, before any council.md Step 5 code.
