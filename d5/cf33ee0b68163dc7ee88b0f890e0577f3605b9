@@ -1,0 +1,40 @@
+plugins/yellow-review/CLAUDE.md
+  s_5667e810256031::t_bfe5dba7ba963d 238-240,251-252,267-268
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_5667e810256031::t_01accfb57a4e76 259-260,340-341
+  s_5667e810256031::t_3f01efd9c14134 200-207,252-258,261
+  s_5667e810256031::t_002d37e4dc24bb 236-241,342-345
+plugins/yellow-review/references/resolve/dispositions.md
+  s_5667e810256031::t_1477c9f6dfcd20 690-698
+plugins/yellow-review/commands/review/sweep.md
+  s_5667e810256031::t_e3f12f4a1473cf 16-18
+  s_5667e810256031::t_0d7e1478838b6d 136-137,195-196
+plugins/yellow-review/commands/review/sweep-all.md
+  s_5667e810256031::t_7f166236ae64c4 250,255,354-367
+  s_5667e810256031::t_0a774fc9d1170b 230-232,235-236,239-244
+plugins/yellow-review/README.md
+  s_5667e810256031::t_6c75c6578a3035 57-61,63-66,70-73,84-86,159
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_5667e810256031::t_e64266de6266d9 477-478
+  s_5667e810256031::t_0a5b62ace47075 473-474,480-481
+plugins/yellow-review/references/resolve/dirty-tree-cleanup.md
+  s_5667e810256031::t_b3b27c97064de5 1-77
+plugins/yellow-review/tests/skill-content.bats
+  s_5667e810256031::t_23428802c5d6cd 220,319,460,467-470,472-474,476-503,513,517,520-530,537-554
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d5cf33ee0b68163dc7ee88b0f890e0577f3605b9",
+  "prompts": {},
+  "sessions": {
+    "s_5667e810256031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71658bdb-741e-429a-9714-ebc269ae3896",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
