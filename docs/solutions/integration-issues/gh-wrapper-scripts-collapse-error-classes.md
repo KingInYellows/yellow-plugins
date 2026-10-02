@@ -122,7 +122,12 @@ gate sees all of its input.
   greps stderr for `rate limit|HTTP 429`. Two classifiers will drift. The
   credential heuristics have the same split: `lib/resolve-text.sh`,
   `RL_SUSP_AWK` in `lib/review-ledger.sh` and yellow-core's
-  `cs_redact_secrets` are separate implementations.
+  `cs_redact_secrets` are separate implementations. Point-in-time: the
+  `lib/gh-graphql.sh` helper (PR #954) and `lib/resolve-text.sh` (PRs #950,
+  #952 and #954), both under `plugins/yellow-review/`, exist only on those
+  unmerged branches, not on `main`; `RL_SUSP_AWK` and `cs_redact_secrets` are
+  already on `main`. Re-grep for `gg_is_rate_limited` before relying on these
+  names once those PRs land.
 - **A truncated read must not look complete.** `get-pr-comments` warns on
   stderr when pagination stops at the page limit or loses its cursor, then
   continues to exit 0 with a partial thread list. A caller deciding "nothing

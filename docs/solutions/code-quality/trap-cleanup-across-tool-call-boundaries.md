@@ -32,14 +32,25 @@ and split the lifecycle across calls:
 3. **Consume:** a later Bash call re-validates the path, registers the
    `trap` that removes the directory on every exit of that call, then reads
    the file and does the remaining work.
-4. **Abort cover:** if `Write` fails, or the run is cancelled or aborts
-   between steps 1 and 3, the orchestrator runs an explicit
+4. **Abort cover:** if `Write` fails, or the orchestrator stays active after
+   an abort between steps 1 and 3, it runs an explicit
    `rm -rf -- "<dir>"` block before stopping. No trap exists yet in that
    window, so this block is the only cleanup.
+   If the user cancels the run in that window, the orchestrator gets no later
+   tool call and this block never runs, so the directory is orphaned. Cover
+   that residual with a stale-directory sweep at the start of a later run, as
+   the council command's `council-synth-*` sweep does (reclaims directories
+   older than a day).
 
 Re-validate the path in step 3 before the trap or any `rm -rf` can act on
 it. The value crossed a tool-call boundary as text, so check that it is
-non-empty, is a directory, and sits under the expected temp root.
+non-empty, is a directory you own and not a symlink, and is a direct child of the
+expected temp root with the name the mint call chose. Reject any `..`. Run
+every check before installing the trap: a trap installed on an unchecked
+path deletes whatever directory that path names. A relayed literal is still
+only text; see
+[Shell-owned state is not a boundary against Write](../security-issues/shell-owned-state-is-not-a-boundary-against-write.md)
+for what these checks do and do not guarantee.
 
 ## Why This Matters
 
@@ -69,7 +80,8 @@ Right, as three steps:
 
 ```bash
 # Call 1 -- mint only
-STAGE_DIR="$(mktemp -d)" && printf '%s\n' "$STAGE_DIR"
+TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
+STAGE_DIR="$(mktemp -d "$TMP_ROOT/stage.XXXXXX")" && printf '%s\n' "$STAGE_DIR"
 ```
 
 ```text
@@ -78,8 +90,16 @@ Write: <STAGE_DIR>/report.md   (literal path from call 1)
 
 ```bash
 # Call 3 -- re-validate, trap, consume
+TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
 STAGE_DIR="<literal path from call 1>"
-[ -n "$STAGE_DIR" ] && [ -d "$STAGE_DIR" ] || exit 1
+[ -n "$STAGE_DIR" ] || exit 1
+# Strip the root: an unchanged value is outside it, */* is nested, *..* is traversal.
+case "${STAGE_DIR#"$TMP_ROOT"/}" in
+  "$STAGE_DIR"|*/*|*..*) exit 1 ;;
+  stage.?*) ;;
+  *) exit 1 ;;
+esac
+[ -d "$STAGE_DIR" ] && [ ! -L "$STAGE_DIR" ] && [ -O "$STAGE_DIR" ] || exit 1
 trap 'rm -rf -- "$STAGE_DIR"' EXIT
 cat -- "$STAGE_DIR/report.md"
 ```

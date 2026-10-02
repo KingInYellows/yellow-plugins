@@ -59,5 +59,5 @@ before the fix.
 - Name derived-state inputs explicitly in the command so a reader can see what
   is recomputed per round.
 
-See also `docs/solutions/logic-errors/early-exit-before-per-item-cleanup.md`
-for the other per-item loop ordering rules in review commands.
+See also `docs/solutions/logic-errors/iterate-until-clean-loop-stop-condition.md`
+for the stop-condition rules of bounded review-fix loops.

@@ -26,7 +26,8 @@ the pre-wiring state.
 - The `dispositions.md` "Implementation status" paragraph was stale and omitted
   `pr-changed-ranges` and `poll-new-threads`.
 - `resolve-stack` still matched the token `skipped (cluster cap)` that
-  `/review:resolve` no longer emits.
+  `/review:resolve` no longer emits in PR #954's branch (the producer there
+  records `not attempted (cluster cap)`).
 - The command preamble said every stop prints the Resolve line, but the Step 2
   pre-flight stops did not.
 
@@ -38,9 +39,12 @@ the pre-wiring state.
 2. When a PR changes a component from unwired to wired, search the repo for
    the old claim before finishing: `unwired`, `unchanged`, `not yet`,
    "Implementation status", counts of scripts or agents, and old output tokens.
-3. Key cross-command matching on the tokens the producer emits now
-   (`not attempted (cluster cap)`, `not attempted (rate limit)`), and grep the
-   consumer for the old token when the producer changes.
+3. Key cross-command matching on the tokens the producer emits now, and grep
+   the consumer for the old token when the producer changes. Take the token
+   from the producer's own text, not from this doc. Point-in-time: PR #954
+   changes the producer to `not attempted (cluster cap)` and
+   `not attempted (rate limit)`; until it merges, `resolve-pr.md` still emits
+   `skipped (cluster cap)` and `resolve-stack.md` still matches it.
 4. Scope universal claims ("every stop prints X") to the steps where they hold,
    or make them true.
 5. Rewrite the changeset to describe what ships: the wiring, new exit codes,
@@ -67,7 +71,8 @@ in-cluster edits.
 After: one edit-bounds table states which changed-line states permit edits;
 `clusters.md` and Step 4 link to it.
 
-Sweep command after a wiring PR:
+Sweep command after a wiring PR (`skipped \(cluster cap\)` is the stale token
+once PR #954 lands; on a branch without it, that string is still the live one):
 
 ```bash
 rg -n 'unwired|not yet wired|Implementation status|skipped \(cluster cap\)' plugins/yellow-review .changeset

@@ -13,8 +13,14 @@ components: [yellow-review]
 `/review:resolve` dispatches `pr-comment-resolver` agents to edit files, then
 verifies and, on failure, reverts their work using `git status`. Two guards
 carried the safety weight: the revert, which sees only what git sees, and a
-deny list in `references/resolve/dispositions.md`, which was enforced only by
-the resolver's prompt. PR #954 review (architecture and security) rated this P1.
+deny list, which was enforced only by the resolver's prompt (the `Do NOT:`
+rules in `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`). PR
+#954 review (architecture and security) rated this P1.
+
+Point-in-time: PR #950 adds the deny-list contract in
+`plugins/yellow-review/references/resolve/dispositions.md`. That file is not
+on trunk until #950 merges, so on a checkout without it the agent file above is
+the only place the deny list lives.
 
 ## Symptoms
 
@@ -97,11 +103,17 @@ and the trusted-config revert both miss it. The edit then runs as a shell
 command on the next PR in the walk.
 
 Guidance: do not detect trusted-config tampering through git. At
-pre-flight, hash every trusted-config path that exists, ignored ones
-included (`.claude/`, `yellow-plugins.local.md`, root `CLAUDE.md`,
-`AGENTS.md`, `.mcp.json`). After each resolve, re-hash. On a change,
-restore the file from the pre-flight copy and stop the walk. A restore
-that fails is itself a stop condition. Tracked in #973.
+pre-flight, record whether each trusted-config path exists, and hash every
+one that does, ignored ones included. The path set is the resolver deny
+list: the "File set" section of `references/resolve/dispositions.md`
+(PR #954) and `rp_denied` in `lib/resolve-paths.sh` are the canonical
+source, so do not copy the list here or into the walk. After each resolve,
+compare both existence and content, because a resolver can create an
+optional file such as `yellow-plugins.local.md` that a later command then
+loads. On any creation or change, restore the pre-flight state (delete a
+created file, restore a changed one from its pre-flight copy) and stop the
+walk. A restore that fails is itself a stop condition. Tracked in #973;
+point-in-time, as the walk-level check is not on main yet.
 
 ### `--revert-only` was called loosely
 

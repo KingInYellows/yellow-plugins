@@ -16,7 +16,9 @@ design had the orchestrating model relay the directory path and a random token
 from one Bash block to the next, so a prompt-injected model could substitute a
 different path and steer 5e's `rm -rf`.
 
-PR #971 moved the capability (directory on line 1, token on line 2) into
+PR #971 (point-in-time: open and unmerged when this doc was written, so
+`council.md` on `main` still has the relayed-literal design until it lands)
+moves the capability (directory on line 1, token on line 2) into
 `$GIT_ROOT/.git/council-synth.state`, written only by 5a and reloaded by every
 destructive step. Review (seven reviewers) found that the change was described
 as stronger than it is.
@@ -60,8 +62,10 @@ Related findings from the same review:
 - **Concurrent runs.** A single per-repo state file lets a second `/council`
   overwrite the first run's capability, so the first run's 5e could delete the
   second run's directory. Claim the file atomically (`ln` fails if the target
-  exists), reclaim only a dead or stale (over an hour) leftover, and document
-  the one-synthesis-per-worktree limit. Commit c0b35793 added the `ln` claim.
+  exists), reclaim only a dead or stale (over 24 hours, the staging retention)
+  leftover, and document the one-synthesis-per-worktree limit. PR #971's
+  review-fix round added the `ln` claim (point-in-time: see `council.md`
+  Step 5a for the current code).
 - **Cleanup comments.** After the change, `council_cleanup_claude_only` also
   unlinks the state file. A comment saying the minted path is the only
   reclaimable artifact became false. Update comments and the error-table row
