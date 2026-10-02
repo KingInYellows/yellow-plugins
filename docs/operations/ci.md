@@ -219,6 +219,10 @@ put first on `PATH` because the runner image ships mikefarah yq), then runs:
 - `bats tests/shell-compat/`: tier 4 libraries under bash, zsh and zsh with
   snapshot options, and tier 3 libraries through the bash wrapper from a zsh
   `noclobber` parent
+- `bats plugins/yellow-debt/tests/` (required): the todo state machine,
+  fingerprint matching and status-parity tests. They need kislyuk `yq`, so they
+  live here; `require_kislyuk_yq` skips locally and fails when `CI` is set. The
+  `plugin-shell-tests` advisory loop skips the yellow-debt directory
 
 Locally: `pnpm validate:shell-compat`, `pnpm check:shell-parse` (skips
 without zsh) and `pnpm test:shell-compat`. Fork pull requests skip this job;

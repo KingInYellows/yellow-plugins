@@ -197,6 +197,14 @@ path**: `ready` → `in-progress` → `ready` (retry)
 
 All transitions use atomic `transition_todo_state()` function.
 
+**Closing a todo while its fix runs**: the fixer works in an isolated git
+worktree, a separate checkout. A rename made in the main checkout afterwards is
+not visible there, so a running fixer does not stop at its next transition;
+whether the worktree has the todo at all depends on whether `todos/` is
+tracked. Let the fix finish or abandon it before closing the todo. A `wont-fix`
+todo is not a `/debt:fix` target afterwards: reopen it to `pending`, then accept
+it in `/debt:triage`.
+
 ## Error Recovery
 
 If fix agent fails:

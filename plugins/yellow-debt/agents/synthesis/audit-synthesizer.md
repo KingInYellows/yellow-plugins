@@ -138,17 +138,99 @@ Record gate stats:
 
 ### 5. Reconciliation
 
-Count existing pending todos, confirm deletion via AskUserQuestion:
+Count existing pending todos and confirm their deletion via AskUserQuestion, but
+do not delete yet: Step 5a runs first, so a failure there leaves the existing
+pending todos in place. `debt_pending_todos` lists a todo only when its file name
+and its frontmatter both say `pending`. An unanchored `*-pending-*.md` also
+matches a `ready` todo whose slug contains `-pending-`, and a file renamed
+`-pending-` whose frontmatter says `wont_fix` is a closed todo that must not be
+deleted (it is reported on stderr as `Leaving …`; copy those lines into the
+report so the user can repair them).
 
 ```bash
-pending_count=$(find todos/debt -name '*-pending-*.md' 2>/dev/null | wc -l)
-if [ "$pending_count" -gt 0 ]; then
-  # Ask: "Delete $pending_count existing pending findings and proceed?"
-  # If "No": exit 0  |  If "Yes": rm -f todos/debt/*-pending-*.md
-fi
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+list=$(debt_pending_todos) || exit 1
+printf '%s\n' "$list" | grep -c . || true
+__YELLOW_DEBT_BASH__
 ```
 
-Preserve all other states (ready, in-progress, complete, deferred).
+If the count is above 0, ask: "Delete N existing pending findings and proceed?"
+If "No": stop. If "Yes", remember it and continue with 5a; Step 5b deletes.
+
+#### 5a. Skip findings that match a kept todo
+
+A finding the user already closed (`wont-fix`, `complete`, `deleted`) or has
+accepted (`ready`, `in-progress`) must not come back as a new pending todo. A
+`deferred` todo does not suppress: that finding comes back as a new pending todo
+while the code still has the problem. Match by code, not by line numbers: scanner line ranges drift
+between runs.
+
+First clear any file a cloned repository may have planted at the path the
+Write tool is about to use (`rm` removes a symlink, not its target):
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+debt_refuse_symlinks .debt || exit 1
+rm -f -- .debt/surviving-findings.json .debt/fingerprints.json
+__YELLOW_DEBT_BASH__
+```
+
+Then write the surviving findings from Step 4 (after Step 2 deduplication) to
+`.debt/surviving-findings.json` with the Write tool, as a JSON array of the
+in-memory v2.0 records (each needs `category` and `file.path`; `file.lines`
+is needed to match). Then run the matcher. It writes `.debt/fingerprints.json`
+and prints one `skipped:` line per matched finding:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+debt_match_kept_todos
+__YELLOW_DEBT_BASH__
+```
+
+If the block exits non-zero, stop and report its stderr: do not read
+`.debt/fingerprints.json`, which the block removes first. A `Warning:` line on
+stderr means some kept todos or findings could not be matched and may
+resurface; include it in the report. Set `stats.skipped_kept` to the number of
+`skipped:` lines.
+
+Read `.debt/fingerprints.json`. Drop every entry with `skip: true` from the
+surviving list and record it in `skipped_kept[]` (finding index, `kept_id`,
+`status`, `match`). Keep each remaining entry's `fingerprint` and
+`anchor_hash` for Step 7. A finding with a tie, an unreadable range, or no
+match resurfaces as a new pending todo.
+
+#### 5b. Delete the pending todos
+
+Only if the user answered "Yes" in Step 5:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+list=$(debt_pending_todos) || exit 1
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  rm -f -- "$f" || exit 1
+done <<<"$list"
+__YELLOW_DEBT_BASH__
+```
+
+Preserve all other states (ready, in-progress, complete, deferred, deleted,
+wont-fix).
 
 ### 6. Generate Audit Report
 
@@ -159,22 +241,45 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 - Category breakdown (critical/high/medium/low)
 - Confidence-gate stats (suppressed counts per category, severity-exception
   survivors)
+- Findings skipped because a kept todo already covers them (`skipped_kept[]`:
+  kept id, its status, match type)
 - Hotspot files
 - Next steps (`/debt:triage`)
 
 ### 7. Generate Todo Files
 
-**Iterate only over the surviving findings list from Step 4 — do NOT include
-entries from `suppressed[]`.** The suppressed array is preserved on the audit
+**Iterate only over the surviving findings list from Step 4 and Step 5a — do
+NOT include entries from `suppressed[]` or `skipped_kept[]`.** The suppressed array is preserved on the audit
 report for calibration review, not for todo generation. A finding that was
 gated out at Step 4 must not become a pending todo at Step 7.
 
-Format: `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
+Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
 
-- `NNN`: zero-padded ID (001, 002...)
+- `NNN`: zero-padded ID, starting one above the highest id of any file in
+  `todos/debt/` (run the block below once, then count up from its output)
 - `SEVERITY`: critical/high/medium/low
 - `slug`: kebab-case derived from the v2.0 `finding` string (40 chars max)
-- `HASH`: SHA256(category:file:lines) first 8 chars
+- `HASH`: the first 8 hex digits after `fp/v1:` in the finding's
+  `fingerprint` from `.debt/fingerprints.json`; omit the `-HASH` segment when
+  the fingerprint is `null`
+
+Existing todos keep their ids. A new todo that reused a number would collide
+with a kept file, so take the next free ids from every `*.md` under
+`todos/debt/`, not only the well-named ones. Run this once with the number of
+findings left after Step 5a in place of `<count>`; it prints that many free
+ids, one per line (they can skip a number a directory or symlink holds). Give
+each finding the id on the matching line, in the order of the findings, and use
+the printed text verbatim:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<count>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+debt_next_todo_id "$1"
+__YELLOW_DEBT_BASH__
+```
 
 #### v2.0 → todo frontmatter mapping (write side)
 
@@ -196,44 +301,66 @@ on-disk frontmatter as follows:
 | `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
+| (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null` |
+| (shell-derived)      | `resurfaced_from:` frontmatter | The id from `.debt/fingerprints.json` when a `deferred` todo has the same fingerprint (the finding came back); single-quoted; omit when `null`. The field is a record for readers of the file; no command reads it yet |
+| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ bytes once blanks are folded) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator
-(`yq -r '.affected_files[]'` at line 57) without changes — the fixer reads
+(the `yq -r '.affected_files[]'` calls in `debt-fixer.md`) without changes — the fixer reads
 the on-disk frontmatter, not the in-memory v2.0 record.
 
 **CRITICAL SECURITY - Slug Derivation**:
 
 ```bash
-# The Bash block runs in a fresh subprocess. The LLM agent iterates over
-# the surviving-findings JSON array; for each iteration it must export
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+# The block runs in a fresh subprocess. The LLM agent iterates over the
+# surviving-findings JSON array; for each iteration it must export
 # `$record` (the single in-memory finding object as a JSON string) and
-# `$id`/`$severity`/`$content_hash` (the synthesizer-assigned per-finding
-# fields) into the shell environment BEFORE invoking this block — variables
-# from prose context are NOT inherited automatically by a fresh subprocess.
-# Derive $finding from $record FIRST in this same block as a sanity check
-# (a missing $record will produce empty $finding and the whitelist below
-# will reject the empty slug, surfacing the missing-input bug loudly):
+# `$id`/`$severity`/`$fp_prefix` (the per-finding fields: the next free id, the
+# severity, and the 8 hex digits taken from the finding's fingerprint, or empty)
+# into the shell environment BEFORE invoking this block — variables from prose
+# context are NOT inherited automatically by a fresh subprocess.
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Derive $finding from $record FIRST (a missing $record produces an empty
+# $finding and the whitelist below rejects the empty slug, surfacing the
+# missing-input bug loudly):
 finding=$(printf '%s' "$record" | jq -r '.finding')
 
 # Lowercase, replace special chars, truncate, validate.
-slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | sed 's/-\+/-/g; s/^-\|-$//g' | cut -c1-40 | sed 's/-$//')
+slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | tr -s '-' | sed 's/^-//; s/-$//' | cut -c1-40 | sed 's/-$//')
 
 # CRITICAL: whitelist validation
-[[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | sha256sum | cut -d' ' -f1 | cut -c1-16)
+[[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | _debt_sha16)
 
-todo_filename="todos/debt/${id}-pending-${severity}-${slug}-${content_hash}.md"
+todo_filename="todos/debt/${id}-pending-${severity}-${slug}${fp_prefix:+-$fp_prefix}.md"
 
-# Defense in depth: verify path stays in todos/debt/
-resolved=$(realpath -m "$todo_filename")
-case "$resolved" in
-  "$(pwd)/todos/debt/"*) ;;
+# Defense in depth: id, severity and hash come from the agent, so the final
+# name must fit the todo contract before anything is written.
+hash_re='^([0-9a-f]{8})?$'
+[[ "$fp_prefix" =~ $hash_re ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
+debt_todo_name_ok "${todo_filename##*/}" || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
+
+# Defense in depth: the name check above rejects any `/`; this also pins the
+# directory without realpath, which BSD lacks. A symlink added since the ids
+# were allocated would redirect the write, so check the directories again.
+debt_refuse_symlinks todos todos/debt || exit 1
+case "$todo_filename" in
+  todos/debt/*/*) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
+  todos/debt/*) ;;
   *) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
 esac
+printf '%s\n' "$todo_filename"
+__YELLOW_DEBT_BASH__
 ```
 
 Prevents path traversal via: (1) whitelist validation, (2) hash fallback, (3)
-path canonicalization.
+the directory pin, (4) the `fp_prefix` format check and (5) the todo-name
+contract check (`debt_todo_name_ok`).
 
 ### 8. Output Summary
 

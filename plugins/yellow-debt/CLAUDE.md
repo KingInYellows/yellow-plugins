@@ -109,15 +109,32 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 ## Testing
 
-`bats tests/validate.bats` from the plugin directory. Its `setup()` sources
+`bats tests/` from the plugin directory (CI runs it as a required step with
+kislyuk `yq`; the transition tests skip without it locally and fail in CI).
+`tests/status-parity.bats` fails when a status in `DEBT_TODO_NAME_RE` is
+missing from `status.md`, SKILL.md, the README state machine, the
+synthesizer's preserve list or `validate_transition` — add a status to all of
+them, except `pending`, which the preserve list must not contain (a pending
+todo is reconciled away). `validate.bats` `setup()` sources
 `../../yellow-core/lib/validate-fs.sh` before `lib/validate.sh` because the
 runtime source is `CLAUDE_PLUGIN_ROOT`-gated. Hook config lives in
 `catalog/plugins/yellow-debt.json` and is generated into `plugin.json` by
 `pnpm generate:manifests` — do not add `hooks/hooks.json` (Claude Code
 auto-loads it as a second hook source). Findings live at
 `${CLAUDE_PROJECT_DIR}/todos/debt/` named
-`{id}-{status}-{severity}-{slug}-{hash}.md`; the SessionStart hook counts only
+`{id}-{status}-{severity}-{slug}[-{hash}].md`; the SessionStart hook counts only
 `pending|ready` × `critical|high` filenames.
+
+`wont-fix` closes a valid finding that is deliberately not fixed; the file stays
+(as does `deleted`, which means the finding was wrong) and a re-audit skips
+findings that match a kept todo (not a `deferred` one). A todo may carry a
+shell-computed `fingerprint: fp/v1:…` (category, path and the whole flagged
+range with blanks folded) and an `anchor_hash`; a finding without a usable
+line range gets neither. `audit-synthesizer` Step 5a (`debt_match_kept_todos`)
+matches on the fingerprint first, then on the anchor (never for
+`security-debt`, `complete` or `deleted` todos), and only a unique anchor match
+suppresses.
+Closing a todo does not close its Linear issue.
 
 ## Known Limitations
 
@@ -125,6 +142,24 @@ auto-loads it as a second hook source). Findings live at
 - Large codebases (100K+ LOC) require file chunking (implemented in audit
   command)
 - Linear sync requires yellow-linear plugin to be installed
+- A kept todo (other than `complete`) written before fingerprints existed is
+  rehashed from its recorded `affected_files` lines on every audit. If lines
+  were inserted above the code since, that range hashes other text, so the
+  finding resurfaces on each audit until it is closed again, which stamps a
+  fingerprint that survives later drift. A legacy `complete` todo is never
+  rehashed, so its finding resurfaces whenever it is reported
+- The matcher reads only the first `affected_files` entry of a kept todo, and
+  the SessionStart hook counts by file name alone (no frontmatter read, to keep
+  session start fast). A pre-v2 todo that lists several files therefore
+  matches only its first file, and a legacy `-pending-` file whose frontmatter
+  says `wont_fix` is still counted as pending there; `/debt:status` reports
+  it and prints the repair recipe
+- Suppression trusts the `todos/debt/` files in the repository: a well-named
+  `wont-fix`, `ready`, `in-progress`, `deleted` or `complete` todo hides the
+  finding it describes, `security-debt` included, without a triage decision on
+  this machine. That is how a team shares decisions through git, so audit only
+  repositories you trust, and do not read an audit of a repository you do not
+  control as proof that it has no findings
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
 - Scanner output schema v1.0 is no longer accepted; the synthesizer warns

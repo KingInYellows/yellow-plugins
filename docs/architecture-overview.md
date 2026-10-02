@@ -350,8 +350,10 @@ Blocking jobs are exactly the `needs:` list of the `ci-status` aggregator in
 `validate-schemas.yml` — read the list there rather than from any doc. Inside
 `plugin-shell-tests`, only the yellow-core, yellow-council, yellow-review, and
 yellow-codex bats suites are required; other plugins' suites run
-`continue-on-error`. `report-metrics` (not in `ci-status`, never blocks merge)
-is meant to check the 60s per-target schema SLO, but the check is dormant:
+`continue-on-error`. The yellow-debt suite is also required, as a step in
+`shell-compat-tests` (it needs kislyuk `yq`); the advisory loop skips it.
+`report-metrics` (not in `ci-status`, never blocks merge) is meant to check the
+60s per-target schema SLO, but the check is dormant:
 `CI_UPLOAD_ARTIFACTS` is `'false'`, so no metrics are uploaded or downloaded and
 it passes on an empty file.
 

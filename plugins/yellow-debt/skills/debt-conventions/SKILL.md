@@ -293,10 +293,66 @@ Todo files must use one of the following status values:
 - `complete` — Fix completed
 - `deferred` — Postponed to future sprint (includes optional `deferred_reason`
   field in frontmatter)
-- `deleted` — Rejected or no longer relevant
+- `deleted` — Rejected or no longer relevant (a false positive)
+- `wont-fix` — Valid finding that is deliberately not being fixed (includes
+  optional `wont_fix_reason` field, 200 characters at most). The file is kept,
+  so a re-audit does not recreate it; reopen it to `pending` to re-triage.
+  Distinct from `deleted`, which means the finding was wrong.
+
+`wont_fix`, `wontfix` and `wont fix` are not valid statuses, but the helper
+accepts them as the source of a transition to `wont-fix`, which repairs the
+file. That works only when the file NAME already fits the todo pattern (for
+example `052-pending-high-…`) and the spelling is in the frontmatter; a name
+that itself contains `wont_fix`, `wontfix` or `wont fix` is rejected, so rename
+it to a valid status such as `pending` first. To close a todo as `wont-fix`,
+repair one, or reopen one to `pending`,
+run this from any directory (replace `<current-status>` with the status in the
+file NAME, for example `pending`, and `<new-status>` with `wont-fix` or
+`pending`; to record a reason, use the reason-directory recipe in
+`/debt:triage` "Triage Decisions", which also closes `ready`, `in-progress` and
+`deferred` todos; a legacy file's existing `wont_fix_reason` is kept):
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-id>' '<current-status>' '<new-status>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
+transition_todo_state "$todo_file" "$3" || {
+  printf '[debt] Error: transition failed\n' >&2
+  exit 1
+}
+__YELLOW_DEBT_BASH__
+```
+
+`/debt:status` points here for a todo carrying a legacy spelling.
 
 **Remediation**: Run `lib/validate.sh` validation functions to check status
 field against allowed values.
+
+### Re-audit Fingerprint Fields
+
+New todos carry `fingerprint: fp/v1:<16 hex>` and `anchor_hash`, both computed
+in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
+fingerprint hashes the category, the path and the whole flagged range with
+blanks folded and CR removed; a finding without a line range gets none.
+`anchor_hash` hashes the first substantive flagged line
+(20+ bytes once blanks are folded, so `}` or `if err != nil {` never
+anchors). `audit-synthesizer` uses them to skip a new finding that matches a
+kept todo, by the todo's frontmatter status (any status except `pending` and
+`deferred`): an exact fingerprint first (any number of kept todos may share it),
+then the same category and path whose anchor equals the first substantive line
+of the new range. The anchor tier never applies to `security-debt`, `complete`
+or `deleted` todos. Only a unique anchor match suppresses; edited code resurfaces
+as a new pending todo. A todo closed as `wont-fix` or `deleted` is stamped at
+close time (with a warning when that is not possible); older ones are rehashed
+from the current tree, except `complete` ones, so a stale line range can stamp
+the wrong code: close old todos promptly. A new pending todo whose fingerprint
+matches a `deferred` todo carries `resurfaced_from: '<id>'`, so the pair is
+visible. Closing a todo that is already in the target state succeeds with an
+"already" note, and every transition prints a one-line receipt naming the new
+file.
 
 ### Invalid Priority Values
 

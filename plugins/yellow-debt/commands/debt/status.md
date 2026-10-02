@@ -56,7 +56,7 @@ declare -A by_severity
 declare -A by_effort
 
 # Initialize counters
-for status in pending ready in-progress deferred complete deleted; do
+for status in pending ready in-progress deferred complete deleted wont-fix; do
   by_status["$status"]=0
 done
 
@@ -72,9 +72,17 @@ for effort in quick small medium large; do
   by_effort["$effort"]=0
 done
 
+# A missing yq must stop the command; the per-file fallbacks below only cover a
+# file whose frontmatter will not parse.
+command -v yq >/dev/null 2>&1 || {
+  printf '[status] Error: yq is required but not installed\n' >&2
+  exit 1
+}
+
 # Scan all todo files
 TODO_COUNT=0
 ERROR_COUNT=0
+REPAIR_JSON=""
 
 if [ -d todos/debt ]; then
   while IFS= read -r -d '' todo_file; do
@@ -89,16 +97,32 @@ if [ -d todos/debt ]; then
     # NOTE: Todo files are markdown with YAML frontmatter. extract_frontmatter()
     #       extracts only the YAML section for yq compatibility (kislyuk/yq cannot
     #       parse mixed markdown+YAML format).
-    STATUS=$(extract_frontmatter "$todo_file" | yq -r '.status // "unknown"' 2>/dev/null)
-    CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // "unknown"' 2>/dev/null)
-    SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // "unknown"' 2>/dev/null)
-    EFFORT=$(extract_frontmatter "$todo_file" | yq -r '.effort // "unknown"' 2>/dev/null)
+    # A file whose frontmatter will not parse is counted as unknown, not fatal
+    # (set -e would otherwise abort the whole dashboard on one bad file).
+    STATUS=$(extract_frontmatter "$todo_file" | yq -r '.status // "unknown"' 2>/dev/null) || STATUS=unknown
+    CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // "unknown"' 2>/dev/null) || CATEGORY=unknown
+    SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // "unknown"' 2>/dev/null) || SEVERITY=unknown
+    EFFORT=$(extract_frontmatter "$todo_file" | yq -r '.effort // "unknown"' 2>/dev/null) || EFFORT=unknown
 
     # Validate and increment status counter
     case "$STATUS" in
-      pending|ready|in-progress|complete|deferred|deleted)
+      pending|ready|in-progress|complete|deferred|deleted|wont-fix)
         val_status=${by_status["$STATUS"]:-0}
         by_status["$STATUS"]=$((val_status + 1))
+        ;;
+      wont_fix|wontfix|"wont fix")
+        # Hand-written spelling. The value is frontmatter text: print it only
+        # through %s, never inside a heredoc.
+        legacy_base="${todo_file##*/}"
+        if [[ "$legacy_base" =~ $DEBT_TODO_NAME_RE ]]; then
+          printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: close todo id %s (name status %s) as wont-fix with the recipe in the debt-conventions skill\n' "$STATUS" "$todo_file" "${legacy_base%%-*}" "${BASH_REMATCH[1]}" >&2
+          # id (digits) and name status (enum) come from the validated name, so
+          # they need no JSON escaping.
+          REPAIR_JSON="${REPAIR_JSON:+$REPAIR_JSON, }{\"id\": \"${legacy_base%%-*}\", \"name_status\": \"${BASH_REMATCH[1]}\"}"
+        else
+          printf '[status] WARNING: Status "%s" in %s should be wont-fix, but the file name does not fit the todo pattern; rename it by hand to the -pending- form first\n' "$STATUS" "$todo_file" >&2
+        fi
+        ERROR_COUNT=$((ERROR_COUNT + 1))
         ;;
       *)
         printf '[status] WARNING: Unknown status "%s" in %s\n' "$STATUS" "$todo_file" >&2
@@ -173,7 +197,8 @@ if [ "$JSON_OUTPUT" = true ]; then
     "in_progress": ${by_status[in-progress]},
     "deferred": ${by_status[deferred]},
     "complete": ${by_status[complete]},
-    "deleted": ${by_status[deleted]}
+    "deleted": ${by_status[deleted]},
+    "wont_fix": ${by_status[wont-fix]}
   },
   "by_category": {
     "ai_pattern": ${by_category[ai-pattern]},
@@ -188,6 +213,7 @@ if [ "$JSON_OUTPUT" = true ]; then
     "medium": ${by_severity[medium]},
     "low": ${by_severity[low]}
   },
+  "needs_repair": [$REPAIR_JSON],
   "estimated_effort_hours": $EFFORT_HOURS
 }
 EOF
@@ -204,6 +230,7 @@ By Status:
   Deferred:    ${by_status[deferred]} findings
   Complete:    ${by_status[complete]} findings (resolved)
   Deleted:     ${by_status[deleted]} findings (removed)
+  Won't fix:   ${by_status[wont-fix]} findings (closed)
 
 By Category:
   Complexity:    ${by_category[complexity]}
@@ -227,7 +254,7 @@ Estimated Remaining Effort: ~${EFFORT_HOURS} hours
 EOF
 
   if [ $ERROR_COUNT -gt 0 ]; then
-    printf 'WARNING: %d corrupted todo file(s) skipped\n\n' "$ERROR_COUNT"
+    printf 'WARNING: %d todo file(s) need attention (see warnings above)\n\n' "$ERROR_COUNT"
   fi
 
   # Next steps based on current state
@@ -241,7 +268,7 @@ EOF
     printf 'Next Steps:\n'
     printf '  - Complete %d in-progress finding(s)\n' "${by_status[in-progress]}"
   else
-    printf 'All findings have been triaged and completed!\n'
+    printf 'No findings are waiting for triage or a fix.\n'
     printf 'Run /debt:audit to scan for new technical debt.\n'
   fi
 fi
@@ -272,6 +299,8 @@ By Status:
   In Progress:  1 finding
   Deferred:     3 findings
   Complete:    15 findings (resolved)
+  Deleted:      2 findings (removed)
+  Won't fix:    4 findings (closed)
 
 By Category:
   Complexity:    8 (3 critical, 5 high)
@@ -294,13 +323,15 @@ Next Steps:
 ```json
 {
   "total_findings": 23,
-  "errors": 0,
+  "errors": 1,
   "by_status": {
     "pending": 12,
     "ready": 8,
     "in_progress": 1,
     "deferred": 3,
-    "complete": 15
+    "complete": 15,
+    "deleted": 2,
+    "wont_fix": 4
   },
   "by_category": {
     "ai_pattern": 4,
@@ -315,6 +346,7 @@ Next Steps:
     "medium": 5,
     "low": 2
   },
+  "needs_repair": [{"id": "052", "name_status": "pending"}],
   "estimated_effort_hours": 32
 }
 ```
@@ -323,7 +355,7 @@ Next Steps:
 
 **Corrupted todo files**: Skipped with warning, counted in error total **Missing
 todos/debt/ directory**: Shows zeros for all metrics **Malformed YAML
-frontmatter**: File skipped, error logged
+frontmatter**: Counted as `unknown` in `total_findings`, with a warning
 
 ## Use Cases
 

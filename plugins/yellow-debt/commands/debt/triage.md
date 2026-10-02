@@ -1,13 +1,13 @@
 ---
 name: debt:triage
-description: 'Interactive review and prioritization of pending debt findings. Use when you need to accept, reject, or defer findings from an audit.'
+description: 'Interactive review and prioritization of pending debt findings. Use when you need to accept, reject, defer, or close as won''t fix findings from an audit.'
 argument-hint: '[--category <name>] [--priority <level>]'
 allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
-  # Write is used only to create the defer-reason file in a private temp
-  # directory. Todo transitions still go through transition_todo_state() in
+  # Write is used only to create the defer- or won't-fix-reason file in a
+  # private temp directory. Todo transitions still go through transition_todo_state() in
   # validate.sh using Bash shell I/O (>, mv, rm).
   - Write
 ---
@@ -15,7 +15,8 @@ allowed-tools:
 # Technical Debt Triage Command
 
 Interactively review pending technical debt findings and decide to accept
-(ready), reject (deleted), or defer (deferred) each one.
+(ready), reject (deleted), defer (deferred), or close as won't fix (wont-fix)
+each one.
 
 ## Step 1: Prerequisites
 
@@ -37,30 +38,27 @@ If the above exits non-zero, stop. Do not proceed.
 
 ## Step 2: Discover Findings
 
-Find all pending todo files, anchored to git root:
+List the pending todo files. `debt_pending_todos` keeps a file only when its
+name fits the todo pattern and its frontmatter status is also `pending`: a
+closed legacy todo that still has `-pending-` in its name is reported on stderr
+and left out, because Accept, Reject and Defer would all fail on it (repair it
+with the recipe in "Triage Decisions" below):
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 GIT_ROOT="$(git rev-parse --show-toplevel)" || {
   printf '[debt:triage] Error: not inside a git repository\n' >&2
   exit 1
 }
 cd "$GIT_ROOT" || exit 1
-if [ -L todos ] || [ -L todos/debt ]; then
-  printf '[debt:triage] Error: todos/ or todos/debt/ is a symlink; refusing\n' >&2
-  exit 1
-fi
-# Only names that fit {id}-pending-{severity}-{slug}[-{hash}].md are listed;
-# the repository controls these names, so anything else is skipped.
-all_todos=$(find todos/debt -maxdepth 1 -type f -name '*-pending-*.md' 2>/dev/null | LC_ALL=C sort)
-todo_list=$(printf '%s\n' "$all_todos" \
-  | LC_ALL=C grep -E '^todos/debt/[0-9]{1,6}-pending-(critical|high|medium|low)-[a-z0-9]+(-[a-z0-9]+)*\.md$' || true)
-all_count=$(printf '%s' "$all_todos" | grep -c . || true)
-kept_count=$(printf '%s' "$todo_list" | grep -c . || true)
-if [ "$all_count" -gt "$kept_count" ]; then
-  printf '[debt:triage] Warning: skipped %d file(s) whose names do not fit the todo pattern\n' \
-    "$((all_count - kept_count))" >&2
-fi
-[ -z "$todo_list" ] || printf '%s\n' "$todo_list"
+# Keep the function's status: a refused symlink must stop the command, not
+# read as an empty list.
+list=$(debt_pending_todos) || exit 1
+[ -z "$list" ] || printf '%s\n' "$list" | LC_ALL=C sort
+__YELLOW_DEBT_BASH__
 ```
 
 If no files are listed: report "No pending findings to triage. Run /debt:audit
@@ -85,7 +83,7 @@ remain: report "No pending findings match the filter criteria." and stop.
 
 Sort filtered findings by severity: critical first, then high, medium, low.
 Extract severity from the filename pattern
-(`{id}-{status}-{severity}-{slug}-{hash}.md`) or from frontmatter if the
+(`{id}-{status}-{severity}-{slug}[-{hash}].md`) or from frontmatter if the
 pattern doesn't match.
 
 ## Step 5: Pre-Loop Overview (user confirmation gate)
@@ -103,7 +101,7 @@ If user selects Cancel: output "Triage cancelled." and stop. Do not proceed.
 ## Step 6: Triage Loop
 
 For each finding in severity order, maintain running counts of
-accepted/rejected/deferred in your conversation context (NOT as shell variables
+accepted/rejected/deferred/won't-fix in your conversation context (NOT as shell variables
 — each Bash tool call is a separate subprocess).
 
 ### Per-Finding Steps
@@ -118,7 +116,7 @@ accepted/rejected/deferred in your conversation context (NOT as shell variables
    Options:
    - "Accept — mark as ready for remediation"
    - "Reject — mark as false positive (will be deleted)"
-   - "Defer — postpone with reason"
+   - "Defer or won't fix — valid, not fixing now"
    - "Stop — end triage session"
 
 3. **Handle user choice:**
@@ -162,6 +160,16 @@ __YELLOW_DEBT_BASH__
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your rejected count.
 
+   **On Defer or won't fix:**
+   Use AskUserQuestion: "Defer this finding to re-evaluate later, or close it as
+   won't fix?"
+   - "Defer — postpone with reason"
+   - "Won't fix — valid, deliberately not fixing"
+   - "Cancel — go back"
+
+   **On Defer or won't fix — Cancel:** Do not run `transition_todo_state`.
+   Return to the same finding's main options. Do not increment any count.
+
    **On Defer:**
    Use AskUserQuestion:
    - Prompt: "Why defer this finding? (Max 200 characters — leave blank to skip reason)"
@@ -171,8 +179,8 @@ __YELLOW_DEBT_BASH__
    defer reason.
 
    **On Defer — Cancel:** Do not run `transition_todo_state`. Return to the
-   same finding's main options (Accept/Reject/Defer/Stop). Do not increment
-   any count.
+   same finding's main options (Accept/Reject/Defer or won't fix/Stop). Do not
+   increment any count.
 
    **On Defer — Submit reason:** The reason is untrusted free text. Never place
    it in shell text (no heredoc, no quoting): a line matching a heredoc
@@ -182,7 +190,7 @@ __YELLOW_DEBT_BASH__
    1. Create a private directory atomically (mode 0700, so no other user can
       claim paths inside it):
       ```bash
-      mktemp -d "${TMPDIR:-/tmp}/debt-defer.XXXXXX"
+      mktemp -d "${TMPDIR:-/tmp}/debt-reason.XXXXXX"
       ```
    2. Use the Write tool (not Bash) to create `<dir>/reason.txt` inside the
       printed directory, with the reason text as its content.
@@ -194,15 +202,18 @@ __YELLOW_DEBT_BASH__
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
 bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt")
-rm -f -- "$2/reason.txt"
-rmdir -- "$2"
+debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
+[ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" pending) || exit 1
 transition_todo_state "$todo_file" deferred "$DEFER_REASON" || {
-printf '[debt:triage] Error: transition failed\n' >&2
+printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
 exit 1
 }
+# The todo is already closed: a cleanup failure must not read as a failed close.
+rm -f -- "$2/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$2" >&2
+rmdir -- "$2" || printf '[debt:triage] Warning: could not remove %s\n' "$2" >&2
 __YELLOW_DEBT_BASH__
 ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
@@ -225,6 +236,61 @@ __YELLOW_DEBT_BASH__
    If the above exits non-zero, stop. Report the error. Do not increment any count.
    Otherwise increment your deferred count.
 
+   **On Won't fix:**
+   Use AskUserQuestion:
+   - Prompt: "Why is this finding not being fixed? (Max 200 characters — leave blank to skip reason)"
+   - Options: "Other" / "Cancel — go back without closing"
+
+   The "Other" option opens a free-text input field — use the entered text as the
+   won't-fix reason.
+
+   **On Won't fix — Cancel:** Do not run `transition_todo_state`. Return to the
+   same finding's main options. Do not increment any count.
+
+   **On Won't fix — Submit reason:** The reason is untrusted free text. Pass it
+   through a file exactly as in Defer (private directory from
+   `mktemp -d "${TMPDIR:-/tmp}/debt-reason.XXXXXX"`, then the Write tool to
+   create `<dir>/reason.txt`), then run the transition with the id and the
+   directory as single-quoted operands:
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
+[ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_file=$(debt_resolve_todo "$1" pending) || exit 1
+transition_todo_state "$todo_file" wont-fix "$REASON" || {
+printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
+exit 1
+}
+# The todo is already closed: a cleanup failure must not read as a failed close.
+rm -f -- "$2/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$2" >&2
+rmdir -- "$2" || printf '[debt:triage] Warning: could not remove %s\n' "$2" >&2
+__YELLOW_DEBT_BASH__
+```
+   If the above exits non-zero, stop. Report the error. Do not increment any count.
+   Otherwise increment your won't-fix count.
+
+   **On Won't fix — empty reason (blank "Other" input):** Call without third argument:
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-id>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_file=$(debt_resolve_todo "$1" pending) || exit 1
+transition_todo_state "$todo_file" wont-fix || {
+printf '[debt:triage] Error: transition failed\n' >&2
+exit 1
+}
+__YELLOW_DEBT_BASH__
+```
+   If the above exits non-zero, stop. Report the error. Do not increment any count.
+   Otherwise increment your won't-fix count.
+
    **On Stop:**
    Break out of the loop and proceed to the summary.
 
@@ -232,7 +298,7 @@ __YELLOW_DEBT_BASH__
 
 Present totals:
 
-"Triage complete: N accepted, M rejected, P deferred, Q remaining.
+"Triage complete: N accepted, M rejected, P deferred, R won't fix, Q remaining.
 Run /debt:fix to begin remediation of accepted findings."
 
 ## Triage Decisions
@@ -249,8 +315,55 @@ Run /debt:fix to begin remediation of accepted findings."
 
 **Defer** → Transitions to `deferred` state with reason
 - Valid finding but not addressing now
-- Optional reason (validated: no newlines, max 200 chars)
-- Will be re-evaluated in next audit
+- Optional reason (newlines stripped, truncated to 200 characters)
+- Kept in `todos/debt/`, but a re-audit does not skip it: the finding comes
+  back as a new pending todo while the code still has the problem
+
+**Won't fix** → Transitions to `wont-fix` state with optional reason
+- Valid finding that is deliberately not being fixed
+- The file is kept in `todos/debt/` (with `wont_fix_reason`) and stamped with
+  the finding's fingerprint, so a re-audit recognises it and does not recreate
+  it. Reject (`deleted`) is kept and stamped the same way; the difference is
+  meaning: Reject says the finding was wrong
+- Optional reason (newlines stripped, truncated to 200 characters)
+- A close is idempotent: repeating it on a todo that is already `wont-fix`
+  prints "already wont-fix" and succeeds
+- Reopen with `transition_todo_state … pending` if the decision changes
+- Its Linear issue, if synced, is not touched: close it by hand
+- A finding that is already `ready`, `in-progress` or `deferred` is closed with
+  the helper directly. Replace `<current-status>` with `ready`, `in-progress`
+  or `deferred`; for a legacy todo that Step 2 left out (named `-pending-`, its
+  frontmatter `wont_fix`) use `pending`, and the helper repairs name and
+  frontmatter. To record a reason, make the private directory and `reason.txt`
+  as in Defer and pass the directory as `'<reason-dir>'`; pass `'-'` for none:
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 '<todo-id>' '<current-status>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+REASON=""
+if [ "$3" != "-" ]; then
+  debt_refuse_symlinks "$3" "$3/reason.txt" || exit 1
+  [ -f "$3/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
+  REASON=$(tr -d '\n\r' < "$3/reason.txt") || exit 1
+fi
+cd "$(git rev-parse --show-toplevel)" || exit 1
+todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
+transition_todo_state "$todo_file" wont-fix "$REASON" || {
+if [ "$3" = "-" ]; then
+  printf '[debt:triage] Error: transition failed\n' >&2
+else
+  printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$3" >&2
+fi
+exit 1
+}
+if [ "$3" != "-" ]; then
+  # The todo is already closed: a cleanup failure must not read as a failed close.
+  rm -f -- "$3/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$3" >&2
+  rmdir -- "$3" || printf '[debt:triage] Warning: could not remove %s\n' "$3" >&2
+fi
+__YELLOW_DEBT_BASH__
+```
 
 ## Error Recovery
 

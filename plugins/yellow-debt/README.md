@@ -85,7 +85,8 @@ Interactively review and prioritize pending findings.
 ```
 
 **Actions:** Accept (→ ready), Reject (→ deleted), Defer (→ deferred with
-reason)
+reason), Won't fix (→ wont-fix with reason; a valid finding you are deliberately
+not fixing, kept so a re-audit does not bring it back)
 
 ### `/debt:fix <id | path>`
 
@@ -130,7 +131,7 @@ Push accepted findings to Linear as issues.
 1. **Validate setup**: `/debt:setup` to verify required tools and repo
    writability
 2. **Run audit**: `/debt:audit` to scan your codebase
-3. **Review findings**: `/debt:triage` to accept/reject/defer
+3. **Review findings**: `/debt:triage` to accept/reject/defer/won't fix
 4. **Fix issues**: `/debt:fix <id>` for agent-assisted remediation
 5. **Track progress**: `/debt:status` to see current state
 6. **Sync to Linear**: `/debt:sync` for team visibility
@@ -155,7 +156,10 @@ affected_files:
 linear_issue_id: null
 deferred_until: null
 deferred_reason: null
-content_hash: 'a3f2b1c4'
+wont_fix_reason: null
+fingerprint: 'fp/v1:0f3a9c27d1b84e65'
+anchor_hash: 'a3f2b1c49d0e7788'
+resurfaced_from: null
 ---
 
 # High Cyclomatic Complexity in UserService
@@ -196,7 +200,31 @@ pending → ready/deleted/deferred
 ready → in-progress/deleted
 in-progress → complete/ready
 deferred → pending
+pending/ready/in-progress/deferred → wont-fix
+wont-fix → pending
 ```
+
+`wont-fix` closes a valid finding you are deliberately not fixing and keeps its
+file, as `deleted` does; the difference is meaning (`deleted` says the finding
+was wrong). Triage offers it
+for pending findings. To close one that is already `ready`, `in-progress` or
+`deferred`, use the wrapped recipe in the `debt-conventions` skill or in
+`/debt:triage` "Triage Decisions" (`transition_todo_state` run from the git root
+in a bash child that sources `lib/validate.sh`).
+Closing a todo does not touch its Linear issue: close that by hand.
+
+A re-audit skips a new finding that matches a kept todo (every status except
+`pending` and `deferred`) by `fingerprint`, a hash of the category, path and
+flagged code (blanks folded), so a closed finding does not come back. When
+nothing matches exactly, a unique todo with the same category and path whose
+`anchor_hash` is the hash of the first substantive line of the new range also
+suppresses it, so an edit elsewhere in the range can still be skipped; that
+fallback never applies to `security-debt`, nor to `complete` or `deleted`
+todos. A todo without a stored fingerprint is rehashed from its recorded
+range at match time (except `complete`), so it can still suppress an unchanged
+finding; a finding without a usable line range gets none, and a tie
+resurfaces. A `deferred` finding is not skipped: it comes back as a new
+pending todo while the code still has the problem.
 
 All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
 
