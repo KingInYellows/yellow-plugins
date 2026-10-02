@@ -1,0 +1,23 @@
+plugins/yellow-core/skills/local-config/SKILL.md
+  s_becc7011266565::t_25563fd9eebb1c 70-74,88,106-110,206-208
+.changeset/local-config-resolve-keys.md
+  s_becc7011266565::t_284ec197a529f0 1-9
+plans/review-resolve-hardening.md
+  s_becc7011266565::t_c99e8143bca1c8 525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fd3f590890eeeba81a6010882896d465b11392c5",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
