@@ -1,0 +1,32 @@
+docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md
+  s_7a82748dd606d9::t_a6c4ff7095bd2f 46-47,50-53
+  s_7a82748dd606d9::t_869660942ef0a8 87-90
+  s_7a82748dd606d9::t_ffa245d6e87d13 101-102
+  s_7a82748dd606d9::t_e47b9989008249 110-112,117-124
+  s_7a82748dd606d9::t_febc8a38ef744c 126-129,133-135
+  s_7a82748dd606d9::t_e8bbf41662bccd 130-132
+  s_7a82748dd606d9::t_ff5e2925d9c94e 36-39
+  s_7a82748dd606d9::t_72c65373740b48 82,125
+docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md
+  s_7a82748dd606d9::t_1d635c5df9f020 52-62
+  s_7a82748dd606d9::t_bdc86be42738a5 119-121
+  s_7a82748dd606d9::t_a07bff6835408a 114-118
+docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md
+  s_7a82748dd606d9::t_944d5a91152d22 53-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a35bcefc8d1da93eef4b8db9768c9581213a3b3b",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
