@@ -113,9 +113,10 @@ Unchanged and checked: the session-start hook (counts only `pending|ready`),
 - **Doc mismatch on `deleted`.** `triage.md` says a rejected file "will be
   removed from todos/debt/", but `transition_todo_state` only renames it and
   keeps the file. Separate cleanup.
-- **Audit re-detection.** The synthesizer's dedup does not appear to check
-  existing todos, so a later `/debt:audit` may re-create a todo for a finding
-  already closed as `wont-fix` (or `deleted`). Needs its own investigation.
+- **Audit re-detection.** (Resolved: the synthesizer's Step 5a now skips a
+  finding that matches a kept todo.) The synthesizer's dedup did not check
+  existing todos, so a later `/debt:audit` could re-create a todo for a finding
+  already closed as `wont-fix` (or `deleted`).
 - **Existing `wont_fix` files in other repos.** Not migrated by this change.
   The `/debt:status` hint points at the fix; whether to ship a repair helper is
   deferred.

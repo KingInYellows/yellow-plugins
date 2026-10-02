@@ -726,13 +726,18 @@ write_surviving() {
   [ "$(debt_fingerprint duplication src/a.js 5 6)" != "$(debt_fingerprint complexity src/a.js 5 6)" ]
 }
 
+# SHA-256 of stdin, first 16 hex digits, without assuming GNU coreutils.
+sha16_ref() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-16; else shasum -a 256 | cut -c1-16; fi
+}
+
 @test "debt_fingerprint known answer: the fp/v1 recipe does not drift" {
   printf 'alpha_one_long_name_here\n  beta_two_long_name_here\n' > known.js
   # Pinned literals, and the same recipe recomputed without the library.
   [ "$(debt_fingerprint complexity known.js 1 2)" = "fp/v1:7af66535893caf60" ]
-  [ "$(printf 'fp/v1\0complexity\0known.js\0alpha_one_long_name_here\nbeta_two_long_name_here' | sha256sum | cut -c1-16)" = "7af66535893caf60" ]
+  [ "$(printf 'fp/v1\0complexity\0known.js\0alpha_one_long_name_here\nbeta_two_long_name_here' | sha16_ref)" = "7af66535893caf60" ]
   [ "$(debt_anchor_hashes known.js 1 2 1)" = "9ea1ec096be5fb89" ]
-  [ "$(printf '%s' alpha_one_long_name_here | sha256sum | cut -c1-16)" = "9ea1ec096be5fb89" ]
+  [ "$(printf '%s' alpha_one_long_name_here | sha16_ref)" = "9ea1ec096be5fb89" ]
 }
 
 @test "debt_fingerprint refuses traversal, absolute and symlinked paths and bad ranges" {
@@ -758,10 +763,21 @@ write_surviving() {
   [ "$status" -eq 0 ]
 }
 
-@test "debt_fingerprint hashes the first 200 lines of a longer range" {
+@test "debt_fingerprint hashes the whole range, so an edit past line 200 changes it" {
   seq 1 400 | sed 's/^/statement_/' > big.js
-  [ "$(debt_fingerprint complexity big.js 1 300)" = "$(debt_fingerprint complexity big.js 1 200)" ]
-  [ "$(debt_fingerprint complexity big.js 1 199)" != "$(debt_fingerprint complexity big.js 1 200)" ]
+  before=$(debt_fingerprint complexity big.js 1 300)
+  [ "$before" != "$(debt_fingerprint complexity big.js 1 200)" ]
+  sed -i.bak '250s/.*/statement_changed/' big.js
+  [ "$(debt_fingerprint complexity big.js 1 300)" != "$before" ]
+}
+
+@test "debt_fingerprint folds blanks but keeps the gap between tokens" {
+  printf 'if (role == "allow admin") {\n  grant()\n}\n' > ws.js
+  before=$(debt_fingerprint complexity ws.js 1 3)
+  printf '\tif   (role == "allow  admin")  {\r\n\t\tgrant()  \r\n}\n' > ws.js
+  [ "$(debt_fingerprint complexity ws.js 1 3)" = "$before" ]
+  printf 'if (role == "allowadmin") {\n  grant()\n}\n' > ws.js
+  [ "$(debt_fingerprint complexity ws.js 1 3)" != "$before" ]
 }
 
 @test "debt_anchor_hashes skips short lines and honours LIMIT" {
@@ -953,6 +969,14 @@ write_surviving() {
   run debt_next_todo_id
   [ "$status" -eq 0 ]
   [ "$output" = "013" ]
+}
+
+@test "debt_next_todo_id ignores a planted symlink so it cannot exhaust the id space" {
+  : > todos/debt/004-ready-high-a.md
+  ln -s 004-ready-high-a.md todos/debt/999999-ready-high-planted.md
+  run debt_next_todo_id
+  [ "$status" -eq 0 ]
+  [ "$output" = "005" ]
 }
 
 @test "debt_next_todo_id starts at 001 with no todos and refuses when ids run out" {
@@ -1164,13 +1188,15 @@ run_status_block() {
   init_repo
   make_source
   printf -- '---\nstatus: [unclosed\ncategory: complexity\n---\nB\n' > todos/debt/007-wont-fix-high-aaa.md
-  printf 'src/a.js\n' > "$BATS_TEST_TMPDIR/note"
   printf -- '---\nstatus: wont-fix\naffected_files:\n  - src/a.js:2-3\n  - bad: [\n---\nB\n' > todos/debt/009-wont-fix-high-ccc.md
+  make_todo 011 wont-fix 011-wont-fix-high-ddd.md "affected_files:\n  - src/a.js:2-3"
   mkdir -p .debt
   write_surviving 2-3
   run --separate-stderr debt_match_kept_todos
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"unreadable"* ]]
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"011"'* ]]
 }
 
 @test "closing a todo as deleted stamps it, and the stamp then suppresses the finding" {

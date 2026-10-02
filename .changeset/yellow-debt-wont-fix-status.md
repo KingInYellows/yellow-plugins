@@ -25,4 +25,5 @@ idempotent (repeating it says "already"), every transition prints a receipt, a
 rejected one lists the allowed targets, and `/debt:status --json` lists the
 files needing repair in `needs_repair`. A reason that starts with a dash is no
 longer read as a `yq` option. A new `status-parity.bats` test fails when a
-status is missing from any site that lists statuses.
+status is missing from `status.md`, the `debt-conventions` skill, the README
+state machine, the synthesizer's preserve list or `validate_transition`.

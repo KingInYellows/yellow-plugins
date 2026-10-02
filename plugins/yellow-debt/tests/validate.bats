@@ -270,7 +270,8 @@ teardown() {
 }
 
 @test "debt_todo_name_ok accepts wont-fix names and rejects wont_fix names" {
-  debt_todo_name_ok "001-wont-fix-high-long-fn-0a1b2c3d.md"
+  run debt_todo_name_ok "001-wont-fix-high-long-fn-0a1b2c3d.md"
+  [ "$status" -eq 0 ]
   run debt_todo_name_ok "001-wont_fix-high-long-fn.md"
   [ "$status" -eq 1 ]
 }

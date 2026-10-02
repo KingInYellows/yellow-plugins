@@ -60,6 +60,7 @@ file handed between blocks by index or name, and any check labelled
 # synthesizer block: one call, library does the work
 bash /dev/fd/3 3<<'EOS'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
 debt_match_kept_todos || exit 1
 EOS
 ```

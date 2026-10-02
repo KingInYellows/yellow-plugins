@@ -163,8 +163,8 @@ Decisions (user-confirmed unless marked):
 
 - [x] 1.5: Add `debt_fingerprint CATEGORY PATH START END` to `validate.sh`.
       It validates `PATH` with `validate_file_path` (relative, inside the
-      repo, not a symlink), reads lines `START..END`, removes spaces, tabs
-      and CR, and prints `fp/v1:<16 hex>` of
+      repo, not a symlink), reads lines `START..END`, folds blanks and
+      removes CR, and prints `fp/v1:<16 hex>` of
       `sha256("fp/v1\0category\0path\0text")`. Add `debt_anchor_hashes PATH
       START END`, printing one normalized-line hash per non-blank line (the
       first is the todo's `anchor_hash`). A finding with no line range
@@ -377,7 +377,7 @@ record; the decisions are kept as written at plan time.
   sources (the plan's hint named all three but the transition table only one).
   The only accepted target spelling is still `wont-fix`.
 - Decision 7: a finding needs a line range, since a range-less fingerprint
-  covered a whole file. A longer range hashes its first 200 lines. The anchor is
+  covered a whole file. The whole range is hashed. The anchor is
   the first line with 8 or more non-whitespace characters, and it matches only
   when it equals the first such line of the new range, and never for
   `security-debt`. Older kept todos are rehashed from the tree, except
@@ -433,8 +433,8 @@ and component counts are unchanged.
    `-pending-` legacy file repairs both name and frontmatter.
 6. Triage won't-fix works with a reason, a blank reason, and Cancel, under
    zsh with `noclobber`.
-7. A re-audit does not recreate a todo for a finding that matches any kept
-   todo by fingerprint or unique anchor, including after lines are inserted
+7. A re-audit does not recreate a todo for a finding that matches a kept
+   todo (any status but `pending` and `deferred`) by fingerprint or unique anchor, including after lines are inserted
    above it; ties resurface; new ids never collide with existing files.
 8. `status-parity.bats` fails when `wont-fix` is removed from any site.
 9. All Phase 4 validators and `bats tests/` pass.

@@ -331,10 +331,10 @@ field against allowed values.
 
 New todos carry `fingerprint: fp/v1:<16 hex>` and `anchor_hash`, both computed
 in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
-fingerprint hashes the category, the path and the flagged code with spaces,
-tabs and CR removed (the first 200 lines of a longer range); a finding without a
-line range gets none. `anchor_hash` hashes the first substantive flagged line
-(20+ characters once whitespace is removed, so `}` or `if err != nil {` never
+fingerprint hashes the category, the path and the whole flagged range with
+blanks folded and CR removed; a finding without a line range gets none.
+`anchor_hash` hashes the first substantive flagged line
+(20+ characters once blanks are folded, so `}` or `if err != nil {` never
 anchors). `audit-synthesizer` uses them to skip a new finding that matches a
 kept todo, by the todo's frontmatter status (any status except `pending` and
 `deferred`): an exact fingerprint first (any number of kept todos may share it),

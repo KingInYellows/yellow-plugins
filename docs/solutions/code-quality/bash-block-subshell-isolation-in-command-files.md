@@ -505,7 +505,8 @@ A defense-in-depth check in `audit-synthesizer.md` Step 7 used
 `[[ "$name" =~ $DEBT_TODO_NAME_RE ]]` in a block that never sourced
 `plugins/yellow-debt/lib/validate.sh`. The variable was unset in the fresh
 subprocess, an empty regex matches every string, and the check passed anything.
-`[[ ... =~ $unset ]]` never fails loudly, so this class of omission is invisible
+`[[ ... =~ $unset ]]` never fails loudly in the default shell mode (only
+`set -u` turns it into an unbound-variable error), so this class of omission is invisible
 until a reviewer reads the block.
 
 **Fix:** run the block in a `bash /dev/fd/3` child, source the library, and call

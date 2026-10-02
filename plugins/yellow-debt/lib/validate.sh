@@ -11,7 +11,30 @@
 # back to the highest installed yellow-core version.
 _VALIDATE_FS_HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
 if [ ! -f "$_VALIDATE_FS_HELPER" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
-  _VALIDATE_FS_HELPER=$(printf '%s\n' "${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh | sort -V | tail -n 1)
+  # No `sort -V`: BSD sort lacks it, and under the callers' `set -eo pipefail`
+  # its failure would abort the command.
+  _debt_ver_gt() {
+    local -a a b
+    local i x y
+    IFS=. read -r -a a <<<"$1"
+    IFS=. read -r -a b <<<"$2"
+    for i in 0 1 2 3; do
+      x="${a[i]:-0}"; y="${b[i]:-0}"; x="${x//[!0-9]/}"; y="${y//[!0-9]/}"
+      x="${x:-0}"; y="${y:-0}"
+      [ "$((10#$x))" -le "$((10#$y))" ] || return 0
+      [ "$((10#$x))" -ge "$((10#$y))" ] || return 1
+    done
+    return 1
+  }
+  _best=""; _best_v=""
+  for _cand in "${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh; do
+    [ -f "$_cand" ] || continue
+    _cand_v="${_cand%/lib/validate-fs.sh}"; _cand_v="${_cand_v##*/}"
+    if [ -z "$_best" ] || _debt_ver_gt "$_cand_v" "$_best_v"; then _best="$_cand"; _best_v="$_cand_v"; fi
+  done
+  [ -z "$_best" ] || _VALIDATE_FS_HELPER="$_best"
+  unset -f _debt_ver_gt
+  unset _best _best_v _cand _cand_v
 fi
 if [ -f "$_VALIDATE_FS_HELPER" ]; then
   # shellcheck source=/dev/null
@@ -390,13 +413,11 @@ transition_todo_state() {
 # --- Finding fingerprints -------------------------------------------------
 # A re-audit must recognise a finding that already has a kept todo. Line
 # numbers drift between LLM runs, so identity is the flagged code itself, with
-# spaces, tabs and CR removed (re-indenting does not change it), the same idea
-# as GitHub's primaryLocationLineHash. The value is versioned (`fp/v1:`) so the
+# blanks folded (re-indenting does not change it), the same idea as GitHub's
+# primaryLocationLineHash. The value is versioned (`fp/v1:`) so the
 # normalisation can change later.
 
-# Lines of a flagged range that are hashed, and the shortest line (whitespace
-# removed) that can serve as an anchor.
-DEBT_FLAG_WINDOW=200
+# The shortest line (blanks folded) that can serve as an anchor.
 DEBT_ANCHOR_MIN_CHARS=20
 
 # Split "path:START-END" (or "path:LINE", or a bare path) into _DEBT_P, _DEBT_S
@@ -422,7 +443,10 @@ _debt_sha16() {
   printf '%s\n' "${out:0:16}"
 }
 
-# Print lines START..END of PATH with spaces, tabs and CR removed. The path is
+# Print lines START..END of PATH with each line's CR and surrounding blanks
+# removed and inner runs of blanks folded to one space, so a reformat does not
+# change the text but `"allow admin"` and `"allowadmin"` stay different. The
+# whole range is read: an edit anywhere in it changes the text. The path is
 # scanner output and untrusted: it must be project-relative, inside the repo
 # and not a symlink.
 _debt_flagged_text() {
@@ -432,12 +456,9 @@ _debt_flagged_text() {
   [ ! -L "$path" ] && [ -f "$path" ] || return 1
   [[ "$start" =~ ^[0-9]{1,9}$ && "$end" =~ ^[0-9]{1,9}$ ]] || return 1
   [ "$((10#$start))" -ge 1 ] && [ "$((10#$start))" -le "$((10#$end))" ] || return 1
-  # A long range hashes its first DEBT_FLAG_WINDOW lines, so a god-module
-  # finding still gets a stable identity. File on stdin: BSD sed reads a `--`
-  # after the script as a file name.
-  local last=$((10#$end))
-  [ "$((last - 10#$start))" -lt "$DEBT_FLAG_WINDOW" ] || last=$((10#$start + DEBT_FLAG_WINDOW - 1))
-  sed -n "$((10#$start)),${last}p;${last}q" < "$path" | tr -d ' \t\r'
+  # File on stdin: BSD sed reads a `--` after the script as a file name.
+  sed -n "$((10#$start)),$((10#$end))p;$((10#$end))q" < "$path" |
+    tr -d '\r' | sed -e 's/[[:blank:]][[:blank:]]*/ /g' -e 's/^ //' -e 's/ $//'
 }
 
 # Usage: debt_fingerprint CATEGORY PATH START END
@@ -457,7 +478,7 @@ debt_fingerprint() {
 
 # Usage: debt_anchor_hashes PATH START END [LIMIT]
 # Prints one 16-hex hash per substantive line of the range, in order: a line
-# with at least DEBT_ANCHOR_MIN_CHARS characters once whitespace is removed.
+# with at least DEBT_ANCHOR_MIN_CHARS characters once blanks are folded.
 # Shorter lines (`}`, `else {`, `return nil`, `if err != nil {`, `@Override`)
 # occur all over a file and would match unrelated findings. Length is counted in
 # bytes (LC_ALL=C) so stamping and matching agree whatever the locale. The first
@@ -506,7 +527,8 @@ debt_pending_todos() {
 # Print the next free todo ids, one per line, zero-padded to three digits: COUNT
 # consecutive ids (default 1) starting one above the highest leading number of
 # any *.md under todos/debt/. Ids are 1-6 digits everywhere else, so a larger
-# one is ignored. Run from the git root.
+# one is ignored, and so is a symlink (a planted one must not move the
+# counter). Run from the git root.
 # Usage: debt_next_todo_id [COUNT]
 debt_next_todo_id() {
   local count="${1:-1}" f base id max=0 k
@@ -514,7 +536,7 @@ debt_next_todo_id() {
     printf '[debt] Error: count must be 1-9999\n' >&2; return 1; }
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/*.md; do
-    [ -e "$f" ] || continue
+    [ -e "$f" ] && [ ! -L "$f" ] || continue
     base="${f##*/}"; id="${base%%-*}"
     [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
     [ "$((10#$id))" -le "$max" ] || max=$((10#$id))

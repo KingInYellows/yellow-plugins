@@ -56,7 +56,10 @@ All in `plugins/yellow-debt/lib/validate.sh`, called from the synthesizer:
    Only a unique match suppresses; a tie or no match resurfaces.
 4. `complete` todos are never rehashed from the tree. `wont-fix` and
    `deleted` todos are stamped with `fingerprint` and `anchor_hash` inside
-   `transition_todo_state`, at close time, while the code still matches.
+   `transition_todo_state`, at close time, while the code still matches. The
+   stamp is best effort: it is skipped when a fingerprint already exists,
+   and a failed stamp does not block the closure, so a todo may lack either
+   field (the matcher then rehashes it from the tree).
 5. The printed repair recipe and `validate_transition` accept the same set
    (`wont_fix`, `wontfix`, `wont fix`), and a test runs the recipe.
 
@@ -67,6 +70,11 @@ closed". Every shortcut widened that claim: a whole-file key, a contains-match,
 a tree hash taken after the code changed. The fixes make identity come from
 data captured when the human decided, require it to be narrow, and make any
 doubt (no range, tie, unreadable todo) fall toward resurfacing the finding.
+Two cases still suppress by design: a `complete` todo whose flagged code
+reappears byte for byte matches on the exact fingerprint (a regression stays
+hidden), and two distinct findings of one category over identical code share
+one identity (a finding's wording is not stable between audits, so it cannot
+join the key).
 A destructive step keyed on a derived label (file name) must re-read the
 source of truth (frontmatter) first.
 

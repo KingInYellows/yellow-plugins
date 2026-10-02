@@ -114,7 +114,8 @@ kislyuk `yq`; the transition tests skip without it locally and fail in CI).
 `tests/status-parity.bats` fails when a status in `DEBT_TODO_NAME_RE` is
 missing from `status.md`, SKILL.md, the README state machine, the
 synthesizer's preserve list or `validate_transition` — add a status to all of
-them. `validate.bats` `setup()` sources
+them, except `pending`, which the preserve list must not contain (a pending
+todo is reconciled away). `validate.bats` `setup()` sources
 `../../yellow-core/lib/validate-fs.sh` before `lib/validate.sh` because the
 runtime source is `CLAUDE_PLUGIN_ROOT`-gated. Hook config lives in
 `catalog/plugins/yellow-debt.json` and is generated into `plugin.json` by
@@ -126,11 +127,13 @@ auto-loads it as a second hook source). Findings live at
 
 `wont-fix` closes a valid finding that is deliberately not fixed; the file stays
 (as does `deleted`, which means the finding was wrong) and a re-audit skips
-findings that match a kept todo (not a `deferred` one). Each
-todo carries a shell-computed `fingerprint: fp/v1:…` (category, path and flagged
-code with whitespace removed, so a finding needs a line range) and an
-`anchor_hash`; `audit-synthesizer` Step 5a (`debt_match_kept_todos`) matches on
-the fingerprint first, then on the anchor, and only a unique match suppresses.
+findings that match a kept todo (not a `deferred` one). A todo may carry a
+shell-computed `fingerprint: fp/v1:…` (category, path and the whole flagged
+range with blanks folded) and an `anchor_hash`; a finding without a usable
+line range gets neither. `audit-synthesizer` Step 5a (`debt_match_kept_todos`)
+matches on the fingerprint first, then on the anchor (never for
+`security-debt`, `complete` or `deleted` todos), and only a unique anchor match
+suppresses.
 Closing a todo does not close its Linear issue.
 
 ## Known Limitations

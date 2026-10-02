@@ -261,7 +261,7 @@ EOF
     printf 'Next Steps:\n'
     printf '  - Complete %d in-progress finding(s)\n' "${by_status[in-progress]}"
   else
-    printf 'All findings have been triaged and completed!\n'
+    printf 'No findings are waiting for triage or a fix.\n'
     printf 'Run /debt:audit to scan for new technical debt.\n'
   fi
 fi
