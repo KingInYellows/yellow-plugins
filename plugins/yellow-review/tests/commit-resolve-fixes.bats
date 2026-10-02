@@ -779,3 +779,17 @@ STUB
   [ "$status" -eq 0 ]
   [[ "$stderr" != *"no timeout binary"* ]]
 }
+
+@test "a failed pre-commit diff extraction refuses with exit 3 and leaves nothing staged" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  # Fail only rt_added_lines' awk call (its program starts with /^diff);
+  # every other awk call runs for real.
+  printf '#!/bin/sh\ncase "$1" in "/^diff"*) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v awk)" >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  printf 'one\nfeature changed\n' >| src/a.txt
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not extract the added lines"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}

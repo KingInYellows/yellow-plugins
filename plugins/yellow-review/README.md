@@ -88,6 +88,8 @@ new ones yet; wiring lands in a later PR of this stack.
 | `resolve-pr-thread` | Resolve a single thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
 | `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example a Linear issue) |
+| `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files; `--revert-only` and `--revert-dirty` revert without running) |
 
 ## Opt-in: thermonuclear structural review
 

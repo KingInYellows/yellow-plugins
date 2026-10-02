@@ -278,8 +278,11 @@ package manifests (`build.gradle[.kts]`, `settings.gradle[.kts]`, `gradlew`,
 repository-root `scripts/` directory, any `.husky/` or `.cargo/` directory at
 any depth, or the `core.hooksPath` directory (all matched
 case-insensitively). `rp_runner` in `lib/resolve-paths.sh` is authoritative
-when this list and the code differ. Nested `scripts/` directories, such as a
-plugin's `skills/*/scripts/`, are ordinary sources on purpose: hooks and build
+when this list and the code differ. The resolve runtime is a runner too: any
+file under `plugins/yellow-review/skills/pr-review-workflow/scripts/`,
+`plugins/yellow-review/lib/` or `plugins/yellow-review/hooks/` (the orchestrator
+executes or sources them). Other nested `scripts/` directories, such as
+another plugin's `skills/*/scripts/`, are ordinary sources on purpose: hooks and build
 tools run the root `scripts/` directory by convention, and treating every
 nested one as a runner would block ordinary plugin and package code. Also not
 runners: `go.mod` and `requirements.txt` (declarative, never executed) and
@@ -351,15 +354,19 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   and the result carries `patch: null`, `treeClean: false` and a `reason`.
   Untracked symlinks, including dangling ones, and staged deletions are
   saved. The credential screen runs on a separate `--text` diff of the same
-  files, so a binary-attributed file cannot hide a secret. It uses
-  `rt_looks_secret_strict`: private-key blocks, known token prefixes (`ghp_`,
-  `github_pat_`, `xox*-`, `AKIA`/`ASIA`, `sk-`, `glpat-`, `AIza`) and long
-  mixed-case tokens, without the `password = "..."` keyword rules, so a
-  resolver's code edit is not lost to a false positive. (Posted text and
-  `commit-resolve-fixes` keep the full `rt_looks_secret`.) A patch whose
-  added lines match is deleted rather than archived under `.git`; the files
-  are still reverted so the secret leaves the disk, and the result carries
-  `patch: null` and a `reason`.
+  files, so a binary-attributed file cannot hide a secret. It uses the full
+  `rt_looks_secret` rules, keyword assignments such as `password = "..."`
+  included: a retained patch sits under `.git` where the later commit scan
+  cannot reach it, so it is screened as strictly as posted text. The cost is
+  that a failed verify loses the patch for code that assigns a
+  credential-looking value. A patch whose added lines match is deleted
+  rather than archived; the files are still reverted so the secret leaves the
+  disk, and the result carries `patch: null` and a `reason`.
+  Before any patch is built, every listed path is checked: only regular
+  files, symlinks (dangling ones too) and absent paths are accepted. A FIFO,
+  socket, device or directory in its place is refused with exit 2 in run
+  mode, and removed unopened by the revert modes, so a special file cannot
+  block `git diff` or the refusal cleanup.
   The patch is also withheld, with a `reason`, when the screen
   returns any status other than 0 or 1 (the screen could not answer). When
   the `--text` diff cannot be produced or read, the script exits 2 and
@@ -378,10 +385,17 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   failed stream adds `log may be incomplete: the output stream failed`, so a
   pass can carry a `reason` with `treeClean: true`. A log file that cannot be
   created exits 2. The log is redacted with yellow-core's `cs_redact_secrets`
-  (and capped again afterwards, since redaction can grow it), or withheld when
-  that is unavailable. A pass whose command left changes outside the listed
-  files reports `result: pass`, `treeClean: false` and a `reason`, and
-  reverts nothing; the caller then refuses to commit. Files live under
+  plus a pass that blanks any `NAME=value` assignment whose name ends in
+  `_KEY`, `_TOKEN`, `_SECRET`, `_ID` or `_PASSWORD`, then scanned with
+  `rt_looks_secret` and withheld if it still looks like a credential (and
+  capped again afterwards, since redaction can grow it); it is also withheld
+  when redaction is unavailable. A pass whose command left changes outside
+  the listed files reports `result: pass`, `treeClean: false` and a `reason`,
+  and reverts nothing; the caller then refuses to commit. A pass whose
+  command removed a listed edit (restored a file, deleted a new one) is
+  treated as a failure instead: the snapshot is kept as the recovery patch,
+  the files are reverted and the result is `reverted` with a `reason` naming
+  the paths. Files live under
   `<git-common-dir>/yellow-review/resolve-patches/` (mode 0600); the newest
   10 patches and 10 logs per PR are kept, and other PRs' files are never
   pruned.

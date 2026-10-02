@@ -92,10 +92,30 @@ vr_redact_log() {
     fi
     # shellcheck disable=SC1090
     [ -n "$lib" ] && . "$lib" 2>/dev/null
+    # cs_redact_secrets has no rule for env-style credential names such as
+    # DEVIN_ORG_ID=org-1234567, so a second pass blanks the rest of any line
+    # that assigns a *_KEY/_TOKEN/_SECRET/_ID/_PASSWORD name. A final scan
+    # (rt_looks_secret, from resolve-text.sh) fails closed: a log that still
+    # looks like a credential, or that cannot be scanned, is withheld.
+    local scan_rc=0
     if declare -F cs_redact_secrets >/dev/null 2>&1 \
-        && (umask 077 && cs_redact_secrets <"$log" >"$log.tmp" 2>/dev/null) \
-        && mv -f -- "$log.tmp" "$log"; then
-        return 0
+        && declare -F rt_looks_secret >/dev/null 2>&1 \
+        && (
+            umask 077
+            set -o pipefail
+            cs_redact_secrets <"$log" 2>/dev/null \
+                | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/' \
+                >"$log.tmp"
+        ); then
+        rt_looks_secret "$log.tmp" || scan_rc=$?
+        if [ "$scan_rc" -eq 1 ] && mv -f -- "$log.tmp" "$log"; then
+            return 0
+        fi
+        rm -f -- "$log.tmp"
+        if [ "$scan_rc" -ne 1 ]; then
+            (umask 077 && printf '[withheld: log still looks like a credential after redaction]\n' >|"$log") || rm -f -- "$log"
+            return 0
+        fi
     fi
     rm -f -- "$log.tmp"
     (umask 077 && printf '[withheld: log redaction unavailable]\n' >|"$log") || rm -f -- "$log"
