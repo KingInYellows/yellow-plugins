@@ -1,0 +1,22 @@
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_7a82748dd606d9::t_08a4ce493083d4 165-193
+plugins/yellow-review/lib/gh-graphql.sh
+  s_7a82748dd606d9::t_54ef1e4b428aee 14
+  s_7a82748dd606d9::t_6183303efa502a 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7d38619df7cc2d4c4c41f8d9e642d12aba902471",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

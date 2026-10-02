@@ -1,0 +1,28 @@
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_7a82748dd606d9::t_63160ea83efc69 363-369
+  s_7a82748dd606d9::t_a71fba537f4093 331-335
+plugins/yellow-review/references/resolve/dispositions.md
+  s_7a82748dd606d9::t_e953ebf66669af 602-604
+plugins/yellow-review/skills/pr-review-workflow/scripts/poll-new-threads
+  s_7a82748dd606d9::t_9747a60a82e130 17-20,89-94
+plugins/yellow-review/tests/poll-new-threads.bats
+  s_7a82748dd606d9::t_6af8ed4f216ed2 197-239
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_47a2bc7fba3231 459-466
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "932dcabf9a1e7e8aeff83262206898cdb66601c0",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
