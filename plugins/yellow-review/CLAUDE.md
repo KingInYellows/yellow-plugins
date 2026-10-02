@@ -182,7 +182,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   PR review threads via GitHub GraphQL API (non-outdated only unless the flag
   is set), with thread permissions, comment author type and a per-thread
   `commentsTruncated` flag (a truncated thread is never resolved); exits 3
-  (partial array on stdout) when the thread list is truncated
+  (partial array on stdout) when the thread list is truncated (page cap, missing
+  cursor or the 270 s fetch deadline)
 - `get-pr-blockers <owner/repo> <pr>` — `CHANGES_REQUESTED` reviewers,
   `reviewDecision` and whether the base branch enforces conversation
   resolution; never fails the caller (`lookupFailed` true and null or

@@ -422,7 +422,7 @@ Located at `skills/pr-review-workflow/scripts/`:
   `authorType` per comment, and `commentsTruncated` per thread (true when it
   has more comments than were fetched, and a resolver must never resolve such a
   thread); exits 3 with the partial array on stdout when the thread list is
-  truncated
+  truncated (page cap, missing cursor or the 270 s fetch deadline)
 - **get-pr-blockers** `<owner/repo> <pr-number>` — `CHANGES_REQUESTED`
   reviewers, `reviewDecision`, and whether the base branch enforces
   conversation resolution; never fails the caller (`lookupFailed` is true,
