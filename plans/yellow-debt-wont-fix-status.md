@@ -388,6 +388,13 @@ record; the decisions are kept as written at plan time.
 - Decision 7: a `deferred` todo does not suppress a new finding (the user chose
   this in review: Defer means "ask me again next audit"), so the kept set is
   `ready`, `in-progress`, `complete`, `wont-fix` and `deleted`.
+- Review round 2: `lib/validate.sh` finds `yellow-core` in the versioned plugin
+  cache (the `../yellow-core` path only exists in a checkout, so fingerprinting
+  was silently off for installed plugins); the matcher reads the frontmatter
+  status; an exact fingerprint suppresses however many kept todos share it; the
+  anchor tier skips `complete` and `deleted` todos and needs a 20-character
+  line; the audit matches before it deletes pending todos; closing a todo with
+  no usable range warns.
 - The Step 5 wipe leaves a file named `-pending-` whose frontmatter status says
   otherwise (a closed legacy todo).
 - Decision 9 was wrong: the fixer runs in a separate worktree and does not see a

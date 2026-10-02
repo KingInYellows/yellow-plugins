@@ -132,19 +132,20 @@ Record gate stats:
 ```json
 "stats": {
   "suppressed_by_confidence_gate": 12,
-  "survived_severity_exception": 2,
-  "skipped_kept": 3
+  "survived_severity_exception": 2
 }
 ```
 
 ### 5. Reconciliation
 
-Count existing pending todos, confirm deletion via AskUserQuestion.
-`debt_pending_todos` lists a todo only when its file name and its frontmatter
-both say `pending`: an unanchored `*-pending-*.md` also matches a `ready` todo
-whose slug contains `-pending-`, and a file renamed `-pending-` whose
-frontmatter says `wont_fix` is a closed todo that must not be deleted (it is
-reported on stderr instead).
+Count existing pending todos and confirm their deletion via AskUserQuestion, but
+do not delete yet: Step 5a runs first, so a failure there leaves the existing
+pending todos in place. `debt_pending_todos` lists a todo only when its file name
+and its frontmatter both say `pending`. An unanchored `*-pending-*.md` also
+matches a `ready` todo whose slug contains `-pending-`, and a file renamed
+`-pending-` whose frontmatter says `wont_fix` is a closed todo that must not be
+deleted (it is reported on stderr as `Leaving …`; copy those lines into the
+report so the user can repair them).
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -152,25 +153,13 @@ reported on stderr instead).
 bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_pending_todos | grep -c . || true
+list=$(debt_pending_todos) || exit 1
+printf '%s\n' "$list" | grep -c . || true
 __YELLOW_DEBT_BASH__
 ```
 
 If the count is above 0, ask: "Delete N existing pending findings and proceed?"
-If "No": stop. If "Yes", delete them:
-
-```bash
-# lib/validate.sh is bash-only: run this block in bash even when the Bash
-# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
-. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
-cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_pending_todos | while IFS= read -r f; do rm -f -- "$f"; done
-__YELLOW_DEBT_BASH__
-```
-
-Preserve all other states (ready, in-progress, complete, deferred, deleted,
-wont-fix).
+If "No": stop. If "Yes", remember it and continue with 5a; Step 5b deletes.
 
 #### 5a. Skip findings that match a kept todo
 
@@ -213,13 +202,35 @@ __YELLOW_DEBT_BASH__
 If the block exits non-zero, stop and report its stderr: do not read
 `.debt/fingerprints.json`, which the block removes first. A `Warning:` line on
 stderr means some kept todos or findings could not be matched and may
-resurface; include it in the report.
+resurface; include it in the report. Set `stats.skipped_kept` to the number of
+`skipped:` lines.
 
 Read `.debt/fingerprints.json`. Drop every entry with `skip: true` from the
 surviving list and record it in `skipped_kept[]` (finding index, `kept_id`,
 `status`, `match`). Keep each remaining entry's `fingerprint` and
 `anchor_hash` for Step 7. A finding with a tie, an unreadable range, or no
 match resurfaces as a new pending todo.
+
+#### 5b. Delete the pending todos
+
+Only if the user answered "Yes" in Step 5:
+
+```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+list=$(debt_pending_todos) || exit 1
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  rm -f -- "$f" || exit 1
+done <<<"$list"
+__YELLOW_DEBT_BASH__
+```
+
+Preserve all other states (ready, in-progress, complete, deferred, deleted,
+wont-fix).
 
 ### 6. Generate Audit Report
 
@@ -242,7 +253,7 @@ NOT include entries from `suppressed[]` or `skipped_kept[]`.** The suppressed ar
 report for calibration review, not for todo generation. A finding that was
 gated out at Step 4 must not become a pending todo at Step 7.
 
-Format: `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
+Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
 
 - `NNN`: zero-padded ID, starting one above the highest id of any file in
   `todos/debt/` (run the block below once, then count up from its output)
@@ -288,11 +299,11 @@ on-disk frontmatter as follows:
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
 | (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null` |
-| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (8+ characters without whitespace) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
+| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ characters without whitespace) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator
-(`yq -r '.affected_files[]'` at line 57) without changes — the fixer reads
+(the `yq -r '.affected_files[]'` calls in `debt-fixer.md`) without changes — the fixer reads
 the on-disk frontmatter, not the in-memory v2.0 record.
 
 **CRITICAL SECURITY - Slug Derivation**:
@@ -339,7 +350,8 @@ __YELLOW_DEBT_BASH__
 ```
 
 Prevents path traversal via: (1) whitelist validation, (2) hash fallback, (3)
-path canonicalization.
+path canonicalization, (4) the `fp_prefix` format check and (5) the todo-name
+contract check (`debt_todo_name_ok`).
 
 ### 8. Output Summary
 

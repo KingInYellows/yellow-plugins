@@ -304,7 +304,9 @@ accepts them as the source of a transition to `wont-fix`, which repairs the
 file. To close a todo as `wont-fix`, repair one, or reopen one to `pending`,
 run this from any directory (replace `<current-status>` with the status in the
 file NAME, for example `pending`, and `<new-status>` with `wont-fix` or
-`pending`; a reason needs `/debt:triage`):
+`pending`; to record a reason, use the reason-directory recipe in
+`/debt:triage` "Triage Decisions", which also closes `ready`, `in-progress` and
+`deferred` todos; a legacy file's existing `wont_fix_reason` is kept):
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -332,14 +334,17 @@ in shell (`debt_fingerprint`, `debt_anchor_hashes` in `lib/validate.sh`). The
 fingerprint hashes the category, the path and the flagged code with spaces,
 tabs and CR removed (the first 200 lines of a longer range); a finding without a
 line range gets none. `anchor_hash` hashes the first substantive flagged line
-(8+ characters once whitespace is removed). `audit-synthesizer` uses them to
-skip a new finding that matches a kept todo (any status except `pending` and
-`deferred`):
-exact fingerprint first, then the same category and path whose anchor equals the
-first substantive line of the new range (never for `security-debt`). Only a
-unique match suppresses; ties and edited code resurface as new pending todos. A
-todo closed as `wont-fix` or `deleted` is stamped at close time; older ones are
-rehashed from the tree, except `complete` ones, which are not.
+(20+ characters once whitespace is removed, so `}` or `if err != nil {` never
+anchors). `audit-synthesizer` uses them to skip a new finding that matches a
+kept todo, by the todo's frontmatter status (any status except `pending` and
+`deferred`): an exact fingerprint first (any number of kept todos may share it),
+then the same category and path whose anchor equals the first substantive line
+of the new range. The anchor tier never applies to `security-debt`, `complete`
+or `deleted` todos. Only a unique anchor match suppresses; edited code resurfaces
+as a new pending todo. A todo closed as `wont-fix` or `deleted` is stamped at
+close time (with a warning when that is not possible); older ones are rehashed
+from the current tree, except `complete` ones, so a stale line range can stamp
+the wrong code: close old todos promptly.
 
 ### Invalid Priority Values
 

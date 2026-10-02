@@ -110,7 +110,7 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 ## Testing
 
 `bats tests/` from the plugin directory (CI runs it as a required step with
-kislyuk `yq`; the transition tests skip without it).
+kislyuk `yq`; the transition tests skip without it locally and fail in CI).
 `tests/status-parity.bats` fails when a status in `DEBT_TODO_NAME_RE` is
 missing from `status.md`, SKILL.md, the README state machine, the
 synthesizer's preserve list or `validate_transition` — add a status to all of

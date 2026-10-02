@@ -5,8 +5,14 @@
 # Shared filesystem-path validators (validate_file_path,
 # canonicalize_project_dir) live in yellow-core's shared lib so a security
 # fix lands in one place. At runtime CLAUDE_PLUGIN_ROOT is set by Claude
-# Code; in Bats tests the suite sources validate-fs.sh directly.
+# Code; in Bats tests the suite sources validate-fs.sh directly. In a checkout
+# yellow-core is a sibling of the plugin directory. In the installed cache both
+# plugins are versioned (.../yellow-debt/<ver>, .../yellow-core/<ver>), so fall
+# back to the highest installed yellow-core version.
 _VALIDATE_FS_HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
+if [ ! -f "$_VALIDATE_FS_HELPER" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  _VALIDATE_FS_HELPER=$(printf '%s\n' "${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh | sort -V | tail -n 1)
+fi
 if [ -f "$_VALIDATE_FS_HELPER" ]; then
   # shellcheck source=/dev/null
   . "$_VALIDATE_FS_HELPER"
@@ -24,8 +30,8 @@ command -v validate_file_path >/dev/null 2>&1 || \
 # outside it is never handed to a shell block or a model — the repository
 # controls these names, and one containing `$(…)` or a backtick would run if
 # it were pasted into shell text. `wont-fix` (valid finding, deliberately not
-# fixed) is hyphenated so it fits the status group; the `wont_fix` spelling an
-# agent once wrote by hand is accepted only as a transition source.
+# fixed) is hyphenated so it fits the status group; the hand-written spellings
+# `wont_fix`, `wontfix` and `wont fix` are accepted only as transition sources.
 DEBT_TODO_NAME_RE='^[0-9]{1,6}-(pending|ready|in-progress|deferred|complete|deleted|wont-fix)-(critical|high|medium|low)-[a-z0-9]+(-[a-z0-9]+)*\.md$'
 
 debt_todo_name_ok() {
@@ -275,9 +281,9 @@ transition_todo_state() {
   # failure leaves the todo unstamped and never blocks the transition.
   case "$new_state" in
     wont-fix|deleted)
-      local st_fp st_cat st_loc st_new st_anchor
-      st_fp=$(printf '%s' "$updated_frontmatter" | yq -r '.fingerprint // ""' 2>/dev/null) || st_fp="x"
-      if [ -z "$st_fp" ]; then
+      local st_fp st_cat st_loc st_new st_anchor st_read=0
+      if st_fp=$(printf '%s' "$updated_frontmatter" | yq -r '.fingerprint // ""' 2>/dev/null); then st_read=1; fi
+      if [ "$st_read" -eq 1 ] && [ -z "$st_fp" ]; then
         st_cat=$(printf '%s' "$updated_frontmatter" | yq -r '.category // ""' 2>/dev/null) || st_cat=""
         st_loc=$(printf '%s' "$updated_frontmatter" | yq -r '.affected_files[0] // ""' 2>/dev/null) || st_loc=""
         _debt_split_loc "$st_loc"
@@ -286,7 +292,12 @@ transition_todo_state() {
           if st_new=$(printf '%s' "$updated_frontmatter" | yq -y --arg fp "$st_fp" --arg an "$st_anchor" \
               '.fingerprint = $fp | (if $an != "" then .anchor_hash = $an else . end)' 2>/dev/null); then
             updated_frontmatter="$st_new"
+          else
+            st_fp=""
           fi
+        fi
+        if [ -z "$st_fp" ]; then
+          printf '[debt] Warning: %s closed without a code fingerprint (no usable line range in affected_files); a re-audit may recreate it\n' "${todo_file##*/}" >&2
         fi
       fi
       ;;
@@ -350,7 +361,7 @@ transition_todo_state() {
 # Lines of a flagged range that are hashed, and the shortest line (whitespace
 # removed) that can serve as an anchor.
 DEBT_FLAG_WINDOW=200
-DEBT_ANCHOR_MIN_CHARS=8
+DEBT_ANCHOR_MIN_CHARS=20
 
 # Split "path:START-END" (or "path:LINE", or a bare path) into _DEBT_P, _DEBT_S
 # and _DEBT_E.
@@ -410,11 +421,13 @@ debt_fingerprint() {
 
 # Usage: debt_anchor_hashes PATH START END [LIMIT]
 # Prints one 16-hex hash per substantive line of the range, in order: a line
-# with at least DEBT_ANCHOR_MIN_CHARS characters once whitespace is removed. Shorter lines (`}`,
-# `else {`, `return nil`) occur all over a file and would match unrelated
-# findings. The first hash is the todo's `anchor_hash`. LIMIT stops after that
-# many hashes.
+# with at least DEBT_ANCHOR_MIN_CHARS characters once whitespace is removed.
+# Shorter lines (`}`, `else {`, `return nil`, `if err != nil {`, `@Override`)
+# occur all over a file and would match unrelated findings. Length is counted in
+# bytes (LC_ALL=C) so stamping and matching agree whatever the locale. The first
+# hash is the todo's `anchor_hash`. LIMIT stops after that many hashes.
 debt_anchor_hashes() {
+  local LC_ALL=C
   local line text limit="${4:-0}" n=0
   [[ "$limit" =~ ^[0-9]{1,4}$ ]] || return 1
   text=$(_debt_flagged_text "$1" "$2" "$3") || return 1
@@ -431,12 +444,16 @@ debt_anchor_hashes() {
 # such as the legacy wont_fix spelling) is a closed todo: it is reported on
 # stderr and left alone. Run from the git root.
 debt_pending_todos() {
-  local f base st
+  local f base st skipped=0
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/[0-9]*-pending-*.md; do
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     base="${f##*/}"
-    [[ "$base" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]] || continue
+    if ! [[ "$base" =~ $DEBT_TODO_NAME_RE ]]; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    [ "${BASH_REMATCH[1]}" = pending ] || continue
     st=$(extract_frontmatter "$f" | yq -r '.status // ""' 2>/dev/null) || st=""
     if [ "$st" = pending ]; then
       printf '%s\n' "$f"
@@ -444,6 +461,9 @@ debt_pending_todos() {
       printf '[debt] Leaving %s: its frontmatter status is "%s", not pending\n' "$f" "${st//[^A-Za-z_ -]/?}" >&2
     fi
   done
+  if [ "$skipped" -gt 0 ]; then
+    printf '[debt] Warning: skipped %d file(s) whose names do not fit the todo pattern\n' "$skipped" >&2
+  fi
   return 0
 }
 
@@ -477,7 +497,10 @@ debt_next_todo_id() {
 debt_match_kept_todos() {
   local US=$'\x1f' paths out f base st meta cat loc fp anchor
   local -a k_id=() k_status=() k_cat=() k_path=() k_fp=() k_anchor=() candidates=()
-  local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged
+  local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged fm_status
+  command -v validate_file_path >/dev/null 2>&1 || {
+    printf '[debt] Error: validate_file_path is unavailable (yellow-core lib/validate-fs.sh not found); cannot fingerprint findings\n' >&2
+    return 1; }
   debt_refuse_symlinks todos todos/debt .debt .debt/surviving-findings.json .debt/fingerprints.json || return 1
   rm -f -- .debt/fingerprints.json
   command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || {
@@ -496,12 +519,18 @@ debt_match_kept_todos() {
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     base="${f##*/}"
     [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
-    st="${BASH_REMATCH[1]}"
+    meta=$(extract_frontmatter "$f" | yq -r '[(.status // ""), (.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || { unreadable=$((unreadable + 1)); continue; }
+    IFS="$US" read -r fm_status cat loc fp anchor <<<"$meta"
+    # The frontmatter status is the source of truth: a file name is a cache of
+    # it, and a hand edit (the legacy wont_fix spelling) can leave them apart.
+    case "$fm_status" in
+      wont_fix|wontfix|"wont fix") st=wont-fix ;;
+      pending|ready|in-progress|deferred|complete|deleted|wont-fix) st="$fm_status" ;;
+      *) unreadable=$((unreadable + 1)); continue ;;
+    esac
     # A pending todo is about to be deleted and a deferred one is meant to come
     # back: neither suppresses a new finding.
     [ "$st" != pending ] && [ "$st" != deferred ] || continue
-    meta=$(extract_frontmatter "$f" | yq -r '[(.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || { unreadable=$((unreadable + 1)); continue; }
-    IFS="$US" read -r cat loc fp anchor <<<"$meta"
     _debt_split_loc "$loc"
     # An older todo has no stored identity. Rehash it from the tree, except a
     # complete one: its code was changed by the fix, so the tree says nothing.
@@ -520,14 +549,21 @@ debt_match_kept_todos() {
     fp=$(debt_fingerprint "$cat" "$fpath" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || { fp=""; unfingerprinted=$((unfingerprinted + 1)); }
     first=""; first_done=0; match_idx=-1; matches=0; how=""
     if [ -n "$fp" ]; then
+      # An exact fingerprint is unambiguous, so any number of kept todos with it
+      # suppress (a finding closed twice must stay closed). Report the lowest id.
       for j in "${!k_id[@]}"; do
         [ "${k_fp[j]}" = "$fp" ] || continue
-        matches=$((matches + 1)); match_idx=$j
+        [ "$matches" -gt 0 ] || match_idx=$j
+        matches=$((matches + 1))
       done
-      [ "$matches" -eq 1 ] && how=fingerprint
+      [ "$matches" -ge 1 ] && how=fingerprint
     fi
     if [ -z "$how" ] && [ "$matches" -eq 0 ] && [ -n "$fp" ] && [ "$cat" != security-debt ]; then
       for j in "${!k_id[@]}"; do
+        # complete and deleted todos suppress only on an exact fingerprint: a
+        # fixed function often keeps its first line, and a false positive says
+        # nothing about a later real finding that starts on the same line.
+        [ "${k_status[j]}" != complete ] && [ "${k_status[j]}" != deleted ] || continue
         [ "${k_cat[j]}" = "$cat" ] && [ "${k_path[j]}" = "$fpath" ] && [ -n "${k_anchor[j]}" ] || continue
         if [ "$first_done" -eq 0 ]; then
           first=$(debt_anchor_hashes "$fpath" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || first=""
@@ -553,7 +589,7 @@ debt_match_kept_todos() {
   printf '%s\n' "$merged" | debt_write_file .debt/fingerprints.json || return 1
   jq -r '.[] | select(.skip) | "skipped: finding \(.index) matches kept todo \(.kept_id) (\(.status), \(.match))"' .debt/fingerprints.json
   if [ "$unreadable" -gt 0 ] || [ "$unfingerprinted" -gt 0 ]; then
-    printf '[debt] Warning: %d kept todo(s) unreadable, %d finding(s) without a usable line range; those cannot match and may resurface\n' \
+    printf '[debt] Warning: %d kept todo(s) unreadable or with an unknown status, %d finding(s) without a usable line range; those cannot match and may resurface\n' \
       "$unreadable" "$unfingerprinted" >&2
   fi
 }

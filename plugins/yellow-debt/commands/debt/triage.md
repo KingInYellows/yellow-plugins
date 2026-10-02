@@ -38,30 +38,24 @@ If the above exits non-zero, stop. Do not proceed.
 
 ## Step 2: Discover Findings
 
-Find all pending todo files, anchored to git root:
+List the pending todo files. `debt_pending_todos` keeps a file only when its
+name fits the todo pattern and its frontmatter status is also `pending`: a
+closed legacy todo that still has `-pending-` in its name is reported on stderr
+and left out, because Accept, Reject and Defer would all fail on it (repair it
+with the recipe in "Triage Decisions" below):
 
 ```bash
+# lib/validate.sh is bash-only: run this block in bash even when the Bash
+# tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
+bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 GIT_ROOT="$(git rev-parse --show-toplevel)" || {
   printf '[debt:triage] Error: not inside a git repository\n' >&2
   exit 1
 }
 cd "$GIT_ROOT" || exit 1
-if [ -L todos ] || [ -L todos/debt ]; then
-  printf '[debt:triage] Error: todos/ or todos/debt/ is a symlink; refusing\n' >&2
-  exit 1
-fi
-# Only names that fit {id}-pending-{severity}-{slug}[-{hash}].md are listed;
-# the repository controls these names, so anything else is skipped.
-all_todos=$(find todos/debt -maxdepth 1 -type f -name '*-pending-*.md' 2>/dev/null | LC_ALL=C sort)
-todo_list=$(printf '%s\n' "$all_todos" \
-  | LC_ALL=C grep -E '^todos/debt/[0-9]{1,6}-pending-(critical|high|medium|low)-[a-z0-9]+(-[a-z0-9]+)*\.md$' || true)
-all_count=$(printf '%s' "$all_todos" | grep -c . || true)
-kept_count=$(printf '%s' "$todo_list" | grep -c . || true)
-if [ "$all_count" -gt "$kept_count" ]; then
-  printf '[debt:triage] Warning: skipped %d file(s) whose names do not fit the todo pattern\n' \
-    "$((all_count - kept_count))" >&2
-fi
-[ -z "$todo_list" ] || printf '%s\n' "$todo_list"
+debt_pending_todos | LC_ALL=C sort
+__YELLOW_DEBT_BASH__
 ```
 
 If no files are listed: report "No pending findings to triage. Run /debt:audit
@@ -316,15 +310,17 @@ Run /debt:fix to begin remediation of accepted findings."
 
 **Defer** → Transitions to `deferred` state with reason
 - Valid finding but not addressing now
-- Optional reason (validated: no newlines, max 200 chars)
+- Optional reason (newlines stripped, truncated to 200 characters)
 - Kept in `todos/debt/`, but a re-audit does not skip it: the finding comes
   back as a new pending todo while the code still has the problem
 
 **Won't fix** → Transitions to `wont-fix` state with optional reason
 - Valid finding that is deliberately not being fixed
-- Unlike Reject, the file is kept in `todos/debt/` (with `wont_fix_reason`), so
-  a re-audit recognises it and does not recreate it
-- Optional reason (validated: no newlines, max 200 chars)
+- The file is kept in `todos/debt/` (with `wont_fix_reason`) and stamped with
+  the finding's fingerprint, so a re-audit recognises it and does not recreate
+  it. Reject (`deleted`) is kept and stamped the same way; the difference is
+  meaning: Reject says the finding was wrong
+- Optional reason (newlines stripped, truncated to 200 characters)
 - Reopen with `transition_todo_state … pending` if the decision changes
 - Its Linear issue, if synced, is not touched: close it by hand
 - A finding that is already `ready`, `in-progress` or `deferred` is closed with

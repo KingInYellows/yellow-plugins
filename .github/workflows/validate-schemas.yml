@@ -1511,16 +1511,17 @@ jobs:
           STATUS=0
           # Both top-level and nested test dirs. yellow-core's suites,
           # yellow-council's redaction suite, yellow-review's suite and
-          # yellow-codex's redaction suite are run as required steps above;
-          # skip them here to avoid double execution and to keep the advisory
-          # status accurate.
+          # yellow-codex's redaction suite are run as required steps above, and
+          # yellow-debt's in shell-compat-tests; skip them here to avoid double
+          # execution and to keep the advisory status accurate.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             case "$d" in
               plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests|plugins/yellow-codex/tests) continue ;;
               # Required in shell-compat-tests, the job that installs the
               # kislyuk yq its transition tests need (this one has mikefarah
-              # yq, so those tests would skip here).
+              # yq, so those tests would fail here: a missing kislyuk yq is a
+              # failure whenever CI is set).
               plugins/yellow-debt/tests) continue ;;
               # Its own job below: its timing-heavy suite alone outlasts
               # what this job's 10 minutes leave after the required suites.
@@ -1610,10 +1611,10 @@ jobs:
 
       - name: Run yellow-debt bats suite (required)
         # Required, not advisory. The transition, reason-truncation and
-        # kept-todo matching tests need kislyuk yq and skip without it, which
-        # is why they never ran in plugin-shell-tests (mikefarah yq). The
-        # parity test fails when a todo status is missing from a site that
-        # lists statuses.
+        # kept-todo matching tests need kislyuk yq: they skip locally without
+        # it and fail when CI is set, so they cannot go quiet here. They never
+        # ran in plugin-shell-tests (mikefarah yq). The parity test fails when
+        # a todo status is missing from a site that lists statuses.
         run: bats plugins/yellow-debt/tests/
 
   # ============================================================================
