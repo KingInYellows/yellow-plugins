@@ -247,6 +247,10 @@ transition_todo_state() {
   local clean_reason
   clean_reason=$(printf '%s' "$reason" | tr -d '\n\r')
   clean_reason=$(jq -rn --arg s "$clean_reason" '$s[0:200]') || return 1
+  # Hand yq the reason as a JSON string: kislyuk yq's argument parser reads a
+  # plain `--arg val ---` (or any value starting with `-`) as an option.
+  local reason_json
+  reason_json=$(jq -n --arg s "$clean_reason" '$s') || return 1
   case "$new_state" in
     wont-fix)
       if [ -z "$clean_reason" ] && [ "$current_state" = "wont_fix" ]; then
@@ -255,14 +259,14 @@ transition_todo_state() {
           (if (.wont_fix_reason | type) == "string" then .wont_fix_reason |= .[0:200] else . end)
           | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       elif [ -n "$clean_reason" ]; then
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.wont_fix_reason = $val | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --argjson val "$reason_json" '.wont_fix_reason = $val | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       else
         updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.wont_fix_reason) | del(.deferred_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       fi
       ;;
     deferred)
       if [ -n "$clean_reason" ]; then
-        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.deferred_reason = $val | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
+        updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --argjson val "$reason_json" '.deferred_reason = $val | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       else
         updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.deferred_reason) | del(.wont_fix_reason) | del(.defer_reason)' 2>/dev/null) || return 1
       fi

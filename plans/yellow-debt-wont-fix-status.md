@@ -275,11 +275,11 @@ Decisions (user-confirmed unless marked):
 
 ### Phase 3: Tests
 
-- [ ] 3.1: `tests/validate.bats`: one test per new edge (including
+- [x] 3.1: `tests/validate.bats`: one test per new edge (including
       `wont_fix→wont-fix`); rejects for `wont-fix→{ready,in-progress,
       deferred,complete,deleted,wont-fix}`, `{complete,deleted}→wont-fix`,
       and `pending→wont_fix`.
-- [ ] 3.2: `tests/security.bats` (`require_kislyuk_yq`):
+- [x] 3.2: `tests/security.bats` (`require_kislyuk_yq`):
   - `→wont-fix` with reason: filename `001-wont-fix-high-…`, frontmatter
     `status`, `wont_fix_reason` round-trips via `yq -r`
   - reopen `wont-fix→pending` with a hyphenated slug and hash: name
@@ -313,7 +313,7 @@ Decisions (user-confirmed unless marked):
 > (`0a1b2c3d`, line 139).
 <!-- /deepen-plan -->
 
-- [ ] 3.3: new `tests/status-parity.bats`:
+- [x] 3.3: new `tests/status-parity.bats`:
   - extract the canonical list from `DEBT_TODO_NAME_RE` via `BASH_REMATCH`;
     assert ≥7 entries including `pending` and `wont-fix`
   - set equality with the `status.md` init loop and valid case arm
@@ -338,7 +338,7 @@ Decisions (user-confirmed unless marked):
 > order.
 <!-- /deepen-plan -->
 
-- [ ] 3.4: Run `bats tests/` from `plugins/yellow-debt` (or
+- [x] 3.4: Run `bats tests/` from `plugins/yellow-debt` (or
       `pnpm dlx bats@1.11.0 tests/`).
 
 ### Phase 4: Release hygiene

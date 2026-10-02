@@ -217,3 +217,60 @@ teardown() {
   run validate_transition "pending" ""
   [ "$status" -eq 1 ]
 }
+
+# --- validate_transition: wont-fix ---
+
+@test "validate_transition allows pending to wont-fix" {
+  run validate_transition "pending" "wont-fix"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition allows ready to wont-fix" {
+  run validate_transition "ready" "wont-fix"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition allows in-progress to wont-fix" {
+  run validate_transition "in-progress" "wont-fix"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition allows deferred to wont-fix" {
+  run validate_transition "deferred" "wont-fix"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition allows wont-fix to pending (reopen)" {
+  run validate_transition "wont-fix" "pending"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition repairs the legacy wont_fix source spelling" {
+  run validate_transition "wont_fix" "wont-fix"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_transition rejects every other wont-fix source edge" {
+  local misses="" to
+  for to in ready in-progress deferred complete deleted wont-fix; do
+    validate_transition "wont-fix" "$to" && misses="$misses wont-fix→$to"
+  done
+  validate_transition "complete" "wont-fix" && misses="$misses complete→wont-fix"
+  validate_transition "deleted" "wont-fix" && misses="$misses deleted→wont-fix"
+  validate_transition "wont-fix" "wont-fix" && misses="$misses wont-fix→wont-fix"
+  [ -z "$misses" ] || { echo "unexpectedly allowed:$misses"; return 1; }
+}
+
+@test "validate_transition never accepts wont_fix as a target" {
+  local from misses=""
+  for from in pending ready in-progress deferred wont-fix wont_fix; do
+    validate_transition "$from" "wont_fix" && misses="$misses $from→wont_fix"
+  done
+  [ -z "$misses" ] || { echo "unexpectedly allowed:$misses"; return 1; }
+}
+
+@test "debt_todo_name_ok accepts wont-fix names and rejects wont_fix names" {
+  debt_todo_name_ok "001-wont-fix-high-long-fn-0a1b2c3d.md"
+  run debt_todo_name_ok "001-wont_fix-high-long-fn.md"
+  [ "$status" -eq 1 ]
+}

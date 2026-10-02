@@ -140,8 +140,8 @@ Record gate stats:
 ### 5. Reconciliation
 
 Count existing pending todos, confirm deletion via AskUserQuestion. Match only
-names that fit the todo contract: an unanchored `*-pending-*.md` also matches a
-`ready` todo whose slug contains `-pending-`.
+names whose status field is `pending`: an unanchored `*-pending-*.md` also
+matches a `ready` todo whose slug contains `-pending-`.
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -151,7 +151,11 @@ bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 cd "$(git rev-parse --show-toplevel)" || exit 1
 count=0
 for f in todos/debt/[0-9]*-pending-*.md; do
-  [ -f "$f" ] && [ ! -L "$f" ] && debt_todo_name_ok "${f##*/}" && count=$((count + 1))
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
+  # The status is the field right after the id; a slug word is not a status.
+  if [[ "${f##*/}" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]]; then
+    count=$((count + 1))
+  fi
 done
 printf '%s\n' "$count"
 __YELLOW_DEBT_BASH__
@@ -167,7 +171,10 @@ bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
 for f in todos/debt/[0-9]*-pending-*.md; do
-  [ -f "$f" ] && [ ! -L "$f" ] && debt_todo_name_ok "${f##*/}" && rm -f -- "$f"
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
+  if [[ "${f##*/}" =~ $DEBT_TODO_NAME_RE && "${BASH_REMATCH[1]}" = pending ]]; then
+    rm -f -- "$f"
+  fi
 done
 __YELLOW_DEBT_BASH__
 ```

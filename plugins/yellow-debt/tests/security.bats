@@ -38,9 +38,10 @@ no_pwned() {
   [ -z "$(find "$WORK" -name 'pwned*' ! -name '*.md')" ]
 }
 
+# Usage: make_todo ID STATUS FILENAME [EXTRA_FRONTMATTER_LINES]
 make_todo() {
-  printf -- '---\nid: "%s"\nstatus: %s\ncategory: complexity\nseverity: high\ntitle: Long function\n---\nBody.\n' \
-    "$1" "$2" > "todos/debt/$3"
+  printf -- '---\nid: "%s"\nstatus: %s\ncategory: complexity\nseverity: high\ntitle: Long function\n%b---\nBody.\n' \
+    "$1" "$2" "${4:+$4\n}" > "todos/debt/$3"
 }
 
 # Prints the Nth `bash /dev/fd/3 ... 3<<'__YELLOW_DEBT_BASH__'` block of a
@@ -505,4 +506,291 @@ init_repo() {
   CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/scope.zsh"
   [ "$status" -eq 0 ]
   [ -f todos/debt/043-pending-high-other-def456.md ]
+}
+
+# --- wont-fix: transitions, reasons, repair ---
+
+frontmatter_field() {
+  extract_frontmatter "$1" | yq -r "$2"
+}
+
+@test "transition to wont-fix renames the file and round-trips the reason" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-0a1b2c3d.md
+  run transition_todo_state todos/debt/001-pending-high-long-fn-0a1b2c3d.md wont-fix "too costly: not worth it"
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/001-wont-fix-high-long-fn-0a1b2c3d.md ]
+  [ ! -e todos/debt/001-pending-high-long-fn-0a1b2c3d.md ]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-0a1b2c3d.md .status)" = "wont-fix" ]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-0a1b2c3d.md .wont_fix_reason)" = "too costly: not worth it" ]
+  [ -z "$(find todos/debt -name '.debt-*' -o -name '*.lock')" ]
+}
+
+@test "reopening wont-fix restores a hyphenated slug and hash exactly" {
+  require_kislyuk_yq
+  make_todo 004 pending 004-pending-medium-slug-with-parts-0a1b2c3d.md
+  transition_todo_state todos/debt/004-pending-medium-slug-with-parts-0a1b2c3d.md wont-fix "later"
+  [ -f todos/debt/004-wont-fix-medium-slug-with-parts-0a1b2c3d.md ]
+  run transition_todo_state todos/debt/004-wont-fix-medium-slug-with-parts-0a1b2c3d.md pending
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/004-pending-medium-slug-with-parts-0a1b2c3d.md ]
+  debt_todo_name_ok 004-pending-medium-slug-with-parts-0a1b2c3d.md
+  [ "$(frontmatter_field todos/debt/004-pending-medium-slug-with-parts-0a1b2c3d.md '.wont_fix_reason // "absent"')" = "absent" ]
+}
+
+@test "reason fields are exclusive to their own status" {
+  require_kislyuk_yq
+  make_todo 001 deferred 001-deferred-high-long-fn-abc123.md 'deferred_reason: later'
+  transition_todo_state todos/debt/001-deferred-high-long-fn-abc123.md wont-fix "never"
+  f=todos/debt/001-wont-fix-high-long-fn-abc123.md
+  [ "$(frontmatter_field $f '.deferred_reason // "absent"')" = "absent" ]
+  [ "$(frontmatter_field $f .wont_fix_reason)" = "never" ]
+  transition_todo_state $f pending
+  [ "$(frontmatter_field todos/debt/001-pending-high-long-fn-abc123.md '.wont_fix_reason // "absent"')" = "absent" ]
+}
+
+@test "wont-fix reason is cut to 200 codepoints without splitting a character (C locale)" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  reason="$(printf 'a%.0s' $(seq 199))é$(printf 'b%.0s' $(seq 100))"
+  LC_ALL=C run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix "$reason"
+  [ "$status" -eq 0 ]
+  got=$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)
+  [ "$(printf '%s' "$got" | jq -Rr 'length')" -eq 200 ]
+  [ "$(printf '%s' "$got" | jq -Rr 'endswith("é")')" = "true" ]
+  printf '%s' "$got" | iconv -f UTF-8 -t UTF-8 >/dev/null
+}
+
+@test "wont-fix reason drops newlines; a reason of only newlines writes no field" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  make_todo 002 pending 002-pending-high-long-fn-abc123.md
+  transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix $'line one\nline two\r'
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "line oneline two" ]
+  transition_todo_state todos/debt/002-pending-high-long-fn-abc123.md wont-fix $'\n\n'
+  [ "$(frontmatter_field todos/debt/002-wont-fix-high-long-fn-abc123.md '.wont_fix_reason // "absent"')" = "absent" ]
+}
+
+@test "hostile wont-fix reasons are stored as data and never run" {
+  require_kislyuk_yq
+  local i=0 reason
+  for reason in '$(touch pwned)' '`touch pwned2`' 'a: b # c' '---' "it's \"quoted\""; do
+    i=$((i + 1))
+    make_todo "00$i" pending "00$i-pending-high-long-fn-abc123.md"
+    run transition_todo_state "todos/debt/00$i-pending-high-long-fn-abc123.md" wont-fix "$reason"
+    [ "$status" -eq 0 ]
+    [ "$(frontmatter_field "todos/debt/00$i-wont-fix-high-long-fn-abc123.md" .wont_fix_reason)" = "$reason" ]
+    [ "$(frontmatter_field "todos/debt/00$i-wont-fix-high-long-fn-abc123.md" .status)" = "wont-fix" ]
+  done
+  no_pwned
+}
+
+@test "legacy wont_fix frontmatter is repaired and keeps its hand-written reason" {
+  require_kislyuk_yq
+  make_todo 052 wont_fix 052-pending-high-long-fn-0a1b2c3d.md 'wont_fix_reason: agent wrote this'
+  run transition_todo_state todos/debt/052-pending-high-long-fn-0a1b2c3d.md wont-fix
+  [ "$status" -eq 0 ]
+  f=todos/debt/052-wont-fix-high-long-fn-0a1b2c3d.md
+  [ -f $f ]
+  [ ! -e todos/debt/052-pending-high-long-fn-0a1b2c3d.md ]
+  debt_todo_name_ok 052-wont-fix-high-long-fn-0a1b2c3d.md
+  [ "$(frontmatter_field $f .status)" = "wont-fix" ]
+  [ "$(frontmatter_field $f .wont_fix_reason)" = "agent wrote this" ]
+}
+
+@test "legacy repair truncates an over-long hand-written reason to 200 codepoints" {
+  require_kislyuk_yq
+  make_todo 052 wont_fix 052-pending-high-long-fn-0a1b2c3d.md "wont_fix_reason: $(printf 'x%.0s' $(seq 250))"
+  transition_todo_state todos/debt/052-pending-high-long-fn-0a1b2c3d.md wont-fix
+  got=$(frontmatter_field todos/debt/052-wont-fix-high-long-fn-0a1b2c3d.md .wont_fix_reason)
+  [ "$(printf '%s' "$got" | jq -Rr 'length')" -eq 200 ]
+}
+
+@test "reopening onto an existing pending name fails and leaves the source and no lock" {
+  require_kislyuk_yq
+  make_todo 001 wont-fix 001-wont-fix-high-long-fn-abc123.md 'wont_fix_reason: keep'
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  run transition_todo_state todos/debt/001-wont-fix-high-long-fn-abc123.md pending
+  [ "$status" -ne 0 ]
+  [ -f todos/debt/001-wont-fix-high-long-fn-abc123.md ]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "keep" ]
+  [ -z "$(find todos/debt -name '.debt-*' -o -name '*.lock')" ]
+}
+
+@test "a todo closed as wont-fix no longer resolves as in-progress" {
+  require_kislyuk_yq
+  make_todo 001 in-progress 001-in-progress-high-long-fn-abc123.md
+  transition_todo_state todos/debt/001-in-progress-high-long-fn-abc123.md wont-fix "dropped"
+  run debt_resolve_todo 001 in-progress
+  [ "$status" -eq 1 ]
+  run debt_resolve_todo 001 wont-fix
+  [ "$status" -eq 0 ]
+}
+
+@test "triage won't-fix blocks run under zsh noclobber" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  make_todo 002 pending 002-pending-high-long-fn-abc123.md
+  reason_dir=$(mktemp -d)
+  printf 'not worth it\n' > "$reason_dir/reason.txt"
+  extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 5 \
+    | sed "s#'<todo-id>'#'001'#; s#'<reason-dir>'#'$reason_dir'#" > "$BATS_TEST_TMPDIR/wf-reason.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf-reason.zsh"
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "not worth it" ]
+  [ ! -e "$reason_dir" ]
+  extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 6 \
+    | sed "s#'<todo-id>'#'002'#" > "$BATS_TEST_TMPDIR/wf-blank.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf-blank.zsh"
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/002-wont-fix-high-long-fn-abc123.md '.wont_fix_reason // "absent"')" = "absent" ]
+}
+
+@test "triage won't-fix recipe closes a ready todo under zsh noclobber" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  make_todo 003 ready 003-ready-high-long-fn-abc123.md
+  extract_wrapper "$PLUGIN_ROOT/commands/debt/triage.md" 7 \
+    | sed "s#'<todo-id>'#'003'#; s#'<current-status>'#'ready'#" > "$BATS_TEST_TMPDIR/recipe.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/recipe.zsh"
+  [ "$status" -eq 0 ]
+  [ -f todos/debt/003-wont-fix-high-long-fn-abc123.md ]
+}
+
+# --- debt_fingerprint / audit-synthesizer kept-todo matching ---
+
+make_source() {
+  mkdir -p src
+  printf 'top\nfoo(1)\n  bar()\nbaz()\nqux()\n' > src/a.js
+}
+
+@test "debt_fingerprint ignores inserted lines above and re-indentation, not code edits" {
+  make_source
+  before=$(debt_fingerprint complexity src/a.js 2 3)
+  [[ "$before" =~ ^fp/v1:[0-9a-f]{16}$ ]]
+  printf 'n1\nn2\nn3\ntop\n      foo(1)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  [ "$(debt_fingerprint complexity src/a.js 5 6)" = "$before" ]
+  printf 'n1\nn2\nn3\ntop\n      foo(2)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  [ "$(debt_fingerprint complexity src/a.js 5 6)" != "$before" ]
+  [ "$(debt_fingerprint duplication src/a.js 5 6)" != "$(debt_fingerprint complexity src/a.js 5 6)" ]
+}
+
+@test "debt_fingerprint refuses traversal, absolute and symlinked paths and bad ranges" {
+  make_source
+  ln -s a.js src/link.js
+  local args misses=""
+  for args in "../a.js 1 2" "/etc/passwd 1 2" "src/link.js 1 2" "src/a.js 0 2" "src/a.js 3 2" "src/a.js x 2" "src/a.js 90 95" "src/missing.js 1 2"; do
+    # shellcheck disable=SC2086
+    debt_fingerprint complexity $args >/dev/null 2>&1 && misses="$misses [$args]"
+  done
+  [ -z "$misses" ] || { echo "accepted:$misses"; return 1; }
+  run debt_fingerprint not-a-category src/a.js 1 2
+  [ "$status" -eq 1 ]
+}
+
+@test "debt_fingerprint without a range covers category and path only" {
+  make_source
+  one=$(debt_fingerprint complexity src/a.js)
+  printf 'changed\n' > src/a.js
+  [ "$(debt_fingerprint complexity src/a.js)" = "$one" ]
+}
+
+# Runs the synthesizer's kept-todo matching block (Step 5a) and prints the
+# per-finding results from .debt/fingerprints.json, one compact object per line.
+run_match_block() {
+  mkdir -p .debt
+  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 3 > "$BATS_TEST_TMPDIR/match.sh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/match.sh"
+  [ "$status" -eq 0 ]
+  jq -c '.[]' .debt/fingerprints.json
+}
+
+write_surviving() {
+  printf '[' > .debt/surviving-findings.json
+  local first=1 lines
+  for lines in "$@"; do
+    [ "$first" -eq 1 ] || printf ',' >> .debt/surviving-findings.json
+    first=0
+    printf '{"category":"complexity","file":{"path":"src/a.js","lines":"%s"},"finding":"f"}' "$lines" >> .debt/surviving-findings.json
+  done
+  printf ']' >> .debt/surviving-findings.json
+}
+
+@test "synthesizer block skips a finding that matches a kept wont-fix todo after the code moved" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  anchor=$(debt_anchor_hashes src/a.js 2 3 | head -n 1)
+  make_todo 007 wont-fix 007-wont-fix-high-long-fn-abc123.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp\nanchor_hash: $anchor"
+  printf 'n1\nn2\nn3\ntop\n      foo(1)\n\t\tbar()\nbaz()\nqux()\n' > src/a.js
+  mkdir -p .debt
+  write_surviving 5-6 5-7 4-4
+  run run_match_block
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == *'"skip":true'*'"kept_id":"007"'*'"status":"wont-fix"'*'"match":"fingerprint"'* ]]
+  [[ "${lines[1]}" == *'"skip":true'*'"match":"anchor"'* ]]
+  [[ "${lines[2]}" == *'"skip":false'*'"fingerprint":"fp/v1:'* ]]
+}
+
+@test "synthesizer block does not suppress on a tie between two kept todos" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  make_todo 007 wont-fix 007-wont-fix-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  make_todo 008 complete 008-complete-high-bbb.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  mkdir -p .debt
+  write_surviving 2-3
+  run run_match_block
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "synthesizer block never matches a pending todo" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  make_todo 007 pending 007-pending-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  mkdir -p .debt
+  write_surviving 2-3
+  run run_match_block
+  [[ "${lines[0]}" == *'"skip":false'* ]]
+}
+
+@test "synthesizer next-id block counts above every file, including 8x and malformed names" {
+  mkdir -p todos/debt
+  : > todos/debt/008-ready-high-a.md
+  : > todos/debt/009-wont-fix-high-b.md
+  : > todos/debt/012-pending-bogus-name.md
+  : > todos/debt/notes.md
+  init_repo
+  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 4 > "$BATS_TEST_TMPDIR/nextid.sh"
+  run bash "$BATS_TEST_TMPDIR/nextid.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "013" ]
+}
+
+@test "synthesizer pending wipe leaves a ready todo whose slug contains -pending-" {
+  require_kislyuk_yq
+  init_repo
+  : > todos/debt/001-pending-high-old-finding.md
+  : > todos/debt/002-ready-high-fix-pending-queue.md
+  extract_wrapper "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 2 > "$BATS_TEST_TMPDIR/wipe.sh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run bash "$BATS_TEST_TMPDIR/wipe.sh"
+  [ "$status" -eq 0 ]
+  [ ! -e todos/debt/001-pending-high-old-finding.md ]
+  [ -f todos/debt/002-ready-high-fix-pending-queue.md ]
+}
+
+@test "a defer reason that starts with a dash is stored, not read as a yq option" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md deferred '--help'
+  [ "$status" -eq 0 ]
+  [ "$(frontmatter_field todos/debt/001-deferred-high-long-fn-abc123.md .deferred_reason)" = "--help" ]
 }
