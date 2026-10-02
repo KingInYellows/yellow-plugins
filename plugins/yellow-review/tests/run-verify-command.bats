@@ -388,7 +388,9 @@ has_kill_after() {
     printf 'exec "%s" "$@"\n' "$real"
   } >| "$shim/git"
   chmod +x "$shim/git"
-  PATH="$shim:$PATH" verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  # Run mode now refuses to start without its pre-verification snapshot (see the
+  # last test); the revert modes still save at revert time and must not revert.
+  PATH="$shim:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
@@ -870,4 +872,26 @@ redact_log() {
   [ -f src/a.txt ]
   [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
   [ -z "$(git status --porcelain)" ]
+}
+
+@test "a failed pre-verification snapshot aborts with exit 2 before the command runs" {
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+# Fail the snapshot diff of a tracked listed file (the only call using --binary).
+case "\$*" in
+  *" diff "*--binary*) exit 1 ;;
+esac
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"could not snapshot"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # The resolver edits are untouched and no patch is left behind.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
 }

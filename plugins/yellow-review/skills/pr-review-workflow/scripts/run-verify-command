@@ -361,8 +361,15 @@ save_patch() {
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 if [ "$MODE" = run ]; then
+    # Both snapshots must exist before the verifier runs: it may overwrite or
+    # delete a listed edit and fail, and the revert below needs a patch that
+    # still holds the resolver's work. Abort with the tree untouched.
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    if [ "$SAVE_BIN_OK" != 1 ] || [ "$SAVE_TEXT_OK" != 1 ]; then
+        rm -f -- "$PATCH"
+        die 2 "could not snapshot the listed files before the verify command; the command was not run and the tree is untouched"
+    fi
     # Which listed paths exist now: a verifier that deletes or recreates one
     # has lost the resolver's edit (checked after a passing run).
     PRE_PRESENT=()

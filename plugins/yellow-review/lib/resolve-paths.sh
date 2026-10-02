@@ -77,10 +77,16 @@ rp_runner() {
     # The resolve runtime itself: the orchestrator executes these scripts and
     # sources these libraries, so an edit by an unattended resolver would run
     # with the orchestrator's authority. Matched by repository-relative prefix
-    # (a source checkout of this plugin), at any depth below it.
+    # (a source checkout of this plugin), at any depth below it. Sibling
+    # plugin files that commit-resolve-fixes executes from the same checkout
+    # count too: the github-workflow runtime (`node "$RUNTIME" submit`, found
+    # by find_runtime) and yellow-core's compound-staging.sh (sourced for log
+    # redaction and the review ledger).
     case "$l" in
         plugins/yellow-review/skills/pr-review-workflow/scripts/*) return 0 ;;
         plugins/yellow-review/lib/*|plugins/yellow-review/hooks/*) return 0 ;;
+        plugins/github-workflow/lib/*) return 0 ;;
+        plugins/yellow-core/lib/compound-staging.sh) return 0 ;;
     esac
     # Only the repository-root scripts/ directory: build and hook tooling
     # lives there. Other nested scripts/ directories (e.g. another plugin's

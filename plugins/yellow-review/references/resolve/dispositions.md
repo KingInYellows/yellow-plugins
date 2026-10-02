@@ -281,7 +281,9 @@ case-insensitively). `rp_runner` in `lib/resolve-paths.sh` is authoritative
 when this list and the code differ. The resolve runtime is a runner too: any
 file under `plugins/yellow-review/skills/pr-review-workflow/scripts/`,
 `plugins/yellow-review/lib/` or `plugins/yellow-review/hooks/` (the orchestrator
-executes or sources them). Other nested `scripts/` directories, such as
+executes or sources them), plus the sibling files it runs from a source
+checkout: anything under `plugins/github-workflow/lib/` (the submit runtime)
+and `plugins/yellow-core/lib/compound-staging.sh`. Other nested `scripts/` directories, such as
 another plugin's `skills/*/scripts/`, are ordinary sources on purpose: hooks and build
 tools run the root `scripts/` directory by convention, and treating every
 nested one as a runner would block ordinary plugin and package code. Also not
