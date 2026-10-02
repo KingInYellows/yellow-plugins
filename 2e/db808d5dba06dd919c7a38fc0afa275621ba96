@@ -1,0 +1,96 @@
+.changeset/review-ledger-followups-merged-prs.md
+  s_7a82748dd606d9::t_053d766e7aa9f2 15-23,25-30,32-35
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_7745d33e501c7c 965
+  s_7a82748dd606d9::t_8fb76320835e9e 887-898,902,910-912,915,921-922,924-928,933-962
+  s_7a82748dd606d9::t_d13916e710f2a3 1360-1362
+  s_7a82748dd606d9::t_d9a1d52cc24cc1 963,1086,1373,1385-1386,1388-1401,1403-1407
+  s_7a82748dd606d9::t_8e4fcb12274675 1088,1090,1092,1094
+  s_7a82748dd606d9::t_b3bc2ccd071588 992,1005-1006,1009-1037,1041-1043,1052-1085
+  s_7a82748dd606d9::t_2636e73b1d7fba 982-983
+  s_19981440458bca::t_78409028744dd1 964,1087
+plugins/yellow-core/tests/web-app-signals.bats
+  s_7a82748dd606d9::t_ce34a5b5e85af2 111
+  s_7a82748dd606d9::t_b1c62c61ac37a1 85-86
+plans/setup-command-bugs.md
+  s_7a82748dd606d9::t_ae3213576f96eb 29
+  s_7a82748dd606d9::t_65236885738309 30
+docs/solutions/code-quality/bats-negated-grep-mid-test-never-fails.md
+  s_7a82748dd606d9::t_c6e5b082b76498 56-57
+  s_7a82748dd606d9::t_31746cc02efbe4 36-43
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_771148e1505f1d 2017-2018
+  s_7a82748dd606d9::t_f26bc6ddf3658f 2378-2382
+  s_7a82748dd606d9::t_b50ddcc38cde28 2962-2966
+  s_7a82748dd606d9::t_2b66109d613b97 1665-1682,1685-1693
+  s_7a82748dd606d9::t_929ccd2b819b7d 2365
+  s_7a82748dd606d9::t_60cd65b1dbe809 3215
+  s_7a82748dd606d9::t_3e79aeadf98af1 3213-3214
+  s_7a82748dd606d9::t_c48e30db2b4dbc 2071-2084,2086-2092
+  s_7a82748dd606d9::t_aa75c2a8453a12 2098-2104
+  s_7a82748dd606d9::t_7d161053334255 3157-3160
+  s_7a82748dd606d9::t_549360c2cb28e4 1849-1851
+  s_7a82748dd606d9::t_6691279427b765 1297-1302
+  s_7a82748dd606d9::t_a9c60a4dbb26d5 1145-1161,1170-1171
+  s_7a82748dd606d9::t_f5997449599332 2366
+  s_7a82748dd606d9::t_b3971ec14f0404 3038-3048
+  s_7a82748dd606d9::t_533c01171d04da 1220-1221
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_4897463b16ddfd 928-929
+  s_7a82748dd606d9::t_7c8cb204ad1fc3 570-574
+  s_7a82748dd606d9::t_75f351e4556d63 778-785
+  s_7a82748dd606d9::t_9f0d3694d49083 802-804
+  s_7a82748dd606d9::t_6bae9fecf73343 725-727
+  s_7a82748dd606d9::t_32f058c2775238 814-815
+  s_7a82748dd606d9::t_657c8d1d9b8da6 351-355
+  s_7a82748dd606d9::t_0a8fa4aa242626 866-869
+  s_7a82748dd606d9::t_5c731897991c9c 227-229
+  s_7a82748dd606d9::t_b88dd499460e01 459-463
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_7a82748dd606d9::t_facb45af5c092e 73
+docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md
+  s_7a82748dd606d9::t_571e46daa2505e 18-22,25-31,34-36
+docs/solutions/code-quality/solution-doc-citations-die-on-restack.md
+  s_7a82748dd606d9::t_cf0ec3ca2cfce3 181-191
+plugins/yellow-core/commands/setup/all.md
+  s_7a82748dd606d9::t_c77257a1efb4f3 299
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_7a82748dd606d9::t_3d5b947f350115 146-147
+  s_7a82748dd606d9::t_ec1f348bc97ad0 58-63
+  s_7a82748dd606d9::t_19f6606b58c37e 105-125,127-128
+  s_7a82748dd606d9::t_507a19ac22b3c3 129-131
+docs/security.md
+  s_7a82748dd606d9::t_b391bd225e15e7 553-557,562-579
+  s_7a82748dd606d9::t_3c5b9eefb5a6ba 558
+plugins/yellow-council/CLAUDE.md
+  s_7a82748dd606d9::t_594c60f0e1a445 251-254
+  s_7a82748dd606d9::t_c0932d6fb4c286 92-94
+  s_7a82748dd606d9::t_394c625283aa23 89-91
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_7a82748dd606d9::t_111aa929c92052 74-75
+  s_7a82748dd606d9::t_07568eadd85fd6 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2edb808d5dba06dd919c7a38fc0afa275621ba96",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
