@@ -200,10 +200,14 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   `file-followup-issue` and `check-resolve-text`) — the credential-shape
   check for resolver-written text; a match means the text is never posted.
   On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal`
-  prints the `resolve-text: refused rule=... line=...` stderr line (never the
-  text) that tells a refusal from a usage error.
-- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`) — runs `gh`
-  under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a timeout.
+  prints a `resolve-text:` stderr line (never the text) that tells a refusal
+  from a usage error: `refused rule=<rule> line=<n>` for a credential hit,
+  `scan failed` when the scan did not run. Callers look for that line anywhere
+  on stderr rather than assume it is first.
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
+  `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
+  30 s) and returns 124 on a timeout, but only when `timeout(1)` is installed;
+  without it `gh` runs unbounded.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,

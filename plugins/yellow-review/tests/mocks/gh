@@ -85,16 +85,18 @@ case "$ALL_ARGS" in
   "issue list "*)
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
     _call=$(bump issue_list)
-    # MOCK_GH_RESCAN shapes the second list call (the post-create rescan):
+    # MOCK_GH_RESCAN shapes the second list call only (the post-create rescan):
     # winner = an older marker issue #70 plus ours (#77); own = ours (#77)
     # plus a later marker issue #80; fail / ratelimit = the list fails.
-    if [ "$_call" -ge 2 ] && [ -n "${MOCK_GH_RESCAN:-}" ]; then
+    # Any other value is a test typo and fails loudly.
+    if [ "$_call" -eq 2 ] && [ -n "${MOCK_GH_RESCAN:-}" ]; then
       _nums=""
       case "$MOCK_GH_RESCAN" in
         ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
         fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
         winner) _nums='70 77' ;;
         own) _nums='77 80' ;;
+        *) printf 'mock gh: unknown MOCK_GH_RESCAN value: %s (expected winner|own|fail|ratelimit)\n' "$MOCK_GH_RESCAN" >&2; exit 2 ;;
       esac
       jq -n --arg nums "$_nums" '[ ($nums | split(" ")[] | tonumber) as $n
         | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},

@@ -11,9 +11,11 @@
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a
-#               body that looks like a credential (or could not be scanned;
-#               stderr then starts with a `resolve-text:` line naming the
-#               rule and line, never the text),
+#               body that looks like a credential (or could not be scanned).
+#               A refusal prints a `resolve-text:` line, never the text:
+#               `refused rule=<rule> line=<n>` for a credential hit,
+#               `scan failed` when the scan did not run. Look for that line
+#               anywhere on stderr; it is not always first,
 #             3 not found or permission,
 #             4 rate limited or timed out: a second rate limit after the one
 #               retry the whole script gets, a wait over 90 s (the wait is

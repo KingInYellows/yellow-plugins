@@ -50,6 +50,10 @@ rt_looks_secret() {
         /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
             l = tolower($0)
+            # Each loop below copies the rest of the line per match, which is
+            # quadratic on a huge hostile line. Cap the matches per loop and
+            # refuse past the cap (truncating would fail open).
+            nq = nu = nurl = nauth = 0
             # keyword = "quoted value" (a type annotation such as
             # `token: string` is not a credential). The keyword must start a
             # word, as in the unquoted branch below: `bypass="false"` is not
@@ -59,6 +63,7 @@ rt_looks_secret() {
             while (match(r, /(pass(word|wd)?|secret|token|api[_-]?key|credential)["\047]?[ \t]*[=:][ \t]*["\047][^ \t"\047][^ \t"\047][^ \t"\047][^ \t"\047]/)) {
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
+                if (++nq > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 if (!(start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)) flag("quoted-keyword-assignment")
             }
@@ -77,6 +82,7 @@ rt_looks_secret() {
                 seg = substr(r, RSTART, RLENGTH)
                 start = base + RSTART
                 base += RSTART + RLENGTH - 1
+                if (++nu > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 inword = (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
@@ -87,10 +93,15 @@ rt_looks_secret() {
                 # known type or prose placeholder.
                 else if (inword) continue
                 else if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) flag("unquoted-keyword-value")
-                # Separated lowercase literal (`password: correct-horse-battery`):
-                # flag unless every part is a placeholder word.
-                else if (seg ~ /^[a-z]+([-_\/][a-z]+)+$/) {
-                    np = split(seg, parts, /[-_\/]/)
+                # Separated lowercase literal (`password: correct-horse-battery`,
+                # `password: hunter@cats`): separators are punctuation that
+                # passwords commonly use. Flag unless every part is a
+                # placeholder word. A property access on a common config or
+                # environment object (`token = process.env.api_key`) is a
+                # reference, not a literal.
+                else if (seg ~ /^(process\.env|import\.meta\.env|os\.environ|env|this|self|config|settings|secrets|args|params|props)\./) continue
+                else if (seg ~ /^[a-z]+([_\/.@+!#%^&*:-][a-z]+)+$/) {
+                    np = split(seg, parts, /[_\/.@+!#%^&*:-]/)
                     allph = 1
                     for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
                     if (!allph) flag("unquoted-keyword-value")
@@ -104,6 +115,7 @@ rt_looks_secret() {
             # end the authority, so they cannot be part of the userinfo.
             while (match(r, /[a-z][a-z0-9+.-]*:\/\/[^\/@?# \t:]*:[^\/@?# \t]+@/)) {
                 seg = substr(r, RSTART, RLENGTH)
+                if (++nurl > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 sub(/^[^:]*:\/\/[^:]*:/, "", seg)
                 sub(/@$/, "", seg)
@@ -117,6 +129,7 @@ rt_looks_secret() {
             r = l
             while (match(r, /(authorization[ \t]*[=:][ \t]*([a-z]+[ \t]+)?|(bearer|basic)[ \t]+)[a-z0-9._~+\/=-]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
+                if (++nauth > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 sub(/^authorization[ \t]*[=:][ \t]*/, "", seg)
                 sub(/^[a-z]+[ \t]+/, "", seg)
@@ -152,8 +165,8 @@ rt_looks_secret() {
                 # Exempt an identifier-shaped token: letters only in humps of
                 # an optional capital plus 2+ lowercase letters, and digit
                 # runs (`ReviewFindingsHelper2`). Random key material breaks
-                # that within a few characters. Only the first 256 characters
-                # are tested, which keeps the match bounded.
+                # that within a few characters. A token over 256 characters is
+                # never exempt (fail closed), which keeps the match bounded.
                 if (m >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) {
                     exempt = 0
                     if (w !~ /[+=]/) {
@@ -164,7 +177,7 @@ rt_looks_secret() {
                                 if (length(segs[j]) > 24 && segs[j] !~ /-/) exempt = 0
                         }
                     }
-                    if (substr(w, 1, 256) ~ /^([A-Z]?[a-z][a-z]+|[0-9]+)+$/) exempt = 1
+                    if (m <= 256 && w ~ /^([A-Z]?[a-z][a-z]+|[0-9]+)+$/) exempt = 1
                     if (!exempt) flag("long-token")
                 }
             }

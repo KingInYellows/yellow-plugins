@@ -11,7 +11,8 @@ RG_GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$RG_GH_TIMEOUT" in ''|*[!0-9]*) RG_GH_TIMEOUT=30 ;; esac
 [ "$RG_GH_TIMEOUT" -gt 0 ] 2>/dev/null || RG_GH_TIMEOUT=30
 
-# rg_gh <gh args...>: run gh; a call that exceeded the timeout returns 124.
+# rg_gh <gh args...>: run gh; with timeout(1) installed, a call that exceeded
+# the timeout returns 124. Without timeout(1) gh runs unbounded.
 rg_gh() {
     if command -v timeout >/dev/null 2>&1; then
         timeout "$RG_GH_TIMEOUT" gh "$@"

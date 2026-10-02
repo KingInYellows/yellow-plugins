@@ -419,8 +419,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   <body-file>` — Files or finds the follow-up issue for an out-of-scope
   thread; `--find <owner/repo> <PRRT_id>` only looks and never files
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential, after a `resolve-text: refused rule=<rule> line=<n>` line on
-  stderr (the same line `reply-pr-thread` and `file-followup-issue` print)
+  credential. A refusal prints a `resolve-text:` line on stderr
+  (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
+  the scan did not run); look for it anywhere on stderr, not just first.
+  `reply-pr-thread` and `file-followup-issue` print the same line
 
 `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
 `check-resolve-text` are not yet invoked by `/review:resolve`; the contract
