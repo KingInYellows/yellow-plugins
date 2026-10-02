@@ -318,3 +318,60 @@ teardown() {
   [[ "$(cat "$stderr_file")" == *"rate limit"* ]]
   [[ "$(cat "$stderr_file")" != *"Insufficient permissions"* ]]
 }
+
+# --- Time bounds ---
+
+@test "a gh call killed by timeout is a clean failure, not a partial list" {
+  mkdir -p "${BATS_TEST_TMPDIR}/killer"
+  printf '#!/bin/sh\nexit 124\n' >"${BATS_TEST_TMPDIR}/killer/timeout"
+  printf '#!/bin/sh\nexit 124\n' >"${BATS_TEST_TMPDIR}/killer/gtimeout"
+  chmod +x "${BATS_TEST_TMPDIR}/killer/timeout" "${BATS_TEST_TMPDIR}/killer/gtimeout"
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_kill"
+  PATH="${BATS_TEST_TMPDIR}/killer:${PATH}" run bash -c "'$SCRIPT' test/repo 123 2>'$stderr_file'"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [[ "$(cat "$stderr_file")" == *"gh timed out after 30s"* ]]
+}
+
+@test "YELLOW_REVIEW_GH_TIMEOUT is clamped to 60 s per gh call" {
+  mkdir -p "${BATS_TEST_TMPDIR}/killer"
+  printf '#!/bin/sh\nexit 124\n' >"${BATS_TEST_TMPDIR}/killer/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/killer/timeout"
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_clamp"
+  YELLOW_REVIEW_GH_TIMEOUT=9999 PATH="${BATS_TEST_TMPDIR}/killer:${PATH}" \
+    run bash -c "'$SCRIPT' test/repo 123 2>'$stderr_file'"
+  [ "$status" -eq 1 ]
+  [[ "$(cat "$stderr_file")" == *"gh timed out after 60s"* ]]
+}
+
+@test "an expired deadline stops paginating and exits 3 with the partial array" {
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_deadline"
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_pr370"
+  MOCK_GH_SLEEP=2 YELLOW_REVIEW_FETCH_DEADLINE=1 run bash -c "'$SCRIPT' test/repo 370 2>'$stderr_file'"
+  [ "$status" -eq 3 ]
+  # Exactly one page was fetched before the deadline check ran.
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_pr370")" = 1 ]
+  [ "$(printf '%s' "$output" | jq -r '.[].threadId')" = "PRRT_slow1" ]
+  [[ "$(cat "$stderr_file")" == *"get-pr-comments: deadline reached"* ]]
+  [[ "$(cat "$stderr_file")" != *"pagination limit"* ]]
+}
+
+@test "an invalid or oversized deadline falls back to the 270 s default" {
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_baddeadline"
+  local v
+  for v in 0 abc 99999 -5 ""; do
+    rm -f "${BATS_TEST_TMPDIR}/mock_gh_count_pr370"
+    MOCK_GH_SLEEP=0 YELLOW_REVIEW_FETCH_DEADLINE="$v" run bash -c "'$SCRIPT' test/repo 370 2>'$stderr_file'"
+    # The slow mock never ends, so the page cap, not a 1 s deadline, stops it.
+    [ "$status" -eq 3 ]
+    [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_pr370")" = 10 ]
+    [[ "$(cat "$stderr_file")" == *"pagination limit"* ]]
+  done
+}
+
+@test "the default deadline leaves a normal multi-page fetch unchanged" {
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_pr300_page"
+  run "$SCRIPT" "test/repo" "300"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq 'length')" -eq 2 ]
+}

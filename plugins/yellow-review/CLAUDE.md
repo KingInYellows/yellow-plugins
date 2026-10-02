@@ -170,7 +170,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API; outdated threads are excluded
   unless `--include-outdated` is passed; exits 3 (partial array on stdout)
-  when the thread list is truncated; each thread carries `commentsTruncated`
+  when the thread list is truncated (page cap, missing cursor or the 270 s
+  fetch deadline); each thread carries `commentsTruncated`
   (true past the 50 comments fetched), and such a thread is never resolved
 - `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
   `reviewDecision`, whether conversation resolution is enforced (read from the
