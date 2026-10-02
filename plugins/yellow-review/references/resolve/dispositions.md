@@ -69,6 +69,9 @@ The orchestrator turns a proposed disposition into `unclear` when:
 - the cluster emitted `CONFLICT:` and its edits were rolled back (or, under
   `--non-interactive`, were kept but not reconciled);
 - an evidence check below fails;
+- the thread has `commentsTruncated` true (see Lanes): any proposed
+  disposition becomes `unclear` with evidence `comments truncated (<n> of
+  <commentCount> fetched)`;
 - `oos` has an empty `oos_reason` in an unattended run, the interactive user
   declined the issue, or the thread is over the issue cap.
 
@@ -124,21 +127,32 @@ substantive body is what matters. Adapted from upstream
 `EveryInc/compound-engineering-plugin` PR #461 at locked SHA `e5b397c9`; the
 yellow-plugins variant is intentionally conservative — when in doubt, keep
 the thread. Dropped threads skip the resolvers and are resolved with no
-reply in the write phase (the lane below).
+reply in the write phase (the lane below). A thread with
+`commentsTruncated` true is never dropped: its omitted comments are unread,
+so the whole body cannot be matched.
 
 ## Lanes
 
 A thread is **bot** only when it has at least one comment the viewer did not
 author, every such comment has `authorType` `Bot`, and all of its comments
-were fetched (`commentCount`
+were fetched (`commentsTruncated` is false, so `commentCount`
 equals the number returned; longer threads count as human). One human reply makes it a human thread, so a human's
 objection inside a bot-opened thread is never auto-resolved. Unknown or
 missing types count as human, and so does a thread of only the viewer's own
 comments. When comparing logins, strip a trailing
 `[bot]`.
 
+A thread with `commentsTruncated` true is held open in every lane, whatever
+the `resolve_human_threads` setting: an objection may sit in an omitted
+comment, so no evidence (`fixed` or `addressed`) can close it. It is reported
+as `unclear` with a reason naming the truncation and counts as blocking. The
+resolver may still edit code for it, but the thread is never resolved and
+`fixed` is never claimed. The reply, when `viewerCanReply` is true, says the
+thread is too long to read in full and needs a human.
+
 | Lane | Rule |
 | --- | --- |
+| `commentsTruncated` true (any lane) | Never resolve. Disposition `unclear`, blocking; evidence names the truncation. Overrides every row below |
 | Bot thread | All four dispositions apply as written |
 | Human thread, `resolve_human_threads: evidence` (default) | Resolve only `fixed` (verified push) and `addressed` (verified pointer); `oos` and `disagree` reply and stay open |
 | Human thread, `never` | Reply for every disposition; never resolve |
