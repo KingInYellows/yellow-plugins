@@ -1,0 +1,22 @@
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_7a82748dd606d9::t_f17e41901eb0f1 23
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_7a82748dd606d9::t_88d49c8002c648 75-79
+  s_7a82748dd606d9::t_e9f7b3fb4f8220 63-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ea8d066469a29856f0cd0c7541c8b597100b8597",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
