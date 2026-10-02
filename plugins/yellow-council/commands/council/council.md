@@ -1209,23 +1209,36 @@ if [ -f "$SYNTH_STATE" ]; then
     *) OLD_DIR="" ;;
   esac
   if [ -n "$OLD_DIR" ] && [ -d "$OLD_DIR" ] && [ ! -L "$OLD_DIR" ] \
-    && [ -n "$(find "$OLD_DIR" -maxdepth 0 -mmin -1440 2>/dev/null)" ]; then
+    && [ -n "$(find "$OLD_DIR" -maxdepth 0 -mmin "-${STALE_MINUTES}" 2>/dev/null)" ]; then
     rm -rf -- "$SYNTH_DIR"
     printf '[council] Error: another council synthesis is in progress in this worktree (%s); wait for it or remove %s\n' "$OLD_DIR" "$SYNTH_STATE" >&2
     exit 1
   fi
   rm -f -- "$SYNTH_STATE"
 fi
-SYNTH_STATE_TMP=""
-SYNTH_STATE_TMP=$(mktemp "$SYNTH_STATE.XXXXXX" 2>/dev/null) \
-  && [ -f "$SYNTH_STATE_TMP" ] && [ ! -L "$SYNTH_STATE_TMP" ] && [ -O "$SYNTH_STATE_TMP" ] \
-  && printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE_TMP" \
-  && ln -- "$SYNTH_STATE_TMP" "$SYNTH_STATE" || {
+SYNTH_STATE_TMP=$(mktemp "$SYNTH_STATE.XXXXXX" 2>/dev/null) || {
+  rm -rf -- "$SYNTH_DIR"
+  printf '[council] Error: cannot create the synthesis state temp file in %s (check that the git directory is writable)\n' "${SYNTH_STATE%/*}" >&2
+  exit 1
+}
+# ln has no portable no-target-directory flag (-T is GNU-only): if another
+# process puts a directory (or a symlink to one) at the state path after the
+# check above, ln succeeds by linking INSIDE it. So after ln, confirm the state
+# path is itself a regular, non-symlink file that is our temp file's link; if
+# not, remove any stray link ln made inside a directory there, and fail the
+# claim.
+if ! {
+  [ -f "$SYNTH_STATE_TMP" ] && [ ! -L "$SYNTH_STATE_TMP" ] && [ -O "$SYNTH_STATE_TMP" ] \
+    && printf '%s\n%s\n' "$SYNTH_DIR" "$SYNTH_TOKEN" >| "$SYNTH_STATE_TMP" \
+    && ln -- "$SYNTH_STATE_TMP" "$SYNTH_STATE" \
+    && [ -f "$SYNTH_STATE" ] && [ ! -L "$SYNTH_STATE" ] && [ "$SYNTH_STATE" -ef "$SYNTH_STATE_TMP" ]
+}; then
+  rm -f -- "$SYNTH_STATE/${SYNTH_STATE_TMP##*/}" 2>/dev/null
   rm -rf -- "$SYNTH_DIR"
   rm -f -- "$SYNTH_STATE_TMP"
   printf '[council] Error: cannot claim the synthesis state file (another run may hold it)\n' >&2
   exit 1
-}
+fi
 rm -f -- "$SYNTH_STATE_TMP"
 printf 'COUNCIL_SYNTH_DIR=%s\n' "$SYNTH_DIR"
 ```
@@ -1252,9 +1265,11 @@ through `Write`).
 If this block exits non-zero, do not synthesize: run the Step 8 Cancel
 cleanup block (substituting the same `CLAUDE_FENCED_FILE` literal), then
 stop. Exception: when the error is `another council synthesis is in
-progress`, the state file belongs to that run and the Cancel block would
-unlink it, so also set the block's `KEEP_SYNTH_STATE` literal to `1`; the
-block then leaves the state file alone.
+progress` or `cannot claim the synthesis state file (another run may hold
+it)`, the state file belongs to another run (the second message means a
+concurrent run won the claim) and the Cancel block would unlink it, so also set
+the block's `KEEP_SYNTH_STATE` literal to `1`; the block then leaves the state
+file alone.
 
 #### 5b — Normalize and label
 
@@ -2848,9 +2863,10 @@ If user selects **Cancel**:
 ```bash
 # Self-contained: fresh subprocess, so re-load state inline
 # Leave at the placeholder (any value but 1) so the synthesis state file is
-# unlinked below. Set to 1 only after 5a refused because another synthesis is
-# live: that state file is the other run's capability, not ours to delete.
-KEEP_SYNTH_STATE="<0, or 1 only after 5a refused because another synthesis is live>"
+# unlinked below. Set to 1 only after 5a refused with `another council synthesis
+# is in progress` or `cannot claim the synthesis state file`: that state file is
+# another run's capability, not ours to delete.
+KEEP_SYNTH_STATE="<0, or 1 only after 5a refused because another run holds the synthesis state file>"
 # Do NOT `|| exit 1` here: this line sits INSIDE the cleanup section, so
 # exiting on it skips the very unlinks this section exists to guarantee. A
 # missing git root only costs us the state file's contents — the minted claude
@@ -3083,7 +3099,7 @@ This is the final output of the command. Exit 0.
 | Staging state file missing, symlinked, foreign or garbled in 5b/5d/5e, or its directory has no `.token` matching the state file's token | `[council] Error: ... synthesis state file ... ` or `... not the one Step 5a minted for this run`; exit 1; nothing is written or deleted. Directory and token come only from `.git/council-synth.state`, never from model-relayed text |
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; stop and re-run `/council` |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind; the next run's 5a sweep removes it once it is older than 24h |
-| Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 24 hours old (`STALE_MINUTES=1440`, the staging retention); before that, 5a exits 1 with `another council synthesis is in progress in this worktree` — wait, or remove the file by hand |
+| Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 24 hours old (`STALE_MINUTES=1440`, the staging retention); before that, 5a exits 1 with `another council synthesis is in progress in this worktree` — wait, or remove the file by hand. Both that message and `cannot claim the synthesis state file (another run may hold it)` leave the other run's state file in place, so run the Step 8 Cancel block with `KEEP_SYNTH_STATE=1` |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |
 | Git not in repo | Pre-flight error; exit 1 |

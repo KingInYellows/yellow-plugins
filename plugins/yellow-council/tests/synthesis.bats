@@ -835,11 +835,36 @@ teardown() {
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
     chmod 755 "$REPO/.git"
     [ "$status" -ne 0 ]
-    [[ "$stderr" == *"cannot claim the synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$stderr" == *"cannot create the synthesis state temp file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$stderr" != *"cannot claim the synthesis state file"* ]]
     [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
     after=$(synth_dirs)
     [ "$before" = "$after" ]
     [ ! -e "$REPO/.git/council-synth.state" ]
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "5a fails the claim and leaves no stray link when a directory appears at the state path before ln" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" profile before after
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  for profile in $PROFILES; do
+    setup_council_run
+    before=$(synth_dirs)
+    # The ln function stands in for another process that wins the race: it
+    # creates a directory at the state path just before the real ln runs, so
+    # plain ln would succeed by linking inside that directory.
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && ln() { mkdir '$REPO/.git/council-synth.state'; command ln \"\$@\"; } && . '$s5a'"
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"cannot claim the synthesis state file"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$output" != *COUNCIL_SYNTH_DIR* ]]
+    after=$(synth_dirs)
+    [ "$before" = "$after" ]
+    # The racing directory is untouched and empty: no stray hard link, no temp file.
+    [ -d "$REPO/.git/council-synth.state" ]
+    [ -z "$(find "$REPO/.git/council-synth.state" -mindepth 1)" ]
+    [ -z "$(find "$REPO/.git" -maxdepth 1 -name 'council-synth.state.*')" ]
     SD=""
     rm -rf "$REPO"
   done
@@ -870,6 +895,33 @@ teardown() {
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s8.raw" >| "$s8.default"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.default'"
   [ ! -e "$st" ]
+  rm -rf "$LIVE" "$REPO"
+}
+
+@test "5a losing the claim race to another run, then the Step 8 Cancel block told to keep it, leaves the winner's state file" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s8="${BATS_TEST_TMPDIR}/8.sh" st LIVE stub
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
+  # A stub ln models the race: a concurrent run wins the link between 5a's
+  # `rm -f` and its own claim, so 5a's ln fails with the winner's file in place.
+  stub="${BATS_TEST_TMPDIR}/lnstub"
+  mkdir -p "$stub"
+  printf '#!/bin/sh\nprintf "%%s\\n%%s\\n" "%s" 0123456789abcdef0123456789abcdef > "$3"\nexit 1\n' "$LIVE" >| "$stub/ln"
+  chmod +x "$stub/ln"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && PATH='$stub':\"\$PATH\" && . '$s5a'"
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"cannot claim the synthesis state file (another run may hold it)"* ]] || { echo "$stderr"; return 1; }
+  [ "$(sed -n 1p "$st")" = "$LIVE" ]
+  # 5a's prose: after that refusal too, run the Cancel block with KEEP_SYNTH_STATE=1.
+  sed -e "s|^KEEP_SYNTH_STATE=.*|KEEP_SYNTH_STATE=1|" -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s8.raw" >| "$s8"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [ -f "$st" ]
+  [ "$(sed -n 1p "$st")" = "$LIVE" ]
+  [ -d "$LIVE" ]
   rm -rf "$LIVE" "$REPO"
 }
 
