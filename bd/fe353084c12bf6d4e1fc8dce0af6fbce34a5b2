@@ -1,0 +1,19 @@
+docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md
+  s_7a82748dd606d9::t_8dfdc978d2327d 52-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bdfe353084c12bf6d4e1fc8dce0af6fbce34a5b2",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
