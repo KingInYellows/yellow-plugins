@@ -49,8 +49,10 @@
 #               until a human signs in again.
 # Contract: references/resolve/dispositions.md
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
-#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
-#      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
+#      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says;
+#        non-numeric or over 4 digits falls back to 60.
+#      YELLOW_REVIEW_GH_TIMEOUT (default 30; 0, non-numeric or over 4 digits
+#        falls back to 30) — seconds per gh call; needs
 #        timeout(1) or gtimeout(1), skipped with a stderr note when neither
 #        is installed (lib/resolve-gh.sh).
 

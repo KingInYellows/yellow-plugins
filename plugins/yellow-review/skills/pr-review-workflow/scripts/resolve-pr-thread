@@ -38,9 +38,11 @@ Environment:
                                  values fall back to 1, capped at 10
   YELLOW_REVIEW_RATE_LIMIT_WAIT  retry wait when no Retry-After or
                                  x-ratelimit-reset header says; default 60,
-                                 over 90 exits 4
+                                 over 90 exits 4; non-numeric or over 4
+                                 digits falls back to 60
   YELLOW_REVIEW_GH_TIMEOUT       seconds per gh call; default 30, needs
-                                 timeout(1)
+                                 timeout(1); 0, non-numeric or over 4
+                                 digits falls back to 30
 HELP
 }
 

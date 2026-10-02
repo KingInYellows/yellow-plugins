@@ -375,10 +375,11 @@ case "$ALL_ARGS" in
           exit 1
         fi
         ;;
-      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
-        # Wait-source arms. ra120 / resetfar are always limited (over the
-        # cap); the rest are limited on the first call only.
-        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_resetfar"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_rahuge"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*|*"PRRT_reply_resethuge"*|*"PRRT_reply_envhuge"*)
+        # Wait-source arms. ra120 / rahuge / resetfar / resethuge are always
+        # limited (over the cap); envhuge is always limited with no header;
+        # the rest are limited on the first call only.
+        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_rahuge"*|*"PRRT_reply_resetfar"*|*"PRRT_reply_resethuge"*|*"PRRT_reply_envhuge"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
         if [ "$limited" = 1 ]; then
           MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
           _now=$(date +%s)
@@ -386,6 +387,8 @@ case "$ALL_ARGS" in
             *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
             *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
             *"PRRT_reply_radate"*) _hdr="Retry-After: Wed, 21 Oct 2026 07:28:00 GMT" ;;
+            *"PRRT_reply_rahuge"*) _hdr="Retry-After: 99999999999999999999" ;;
+            *"PRRT_reply_resethuge"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: 99999999999999999999') ;;
             *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
             *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
             *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
@@ -610,6 +613,19 @@ case "$ALL_ARGS" in
     bump resolve_rl_long >/dev/null
     MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
     http "HTTP/2.0 429 Too Many Requests" "Retry-After: 120"
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_rl_huge"*|*"PRRT_rl_resethuge"*)
+    # Retry-After / x-ratelimit-reset values past the shell's integer range;
+    # always limited.
+    bump "resolve_$(printf '%s' "$ALL_ARGS" | grep -o 'PRRT_rl_[a-z]*huge' | head -1)" >/dev/null
+    MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+    case "$ALL_ARGS" in
+      *"PRRT_rl_resethuge"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: 99999999999999999999') ;;
+      *) _hdr="Retry-After: 99999999999999999999" ;;
+    esac
+    http "HTTP/2.0 429 Too Many Requests" "$_hdr"
     printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
     exit 1
     ;;

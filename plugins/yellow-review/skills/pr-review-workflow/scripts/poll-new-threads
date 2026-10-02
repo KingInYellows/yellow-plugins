@@ -27,6 +27,7 @@ STEP=20
 # Seconds one get-pr-comments call may run (see header).
 FETCH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$FETCH_TIMEOUT" in ''|*[!0-9]*) FETCH_TIMEOUT=30 ;; esac
+[ "${#FETCH_TIMEOUT}" -le 4 ] || FETCH_TIMEOUT=30
 [ "$FETCH_TIMEOUT" -gt 0 ] 2>/dev/null || FETCH_TIMEOUT=30
 # GNU coreutils on macOS installs it as gtimeout.
 TIMEOUT_BIN=""

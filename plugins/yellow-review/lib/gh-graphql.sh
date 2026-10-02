@@ -12,11 +12,19 @@
 GG_MAX_WAIT_SECONDS=90
 # Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
+# Longest digit string accepted for a numeric env setting or a Retry-After
+# header; a longer one can overflow the shell's integer range in later
+# `[ -gt ]` comparisons, so it counts as invalid.
+GG_MAX_DIGITS=4
+# Wait reported for a header value too long to compare; always over
+# GG_MAX_WAIT_SECONDS, so the caller exits 4 instead of sleeping.
+GG_OVERSIZE_WAIT=9999
 # Seconds one gh call may run (YELLOW_REVIEW_GH_TIMEOUT, default 30; invalid
-# values and 0, which timeout(1) treats as "no limit", fall back to 30).
-# Enforced only when timeout(1) or gtimeout(1) is installed.
+# values, values over 4 digits and 0, which timeout(1) treats as "no limit",
+# fall back to 30). Enforced only when timeout(1) or gtimeout(1) is installed.
 GG_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GG_TIMEOUT" in ''|*[!0-9]*) GG_TIMEOUT=30 ;; esac
+[ "${#GG_TIMEOUT}" -le "$GG_MAX_DIGITS" ] || GG_TIMEOUT=30
 [ "$GG_TIMEOUT" -gt 0 ] 2>/dev/null || GG_TIMEOUT=30
 # GNU coreutils on macOS installs it as gtimeout.
 GG_TIMEOUT_BIN=""
@@ -93,22 +101,36 @@ gg_reason() {
 
 # gg_rate_limit_wait: seconds to wait before the single retry (Retry-After,
 # then the reset time when no requests remain, then
-# YELLOW_REVIEW_RATE_LIMIT_WAIT, default 60). Always prints the computed
-# wait; the caller compares it with GG_MAX_WAIT_SECONDS so its exit-4
-# message can state the wait it refused.
+# YELLOW_REVIEW_RATE_LIMIT_WAIT, default 60; a non-numeric or over-4-digit
+# value falls back to 60). Always prints the computed wait; the caller compares
+# it with GG_MAX_WAIT_SECONDS so its exit-4 message can state the wait it
+# refused. A header value too long to compare prints GG_OVERSIZE_WAIT, so it
+# reads as over the cap rather than overflowing the caller's `-gt` check.
 gg_rate_limit_wait() {
     _gg_wait=$(gg_header retry-after)
-    case "$_gg_wait" in ''|*[!0-9]*) _gg_wait="" ;; esac
+    case "$_gg_wait" in
+        '') ;;
+        *[!0-9]*) _gg_wait="" ;;
+        *) [ "${#_gg_wait}" -le "$GG_MAX_DIGITS" ] || _gg_wait=$GG_OVERSIZE_WAIT ;;
+    esac
     if [ -z "$_gg_wait" ] && [ "$(gg_header x-ratelimit-remaining)" = 0 ]; then
         _gg_reset=$(gg_header x-ratelimit-reset)
         case "$_gg_reset" in
             ''|*[!0-9]*) ;;
-            *) _gg_wait=$((_gg_reset - $(date +%s))); [ "$_gg_wait" -ge 0 ] || _gg_wait=0 ;;
+            *)
+                # An epoch is 10 digits; more than 12 cannot be subtracted safely.
+                if [ "${#_gg_reset}" -gt 12 ]; then
+                    _gg_wait=$GG_OVERSIZE_WAIT
+                else
+                    _gg_wait=$((_gg_reset - $(date +%s))); [ "$_gg_wait" -ge 0 ] || _gg_wait=0
+                fi
+                ;;
         esac
     fi
     if [ -z "$_gg_wait" ]; then
         _gg_wait="${YELLOW_REVIEW_RATE_LIMIT_WAIT:-60}"
         case "$_gg_wait" in ''|*[!0-9]*) _gg_wait=60 ;; esac
+        [ "${#_gg_wait}" -le "$GG_MAX_DIGITS" ] || _gg_wait=60
     fi
     printf '%s' "$_gg_wait"
 }
