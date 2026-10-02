@@ -75,6 +75,7 @@ done
 # Scan all todo files
 TODO_COUNT=0
 ERROR_COUNT=0
+REPAIR_JSON=""
 
 if [ -d todos/debt ]; then
   while IFS= read -r -d '' todo_file; do
@@ -89,10 +90,12 @@ if [ -d todos/debt ]; then
     # NOTE: Todo files are markdown with YAML frontmatter. extract_frontmatter()
     #       extracts only the YAML section for yq compatibility (kislyuk/yq cannot
     #       parse mixed markdown+YAML format).
-    STATUS=$(extract_frontmatter "$todo_file" | yq -r '.status // "unknown"' 2>/dev/null)
-    CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // "unknown"' 2>/dev/null)
-    SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // "unknown"' 2>/dev/null)
-    EFFORT=$(extract_frontmatter "$todo_file" | yq -r '.effort // "unknown"' 2>/dev/null)
+    # A file whose frontmatter will not parse is counted as unknown, not fatal
+    # (set -e would otherwise abort the whole dashboard on one bad file).
+    STATUS=$(extract_frontmatter "$todo_file" | yq -r '.status // "unknown"' 2>/dev/null) || STATUS=unknown
+    CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // "unknown"' 2>/dev/null) || CATEGORY=unknown
+    SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // "unknown"' 2>/dev/null) || SEVERITY=unknown
+    EFFORT=$(extract_frontmatter "$todo_file" | yq -r '.effort // "unknown"' 2>/dev/null) || EFFORT=unknown
 
     # Validate and increment status counter
     case "$STATUS" in
@@ -106,6 +109,9 @@ if [ -d todos/debt ]; then
         legacy_base="${todo_file##*/}"
         if [[ "$legacy_base" =~ $DEBT_TODO_NAME_RE ]]; then
           printf '[status] WARNING: Status "%s" in %s should be wont-fix; the file counts in total_findings but in no by_status bucket. Repair: close todo id %s (name status %s) as wont-fix with the recipe in the debt-conventions skill\n' "$STATUS" "$todo_file" "${legacy_base%%-*}" "${BASH_REMATCH[1]}" >&2
+          # id (digits) and name status (enum) come from the validated name, so
+          # they need no JSON escaping.
+          REPAIR_JSON="${REPAIR_JSON:+$REPAIR_JSON, }{\"id\": \"${legacy_base%%-*}\", \"name_status\": \"${BASH_REMATCH[1]}\"}"
         else
           printf '[status] WARNING: Status "%s" in %s should be wont-fix, but the file name does not fit the todo pattern; rename it by hand to the -pending- form first\n' "$STATUS" "$todo_file" >&2
         fi
@@ -200,6 +206,7 @@ if [ "$JSON_OUTPUT" = true ]; then
     "medium": ${by_severity[medium]},
     "low": ${by_severity[low]}
   },
+  "needs_repair": [$REPAIR_JSON],
   "estimated_effort_hours": $EFFORT_HOURS
 }
 EOF
@@ -332,6 +339,7 @@ Next Steps:
     "medium": 5,
     "low": 2
   },
+  "needs_repair": [{"id": "052", "name_status": "pending"}],
   "estimated_effort_hours": 32
 }
 ```

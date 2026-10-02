@@ -264,17 +264,18 @@ Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
   the fingerprint is `null`
 
 Existing todos keep their ids. A new todo that reused a number would collide
-with a kept file, so take the next free id from every `*.md` under
-`todos/debt/`, not only the well-named ones. Run this once and count up from
-its output:
+with a kept file, so take the next free ids from every `*.md` under
+`todos/debt/`, not only the well-named ones. Run this once with the number of
+findings left after Step 5a in place of `<count>`; it prints that many
+consecutive ids, one per line, in the order of the findings:
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
 # tool's shell is zsh (bash reads the script from fd 3, so stdin stays free).
-bash /dev/fd/3 3<<'__YELLOW_DEBT_BASH__'
+bash /dev/fd/3 '<count>' 3<<'__YELLOW_DEBT_BASH__'
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 1
-debt_next_todo_id
+debt_next_todo_id "$1"
 __YELLOW_DEBT_BASH__
 ```
 
@@ -299,6 +300,7 @@ on-disk frontmatter as follows:
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
 | (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null` |
+| (shell-derived)      | `resurfaced_from:` frontmatter | The id from `.debt/fingerprints.json` when a `deferred` todo has the same fingerprint (the finding came back); single-quoted; omit when `null`. Triage then shows that this is a deferred finding that returned |
 | (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ characters without whitespace) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
@@ -328,10 +330,10 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 finding=$(printf '%s' "$record" | jq -r '.finding')
 
 # Lowercase, replace special chars, truncate, validate.
-slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | sed 's/-\+/-/g; s/^-\|-$//g' | cut -c1-40 | sed 's/-$//')
+slug=$(printf '%s' "$finding" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | tr -s '-' | sed 's/^-//; s/-$//' | cut -c1-40 | sed 's/-$//')
 
 # CRITICAL: whitelist validation
-[[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | sha256sum | cut -d' ' -f1 | cut -c1-16)
+[[ "$slug" =~ ^[a-z0-9-]+$ ]] || slug=$(printf '%s' "$finding" | _debt_sha16)
 
 todo_filename="todos/debt/${id}-pending-${severity}-${slug}${fp_prefix:+-$fp_prefix}.md"
 
@@ -340,17 +342,19 @@ todo_filename="todos/debt/${id}-pending-${severity}-${slug}${fp_prefix:+-$fp_pre
 [[ "$fp_prefix" =~ ^([0-9a-f]{8})?$ ]] || { printf '[synthesizer] ERROR: bad hash\n' >&2; exit 1; }
 debt_todo_name_ok "${todo_filename##*/}" || { printf '[synthesizer] ERROR: name outside todo pattern\n' >&2; exit 1; }
 
-# Defense in depth: verify path stays in todos/debt/
-resolved=$(realpath -m "$todo_filename")
-case "$resolved" in
-  "$(pwd)/todos/debt/"*) ;;
+# Defense in depth: the name check above rejects any `/`; this also pins the
+# directory without realpath, which BSD lacks.
+case "$todo_filename" in
+  todos/debt/*/*) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
+  todos/debt/*) ;;
   *) printf '[synthesizer] ERROR: Path traversal\n' >&2; exit 1 ;;
 esac
+printf '%s\n' "$todo_filename"
 __YELLOW_DEBT_BASH__
 ```
 
 Prevents path traversal via: (1) whitelist validation, (2) hash fallback, (3)
-path canonicalization, (4) the `fp_prefix` format check and (5) the todo-name
+the directory pin, (4) the `fp_prefix` format check and (5) the todo-name
 contract check (`debt_todo_name_ok`).
 
 ### 8. Output Summary

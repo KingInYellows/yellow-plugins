@@ -105,3 +105,16 @@ check_status_md() {
   check_status_md "$BATS_TEST_TMPDIR/status-stripped.md"
   [ "${#misses[@]}" -ge 3 ]
 }
+
+@test "the legacy wont-fix spellings agree across the helper, the transition table and status.md" {
+  local sp bad=""
+  for sp in wont_fix wontfix "wont fix"; do
+    debt_is_legacy_wont_fix "$sp" || bad="$bad helper:$sp"
+    validate_transition "$sp" "wont-fix" || bad="$bad transition:$sp"
+  done
+  if debt_is_legacy_wont_fix "wont_fixx"; then bad="$bad helper-accepts-wont_fixx"; fi
+  if validate_transition "wont_fixx" "wont-fix"; then bad="$bad transition-accepts-wont_fixx"; fi
+  need_literal "$STATUS_MD" 'wont_fix|wontfix|"wont fix")' "status.md hint arm lists the three spellings"
+  [ -z "$bad" ] || { echo "disagree:$bad"; return 1; }
+  [ "${#misses[@]}" -eq 0 ] || { printf 'miss: %s\n' "${misses[@]}"; return 1; }
+}

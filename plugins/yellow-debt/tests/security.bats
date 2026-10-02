@@ -20,7 +20,8 @@ setup() {
 
 teardown() {
   cd /
-  rm -rf "$WORK" "$OUTSIDE"
+  # git may still be writing under .git for a moment; retry once.
+  rm -rf "$WORK" "$OUTSIDE" 2>/dev/null || { sleep 0.3; rm -rf "$WORK" "$OUTSIDE"; }
 }
 
 # A missing tool skips the test locally but fails it in CI, where a silent skip
@@ -31,6 +32,12 @@ require_kislyuk_yq() {
   fi
   [ -z "${CI:-}" ] || { echo "kislyuk yq is required in CI"; return 1; }
   skip "kislyuk yq not installed"
+}
+
+require_jq() {
+  command -v jq >/dev/null 2>&1 && return 0
+  [ -z "${CI:-}" ] || { echo "jq is required in CI"; return 1; }
+  skip "jq not installed"
 }
 
 require_zsh() {
@@ -273,7 +280,7 @@ extract_block() {
 # --- SessionStart counter (SS-3) ---
 
 @test "session-start counts only conforming high/critical todo names" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  require_jq
   : > todos/debt/001-pending-high-long-fn-abc123.md
   : > todos/debt/002-ready-critical-thing.md
   : > "todos/debt/003-pending-high-x\$(touch pwned).md"
@@ -285,7 +292,7 @@ extract_block() {
 }
 
 @test "session-start ignores a symlinked todos/debt directory" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  require_jq
   rm -rf todos/debt
   mkdir -p "$OUTSIDE/debt"
   : > "$OUTSIDE/debt/001-pending-high-long-fn-abc123.md"
@@ -1212,4 +1219,123 @@ run_status_block() {
   CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/reopen.zsh"
   [ "$status" -eq 0 ]
   [ -f todos/debt/052-pending-high-legacy-aaa.md ]
+}
+
+# --- idempotent close, messages, receipts, multi-id, resurfaced deferred ---
+
+@test "closing a todo that is already wont-fix succeeds and says so" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix "first"
+  run transition_todo_state todos/debt/001-wont-fix-high-long-fn-abc123.md wont-fix
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already wont-fix"* ]]
+  [ "$(frontmatter_field todos/debt/001-wont-fix-high-long-fn-abc123.md .wont_fix_reason)" = "first" ]
+}
+
+@test "a transition prints a receipt naming the new file" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  run transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md ready
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pending -> ready: todos/debt/001-ready-high-long-fn-abc123.md"* ]]
+}
+
+@test "a rejected transition lists the allowed targets" {
+  require_kislyuk_yq
+  make_todo 001 complete 001-complete-high-long-fn-abc123.md
+  make_todo 002 pending 002-pending-high-long-fn-abc123.md
+  run --separate-stderr transition_todo_state todos/debt/001-complete-high-long-fn-abc123.md ready
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"allowed from complete: none"* ]]
+  run --separate-stderr transition_todo_state todos/debt/002-pending-high-long-fn-abc123.md complete
+  [[ "$stderr" == *"allowed from pending: ready deferred deleted wont-fix"* ]]
+}
+
+@test "debt_resolve_todo names the state a todo is actually in" {
+  make_todo 001 wont-fix 001-wont-fix-high-long-fn-abc123.md
+  run --separate-stderr debt_resolve_todo 001 pending
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"todo 001 exists as wont-fix"* ]]
+}
+
+@test "a reason over 200 characters is truncated with a note" {
+  require_kislyuk_yq
+  make_todo 001 pending 001-pending-high-long-fn-abc123.md
+  run --separate-stderr transition_todo_state todos/debt/001-pending-high-long-fn-abc123.md wont-fix "$(printf 'x%.0s' $(seq 300))"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"reason truncated from 300 to 200 characters"* ]]
+}
+
+@test "debt_next_todo_id prints COUNT consecutive ids and rejects a bad count" {
+  : > todos/debt/008-ready-high-a.md
+  run debt_next_todo_id 3
+  [ "$status" -eq 0 ]
+  [ "$output" = $'009\n010\n011' ]
+  run debt_next_todo_id 0
+  [ "$status" -eq 1 ]
+  run debt_next_todo_id abc
+  [ "$status" -eq 1 ]
+}
+
+@test "debt_match_kept_todos explains a surviving-findings file that is not an array" {
+  init_repo
+  mkdir -p .debt
+  printf '{"a":1}' > .debt/surviving-findings.json
+  run --separate-stderr debt_match_kept_todos
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"missing or not a JSON array"* ]]
+}
+
+@test "debt_match_kept_todos names each unreadable kept todo and records a deferred origin" {
+  require_kislyuk_yq
+  init_repo
+  make_source
+  fp=$(debt_fingerprint complexity src/a.js 2 3)
+  make_todo 012 deferred 012-deferred-high-aaa.md "affected_files:\n  - src/a.js:2-3\nfingerprint: $fp"
+  printf -- '---\nstatus: [unclosed\naffected_files:\n  - src/a.js:2-3\n---\nB\n' > todos/debt/013-wont-fix-high-bbb.md
+  mkdir -p .debt
+  write_surviving 2-3
+  run --separate-stderr debt_match_kept_todos
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"kept todo 013-wont-fix-high-bbb.md is unreadable"* ]]
+  load_fingerprints
+  [[ "${lines[0]}" == *'"skip":false'*'"resurfaced_from":"012"'* ]]
+}
+
+@test "the Step 7 block builds a safe name and refuses a bad id or hash" {
+  init_repo
+  extract_block "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 'debt_todo_name_ok "${todo_filename##*/}"' > "$BATS_TEST_TMPDIR/name.sh"
+  record='{"finding":"Fix: The BIG -- thing!! (really)"}'
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" record="$record" id=013 severity=high fp_prefix=0a1b2c3d run bash "$BATS_TEST_TMPDIR/name.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "todos/debt/013-pending-high-fix-the-big-thing-really-0a1b2c3d.md" ]
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" record="$record" id=1234567 severity=high fp_prefix=0a1b2c3d run bash "$BATS_TEST_TMPDIR/name.sh"
+  [ "$status" -ne 0 ]
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" record="$record" id=013 severity=high fp_prefix='zz/../x' run bash "$BATS_TEST_TMPDIR/name.sh"
+  [ "$status" -ne 0 ]
+}
+
+@test "triage won't-fix block keeps the reason directory when the close fails" {
+  require_zsh
+  require_kislyuk_yq
+  init_repo
+  reason_dir=$(mktemp -d)
+  printf 'cost\n' > "$reason_dir/reason.txt"
+  extract_block "$PLUGIN_ROOT/commands/debt/triage.md" 'wont-fix "$REASON"' '<current-status>' \
+    | sed "s#'<todo-id>'#'099'#; s#'<reason-dir>'#'$reason_dir'#" > "$BATS_TEST_TMPDIR/wf.zsh"
+  CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" run zsh -f -o noclobber "$BATS_TEST_TMPDIR/wf.zsh"
+  [ "$status" -ne 0 ]
+  [ -f "$reason_dir/reason.txt" ]
+}
+
+@test "status survives a todo with unreadable frontmatter and lists files needing repair in JSON" {
+  require_kislyuk_yq
+  init_repo
+  make_todo 002 wont_fix 002-pending-high-bbb.md
+  printf -- '---\nstatus: [unclosed\n---\nB\n' > todos/debt/003-pending-high-ccc.md
+  run_status_block --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '.needs_repair')" = '[{"id":"002","name_status":"pending"}]' ]
+  [ "$(printf '%s' "$output" | jq '.errors')" -ge 2 ]
 }

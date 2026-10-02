@@ -38,6 +38,16 @@ debt_todo_name_ok() {
   [[ "$1" =~ $DEBT_TODO_NAME_RE ]]
 }
 
+# The hand-written spellings of wont-fix an agent once wrote into frontmatter.
+# validate_transition accepts the same three as sources; a parity test keeps the
+# two lists equal.
+debt_is_legacy_wont_fix() {
+  case "$1" in
+    wont_fix|wontfix|"wont fix") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Refuse when any argument is a symlink. A cloned repository can ship .debt,
 # todos/debt, a todo file, or a *.tmp/*.lock name as a symlink; writing
 # through one would modify a file outside the tree (e.g. .git/config).
@@ -84,7 +94,7 @@ debt_write_file() {
 # is found here, so a hostile name never appears in shell text.
 # Usage: debt_resolve_todo ID [STATE]
 debt_resolve_todo() {
-  local id="$1" want_state="${2:-}" f base match="" count=0 skipped=0
+  local id="$1" want_state="${2:-}" f base match="" count=0 skipped=0 other=""
   if ! [[ "$id" =~ ^[0-9]{1,6}$ ]]; then
     printf '[debt] Invalid todo id (expected 1-6 digits)\n' >&2
     return 1
@@ -104,7 +114,7 @@ debt_resolve_todo() {
     if [ -n "$want_state" ]; then
       case "$base" in
         "$id-$want_state-"*) ;;
-        *) continue ;;
+        *) other="${BASH_REMATCH[1]}"; continue ;;
       esac
     fi
     match="$f"
@@ -114,8 +124,8 @@ debt_resolve_todo() {
     printf '[debt] Ignored %d file(s) for id %s whose names do not fit the todo pattern\n' "$skipped" "$id" >&2
   fi
   if [ "$count" -ne 1 ]; then
-    printf '[debt] Expected one %stodo with id %s in todos/debt/, found %d\n' \
-      "${want_state:+$want_state }" "$id" "$count" >&2
+    printf '[debt] Expected one %stodo with id %s in todos/debt/, found %d%s\n' \
+      "${want_state:+$want_state }" "$id" "$count" "${other:+ (todo $id exists as $other)}" >&2
     return 1
   fi
   debt_refuse_symlinks "$match" || return 1
@@ -235,11 +245,30 @@ transition_todo_state() {
   local current_state
   current_state=$(extract_frontmatter "$todo_file" | yq -r '.status' 2>/dev/null) || return 1
 
+  # Already there: a retry after a lost result is a success, not an error. When
+  # only the file name lags the frontmatter (a hand edit), fall through to the
+  # rename and skip the edge check, since there is no edge to take.
+  local name_state="" rename_only=false
+  [[ "${todo_file##*/}" =~ $DEBT_TODO_NAME_RE ]] && name_state="${BASH_REMATCH[1]}"
+  if [ "$current_state" = "$new_state" ]; then
+    if [ "$name_state" = "$new_state" ]; then
+      printf '[debt] %s is already %s; nothing to do\n' "${todo_file##*/}" "$new_state"
+      return 0
+    fi
+    rename_only=true
+  fi
+
   # Validate transition
-  validate_transition "$current_state" "$new_state" || {
-    printf '[debt] Invalid transition %s→%s\n' "$current_state" "$new_state" >&2
-    return 1
-  }
+  if [ "$rename_only" = false ]; then
+    validate_transition "$current_state" "$new_state" || {
+      local t allowed=""
+      for t in pending ready in-progress deferred complete deleted wont-fix; do
+        validate_transition "$current_state" "$t" && allowed="$allowed $t"
+      done
+      printf '[debt] Invalid transition %s→%s (allowed from %s:%s)\n' "$current_state" "$new_state" "$current_state" "${allowed:- none}" >&2
+      return 1
+    }
+  fi
 
   # Update frontmatter (extract YAML, update, reconstruct markdown)
   local updated_frontmatter body
@@ -252,6 +281,8 @@ transition_todo_state() {
   # test the cleaned value, so a reason made only of newlines writes no field.
   local clean_reason
   clean_reason=$(printf '%s' "$reason" | tr -d '\n\r')
+  local reason_len
+  reason_len=$(jq -rn --arg s "$clean_reason" '$s | length') || return 1
   clean_reason=$(jq -rn --arg s "$clean_reason" '$s[0:200]') || return 1
   # Hand yq the reason as a JSON string: kislyuk yq's argument parser reads a
   # plain `--arg val ---` (or any value starting with `-`) as an option.
@@ -265,7 +296,10 @@ transition_todo_state() {
     wont-fix) keep=wont_fix_reason ;;
     deferred) keep=deferred_reason ;;
   esac
-  if [[ "$current_state" =~ ^(wont_fix|wontfix|wont\ fix)$ ]]; then legacy=true; fi
+  if debt_is_legacy_wont_fix "$current_state"; then legacy=true; fi
+  if [ -n "$keep" ] && [ "$reason_len" -gt 200 ]; then
+    printf '[debt] Note: reason truncated from %d to 200 characters\n' "$reason_len" >&2
+  fi
   updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y \
     --arg keep "$keep" --argjson val "$reason_json" --argjson legacy "$legacy" '
     .wont_fix_reason as $old
@@ -334,6 +368,7 @@ transition_todo_state() {
   if [ "$new_filename" = "$todo_file" ]; then
     mv -- "$temp_file" "$new_filename" || return 1
     temp_file=""
+    printf '[debt] %s -> %s: %s\n' "$current_state" "$new_state" "$new_filename"
     return 0
   fi
 
@@ -348,6 +383,7 @@ transition_todo_state() {
   temp_file=""
 
   rm -f -- "$todo_file"
+  printf '[debt] %s -> %s: %s\n' "$current_state" "$new_state" "$new_filename"
   return 0
 }
 
@@ -467,11 +503,15 @@ debt_pending_todos() {
   return 0
 }
 
-# Print the next free todo id, zero-padded to three digits: one above the
-# highest leading number of any *.md under todos/debt/. Ids are 1-6 digits
-# everywhere else, so a larger one is ignored. Run from the git root.
+# Print the next free todo ids, one per line, zero-padded to three digits: COUNT
+# consecutive ids (default 1) starting one above the highest leading number of
+# any *.md under todos/debt/. Ids are 1-6 digits everywhere else, so a larger
+# one is ignored. Run from the git root.
+# Usage: debt_next_todo_id [COUNT]
 debt_next_todo_id() {
-  local f base id max=0
+  local count="${1:-1}" f base id max=0 k
+  [[ "$count" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$count))" -ge 1 ] || {
+    printf '[debt] Error: count must be 1-9999\n' >&2; return 1; }
   debt_refuse_symlinks todos todos/debt || return 1
   for f in todos/debt/*.md; do
     [ -e "$f" ] || continue
@@ -479,15 +519,17 @@ debt_next_todo_id() {
     [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
     [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
   done
-  if [ "$max" -ge 999999 ]; then
+  if [ "$((max + 10#$count))" -gt 999999 ]; then
     printf '[debt] Error: todo ids exhausted\n' >&2
     return 1
   fi
-  printf '%03d\n' "$((max + 1))"
+  for ((k = 1; k <= 10#$count; k++)); do
+    printf '%03d\n' "$((max + k))"
+  done
 }
 
 # Decide which surviving findings already have a kept todo (any status but
-# pending or deferred). Reads .debt/surviving-findings.json (an array of v2.0 records),
+# pending or deferred; a matching deferred todo is reported as resurfaced_from). Reads .debt/surviving-findings.json (an array of v2.0 records),
 # writes .debt/fingerprints.json (one entry per finding, by index) and prints a
 # line per skipped finding. Exact fingerprint first; then same category and
 # path whose anchor_hash equals the first substantive line of the new range
@@ -496,8 +538,8 @@ debt_next_todo_id() {
 # git root.
 debt_match_kept_todos() {
   local US=$'\x1f' paths out f base st meta cat loc fp anchor
-  local -a k_id=() k_status=() k_cat=() k_path=() k_fp=() k_anchor=() candidates=()
-  local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged fm_status
+  local -a k_id=() k_status=() k_cat=() k_path=() k_fp=() k_anchor=() candidates=() d_id=() d_fp=()
+  local unreadable=0 unfingerprinted=0 n i j rec fpath lines first first_done matches how match_idx merged fm_status resurfaced
   command -v validate_file_path >/dev/null 2>&1 || {
     printf '[debt] Error: validate_file_path is unavailable (yellow-core lib/validate-fs.sh not found); cannot fingerprint findings\n' >&2
     return 1; }
@@ -508,6 +550,10 @@ debt_match_kept_todos() {
   paths=$(mktemp .debt/.paths.XXXXXX) || return 1
   out=$(mktemp .debt/.fingerprints.XXXXXX) || { rm -f -- "$paths"; return 1; }
   trap 'rm -f -- "$paths" "$out"; trap - RETURN' RETURN
+  if ! jq -e 'type == "array"' .debt/surviving-findings.json >/dev/null 2>&1; then
+    printf '[debt] Error: .debt/surviving-findings.json is missing or not a JSON array; write it with the Write tool first\n' >&2
+    return 1
+  fi
   n=$(jq 'length' .debt/surviving-findings.json) || return 1
 
   # Only a kept todo that names a surviving finding's path can match, so read
@@ -519,24 +565,33 @@ debt_match_kept_todos() {
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     base="${f##*/}"
     [[ "$base" =~ $DEBT_TODO_NAME_RE ]] || continue
-    meta=$(extract_frontmatter "$f" | yq -r '[(.status // ""), (.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || { unreadable=$((unreadable + 1)); continue; }
+    meta=$(extract_frontmatter "$f" | yq -r '[(.status // ""), (.category // ""), (.affected_files[0] // ""), (.fingerprint // ""), (.anchor_hash // "")] | join("\u001f")' 2>/dev/null) || {
+      unreadable=$((unreadable + 1)); printf '[debt] Warning: kept todo %s is unreadable\n' "$base" >&2; continue; }
     IFS="$US" read -r fm_status cat loc fp anchor <<<"$meta"
     # The frontmatter status is the source of truth: a file name is a cache of
     # it, and a hand edit (the legacy wont_fix spelling) can leave them apart.
-    case "$fm_status" in
-      wont_fix|wontfix|"wont fix") st=wont-fix ;;
-      pending|ready|in-progress|deferred|complete|deleted|wont-fix) st="$fm_status" ;;
-      *) unreadable=$((unreadable + 1)); continue ;;
-    esac
-    # A pending todo is about to be deleted and a deferred one is meant to come
-    # back: neither suppresses a new finding.
-    [ "$st" != pending ] && [ "$st" != deferred ] || continue
+    if debt_is_legacy_wont_fix "$fm_status"; then
+      st=wont-fix
+    else
+      case "$fm_status" in
+        pending|ready|in-progress|deferred|complete|deleted|wont-fix) st="$fm_status" ;;
+        *) unreadable=$((unreadable + 1)); printf '[debt] Warning: kept todo %s has an unknown status\n' "$base" >&2; continue ;;
+      esac
+    fi
+    # A pending todo is about to be deleted: it suppresses nothing.
+    [ "$st" != pending ] || continue
     _debt_split_loc "$loc"
     # An older todo has no stored identity. Rehash it from the tree, except a
     # complete one: its code was changed by the fix, so the tree says nothing.
     if [ "$st" != complete ] && [ -n "$cat" ] && [ -n "$_DEBT_S" ]; then
       [ -n "$fp" ] || fp=$(debt_fingerprint "$cat" "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || fp=""
       [ -n "$anchor" ] || anchor=$(debt_anchor_hashes "$_DEBT_P" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || anchor=""
+    fi
+    if [ "$st" = deferred ]; then
+      # A deferred todo is meant to come back, so it never suppresses; remember
+      # its identity so the new pending todo can point at it.
+      d_id+=("${base%%-*}"); d_fp+=("$fp")
+      continue
     fi
     k_id+=("${base%%-*}"); k_status+=("$st"); k_cat+=("$cat"); k_path+=("$_DEBT_P"); k_fp+=("$fp"); k_anchor+=("$anchor")
   done
@@ -546,8 +601,9 @@ debt_match_kept_todos() {
     IFS="$US" read -r cat fpath lines <<<"$rec"
     loc="$fpath"; [ -z "$lines" ] || loc="$fpath:$lines"
     _debt_split_loc "$loc"
-    fp=$(debt_fingerprint "$cat" "$fpath" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || { fp=""; unfingerprinted=$((unfingerprinted + 1)); }
-    first=""; first_done=0; match_idx=-1; matches=0; how=""
+    fp=$(debt_fingerprint "$cat" "$fpath" "$_DEBT_S" "$_DEBT_E" 2>/dev/null) || {
+      fp=""; unfingerprinted=$((unfingerprinted + 1)); printf '[debt] Warning: finding %d has no usable line range\n' "$i" >&2; }
+    first=""; first_done=0; match_idx=-1; matches=0; how=""; resurfaced=""
     if [ -n "$fp" ]; then
       # An exact fingerprint is unambiguous, so any number of kept todos with it
       # suppress (a finding closed twice must stay closed). Report the lowest id.
@@ -581,8 +637,14 @@ debt_match_kept_todos() {
       if [ "$first_done" -eq 0 ] && [ -n "$fp" ]; then
         first=$(debt_anchor_hashes "$fpath" "$_DEBT_S" "$_DEBT_E" 1 2>/dev/null) || first=""
       fi
-      jq -cn --argjson i "$i" --arg fp "$fp" --arg anchor "$first" \
-        '{index: $i, skip: false, fingerprint: (if $fp == "" then null else $fp end), anchor_hash: (if $anchor == "" then null else $anchor end)}' >> "$out" || return 1
+      if [ -n "$fp" ]; then
+        for j in "${!d_id[@]}"; do
+          [ "${d_fp[j]}" = "$fp" ] || continue
+          resurfaced="${d_id[j]}"; break
+        done
+      fi
+      jq -cn --argjson i "$i" --arg fp "$fp" --arg anchor "$first" --arg res "$resurfaced" \
+        '{index: $i, skip: false, fingerprint: (if $fp == "" then null else $fp end), anchor_hash: (if $anchor == "" then null else $anchor end), resurfaced_from: (if $res == "" then null else $res end)}' >> "$out" || return 1
     fi
   done
   merged=$(jq -s '.' "$out") || return 1

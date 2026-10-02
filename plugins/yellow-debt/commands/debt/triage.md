@@ -202,14 +202,14 @@ bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
 [ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
 DEFER_REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
-rm -f -- "$2/reason.txt"
-rmdir -- "$2"
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" pending) || exit 1
 transition_todo_state "$todo_file" deferred "$DEFER_REASON" || {
-printf '[debt:triage] Error: transition failed\n' >&2
+printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
 exit 1
 }
+rm -f -- "$2/reason.txt"
+rmdir -- "$2"
 __YELLOW_DEBT_BASH__
 ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
@@ -256,14 +256,14 @@ bash /dev/fd/3 '<todo-id>' '<reason-dir>' 3<<'__YELLOW_DEBT_BASH__'
 debt_refuse_symlinks "$2" "$2/reason.txt" || exit 1
 [ -f "$2/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
 REASON=$(tr -d '\n\r' < "$2/reason.txt") || exit 1
-rm -f -- "$2/reason.txt"
-rmdir -- "$2"
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" pending) || exit 1
 transition_todo_state "$todo_file" wont-fix "$REASON" || {
-printf '[debt:triage] Error: transition failed\n' >&2
+printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
 exit 1
 }
+rm -f -- "$2/reason.txt"
+rmdir -- "$2"
 __YELLOW_DEBT_BASH__
 ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
@@ -321,6 +321,8 @@ Run /debt:fix to begin remediation of accepted findings."
   it. Reject (`deleted`) is kept and stamped the same way; the difference is
   meaning: Reject says the finding was wrong
 - Optional reason (newlines stripped, truncated to 200 characters)
+- A close is idempotent: repeating it on a todo that is already `wont-fix`
+  prints "already wont-fix" and succeeds
 - Reopen with `transition_todo_state … pending` if the decision changes
 - Its Linear issue, if synced, is not touched: close it by hand
 - A finding that is already `ready`, `in-progress` or `deferred` is closed with
@@ -337,15 +339,17 @@ if [ "$3" != "-" ]; then
   debt_refuse_symlinks "$3" "$3/reason.txt" || exit 1
   [ -f "$3/reason.txt" ] || { printf '[debt:triage] Error: reason file missing\n' >&2; exit 1; }
   REASON=$(tr -d '\n\r' < "$3/reason.txt") || exit 1
-  rm -f -- "$3/reason.txt"
-  rmdir -- "$3"
 fi
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
 transition_todo_state "$todo_file" wont-fix "$REASON" || {
-printf '[debt:triage] Error: transition failed\n' >&2
+printf '[debt:triage] Error: transition failed; a reason directory is kept for a retry\n' >&2
 exit 1
 }
+if [ "$3" != "-" ]; then
+  rm -f -- "$3/reason.txt"
+  rmdir -- "$3"
+fi
 __YELLOW_DEBT_BASH__
 ```
 

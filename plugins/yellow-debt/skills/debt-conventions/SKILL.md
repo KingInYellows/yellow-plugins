@@ -344,7 +344,11 @@ or `deleted` todos. Only a unique anchor match suppresses; edited code resurface
 as a new pending todo. A todo closed as `wont-fix` or `deleted` is stamped at
 close time (with a warning when that is not possible); older ones are rehashed
 from the current tree, except `complete` ones, so a stale line range can stamp
-the wrong code: close old todos promptly.
+the wrong code: close old todos promptly. A new pending todo whose fingerprint
+matches a `deferred` todo carries `resurfaced_from: '<id>'`, so the pair is
+visible. Closing a todo that is already in the target state succeeds with an
+"already" note, and every transition prints a one-line receipt naming the new
+file.
 
 ### Invalid Priority Values
 

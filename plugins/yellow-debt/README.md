@@ -204,7 +204,8 @@ wont-fix → pending
 ```
 
 `wont-fix` closes a valid finding you are deliberately not fixing and keeps its
-file (unlike `deleted`, which means the finding was wrong). Triage offers it
+file, as `deleted` does; the difference is meaning (`deleted` says the finding
+was wrong). Triage offers it
 for pending findings. To close one that is already `ready`, `in-progress` or
 `deferred`, use the wrapped recipe in the `debt-conventions` skill or in
 `/debt:triage` "Triage Decisions" (`transition_todo_state` run from the git root
