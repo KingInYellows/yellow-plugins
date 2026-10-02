@@ -153,7 +153,9 @@ threads still block merge, so include them:
 ```
 
 If it exits non-zero, report its stderr verbatim and stop; stderr naming a
-rate limit means `ratelimited=1` on the `Resolve:` line. Then:
+rate limit means `ratelimited=1` on the `Resolve:` line. Exit 3 means the
+thread list is partial (page cap, missing cursor or the fetch deadline): report
+it as a partial list and do not treat it as complete. Then:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-blockers" "<owner/repo>" "<PR#>"
@@ -161,7 +163,9 @@ rate limit means `ratelimited=1` on the `Resolve:` line. Then:
 
 Give both of these read-only calls a Bash tool `timeout` of 300000 ms: each
 makes several `gh` calls bounded at 60 s apiece, so the 120 s default could
-kill a slow lookup.
+kill a slow lookup. `get-pr-comments` can fetch 10 pages, so it also stops
+paginating at a 270 s deadline and ends inside that budget. The contract's
+"Bash timeouts" is the single source for these numbers.
 
 It never fails the run; keep its JSON (`changesRequested`,
 `conversationResolution`, `lookupFailed`) for Step 9.

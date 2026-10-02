@@ -500,7 +500,20 @@ values still fall back to 30), and the budget is derived from that cap:
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and
 startup, and stays under the Bash tool's 600 s maximum. Change the cap and
 this budget together. `poll-new-threads` uses the same cap for each fetch and
-ends within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget.
+ends within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget. It
+runs `get-pr-comments` under that 60 s cap, so the deadline below does not
+change the Step 8 poll budget.
+
+`get-pr-comments` (Step 2, with `get-pr-blockers`) gets a `timeout` of 300000 ms.
+It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
+`YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
+0 or over-4-digit value falls back to 270), checked before each page. On
+expiry it prints `get-pr-comments: deadline reached` and exits 3 with the
+partial array, the same as a page-cap truncation. From page 2 on each `gh`
+call's limit is also cut to the time left, so the worst case is the 270 s
+deadline plus `jq` and startup, inside 300000 ms. Page 1 gets the full per-call
+limit; a call killed by it exits 1 (`gh timed out`). Without `timeout` or
+`gtimeout` the calls run unbounded, as in the other scripts.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls
 with a `timeout`/`gtimeout` binary that supports `--kill-after`; without one
@@ -653,9 +666,11 @@ Report exit 3 as `needs permission` only for `reason=permission`, and as
 `pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`)
 and 2 on usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage.
 
-`get-pr-comments` exits 1 on any failure (usage included) and 3 when the
-thread list is truncated by the page cap or a missing cursor; stdout then
-holds the partial array, which a caller must not treat as complete.
+`get-pr-comments` exits 1 on any failure (usage included, and a `gh` call
+killed by the time limit) and 3 when the thread list is truncated by the page
+cap, a missing cursor or the fetch deadline (stderr `get-pr-comments: deadline
+reached`); stdout then holds the partial array, which a caller must not treat
+as complete.
 
 `get-pr-blockers` exits 2 on usage errors and 0 otherwise. Key a failed
 lookup on `lookupFailed: true` (with `changesRequested` null), not on any

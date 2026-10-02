@@ -471,6 +471,13 @@ case "$ALL_ARGS" in
     # Endless pagination: every page says there is another, with a cursor.
     printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
+  *"number=370"*)
+    # Slow endless pagination: each page takes MOCK_GH_SLEEP seconds (default
+    # 2), holds one unresolved thread, and says there is another page.
+    sleep "${MOCK_GH_SLEEP:-2}"
+    _n=$(bump pr370)
+    printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[{"id":"PRRT_slow%s","isResolved":false,"isOutdated":false,"viewerCanResolve":true,"viewerCanReply":true,"path":"a.txt","line":1,"startLine":null,"comments":{"totalCount":0,"nodes":[]}}]}}}}}\n' "$_n"
+    ;;
   *"PRRT_gqlrl_exit0"*)
     # HTTP 200 with a GraphQL rate-limit error and gh exiting 0.
     bump resolve_gqlrl_exit0 >/dev/null

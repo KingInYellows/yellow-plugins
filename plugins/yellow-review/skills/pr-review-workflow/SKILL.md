@@ -407,7 +407,8 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
   Returns JSON array of unresolved review threads (outdated threads are
   excluded unless `--include-outdated` is passed); exits 3 with the partial
-  array on stdout when the thread list is truncated; each thread carries
+  array on stdout when the thread list is truncated (page cap, missing cursor
+  or the 270 s fetch deadline); each thread carries
   `commentsTruncated` (true past the 50 comments fetched), and a resolver
   must never resolve such a thread
 - **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
