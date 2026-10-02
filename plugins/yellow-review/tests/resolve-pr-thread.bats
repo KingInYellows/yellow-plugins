@@ -180,6 +180,9 @@ stub_sleep() {
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"retrying once in 0s"* ]]
   [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_resetpast")" = 2 ]
+  # Every recorded sleep (rate-limit wait and pacing) must be 0.
+  [ -s "$SLEEP_LOG" ]
+  ! grep -qvx 0 "$SLEEP_LOG"
 }
 
 @test "a reset time over the 90 s cap exits 4 without retrying" {
@@ -188,6 +191,8 @@ stub_sleep() {
   [ "$status" -eq 4 ]
   [[ "$stderr" == *"exceeds 90s"* ]]
   [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_resetfar")" = 1 ]
+  # No sleep of any duration happened before the exit.
+  [ ! -s "$SLEEP_LOG" ]
 }
 
 # --- Rate-limit wait fallback and cap ---

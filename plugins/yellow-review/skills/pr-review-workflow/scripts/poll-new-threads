@@ -5,7 +5,9 @@
 #   min(20, remaining) seconds, fetches, and stops at the first fetch that
 #   shows a thread ID missing from <round1-ids-file> (one ID per line; blank
 #   lines and CRs are ignored) or when the wait is used up; it always fetches
-#   at least once.
+#   at least once. --wait is a wall-clock bound: time spent inside
+#   get-pr-comments counts, so the remaining wait shrinks after a slow fetch
+#   and no further round starts once it is used up.
 # Output: the last successful get-pr-comments JSON in <out-file>; progress
 #   lines "poll t=<s> new=<0|1>" and a final "repass fetched=<0|1> found=<0|1>"
 #   on stdout. fetched=0 means no fetch succeeded (inconclusive).
@@ -46,13 +48,24 @@ tr -d '\r' <"$ROUND1" | grep -v '^$' >"$WORK/round1" || :
 
 fetched=0
 found=0
+START=$(date +%s)
+slept=0
 waited=0
+# Seconds used so far: wall-clock since START, never less than the time slept.
+tick() {
+    now=$(date +%s) || now=$START
+    waited=$((now - START))
+    [ "$waited" -lt "$slept" ] && waited=$slept
+    return 0
+}
 while :; do
+    tick
     if [ "$waited" -lt "$WAIT" ]; then
         step=$((WAIT - waited))
         [ "$step" -gt "$STEP" ] && step=$STEP
         sleep "$step"
-        waited=$((waited + step))
+        slept=$((slept + step))
+        tick
     fi
     if "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR" >"$WORK/new" 2>"$WORK/err"; then
         if jq -r '.[].threadId' "$WORK/new" >"$WORK/ids" 2>/dev/null; then
@@ -71,6 +84,7 @@ while :; do
         printf 'poll rate-limited\n'
         exit 4
     fi
+    tick
     if [ "$found" = 1 ] || [ "$waited" -ge "$WAIT" ]; then break; fi
 done
 printf 'repass fetched=%s found=%s\n' "$fetched" "$found"

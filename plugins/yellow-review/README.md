@@ -77,19 +77,29 @@ yellow-core integration before reviewing real PRs.
 
 Helpers under `skills/pr-review-workflow/scripts/` that implement the
 mechanical parts of the resolve contract in
-`references/resolve/dispositions.md`. `/review:resolve` does not invoke the
-new ones yet; wiring lands in a later PR of this stack.
+`references/resolve/dispositions.md`. `/review:resolve` invokes
+`get-pr-blockers`, `reply-pr-thread`, `resolve-pr-thread` and
+`file-followup-issue` per that contract; the other helpers below serve the
+fetch, verify, commit and re-pass steps.
 
 | Script | Description |
 | ------ | ----------- |
 | `get-pr-comments` | Unresolved review threads (`--include-outdated` adds outdated ones) |
 | `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
+| `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
+| `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
+| `run-verify-command` | Run the repository's verify command under a timeout, reverting on failure |
+| `commit-resolve-fixes` | Commit and submit the resolver's fixes through the enabled stack provider |
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve a single thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
-| `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
+| `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
+| `check-resolve-text` | Refuse credential-shaped text before it is posted to Linear |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
 | `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files; `--revert-only` and `--revert-dirty` revert without running) |
+
+Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-paths.sh`,
+`gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
 
 ## Opt-in: thermonuclear structural review
 

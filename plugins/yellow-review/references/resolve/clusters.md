@@ -8,14 +8,18 @@ upstream `EveryInc/compound-engineering-plugin` PR #480 at locked SHA
 ## Algorithm
 
 1. Bucket the post-Step-3c threads by `path` (the GraphQL `path` field).
-2. Within a path, sort line-anchored threads by end line (`line`). A thread's
-   range is `[startLine, line]` (`startLine` falls back to `line` when null).
-   Merge threads into one cluster when their ranges overlap (`a.startLine ≤
-   b.line` and `b.startLine ≤ a.line`) or the gap between consecutive threads
-   is within the snapshot's `cluster_line_distance` (`b.startLine - a.line ≤
-   D`, default 10). The merge is transitive: with D = 10, threads at 40–48,
-   50–55 and 60–62 form one cluster. Range overlap is required so Thread
-   A = 10–50 and Thread B = 15–20 never split into overlapping edit sets.
+2. Within a path, sort line-anchored threads by start line (`startLine`). A
+   thread's range is `[startLine, line]` (`startLine` falls back to `line`
+   when null). Track the open cluster's end as the maximum `line` seen so far
+   (`clusterEnd`). A thread joins the open cluster when its `startLine ≤
+   clusterEnd + D`, where `D` is the snapshot's `cluster_line_distance`
+   (default 10); this covers both overlap and a gap within `D`. Otherwise it
+   starts a new cluster. After each join, set `clusterEnd = max(clusterEnd,
+   line)`. The merge is transitive: with D = 10, threads at 40–48, 50–55 and
+   60–62 form one cluster. Sorting by start and comparing against the
+   accumulated end means a long range such as 10–50 absorbs every range it
+   contains or bridges, so ranges 10–20, 45–46 and 10–50 form one cluster and
+   no two clusters ever hold overlapping ranges.
 3. Threads with a `path` but no `line` (file-level and review-level
    comments) form one **review-level cluster per path**, separate from the
    line-anchored clusters of that file. A thread with neither `path` nor
