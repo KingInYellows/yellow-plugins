@@ -309,3 +309,116 @@ setup() {
     [ "$status" -ne 0 ] || { echo "runner: $p"; false; }
   done
 }
+
+@test "rp_runner flags the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file inside the repository" {
+  mkdir -p tools
+  : >| tools/custom-runtime.js
+  for ov in "$(pwd -P)/tools/custom-runtime.js" tools/custom-runtime.js ./tools/../tools/custom-runtime.js; do
+    export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$ov"
+    rp_runner tools/custom-runtime.js || { echo "not a runner with override=$ov"; false; }
+    rp_runner Tools/Custom-Runtime.js || { echo "not a runner (case) with override=$ov"; false; }
+    run rp_runner tools/other.js
+    [ "$status" -ne 0 ] || { echo "runner: tools/other.js with override=$ov"; false; }
+    run rp_runner tools/custom-runtime.js.bak
+    [ "$status" -ne 0 ]
+  done
+}
+
+@test "rp_runner follows a symlinked runtime override to the repository file" {
+  mkdir -p tools
+  : >| tools/custom-runtime.js
+  ln -s "$(pwd -P)/tools/custom-runtime.js" "$BATS_TEST_TMPDIR/linked.js"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/linked.js"
+  rp_runner tools/custom-runtime.js
+}
+
+@test "rp_runner ignores a runtime override outside the repository or unset" {
+  : >| "$BATS_TEST_TMPDIR/runtime.js"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/runtime.js"
+  run rp_runner runtime.js
+  [ "$status" -ne 0 ]
+  run rp_runner src/a.ts
+  [ "$status" -ne 0 ]
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/missing-dir/runtime.js"
+  run rp_runner runtime.js
+  [ "$status" -ne 0 ]
+  unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
+  run rp_runner tools/custom-runtime.js
+  [ "$status" -ne 0 ]
+}
+
+# hooks_repo: a repository with one commit, cwd at its root.
+hooks_repo() {
+  git config user.email t@t.com && git config user.name T && git config commit.gpgsign false
+  printf 'x\n' >| a.txt
+  git add a.txt && git commit -q -m init
+  OUT="$BATS_TEST_TMPDIR/hooks.out"
+}
+
+@test "rp_hooks_untracked leaves the default hooks directory and a missing one alone" {
+  hooks_repo
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  git config core.hooksPath nowhere
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_hooks_untracked names an in-tree hooks directory holding an ignored or untracked file" {
+  hooks_repo
+  mkdir -p .hooks/sub
+  printf '#!/bin/sh\n' >| .hooks/pre-commit
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = ".hooks" ]
+  printf '.hooks/\n' >> .git/info/exclude
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = ".hooks" ]
+  git config core.hooksPath "$(pwd -P)/.hooks/sub/../"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = ".hooks" ]
+}
+
+@test "rp_hooks_untracked allows a hooks directory whose files are all tracked" {
+  hooks_repo
+  mkdir -p .hooks
+  printf '#!/bin/sh\n' >| .hooks/pre-commit
+  git add .hooks && git commit -q -m hooks
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  # An ignored sibling below it is not.
+  mkdir -p .hooks/_
+  printf 'x\n' >| .hooks/_/h
+  printf '.hooks/_/\n' >> .git/info/exclude
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+}
+
+@test "rp_hooks_untracked allows a hooks directory outside the working tree" {
+  hooks_repo
+  mkdir -p "$BATS_TEST_TMPDIR/ext"
+  printf '#!/bin/sh\n' >| "$BATS_TEST_TMPDIR/ext/pre-commit"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/ext"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_hooks_untracked treats a repository-root hooks path as holding untracked files" {
+  hooks_repo
+  printf '#!/bin/sh\n' >| pre-commit
+  git config core.hooksPath .
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+  [ "$output" = "." ]
+}
+
+@test "rp_hooks_untracked fails closed outside a repository" {
+  cd "$BATS_TEST_TMPDIR"
+  mkdir plain && cd plain
+  GIT_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR" run rp_hooks_untracked "$BATS_TEST_TMPDIR/out"
+  [ "$status" -eq 2 ]
+}

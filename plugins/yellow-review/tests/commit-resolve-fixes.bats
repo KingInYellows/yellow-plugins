@@ -922,3 +922,238 @@ remote_with_push_url() {
   [ "$status" -eq 3 ]
   [[ "$stderr" != *"s3cr3t-tok3n"* ]]
 }
+
+# --- The push URL's host and scheme ---
+
+# push_via <url>: make the branch push to a remote reporting <url>, then edit a
+# listed file so a run has something to commit.
+push_via() {
+  remote_with_push_url hostcase "$1"
+  git config branch.feature.pushRemote hostcase
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+}
+
+@test "a push URL with the right owner/repo on another host is refused before committing (exit 3)" {
+  for url in https://git.example/acme/widgets.git \
+             ssh://git@git.example:2222/acme/widgets.git \
+             git@git.example:acme/widgets.git \
+             https://github.com.evil.example/acme/widgets.git \
+             https://github.com@git.example/acme/widgets.git; do
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" == *"remote 'hostcase' does not push to the active GitHub host"* ]]
+    [[ "$stderr" != *"git.example"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "ssh.github.com and www.github.com count as github.com" {
+  n=0
+  for url in ssh://git@ssh.github.com:443/acme/widgets.git \
+             ssh://git@SSH.GitHub.com:443/acme/widgets \
+             https://www.github.com/acme/widgets.git; do
+    n=$((n + 1))
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "rejected: $url: $stderr" >&2; return 1; }
+  done
+}
+
+@test "GH_HOST names the active host, case-insensitively, and wins over the PR URL" {
+  export GH_HOST=Git.Example
+  push_via https://git.example/acme/widgets.git
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  # github.com is no longer the active host.
+  git remote remove hostcase
+  push_via https://github.com/acme/widgets.git
+  printf 'one\nfeature\nfix2\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+}
+
+@test "without GH_HOST the host of the PR's URL is the active host" {
+  export STUB_PR_URL=https://git.example/acme/widgets/pull/7
+  push_via https://git.example/acme/widgets.git
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  git remote remove hostcase
+  push_via https://github.com/acme/widgets.git
+  printf 'one\nfeature\nfix2\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+}
+
+@test "an undeterminable active host refuses the commit (exit 3)" {
+  export STUB_PR_URL=none
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"could not determine the active GitHub host"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "a push URL with a scheme other than https, http, ssh or git is refused (exit 3)" {
+  for url in file://github.com/acme/widgets.git \
+             ftp://github.com/acme/widgets.git \
+             ext::https://github.com/acme/widgets.git \
+             git+ssh://git@github.com/acme/widgets.git; do
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" == *"cannot tell which repository remote 'hostcase' pushes to"* ]]
+    [[ "$stderr" != *"github.com/acme"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+}
+
+@test "the git:// and http:// schemes are accepted for the right host and repository" {
+  n=0
+  for url in git://github.com/acme/widgets.git http://github.com/acme/widgets.git; do
+    n=$((n + 1))
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "rejected: $url: $stderr" >&2; return 1; }
+  done
+}
+
+# --- Hooks the commit would run ---
+
+# plant_hook <dir>: an executable pre-commit hook in <dir> that logs its run.
+plant_hook() {
+  mkdir -p "$1"
+  printf '#!/bin/sh\necho ran >> "%s/hook.log"\n' "$BATS_TEST_TMPDIR" >| "$1/pre-commit"
+  chmod +x "$1/pre-commit"
+}
+
+@test "an ignored hooks directory inside the repository is refused before committing (exit 3)" {
+  for provider in github graphite; do
+    plant_hook .hooks
+    printf '.hooks/\n' >> .git/info/exclude
+    git config core.hooksPath .hooks
+    printf 'one\nfeature\nfix\n' >| src/a.txt
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $provider" >&2; return 1; }
+    [[ "$stderr" == *"hooks directory '.hooks' holds untracked or ignored files"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+    # An absolute path to the same directory is the same directory.
+    git config core.hooksPath "$(pwd -P)/.hooks"
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ]
+    git config --unset core.hooksPath
+    rm -rf .hooks
+  done
+  ! grep -q '^node \|^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "an ignored file below a tracked hooks directory is refused too (exit 3)" {
+  plant_hook .hooks
+  git add .hooks && git commit -q -m "chore: hooks"
+  mkdir -p .hooks/lib
+  printf 'x=1\n' >| .hooks/lib/helper.sh
+  printf '.hooks/lib/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"hooks directory '.hooks' holds untracked or ignored files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+@test "a hooks directory whose files are all tracked is allowed and its hook runs" {
+  plant_hook .hooks
+  git add .hooks && git commit -q -m "chore: hooks"
+  git config core.hooksPath .hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+@test "a hooks directory outside the repository is allowed and its hook runs" {
+  plant_hook "$BATS_TEST_TMPDIR/ext-hooks"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+@test "the default hooks directory inside .git is allowed even though git does not track it" {
+  plant_hook .git/hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+}
+
+# --- The runtime override is a runner file ---
+
+@test "--unattended refuses a listed YELLOW_REVIEW_GITHUB_STACK_RUNTIME inside the repository (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/custom-runtime.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  printf '// edited\n' >> tools/custom-runtime.js
+  for ov in "$(pwd -P)/tools/custom-runtime.js" tools/custom-runtime.js ./tools/../tools/custom-runtime.js; do
+    export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$ov"
+    run_crf --provider github --pr 7 --message "$MSG" --unattended -- tools/custom-runtime.js
+    [ "$status" -eq 3 ] || { echo "accepted: $ov" >&2; return 1; }
+    [[ "$stderr" == *"runner file"* ]]
+    [ "$(git rev-parse HEAD)" = "$base" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "--unattended refuses an override reached through a symlink to a listed repository file" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/custom-runtime.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  printf '// edited\n' >> tools/custom-runtime.js
+  ln -s "$(pwd -P)/tools/custom-runtime.js" "$BATS_TEST_TMPDIR/linked-runtime.js"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/linked-runtime.js"
+  run_crf --provider github --pr 7 --message "$MSG" --unattended -- tools/custom-runtime.js
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"runner file"* ]]
+}
+
+@test "an override outside the repository does not make listed files runners" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" --unattended -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+# --- DEVIN_ORG_ID is a prohibited credential name ---
+
+@test "a literal DEVIN_ORG_ID assignment is refused with and without --unattended (exit 3)" {
+  for flag in "" --unattended; do
+    printf 'one\nfeature\nDEVIN_ORG_ID=org-1234567890\n' >| src/a.txt
+    # shellcheck disable=SC2086
+    run_crf --provider graphite --pr 7 --message "$MSG" $flag -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted (flag='$flag')" >&2; return 1; }
+    [[ "$stderr" == *"credential-shaped"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+  done
+  printf 'one\nfeature\nexport DEVIN_ORG_ID="org-1234567890"\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "_ID references and ordinary _ID assignments stay clean" {
+  printf 'one\nfeature\nconst ORG_ID = process.env.ORG_ID;\nDEVIN_ORG_ID = process.env.DEVIN_ORG_ID\nUSER_ID=12345678\nDEVIN_ORG_ID="${DEVIN_ORG_ID:-}"\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}

@@ -59,6 +59,34 @@ rp_denied() {
     return 1
 }
 
+# rp_runtime_override_rels: the repository-relative, lowercased path(s) that
+# YELLOW_REVIEW_GITHUB_STACK_RUNTIME names, one per line: the path as given
+# (its directory made physical) and each symlink hop down to the file node
+# would run. Prints nothing when the variable is unset, the file is outside
+# the repository or the path cannot be resolved. Relative values resolve from
+# the current directory, as `node "$RUNTIME"` does.
+rp_runtime_override_rels() {
+    local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top dir t hops=0
+    [ -n "$p" ] || return 0
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 0
+    while :; do
+        dir=$(cd -- "$(dirname -- "$p")" 2>/dev/null && pwd -P) || return 0
+        p="${dir%/}/${p##*/}"
+        case "$p" in
+            "$top"/*) printf '%s\n' "$(rp_lower "${p#"$top"/}")" ;;
+        esac
+        [ -L "$p" ] || return 0
+        hops=$((hops + 1))
+        [ "$hops" -le 40 ] || return 0
+        t=$(readlink -- "$p") || return 0
+        case "$t" in
+            /*) p="$t" ;;
+            *) p="${p%/*}/$t" ;;
+        esac
+    done
+}
+
 # rp_runner <path>: files a verify command, package manager or git hook
 # would execute or evaluate. A deny list of known entry points, not a proof:
 # a test run still executes any source file the suite imports, which is why
@@ -72,7 +100,7 @@ rp_denied() {
 # go.mod and requirements.txt (declarative, never executed) and __init__.py
 # (any package has them; too broad).
 rp_runner() {
-    local l hooks top rc
+    local l hooks top rc ov ovs
     l=$(rp_lower "$1")
     # The resolve runtime itself: the orchestrator executes these scripts and
     # sources these libraries, so an edit by an unattended resolver would run
@@ -88,6 +116,15 @@ rp_runner() {
         plugins/github-workflow/lib/*) return 0 ;;
         plugins/yellow-core/lib/compound-staging.sh) return 0 ;;
     esac
+    # YELLOW_REVIEW_GITHUB_STACK_RUNTIME replaces the sibling runtime above
+    # with any file, so that file counts too when it sits in this repository.
+    # One outside the repository is not a PR file and is left alone.
+    ovs=$(rp_runtime_override_rels 2>/dev/null || true)
+    if [ -n "$ovs" ]; then
+        while IFS= read -r ov; do
+            if [ -n "$ov" ] && [ "$l" = "$ov" ]; then return 0; fi
+        done <<<"$ovs"
+    fi
     # Only the repository-root scripts/ directory: build and hook tooling
     # lives there. Other nested scripts/ directories (e.g. another plugin's
     # skills/*/scripts/) are ordinary sources that hooks do not run.
@@ -177,6 +214,44 @@ rp_tree_changes() {
         printf 'rp_tree_changes: %s\n' "${err%%$'\n'*}" >&2
         return "$rc"
     fi
+}
+
+# rp_hooks_untracked <outfile>: the dirty-set guard cannot see a resolver edit
+# to an untracked or gitignored hook, and `git commit` would run it. Resolves
+# the effective hooks directory (`git rev-parse --git-path hooks`, which
+# honours core.hooksPath). Prints its repository-relative path and returns 0
+# when it lies inside the working tree (the git directory does not count) and
+# any file under it is untracked or ignored; returns 1 when it is fine (no such
+# directory, outside the working tree, or every file tracked) and 2 when it
+# cannot be inspected, which a caller must treat as a refusal. The caller owns
+# <outfile>, a scratch file. Tools that keep generated hooks in an ignored
+# directory (husky's .husky/_) are refused too: their files cannot be told
+# from a planted one.
+rp_hooks_untracked() {
+    (
+        local hp top gitdir rel spec=()
+        top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        cd -- "$top" 2>/dev/null || exit 2
+        top=$(pwd -P) || exit 2
+        hp=$(git rev-parse --git-path hooks 2>/dev/null) || exit 2
+        [ -n "$hp" ] || exit 2
+        [ -d "$hp" ] || exit 1
+        hp=$(cd -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || exit 2
+        gitdir=$(cd -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
+        case "$hp" in "$gitdir"|"$gitdir"/*) exit 1 ;; esac
+        case "$hp" in
+            "$top") rel=. ;;
+            "$top"/*) rel="${hp#"$top"/}" ;;
+            *) exit 1 ;;
+        esac
+        # The whole tree when the hooks directory is the repository root.
+        [ "$rel" = . ] || spec=(-- "$rel")
+        lgit ls-files --others --directory --no-empty-directory -z ${spec[@]+"${spec[@]}"} >|"$1" 2>/dev/null || exit 2
+        [ -s "$1" ] || exit 1
+        printf '%s' "$rel"
+        exit 0
+    )
 }
 
 # rp_assert_only_listed <changes-file> [path...]: succeeds when every path in

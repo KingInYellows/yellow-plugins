@@ -103,8 +103,17 @@ vr_load_redactor() {
 # assigns a *_KEY/_TOKEN/_SECRET/_ID/_PASSWORD name. Both passes are sed, so
 # they work on a stream: PEM blocks are a sed range, which drops its lines
 # until the END line arrives.
+# Both sed passes hold a whole input line in memory, so the stream is first cut
+# into records of at most 64 KiB (fold -b -s -w 65536: POSIX, byte-based, breaks
+# after the last blank inside the window and hard-breaks only a run of 64 KiB
+# with no blank). Minified output or binary data without newlines therefore
+# costs one bounded record per filter, not the whole stream. This inserts a
+# newline at each break. Residual: a credential that straddles a hard break (a
+# 64 KiB run with no blank, cut mid-value) can escape its pattern; the final
+# rt_looks_secret screen in vr_publish_log is the backstop.
 vr_redact_filter() {
-    cs_redact_secrets 2>/dev/null \
+    fold -b -s -w 65536 \
+        | cs_redact_secrets 2>/dev/null \
         | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
 }
 
@@ -115,7 +124,7 @@ vr_redact_filter() {
 # SIGPIPE. Returns the filter's status.
 vr_redact_stream() {
     local rc=0
-    if declare -F cs_redact_secrets >/dev/null 2>&1; then
+    if declare -F cs_redact_secrets >/dev/null 2>&1 && command -v fold >/dev/null 2>&1; then
         (set -o pipefail; vr_redact_filter) || rc=$?
     else
         rc=1
@@ -157,6 +166,7 @@ vr_redact_log() {
     # withheld.
     local scan_rc=0
     if declare -F cs_redact_secrets >/dev/null 2>&1 \
+        && command -v fold >/dev/null 2>&1 \
         && declare -F rt_looks_secret >/dev/null 2>&1 \
         && (
             umask 077
