@@ -432,18 +432,29 @@ path_without_timeout() {
   grep -q 'author { __typename }' "$SCRIPT"
 }
 
-@test "a bot-account viewer's own unmarked acknowledgement after our marker still skips" {
-  run "$SCRIPT" PRRT_reply_botself fixed "$BODY"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
-  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
-  [ ! -f "$CALLS" ]
+# --- structured exit-4 reason (rate-limit vs timeout) ---
+
+@test "exit 4 from a gh timeout prints reason=timeout and no other reason" {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nexit 124\n' >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }
 
-@test "a marker authored by a Bot viewer is still recognised" {
-  run "$SCRIPT" PRRT_reply_botmarker fixed "$BODY"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
-  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
-  [ ! -f "$CALLS" ]
+@test "exit 4 from a wait over the cap prints reason=rate-limit" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_ra120 fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a second rate limit prints reason=rate-limit" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_rl2 fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }

@@ -31,7 +31,8 @@
 #               anywhere on stderr; it is not always first,
 #             3 not found or permission (stderr carries a
 #               reason=not-found|permission line),
-#             4 rate limited or timed out: a second rate limit after the one
+#             4 rate limited or timed out (stderr carries a
+#               reason=rate-limit|timeout line): a second rate limit after the one
 #               retry the whole script gets, a wait over 90 s (the wait is
 #               Retry-After, else x-ratelimit-reset when
 #               x-ratelimit-remaining is 0, else
@@ -132,17 +133,17 @@ call_with_retry() {
             return 0
         fi
         if [ "$GG_EXIT" -eq 124 ]; then
-            printf 'Error: gh timed out after %ss on %s for %s; not retried.\n' "$GG_TIMEOUT" "$_label" "$THREAD_ID" >&2
+            printf 'Error: gh timed out after %ss on %s for %s; not retried.\nreason=timeout\n' "$GG_TIMEOUT" "$_label" "$THREAD_ID" >&2
             exit 4
         fi
         if gg_is_rate_limited; then
             _w=$(gg_rate_limit_wait)
             if [ "$_w" -gt "$GG_MAX_WAIT_SECONDS" ]; then
-                printf 'Error: GitHub rate limit on %s for %s; the %ss wait is over the %ss cap, not retried.\n' "$_label" "$THREAD_ID" "$_w" "$GG_MAX_WAIT_SECONDS" >&2
+                printf 'Error: GitHub rate limit on %s for %s; the %ss wait is over the %ss cap, not retried.\nreason=rate-limit\n' "$_label" "$THREAD_ID" "$_w" "$GG_MAX_WAIT_SECONDS" >&2
                 exit 4
             fi
             if [ "$RETRIED" = 1 ]; then
-                printf 'Error: GitHub rate limit on %s for %s; the one retry is already spent (would wait %ss).\n' "$_label" "$THREAD_ID" "$_w" >&2
+                printf 'Error: GitHub rate limit on %s for %s; the one retry is already spent (would wait %ss).\nreason=rate-limit\n' "$_label" "$THREAD_ID" "$_w" >&2
                 exit 4
             fi
             printf '[reply-pr-thread] Rate limited on %s; retrying in %ss.\n' "$_label" "$_w" >&2

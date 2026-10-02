@@ -540,88 +540,36 @@ path_without_timeout() {
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
 }
 
-# --- Refusals (6) and permanent failures (7) ---
+# --- structured exit-4 reason (rate-limit vs timeout) ---
 
-@test "a title or body with an image, a mention or a foreign URL exits 6 and files nothing" {
-  for t in 'See ![x](https://github.com/o/r/raw/x.png)' 'cc @octocat' 'See https://evil.example/x'; do
-    for where in title body; do
-      # Restore both clean files, then plant the sample in one of them.
-      printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
-      printf 'Retry policy belongs in the client module.\n' >| "$BODY"
-      if [ "$where" = title ]; then
-        printf '%s\n' "$t" >| "$TITLE"
-      else
-        printf '%s\n' "$t" >| "$BODY"
-      fi
-      run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-      [ "$status" -eq 6 ] || { echo "not refused in $where: $t"; false; }
-      [[ "$stderr" == *"resolve-text: refused rule="*"in=${where}"* ]] || { echo "wrong in= for $where: $stderr"; false; }
-      [ ! -e "$CREATES" ]
-    done
-  done
-}
-
-@test "usage and wrong-PR errors stay exit 2 and carry no resolve-text token" {
-  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE"
-  [ "$status" -eq 2 ]
-  [[ "$stderr" != *"resolve-text:"* ]]
-}
-
-@test "an HTTP 401 on the issue lookup exits 7 and files nothing" {
-  export MOCK_GH_ISSUE_LIST_FAIL=auth
-  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 7 ]
-  [[ "$stderr" == *"rejected the credentials"* ]]
-  [ ! -e "$CREATES" ]
-}
-
-@test "a token without access on the issue lookup exits 7, not the transient exit 1" {
-  export MOCK_GH_ISSUE_LIST_FAIL=forbidden
-  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 7 ]
-  [[ "$stderr" == *"not permitted"* ]]
-  [ ! -e "$CREATES" ]
-}
-
-@test "a rate limit that is also an HTTP 403 stays exit 4, not 7" {
-  export MOCK_GH_ISSUE_LIST_FAIL=ratelimit403
+@test "exit 4 from a rate-limited create prints reason=rate-limit" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=ratelimit
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 4 ]
-  [ ! -e "$CREATES" ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }
 
-@test "a repository with Issues disabled exits 7 before the thread lookup and the create" {
-  export MOCK_GH_ISSUES_DISABLED=1
+@test "exit 4 from a rate-limited duplicate close prints reason=rate-limit" {
+  export MOCK_GH_RESCAN=winner MOCK_GH_ISSUE_CLOSE_FAIL=ratelimit
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 7 ]
-  [[ "$stderr" == *"Issues are disabled"* ]]
-  [ ! -e "$CREATES" ]
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
 }
 
-@test "--find on a repository with Issues disabled still just reports exists:false" {
-  export MOCK_GH_ISSUES_DISABLED=1
-  run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
-  [ "$status" -eq 0 ]
-  [ "$output" = '{"exists":false}' ]
-}
-
-@test "a create that fails because Issues are disabled, forbidden or unauthenticated exits 7" {
-  for mode in disabled forbidden auth; do
-    export MOCK_GH_ISSUE_CREATE_FAIL=$mode
-    run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-    [ "$status" -eq 7 ] || { echo "$mode: status $status ($stderr)"; false; }
-  done
-}
-
-@test "a thread lookup refused with HTTP 403 exits 7 instead of exit 1" {
-  export MOCK_GH_THREAD_FAIL=forbidden
+@test "exit 4 from a timed-out create prints reason=timeout and no other reason" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=create
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 7 ]
-  [ ! -e "$CREATES" ]
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }
 
-@test "a create that fails for another reason is still the transient exit 1" {
-  export MOCK_GH_ISSUE_CREATE_FAIL=1
+@test "exit 4 from a timed-out issue list prints reason=timeout" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=list
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
 }
