@@ -14,7 +14,8 @@ git status --porcelain=v1 -z --untracked-files=all
 ```
 
 Output is NUL-separated records of `XY <path>`. When `X` or `Y` is `R` or
-`C`, the next NUL field is the original path with no `XY` prefix; list both.
+`C`, the next NUL field is the original path with no `XY` prefix; list both and
+keep them together as one rename/copy entry (destination first, then original).
 Never use plain `--porcelain`: it collapses untracked directories and quotes
 unusual paths. If the command fails, treat the tree as dirty with unknown
 contents: revert nothing and report `revert incomplete`.
@@ -27,7 +28,18 @@ A path is **owned** when it is one of:
   (never owned, even when the PR changes it): the first column of
   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" "<PR#>"`
   (paginated files API; it works past `gh pr diff` size limits and lists only
-  paths matching `^[A-Za-z0-9._/-]+$`);
+  paths matching `^[A-Za-z0-9._/-]+$`) — plus the `previous_filename` of each
+  renamed file. `pr-changed-ranges` prints only `filename`, so read the
+  originals from the same files API:
+
+  ```bash
+  gh api --paginate "repos/{owner}/{repo}/pulls/<PR#>/files?per_page=100" --jq '.[] | select(.previous_filename) | .previous_filename'
+  ```
+
+  The PR's owned file set is each file's `filename` plus its
+  `previous_filename`, under the same `^[A-Za-z0-9._/-]+$` and
+  `.claude/agent-memory/` rules. If this call fails, no `previous_filename` is
+  known and original paths stay unrecognized;
 - a **trusted-config path**, which a refused resolver edit must never leave on
   disk: anything under `.claude/` except `.claude/agent-memory/`,
   `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
@@ -38,6 +50,10 @@ write learnings there as a normal part of a run. Those writes are not
 evidence of a refused edit, and reverting them would delete legitimate
 memory. They are not owned, even when the PR's own file list includes them,
 so they follow the unrecognized path below.
+
+A rename or copy entry (two paths from step 1) is owned only when **both** of
+its paths are owned. If either path is unrecognized, the whole entry is
+unrecognized.
 
 Every other path is **unrecognized**. When `pr-changed-ranges` exits non-zero,
 no path is owned through the PR file list (only trusted-config paths remain
