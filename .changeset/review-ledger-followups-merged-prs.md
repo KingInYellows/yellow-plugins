@@ -15,7 +15,9 @@ and setup-command PRs.
   The Cancel block, Steps 7 to 9 and `council_synth_abort` unlink the state file
   only when this run claimed it (`SYNTH_STATE_CLAIMED`), so a symlink or foreign
   entry that 5a refused is left alone, and they remove it even when the staging
-  directory cannot be removed. A non-writable staging directory is repaired with
+  directory cannot be removed; 5e and `council_synth_abort` release the state
+  claim before they remove the staging directory, so a directory that cannot be
+  removed no longer blocks later runs. A non-writable staging directory is repaired with
   `chmod -R u+rwx` and retried once, otherwise the warning names the manual
   command. The 24-hour figure is documented as the sweep's eligibility threshold,
   and the stale-state reclaim race is recorded as a known residual.

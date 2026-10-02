@@ -1712,16 +1712,19 @@ council_rm_synth_state() {
 # never an entry another run holds.
 SYNTH_STATE_CLAIMED=1
 council_synth_abort() {
-  # Same order as 5e: the state file goes even when the directory cannot, since
-  # nothing reads it to find the directory and a surviving state file would
-  # block the next /council for up to a day. An unremovable directory is
-  # reported with the exact manual cleanup command; the 5a sweep only retries
-  # it once it is over 24 hours old and a later /council reaches 5a.
-  council_rm_synth_dir "$SYNTH_DIR" \
-    || printf '[council] Warning: could not remove %s; remove it by hand: chmod -R u+rwx %s && rm -rf %s\n' "$SYNTH_DIR" "$SYNTH_DIR" "$SYNTH_DIR" >&2
+  # Same order as 5e: release the claim FIRST. council_rm_synth_state proves
+  # ownership with the directory's .token, and a rm -rf that fails partway can
+  # delete .token and still leave the directory, after which the state file
+  # could no longer be authenticated and would block the next /council for up to
+  # a day. So the state file is unlinked while .token is intact, and only then is
+  # the directory removed. An unremovable directory is reported with the exact
+  # manual cleanup command; it no longer blocks a new run, and the 5a sweep only
+  # retries it once it is over 24 hours old and a later /council reaches 5a.
   if [ "$SYNTH_STATE_CLAIMED" = 1 ]; then
     council_rm_synth_state "$SYNTH_DIR" "$SYNTH_STATE"
   fi
+  council_rm_synth_dir "$SYNTH_DIR" \
+    || printf '[council] Warning: could not remove %s; remove it by hand: chmod -R u+rwx %s && rm -rf %s\n' "$SYNTH_DIR" "$SYNTH_DIR" "$SYNTH_DIR" >&2
   exit 1
 }
 # A missed CLAUDE_FENCED_FILE substitution must fail loudly here, as it does
@@ -2053,8 +2056,9 @@ hours, after the whole reviewer fan-out has been paid for.
 #### 5e — Assemble and de-anonymize
 
 Only now print the label map. Nothing is substituted: the block loads the
-staging directory and token from 5a's state file, then removes the staging
-directory and that state file, the file only if it is still this run's claim:
+staging directory and token from 5a's state file, then releases the claim
+(unlinks that state file, only if it is still this run's claim) and only then
+removes the staging directory:
 
 ```bash
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -2137,19 +2141,23 @@ council_rm_synth_state() {
     return 1
   }
 }
-# The state file goes even when the directory cannot: nothing reads it to find
-# the directory, and a surviving state file would make the next 5a refuse while
-# that directory is under a day old. An unremovable directory is reported with
-# the exact manual cleanup command; the 5a sweep only retries it once it is over
-# 24 hours old and a later /council reaches 5a. The state file passed the
-# regular-file, ownership and token checks above, and the function re-checks
-# them at unlink time, so only THIS run's claim is removed.
-council_rm_synth_dir "$SYNTH_DIR" \
-  || printf '[council] Warning: could not remove %s; remove it by hand: chmod -R u+rwx %s && rm -rf %s\n' "$SYNTH_DIR" "$SYNTH_DIR" "$SYNTH_DIR" >&2
+# Release the claim FIRST, then remove the directory. The state function proves
+# ownership with the directory's .token; a rm -rf that fails partway can delete
+# .token and still leave the directory, after which the file could no longer be
+# authenticated and would block the next /council for up to a day. Unlinking it
+# while .token is intact means an unremovable directory never blocks a new run:
+# it is reported with the exact manual cleanup command, and the 5a sweep only
+# retries it once it is over 24 hours old and a later /council reaches 5a. The
+# state file passed the regular-file, ownership and token checks above, and the
+# function re-checks them at unlink time, so only THIS run's claim is removed; a
+# file that fails them is left in place with a Note, and the directory (proven
+# this run's above) is still removed.
 # The label map is already printed, so a leftover state file only warns: exit 0.
 if council_rm_synth_state "$SYNTH_DIR" "$SYNTH_STATE"; then
   printf '[council] Note: released this run'\''s synthesis state claim\n' >&2
 fi
+council_rm_synth_dir "$SYNTH_DIR" \
+  || printf '[council] Warning: could not remove %s; remove it by hand: chmod -R u+rwx %s && rm -rf %s\n' "$SYNTH_DIR" "$SYNTH_DIR" "$SYNTH_DIR" >&2
 exit 0
 ```
 
@@ -2168,7 +2176,10 @@ Steps 7, 8 and 9 finds it missing (success) or another run's (left alone).
 The warning means the directory could not be removed even after restoring
 owner permissions; it names the `chmod -R u+rwx <dir> && rm -rf <dir>` command
 to run by hand, and the next 5a sweep retries it only once the directory is
-over 24 hours old.
+over 24 hours old. The claim is released before the removal is attempted (the
+state function authenticates with the directory's `.token`, which a partly
+failed `rm -rf` can delete), so a directory left behind never blocks a new
+`/council`.
 
 Replace each `S<n>` with that reviewer's display name (`Claude`, `Codex`,
 `Gemini`, `OpenCode`) in the attribution positions of the Agreement and
@@ -3358,7 +3369,7 @@ This is the final output of the command. Exit 0.
 | Label randomization fails later anyway (`od` or `sort` fails in 5b) | Step 5b exits 1 with `[council] Error:`; no fixed-order fallback; run the Step 8 Cancel cleanup and stop |
 | Staging state file missing, symlinked, foreign or garbled in 5b/5d/5e, or its directory has no `.token` matching the state file's token | `[council] Error: ... synthesis state file ... ` or `... not the one Step 5a minted for this run`; exit 1; nothing is written or deleted. Directory and token come only from `.git/council-synth.state`, never from model-relayed text |
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; run the Step 8 Cancel cleanup (so the next 5a is not refused by the leftover state file), then stop and re-run `/council` |
-| 5e exits non-zero (state file, directory, label map or token unusable) | No label map is printed; run the Step 8 Cancel cleanup (with `SYNTH_OWN_DIR` set to the path 5a printed), then stop. The block unlinks the state file only if it is still this run's claim: a file that is missing, symlinked, foreign, another run's live claim (for example a paused run whose stale state another `/council` reclaimed) or token-mismatched is left in place with a `Note:`. After a successful 5e, `Note: released this run's synthesis state claim` means this run no longer owns the file, so the Step 7, 8 and 9 cleanups find it missing or another run's and leave it. A `Warning:` that the staging directory could not be removed still exits 0: the map was printed. 5e already tried `chmod -R u+rwx` and a second `rm -rf`, so the warning names the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command to run by hand; the 5a sweep applies the same chmod-then-remove, but only once the directory is over 24 hours old and a later `/council` reaches 5a |
+| 5e exits non-zero (state file, directory, label map or token unusable) | No label map is printed; run the Step 8 Cancel cleanup (with `SYNTH_OWN_DIR` set to the path 5a printed), then stop. The block unlinks the state file only if it is still this run's claim: a file that is missing, symlinked, foreign, another run's live claim (for example a paused run whose stale state another `/council` reclaimed) or token-mismatched is left in place with a `Note:`. After a successful 5e, `Note: released this run's synthesis state claim` means this run no longer owns the file, so the Step 7, 8 and 9 cleanups find it missing or another run's and leave it. 5e releases the claim (unlinks the state file) BEFORE it removes the directory, so a `rm -rf` that fails partway after deleting `.token` cannot strand the state file: the file is already gone and a new `/council` is not blocked. A `Warning:` that the staging directory could not be removed still exits 0: the map was printed. 5e already tried `chmod -R u+rwx` and a second `rm -rf`, so the warning names the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command to run by hand; the 5a sweep applies the same chmod-then-remove, but only once the directory is over 24 hours old and a later `/council` reaches 5a |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind. 24 hours is the sweep's eligibility threshold, not a maximum retention: the text stays until a later `/council` invocation reaches 5a after the directory is over 24h old, or until you remove it |
 | Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 24 hours old (`STALE_MINUTES=1440`, the eligibility threshold for reclamation, which happens only when a later `/council` reaches 5a); before that, 5a exits 1 with `another council synthesis is in progress in this checkout` — wait, or remove the file by hand. After any 5a failure run the Step 8 Cancel block with `SYNTH_STATE_CLAIMED=0`: this run claimed nothing, so the block leaves the state path alone (another run's file, a concurrent winner's claim, or the symlink or foreign entry 5a refused) and prints a `Note:` naming it. Only a run whose 5a printed `COUNCIL_SYNTH_DIR` passes `SYNTH_STATE_CLAIMED=1` and `SYNTH_OWN_DIR` set to that path, and only then does the block unlink the state file, and only when the file is a regular non-symlink file of this user whose first line equals `SYNTH_OWN_DIR` (and whose token matches while that directory exists); otherwise it prints a `Note:` and leaves it. A stale file the next 5a reclaims is announced with `[council] Note: reclaimed a stale synthesis state file` |
 | Bash < 4.3 | Pre-flight error; exit 1 |

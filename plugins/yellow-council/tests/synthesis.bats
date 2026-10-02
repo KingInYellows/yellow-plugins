@@ -1566,3 +1566,160 @@ EOF2
   done
   rm -rf "$REPO"
 }
+
+# --- Release the claim before removing the directory ------------------------
+#
+# council_rm_synth_state authenticates with the directory's .token. A rm -rf that
+# deletes .token and then fails leaves a directory the function can no longer
+# authenticate, so 5e and council_synth_abort unlink the state file FIRST.
+
+# write_rm_stub <stub> <mode> <dir> <state> <log> — a sourced `rm` function. It
+# logs whether <state> still exists when `rm -rf -- <dir>` runs. mode "partial"
+# then deletes <dir>/.token and fails (the directory survives, token gone); mode
+# "record" removes the directory for real. Every other rm call passes through.
+write_rm_stub() {
+  cat >| "$1" <<EOF
+rm() {
+  if [ "\$1" = -rf ] && [ "\$2" = -- ] && [ "\$3" = "$3" ]; then
+    if [ -e "$4" ]; then echo present >> "$5"; else echo absent >> "$5"; fi
+    if [ "$2" = partial ]; then
+      command rm -f -- "$3/.token"
+      return 1
+    fi
+  fi
+  command rm "\$@"
+}
+EOF
+}
+
+# assert_next_5a_claims <5a script> — a following /council reaches 5a and claims
+# the state path (the leftover directory must not block it).
+assert_next_5a_claims() {
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$1'"
+  [ "$status" -eq 0 ] || { echo "next 5a: $stderr"; return 1; }
+  LIVE=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  [ -n "$LIVE" ] && [ "$LIVE" != "$SD" ]
+  [ "$(sed -n 1p "$REPO/.git/council-synth.state")" = "$LIVE" ]
+}
+
+@test "5e releases the claim before removing the directory, and a partly failed removal leaves the file released" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" st log="${BATS_TEST_TMPDIR}/rm.log" profile
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  for profile in $PROFILES; do
+    setup_council_run
+    st="$REPO/.git/council-synth.state"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
+
+    # Normal path: the directory is removed while the state file is already gone.
+    : >| "$log"
+    write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" record "$SD" "$st" "$log"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
+    [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
+    [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
+    [ "$(cat "$log")" = absent ] || { echo "$profile: state file still present at rm -rf: $(cat "$log")"; return 1; }
+    [ ! -e "$SD" ]
+    [ ! -e "$st" ]
+
+    # Partial removal: .token is deleted, then rm -rf fails. The state file is
+    # already released, so the surviving directory blocks nothing.
+    rm -rf "$REPO"
+    setup_council_run
+    st="$REPO/.git/council-synth.state"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
+    : >| "$log"
+    write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" partial "$SD" "$st" "$log"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
+    [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
+    [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
+    [[ "$stderr" == *"released this run's synthesis state claim"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$stderr" == *"could not remove $SD; remove it by hand: chmod -R u+rwx $SD && rm -rf $SD"* ]] || { echo "$profile: $stderr"; return 1; }
+    [[ "$stderr" != *"leaving"* ]] || { echo "$profile: $stderr"; return 1; }
+    [ "$(head -n 1 "$log")" = absent ]
+    [ ! -e "$st" ]
+    [ -d "$SD" ]
+    [ ! -e "$SD/.token" ]
+    assert_next_5a_claims "$s5a"
+    rm -rf "$LIVE" "$REPO"
+    LIVE=""
+    chmod -R u+rwx "$SD" 2>/dev/null; rm -rf "$SD"
+    SD=""
+  done
+}
+
+@test "5b abort releases the claim before removing the directory, and a partly failed removal leaves the file released" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5b="${BATS_TEST_TMPDIR}/5b.sh" st log="${BATS_TEST_TMPDIR}/rm.log"
+  local TOKEN=0123456789abcdef0123456789abcdef
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  local mode
+  for mode in record partial; do
+    setup_council_run
+    st="$REPO/.git/council-synth.state"
+    SD=$(mktemp -d /tmp/council-synth-XXXXXX)
+    printf '%s\n' "$TOKEN" >| "$SD/.token"
+    write_synth_state "$SD" "$TOKEN"
+    : >| "$log"
+    write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" "$mode" "$SD" "$st" "$log"
+    # CLAUDE_FENCED_FILE left unsubstituted: council_synth_abort runs.
+    run_in bash "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5b'"
+    [ "$status" -ne 0 ]
+    [ "$(head -n 1 "$log")" = absent ] || { echo "$mode: state file still present at rm -rf"; return 1; }
+    [ ! -e "$st" ]
+    if [ "$mode" = record ]; then
+      [ ! -e "$SD" ]
+    else
+      [[ "$stderr" == *"could not remove $SD; remove it by hand: chmod -R u+rwx $SD && rm -rf $SD"* ]] || { echo "$stderr"; return 1; }
+      [ -d "$SD" ]
+      [ ! -e "$SD/.token" ]
+      assert_next_5a_claims "$s5a"
+      rm -rf "$LIVE"
+      LIVE=""
+      chmod -R u+rwx "$SD" 2>/dev/null; rm -rf "$SD"
+    fi
+    SD=""
+    rm -rf "$REPO"
+  done
+}
+
+@test "5e still leaves a state file that fails authentication at unlink time, though the directory is still removed" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh" st head_stub="${BATS_TEST_TMPDIR}/head-stub.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  setup_council_run
+  st="$REPO/.git/council-synth.state"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ] || { echo "5a: $stderr"; return 1; }
+  SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
+  # 5e passes its own token proof (it reads labels.txt right after it), then the
+  # directory's .token reads back as something else when council_rm_synth_state
+  # compares it: the file fails authentication at unlink time and stays.
+  cat >| "$head_stub" <<EOF
+head() {
+  case "\$*" in
+    *"$SD/labels.txt") : >| "${BATS_TEST_TMPDIR}/flipped" ;;
+    *"$SD/.token") if [ -e "${BATS_TEST_TMPDIR}/flipped" ]; then echo ffffffffffffffffffffffffffffffff; return 0; fi ;;
+  esac
+  command head "\$@"
+}
+EOF
+  rm -f "${BATS_TEST_TMPDIR}/flipped"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$head_stub' && . '$s5e'"
+  [ "$status" -eq 0 ] || { echo "5e: $stderr"; return 1; }
+  [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
+  [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
+  [[ "$stderr" != *"released this run's synthesis state claim"* ]]
+  [ -f "$st" ]
+  [ "$(sed -n 1p "$st")" = "$SD" ]
+  # The directory this run's token proof covered is still removed.
+  [ ! -e "$SD" ]
+  rm -rf "$REPO"
+  SD=""
+}

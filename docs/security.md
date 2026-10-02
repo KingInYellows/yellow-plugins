@@ -556,10 +556,15 @@ trust boundary from the pack and fenced-output files above:
   stale check and its `ln`, so two syntheses can proceed in one checkout. The
   window is milliseconds and is left open because `sh` has no atomic
   compare-and-remove.
-- **Cleanup and retention**: 5e and `council_synth_abort` remove the directory
-  and the state file; the state file goes even when the directory cannot be
-  removed, because nothing reads it to find the directory and a surviving one
-  would block the next run. When `rm -rf` fails (a non-writable directory),
+- **Cleanup and retention**: 5e and `council_synth_abort` release the claim
+  first (unlink the state file) and only then remove the directory. The state
+  file is authenticated with the directory's `.token`, and a `rm -rf` that fails
+  partway can delete `.token` yet leave the directory, after which the file
+  could no longer be authenticated and would block the next run for up to a
+  day; so the file goes while `.token` is intact, and a directory that cannot be
+  removed never blocks a new run. A file that fails authentication is still
+  never unlinked, and a symlink is never followed. When `rm -rf` fails (a
+  non-writable directory),
   they run `chmod -R u+rwx` on the directory and retry once, only for a real
   directory the user owns under `/tmp/council-synth-*`; if it still cannot be
   removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command
