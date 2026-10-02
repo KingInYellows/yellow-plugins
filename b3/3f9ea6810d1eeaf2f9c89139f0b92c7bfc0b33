@@ -1,0 +1,24 @@
+plugins/yellow-review/tests/mocks/gh
+  s_7a82748dd606d9::t_97b4e51c7fbfce 156-157,159-162
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_7a82748dd606d9::t_bc2990f96fafd1 396-404
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_7a82748dd606d9::t_4db7a3a6f55a83 242-243
+  s_7a82748dd606d9::t_e3f0dc95de094a 250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b33f9ea6810d1eeaf2f9c89139f0b92c7bfc0b33",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
