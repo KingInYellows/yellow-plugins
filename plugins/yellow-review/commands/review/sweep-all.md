@@ -250,13 +250,15 @@ For each iteration:
    would carry these edits onto the next branch. Also skip Step 6 (print
    `[review:sweep-all] Skipping /flow:compound — working tree not clean.`)
    whenever the tree is still dirty at this point, so compounding never
-   runs over unresolved edits. The command exits `1` after the summary.
+   runs over unresolved edits. Record `pending-exit-1` (this stop forces the
+   final exit; see Step 6). The command exits `1` after the summary.
 5. **Rate-limit stop** — only after item 4: if this PR's effective
    `ratelimited` state (item 3: `ratelimited=1` on a valid final contract
    line, else the documented whole-line marker fallback) is `1`, add `rate limited` to its `Notes`, mark every
    remaining PR `skipped — not attempted (rate limit)`, and go to
    `### Step 5: End-of-loop summary table`: the next sweep would hit the same
-   GitHub limit. The command exits `1` after the summary.
+   GitHub limit. Record `pending-exit-1` (this stop forces the final exit; see
+   Step 6). The command exits `1` after the summary.
 6. **Continue** to the next PR otherwise. Unless item 4 or 5 stopped the
    loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
@@ -340,8 +342,15 @@ Otherwise, with `attempted_count >= 1`:
    [review:sweep-all] Warning: /flow:compound failed; learnings not captured. (Run /flow:compound manually if desired.)
    ```
 
-   Then continue — do NOT fail the command. sweep-all succeeded; only
-   the optional compounding step failed.
+   Then continue — do NOT fail the command because of compounding. When
+   no early stop occurred (`pending-exit-1` unset), sweep-all succeeded;
+   only the optional compounding step failed.
+
+**Final exit:** after Step 6 finishes, skips, or warns, read
+`pending-exit-1`. If Step 4 item 4 or 5 set it, the command exits `1`
+regardless of Step 6's outcome: a clean compound pass, a skip, or a compound
+warning never turns an early stop into success, and the "sweep-all
+succeeded" wording above does not apply. Otherwise exit `0`.
 
 ## Error Handling
 
@@ -363,13 +372,14 @@ Otherwise, with `attempted_count >= 1`:
   dirty, prints the summary, and exits `1`.
 - **Rate-limited PR** (Step 4 item 5): the loop stops after that PR, marks
   every remaining PR `skipped — not attempted (rate limit)`, prints the
-  summary, and exits `1`. Step 6 still runs when the tree is clean.
+  summary, and exits `1`. Step 6 still runs when the tree is clean, but the
+  pending exit `1` is kept after it.
 - **Every PR skipped for per-PR reasons** (no Step 4 stop): summary table is
   still printed; compound is skipped (per Step 6's guard); exit 0. sweep-all
   itself succeeded — the batch completed without hitting a stop condition,
   and the skipped PRs are counted separately from attempted ones.
 - **`/flow:compound` failure**: warning is printed; the exit code is
-  unchanged (`0` unless a stop above set `1`). Compounding is best-effort, not load-bearing.
+  unchanged (`0` unless a stop above set `pending-exit-1`, which stays `1`). Compounding is best-effort, not load-bearing.
 - **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at
   Step 1 does NOT serialize concurrent sweeps — `/review:pr` and
   `/review:resolve` clean the working tree between PRs (via a commit +
