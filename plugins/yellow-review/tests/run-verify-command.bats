@@ -1494,3 +1494,85 @@ cap_boundary_command() {
   [ "$(mode "$log")" = 600 ]
   [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
 }
+
+# --- rollback runs with git hooks disabled ---
+# A resolver can plant or edit a hook that git status and rp_tree_changes do not
+# list (ignored, or under .git). A file checkout runs post-checkout and an index
+# write runs post-index-change, so the revert must not run any hook.
+
+plant_marker_hooks() {
+  mkdir -p "$1"
+  for h in post-checkout post-index-change post-merge reference-transaction; do
+    printf '#!/bin/sh\necho %s >> "%s/hook-ran.log"\n' "$h" "$BATS_TEST_TMPDIR" >| "$1/$h"
+    chmod +x "$1/$h"
+  done
+}
+
+# The planted hooks fire for a plain checkout, so a silent revert means hooks
+# were off and not that the fixture is broken.
+hooks_fire_control() {
+  rm -f "$BATS_TEST_TMPDIR/hook-ran.log"
+  git checkout -q HEAD -- package.json
+  [ -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+  rm -f "$BATS_TEST_TMPDIR/hook-ran.log"
+}
+
+@test "--revert-dirty runs no hook from .git/hooks and still restores the tracked file" {
+  plant_marker_hooks .git/hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-only runs no hook from .git/hooks and still restores the tracked file" {
+  plant_marker_hooks .git/hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-dirty runs no hook from an ignored in-repo core.hooksPath and still restores the file" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-only runs no hook from an ignored in-repo core.hooksPath and still restores the file" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "a failing verify run reverts without running an ignored in-repo hook" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}

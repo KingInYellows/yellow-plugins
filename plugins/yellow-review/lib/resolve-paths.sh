@@ -11,6 +11,13 @@
 # command never inherit it.
 lgit() { git --literal-pathspecs "$@"; }
 
+# lgit with every git hook disabled (core.hooksPath=/dev/null overrides
+# .git/hooks and any configured hooks directory). For the rollback paths: a
+# resolver can plant or edit an ignored hook that rp_tree_changes does not
+# list, and a file checkout, an index write or a status refresh would run it
+# (post-checkout, post-index-change).
+lgit_nohooks() { git -c core.hooksPath=/dev/null --literal-pathspecs "$@"; }
+
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 # rp_canonical <path>: repo-relative with no empty, `.` or `..` segment, no
@@ -69,9 +76,11 @@ rp_denied() {
 # (its target is judged), one inside is printed before it is followed. Prints
 # nothing for nodes outside the repository or when the variable is unset;
 # stops at a path that loops or exceeds the hop limit. Relative values
-# resolve from the current directory, as `node "$RUNTIME"` does.
+# resolve from the current directory, as `node "$RUNTIME"` does. With the
+# argument `raw` the paths keep their case (for asking git about them).
 rp_runtime_override_rels() {
-    local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top cur rest c next t hops=0
+    local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top cur rest c next t hops=0 raw=0
+    [ "${1:-}" = raw ] && raw=1
     [ -n "$p" ] || return 0
     top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 0
@@ -89,7 +98,13 @@ rp_runtime_override_rels() {
         esac
         next="${cur%/}/$c"
         case "$next" in
-            "$top"/*) printf '%s\n' "$(rp_lower "${next#"$top"/}")" ;;
+            "$top"/*)
+                if [ "$raw" = 1 ]; then
+                    printf '%s\n' "${next#"$top"/}"
+                else
+                    printf '%s\n' "$(rp_lower "${next#"$top"/}")"
+                fi
+                ;;
         esac
         if [ -L "$next" ]; then
             hops=$((hops + 1))
@@ -103,6 +118,46 @@ rp_runtime_override_rels() {
             cur="$next"
         fi
     done
+}
+
+# rp_runtime_override_untrusted: exit 0 and print the repository-relative path
+# (never contents) of the first file or symlink on the
+# YELLOW_REVIEW_GITHUB_STACK_RUNTIME path that lies inside the repository and
+# is not tracked, not clean against HEAD, or is hidden from status
+# (assume-unchanged or skip-worktree). Exit 1 when every such node is tracked
+# and unmodified, or the variable is unset or names only nodes outside the
+# repository. Exit 2 when git cannot answer (treat as untrusted). rp_tree_changes
+# omits ignored files, so a resolver can rewrite an ignored override unseen;
+# this check reads the override itself. Directories are skipped: git tracks
+# files, and the final file is checked.
+rp_runtime_override_untrusted() {
+    local top rels rel st
+    [ -n "${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" ] || return 1
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 2
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 2
+    rels=$(rp_runtime_override_rels raw 2>/dev/null) || return 2
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        if [ -d "$top/$rel" ] && [ ! -L "$top/$rel" ]; then
+            continue
+        fi
+        # A tracked path lists as "H <name>" (cached); anything else (untracked,
+        # ignored, or flagged assume-unchanged/skip-worktree) is untrusted.
+        if ! st=$(lgit -C "$top" ls-files -v --error-unmatch -- "$rel" 2>/dev/null) \
+            || [ "${st:0:2}" != "H " ]; then
+            printf '%s\n' "$rel"
+            return 0
+        fi
+        # Exit 0 clean, 1 modified (staged or unstaged), other: unknown.
+        st=0
+        lgit -C "$top" diff --quiet --no-ext-diff HEAD -- "$rel" 2>/dev/null || st=$?
+        case "$st" in
+            0) ;;
+            1) printf '%s\n' "$rel"; return 0 ;;
+            *) printf '%s\n' "$rel"; return 2 ;;
+        esac
+    done <<<"$rels"
+    return 1
 }
 
 # rp_runner <path>: files a verify command, package manager or git hook

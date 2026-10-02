@@ -1338,3 +1338,162 @@ STUB
   [ "$(git rev-parse HEAD)" = "$base" ]
   ! grep -q '^node ' "$STUB_LOG"
 }
+
+# --- An in-repository runtime override must be tracked and unmodified ---
+# rp_tree_changes omits ignored files, so a resolver can rewrite an ignored
+# override unseen; the override itself is judged before it can run.
+
+node_calls() { grep -c '^node ' "$STUB_LOG" || true; }
+
+@test "an ignored in-repository runtime override is refused before committing, naming the path (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  printf 'tools/\n' >> .git/info/exclude
+  base=$(git rev-parse HEAD)
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"github-stack-runtime override 'tools/rt.js'"* ]]
+  [[ "$stderr" != *"// runtime"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "an ignored in-repository runtime override is refused whatever form its path takes" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  printf 'tools/\n' >> .git/info/exclude
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  for ov in "$(pwd -P)/tools/rt.js" ./tools/../tools/rt.js; do
+    export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$ov"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $ov" >&2; return 1; }
+    [[ "$stderr" == *"override 'tools/rt.js'"* ]]
+  done
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "an ignored in-repository symlink to an outside runtime is refused (exit 3)" {
+  printf '// runtime\n' >| "$BATS_TEST_TMPDIR/outside-rt.js"
+  ln -s "$BATS_TEST_TMPDIR/outside-rt.js" rt-link.js
+  printf 'rt-link.js\n' >> .git/info/exclude
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="rt-link.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"override 'rt-link.js'"* ]]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "an untracked in-repository runtime override is refused (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  base=$(git rev-parse HEAD)
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a listed untracked in-repository runtime override is refused by the override check (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run_crf --provider github --pr 7 --message "$MSG" -- tools/rt.js
+  [ "$status" -eq 3 ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a modified tracked in-repository runtime override is refused (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  printf '// edited\n' >> tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  run_crf --provider github --pr 7 --message "$MSG" -- tools/rt.js
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"github-stack-runtime override 'tools/rt.js'"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a staged edit to a tracked in-repository runtime override is refused (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  printf '// edited\n' >> tools/rt.js
+  git add tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a tracked override hidden from status by assume-unchanged is refused (exit 3)" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  printf '// edited\n' >> tools/rt.js
+  git update-index --assume-unchanged tools/rt.js
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"override 'tools/rt.js'"* ]]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a clean tracked in-repository runtime override is allowed" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  git add tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(node_calls)" = 1 ]
+}
+
+@test "a clean tracked override behind a tracked in-repository symlink is allowed" {
+  mkdir -p real-tools
+  printf '// runtime\n' >| real-tools/rt.js
+  ln -s real-tools tools
+  git add real-tools tools && git commit -q -m "feat: runtime" && git push -q origin feature 2>/dev/null
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(node_calls)" = 1 ]
+}
+
+@test "a runtime override outside the repository is not judged" {
+  printf '// runtime\n' >| "$BATS_TEST_TMPDIR/outside-rt.js"
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$BATS_TEST_TMPDIR/outside-rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(node_calls)" = 1 ]
+}
+
+@test "the default sibling runtime is not judged when no override is set" {
+  unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(node_calls)" = 1 ]
+}
+
+@test "the graphite provider ignores the override check" {
+  mkdir -p tools
+  printf '// runtime\n' >| tools/rt.js
+  printf 'tools/\n' >> .git/info/exclude
+  export YELLOW_REVIEW_GITHUB_STACK_RUNTIME="tools/rt.js"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
