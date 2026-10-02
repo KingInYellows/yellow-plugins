@@ -1,0 +1,28 @@
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_becc7011266565::t_281924419303c9 129,134,137,143-187
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_becc7011266565::t_f6f5019c221c75 5-6,10-13,30,45-53,67-78,83-86,89-91,147,149-153,160
+plugins/yellow-review/tests/run-verify-command.bats
+  s_becc7011266565::t_281924419303c9 26-27,68-69,118-153
+  s_becc7011266565::t_d56dd4ae630468 154
+plugins/yellow-review/tests/helpers/resolve-repo.bash
+  s_becc7011266565::t_281924419303c9 16
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_becc7011266565::t_987b6342151a5d 4-11,15-18,21-22,33,46-54,76-94,104-105,113-115,122,149,171-179,181,183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bc78b46ba4b9d204d584dba4aaeebca75f789035",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
