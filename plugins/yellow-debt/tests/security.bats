@@ -979,6 +979,14 @@ sha16_ref() {
   [ "$output" = "005" ]
 }
 
+@test "debt_next_todo_id ignores a directory named like a todo for the maximum" {
+  : > todos/debt/004-ready-high-a.md
+  mkdir -p todos/debt/999999-poison.md/child
+  run debt_next_todo_id
+  [ "$status" -eq 0 ]
+  [ "$output" = "005" ]
+}
+
 @test "debt_next_todo_id skips a number held by a dangling symlink" {
   : > todos/debt/004-ready-high-a.md
   ln -s missing.md todos/debt/005-ready-high-gone.md

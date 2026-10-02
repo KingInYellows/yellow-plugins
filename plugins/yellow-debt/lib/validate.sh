@@ -526,9 +526,9 @@ debt_pending_todos() {
 
 # Print the next free todo ids, one per line, zero-padded to three digits: COUNT
 # ids (default 1) above the highest leading number of any regular *.md under
-# todos/debt/, skipping a number a symlink holds (dangling or not: the resolver
-# sees it, so reusing the number would make the new todo ambiguous). A symlink
-# never raises the counter, so a planted `999999-…` link cannot exhaust the id
+# todos/debt/, skipping a number a symlink or directory holds (the resolver
+# sees it, so reusing the number would make the new todo ambiguous). Neither
+# ever raises the counter, so a planted `999999-…` link cannot exhaust the id
 # space. Ids are 1-6 digits everywhere else, so a larger one is ignored. Run
 # from the git root.
 # Usage: debt_next_todo_id [COUNT]
@@ -541,7 +541,7 @@ debt_next_todo_id() {
     [ -e "$f" ] || [ -L "$f" ] || continue
     base="${f##*/}"; id="${base%%-*}"
     [[ "$id" =~ ^[0-9]{1,6}$ ]] || continue
-    if [ -L "$f" ]; then held="$held$((10#$id)) "; continue; fi
+    if [ -L "$f" ] || [ ! -f "$f" ]; then held="$held$((10#$id)) "; continue; fi
     [ "$((10#$id))" -le "$max" ] || max=$((10#$id))
   done
   n=$max
