@@ -34,6 +34,8 @@ MAX_BODY_CHARS=1000
 MAX_WAIT_SECONDS=90
 GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
 case "$GH_TIMEOUT" in ''|*[!0-9]*) GH_TIMEOUT=30 ;; esac
+# timeout(1) treats 0 as "no limit"; fall back to the default instead.
+[ "$GH_TIMEOUT" -gt 0 ] 2>/dev/null || GH_TIMEOUT=30
 
 usage() {
     printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2

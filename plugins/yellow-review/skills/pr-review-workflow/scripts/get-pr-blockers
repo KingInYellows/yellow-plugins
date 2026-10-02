@@ -7,11 +7,14 @@
 #    "conversationResolution":"enforced|not_enforced|unknown",
 #    "lookupFailed":true|false}
 # Only reviews from users with write access are counted (writersOnly).
-# A failed lookup is signalled by changesRequested null together with
-# lookupFailed true (also when there are more than 100 reviewers) and by
-# conversationResolution "unknown". reviewDecision null alone is not a
-# failure: GitHub returns it when no review is required. Callers must treat
-# lookupFailed true as blocking-unknown, never as "no blockers".
+# A failed review lookup is signalled only by lookupFailed true, together
+# with changesRequested null (also when there are more than 100 reviewers).
+# Callers must use lookupFailed to detect it and treat true as
+# blocking-unknown, never as "no blockers". reviewDecision null alone is not
+# a failure: GitHub returns it when no review is required.
+# conversationResolution "unknown" is independent of lookupFailed: it means
+# the branch-protection or ruleset lookup was unreadable, and it can occur
+# while lookupFailed is false.
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
 # with unknown fields and a note on stderr.
 
@@ -81,17 +84,21 @@ BASE=""
 RESPONSE=""
 if RESPONSE=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
         -f query="$QUERY" 2>"$ERR_FILE") \
-    && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest | objects' 2>/dev/null); then
+    && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e 'if ((.errors // []) | length) > 0 then empty else .data.repository.pullRequest | objects end' 2>/dev/null); then
     # A page past the first 100 reviewers would undercount; report unknown.
     if [ "$(printf '%s' "$PR_JSON" | jq -r '.latestOpinionatedReviews.pageInfo.hasNextPage // false')" = true ]; then
         note 'more than 100 opinionated reviewers; changesRequested unknown'
     else
-        # A jq failure on a malformed payload leaves the fields unknown
-        # instead of aborting under set -e.
+        # A missing connection or a non-array nodes value is an error, not an
+        # empty list. A jq failure leaves the fields unknown instead of
+        # aborting under set -e.
         if CHANGES_REQUESTED=$(printf '%s' "$PR_JSON" | jq -c '
-          [ (.latestOpinionatedReviews.nodes // [])[]
+          if (.latestOpinionatedReviews.nodes | type) != "array"
+          then error("review nodes missing")
+          else [ .latestOpinionatedReviews.nodes[]
             | select(.state == "CHANGES_REQUESTED")
-            | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]' 2>/dev/null); then
+            | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]
+          end' 2>/dev/null); then
             LOOKUP_FAILED=false
         else
             CHANGES_REQUESTED=null

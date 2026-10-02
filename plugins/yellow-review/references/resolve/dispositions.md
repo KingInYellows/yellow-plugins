@@ -357,8 +357,14 @@ Replies and issue bodies end with:
   required wait over 90 s, exits 4. A bare 403 is not a rate limit: it exits
   3. `file-followup-issue` never waits or retries; a rate limit exits 4 at
   once.
+- `reply-pr-thread` also exits 4 when a `gh` call exceeds
+  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)`). It does not
+  retry, because the killed call may already have posted the reply. A re-run
+  skips through the idempotency pre-check if the reply landed.
 - After any exit 4, stop mutating. Every remaining thread is reported as
-  `not attempted (rate limit)` and counts as blocking.
+  `not attempted (rate limit)` and counts as blocking. For a timeout, the
+  current thread's reply may have posted: re-run `reply-pr-thread` for it
+  once, and treat a `skipped` result as posted.
 
 ## Script exit codes
 
@@ -367,15 +373,18 @@ network, unexpected response).
 
 | Script | 0 | 2 | 3 | 4 | 5 | 6 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reply-pr-thread` | replied or skipped | usage / body too long / credential or scan failure | not found or permission | rate limited | — | — |
+| `reply-pr-thread` | replied or skipped | usage / body too long / credential or scan failure | not found or permission | rate limited, or a `gh` call timed out (the reply may have posted) | — | — |
 | `resolve-pr-thread` (planned codes; currently 0 or 1 only) | resolved | usage | not found or permission | rate limited | — | — |
-| `file-followup-issue` | created or found | usage / credential or scan failure | — | rate limited (no retry) | — | — |
+| `file-followup-issue` | created or found | usage / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry) | — | — |
 | `commit-resolve-fixes` (planned) | `PUSHED` or `NOOP` | usage | staged mismatch or refused path | commit failed | submit failed | head not verified |
 | `run-verify-command` (planned) | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list | — | — | — | — |
 | `check-resolve-text` | clean | usage / credential or scan failure | — | — | — | — |
 
-`get-pr-blockers` exits 2 on usage errors and 0 otherwise; null or
-`unknown` fields mean the lookup failed.
+`get-pr-blockers` exits 2 on usage errors and 0 otherwise. Key a failed
+lookup on `lookupFailed: true` (with `changesRequested` null), not on any
+null field: `reviewDecision: null` alone is legitimate when the PR has no
+review requirement. `conversationResolution: "unknown"` is a separate,
+independent signal that enforcement could not be determined.
 
 ## Report and contract line
 

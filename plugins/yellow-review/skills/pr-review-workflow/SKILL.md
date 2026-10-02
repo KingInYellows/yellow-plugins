@@ -422,7 +422,8 @@ Located at `skills/pr-review-workflow/scripts/`:
 
 `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
 `check-resolve-text` are not yet invoked by `/review:resolve`; the contract
-is `references/resolve/dispositions.md`. All require `gh` and `jq`.
+is `references/resolve/dispositions.md`. The other five scripts require `gh`
+and `jq`; `check-resolve-text` needs only POSIX sh with awk.
 
 ## File Line Counts Script
 
