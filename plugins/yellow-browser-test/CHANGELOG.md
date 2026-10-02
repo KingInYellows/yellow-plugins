@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.9
+
+### Patch Changes
+
+- [`fac0932`](https://github.com/KingInYellows/yellow-plugins/commit/fac0932fd4ea079e9771af337b10d36d660aaed1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  fix(yellow-browser-test): `/browser-test:setup` now detects web apps beyond
+  `package.json`, using the same signals as `/setup:all` (Rails, Python
+  Django/Flask/FastAPI/Starlette/Sanic, Go, Rust, PaaS config, docker-compose
+  HTTP ports). Django, FastAPI, Rails, Go and Rust projects no longer see the
+  "no web framework detected" prompt, which also stops claiming those apps are
+  undetectable. The `app-discoverer` agent now inspects all four Compose
+  filenames (`compose.yaml`, `compose.yml`, `docker-compose.yaml`,
+  `docker-compose.yml`) to match.
+
 ## 1.1.8
 
 ### Patch Changes
