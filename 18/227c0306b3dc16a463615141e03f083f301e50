@@ -1,0 +1,67 @@
+docs/solutions/integration-issues/gh-wrapper-scripts-collapse-error-classes.md
+  s_7a82748dd606d9::t_4cd6c1ae006ddd 13-24,57-61,120-121,130-132,135-136,145-147,150-163
+plugins/yellow-core/commands/setup/all.md
+  s_7a82748dd606d9::t_ffd9e76618ab3f 299
+docs/solutions/code-quality/bats-negated-grep-mid-test-never-fails.md
+  s_7a82748dd606d9::t_f40df32b4ffa00 13-15,36-37,48-52
+plans/setup-command-bugs.md
+  s_7a82748dd606d9::t_8f67a74f91ae83 30-31,42,78-80
+plugins/yellow-research/commands/research/setup.md
+  s_7a82748dd606d9::t_799364b14e5f3e 156,229-231,328,431,537,698-710,762,764,781-783,792-793,814,836-838,903
+plugins/yellow-core/tests/web-app-signals.bats
+  s_7a82748dd606d9::t_b1a8230217b2c5 85-86,108,131,135
+plugins/yellow-council/tests/synthesis.bats
+  s_7a82748dd606d9::t_275f25f43bb70f 483-501,514,718-719,797,801,805-806,810,825,827,830-831,834,841,848-849,855-856,864,868,872,876-877,888,916,942,961-964,971,976,980,990-992,998,1006,1019,1184-1271
+plugins/yellow-council/CLAUDE.md
+  s_7a82748dd606d9::t_b746ca9c91bfff 88-92
+docs/solutions/integration-issues/plugin-add-enumeration-checklist-gaps.md
+  s_7a82748dd606d9::t_54c3d53a6ab1b9 29-35,40-49,70,72-74
+docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md
+  s_7a82748dd606d9::t_ff8edd6a188924 19-20,79-80
+docs/security.md
+  s_7a82748dd606d9::t_c8c57c042c5a26 523-530,533-543,549-564
+docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md
+  s_7a82748dd606d9::t_2ff5f53bd3a066 23-27,56-60,119-122,130-132
+plugins/yellow-browser-test/commands/browser-test/setup.md
+  s_7a82748dd606d9::t_4121d7a8487dd1 48-49,52,73,96,100-101,108-110,123-125
+docs/solutions/workflow/squash-commit-ancestry-verification-in-merge-queue.md
+  s_7a82748dd606d9::t_f2bfc56240f5e1 6,8,23-26
+docs/solutions/code-quality/fence-output-cap-and-untested-orchestration.md
+  s_7a82748dd606d9::t_21a098991b7a86 6-7,96-97
+.changeset/review-ledger-followups-merged-prs.md
+  s_7a82748dd606d9::t_f607cf349b44c3 1-27
+plugins/yellow-council/commands/council/council.md
+  s_7a82748dd606d9::t_a05d049423a64f 3018
+  s_7a82748dd606d9::t_236abb8a7feddf 2970-2974
+  s_7a82748dd606d9::t_192768dcfddefe 3082-3086
+  s_7a82748dd606d9::t_4b24499f70f435 1160,1200,1203-1206,1217,1220-1225,1247-1251,1648-1652,1864-1865,1975-1978,2029-2035,2038-2042,2222-2225,2313-2317,3009-3010,3136-3137,3139
+  s_7a82748dd606d9::t_c6b3f95e8d4309 2905
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_7a82748dd606d9::t_b51c4ac295d276 103,132-134,136-140,202-211,218-223,255-260,293-299
+docs/solutions/code-quality/solution-doc-citations-die-on-restack.md
+  s_7a82748dd606d9::t_1fc1762e099198 4,15-18,26-27,126-128,136-137,181-183
+docs/solutions/workflow/release-pr-token-bypass-only-for-new-version-prs.md
+  s_7a82748dd606d9::t_9089f2e36d08d8 8,21
+docs/solutions/logic-errors/resolve-stack-state-stale-after-fix-commit-push.md
+  s_7a82748dd606d9::t_94e01461670bda 13-27
+docs/solutions/integration-issues/ruvector-embedder-mismatch-if-ruvector-intelligenc.md
+  s_7a82748dd606d9::t_a2600eed009acd 19-20,29,31
+docs/solutions/code-quality/when-testing-signal-handling-in-bats-with-timeout.md
+  s_7a82748dd606d9::t_8a37225d314203 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "18227c0306b3dc16a463615141e03f083f301e50",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
