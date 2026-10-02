@@ -102,21 +102,34 @@ time.
   heredoc (`<<'__EOF_COUNCIL_SYNTHESIS__'`). Shell 03 only escapes that
   delimiter in 5b input and in 5e's quoting rule; a synthesizer-authored
   (paraphrased) line could still reproduce it and run the rest as shell.
-  Stage `SYNTHESIS_MD` through `Write` into a fresh `mktemp -d` created and
-  owned by Step 7, and `cat` it from there, like 5a does for reviewer text.
+  Stage `SYNTHESIS_MD` through `Write` into a fresh
+  `mktemp -d /tmp/council-synth-XXXXXX` created and owned by Step 7, and `cat`
+  it from there, like 5a does for reviewer text. Keep the `council-synth-`
+  prefix so the existing 5a stale sweep reclaims an orphan.
   Do not reuse the 5e staging dir: 5e runs `rm -rf -- "$SYNTH_DIR"` right
   after printing the label map, before Step 7, so nothing is left to reuse
   (unless 5e is deliberately changed to stop deleting it, which would move
   cleanup ownership and is out of scope here). Each Bash block is a fresh
   subprocess, so a `trap` set right after `mktemp -d` would fire when that
   block exits, before the separate `Write` call can stage the file. Use a
-  cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap
-  and prints the path; (2) `Write` stages `SYNTHESIS_MD` there; (3) a later
-  block installs the `trap` (removing the dir on every exit of that block),
-  then `cat`s the file and runs the rest of Step 7. If `Write` fails, or the
-  run is cancelled or aborts between (1) and (3), the orchestrator runs an
-  explicit `rm -rf -- "<dir>"` block before stopping. The synthesized
-  findings never persist in a temp dir.
+  cross-call lifecycle instead: (1) one block runs `mktemp -d` with no trap,
+  writes a random `.token` file into the dir as 5a does, and prints the path;
+  (2) `Write` stages `SYNTHESIS_MD` there; (3) a later block installs the
+  `trap` (removing the dir on every exit of that block), then `cat`s the file
+  and runs the rest of Step 7. The path crosses from one Bash process through
+  model-controlled substitution into `Write`, `cat` and `rm -rf`, so every
+  block that reads, writes or deletes it first re-validates it: the path
+  matches `/tmp/council-synth-*` with no `..` and no further `/`, is not a
+  symlink, is owned by the current user (`-O`), and its `.token` matches the
+  token from (1). Refuse and stop on any mismatch; never delete on name alone.
+  Cleanup is best effort across calls. If `Write` fails, the block (3) trap and
+  the validated `rm -rf -- "<dir>"` run when the orchestrator is still running.
+  If the run is cancelled or aborts between (1) and (3), the orchestrator
+  cannot run any cleanup, so the staged findings can remain in the 0700 dir
+  until the next run's 5a sweep removes it once it is older than 24 hours.
+  Document that window (in the Step 7 prose and the council.md failure-mode
+  table next to the 5a-5e row); do not promise cleanup after cancellation
+  unless a cancellation-surviving mechanism is added.
 - **F3 — unclosed code fence.** In `council_normalize_text`, an opening fence
   with no closing fence passes every remaining line of that reviewer's text
   through unnormalized (identity and style signal survive). Buffer fenced
@@ -148,8 +161,10 @@ time.
 
 0. **Synthesis library location (F1)** — make and record the decision before
    any Step 5 code is added; if moving, do the move as its own step and satisfy
-   F1's shell-compat requirements, plus `pnpm check:shell-parse` (parses the
-   edited Step 5 fenced wrappers under bash and zsh) passing.
+   F1's shell-compat requirements. Whether the library moves or stays inline,
+   Steps 1 and 7 edit fenced Bash in `council.md`, so `pnpm validate:shell-compat`
+   and `pnpm check:shell-parse` (parses the edited fenced blocks under bash and
+   zsh) must pass for this shell in both cases.
 1. **Normalizer fixes (F3, F4)** — implement F3 and F4 in
    `council_normalize_text` per "Carried follow-ups", with their golden cases.
 2. **Verification helper** — Tier 1 mode-dependent exact match with the
@@ -173,7 +188,8 @@ time.
    component counts and README/CHANGELOG, manual e2e scenarios (quota ETA,
    lineage warning, tie presentation, single-pass bypass, rubric output,
    verification hit/miss paths), verify every shipped PR carried its
-   changeset, and run the full validation suite end-to-end.
+   changeset, and run the full validation suite end-to-end, including
+   `pnpm validate:shell-compat` and `pnpm check:shell-parse`.
 
 ## Open Questions
 
