@@ -179,6 +179,13 @@ successfully — there is nothing to walk.
 
 ### Step 3: Walk the stack
 
+Before the first iteration, Read
+`${CLAUDE_PLUGIN_ROOT}/references/resolve/dispositions.md` (the "Reading
+`ratelimited` (callers)" section): it defines the anchored contract line item 2
+reads, its allowed `push` and `verify` values, and the `no contract` rule. If
+the Read fails, stop and report the path. Never parse a final line that fails
+the anchored form defined there.
+
 For each PR in the base-to-tip list, in order, do the following, using the
 provider resolved in Step 0. **No pauses anywhere in this loop** — log
 failures and continue.
