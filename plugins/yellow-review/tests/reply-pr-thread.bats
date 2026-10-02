@@ -458,3 +458,48 @@ path_without_timeout() {
   printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
   [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }
+
+# --- Oversized numeric values (past the shell's integer range) ---
+
+@test "an oversized YELLOW_REVIEW_RATE_LIMIT_WAIT falls back to 60 s and never sleeps the huge value" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=99999999999999999999 run --separate-stderr "$SCRIPT" PRRT_reply_envhuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$SLEEP_LOG")" = 60 ]
+}
+
+@test "a Retry-After past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_rahuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$CALLS")" = 1 ]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "an x-ratelimit-reset past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_resethuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$CALLS")" = 1 ]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "an oversized YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=99999999999999999999 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a 5-digit YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=10000 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}

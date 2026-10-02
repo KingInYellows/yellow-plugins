@@ -328,3 +328,49 @@ stub_sleep() {
   printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
   [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
 }
+
+# --- Oversized numeric values (past the shell's integer range) ---
+
+stub_timeout_logging() {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >| "%s/timeout_arg"\nexit 124\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
+}
+
+@test "an oversized YELLOW_REVIEW_RATE_LIMIT_WAIT falls back to 60 s and never sleeps the huge value" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=99999999999999999999 run --separate-stderr "$SCRIPT" "PRRT_ratelimited"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  grep -qx 60 "$SLEEP_LOG"
+  ! grep -q 99999999999999999999 "$SLEEP_LOG"
+}
+
+@test "a Retry-After past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" "PRRT_rl_huge"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_huge")" = 1 ]
+  [ ! -s "$SLEEP_LOG" ]
+}
+
+@test "an x-ratelimit-reset past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" "PRRT_rl_resethuge"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_PRRT_rl_resethuge")" = 1 ]
+  [ ! -s "$SLEEP_LOG" ]
+}
+
+@test "an oversized YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=99999999999999999999 run --separate-stderr "$SCRIPT" "PRRT_ok"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}

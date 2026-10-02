@@ -554,3 +554,12 @@ path_without_timeout() {
   [ "$status" -eq 4 ]
   printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
 }
+
+@test "an oversized YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=list
+  YELLOW_REVIEW_GH_TIMEOUT=99999999999999999999 run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"timed out after 30 s"* ]]
+  [[ "$stderr" != *"integer expression"* ]]
+}
