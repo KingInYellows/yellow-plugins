@@ -588,6 +588,17 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'blocking' "$SWEEP_ALL"
 }
 
+@test "sweep: the Resolve: contract line is re-emitted as the final line of output" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP")
+  flat=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Finish with the contract line as the very last line of output' <<<"$flat"
+  grep -qF 'unindented' <<<"$flat"
+  grep -qF 'nothing printed after it' <<<"$flat"
+  grep -qF 'output unavailable' <<<"$flat"
+  # sweep-all reads only the last line of the sweep output
+  tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ' | grep -qF "the LAST line of the captured output"
+}
+
 @test "Resolve: ratelimited rule is defined once in dispositions.md and the callers point to it" {
   for marker in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'only rate-limit state'; do
     tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ' | grep -qF "$marker" || { echo "missing $marker"; false; }
