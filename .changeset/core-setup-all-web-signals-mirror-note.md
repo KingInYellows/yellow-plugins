@@ -8,4 +8,5 @@ apps. The Cargo signal now matches `[dependencies.<crate>]` tables, renamed
 lines. The Compose signal now checks `compose.yaml`, `compose.yml`,
 `docker-compose.yaml` and `docker-compose.yml` for HTTP port mappings. The block
 also notes that `/browser-test:setup` Step 2.5 mirrors it, so a signal change
-updates both.
+updates both. A new `tests/web-app-signals.bats` runs both copies against
+positive and negative fixtures under bash and zsh and fails when they disagree.

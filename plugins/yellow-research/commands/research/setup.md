@@ -337,11 +337,17 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  if has_userconfig yellow-research exa_api_key; then
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research exa_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run an exa tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=exa\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 **Tavily:**
@@ -434,11 +440,17 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  if has_userconfig yellow-research tavily_api_key; then
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research tavily_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a tavily tool call to validate the userConfig key."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status)"
   fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=tavily\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 **Perplexity:**
@@ -534,16 +546,23 @@ else
   fi
   # The probe tests the shell key; with both set, the MCP uses the userConfig one,
   # so report the probe result without claiming the MCP's key was tested.
-  if has_userconfig yellow-research perplexity_api_key; then
+  if ! command -v jq >/dev/null 2>&1; then
+    # Without jq has_userconfig is a substring match that can false-positive, so
+    # keep the shell probe result and say the userConfig claim is unconfirmed.
+    provider_detail="$provider_detail (jq is not installed, so whether a userConfig key is also set was not checked)"
+  elif has_userconfig yellow-research perplexity_api_key; then
     provider_detail="Shell key probe: $provider_status ($provider_detail). A userConfig key is also set and takes precedence in the MCP; it was not tested here. If the shell key was rejected, update or unset it in your shell rc. Run a perplexity tool call to validate the userConfig key. Perplexity counts as active only once Step 3.5 sees its MCP tools."
     provider_status="PRESENT (userConfig takes precedence — shell key probe: $provider_status; pending MCP-visibility confirmation)"
   fi
 fi
+# Variables do not cross Bash blocks, so print the result for Steps 4 and 5.
+printf 'provider=perplexity\nprovider_status=%s\nprovider_detail=%s\n' "$provider_status" "$provider_detail"
 ```
 
 Each provider block above runs its own inline decision tree (in the same
 subprocess as the curl probe) so `$curl_exit` and `$http_status` stay in
-scope. A standalone post-probe decision tree was tried earlier but failed —
+scope, and ends by printing its `provider`, `provider_status` and
+`provider_detail` lines: those printed lines are what Steps 4 and 5 read. A standalone post-probe decision tree was tried earlier but failed —
 each ``` ```bash``` ``` block is a fresh subprocess, so variables set in one
 block are invisible to the next. See
 `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
