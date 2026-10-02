@@ -357,7 +357,7 @@ stub_timeout_logging() {
 @test "a last comment the prior-marker check cannot read exits 1 and posts nothing" {
   run --separate-stderr "$SCRIPT" PRRT_reply_badbody fixed "$BODY"
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not read the last comment"* ]]
+  [[ "$stderr" == *"could not read the recent comments"* ]]
   [ ! -f "$CALLS" ]
 }
 
@@ -393,4 +393,41 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- Recovery window: comments(last: 10), Bot acknowledgements ignored ---
+
+@test "skips when only Bot comments follow our marker and reports its disposition" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_botafter unclear "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "posts when a human comment follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "posts when a comment with an unreadable author follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_ghostafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "posts when our latest comment has no marker for this thread" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_nomarker fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "the pre-check reads the last 10 comments with their author type" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  grep -q 'comments(last: 10)' "$SCRIPT"
+  grep -q 'author { __typename }' "$SCRIPT"
 }

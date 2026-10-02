@@ -6,12 +6,13 @@
 # Output: JSON to stdout:
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
 #   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
-#     (skipped when the thread's last comment is ours and carries a marker
-#     for this thread; "disposition" is the one found. The one exception: a
-#     prior disagree or unclear marker never blocks a fixed, addressed or oos
-#     reply, because that reply carries the evidence the later resolve needs.
-#     A caller resolves after a skip only when "disposition" equals the one
-#     it asked for.)
+#     (skipped when our latest comment in the thread's last 10 carries a
+#     marker for this thread and every comment after it is from a Bot author;
+#     "disposition" is the one found. The one exception: a prior disagree or
+#     unclear marker never blocks a fixed, addressed or oos reply, because
+#     that reply carries the evidence the later resolve needs. A caller
+#     resolves after a skip only when "disposition" equals the one it asked
+#     for.)
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a
@@ -136,14 +137,14 @@ call_with_retry() {
     done
 }
 
-# --- Pre-check: skip when our last comment already carries a marker ---
+# --- Pre-check: skip when our latest comment already carries a marker ---
 # shellcheck disable=SC2016
 PRECHECK='
 query ReplyPrecheck($threadId: ID!) {
   node(id: $threadId) {
     ... on PullRequestReviewThread {
       id
-      comments(last: 1) { nodes { viewerDidAuthor body } }
+      comments(last: 10) { nodes { viewerDidAuthor body author { __typename } } }
     }
   }
 }'
@@ -155,21 +156,27 @@ if ! jq -e '.data.node.id' "$GG_RESP" >/dev/null 2>&1; then
 fi
 
 # A marker counts only on a comment the viewer authored; a reviewer quoting
-# our marker never causes a skip. Any disposition counts: a re-run after a
-# crash (reply posted, resolve failed) must not post a contradictory reply.
-# The exception is an upgrade from a reply that left the thread open
-# (disagree, unclear) to one that lets the caller resolve it (fixed,
-# addressed, oos): skipping would resolve the thread with no evidence posted.
-# No match prints nothing and exits 0; a jq failure must not read as "no
-# marker", or the reply the marker exists to prevent would be posted.
+# our marker never causes a skip. Only our LATEST comment in the 10-comment
+# window is checked, and only comments after it by a Bot author (an
+# acknowledgement) are ignored; a human or unreadable author is new input, so
+# the reply is posted. Any disposition counts: a re-run after a crash (reply
+# posted, resolve failed) must not post a contradictory reply. The exception
+# is an upgrade from a reply that left the thread open (disagree, unclear) to
+# one that lets the caller resolve it (fixed, addressed, oos): skipping would
+# resolve the thread with no evidence posted. No match prints nothing and
+# exits 0; a jq failure must not read as "no marker", or the reply the marker
+# exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
-    .data.node.comments.nodes[-1]
-    | select(. != null and .viewerDidAuthor == true)
+    .data.node.comments.nodes as $n
+    | ([range(0; $n | length) | select($n[.].viewerDidAuthor == true)] | last) as $i
+    | select($i != null)
+    | select($n[$i + 1:] | all(((.author // {}) | if type == "object" then .__typename else null end) == "Bot"))
+    | $n[$i]
     | (.body // "") | sub("\\s+$"; "")
     | capture("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$")
     | .d
   ' "$GG_RESP" 2>/dev/null); then
-    printf 'Error: could not read the last comment of %s; not posting.\n' "$THREAD_ID" >&2
+    printf 'Error: could not read the recent comments of %s; not posting.\n' "$THREAD_ID" >&2
     exit 1
 fi
 case "$PRIOR_DISPOSITION:$DISPOSITION" in
