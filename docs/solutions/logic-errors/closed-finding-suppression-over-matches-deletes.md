@@ -59,7 +59,8 @@ All in `plugins/yellow-debt/lib/validate.sh`, called from the synthesizer:
    `transition_todo_state`, at close time, while the code still matches. The
    stamp is best effort: it is skipped when a fingerprint already exists,
    and a failed stamp does not block the closure, so a todo may lack either
-   field (the matcher then rehashes it from the tree).
+   field (the matcher then rehashes it from the tree, but only when the todo
+   has a usable line range).
 5. The printed repair recipe and `validate_transition` accept the same set
    (`wont_fix`, `wontfix`, `wont fix`), and a test runs the recipe.
 

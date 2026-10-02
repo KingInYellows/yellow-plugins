@@ -143,9 +143,11 @@ Closing a todo does not close its Linear issue.
   command)
 - Linear sync requires yellow-linear plugin to be installed
 - A kept todo (other than `complete`) written before fingerprints existed is
-  rehashed from its recorded `affected_files` lines. If lines were inserted above the code since,
-  that range hashes other text and the finding resurfaces once; closing it again
-  stamps a fingerprint that survives later drift
+  rehashed from its recorded `affected_files` lines on every audit. If lines
+  were inserted above the code since, that range hashes other text, so the
+  finding resurfaces on each audit until it is closed again, which stamps a
+  fingerprint that survives later drift. A legacy `complete` todo is never
+  rehashed, so its finding resurfaces whenever it is reported
 - The matcher reads only the first `affected_files` entry of a kept todo, and
   the SessionStart hook counts by file name alone (no frontmatter read, to keep
   session start fast). A pre-v2 todo that lists several files therefore

@@ -304,7 +304,8 @@ accepts them as the source of a transition to `wont-fix`, which repairs the
 file. That works only when the file NAME already fits the todo pattern (for
 example `052-pending-high-…`) and the spelling is in the frontmatter; a name
 that itself contains `wont_fix`, `wontfix` or `wont fix` is rejected, so rename
-it to a valid status such as `pending` first. To close a todo as `wont-fix`, repair one, or reopen one to `pending`,
+it to a valid status such as `pending` first. To close a todo as `wont-fix`,
+repair one, or reopen one to `pending`,
 run this from any directory (replace `<current-status>` with the status in the
 file NAME, for example `pending`, and `<new-status>` with `wont-fix` or
 `pending`; to record a reason, use the reason-directory recipe in

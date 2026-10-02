@@ -436,7 +436,8 @@ and component counts are unchanged.
 7. A re-audit does not recreate a todo for a finding that matches a kept
    todo (any status but `pending` and `deferred`) by fingerprint, or by unique
    anchor for statuses other than `complete` and `deleted`, including after
-   lines are inserted above it; ties resurface; new ids never collide with existing files.
+   lines are inserted above it; ties resurface; new ids never collide with
+   existing files.
 8. `status-parity.bats` fails when `wont-fix` is removed from any site.
 9. All Phase 4 validators and `bats tests/` pass.
 10. A failing yellow-debt Bats test blocks the PR in CI.

@@ -13,18 +13,24 @@ _VALIDATE_FS_HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
 if [ ! -f "$_VALIDATE_FS_HELPER" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
   # No `sort -V`: BSD sort lacks it, and under the callers' `set -eo pipefail`
   # its failure would abort the command.
+  # Core numbers first; on equal cores a release outranks a prerelease
+  # (1.10.0 > 1.10.0-beta.2) and build metadata is ignored.
   _debt_ver_gt() {
     local -a a b
-    local i x y
-    IFS=. read -r -a a <<<"$1"
-    IFS=. read -r -a b <<<"$2"
+    local i x y pa="" pb="" va="${1%%+*}" vb="${2%%+*}"
+    [ "${va%%-*}" = "$va" ] || pa="${va#*-}"
+    [ "${vb%%-*}" = "$vb" ] || pb="${vb#*-}"
+    IFS=. read -r -a a <<<"${va%%-*}"
+    IFS=. read -r -a b <<<"${vb%%-*}"
     for i in 0 1 2 3; do
       x="${a[i]:-0}"; y="${b[i]:-0}"; x="${x//[!0-9]/}"; y="${y//[!0-9]/}"
       x="${x:-0}"; y="${y:-0}"
       [ "$((10#$x))" -le "$((10#$y))" ] || return 0
       [ "$((10#$x))" -ge "$((10#$y))" ] || return 1
     done
-    return 1
+    [ -n "$pa" ] || { [ -n "$pb" ]; return; }
+    [ -n "$pb" ] || return 1
+    [[ "$pa" > "$pb" ]]
   }
   _best=""; _best_v=""
   for _cand in "${CLAUDE_PLUGIN_ROOT}"/../../yellow-core/*/lib/validate-fs.sh; do

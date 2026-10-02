@@ -159,6 +159,7 @@ deferred_reason: null
 wont_fix_reason: null
 fingerprint: 'fp/v1:0f3a9c27d1b84e65'
 anchor_hash: 'a3f2b1c49d0e7788'
+resurfaced_from: null
 ---
 
 # High Cyclomatic Complexity in UserService
@@ -216,7 +217,7 @@ A re-audit skips a new finding that matches a kept todo (every status except
 `pending` and `deferred`) by `fingerprint`, a hash of the category, path and
 flagged code (blanks folded), so a closed finding does not come back. When
 nothing matches exactly, a unique todo with the same category and path whose
-`anchor_hash` equals the first substantive line of the new range also
+`anchor_hash` is the hash of the first substantive line of the new range also
 suppresses it, so an edit elsewhere in the range can still be skipped; that
 fallback never applies to `security-debt`, nor to `complete` or `deleted`
 todos. A todo without a stored fingerprint is rehashed from its recorded

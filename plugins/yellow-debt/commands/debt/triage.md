@@ -211,8 +211,9 @@ transition_todo_state "$todo_file" deferred "$DEFER_REASON" || {
 printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
 exit 1
 }
-rm -f -- "$2/reason.txt"
-rmdir -- "$2"
+# The todo is already closed: a cleanup failure must not read as a failed close.
+rm -f -- "$2/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$2" >&2
+rmdir -- "$2" || printf '[debt:triage] Warning: could not remove %s\n' "$2" >&2
 __YELLOW_DEBT_BASH__
 ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
@@ -265,8 +266,9 @@ transition_todo_state "$todo_file" wont-fix "$REASON" || {
 printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$2" >&2
 exit 1
 }
-rm -f -- "$2/reason.txt"
-rmdir -- "$2"
+# The todo is already closed: a cleanup failure must not read as a failed close.
+rm -f -- "$2/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$2" >&2
+rmdir -- "$2" || printf '[debt:triage] Warning: could not remove %s\n' "$2" >&2
 __YELLOW_DEBT_BASH__
 ```
    If the above exits non-zero, stop. Report the error. Do not increment any count.
@@ -348,12 +350,17 @@ fi
 cd "$(git rev-parse --show-toplevel)" || exit 1
 todo_file=$(debt_resolve_todo "$1" "$2") || exit 1
 transition_todo_state "$todo_file" wont-fix "$REASON" || {
-printf '[debt:triage] Error: transition failed; a reason directory is kept for a retry\n' >&2
+if [ "$3" = "-" ]; then
+  printf '[debt:triage] Error: transition failed\n' >&2
+else
+  printf '[debt:triage] Error: transition failed; the reason is kept in %s for a retry\n' "$3" >&2
+fi
 exit 1
 }
 if [ "$3" != "-" ]; then
-  rm -f -- "$3/reason.txt"
-  rmdir -- "$3"
+  # The todo is already closed: a cleanup failure must not read as a failed close.
+  rm -f -- "$3/reason.txt" || printf '[debt:triage] Warning: could not remove %s/reason.txt\n' "$3" >&2
+  rmdir -- "$3" || printf '[debt:triage] Warning: could not remove %s\n' "$3" >&2
 fi
 __YELLOW_DEBT_BASH__
 ```

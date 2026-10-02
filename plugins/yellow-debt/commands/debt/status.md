@@ -72,6 +72,13 @@ for effort in quick small medium large; do
   by_effort["$effort"]=0
 done
 
+# A missing yq must stop the command; the per-file fallbacks below only cover a
+# file whose frontmatter will not parse.
+command -v yq >/dev/null 2>&1 || {
+  printf '[status] Error: yq is required but not installed\n' >&2
+  exit 1
+}
+
 # Scan all todo files
 TODO_COUNT=0
 ERROR_COUNT=0

@@ -1132,6 +1132,18 @@ run_status_block() {
   [[ "$output" != *"unavailable"* ]]
 }
 
+@test "validate.sh ranks a release above its own prerelease in the plugin cache" {
+  cache="$BATS_TEST_TMPDIR/cache/yellow-plugins"
+  mkdir -p "$cache/yellow-debt/1.0.0/lib" "$cache/yellow-core/1.10.0-beta.2/lib" "$cache/yellow-core/1.10.0/lib"
+  cp "$PLUGIN_ROOT/lib/validate.sh" "$cache/yellow-debt/1.0.0/lib/"
+  for v in 1.10.0-beta.2 1.10.0; do
+    { cat "$PLUGIN_ROOT/../yellow-core/lib/validate-fs.sh"; printf '_VFS_MARK=%s\n' "$v"; } > "$cache/yellow-core/$v/lib/validate-fs.sh"
+  done
+  run env -u _VALIDATE_FS_LOADED CLAUDE_PLUGIN_ROOT="$cache/yellow-debt/1.0.0" bash -c '. "$CLAUDE_PLUGIN_ROOT/lib/validate.sh" 2>&1; printf "%s\n" "$_VFS_MARK"'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"1.10.0" ]]
+}
+
 @test "debt_match_kept_todos fails loudly when validate_file_path is unavailable" {
   init_repo
   mkdir -p .debt
@@ -1381,6 +1393,7 @@ run_status_block() {
 }
 
 @test "the Step 7 block builds a safe name and refuses a bad id or hash" {
+  require_jq
   init_repo
   extract_block "$PLUGIN_ROOT/agents/synthesis/audit-synthesizer.md" 'debt_todo_name_ok "${todo_filename##*/}"' > "$BATS_TEST_TMPDIR/name.sh"
   record='{"finding":"Fix: The BIG -- thing!! (really)"}'
@@ -1408,6 +1421,7 @@ run_status_block() {
 }
 
 @test "status survives a todo with unreadable frontmatter and lists files needing repair in JSON" {
+  require_jq
   require_kislyuk_yq
   init_repo
   make_todo 002 wont_fix 002-pending-high-bbb.md
