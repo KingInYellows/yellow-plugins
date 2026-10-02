@@ -662,7 +662,6 @@ stays_clean() {  # <printf %b text>
   stays_clean 'password:\n  string\n'
   stays_clean 'password: |\n  <your password>\n'
   stays_clean 'password: |\n\nNext paragraph of prose.\n'
-  stays_clean 'password: |\n  Rotation is scheduled for Friday\n  and the team agreed\n'
   stays_clean 'Keep the password: the team agreed to rotate it\n'
   stays_clean 'bypass: |\n  string\n  something\n'
 }
@@ -737,4 +736,86 @@ password = "abc"
 bypass = "ab cd efgh"
 bypass="false"
 CASES
+}
+
+# Multi-line quoted values: a quote left open at the end of a keyword line is
+# carried onto the following lines (at most 20 lines or 2000 characters) and
+# the joined value is judged like a one-line quoted value. A quote that never
+# closes fails closed unless the visible text is a placeholder.
+@test "a quoted credential that closes on a later line is judged whole" {
+  refuses quoted-keyword-assignment 'password: "abc\n  123"\n'
+  refuses quoted-keyword-assignment "token: 'abc\\n123'\\n"
+  refuses quoted-keyword-assignment 'password: "abc\r\n  123"\r\n'
+  refuses quoted-keyword-assignment "token: 'abc\\r\\n123'\\r\\n"
+  refuses quoted-keyword-assignment 'password: "correct horse\n  battery staple"\n'
+  refuses quoted-keyword-assignment 'password: "ab\\"c\n  d"\n'
+  refuses quoted-keyword-assignment 'password:\n  "abc\n  123"\n'
+  refuses quoted-keyword-assignment '- password: "abc\n    123"\n'
+  # The hit names the line the quote opened on.
+  printf 'ok line\npassword: "abc\n  123"\n' >| "$A"
+  run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"line=2"* ]] || { echo "$stderr"; false; }
+}
+
+@test "a quote that never closes fails closed unless the visible text is a placeholder" {
+  refuses quoted-keyword-assignment 'password: "hunter22 and more text\nnext line of prose\n'
+  refuses quoted-keyword-assignment 'password: "hunter22\r\nsecond line\r\n'
+  refuses quoted-keyword-assignment "token: 'abc\\n"
+  refuses quoted-keyword-assignment 'password: "ab\n'
+  stays_clean 'password: "<your password>\n'
+  stays_clean 'token: "string\n  optional\n'
+  stays_clean 'password: "\n'
+  # Past 20 lines the carry stops and the text so far is judged.
+  local i body='password: "'
+  for i in $(seq 1 25); do body="$body\\nfiller line $i"; done
+  refuses quoted-keyword-assignment "$body\\n"'tail"\n'
+}
+
+@test "a multi-line quoted placeholder or in-word keyword stays clean" {
+  stays_clean 'token: "<your\n  token>"\n'
+  stays_clean 'token: "[redacted\n  value]"\n'
+  stays_clean 'password: "string\n  optional"\n'
+  stays_clean 'token: "a\n  b"\n'
+  stays_clean 'bypass: "something\n  else here"\n'
+  stays_clean 'password: "string"\nplain prose line\n'
+}
+
+@test "a long unclosed quote on a huge hostile file stays linear" {
+  local i
+  # Placeholder-only text never flags, so every open quote runs to its bound.
+  {
+    for i in $(seq 1 800); do
+      printf 'token: "string\n'
+      yes string | head -n 25
+    done
+  } >| "$A"
+  run timeout 30 "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+# Block scalar with an explicit indicator: the lines indented more than the
+# header are ONE credential value (quoted-value rule: 4+ characters, not a
+# whole placeholder, not all placeholder words). A non-indented line after the
+# header is not block content: it is only the single-token first-line check.
+@test "a spaced credential in an indicator block scalar is judged whole" {
+  refuses unquoted-keyword-value 'password: |\n  correct horse battery staple\n'
+  refuses unquoted-keyword-value 'passphrase: >-\n  to be or not to be\n'
+  refuses unquoted-keyword-value 'password: |\r\n  correct horse battery staple\r\n'
+  refuses unquoted-keyword-value 'password: |2 # note\n   correct horse\n   battery staple\n'
+  refuses unquoted-keyword-value 'password:\n  |\n  correct horse battery staple\n'
+  refuses unquoted-keyword-value '- token: >\n    ab cd\n    ef gh\n'
+  refuses unquoted-keyword-value 'password: |\n  string\n\n  correct horse\n'
+}
+
+@test "block scalar placeholders, type words and unindented prose stay clean" {
+  stays_clean 'password: "string"\n'
+  stays_clean 'password: |\n  <your password>\n'
+  stays_clean 'password: |\n  string\n'
+  stays_clean 'password: |\n  optional string\n'
+  stays_clean 'password: |\n\nNext paragraph of prose.\n'
+  stays_clean 'password: |\n  string\nNext paragraph of prose here.\n'
+  stays_clean 'bypass: |\n  correct horse battery staple\n'
+  stays_clean 'Keep the password: the team agreed to rotate it\n'
+  stays_clean 'password:\n  correct horse\n'
 }
