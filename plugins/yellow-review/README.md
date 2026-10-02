@@ -156,7 +156,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `resolve-pr-thread` | Resolve one thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
-| `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example to Linear) |
+| `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
 | `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
