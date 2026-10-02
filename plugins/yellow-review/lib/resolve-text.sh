@@ -9,7 +9,7 @@
 # (lib/review-ledger.sh): those redact text that is then kept, and yellow-core
 # is not a dependency of the resolve scripts. This one answers a different
 # question (refuse or not), so it flags broader shapes (URL userinfo,
-# Authorization/Bearer, NAME_KEY=value) and fails closed. When a vendor
+# Authorization/Bearer, NAME_KEY=value, DEVIN_ORG_ID=value) and fails closed. When a vendor
 # prefix is added to one scanner, check the other.
 # shellcheck shell=sh
 
@@ -138,6 +138,11 @@ _rt_scan() {
         # NAME_KEY=value with a literal-looking value (8+ token characters,
         # so `API_KEY = process.env.API_KEY` in code does not match).
         !strict && /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        # DEVIN_ORG_ID=value, same literal-looking rule. AGENTS.md prohibits
+        # committing that exact name; `_ID` names in general (USER_ID=12345678)
+        # are ordinary code, so no `_ID` suffix rule (the log redactor in
+        # lib/verify-run.sh blanks every `_ID`, but it redacts, this refuses).
+        !strict && /(^|[^A-Za-z0-9_])DEVIN_ORG_ID[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
             # A CRLF file leaves \r on the token, which would hide an
             # all-letter literal from the value rules below.

@@ -1161,3 +1161,36 @@ assert_no_raw_left() {
   [ ! -e src/precious.txt ]
   [ -z "$(git status --porcelain)" ]
 }
+
+# The redaction filters are line-buffered sed passes, so the stream is cut into
+# records of at most 64 KiB before them. A verifier that prints megabytes with
+# no newline must finish, keep the log within the cap and still be redacted.
+@test "a 3 MiB stream with no newline finishes, stays within the log cap and has the planted credential redacted" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  # 2.5 MiB of filler, a blank, the credential, then 0.5 MiB of filler: the
+  # value sits inside the last 1 MiB, so its absence from the log is meaningful.
+  TMPDIR="$STREAM_TMP" verify "{ head -c 2621440 /dev/zero | tr '\\0' a; printf ' %s%s ' $SECRET_A $SECRET_B; head -c 524288 /dev/zero | tr '\\0' b; }" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(wc -c <"$log")" -le 1048576 ]
+  [ "$(wc -c <"$log")" -gt 1000000 ]
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential in the middle of ordinary short lines is still redacted" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "yes ordinary-line | head -n 2000; $PRINT_SECRET; yes tail-line | head -n 2000; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q ordinary-line "$log"
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}

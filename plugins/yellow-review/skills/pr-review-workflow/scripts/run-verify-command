@@ -65,8 +65,12 @@
 #        <pr>-<UTC ts>-<pid>.patch and .log, mode 0600; the newest 10 of each
 #        per PR are kept (other PRs' files are never pruned).
 #        The verifier's output is redacted on its way to disk: a FIFO feeds
-#        vr_redact_stream, then tail keeps the last 1 MiB of the REDACTED
-#        stream in a private mktemp file (mode 0600) outside the git directory.
+#        vr_redact_stream (which first cuts the stream into records of at most
+#        64 KiB, so no redaction filter buffers more than one record; a
+#        credential split by a hard cut inside a blank-free 64 KiB run can
+#        escape its pattern, and the final scan is the backstop), then tail
+#        keeps the last 1 MiB of the REDACTED stream in a private mktemp file
+#        (mode 0600) outside the git directory.
 #        Only after the final credential scan is it copied to the .log path, so
 #        that path never holds raw output (an empty file until then), even
 #        across a crash. Residual: a SIGKILL or host loss mid-run cannot run the
@@ -344,8 +348,10 @@ run_verify() {
     # the command never blocks or gets SIGPIPE however much it prints. tail
     # keeps the last bytes of the redacted stream (failures usually print last)
     # and writes them when the stream ends. The subshell is its own job group,
-    # so vr_drain_log can kill redactor and tail together. A single line is held
-    # whole by sed while it is redacted.
+    # so vr_drain_log can kill redactor and tail together. The redactor cuts the
+    # stream into records of at most 64 KiB before its line-buffered sed passes
+    # (see vr_redact_filter), so memory is bounded by one record per filter, not
+    # by the tail cap, which sits downstream of them and bounds only the file.
     ( vr_redact_stream <"$FIFO" | tail -c "$LOG_CAP_BYTES" >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS

@@ -25,8 +25,9 @@
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
 # Exit codes: 2 usage (including --allow-credential-shaped with
 #             --unattended), 3 staged mismatch, refused path,
-#             pre-commit credential-shaped refusal, or a remote that does not
-#             push to the PR's head repository (unparseable push URL, other
+#             pre-commit credential-shaped refusal, an untracked or ignored
+#             hook file, or a remote that does not push to the PR's head
+#             repository (unparseable push URL, other scheme, host or
 #             owner/repo; nothing committed), 4 commit failed
 #             (or no new commit appeared, changes remain staged, the
 #             commit's files or added lines differ from the checked set
@@ -63,9 +64,18 @@
 #                  flag limits it to the branches above the reset one)
 #   abortConflict  graphite `gt abort`
 # Remote: resolved before anything is staged, and its push URL
-# (`git remote get-url --push`; https, ssh or scp-style, case-insensitive,
-# .git optional) must name the PR's head repository, else exit 3. A URL that
-# cannot be parsed fails closed; no message prints a URL.
+# (`git remote get-url --push`; https, http, ssh, git or scp-style,
+# case-insensitive, .git optional) must name the PR's head repository on the
+# active GitHub host, else exit 3. The active host is GH_HOST when set, else
+# the host of the PR's URL (ssh.github.com and www.github.com count as
+# github.com); none known fails closed. Any other scheme (file, ext, ftp ...)
+# and a URL that cannot be parsed fail closed too; no message prints a URL.
+# Hooks: the effective hooks directory (core.hooksPath honoured) must not hold
+# untracked or ignored files when it lies inside the working tree, else exit 3
+# before anything is staged: the commit would run them and the dirty-set check
+# cannot see them (lib/resolve-paths.sh rp_hooks_untracked).
+# --unattended also refuses the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file when it
+# is inside the repository and listed (rp_runner).
 # The github runtime is given --remote only for an explicit choice
 # (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
 # refuses an ambiguous setup itself (status INVALID_ARGS, exit 5). Graphite
@@ -196,11 +206,14 @@ if [ "${#EXPECTED[@]}" -gt 0 ]; then
     # The checked-out branch must be PR <N>'s own head branch (in this
     # repository, not a fork), or the submit below would publish an unrelated
     # branch before the head check can fail. PR_REPO (owner/name, lowercase)
-    # is the head repository the chosen remote is compared with later.
-    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository,headRepository,headRepositoryOwner 2>/dev/null \
-        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring), (((.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")) | ascii_downcase)] | join(" ")' 2>/dev/null) \
+    # is the head repository the chosen remote is compared with later;
+    # PR_URL_HOST is the host of the PR's own URL, the active GitHub host
+    # unless GH_HOST says otherwise. It is last, so an empty value is safe
+    # for read.
+    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository,headRepository,headRepositoryOwner,url 2>/dev/null \
+        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring), (((.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")) | ascii_downcase), ((.url // "") | ltrimstr("https://") | ltrimstr("http://") | split("/")[0])] | join(" ")' 2>/dev/null) \
         || die 3 "could not read PR #$PR's head branch"
-    read -r PR_BRANCH PR_CROSS PR_REPO <<<"$PR_META"
+    read -r PR_BRANCH PR_CROSS PR_REPO PR_URL_HOST <<<"$PR_META"
     [ "$PR_BRANCH $PR_CROSS" = "$BRANCH false" ] \
         || die 3 "checked-out branch '$BRANCH' is not the head branch of PR #$PR (or the PR is from a fork); nothing committed"
 fi
@@ -239,27 +252,53 @@ if [ -z "$TIMEOUT_BIN" ]; then
     printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
 fi
 
-# remote_slug <push-url>: print the lowercase owner/repo of an https, http,
-# ssh, git or scp-style (user@host:owner/repo) URL, with or without .git;
-# fail for anything else, including a local path. Never prints the URL.
-remote_slug() {
-    local url="$1" rest
+# norm_host <host[:port]>: print the lowercase host name, without userinfo or
+# port; fail when what is left is not a plain host name. Never prints a URL.
+norm_host() {
+    local h="${1##*@}"
+    [[ "$h" =~ ^([^:]+):[0-9]*$ ]] && h="${BASH_REMATCH[1]}"
+    h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
+    [[ "$h" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || return 1
+    printf '%s\n' "$h"
+}
+
+# remote_parse <push-url>: print "<host> <owner/repo>", both lowercase, for an
+# https, http, ssh or git URL or an scp-style (user@host:owner/repo) one, with
+# or without .git. Fails for any other scheme (file, ext, ftp ...), a local
+# path or anything else unparseable. Never prints the URL.
+remote_parse() {
+    local url="$1" scheme auth rest host
     case "$url" in
         *://*)
+            scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
+            case "$scheme" in https|http|ssh|git) ;; *) return 1 ;; esac
             rest="${url#*://}"
             [[ "$rest" == */* ]] || return 1
+            auth="${rest%%/*}"
             rest="${rest#*/}"
             ;;
         *)
-            [[ "$url" =~ ^([^/@:]+@)?[^/@:]+:(.+)$ ]] || return 1
-            rest="${BASH_REMATCH[2]}"
+            [[ "$url" =~ ^([^/@:]+@)?([^/@:]+):(.+)$ ]] || return 1
+            auth="${BASH_REMATCH[2]}"
+            rest="${BASH_REMATCH[3]}"
             ;;
     esac
+    host=$(norm_host "$auth") || return 1
     rest="${rest#"${rest%%[!/]*}"}"
     rest="${rest%"${rest##*[!/]}"}"
     rest="${rest%.git}"
     [[ "$rest" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]] || return 1
-    printf '%s\n' "$rest" | tr '[:upper:]' '[:lower:]'
+    printf '%s %s\n' "$host" "$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')"
+}
+
+# host_matches <active-host> <push-host>: the same host, or, for github.com
+# only, one of its documented aliases (ssh.github.com serves ssh on port 443;
+# www.github.com).
+host_matches() {
+    [ "$1" = "$2" ] && return 0
+    [ "$1" = github.com ] || return 1
+    case "$2" in ssh.github.com|www.github.com) return 0 ;; esac
+    return 1
 }
 
 # safe_name <text>: a remote name for a message. One line, control characters
@@ -303,14 +342,34 @@ if [ "$PROVIDER" = graphite ]; then
     fi
 fi
 
-PUSH_SLUG=$(remote_slug "$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)") \
-    || die 3 "cannot tell which repository remote '$(safe_name "$REMOTE_NAME")' pushes to (unreadable or unparseable push URL); nothing committed"
+# The active GitHub host: GH_HOST when set, else the host of the PR's URL.
+# Neither known fails closed.
+ACTIVE_HOST=$(norm_host "${GH_HOST:-$PR_URL_HOST}") \
+    || die 3 "could not determine the active GitHub host (set GH_HOST); nothing committed"
+PUSH_PARSED=$(remote_parse "$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)") \
+    || die 3 "cannot tell which repository remote '$(safe_name "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
+read -r PUSH_HOST PUSH_SLUG <<<"$PUSH_PARSED"
 case "$PR_REPO" in
     ?*/?*) ;;
     *) die 3 "could not read PR #$PR's head repository; nothing committed" ;;
 esac
+host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
+    || die 3 "remote '$(safe_name "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
 [ "$PUSH_SLUG" = "$PR_REPO" ] \
     || die 3 "remote '$(safe_name "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
+
+# The commit runs the effective git hooks. An untracked or ignored file in a
+# hooks directory inside the working tree is invisible to the dirty-set check
+# above, so a resolver could have planted or edited one: refuse before staging.
+# (A hooks directory outside the working tree, or one whose files are all
+# tracked, is unchanged; see rp_hooks_untracked.)
+HOOKS_RC=0
+HOOKS_DIR=$(rp_hooks_untracked "$DIRTY_FILE") || HOOKS_RC=$?
+case "$HOOKS_RC" in
+    0) die 3 "refusing to commit: git hooks directory '$(safe_name "$HOOKS_DIR")' holds untracked or ignored files that the commit would run; nothing committed" ;;
+    1) ;;
+    *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
+esac
 
 # --- Stage and compare ---
 lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
